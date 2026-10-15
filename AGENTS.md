@@ -63,6 +63,8 @@
 
 ## 검증
 
+- `mockup/`은 원본 4차 화면 목업을 로컬에서 실행하는 폴더다. 실행 방법은 `mockup/README.md`, 문서 읽기 의존성은 `mockup/requirements.txt`를 따른다. 가상환경에서 `python check_env.py`, `python -m pip check`, `python -m py_compile server.py docread.py check_env.py tools/mock_ollama.py`로 환경·문법을 확인하고 실제 화면 흐름은 별도로 확인한다. 이 목업의 환경을 제품 전체 스택 확정으로 확대하지 않는다.
+
 - 실제 저장소의 README, 패키지 설정, CI에서 검사 명령을 확인한다. 존재하지 않는 경로나 도구를 가정해 실행하지 않는다.
 - 문서만 바꿨다면 내용의 일관성, 링크·경로, 예시, Markdown 구조를 확인한다. 의미 없는 코드 테스트를 추가하지 않는다.
 - 코드 변경은 관련 정상·실패·경계 사례를 검증한다. 계약·저장·모델 연결 변경에는 해당 동작을 확인하는 테스트를 함께 갱신한다.
