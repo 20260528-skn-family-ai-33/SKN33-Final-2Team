@@ -16,10 +16,12 @@ py -3.12 -m venv .venv
 
 설치 후에는 `목업_실행.cmd`를 더블클릭하면 실행환경을 확인하고 서버와 브라우저를 엽니다. 기본 주소는 `http://127.0.0.1:8780/`입니다. 종료는 서버 창에서 Ctrl+C입니다. 포트가 사용 중이면 `python server.py --port 8800 --open-browser`로 바꿉니다. 이 문서의 `python`은 설치한 가상환경 Python을 뜻합니다.
 
-Linux/macOS에서는 같은 폴더에서 다음과 같이 실행합니다.
+Linux/macOS에서는 `mockup` 폴더에서 먼저 `python3 --version`으로 버전을 확인합니다. Python 3.10 이상이 필요하며 3.12를 권장합니다.
+
+`python3`가 3.9 등 낮은 버전을 가리키면, 아래 가상환경 생성 명령에서 설치된 `python3.11` 등을 사용합니다(예: `python3.11 -m venv .venv`).
 
 ```bash
-python3.12 -m venv .venv
+python3 -m venv .venv    # Python 3.10 이상 (3.12 권장)
 .venv/bin/python -m pip install -r requirements.txt
 .venv/bin/python check_env.py
 .venv/bin/python server.py
