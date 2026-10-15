@@ -4,17 +4,46 @@
 
 ## 최초 설치 (Windows)
 
-Python 3.12에서 실행을 확인했습니다. 아래 명령은 저장소 루트에서 시작합니다.
+Python 3.10 이상이 필요하며, 실행을 확인한 3.12를 권장합니다. 지원 버전이 설치되어 있지 않다면 [Python 공식 Windows 다운로드 페이지](https://www.python.org/downloads/windows/)에서 설치합니다. 설치 후에는 PowerShell을 새로 열어 아래 버전 확인 명령을 실행합니다.
+
+아래 명령은 PowerShell에서 실행하며, 저장소 루트에서 `mockup` 폴더로 이동합니다.
 
 ```powershell
 cd mockup
+```
+
+가상환경은 아래 세 방법 중 사용 가능한 **하나만** 선택해 만듭니다. 각 방법의 `--version` 결과가 Python 3.10 이상인지 확인한 뒤 가상환경 생성 명령을 실행합니다.
+
+1. `py` 런처와 Python 3.12가 설치되어 있는 경우:
+
+```powershell
+py -3.12 --version
 py -3.12 -m venv .venv
+```
+
+2. `py` 명령이 없거나 3.12가 없지만, `python` 명령으로 지원 버전을 실행할 수 있는 경우:
+
+```powershell
+python --version
+python -m venv .venv
+```
+
+3. 두 명령을 사용할 수 없거나 원하는 버전을 가리키지 않는 경우, 설치된 Python 실행 파일의 전체 경로를 사용합니다. 아래 `C:\Python312\python.exe`는 예시이므로 실제 설치 경로로 바꿉니다. PowerShell에서는 따옴표로 감싼 경로 앞에 `&`를 붙입니다.
+
+```powershell
+& "C:\Python312\python.exe" --version
+& "C:\Python312\python.exe" -m venv .venv
+```
+
+가상환경을 만든 뒤에는 어떤 방법을 선택했든 아래 명령으로 의존성 설치·환경 점검·서버 실행을 진행합니다. 별도로 가상환경을 활성화할 필요는 없습니다.
+
+```powershell
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 .\.venv\Scripts\python.exe check_env.py
 .\.venv\Scripts\python.exe server.py --open-browser
 ```
 
-설치 후에는 `목업_실행.cmd`를 더블클릭하면 실행환경을 확인하고 서버와 브라우저를 엽니다. 기본 주소는 `http://127.0.0.1:8780/`입니다. 종료는 서버 창에서 Ctrl+C입니다. 포트가 사용 중이면 `python server.py --port 8800 --open-browser`로 바꿉니다. 이 문서의 `python`은 설치한 가상환경 Python을 뜻합니다.
+설치 후에는 `목업_실행.cmd`를 더블클릭하면 실행환경을 확인하고 서버와 브라우저를 엽니다. 기본 주소는 `http://127.0.0.1:8780/`입니다. 종료는 서버 창에서 Ctrl+C입니다. 포트가 사용 중이면 `.\.venv\Scripts\python.exe server.py --port 8800 --open-browser`로 바꿉니다. 이후 절의 `python`은 설치한 가상환경 Python을 뜻합니다.
 
 Linux/macOS에서는 `mockup` 폴더에서 먼저 `python3 --version`으로 버전을 확인합니다. Python 3.10 이상이 필요하며 3.12를 권장합니다.
 
