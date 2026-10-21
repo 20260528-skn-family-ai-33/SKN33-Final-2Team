@@ -1,0 +1,82 @@
+{
+  "archive_sha256_verified": true,
+  "tables": 50,
+  "rows": 29903,
+  "manifest_constraints": 202,
+  "foreign_keys_checked": 85,
+  "pk_fk_data_errors": [],
+  "erd_comparison": {
+    "outer": {
+      "missing_tables": [],
+      "column_mismatches": [
+        "public.projects",
+        "public.roadmaps"
+      ],
+      "fk_mismatches": [
+        "public.projects",
+        "public.roadmaps"
+      ],
+      "row_count_mismatches": [
+        "growpath_meta.catalog_api_sources",
+        "growpath_meta.schema_migrations",
+        "public.book_skills",
+        "public.books",
+        "public.certification_skills",
+        "public.certifications",
+        "public.course_skills",
+        "public.courses",
+        "public.learning_resource_embeddings",
+        "public.prompt_versions"
+      ]
+    },
+    "project": {
+      "missing_tables": [],
+      "column_mismatches": [],
+      "fk_mismatches": [],
+      "row_count_mismatches": []
+    }
+  },
+  "resource_hash_audit": {
+    "skills": {
+      "rows": 36,
+      "missing_or_stale_hashes": 0
+    },
+    "courses": {
+      "rows": 1149,
+      "missing_or_stale_hashes": 0
+    },
+    "certifications": {
+      "rows": 68,
+      "missing_or_stale_hashes": 0
+    },
+    "jobs": {
+      "rows": 80,
+      "missing_or_stale_hashes": 0
+    },
+    "majors": {
+      "rows": 132,
+      "missing_or_stale_hashes": 0
+    },
+    "books": {
+      "rows": 3327,
+      "missing_or_stale_hashes": 25
+    }
+  },
+  "stale_book_causes": {
+    "content_status_changed_from_null_to_ready": 25
+  },
+  "regulation_active_chunks": 1406,
+  "regulation_missing_or_stale_hashes": 0,
+  "invalid_vector_dimension_or_values": 0,
+  "employee_count": 14,
+  "department_heads": 0,
+  "employee_populated_fields": {
+    "institution_id": 9,
+    "department_id": 9,
+    "employee_number": 9,
+    "job_grade_id": 9,
+    "job_id": 0,
+    "password_hash": 14
+  },
+  "scope": "Static dump audit only; PostgreSQL restore, triggers, live authorization and retrieval relevance were not executed."
+}
