@@ -1,0 +1,922 @@
+{
+  "format": 1,
+  "imported_on": "2026-10-21",
+  "source_repository": "https://github.com/necknam/fine-tuning",
+  "source_commit": "a61c879096a422e0bf4e7821389a8fa268c550fa",
+  "source_kind": "user_delivered_snapshot",
+  "official_submission_status": "drive_current_files_verified_management_sheet_links_differ",
+  "team_base_commit": "93b98fb5e5ea003bdea35852e770ac2a0605d55a",
+  "files": [
+    {
+      "path": ".gitattributes",
+      "source_path": null,
+      "source_sha256": "2f9b8b0c367c97704addef663bc0b2bcedd964e457809869ad8a1c3f746f5efd",
+      "source_bytes": 154,
+      "source_kind": "team_existing_file",
+      "sha256": "ad2e5eb8ca56f35f46ce031370145bb7df36d0eb14eb05e80aa29ad532dd15eb",
+      "bytes": 849,
+      "handling": "adjusted",
+      "change_note": "Add DB import instructions, artifact links, exclusion settings or verification metadata."
+    },
+    {
+      "path": ".gitignore",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "import_documentation_or_verification",
+      "sha256": "709be4c8cc6d1044455854d4fc89b88d16b58d6dd38cffb223ae4304bf7cb7de",
+      "bytes": 615,
+      "handling": "added",
+      "change_note": "Add DB import instructions, artifact links, exclusion settings or verification metadata."
+    },
+    {
+      "path": "AGENTS.md",
+      "source_path": null,
+      "source_sha256": "c837b93bc675336e3a2aa54fb601a4654f5c609029af8369ed99cfcd3673cab0",
+      "source_bytes": 16414,
+      "source_kind": "team_existing_file",
+      "sha256": "8c9a52fb7d7b3b8a2b1b18ce145e9e37cb3d7c233a5ff8e4e9be8c40b7ee3605",
+      "bytes": 17166,
+      "handling": "adjusted",
+      "change_note": "Add DB import instructions, artifact links, exclusion settings or verification metadata."
+    },
+    {
+      "path": "README.md",
+      "source_path": null,
+      "source_sha256": "15e8559b61d8db92a1a322ba0a1be86852fb1f4555ecf80b89be366d9b289fcf",
+      "source_bytes": 11326,
+      "source_kind": "team_existing_file",
+      "sha256": "0a651e9fe3b90ead585ddd070dd1e1ad9e0c44e7bb72acc159693914d95615e0",
+      "bytes": 13530,
+      "handling": "adjusted",
+      "change_note": "Add DB import instructions, artifact links, exclusion settings or verification metadata."
+    },
+    {
+      "path": "database/.env.example",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "import_documentation_or_verification",
+      "sha256": "138e9a863453a7e75053efbde3592211941395f05988a2a03c008458cd787d4c",
+      "bytes": 671,
+      "handling": "added",
+      "change_note": "Add DB import instructions, artifact links, exclusion settings or verification metadata."
+    },
+    {
+      "path": "database/README.md",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "import_documentation_or_verification",
+      "sha256": "c8aa1d892ca496c1fe5dc14586026584977c1fbb220daf57e30823402a79f082",
+      "bytes": 4430,
+      "handling": "added",
+      "change_note": "Add DB import instructions, artifact links, exclusion settings or verification metadata."
+    },
+    {
+      "path": "database/RESTORE.md",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "import_documentation_or_verification",
+      "sha256": "04f59cbc7abe9c7fb239045738f73b11639b9376144c084c08ccd2020acd6297",
+      "bytes": 3405,
+      "handling": "added",
+      "change_note": "Add DB import instructions, artifact links, exclusion settings or verification metadata."
+    },
+    {
+      "path": "database/assets.manifest.json",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "import_documentation_or_verification",
+      "sha256": "a593971c6efb06bb077d98da0adeb21ba55d13bcdf218141edb86bb70dfad94c",
+      "bytes": 20902,
+      "handling": "added",
+      "change_note": "Add DB import instructions, artifact links, exclusion settings or verification metadata."
+    },
+    {
+      "source_path": "database/config/paths.yaml",
+      "path": "database/config/paths.yaml",
+      "source_sha256": "f3c6661660777e2f9618d07b3649eceec758b11d1c7b902bd1c2beffcac7781e",
+      "source_bytes": 2936,
+      "source_kind": "source_commit_file",
+      "sha256": "f3c6661660777e2f9618d07b3649eceec758b11d1c7b902bd1c2beffcac7781e",
+      "bytes": 2936,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/config/rules.yaml",
+      "path": "database/config/rules.yaml",
+      "source_sha256": "bb55cb6479b5b05c2dfce804a11ea460a2ddf8fa7cf984c0809e47fef65e3209",
+      "source_bytes": 11412,
+      "source_kind": "source_commit_file",
+      "sha256": "bb55cb6479b5b05c2dfce804a11ea460a2ddf8fa7cf984c0809e47fef65e3209",
+      "bytes": 11412,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/data/exports/growpath_full_20261021.manifest.json",
+      "path": "database/data/exports/growpath_full_20261021.manifest.json",
+      "source_sha256": "dcc3061a25cc441fb920a5562c808235852488308dabbbad1fed8bd61f949814",
+      "source_bytes": 52970,
+      "source_kind": "source_commit_file",
+      "sha256": "dcc3061a25cc441fb920a5562c808235852488308dabbbad1fed8bd61f949814",
+      "bytes": 52970,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/data/exports/pgvector_pg17_windows_x64/LICENSE",
+      "path": "database/data/exports/pgvector_pg17_windows_x64/LICENSE",
+      "source_sha256": "6bba9ebeb73e27477463b05e5ef1bf303bccbddb3db9bbc95905d351604d6a87",
+      "source_bytes": 1104,
+      "source_kind": "source_commit_file",
+      "sha256": "6bba9ebeb73e27477463b05e5ef1bf303bccbddb3db9bbc95905d351604d6a87",
+      "bytes": 1104,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/data/exports/pgvector_pg17_windows_x64/manifest.json",
+      "path": "database/data/exports/pgvector_pg17_windows_x64/manifest.json",
+      "source_sha256": "e5baf249fb1bf4004cdb397b9cf37a6e17194693e47045834d38747d0764da6c",
+      "source_bytes": 4188,
+      "source_kind": "source_commit_file",
+      "sha256": "e5baf249fb1bf4004cdb397b9cf37a6e17194693e47045834d38747d0764da6c",
+      "bytes": 4188,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/diagnose_catalog.py",
+      "path": "database/diagnose_catalog.py",
+      "source_sha256": "faec6ff3e4491094bb342ff82949ecc5ea5c239b1217b89ca1351c46f91f8088",
+      "source_bytes": 7244,
+      "source_kind": "source_commit_file",
+      "sha256": "faec6ff3e4491094bb342ff82949ecc5ea5c239b1217b89ca1351c46f91f8088",
+      "bytes": 7244,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/load_data.py",
+      "path": "database/load_data.py",
+      "source_sha256": "625ab83498ba3c6cd966b86cf194da5b22dfd13b06bf771f925185fe6074a416",
+      "source_bytes": 2713,
+      "source_kind": "source_commit_file",
+      "sha256": "625ab83498ba3c6cd966b86cf194da5b22dfd13b06bf771f925185fe6074a416",
+      "bytes": 2713,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/requirements-db.txt",
+      "path": "database/requirements-db.txt",
+      "source_sha256": "029eff81a742a87c4414268c1244113e834992063cc40a823a5f239cc4f556b5",
+      "source_bytes": 227,
+      "source_kind": "source_commit_file",
+      "sha256": "029eff81a742a87c4414268c1244113e834992063cc40a823a5f239cc4f556b5",
+      "bytes": 227,
+      "handling": "byte_preserved"
+    },
+    {
+      "path": "database/requirements.lock.txt",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "import_documentation_or_verification",
+      "sha256": "141ad37c9fa512e47add6309730d1e0b4a27438b9783fce5ed651fc679861c23",
+      "bytes": 557,
+      "handling": "added",
+      "change_note": "Add DB import instructions, artifact links, exclusion settings or verification metadata."
+    },
+    {
+      "source_path": "database/requirements.txt",
+      "path": "database/requirements.txt",
+      "source_sha256": "8812c10feace75161e5ab920c2f1a214af24810d810af086d17d1739103a9cb9",
+      "source_bytes": 145,
+      "source_kind": "source_commit_file",
+      "sha256": "b753c1b55d504924c94c4dd6cd66d196900bcf264685b876fab02c2660cd424a",
+      "bytes": 211,
+      "handling": "adjusted",
+      "change_note": "Add and pin OpenAI SDK used by existing embedding/search functions."
+    },
+    {
+      "path": "database/scripts/check_import.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "import_documentation_or_verification",
+      "sha256": "1398fc8f7da29e3cc11ea7873d27165136c883546f55113192562f95b75ecb5c",
+      "bytes": 2834,
+      "handling": "added",
+      "change_note": "Add DB import instructions, artifact links, exclusion settings or verification metadata."
+    },
+    {
+      "source_path": "database/scripts/db.py",
+      "path": "database/scripts/db.py",
+      "source_sha256": "8c9f7455c788ddf5a341132168c36485acd1dae16c2d2c0f10fc402336a7e071",
+      "source_bytes": 394,
+      "source_kind": "source_commit_file",
+      "sha256": "8c9f7455c788ddf5a341132168c36485acd1dae16c2d2c0f10fc402336a7e071",
+      "bytes": 394,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/scripts/install_postgres.ps1",
+      "path": "database/scripts/install_postgres.ps1",
+      "source_sha256": "4f82e635f14087ac22eebc133fc17513a6162c4b24fb12e69342bc9844416d05",
+      "source_bytes": 2556,
+      "source_kind": "source_commit_file",
+      "sha256": "ff8f131d6b66f1aef5d4a4ab92def798f705697793eb75a0d8f609168d536615",
+      "bytes": 3566,
+      "handling": "adjusted",
+      "change_note": "Accept external pgvector bundle and validate required files/hashes before installation."
+    },
+    {
+      "source_path": "database/scripts/local_db.py",
+      "path": "database/scripts/local_db.py",
+      "source_sha256": "4437e32ee41a4e121ee219473e3e9d625a0bc99dd843165b91078719bfef8a68",
+      "source_bytes": 239,
+      "source_kind": "source_commit_file",
+      "sha256": "4437e32ee41a4e121ee219473e3e9d625a0bc99dd843165b91078719bfef8a68",
+      "bytes": 239,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/scripts/restore_db.py",
+      "path": "database/scripts/restore_db.py",
+      "source_sha256": "a366f47d57ee0dcfb50cb03c2572e6b5ca6a13e6737783356cb85b19a300a5f7",
+      "source_bytes": 189,
+      "source_kind": "source_commit_file",
+      "sha256": "a366f47d57ee0dcfb50cb03c2572e6b5ca6a13e6737783356cb85b19a300a5f7",
+      "bytes": 189,
+      "handling": "byte_preserved"
+    },
+    {
+      "path": "database/snapshot-audit.json",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "import_documentation_or_verification",
+      "sha256": "238f81ddbfe5bc0b4bbf58df4e166040994fde2b50a9afe9da40f172ff94f7b9",
+      "bytes": 2089,
+      "handling": "added",
+      "change_note": "Add DB import instructions, artifact links, exclusion settings or verification metadata."
+    },
+    {
+      "source_path": "database/src/__init__.py",
+      "path": "database/src/__init__.py",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_bytes": 0,
+      "source_kind": "source_commit_file",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/database/__init__.py",
+      "path": "database/src/database/__init__.py",
+      "source_sha256": "5bb5abc9eb03cfad15e5ea486a632395c9523ecc72587f6b8a30b655fa841679",
+      "source_bytes": 113,
+      "source_kind": "source_commit_file",
+      "sha256": "5bb5abc9eb03cfad15e5ea486a632395c9523ecc72587f6b8a30b655fa841679",
+      "bytes": 113,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/database/app_store.py",
+      "path": "database/src/database/app_store.py",
+      "source_sha256": "eb216325686a4012cb644482e3d94176f1d03f4fed4d86105b2bc991c75d14f7",
+      "source_bytes": 23665,
+      "source_kind": "source_commit_file",
+      "sha256": "eb216325686a4012cb644482e3d94176f1d03f4fed4d86105b2bc991c75d14f7",
+      "bytes": 23665,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/database/catalog.current.json",
+      "path": "database/src/database/catalog.current.json",
+      "source_sha256": "60099e9c5f394bb8cda0bd4dd89aabc85cc28c4ba02047495eea8b6bcd269a3b",
+      "source_bytes": 191247,
+      "source_kind": "source_commit_file",
+      "sha256": "60099e9c5f394bb8cda0bd4dd89aabc85cc28c4ba02047495eea8b6bcd269a3b",
+      "bytes": 191247,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/database/catalog.json",
+      "path": "database/src/database/catalog.json",
+      "source_sha256": "24376c9f9915542e561f6a0059e599ca34874c252b890caf7e4ee016c5ee43c5",
+      "source_bytes": 69565,
+      "source_kind": "source_commit_file",
+      "sha256": "24376c9f9915542e561f6a0059e599ca34874c252b890caf7e4ee016c5ee43c5",
+      "bytes": 69565,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/database/db_client.py",
+      "path": "database/src/database/db_client.py",
+      "source_sha256": "c937d92d05f06092e4749a2973a789ae48be646445ae847afd75c2d317cad942",
+      "source_bytes": 15555,
+      "source_kind": "source_commit_file",
+      "sha256": "c937d92d05f06092e4749a2973a789ae48be646445ae847afd75c2d317cad942",
+      "bytes": 15555,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/database/deployment.py",
+      "path": "database/src/database/deployment.py",
+      "source_sha256": "1a0743aba068db82e77567c4f7b84c589b7f1c5bc3292ec2b9f33e640c43e1b2",
+      "source_bytes": 47311,
+      "source_kind": "source_commit_file",
+      "sha256": "93e2a1778ff1851f28755c270caf9e34ea92046ae287b9a0b4f41ee4ab5a4358",
+      "bytes": 47549,
+      "handling": "adjusted",
+      "change_note": "Require external reviewed employee fixtures and remove automatic shared seed password."
+    },
+    {
+      "source_path": "database/src/database/erd.py",
+      "path": "database/src/database/erd.py",
+      "source_sha256": "2c2ec56094cda560f240a4d7987e5aed4e0a12283c32b5c486af93f74014e629",
+      "source_bytes": 13777,
+      "source_kind": "source_commit_file",
+      "sha256": "23816bf6dd3ebbc566cbcb39438b1ce85ef90fac95811eba82eca94b018a42ee",
+      "bytes": 3648,
+      "handling": "adjusted",
+      "change_note": "Preserve the full external ERD layout/controls when refreshing schema JSON; use the registered artifact output path."
+    },
+    {
+      "source_path": "database/src/database/final_schema.py",
+      "path": "database/src/database/final_schema.py",
+      "source_sha256": "63e9e63089eea4ed4ab451760ac264d2ca98dce445f0e96c9c194fa463fe8fca",
+      "source_bytes": 12163,
+      "source_kind": "source_commit_file",
+      "sha256": "63e9e63089eea4ed4ab451760ac264d2ca98dce445f0e96c9c194fa463fe8fca",
+      "bytes": 12163,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/database/ingestion/__init__.py",
+      "path": "database/src/database/ingestion/__init__.py",
+      "source_sha256": "14e4ee22634e0c61506dfe66769a35194a87dbc4a3390b9b4b72923b76d4b639",
+      "source_bytes": 37,
+      "source_kind": "source_commit_file",
+      "sha256": "14e4ee22634e0c61506dfe66769a35194a87dbc4a3390b9b4b72923b76d4b639",
+      "bytes": 37,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/database/ingestion/catalog_details.py",
+      "path": "database/src/database/ingestion/catalog_details.py",
+      "source_sha256": "2e4224cefe1ac999556f62b3fb75d0ce2d2eb2b8d960faf774023049970d693a",
+      "source_bytes": 19021,
+      "source_kind": "source_commit_file",
+      "sha256": "2e4224cefe1ac999556f62b3fb75d0ce2d2eb2b8d960faf774023049970d693a",
+      "bytes": 19021,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/database/ingestion/real_data_ingestor.py",
+      "path": "database/src/database/ingestion/real_data_ingestor.py",
+      "source_sha256": "0432c150ef770fc7abbd9257e95ad88f34555d9dc102080826dd6d11ade3e6b1",
+      "source_bytes": 41897,
+      "source_kind": "source_commit_file",
+      "sha256": "0432c150ef770fc7abbd9257e95ad88f34555d9dc102080826dd6d11ade3e6b1",
+      "bytes": 41897,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/database/local_runtime.py",
+      "path": "database/src/database/local_runtime.py",
+      "source_sha256": "df755507f33a314424e8026f30a6750fd22b6a937990f2ed167c8c17bd2024a3",
+      "source_bytes": 4341,
+      "source_kind": "source_commit_file",
+      "sha256": "df755507f33a314424e8026f30a6750fd22b6a937990f2ed167c8c17bd2024a3",
+      "bytes": 4341,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/database/migrations/001_existing_schema.sql",
+      "path": "database/src/database/migrations/001_existing_schema.sql",
+      "source_sha256": "750402617f3ba2b263f975a70e980c1398c8de62e92dc7978b23b3ad38be3602",
+      "source_bytes": 29637,
+      "source_kind": "source_commit_file",
+      "sha256": "750402617f3ba2b263f975a70e980c1398c8de62e92dc7978b23b3ad38be3602",
+      "bytes": 29637,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/database/migrations/002_application_storage.sql",
+      "path": "database/src/database/migrations/002_application_storage.sql",
+      "source_sha256": "20ce76ff6b9e95eedf2fff40e599a048adc7bc7faaba0974295d4d6110d8552e",
+      "source_bytes": 7052,
+      "source_kind": "source_commit_file",
+      "sha256": "20ce76ff6b9e95eedf2fff40e599a048adc7bc7faaba0974295d4d6110d8552e",
+      "bytes": 7052,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/database/migrations/003_regulation_schema.sql",
+      "path": "database/src/database/migrations/003_regulation_schema.sql",
+      "source_sha256": "564b1a9f3ba1f4cfee83888942068bfae70490faac76fad3403a8298626f4f39",
+      "source_bytes": 5728,
+      "source_kind": "source_commit_file",
+      "sha256": "564b1a9f3ba1f4cfee83888942068bfae70490faac76fad3403a8298626f4f39",
+      "bytes": 5728,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/database/migrations/004_server_access.sql",
+      "path": "database/src/database/migrations/004_server_access.sql",
+      "source_sha256": "31e0c3adcb1c924adc0cbe28dbe563e5437f23ce0255938d34fb87e817871f56",
+      "source_bytes": 1791,
+      "source_kind": "source_commit_file",
+      "sha256": "31e0c3adcb1c924adc0cbe28dbe563e5437f23ce0255938d34fb87e817871f56",
+      "bytes": 1791,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/database/migrations/005_evaluation_criteria.sql",
+      "path": "database/src/database/migrations/005_evaluation_criteria.sql",
+      "source_sha256": "b772d9e7b473e065e1523ba3cf7642a26e8b7fa04ab605a3ba76ff5c77a9a287",
+      "source_bytes": 5662,
+      "source_kind": "source_commit_file",
+      "sha256": "b772d9e7b473e065e1523ba3cf7642a26e8b7fa04ab605a3ba76ff5c77a9a287",
+      "bytes": 5662,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/database/migrations/006_archive_historical_workflow.sql",
+      "path": "database/src/database/migrations/006_archive_historical_workflow.sql",
+      "source_sha256": "60a1fbb84234c1abc27d7ba548d73c42ec3ccc7d4fc783363b4f5f102274dfc0",
+      "source_bytes": 1125,
+      "source_kind": "source_commit_file",
+      "sha256": "60a1fbb84234c1abc27d7ba548d73c42ec3ccc7d4fc783363b4f5f102274dfc0",
+      "bytes": 1125,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/database/migrations/007_final_schema.sql",
+      "path": "database/src/database/migrations/007_final_schema.sql",
+      "source_sha256": "6a99ca4b50e7e85c16e09f5917b5bfd1ff0143b06233696655ec50c871074222",
+      "source_bytes": 22440,
+      "source_kind": "source_commit_file",
+      "sha256": "6a99ca4b50e7e85c16e09f5917b5bfd1ff0143b06233696655ec50c871074222",
+      "bytes": 22440,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/database/migrations/008_remove_empty_archives.sql",
+      "path": "database/src/database/migrations/008_remove_empty_archives.sql",
+      "source_sha256": "bb4c50a109c56646b4736d03a651e5a33c124c7fc9b51a536fb03d0eb24c380d",
+      "source_bytes": 873,
+      "source_kind": "source_commit_file",
+      "sha256": "bb4c50a109c56646b4736d03a651e5a33c124c7fc9b51a536fb03d0eb24c380d",
+      "bytes": 873,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/database/migrations/009_course_image_url.sql",
+      "path": "database/src/database/migrations/009_course_image_url.sql",
+      "source_sha256": "3dd1ae353845c7a0114c0dad7f74d241e2887e8fc35300c50e1c6d969884760a",
+      "source_bytes": 853,
+      "source_kind": "source_commit_file",
+      "sha256": "3dd1ae353845c7a0114c0dad7f74d241e2887e8fc35300c50e1c6d969884760a",
+      "bytes": 853,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/database/migrations/010_resource_image_urls.sql",
+      "path": "database/src/database/migrations/010_resource_image_urls.sql",
+      "source_sha256": "29cbee9a8288be797b0b3435b08850c3e40dba25b262eddc07852869cd1b476e",
+      "source_bytes": 1652,
+      "source_kind": "source_commit_file",
+      "sha256": "29cbee9a8288be797b0b3435b08850c3e40dba25b262eddc07852869cd1b476e",
+      "bytes": 1652,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/database/migrations/011_employee_recommended_prompts.sql",
+      "path": "database/src/database/migrations/011_employee_recommended_prompts.sql",
+      "source_sha256": "e89c6a1fa235f64652319a399d9c92751cc2d373645027f9dafb7cb35b9e237c",
+      "source_bytes": 684,
+      "source_kind": "source_commit_file",
+      "sha256": "e89c6a1fa235f64652319a399d9c92751cc2d373645027f9dafb7cb35b9e237c",
+      "bytes": 684,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/database/migrations/012_prompt_generation_links.sql",
+      "path": "database/src/database/migrations/012_prompt_generation_links.sql",
+      "source_sha256": "b2a916735f643c1c1f56db792aeda7fc19dbbbd78ae84d9332d8d612f68b7a8e",
+      "source_bytes": 1972,
+      "source_kind": "source_commit_file",
+      "sha256": "b2a916735f643c1c1f56db792aeda7fc19dbbbd78ae84d9332d8d612f68b7a8e",
+      "bytes": 1972,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/database/operator_setup.py",
+      "path": "database/src/database/operator_setup.py",
+      "source_sha256": "7eb6bb1ee3ce6d7709e5de89e84a2a3ec25b7e96954d4c920e97d010e2660139",
+      "source_bytes": 2852,
+      "source_kind": "source_commit_file",
+      "sha256": "7eb6bb1ee3ce6d7709e5de89e84a2a3ec25b7e96954d4c920e97d010e2660139",
+      "bytes": 2852,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/database/portable.py",
+      "path": "database/src/database/portable.py",
+      "source_sha256": "4f4e7b5a1e62d17b2d9f17af28afcf33ed21cafa5d372e2cdc37a62f361d9ddb",
+      "source_bytes": 9872,
+      "source_kind": "source_commit_file",
+      "sha256": "e2963efe366a92d4e4f868e62f973bb8b7f707fa8d24cec7aa6a3d8dd9a8107c",
+      "bytes": 10106,
+      "handling": "adjusted",
+      "change_note": "Fail on missing external backup/manifest before password or DB access."
+    },
+    {
+      "source_path": "database/src/database/schema.sql",
+      "path": "database/src/database/schema.sql",
+      "source_sha256": "3df593e6d2884191d546d7102a07124ec81be4e2084731845313168fe7d4680f",
+      "source_bytes": 406,
+      "source_kind": "source_commit_file",
+      "sha256": "5aa14750ce87945ae106b13619ce5108547f23f1fe241be5409339038e343c1d",
+      "bytes": 418,
+      "handling": "adjusted",
+      "change_note": "Correct obsolete-schema guidance to the retained canonical migration path."
+    },
+    {
+      "source_path": "database/src/database/schema_components.py",
+      "path": "database/src/database/schema_components.py",
+      "source_sha256": "11acefd9f0df66193fbca3f5e359d5a61dc5ad1492eae87c4772b31bf8edc5a3",
+      "source_bytes": 1168,
+      "source_kind": "source_commit_file",
+      "sha256": "11acefd9f0df66193fbca3f5e359d5a61dc5ad1492eae87c4772b31bf8edc5a3",
+      "bytes": 1168,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/database/vectors/__init__.py",
+      "path": "database/src/database/vectors/__init__.py",
+      "source_sha256": "14e4ee22634e0c61506dfe66769a35194a87dbc4a3390b9b4b72923b76d4b639",
+      "source_bytes": 37,
+      "source_kind": "source_commit_file",
+      "sha256": "14e4ee22634e0c61506dfe66769a35194a87dbc4a3390b9b4b72923b76d4b639",
+      "bytes": 37,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/database/vectors/regulation_vectors.py",
+      "path": "database/src/database/vectors/regulation_vectors.py",
+      "source_sha256": "f92f6d32888108a5f8481f92116d12ab1729d00528dcf91dd87825c7cc16314d",
+      "source_bytes": 17478,
+      "source_kind": "source_commit_file",
+      "sha256": "f92f6d32888108a5f8481f92116d12ab1729d00528dcf91dd87825c7cc16314d",
+      "bytes": 17478,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/database/vectors/resource_vectors.py",
+      "path": "database/src/database/vectors/resource_vectors.py",
+      "source_sha256": "5f3a506dcc0e59a7d76a27f84d07a4646cae73a3062fd8689e107184056514f1",
+      "source_bytes": 11968,
+      "source_kind": "source_commit_file",
+      "sha256": "5f3a506dcc0e59a7d76a27f84d07a4646cae73a3062fd8689e107184056514f1",
+      "bytes": 11968,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/db/__init__.py",
+      "path": "database/src/db/__init__.py",
+      "source_sha256": "5bb5abc9eb03cfad15e5ea486a632395c9523ecc72587f6b8a30b655fa841679",
+      "source_bytes": 113,
+      "source_kind": "source_commit_file",
+      "sha256": "5bb5abc9eb03cfad15e5ea486a632395c9523ecc72587f6b8a30b655fa841679",
+      "bytes": 113,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/db/db_client.py",
+      "path": "database/src/db/db_client.py",
+      "source_sha256": "3e0970f52350e33764e77f6b90d46ed2990224b85e8d44f40947502d96da335f",
+      "source_bytes": 621,
+      "source_kind": "source_commit_file",
+      "sha256": "3e0970f52350e33764e77f6b90d46ed2990224b85e8d44f40947502d96da335f",
+      "bytes": 621,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/db/deployment.py",
+      "path": "database/src/db/deployment.py",
+      "source_sha256": "2141b2c2c34f3bbc164fa333ff169f4b48a63f42b01b5fbf63f56326a28ad7e7",
+      "source_bytes": 624,
+      "source_kind": "source_commit_file",
+      "sha256": "2141b2c2c34f3bbc164fa333ff169f4b48a63f42b01b5fbf63f56326a28ad7e7",
+      "bytes": 624,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/db/regulation_vectors.py",
+      "path": "database/src/db/regulation_vectors.py",
+      "source_sha256": "1f5fb1a724559f56e040fd2570c53d2784ab4577833cee99bb0a326c51856816",
+      "source_bytes": 672,
+      "source_kind": "source_commit_file",
+      "sha256": "1f5fb1a724559f56e040fd2570c53d2784ab4577833cee99bb0a326c51856816",
+      "bytes": 672,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/db/resource_vectors.py",
+      "path": "database/src/db/resource_vectors.py",
+      "source_sha256": "76370cf9dacebd14ac8ffa9ce7ff542119507154a668287d95196d72f8e52e20",
+      "source_bytes": 666,
+      "source_kind": "source_commit_file",
+      "sha256": "76370cf9dacebd14ac8ffa9ce7ff542119507154a668287d95196d72f8e52e20",
+      "bytes": 666,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/shared/__init__.py",
+      "path": "database/src/shared/__init__.py",
+      "source_sha256": "9ec3a663aed4358a57eb8df34325aa90361bf4dcd07664e9793cf6b6d66896b6",
+      "source_bytes": 49,
+      "source_kind": "source_commit_file",
+      "sha256": "9ec3a663aed4358a57eb8df34325aa90361bf4dcd07664e9793cf6b6d66896b6",
+      "bytes": 49,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/shared/assessment_schema.py",
+      "path": "database/src/shared/assessment_schema.py",
+      "source_sha256": "d5553adb2b9ddb516e4c566a56cfb04bccac2279c7f99814dcfed24fe107de8e",
+      "source_bytes": 5050,
+      "source_kind": "source_commit_file",
+      "sha256": "d5553adb2b9ddb516e4c566a56cfb04bccac2279c7f99814dcfed24fe107de8e",
+      "bytes": 5050,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/shared/catalog_eligibility.py",
+      "path": "database/src/shared/catalog_eligibility.py",
+      "source_sha256": "9d063abbc3baf8c1412d4bbd58ec7aa0f1dae5b25278c76f4cdce2512914545e",
+      "source_bytes": 5979,
+      "source_kind": "source_commit_file",
+      "sha256": "9d063abbc3baf8c1412d4bbd58ec7aa0f1dae5b25278c76f4cdce2512914545e",
+      "bytes": 5979,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/shared/catalog_quality.py",
+      "path": "database/src/shared/catalog_quality.py",
+      "source_sha256": "22eca3cc2c72f6b95bb80b2d5948da6ca5bc3fa0ff5ac7727419d22048218959",
+      "source_bytes": 3016,
+      "source_kind": "source_commit_file",
+      "sha256": "22eca3cc2c72f6b95bb80b2d5948da6ca5bc3fa0ff5ac7727419d22048218959",
+      "bytes": 3016,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/shared/config_loader.py",
+      "path": "database/src/shared/config_loader.py",
+      "source_sha256": "e26e37bb046d357d8078db6fcc64233b1d3541d6965f38d50493ad20eb5da51a",
+      "source_bytes": 1024,
+      "source_kind": "source_commit_file",
+      "sha256": "e26e37bb046d357d8078db6fcc64233b1d3541d6965f38d50493ad20eb5da51a",
+      "bytes": 1024,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/src/shared/skill_matching.py",
+      "path": "database/src/shared/skill_matching.py",
+      "source_sha256": "f74d89de9acbc9e801fc448cceac30d2abd1099c33199e628cca21ffaeaefef6",
+      "source_bytes": 8507,
+      "source_kind": "source_commit_file",
+      "sha256": "f74d89de9acbc9e801fc448cceac30d2abd1099c33199e628cca21ffaeaefef6",
+      "bytes": 8507,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/tests/test_canonical_database.py",
+      "path": "database/tests/test_canonical_database.py",
+      "source_sha256": "f1ee1a6b9642bf1e05ae0c4b606e2c015dc215101132c0ffed9ae75abc26be04",
+      "source_bytes": 6709,
+      "source_kind": "source_commit_file",
+      "sha256": "f1ee1a6b9642bf1e05ae0c4b606e2c015dc215101132c0ffed9ae75abc26be04",
+      "bytes": 6709,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/tests/test_catalog_expansion.py",
+      "path": "database/tests/test_catalog_expansion.py",
+      "source_sha256": "2531e5882b559cf5c00b304f6847638f9121ab3a5911681498af953746ac6045",
+      "source_bytes": 9909,
+      "source_kind": "source_commit_file",
+      "sha256": "2531e5882b559cf5c00b304f6847638f9121ab3a5911681498af953746ac6045",
+      "bytes": 9909,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "database/tests/test_db_deployment.py",
+      "path": "database/tests/test_db_deployment.py",
+      "source_sha256": "9f6dda8220928e40e2257cafcda4ba493a43effb661cbf6a3e25e41764f053b4",
+      "source_bytes": 13286,
+      "source_kind": "source_commit_file",
+      "sha256": "9f6dda8220928e40e2257cafcda4ba493a43effb661cbf6a3e25e41764f053b4",
+      "bytes": 13286,
+      "handling": "byte_preserved"
+    },
+    {
+      "path": "database/tests/test_import_package.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "import_documentation_or_verification",
+      "sha256": "bceeec05003594246a4e5715b9ea296259dcaa2f1910f06af19e0c1cef06f527",
+      "bytes": 3605,
+      "handling": "added",
+      "change_note": "Add DB import instructions, artifact links, exclusion settings or verification metadata."
+    },
+    {
+      "source_path": "database/tests/test_regulation_vectors.py",
+      "path": "database/tests/test_regulation_vectors.py",
+      "source_sha256": "24dfe9be6910eb8ccaf3af1eaddafef075d91d365e1e4b88efa2032ebc442100",
+      "source_bytes": 1912,
+      "source_kind": "source_commit_file",
+      "sha256": "24dfe9be6910eb8ccaf3af1eaddafef075d91d365e1e4b88efa2032ebc442100",
+      "bytes": 1912,
+      "handling": "byte_preserved"
+    },
+    {
+      "source_path": "../ERD_최종반영.html",
+      "path": "docs/07_데이터베이스_저장소_설계/ERD_최종.html",
+      "source_sha256": "f5260d82fdb90d1b6f3309f4cb3f6062034be533133406f25cf5060a27b90b2b",
+      "source_bytes": 166111,
+      "source_kind": "user_delivered_external_erd",
+      "sha256": "9cb7406b70e37fc2aa066a73b93beacf4deeda689c89b7d0f82e5a7a2373a56a",
+      "bytes": 167827,
+      "handling": "adjusted",
+      "change_note": "Use the user-selected external ERD layout/controls and synchronize 3 prompt columns/FKs and 10 row counts to current metadata."
+    },
+    {
+      "path": "docs/07_데이터베이스_저장소_설계/README.md",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "import_documentation_or_verification",
+      "sha256": "e2c68fef8ac7a199140247b59312e116105846cee0a1be6b3a7021f8f61087bf",
+      "bytes": 7885,
+      "handling": "added",
+      "change_note": "Add DB import instructions, artifact links, exclusion settings or verification metadata."
+    },
+    {
+      "path": "docs/07_데이터베이스_저장소_설계/SCHEMA.md",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "import_documentation_or_verification",
+      "sha256": "1e30a33f85cfa8df38ded507c6437f3b1291941b2a9aa5c7879fd66267717319",
+      "bytes": 33472,
+      "handling": "added",
+      "change_note": "Add DB import instructions, artifact links, exclusion settings or verification metadata."
+    },
+    {
+      "source_path": "docs/데이터베이스_저장소_설계_통합본.docx",
+      "path": "docs/07_데이터베이스_저장소_설계/데이터베이스_저장소_설계_통합본.docx",
+      "source_sha256": "8efb462fab610f197b7d1090afcde520fec5e5014046f04e943f3db4a47e2bea",
+      "source_bytes": 5585770,
+      "source_kind": "user_delivered_untracked_document",
+      "sha256": "8efb462fab610f197b7d1090afcde520fec5e5014046f04e943f3db4a47e2bea",
+      "bytes": 5585770,
+      "handling": "byte_preserved"
+    },
+    {
+      "path": "docs/08_데이터_전처리_결과서/README.md",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "import_documentation_or_verification",
+      "sha256": "5f4c62acab37778d0c521308c4c203ebae1acca3985bd88cc96febaaf9f0cf82",
+      "bytes": 3053,
+      "handling": "added",
+      "change_note": "Add DB import instructions, artifact links, exclusion settings or verification metadata."
+    },
+    {
+      "source_path": "docs/데이터_전처리_결과서_통합본.docx",
+      "path": "docs/08_데이터_전처리_결과서/데이터_전처리_결과서_통합본.docx",
+      "source_sha256": "0ac1c44bd3e24369ba947b8473d31bab7c987ff953abccdbacfb0388b6623b30",
+      "source_bytes": 3683199,
+      "source_kind": "user_delivered_untracked_document",
+      "sha256": "0ac1c44bd3e24369ba947b8473d31bab7c987ff953abccdbacfb0388b6623b30",
+      "bytes": 3683199,
+      "handling": "byte_preserved"
+    },
+    {
+      "path": "docs/09_벡터DB_구축_결과서/README.md",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "import_documentation_or_verification",
+      "sha256": "f43475063f3b143d1540493b330a9da4cf376158e033031f8e9cef680c533f9a",
+      "bytes": 2886,
+      "handling": "added",
+      "change_note": "Add DB import instructions, artifact links, exclusion settings or verification metadata."
+    },
+    {
+      "source_path": "docs/벡터DB·GraphDB 구축 결과서_33기_2팀.docx",
+      "path": "docs/09_벡터DB_구축_결과서/벡터DB·GraphDB 구축 결과서_33기_2팀.docx",
+      "source_sha256": "c45ee5e5ab0ee2ae50822fcd13bb132e6ace8f71e6642d7db807dc5d3e6a5bb9",
+      "source_bytes": 3679929,
+      "source_kind": "user_delivered_untracked_document",
+      "sha256": "c45ee5e5ab0ee2ae50822fcd13bb132e6ace8f71e6642d7db807dc5d3e6a5bb9",
+      "bytes": 3679929,
+      "handling": "byte_preserved"
+    }
+  ],
+  "excluded": [
+    "credentials and actual .env",
+    "demo_users.sql",
+    "runtime database",
+    "full dumps and data SQL",
+    "regulation originals",
+    "extension binary bundle",
+    "training data and weights",
+    "qwen_factory",
+    "private IDE and cache"
+  ],
+  "packaging_scope": "One DB source/artifact registration change. No new business features or paid API calls.",
+  "validation": {
+    "python": "3.12",
+    "unit_collected": 42,
+    "unit_passed": 38,
+    "unit_skipped_missing_regulation_packages": 4,
+    "live_database_tests": "not_run",
+    "pip_check": "pass",
+    "cli_help_commands": 8,
+    "business_gaps": [
+      "supervisory_group_scope",
+      "profile_consent_and_learning_inputs",
+      "per_activity_tracking",
+      "comment_state_and_version"
+    ],
+    "stale_book_vectors": 25
+  },
+  "drive_verification": {
+    "checked_at": "2026-10-21T07:54:35Z",
+    "method": "Downloaded stored DOCX originals and compared SHA-256, ZIP entries and visible paragraphs.",
+    "scope": "Current files in the team's DB design, preprocessing and modeling folders; no Drive writes.",
+    "management_sheet": "https://docs.google.com/spreadsheets/d/1EQeYN_FpKWzzxHUdtjG9WYaP9t43bvf-H5e1jGMTMEM/edit?gid=1029234216",
+    "files": [
+      {
+        "path": "docs/07_데이터베이스_저장소_설계/데이터베이스_저장소_설계_통합본.docx",
+        "drive_url": "https://docs.google.com/document/d/1QoI-BKqickgVZQ6yQZvW-eR7hXQhzlht/edit",
+        "modified_time": "2026-10-21T01:05:28.000Z",
+        "sha256": "8efb462fab610f197b7d1090afcde520fec5e5014046f04e943f3db4a47e2bea",
+        "byte_identical": true
+      },
+      {
+        "path": "docs/08_데이터_전처리_결과서/데이터_전처리_결과서_통합본.docx",
+        "drive_url": "https://docs.google.com/document/d/1UJdY5QjMChedGc0dkF07hKrOlhOXEzdU/edit",
+        "modified_time": "2026-10-21T01:09:55.732Z",
+        "sha256": "0ac1c44bd3e24369ba947b8473d31bab7c987ff953abccdbacfb0388b6623b30",
+        "byte_identical": true
+      },
+      {
+        "path": "docs/09_벡터DB_구축_결과서/벡터DB·GraphDB 구축 결과서_33기_2팀.docx",
+        "drive_url": "https://docs.google.com/document/d/1ODZL0rrutkYhLRLpD-pLUEM5-UJNuxnv/edit",
+        "modified_time": "2026-10-21T00:35:55.000Z",
+        "sha256": "c45ee5e5ab0ee2ae50822fcd13bb132e6ace8f71e6642d7db807dc5d3e6a5bb9",
+        "byte_identical": true
+      }
+    ],
+    "management_sheet_links": [
+      {
+        "cell": "2팀!D14",
+        "url": "https://docs.google.com/document/d/1s23TtDs8DXgfUbz_cB-OT_E7kyciOwSS/edit",
+        "modified_time": "2026-10-21T00:17:44.858Z",
+        "document_date": "2026-10-14",
+        "status": "older_content_than_current_integrated_design",
+        "sha256": "48d119a2bde7d65eec5bb0dab53331d92a4531d79dacb4c860e4a5f6e0d6b991"
+      },
+      {
+        "cell": "2팀!D15",
+        "url": "https://docs.google.com/document/d/176yxbR3-N4Zit7QwaV-C2DrcL-eJi21p/edit",
+        "modified_time": "2026-10-16T06:38:38.648Z",
+        "document_date": "2026-10-14",
+        "status": "older_content_than_current_preprocessing",
+        "sha256": "6a8ceb83ebdc672e2bf2dce32fe38001018a6e158b0f1ddd7a014f303f6803e9"
+      },
+      {
+        "cell": "2팀!D18",
+        "status": "filename_present_but_no_cell_hyperlink_returned"
+      }
+    ],
+    "content_limits": "Matching Word files still contain older DB snapshot counts; use the companion current DB table. This verification does not certify submission/review or model quality."
+  },
+  "erd_layout_source": {
+    "source_relative_to_delivered_project": "../ERD_최종반영.html",
+    "source_sha256": "f5260d82fdb90d1b6f3309f4cb3f6062034be533133406f25cf5060a27b90b2b",
+    "metadata_source": "database/src/database/catalog.current.json",
+    "row_count_source": "database/data/exports/growpath_full_20261021.manifest.json",
+    "source_file_modified": false,
+    "layout_and_controls_preserved": true
+  }
+}

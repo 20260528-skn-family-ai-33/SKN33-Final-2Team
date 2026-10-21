@@ -1,0 +1,34 @@
+# Secrets and personal tooling
+.env
+.env.*
+!.env.example
+!.env.sample
+.streamlit/secrets.toml
+.idea/
+.vscode/
+.venv*/
+venv/
+__pycache__/
+*.py[cod]
+*.log
+.cache/
+
+# Metadata is versioned; runtime and source data are external.
+database/data/**
+!database/data/
+!database/data/exports/
+!database/data/exports/*.manifest.json
+!database/data/exports/pgvector_pg17_windows_x64/
+!database/data/exports/pgvector_pg17_windows_x64/manifest.json
+!database/data/exports/pgvector_pg17_windows_x64/LICENSE
+database/logs/
+*.dump
+*.sqlite3*
+*.safetensors
+*.pt
+*.gguf
+*.zip
+qwen_factory/data/
+**/checkpoints/
+**/outputs/
+**/reports/

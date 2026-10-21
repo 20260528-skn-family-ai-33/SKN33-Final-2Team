@@ -1,0 +1,372 @@
+{
+  "format": 1,
+  "assets": [
+    {
+      "id": "full_database",
+      "filename": "growpath_full_20261021.dump",
+      "bytes": 45390365,
+      "sha256": "cbdb5933f8a6e66874d805cdcae5fe9a466ecd7d872592732a37e526f6cad954",
+      "location": null,
+      "location_status": "needs_team_storage_location",
+      "manifest": "data/exports/growpath_full_20261021.manifest.json"
+    },
+    {
+      "id": "pgvector_windows_pg17",
+      "filename": "pgvector_pg17_windows_x64",
+      "location": null,
+      "location_status": "needs_team_storage_location",
+      "manifest": "data/exports/pgvector_pg17_windows_x64/manifest.json"
+    }
+  ],
+  "regulation_originals": [
+    {
+      "source_path": "data/regulations/사내DB_직원가상데이터_구성초안_2.9.0.xlsx",
+      "bytes": 23230,
+      "sha256": "1b2edfd4052bbdbc15ae24bb8168b90b23de0ce7bceaf589167b7c02e84a5258",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/인재개발규정_시범_V01/source/인재개발규정(2024년도 12월 개정).pdf",
+      "bytes": 564274,
+      "sha256": "0835551b52e02b2471022af3e3bf4c65ce39d0816a9fba6b0cc6c5569b5b792f",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_V01/source/기타/복지후생규정(2022년도 12월 개정).pdf",
+      "bytes": 74299,
+      "sha256": "97b015a067f9c32b4154136949acec926d5accb5dd5a4e54122bba0f8be50798",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_V01/source/기타/복지후생규정시행세칙(2026년도 2월 27일 개정).pdf",
+      "bytes": 299852,
+      "sha256": "7a76ea26fbbf2a3fe2edbf5e83d1614eba3d4f157bb1a1eba5ec7f318b521da8",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_V01/source/기타/여비규정(2025년 10월 16일 개정).pdf",
+      "bytes": 492618,
+      "sha256": "b775f00a50ee321a8cedcdbdc98c3df6d9ee024f594e02dd0e87f7d06034a313",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_V01/source/기타/인재개발규정(2024년도 12월 개정).pdf",
+      "bytes": 564274,
+      "sha256": "0835551b52e02b2471022af3e3bf4c65ce39d0816a9fba6b0cc6c5569b5b792f",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_V01/source/보수/국외근무직원연봉및복지후생규정(2025년 12월 18일 개정).pdf",
+      "bytes": 367371,
+      "sha256": "9dd3b62a07438b1039c45882d34698533e447cc6e0e7397ca62c8e5648dba61c",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_V01/source/보수/실무직 보수기준(2026년 6월 22일 개정).pdf",
+      "bytes": 2883795,
+      "sha256": "828e1053aa1892ae38cf98421372032af86f7c82e573912b47dd244db9bff2f2",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_V01/source/보수/연봉규정(2025년 12월 16일 개정).pdf",
+      "bytes": 223087,
+      "sha256": "b80cdb0be60c3e47bbe13c22a79ef4e2e101cae9dd5da8b76812538c602a5d51",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_V01/source/보수/연봉규정시행세칙(2025년 12월 18일 개정).pdf",
+      "bytes": 374943,
+      "sha256": "d343c7ea42c166a948f9f69b4715033447f8266c13ec97ea18ed6eeeb8f6e22e",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_V01/source/보수/특수직 보수기준(2026년 6월 22일 개정).pdf",
+      "bytes": 2029807,
+      "sha256": "01afa593dad622735dfb98d9301702dfc978afd73d50871ca5a5ebc585175ac8",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_V01/source/인사·복무·징계/국외근무직원복무규정(2025년도 11월 10일 개정).pdf",
+      "bytes": 141718,
+      "sha256": "971e6dfeee861bb3a27dc19dd551521244defc1623b14403788aa266d533b7f1",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_V01/source/인사·복무·징계/근무및부업관리규정(2025년도 11월 10일 개정).pdf",
+      "bytes": 297351,
+      "sha256": "1574f9702b40bfbb64e9042593bee7156fc43f8ec53f4110822677c1abd63480",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_V01/source/인사·복무·징계/기간제근로자 관리규정(2025년도 11월 11일 개정).pdf",
+      "bytes": 655885,
+      "sha256": "c9b4a1e6fc9fdc4f39ddbdfe3af4ec6194c98c27a881836d12d7847c573eb334",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_V01/source/인사·복무·징계/기간제근로자 관리기준(2025년도 12월 31일 개정).pdf",
+      "bytes": 2469695,
+      "sha256": "6599e1cda85c01ce9f6d37fba6b766ee41518854c77c27cc4753ad93d163bc5c",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_V01/source/인사·복무·징계/내부임용시험시행지침(2022년도 05월 개정).pdf",
+      "bytes": 310565,
+      "sha256": "34654b99b56cd00067b58fa98a2ffecf6abfce66ffd89859b6dddfee5f5e62b9",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_V01/source/인사·복무·징계/실무직 관리규정(2025년도 12월 31일 개정).pdf",
+      "bytes": 271980,
+      "sha256": "f1d89446acc4c9241d5815c9a82391317183f7ea4c14ca240b976c4efdb8f6f3",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_V01/source/인사·복무·징계/실무직 관리기준(2025년도 12월 31일 개정).pdf",
+      "bytes": 2111184,
+      "sha256": "532d77166d1e1c3ff65e6376c893b26b388289fffbc5ecad96784531dcbcebd8",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_V01/source/인사·복무·징계/운영직관리세칙(2024년도 12월 개정).pdf",
+      "bytes": 270361,
+      "sha256": "4c201be3ff8471b5c6e9359450041aa70440a93bcc1fb86313ab8fb414cf2622",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_V01/source/인사·복무·징계/유연근무제운영기준(2025년도 11월 10일 개정).pdf",
+      "bytes": 293375,
+      "sha256": "f88e0e9a4ccb95731d7d6bb9774b6f0f7c3c5c40ae3d4ec60b7b526b30d8e5dd",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_V01/source/인사·복무·징계/인사규정 채용 세칙(2026년도 3월 30일 개정).pdf",
+      "bytes": 279167,
+      "sha256": "5983dba9c82dab170902c98165d34207094c99ea51917f97c761505d65898b7d",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_V01/source/인사·복무·징계/인사규정(2026년도 8월 27일 개정).pdf",
+      "bytes": 228718,
+      "sha256": "1b6ec41b26c11c3821f72c403f6e2878cb2e7afa967e2309cb47d3ab01c68643",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_V01/source/인사·복무·징계/인사규정시행세칙(2025년도 11월 10일 개정).pdf",
+      "bytes": 1028103,
+      "sha256": "1ad0ac2f6c7ecbbc12e952fedb8d9d8e2ccc2cf089e6c36ecc33d9b2005618ff",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_V01/source/인사·복무·징계/전문직관리세칙(2024년도 12월 개정).pdf",
+      "bytes": 415318,
+      "sha256": "2f156ec671bec612d29f59727860b5d6b8ca0a7db57ecf22a4a7e8c44027c6b5",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_V01/source/인사·복무·징계/청원경찰관리규정(2025년도 7월 개정).pdf",
+      "bytes": 454975,
+      "sha256": "fde1aa1a05f95b936c2066e724bc44039e7bb7c6dddbce8bc13db0a467f6e287",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_V01/source/인사·복무·징계/특정직관리세칙(2024년도 12월 개정).pdf",
+      "bytes": 218769,
+      "sha256": "4349a445b75d6559fdd40a5359d502a7bcebc234a78c58f32470f701f1c4c3a0",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_V01/source/인사·복무·징계/한국수자원공사취업규칙(2026년도 03월 10일 개정).pdf",
+      "bytes": 274772,
+      "sha256": "f57219993cb77be6abc6dc0c5e264e49f073c119fdfdc3dc72993bbb8cb91a38",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_V01/source/직제/위임전결규정(2026년도 6월 1일 개정).pdf",
+      "bytes": 7534819,
+      "sha256": "042165cab895ff2efd8f2ec032a0919b928dc2f40f2986db08a5891c5fde00b6",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_V01/source/직제/직제규정 시행세칙(2026년도 07월 16일 개정).pdf",
+      "bytes": 662927,
+      "sha256": "44e655356bcb3536b989fb922c336328415736590030d946104f68518dabeb9e",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_V01/source/직제/직제규정(2026년도 06월 18일 개정).pdf",
+      "bytes": 1679854,
+      "sha256": "fd754780755edf791bf65f58076c896ebbbb999600d7acd48e8c7303df63262c",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_전달본_V18/한국수자원공사_규정_통합전처리_V01/source/기타/복지후생규정(2022년도 12월 개정).pdf",
+      "bytes": 74299,
+      "sha256": "97b015a067f9c32b4154136949acec926d5accb5dd5a4e54122bba0f8be50798",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_전달본_V18/한국수자원공사_규정_통합전처리_V01/source/기타/복지후생규정시행세칙(2026년도 2월 27일 개정).pdf",
+      "bytes": 299852,
+      "sha256": "7a76ea26fbbf2a3fe2edbf5e83d1614eba3d4f157bb1a1eba5ec7f318b521da8",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_전달본_V18/한국수자원공사_규정_통합전처리_V01/source/기타/여비규정(2025년 10월 16일 개정).pdf",
+      "bytes": 492618,
+      "sha256": "b775f00a50ee321a8cedcdbdc98c3df6d9ee024f594e02dd0e87f7d06034a313",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_전달본_V18/한국수자원공사_규정_통합전처리_V01/source/기타/인재개발규정(2024년도 12월 개정).pdf",
+      "bytes": 564274,
+      "sha256": "0835551b52e02b2471022af3e3bf4c65ce39d0816a9fba6b0cc6c5569b5b792f",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_전달본_V18/한국수자원공사_규정_통합전처리_V01/source/보수/국외근무직원연봉및복지후생규정(2025년 12월 18일 개정).pdf",
+      "bytes": 367371,
+      "sha256": "9dd3b62a07438b1039c45882d34698533e447cc6e0e7397ca62c8e5648dba61c",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_전달본_V18/한국수자원공사_규정_통합전처리_V01/source/보수/실무직 보수기준(2026년 6월 22일 개정).pdf",
+      "bytes": 2883795,
+      "sha256": "828e1053aa1892ae38cf98421372032af86f7c82e573912b47dd244db9bff2f2",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_전달본_V18/한국수자원공사_규정_통합전처리_V01/source/보수/연봉규정(2025년 12월 16일 개정).pdf",
+      "bytes": 223087,
+      "sha256": "b80cdb0be60c3e47bbe13c22a79ef4e2e101cae9dd5da8b76812538c602a5d51",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_전달본_V18/한국수자원공사_규정_통합전처리_V01/source/보수/연봉규정시행세칙(2025년 12월 18일 개정).pdf",
+      "bytes": 374943,
+      "sha256": "d343c7ea42c166a948f9f69b4715033447f8266c13ec97ea18ed6eeeb8f6e22e",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_전달본_V18/한국수자원공사_규정_통합전처리_V01/source/보수/특수직 보수기준(2026년 6월 22일 개정).pdf",
+      "bytes": 2029807,
+      "sha256": "01afa593dad622735dfb98d9301702dfc978afd73d50871ca5a5ebc585175ac8",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_전달본_V18/한국수자원공사_규정_통합전처리_V01/source/인사·복무·징계/국외근무직원복무규정(2025년도 11월 10일 개정).pdf",
+      "bytes": 141718,
+      "sha256": "971e6dfeee861bb3a27dc19dd551521244defc1623b14403788aa266d533b7f1",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_전달본_V18/한국수자원공사_규정_통합전처리_V01/source/인사·복무·징계/근무및부업관리규정(2025년도 11월 10일 개정).pdf",
+      "bytes": 297351,
+      "sha256": "1574f9702b40bfbb64e9042593bee7156fc43f8ec53f4110822677c1abd63480",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_전달본_V18/한국수자원공사_규정_통합전처리_V01/source/인사·복무·징계/기간제근로자 관리규정(2025년도 11월 11일 개정).pdf",
+      "bytes": 655885,
+      "sha256": "c9b4a1e6fc9fdc4f39ddbdfe3af4ec6194c98c27a881836d12d7847c573eb334",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_전달본_V18/한국수자원공사_규정_통합전처리_V01/source/인사·복무·징계/기간제근로자 관리기준(2025년도 12월 31일 개정).pdf",
+      "bytes": 2469695,
+      "sha256": "6599e1cda85c01ce9f6d37fba6b766ee41518854c77c27cc4753ad93d163bc5c",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_전달본_V18/한국수자원공사_규정_통합전처리_V01/source/인사·복무·징계/내부임용시험시행지침(2022년도 05월 개정).pdf",
+      "bytes": 310565,
+      "sha256": "34654b99b56cd00067b58fa98a2ffecf6abfce66ffd89859b6dddfee5f5e62b9",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_전달본_V18/한국수자원공사_규정_통합전처리_V01/source/인사·복무·징계/실무직 관리규정(2025년도 12월 31일 개정).pdf",
+      "bytes": 271980,
+      "sha256": "f1d89446acc4c9241d5815c9a82391317183f7ea4c14ca240b976c4efdb8f6f3",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_전달본_V18/한국수자원공사_규정_통합전처리_V01/source/인사·복무·징계/실무직 관리기준(2025년도 12월 31일 개정).pdf",
+      "bytes": 2111184,
+      "sha256": "532d77166d1e1c3ff65e6376c893b26b388289fffbc5ecad96784531dcbcebd8",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_전달본_V18/한국수자원공사_규정_통합전처리_V01/source/인사·복무·징계/운영직관리세칙(2024년도 12월 개정).pdf",
+      "bytes": 270361,
+      "sha256": "4c201be3ff8471b5c6e9359450041aa70440a93bcc1fb86313ab8fb414cf2622",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_전달본_V18/한국수자원공사_규정_통합전처리_V01/source/인사·복무·징계/유연근무제운영기준(2025년도 11월 10일 개정).pdf",
+      "bytes": 293375,
+      "sha256": "f88e0e9a4ccb95731d7d6bb9774b6f0f7c3c5c40ae3d4ec60b7b526b30d8e5dd",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_전달본_V18/한국수자원공사_규정_통합전처리_V01/source/인사·복무·징계/인사규정 채용 세칙(2026년도 3월 30일 개정).pdf",
+      "bytes": 279167,
+      "sha256": "5983dba9c82dab170902c98165d34207094c99ea51917f97c761505d65898b7d",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_전달본_V18/한국수자원공사_규정_통합전처리_V01/source/인사·복무·징계/인사규정(2026년도 8월 27일 개정).pdf",
+      "bytes": 228718,
+      "sha256": "1b6ec41b26c11c3821f72c403f6e2878cb2e7afa967e2309cb47d3ab01c68643",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_전달본_V18/한국수자원공사_규정_통합전처리_V01/source/인사·복무·징계/인사규정시행세칙(2025년도 11월 10일 개정).pdf",
+      "bytes": 1028103,
+      "sha256": "1ad0ac2f6c7ecbbc12e952fedb8d9d8e2ccc2cf089e6c36ecc33d9b2005618ff",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_전달본_V18/한국수자원공사_규정_통합전처리_V01/source/인사·복무·징계/전문직관리세칙(2024년도 12월 개정).pdf",
+      "bytes": 415318,
+      "sha256": "2f156ec671bec612d29f59727860b5d6b8ca0a7db57ecf22a4a7e8c44027c6b5",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_전달본_V18/한국수자원공사_규정_통합전처리_V01/source/인사·복무·징계/청원경찰관리규정(2025년도 7월 개정).pdf",
+      "bytes": 454975,
+      "sha256": "fde1aa1a05f95b936c2066e724bc44039e7bb7c6dddbce8bc13db0a467f6e287",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_전달본_V18/한국수자원공사_규정_통합전처리_V01/source/인사·복무·징계/특정직관리세칙(2024년도 12월 개정).pdf",
+      "bytes": 218769,
+      "sha256": "4349a445b75d6559fdd40a5359d502a7bcebc234a78c58f32470f701f1c4c3a0",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_전달본_V18/한국수자원공사_규정_통합전처리_V01/source/인사·복무·징계/한국수자원공사취업규칙(2026년도 03월 10일 개정).pdf",
+      "bytes": 274772,
+      "sha256": "f57219993cb77be6abc6dc0c5e264e49f073c119fdfdc3dc72993bbb8cb91a38",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_전달본_V18/한국수자원공사_규정_통합전처리_V01/source/직제/위임전결규정(2026년도 6월 1일 개정).pdf",
+      "bytes": 7534819,
+      "sha256": "042165cab895ff2efd8f2ec032a0919b928dc2f40f2986db08a5891c5fde00b6",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_전달본_V18/한국수자원공사_규정_통합전처리_V01/source/직제/직제규정 시행세칙(2026년도 07월 16일 개정).pdf",
+      "bytes": 662927,
+      "sha256": "44e655356bcb3536b989fb922c336328415736590030d946104f68518dabeb9e",
+      "location": null
+    },
+    {
+      "source_path": "data/regulations/한국수자원공사_규정_통합전처리_전달본_V18/한국수자원공사_규정_통합전처리_V01/source/직제/직제규정(2026년도 06월 18일 개정).pdf",
+      "bytes": 1679854,
+      "sha256": "fd754780755edf791bf65f58076c896ebbbb999600d7acd48e8c7303df63262c",
+      "location": null
+    }
+  ],
+  "notes": "Only metadata is versioned. External locations are not yet assigned; the credential-bearing delivered ZIP is not a distribution URL."
+}
