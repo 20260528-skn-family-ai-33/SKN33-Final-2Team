@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "purpose": "Git 제외 모델 가중치·직렬화 객체·런타임 파일의 복원 식별 정보",
+  "path_base": ".",
+  "source": "로컬 제공 파일의 SHA-256, 바이너리 역직렬화·추론 미실행",
+  "storage_location": null,
+  "access_control": "보관 위치·접근 권한 미정. 사람 지정 필요",
+  "status": "needs_review",
+  "experiment_record": "DL_models/roberta_tuning_best/run_config.json",
+  "artifact_count": 21,
+  "artifacts": [
+    {
+      "path": "DL_models/five_model_comparison/bilstm.pt",
+      "bytes": 3762131,
+      "sha256": "604916bfe81d0c05241d5b1f446bc928566be3fe042ce9b8e1703f3a0420a56d"
+    },
+    {
+      "path": "DL_models/five_model_comparison/deep_mlp.pt",
+      "bytes": 15468873,
+      "sha256": "9dad9be99506c923b160944aa345a90061c858400cfd427e31665fa316618aeb"
+    },
+    {
+      "path": "DL_models/five_model_comparison/e5_logistic_regression.joblib",
+      "bytes": 13256,
+      "sha256": "881a33885c674e3445ae131cb31af6e87e24bc7b05a3cbb9771bc94cbcb7f475"
+    },
+    {
+      "path": "DL_models/five_model_comparison/klue_roberta/config.json",
+      "bytes": 1239,
+      "sha256": "b4580ab28b397440f1832a1e0759ba7e0c72bdec5ae2280a4520a21b0c19a104"
+    },
+    {
+      "path": "DL_models/five_model_comparison/klue_roberta/model.safetensors",
+      "bytes": 442508896,
+      "sha256": "8989804b5a688260cd66309ec9f948cd5b3514cd624c1c85760b94f71290661e"
+    },
+    {
+      "path": "DL_models/five_model_comparison/klue_roberta/tokenizer.json",
+      "bytes": 752264,
+      "sha256": "7ce88996cbefc7d8313592c7fdabfb3572d4b3b35e49d45188a8d3b7ffc1987f"
+    },
+    {
+      "path": "DL_models/five_model_comparison/klue_roberta/tokenizer_config.json",
+      "bytes": 471,
+      "sha256": "7c6aef8a32f96ddc41bc7abb6faeac689cb46c7f14003ddf0245c8398a4c0dd9"
+    },
+    {
+      "path": "DL_models/five_model_comparison/text_cnn.pt",
+      "bytes": 3169048,
+      "sha256": "679b530bd7af30d5da0cefa18fc606a490fc3e5d3b745073abd507c128e66fb8"
+    },
+    {
+      "path": "DL_models/five_model_comparison/tfidf_vectorizer.joblib",
+      "bytes": 684376,
+      "sha256": "59e7b03b3296c97f455631eb068e36b4c6370116e0b266bd3dad45700fc51a83"
+    },
+    {
+      "path": "DL_models/roberta_tuning_best/klue_roberta/config.json",
+      "bytes": 1239,
+      "sha256": "b4580ab28b397440f1832a1e0759ba7e0c72bdec5ae2280a4520a21b0c19a104"
+    },
+    {
+      "path": "DL_models/roberta_tuning_best/klue_roberta/model.safetensors",
+      "bytes": 442508896,
+      "sha256": "20641adb1d9864376236cdacfd3347708344cbf70525665432d1bab967e152d6"
+    },
+    {
+      "path": "DL_models/roberta_tuning_best/klue_roberta/tokenizer.json",
+      "bytes": 752264,
+      "sha256": "7ce88996cbefc7d8313592c7fdabfb3572d4b3b35e49d45188a8d3b7ffc1987f"
+    },
+    {
+      "path": "DL_models/roberta_tuning_best/klue_roberta/tokenizer_config.json",
+      "bytes": 471,
+      "sha256": "7c6aef8a32f96ddc41bc7abb6faeac689cb46c7f14003ddf0245c8398a4c0dd9"
+    },
+    {
+      "path": "DL_models/roberta_tuning_best/klue_roberta_full_model.pt",
+      "bytes": 442613817,
+      "sha256": "d369b4aad6df873e42f988571dab43e9177ef34e5e0336dcc0fd49f69eb94cd6"
+    },
+    {
+      "path": "ML_models/Complement_NB_best.pkl",
+      "bytes": 1840657,
+      "sha256": "f8d90e0fb13c7da90f88f9214239ed1e5eff8f86faa42ec9a507dcc2015acb5d"
+    },
+    {
+      "path": "ML_models/Extra_Trees_best.pkl",
+      "bytes": 36757365,
+      "sha256": "56372d94e1e6342de9a59bfb4adf68a9e0ff51ce5a540718bff5ae94cb1318eb"
+    },
+    {
+      "path": "ML_models/Kernel_SVM_best.pkl",
+      "bytes": 398436,
+      "sha256": "36ff45011a7da04d073e46d353615f0a0218358b0de61bdb448e0c00e7e47711"
+    },
+    {
+      "path": "ML_models/Linear_SVC_best.pkl",
+      "bytes": 337144,
+      "sha256": "dd4adc36e78a9d078de8662886f8bf4e46bf2ed0363ffae20827139386f4ca95"
+    },
+    {
+      "path": "ML_models/Logistic_Regression_best.pkl",
+      "bytes": 337276,
+      "sha256": "77e1648fb64709a1a7e28fade8a9e883e4d0adb300d8312716c67fceb709afca"
+    },
+    {
+      "path": "ML_models/Random_Forest_best.pkl",
+      "bytes": 24337653,
+      "sha256": "6e910500dcf12a4592eca1b247a43a37fae8e9faac0ef55472c283a0fbb6b7f3"
+    },
+    {
+      "path": "ML_models/SGD_Classifier_best.pkl",
+      "bytes": 337434,
+      "sha256": "d386c2397ea457e373f1c8b2fd97d936568712ce40912dff68d2d91b7ed92e26"
+    }
+  ]
+}

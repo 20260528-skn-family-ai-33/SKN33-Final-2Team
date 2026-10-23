@@ -24,6 +24,8 @@ database/data/**
 database/logs/
 *.dump
 *.sqlite3*
+*.pkl
+*.joblib
 *.safetensors
 *.pt
 *.gguf
