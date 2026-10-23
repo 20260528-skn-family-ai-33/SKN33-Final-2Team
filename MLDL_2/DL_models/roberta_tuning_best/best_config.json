@@ -1,0 +1,20 @@
+{
+  "model_name": "klue/roberta-base",
+  "trial": 2,
+  "epoch": 6,
+  "learning_rate": 1e-05,
+  "batch_size": 16,
+  "weight_decay": 0.01,
+  "max_length": 128,
+  "seed": 42,
+  "train_loss": 0.013903546193614603,
+  "train_eval_loss": 0.004756693318486213,
+  "train_accuracy": 1.0,
+  "train_macro_f1": 1.0,
+  "test_loss": 0.012015247475355864,
+  "test_accuracy": 0.9975,
+  "test_macro_f1": 0.9974999374984375,
+  "val_loss": 0.5376236402988434,
+  "val_accuracy": 0.9,
+  "val_macro_f1": 0.8952268233064639
+}
