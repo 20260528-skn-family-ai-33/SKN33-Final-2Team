@@ -1,0 +1,11 @@
+{
+  "model_name": "klue/roberta-base",
+  "dataset": "val.csv",
+  "selection_metric": "val_macro_f1",
+  "samples": 200,
+  "selected_trial": 2,
+  "selected_epoch": 6,
+  "loss": 0.5376236402988434,
+  "accuracy": 0.9,
+  "macro_f1": 0.8952268233064639
+}
