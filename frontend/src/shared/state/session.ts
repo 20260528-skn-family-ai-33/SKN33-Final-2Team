@@ -1,5 +1,5 @@
 /* 계정 (서버 로그인 · 직원/관리자) — 5차 gp-core.js 의 GP.ACCOUNT·setAccount·boot·logout 을 옮김.
-   계정은 로그아웃한 뒤 다시 로그인해야만 바뀐다. 부서장 권한·소속 직원은 서버가 부서 계층으로 정한다.
+   계정은 로그아웃한 뒤 다시 로그인해야만 바뀐다. 부서장 권한·소속 직원은 서버가 부서로 정한다.
    부서장의 소속 직원 목록은 부서장 화면에 들어갈 때 받는다(features/team/teamData.ts · 5차의 로그인 때 미리 받기는 쓰는 곳이 없어 뺌) */
 import { create } from 'zustand';
 import { accountApi } from '@/api/endpoints/account';

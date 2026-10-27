@@ -26,7 +26,7 @@ STATUS = ('재직', '휴직', '퇴직')
 DEPT = Sheet('부서', ('code',), [
     Col('부서 코드', 'code', required=True, help='부서를 찾는 열쇠. 새 부서는 겹치지 않는 영문·숫자 코드로 적어요', example='BIZ', width=14),
     Col('부서 이름', 'name', required=True, example='업무시스템팀', width=20),
-    Col('상위 부서 코드', 'parent', help='위 부서의 코드. 맨 위 부서는 비워요. 부서장 범위(내 부서 + 바로 아래 부서의 부서장)가 이 관계로 정해져요', example='DIGITAL', width=14),
+    Col('상위 부서 코드', 'parent', help='위 부서의 코드. 맨 위 부서는 비워요', example='DIGITAL', width=14),
     Col('부서장', 'head_name', readonly=True, width=12),
     Col('직원 수', 'members', 'int', readonly=True, width=8),
 ], help='부서와 상위 부서. 지우려면 그 부서에 직원과 아래 부서가 없어야 해요')

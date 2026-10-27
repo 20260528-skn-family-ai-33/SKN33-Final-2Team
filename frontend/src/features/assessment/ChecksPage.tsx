@@ -25,7 +25,7 @@ export function ChecksPage() {
   return (
     <Page
       title="점검·보고서"
-      lead={sup ? `점검 응답은 나만 봐요. 결과 보고서는 내 계획을 보는 부서장 ${sup.name} 님도 볼 수 있어요.` : '점검 응답과 결과 보고서는 나만 봐요(내 계획을 보는 부서장 없음).'}
+      lead={sup ? `점검 응답은 나만 봐요. 결과 보고서는 내 계획을 보는 부서장 ${sup.name} 님도 볼 수 있어요.` : undefined}
     >
       {act.length ? (
         <div className="card acc">

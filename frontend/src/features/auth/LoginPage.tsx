@@ -221,7 +221,7 @@ export function LoginPage() {
           <Feat ic="chat" t="사내 생활 도우미" d="업무·사내 생활 질문에 답하고, 규정 질문은 기관 규정 원문의 근거 조항과 함께 답해요." />
         </div>
         <p className="small" style={{ marginTop: 'auto', opacity: 0.82 }}>
-          부서장은 자기 부서 직원과 바로 아래 부서의 부서장이 확정한 로드맵·진행 상태·결과 보고서를 보고 코멘트만 남겨요.
+          부서장은 자기 부서 직원이 확정한 로드맵·진행 상태·결과 보고서를 보고 코멘트만 남겨요.
         </p>
       </aside>
     </div>

@@ -447,7 +447,6 @@ def _patch_current_support(roadmap_id: str, support: dict) -> None:
         row = t.one('SELECT content FROM public.roadmaps WHERE roadmap_id = CAST(:r AS uuid) FOR UPDATE', r=roadmap_id)
         content = row['content']
         content.setdefault('def', {})['support'] = support
-        _actor_for_comments(t, roadmap_id)
         t.run('UPDATE public.roadmaps SET content = :c, updated_at = now() WHERE roadmap_id = CAST(:r AS uuid)', c=db.J(content), r=roadmap_id)
         t.run("UPDATE app_ext.roadmap_versions SET plan = :c WHERE roadmap_id = CAST(:r AS uuid) AND version = :v", c=db.J(content), r=roadmap_id, v=content.get('version'))
 
@@ -464,17 +463,6 @@ def revision_support_retry(employee_id: int, roadmap_id: str) -> str | None:
     return revision_support(employee_id, roadmap_id, str(rv['revision_id']))
 
 
-def _actor_for_comments(t: db.Tx, roadmap_id: str) -> None:
-    """로드맵 내용이 바뀌면 팀 DB 트리거가 코멘트를 '수정 완료'로 바꾼다. 그 갱신은 코멘트 작성자 정보가 있어야 통과한다.
-    한 로드맵의 코멘트는 보통 내 계획을 보는 부서장 한 명이 쓴다. 작성자가 둘 이상이면 저장이 막혀 오류로 알린다(팀원 요청 목록)"""
-    authors = [r['author_employee_id'] for r in t.all('SELECT DISTINCT author_employee_id FROM public.roadmap_comments WHERE roadmap_id = CAST(:r AS uuid)', r=roadmap_id)]
-    if len(authors) == 1:
-        t.actor(authors[0])
-    elif len(authors) > 1:
-        raise ApiError(409, 'COMMENT_TRIGGER', '이 로드맵에 코멘트를 남긴 부서장이 여러 명이라 지금은 새 버전을 저장할 수 없어요. 담당자에게 알려 주세요',
-                       '팀 DB 트리거(mark_roadmap_comments_modified → guard_roadmap_comment)가 코멘트 작성자 한 명의 정보만 받을 수 있어요. 팀원 요청 목록 참고')
-
-
 def accept_revision(employee_id: int, roadmap_id: str, revision_id: str) -> dict:
     row = _owned(employee_id, roadmap_id)
     with db.tx() as t:
@@ -486,7 +474,7 @@ def accept_revision(employee_id: int, roadmap_id: str, revision_id: str) -> dict
         from .drafts import selection_of
         plan = dict(pd['to'], version=cur['version'] + 1, confirmedAt=today(), why=pd['label'], assess=cur.get('assess'), prefs=pd['prefsTo'], handoff=pd['handoff'],
                     selection=selection_of(pd['to']['def']) if changed else cur.get('selection'))
-        _actor_for_comments(t, roadmap_id)
+        # 로드맵 내용이 바뀌면 팀 DB 트리거가 코멘트에 '수정 완료' 시각만 적는다. 그 갱신은 작성자 검사 트리거(본문·작성자·로드맵 열)를 거치지 않는다
         t.run('UPDATE public.roadmaps SET content = :c, strategy_type = :st, strategy_title = :tt, summary = :s, updated_at = now() WHERE roadmap_id = :r',
               c=db.J(plan), st=plan['opt'], tt=plan['name'], s=plan['tagline'], r=row['roadmap_id'])
         _write_steps(t, roadmap_id, plan)

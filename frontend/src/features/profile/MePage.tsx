@@ -114,7 +114,7 @@ function PermCard({ e }: { e: User }) {
         <h2 className="st">권한·공개 범위</h2>
         <span className="tag line">
           <Icon name="lock" />
-          부서 계층 · 관리자가 정함
+          부서 · 관리자가 정함
         </span>
       </div>
       <dl className="kv me-kv">
@@ -129,7 +129,7 @@ function PermCard({ e }: { e: User }) {
               있음 · {e.supGroup?.name} 부서장
               <br />
               <span className="small muted">
-                볼 수 있는 직원 {ms.length}명(내 부서 직원 + 바로 아래 부서의 부서장): {ms.map((m) => m.name).join(', ')}
+                볼 수 있는 직원 {ms.length}명: {ms.map((m) => m.name).join(', ')}
               </span>{' '}
               <button className="link" onClick={() => go(paths.team)}>
                 소속 직원 계획 <Icon name="right" />
@@ -152,16 +152,16 @@ function PermCard({ e }: { e: User }) {
               </span>
             </>
           ) : (
-            <>
-              없음 <span className="small muted">· 내 계획은 나만 봐요</span>
-            </>
+            '없음'
           )}
         </dd>
       </dl>
-      <p className="small muted me-foot">
-        {my ? `${my.name} 님은 내 소속·직급·직위, 확정 로드맵, 활동 진행 상태, 결과 보고서를 볼 수 있어요. ` : ''}활동 메모·첨부, 작성 중인 로드맵, 본인 입력 정보는 부서장 화면에
-        보이지 않아요.
-      </p>
+      {my ? (
+        <p className="small muted me-foot">
+          {my.name} 님은 내 소속·직급·직위, 확정 로드맵, 활동 진행 상태, 결과 보고서를 볼 수 있어요. 활동 메모·첨부, 작성 중인 로드맵, 본인 입력 정보는 부서장
+          화면에 보이지 않아요.
+        </p>
+      ) : null}
     </div>
   );
 }

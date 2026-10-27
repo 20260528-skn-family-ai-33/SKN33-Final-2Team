@@ -1,7 +1,8 @@
 """직원 프로필·권한 (설계서 v1.7 API-04~08 · 5.1 접근 범위).
 
-부서장 범위(2026-10-21 사용자 결정): 부서장은 자기 부서의 직원 + 바로 아래 부서의 부서장을 본다(4차 감독 그룹과 같은 결과).
-내 계획을 보는 부서장 = 자기 부서의 부서장, 내가 부서장이면 바로 위 부서의 부서장. 부서장 권한은 팀 DB employees.is_department_head.
+부서장 범위(2026-10-27 팀 합의 · 팀 DB employee_can_read_employee 와 같음): 부서장은 자기 부서의 직원만 본다.
+내 계획을 보는 부서장 = 자기 부서의 부서장, 부서장의 계획은 본인만 본다. 상위 부서는 표시·목표 후보 입력에만 쓰고 권한에는 쓰지 않는다.
+부서장 권한은 팀 DB employees.is_department_head.
 화면에는 4차와 같은 모양(view)으로 주고, 설계서 API 모양(hr·permission·self·evaluations)도 함께 준다.
 """
 from __future__ import annotations
@@ -27,7 +28,7 @@ def _grade(name: str | None) -> str:
 def _rows() -> list[dict]:
     # 입사일·현재 근무 시작일은 팀 DB employees(#22 최신 DB 의 hire_date·department_start_date)를 먼저 쓴다
     return db.all_(f"""SELECT e.employee_id, e.employee_number, e.name, e.is_department_head, e.department_id, e.source_type,
-            coalesce(d.name, e.department) AS dept, pd.name AS parent_dept, d.parent_department_id,
+            coalesce(d.name, e.department) AS dept, pd.name AS parent_dept,
             coalesce(g.name, e.grade) AS grade, coalesce(j.title, e.job_title) AS job,
             {EMP_GROUP_SQL} AS employee_group, coalesce(e.hire_date, h.hire_date) AS hire_date, h.position, h.job_family, h.task,
             h.employment_status, h.account_status, h.grade_since, coalesce(e.department_start_date, h.valid_from) AS valid_from, h.change_reason
@@ -45,21 +46,15 @@ def _ref(r: dict) -> dict:
 
 
 def supervisor_of(r: dict, rows: list[dict]) -> dict | None:
-    if not r['department_id']:
+    if not r['department_id'] or r['is_department_head']:
         return None
-    if not r['is_department_head']:
-        h = next((x for x in rows if x['department_id'] == r['department_id'] and x['is_department_head'] and x['employee_id'] != r['employee_id']), None)
-    else:
-        h = next((x for x in rows if r['parent_department_id'] and x['department_id'] == r['parent_department_id'] and x['is_department_head']), None)
-    return h
+    return next((x for x in rows if x['department_id'] == r['department_id'] and x['is_department_head']), None)
 
 
 def members_of(r: dict, rows: list[dict]) -> list[dict]:
     if not r['is_department_head'] or not r['department_id']:
         return []
-    child_depts = {x['department_id'] for x in rows if x['parent_department_id'] == r['department_id']}
-    return [x for x in rows if x['employee_id'] != r['employee_id'] and (
-        (x['department_id'] == r['department_id'] and not x['is_department_head']) or (x['department_id'] in child_depts and x['is_department_head']))]
+    return [x for x in rows if x['department_id'] == r['department_id'] and not x['is_department_head']]
 
 
 def member_ids(employee_id: int) -> set[int]:
@@ -186,7 +181,7 @@ def view(employee_id: int, rows: list[dict] | None = None) -> dict | None:
         'accountStatus': r['account_status'] or 'active', 'validFrom': str(r['valid_from']) if r['valid_from'] else None, 'changeReason': r['change_reason'],
         'gradeSince': str(r['grade_since']) if r['grade_since'] else None,
         'supGroup': {'name': r['dept'], 'id': str(r['department_id'])} if r['is_department_head'] and r['department_id'] else None,
-        'members': [_ref(x) for x in ms], 'planGroup': {'name': sup['dept'] if sup and r['is_department_head'] else r['dept'], 'id': str(sup['department_id'])} if sup else None,
+        'members': [_ref(x) for x in ms], 'planGroup': {'name': r['dept'], 'id': str(sup['department_id'])} if sup else None,
         'mySupervisor': _ref(sup) if sup else None,
         'profile': {k: src.get(k) for k in ('workDesc', 'expStatus', 'expSummary', 'devYears', 'inputStatus')} if has_profile else None,
         **{k: list(src.get(k) or []) for k in LISTS},

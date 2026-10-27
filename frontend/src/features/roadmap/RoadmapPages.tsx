@@ -303,18 +303,14 @@ function Confirmed({ R }: { R: PlanRecord }) {
               <span>진행 중인 다른 로드맵 {others}개도 그대로 함께 진행돼요.</span>
             </div>
           ) : null}
-          <div className="row top">
-            <Icon name="users" />
-            <span>
-              {sup ? (
-                <>
-                  내 계획을 보는 부서장 {sup.name} 님은 <b>확정한 로드맵, 진행 상태, 결과 보고서</b>를 볼 수 있어요.
-                </>
-              ) : (
-                '내 계획을 보는 부서장이 없어 로드맵과 보고서는 나만 봐요.'
-              )}
-            </span>
-          </div>
+          {sup ? (
+            <div className="row top">
+              <Icon name="users" />
+              <span>
+                내 계획을 보는 부서장 {sup.name} 님은 <b>확정한 로드맵, 진행 상태, 결과 보고서</b>를 볼 수 있어요.
+              </span>
+            </div>
+          ) : null}
           <div className="row top">
             <Icon name="lock" />
             <span>
