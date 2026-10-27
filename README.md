@@ -225,7 +225,7 @@ DB(PostgreSQL 17 + pgvector) → 팀 DB 백업 복원 → 보충 자료 → 백�
 | 화면 고치기 | Node.js 20.19 이상(24 권장)·npm | `npm ci --prefix frontend` (버전은 `frontend/package-lock.json`에 고정) |
 | 파이썬으로 직접 실행·DB 작업 | Python 3.12 | `pip install -r requirements.txt` (`backend/requirements.txt` + `database/requirements.txt`) |
 
-1. `.env.example`을 복사해 `.env`로 두고 `GP5_DB_PASSWORD`·`GP5_DEMO_PASSWORD`를 정합니다(값은 저장소에 적지 않습니다).
+1. `.env.example`을 복사해 `.env`로 두고 `GP5_DB_PASSWORD`·`GP5_DEMO_PASSWORD`를 정합니다(값은 저장소에 적지 않습니다). RunPod-Ollama를 쓰려면 `OLLAMA_BASE_URL`·`OLLAMA_API_KEY`를 넣습니다. 예시 기본값은 모델 `qwen3.8:27b`, 생각(thinking) 모드 끔, 응답 제한 시간 300초입니다.
 2. DB 담당에게 받은 팀 DB 백업을 `team_db/`에, 규정 원문 PDF를 `team_db/regulations/`에, 직원 가데이터 엑셀을 `backend/data/seed/`에 넣습니다(각 폴더 README 참고).
 3. `docker compose up -d --build`로 실행합니다. 화면은 <http://localhost:8816>, 백엔드 API 문서는 <http://localhost:8815/api/docs>입니다.
 4. `docker compose down`으로 끕니다(데이터는 볼륨에 남습니다).
