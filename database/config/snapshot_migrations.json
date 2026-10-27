@@ -1,0 +1,130 @@
+{
+  "format": 1,
+  "origin": "20261026 supplied logical snapshot",
+  "source_dump_relative_path": "data/import_sources/20261026/growpath_latest.dump",
+  "source_dump_sha256": "ccabce5d279f59418161c3f3ad11d5de9eca8c2de5fe7af01f2a6f45444d7955",
+  "applied_snapshot_migrations": [
+    {
+      "version": "001_existing_schema.sql",
+      "sha256": "750402617f3ba2b263f975a70e980c1398c8de62e92dc7978b23b3ad38be3602",
+      "applied_at": "2026-10-13 04:54:37.88539+00",
+      "sql_file_available": true
+    },
+    {
+      "version": "002_application_storage.sql",
+      "sha256": "20ce76ff6b9e95eedf2fff40e599a048adc7bc7faaba0974295d4d6110d8552e",
+      "applied_at": "2026-10-13 04:54:37.88539+00",
+      "sql_file_available": true
+    },
+    {
+      "version": "003_regulation_schema.sql",
+      "sha256": "564b1a9f3ba1f4cfee83888942068bfae70490faac76fad3403a8298626f4f39",
+      "applied_at": "2026-10-13 04:54:37.88539+00",
+      "sql_file_available": true
+    },
+    {
+      "version": "004_server_access.sql",
+      "sha256": "31e0c3adcb1c924adc0cbe28dbe563e5437f23ce0255938d34fb87e817871f56",
+      "applied_at": "2026-10-13 04:54:37.88539+00",
+      "sql_file_available": true
+    },
+    {
+      "version": "005_evaluation_criteria.sql",
+      "sha256": "b772d9e7b473e065e1523ba3cf7642a26e8b7fa04ab605a3ba76ff5c77a9a287",
+      "applied_at": "2026-10-15 01:24:42.673184+00",
+      "sql_file_available": true
+    },
+    {
+      "version": "006_archive_historical_workflow.sql",
+      "sha256": "60a1fbb84234c1abc27d7ba548d73c42ec3ccc7d4fc783363b4f5f102274dfc0",
+      "applied_at": "2026-10-20 00:17:15.938465+00",
+      "sql_file_available": true
+    },
+    {
+      "version": "007_final_schema.sql",
+      "sha256": "6a99ca4b50e7e85c16e09f5917b5bfd1ff0143b06233696655ec50c871074222",
+      "applied_at": "2026-10-20 07:37:02.343724+00",
+      "sql_file_available": true
+    },
+    {
+      "version": "008_remove_empty_archives.sql",
+      "sha256": "bb4c50a109c56646b4736d03a651e5a33c124c7fc9b51a536fb03d0eb24c380d",
+      "applied_at": "2026-10-20 07:40:55.11766+00",
+      "sql_file_available": true
+    },
+    {
+      "version": "009_course_image_url.sql",
+      "sha256": "3dd1ae353845c7a0114c0dad7f74d241e2887e8fc35300c50e1c6d969884760a",
+      "applied_at": "2026-10-20 08:07:39.534193+00",
+      "sql_file_available": true
+    },
+    {
+      "version": "010_resource_image_urls.sql",
+      "sha256": "29cbee9a8288be797b0b3435b08850c3e40dba25b262eddc07852869cd1b476e",
+      "applied_at": "2026-10-20 08:08:59.42233+00",
+      "sql_file_available": true
+    },
+    {
+      "version": "011_employee_recommended_prompts.sql",
+      "sha256": "e89c6a1fa235f64652319a399d9c92751cc2d373645027f9dafb7cb35b9e237c",
+      "applied_at": "2026-10-21 01:14:35.380962+00",
+      "sql_file_available": true
+    },
+    {
+      "version": "012_prompt_generation_links.sql",
+      "sha256": "b2a916735f643c1c1f56db792aeda7fc19dbbbd78ae84d9332d8d612f68b7a8e",
+      "applied_at": "2026-10-21 01:55:19.34994+00",
+      "sql_file_available": true
+    },
+    {
+      "version": "013_course_enrollment_period.sql",
+      "sha256": "dfd4cc056732321f8f42d69c7eef264304da8c3e69b61ef16ce19d67ad12b59c",
+      "applied_at": "2026-10-22 05:02:17.086301+00",
+      "sql_file_available": false
+    },
+    {
+      "version": "014_skill_ai_mention.sql",
+      "sha256": "a476c3caac232230585c820d27190a0ca64f673a4f12405c69fa04e9edb473df",
+      "applied_at": "2026-10-22 05:04:19.228905+00",
+      "sql_file_available": false
+    },
+    {
+      "version": "015_resource_ai_mention.sql",
+      "sha256": "6f65fbaebe69d6bee61b1891a1f67243ce3638806e704def1fa196f47aabb146",
+      "applied_at": "2026-10-22 05:08:24.066397+00",
+      "sql_file_available": false
+    },
+    {
+      "version": "016_employee_dates.sql",
+      "sha256": "9a580222d4ac1461cb0f6339c45edef0d1641f11d84a6b6000b658f955dc3045",
+      "applied_at": "2026-10-22 05:39:40.422484+00",
+      "sql_file_available": false
+    },
+    {
+      "version": "017_employee_planned_project.sql",
+      "sha256": "09dc26cebd265654a83c791cfbec4aee4b797400d1d0dfd666c128e4b34c277d",
+      "applied_at": "2026-10-26 01:01:32.812163+00",
+      "sql_file_available": false
+    },
+    {
+      "version": "018_employee_unlisted_certifications.sql",
+      "sha256": "3e009786db284526fc2f6c3a236f2d43b40dcbda9dc30be4db6cce72429d1a6a",
+      "applied_at": "2026-10-26 01:01:32.812163+00",
+      "sql_file_available": false
+    },
+    {
+      "version": "019_education_dates.sql",
+      "sha256": "b261bb44ae1877442860ee10d1bd7ef29470967fe97eaf9bdb4d94e8157894cc",
+      "applied_at": "2026-10-26 01:01:32.812163+00",
+      "sql_file_available": false
+    },
+    {
+      "version": "020_employee_number_required.sql",
+      "sha256": "8c7ca32ab63f09e7f2952a6b95c61a81e7c988a00ac4caa7f95d72fa82c50cc5",
+      "applied_at": "2026-10-26 01:01:32.812163+00",
+      "sql_file_available": false
+    }
+  ],
+  "unavailable_sql_note": "Original 013-020 SQL files were not provided. Preserve their recorded hashes, not reconstructed files claiming to be originals. Fresh setup restores the verified logical snapshot before applying local 021+ migrations.",
+  "legacy_form_sql_relative_path": "data/import_sources/legacy_v2/013_employee_input_storage.sql"
+}

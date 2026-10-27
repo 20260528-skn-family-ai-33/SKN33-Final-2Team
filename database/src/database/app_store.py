@@ -7,6 +7,22 @@ from src.shared.assessment_schema import validate_questions,validate_responses
 
 def extend(Base):
  class Store(Base):
+    def get_employee_input_form(self,employee_id,*,actor_employee_id):
+        from .db_client import user_id_value
+        from .employee_form import get_employee_input_form
+        if user_id_value(employee_id)!=user_id_value(actor_employee_id):
+            raise ValueError('Employee form is private to its owner')
+        with self.transaction() as c:
+            return get_employee_input_form(c,user_id_value(employee_id))
+
+    def save_employee_input_profile(self,employee_id,profile,*,actor_employee_id):
+        from .db_client import user_id_value
+        from .employee_form import save_employee_input_form
+        if user_id_value(employee_id)!=user_id_value(actor_employee_id):
+            raise ValueError('Employee form is private to its owner')
+        with self.transaction() as c:
+            return save_employee_input_form(c,user_id_value(employee_id),{'profile':profile})
+
     def get_employee_recommended_prompts(self,employee_id):
         with self.transaction() as c:
             return c.execute('SELECT prompt_id,employee_id,prompt_text,display_order,updated_at FROM public.employee_recommended_prompts WHERE employee_id=%s ORDER BY display_order NULLS LAST,prompt_id',(employee_id,)).fetchall()

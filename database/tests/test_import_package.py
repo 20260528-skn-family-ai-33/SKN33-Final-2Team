@@ -41,6 +41,19 @@ class ImportPackageTests(unittest.TestCase):
 
 
 class ErdTemplateTests(unittest.TestCase):
+    def test_render_has_explicit_reproducible_crlf_bytes(self):
+        with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parent) as folder:
+            template, output = Path(folder) / 'template.html', Path(folder) / 'erd.html'
+            expected = b'<script>\r\nconst D = {};\r\n</script>\r\n'
+            original_write = Path.write_text
+            for source in (expected, expected.replace(b'\r\n', b'\n')):
+                template.write_bytes(source)
+                with patch.object(erd, 'snapshot', return_value={}), \
+                     patch.object(Path, 'write_text', autospec=True, side_effect=original_write) as write:
+                    erd.render(None, template, output)
+                    self.assertEqual(write.call_args.kwargs['newline'], '\r\n')
+                self.assertEqual(output.read_bytes(), expected)
+
     def test_schema_refresh_preserves_external_layout_and_controls(self):
         root = Path(__file__).resolve().parents[2]
         template = (root / "docs/07_데이터베이스_저장소_설계/ERD_최종.html").read_text(encoding="utf-8")

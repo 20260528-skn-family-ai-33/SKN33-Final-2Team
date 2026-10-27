@@ -25,7 +25,7 @@ def active(c):
 
 def snapshot(c):
  result={}
- tables=c.execute("SELECT n.nspname AS schema,t.relname AS name FROM pg_class t JOIN pg_namespace n ON n.oid=t.relnamespace WHERE t.relkind='r' AND n.nspname IN ('public','regulations','growpath_meta','growpath_legacy') ORDER BY 1,2").fetchall()
+ tables=c.execute("SELECT n.nspname AS schema,t.relname AS name FROM pg_class t JOIN pg_namespace n ON n.oid=t.relnamespace WHERE t.relkind='r' AND n.nspname IN ('public','regulations','growpath_meta','growpath_legacy','knowledge') ORDER BY 1,2").fetchall()
  for t in tables:
   key=t['schema']+'.'+t['name']
   cols=c.execute("SELECT a.attname AS column,format_type(a.atttypid,a.atttypmod) AS type,a.attnotnull AS not_null,pg_get_expr(d.adbin,d.adrelid) AS default,a.attidentity AS identity,a.attgenerated AS generated FROM pg_attribute a LEFT JOIN pg_attrdef d ON d.adrelid=a.attrelid AND d.adnum=a.attnum WHERE a.attrelid=%s::regclass AND a.attnum>0 AND NOT a.attisdropped ORDER BY a.attnum",(key,)).fetchall()
@@ -101,6 +101,8 @@ def _followup_migrations(c):
 
 def migrate(c):
  c.execute('SELECT pg_advisory_xact_lock(763250130)')
+ from .snapshot_provenance import verify_snapshot_history
+ verify_snapshot_history(c)
  sha=hashlib.sha256(MIGRATION.read_bytes()).hexdigest()
  if active(c):
   row=c.execute('SELECT sha256 FROM growpath_meta.schema_migrations WHERE version=%s',(MIGRATION.name,)).fetchone()
@@ -133,12 +135,13 @@ def verify(c):
   if actual['pk']!=spec['pk']:raise ValueError('Primary key mismatch: '+table)
   signature=lambda f:(tuple(f['columns']),f['target'],tuple(f['target_columns']))
   if not {signature(f) for f in spec['fks']}.issubset({signature(f) for f in actual['fks']}):raise ValueError('Foreign key mismatch: '+table)
- invalid=c.execute("SELECT conname FROM pg_constraint WHERE NOT convalidated AND connamespace IN (SELECT oid FROM pg_namespace WHERE nspname IN ('public','regulations','growpath_meta','growpath_legacy'))").fetchall()
- if invalid:raise ValueError('Unvalidated DB constraints remain')
+ from .snapshot_provenance import deferred_employee_number_constraint,verify_snapshot_history
+ provenance=verify_snapshot_history(c)
+ pending=deferred_employee_number_constraint(c)
  counts=[]
  for table in meta:
   schema,name=table.split('.')
   n=c.execute(sql.SQL('SELECT COUNT(*) AS n FROM {}.{}').format(sql.Identifier(schema),sql.Identifier(name))).fetchone()['n']
   counts.append({'table':table,'count':n})
  vectors=c.execute('SELECT resource_type,count(*) AS n FROM public.learning_resource_embeddings GROUP BY resource_type ORDER BY resource_type').fetchall()
- return {'schema_and_foreign_keys':'pass','tables':counts,'foreign_keys':sum(len(x['fks']) for x in meta.values()),'resource_vectors':vectors,'unconfirmed_employee_profiles':c.execute('SELECT count(*) AS n FROM public.employees WHERE institution_id IS NULL OR department_id IS NULL OR job_grade_id IS NULL OR job_id IS NULL').fetchone()['n']}
+ return {'schema_and_foreign_keys':'pass','verification_status':'pass_with_warnings' if pending else 'pass','pending_constraints':pending,'snapshot_provenance':provenance,'tables':counts,'foreign_keys':sum(len(x['fks']) for x in meta.values()),'resource_vectors':vectors,'unconfirmed_employee_profiles':c.execute('SELECT count(*) AS n FROM public.employees WHERE institution_id IS NULL OR department_id IS NULL OR job_grade_id IS NULL OR job_id IS NULL').fetchone()['n']}

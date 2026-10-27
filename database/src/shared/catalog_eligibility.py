@@ -1,10 +1,12 @@
 """Fail closed on unknown availability. No generated evidence and no DB mutations."""
+from src.shared.catalog_scope import scope_reason, scoped_matches
 from collections import Counter
 from datetime import datetime, timezone
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, unquote, urlsplit
 from zoneinfo import ZoneInfo
 
 from src.shared.catalog_quality import missing_fields, certification_availability
+from src.shared.course_sources import step_reason, kmooc_reason
 
 PRIMARY_KEYS = {'courses': 'course_id', 'books': 'isbn', 'certifications': 'cert_id',
                 'jobs': 'job_id', 'majors': 'major_id'}
@@ -32,7 +34,12 @@ def public_url(value, hosts):
 
 
 def exclusion_reason(kind, fields, source, raw, fetched_at, *, now=None):
+    reason = scope_reason(kind, fields, source, raw)
+    if reason:
+        return reason
     now = now or datetime.now(timezone.utc)
+    if fields.get('content_status') not in (None, 'ready'):
+        return 'not_ready'
     if kind == 'books':
         return 'insufficient_catalog_metadata' if missing_fields(kind, fields) else None
     checked = timestamp(fetched_at)
@@ -63,16 +70,76 @@ def exclusion_reason(kind, fields, source, raw, fetched_at, *, now=None):
             return 'retired_or_retiring_or_uncertain'
         return None
     if kind == 'courses':
+        if source == 'WEB_INFLEARN':
+            url = str(fields.get('url') or '')
+            source_id = str(raw.get('source_id') or '')
+            parsed = urlsplit(url)
+            info = raw.get('course_info') or {}
+            lessons = raw.get('lessons') or []
+            if (not public_url(url, {'www.inflearn.com'}) or raw.get('url') != url
+                    or not source_id.isascii() or not source_id.isdigit()
+                    or fields.get('course_id') != 'INFLEARN_' + source_id
+                    or str(info.get('id')) != source_id
+                    or unquote(parsed.path) != '/course/' + str(info.get('slug') or '')
+                    or parse_qs(parsed.query) != {'cid': [source_id]}
+                    or info.get('status') != 'PUBLISH' or info.get('originalLanguage') != 'KO'
+                    or raw.get('http_status') != 200
+                    or raw.get('availability_basis') != 'published_sale_offer'
+                    or raw.get('metadata_exposure') is not True
+                    or info.get('title') != fields.get('title')
+                    or not isinstance(lessons, list)):
+                return 'missing_current_inflearn_curriculum_or_enrollment'
+            price = (info.get('paymentInfo') or {}).get('krwPaymentPrice')
+            payment = info.get('paymentInfo') or {}
+            if (payment.get('type') not in {'REGULAR_PRICE_PURCHASE', 'DISCOUNTED_PURCHASE', 'FREE'}
+                    or type(price) is not int or price < 0 or fields.get('cost') != price):
+                return 'missing_factual_inflearn_price'
+            if payment.get('type') == 'FREE' and price != 0:
+                return 'missing_factual_inflearn_price'
+            videos = [r for r in lessons if isinstance(r, dict) and r.get('title') and r.get('hasVideo') is True]
+            return None if len(videos) >= 2 else 'missing_current_inflearn_curriculum_or_enrollment'
+        if source == 'WEB_OPENTUTORIALS':
+            url = str(fields.get('url') or '')
+            source_id = str(raw.get('source_id') or '')
+            lessons = raw.get('lessons') or []
+            if (not public_url(url, {'opentutorials.org'}) or raw.get('url') != url
+                    or not source_id.isascii() or not source_id.isdigit()
+                    or fields.get('course_id') != 'OPENTUTORIALS_' + source_id
+                    or urlsplit(url).path != '/course/' + source_id or urlsplit(url).query
+                    or raw.get('http_status') != 200 or raw.get('public_marker_present') is not True
+                    or fields.get('cost') != 0 or not isinstance(lessons, list)):
+                return 'missing_current_opentutorials_public_curriculum'
+            videos = [r for r in lessons if isinstance(r, dict) and r.get('title')
+                      and r.get('http_status') == 200 and r.get('video_embed_present') is True
+                      and public_url(r.get('url'), {'opentutorials.org'})
+                      and urlsplit(r['url']).path.startswith('/course/' + source_id + '/')]
+            return None if len(videos) >= 2 else 'missing_current_opentutorials_public_curriculum'
+        if source == 'WEB_KOCW':
+            url = str(fields.get('url') or '')
+            source_id = str(raw.get('source_id') or '')
+            until = timestamp(raw.get('available_until'))
+            lessons = raw.get('lessons')
+            if (not public_url(url, {'www.kocw.net', 'kocw.net'}) or raw.get('url') != url
+                    or not source_id.isascii() or not source_id.isdigit()
+                    or fields.get('course_id') != 'KOCW_' + source_id
+                    or urlsplit(url).path != '/home/search/kemView.do'
+                    or urlsplit(url).query != 'kemId=' + source_id
+                    or raw.get('http_status') != 200 or until is None or now >= until
+                    or not isinstance(lessons, list)):
+                return 'missing_current_kocw_public_curriculum'
+            videos = [row for row in lessons if isinstance(row, dict) and row.get('video_listed') is True
+                      and row.get('player_action_present') is True and not row.get('suspended_marker')
+                      and row.get('title')]
+            return None if len(videos) >= 2 else 'missing_current_kocw_public_curriculum'
         if source == 'API_MS_LEARN':
             if (raw.get('type') == 'module' and raw.get('uid') and raw.get('units')
                     and public_url(raw.get('url'), {'learn.microsoft.com'})):
                 return None
             return 'missing_published_learning_module'
         if source == 'API_KMOOC':
-            dates = [timestamp(raw.get(k)) for k in ('enrollment_start', 'enrollment_end', 'study_end')]
-            if all(dates) and dates[0] <= now <= dates[1] and now <= dates[2] and raw.get('public_yn') == 'Y':
-                return None
-            return 'course_not_confirmed_open'
+            return kmooc_reason(fields, raw, now)
+        if source == 'WEB_STEP':
+            return step_reason(fields, raw, now)
         return 'unsupported_availability_source'
     if kind == 'jobs' and source == 'API_CAREERNET':
         return None if (raw.get('detail_record') or {}).get('baseInfo', {}).get('job_cd') else 'missing_current_job_detail'
@@ -97,12 +164,7 @@ def eligible_keys(conn):
             key = (kind, str(fields[pk]))
             body = '\n'.join(str(fields.get(f) or '') for f in ('title','syllabus_summary','description','test_subjects','curriculum','ncs_units'))
             count += 1
-            if kind == 'books':
-                reason = exclusion_reason(kind, fields, None, None, None, now=None)
-                if reason:reasons[reason] += 1
-                else:eligible.add(key)
-                continue
-            if not matcher.match(body):
+            if not scoped_matches(matcher, fields):
                 reasons['no_it_skill_evidence'] += 1
                 continue
             failures = [exclusion_reason(kind, fields, s['source'], s['payload'], s['fetched_at'])

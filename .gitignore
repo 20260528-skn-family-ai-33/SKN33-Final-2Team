@@ -35,6 +35,10 @@ qwen_factory/data/
 **/outputs/
 **/reports/
 
+# Local DB work evidence and employee fixtures remain external.
+database/migration_work/
+database/src/database/demo_users.sql
+
 # ── 화면(frontend) · 이슈 #20 ──
 # 패키지·빌드 결과는 다시 만들 수 있어 올리지 않는다(.env·.env.* 는 위 규칙이 이미 막음)
 node_modules/

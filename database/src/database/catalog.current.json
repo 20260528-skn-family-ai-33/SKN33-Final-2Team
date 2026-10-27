@@ -1495,6 +1495,14 @@
         "default": null,
         "identity": "",
         "generated": ""
+      },
+      {
+        "column": "ai_mention",
+        "type": "text",
+        "not_null": false,
+        "default": null,
+        "identity": "",
+        "generated": ""
       }
     ],
     "pk": [
@@ -1709,6 +1717,14 @@
       },
       {
         "column": "image_url",
+        "type": "text",
+        "not_null": false,
+        "default": null,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "column": "ai_mention",
         "type": "text",
         "not_null": false,
         "default": null,
@@ -1975,6 +1991,38 @@
         "default": null,
         "identity": "",
         "generated": ""
+      },
+      {
+        "column": "enrollment_start",
+        "type": "timestamp with time zone",
+        "not_null": false,
+        "default": null,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "column": "enrollment_end",
+        "type": "timestamp with time zone",
+        "not_null": false,
+        "default": null,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "column": "enrollment_period_type",
+        "type": "text",
+        "not_null": true,
+        "default": "'unknown'::text",
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "column": "ai_mention",
+        "type": "text",
+        "not_null": false,
+        "default": null,
+        "identity": "",
+        "generated": ""
       }
     ],
     "pk": [
@@ -1989,6 +2037,39 @@
         "target": "-",
         "columns": [
           "difficulty"
+        ],
+        "target_columns": []
+      },
+      {
+        "name": "courses_enrollment_order_check",
+        "type": "c",
+        "definition": "CHECK (enrollment_start IS NULL OR enrollment_end IS NULL OR enrollment_start <= enrollment_end)",
+        "target": "-",
+        "columns": [
+          "enrollment_start",
+          "enrollment_end"
+        ],
+        "target_columns": []
+      },
+      {
+        "name": "courses_enrollment_type_check",
+        "type": "c",
+        "definition": "CHECK (enrollment_period_type = ANY (ARRAY['scheduled'::text, 'unrestricted'::text, 'unknown'::text]))",
+        "target": "-",
+        "columns": [
+          "enrollment_period_type"
+        ],
+        "target_columns": []
+      },
+      {
+        "name": "courses_enrollment_values_check",
+        "type": "c",
+        "definition": "CHECK (enrollment_period_type = 'scheduled'::text AND enrollment_start IS NOT NULL AND enrollment_end IS NOT NULL OR enrollment_period_type = 'unrestricted'::text AND enrollment_start IS NULL AND enrollment_end IS NULL OR enrollment_period_type = 'unknown'::text)",
+        "target": "-",
+        "columns": [
+          "enrollment_period_type",
+          "enrollment_start",
+          "enrollment_end"
         ],
         "target_columns": []
       },
@@ -2435,6 +2516,22 @@
         "default": null,
         "identity": "",
         "generated": ""
+      },
+      {
+        "column": "enrollment_date",
+        "type": "date",
+        "not_null": false,
+        "default": null,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "column": "graduation_date",
+        "type": "date",
+        "not_null": false,
+        "default": null,
+        "identity": "",
+        "generated": ""
       }
     ],
     "pk": [
@@ -2467,6 +2564,17 @@
       }
     ],
     "constraints": [
+      {
+        "name": "employee_education_dates_order",
+        "type": "c",
+        "definition": "CHECK (enrollment_date IS NULL OR graduation_date IS NULL OR graduation_date >= enrollment_date)",
+        "target": "-",
+        "columns": [
+          "enrollment_date",
+          "graduation_date"
+        ],
+        "target_columns": []
+      },
       {
         "name": "employee_education_records_education_level_check",
         "type": "c",
@@ -2518,6 +2626,143 @@
         "target": "-",
         "columns": [
           "school_name"
+        ],
+        "target_columns": []
+      }
+    ]
+  },
+  "public.employee_input_profiles": {
+    "columns": [
+      {
+        "column": "employee_id",
+        "type": "integer",
+        "not_null": true,
+        "default": null,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "column": "experience_summary",
+        "type": "text",
+        "not_null": false,
+        "default": null,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "column": "development_years",
+        "type": "numeric(6,2)",
+        "not_null": false,
+        "default": null,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "column": "technology_experience",
+        "type": "text",
+        "not_null": false,
+        "default": null,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "column": "project_experience",
+        "type": "text",
+        "not_null": false,
+        "default": null,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "column": "learning_history",
+        "type": "text",
+        "not_null": false,
+        "default": null,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "column": "learning_preferences",
+        "type": "jsonb",
+        "not_null": true,
+        "default": "'{}'::jsonb",
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "column": "submission_note",
+        "type": "text",
+        "not_null": false,
+        "default": null,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "column": "updated_at",
+        "type": "timestamp with time zone",
+        "not_null": true,
+        "default": "now()",
+        "identity": "",
+        "generated": ""
+      }
+    ],
+    "pk": [
+      "employee_id"
+    ],
+    "fks": [
+      {
+        "name": "employee_input_profiles_employee_id_fkey",
+        "type": "f",
+        "definition": "FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE CASCADE",
+        "target": "public.employees",
+        "columns": [
+          "employee_id"
+        ],
+        "target_columns": [
+          "employee_id"
+        ]
+      }
+    ],
+    "constraints": [
+      {
+        "name": "employee_input_profiles_development_years_check",
+        "type": "c",
+        "definition": "CHECK (development_years >= 0::numeric AND development_years <> 'NaN'::numeric)",
+        "target": "-",
+        "columns": [
+          "development_years"
+        ],
+        "target_columns": []
+      },
+      {
+        "name": "employee_input_profiles_employee_id_fkey",
+        "type": "f",
+        "definition": "FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE CASCADE",
+        "target": "public.employees",
+        "columns": [
+          "employee_id"
+        ],
+        "target_columns": [
+          "employee_id"
+        ]
+      },
+      {
+        "name": "employee_input_profiles_learning_preferences_check",
+        "type": "c",
+        "definition": "CHECK (jsonb_typeof(learning_preferences) = 'object'::text)",
+        "target": "-",
+        "columns": [
+          "learning_preferences"
+        ],
+        "target_columns": []
+      },
+      {
+        "name": "employee_input_profiles_pkey",
+        "type": "p",
+        "definition": "PRIMARY KEY (employee_id)",
+        "target": "-",
+        "columns": [
+          "employee_id"
         ],
         "target_columns": []
       }
@@ -2863,6 +3108,38 @@
         "default": "false",
         "identity": "",
         "generated": ""
+      },
+      {
+        "column": "hire_date",
+        "type": "date",
+        "not_null": false,
+        "default": null,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "column": "department_start_date",
+        "type": "date",
+        "not_null": false,
+        "default": null,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "column": "planned_project_description",
+        "type": "text",
+        "not_null": false,
+        "default": null,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "column": "unlisted_certifications",
+        "type": "text",
+        "not_null": false,
+        "default": null,
+        "identity": "",
+        "generated": ""
       }
     ],
     "pk": [
@@ -2949,6 +3226,17 @@
         ]
       },
       {
+        "name": "employees_department_start_after_hire",
+        "type": "c",
+        "definition": "CHECK (hire_date IS NULL OR department_start_date IS NULL OR department_start_date >= hire_date)",
+        "target": "-",
+        "columns": [
+          "hire_date",
+          "department_start_date"
+        ],
+        "target_columns": []
+      },
+      {
         "name": "employees_grade_requires_institution",
         "type": "c",
         "definition": "CHECK (job_grade_id IS NULL OR institution_id IS NOT NULL)",
@@ -2997,6 +3285,16 @@
         ]
       },
       {
+        "name": "employees_number_required",
+        "type": "c",
+        "definition": "CHECK (employee_number IS NOT NULL AND employee_number !~ '^[[:space:]]*$'::text) NOT VALID",
+        "target": "-",
+        "columns": [
+          "employee_number"
+        ],
+        "target_columns": []
+      },
+      {
         "name": "employees_number_unique",
         "type": "u",
         "definition": "UNIQUE (institution_id, employee_number)",
@@ -3014,6 +3312,26 @@
         "target": "-",
         "columns": [
           "password_hash"
+        ],
+        "target_columns": []
+      },
+      {
+        "name": "employees_planned_project_description_nonblank",
+        "type": "c",
+        "definition": "CHECK (planned_project_description IS NULL OR length(btrim(planned_project_description)) > 0)",
+        "target": "-",
+        "columns": [
+          "planned_project_description"
+        ],
+        "target_columns": []
+      },
+      {
+        "name": "employees_unlisted_certifications_nonblank",
+        "type": "c",
+        "definition": "CHECK (unlisted_certifications IS NULL OR length(btrim(unlisted_certifications)) > 0)",
+        "target": "-",
+        "columns": [
+          "unlisted_certifications"
         ],
         "target_columns": []
       },
@@ -4443,7 +4761,7 @@
       {
         "name": "prompt_versions_agent_id_check",
         "type": "c",
-        "definition": "CHECK (agent_id::text = ANY (ARRAY['agent_practical'::character varying, 'agent_certified'::character varying, 'agent_fasttrack'::character varying, 'agent_plan_draft'::character varying, 'agent_plan_refine'::character varying]::text[]))",
+        "definition": "CHECK (agent_id::text = ANY (ARRAY['agent_practical'::character varying::text, 'agent_certified'::character varying::text, 'agent_fasttrack'::character varying::text, 'agent_plan_draft'::character varying::text, 'agent_plan_refine'::character varying::text]))",
         "target": "-",
         "columns": [
           "agent_id"
@@ -7239,6 +7557,322 @@
         "target": "-",
         "columns": [
           "regulation_id"
+        ],
+        "target_columns": []
+      }
+    ]
+  },
+  "knowledge.chunks": {
+    "columns": [
+      {
+        "column": "chunk_id",
+        "type": "text",
+        "not_null": true,
+        "default": null,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "column": "document_id",
+        "type": "text",
+        "not_null": true,
+        "default": null,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "column": "display_order",
+        "type": "integer",
+        "not_null": true,
+        "default": null,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "column": "chunk_text",
+        "type": "text",
+        "not_null": true,
+        "default": null,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "column": "chunk_text_sha256",
+        "type": "text",
+        "not_null": true,
+        "default": null,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "column": "is_virtual",
+        "type": "boolean",
+        "not_null": true,
+        "default": null,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "column": "metadata",
+        "type": "jsonb",
+        "not_null": true,
+        "default": null,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "column": "embedding_model",
+        "type": "text",
+        "not_null": false,
+        "default": null,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "column": "dimensions",
+        "type": "integer",
+        "not_null": false,
+        "default": null,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "column": "input_sha256",
+        "type": "text",
+        "not_null": false,
+        "default": null,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "column": "embedding",
+        "type": "vector(1536)",
+        "not_null": false,
+        "default": null,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "column": "embedded_at",
+        "type": "timestamp with time zone",
+        "not_null": false,
+        "default": null,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "column": "created_at",
+        "type": "timestamp with time zone",
+        "not_null": true,
+        "default": "now()",
+        "identity": "",
+        "generated": ""
+      }
+    ],
+    "pk": [
+      "chunk_id"
+    ],
+    "fks": [
+      {
+        "name": "chunks_document_id_fkey",
+        "type": "f",
+        "definition": "FOREIGN KEY (document_id) REFERENCES knowledge.documents(document_id)",
+        "target": "knowledge.documents",
+        "columns": [
+          "document_id"
+        ],
+        "target_columns": [
+          "document_id"
+        ]
+      }
+    ],
+    "constraints": [
+      {
+        "name": "chunks_check",
+        "type": "c",
+        "definition": "CHECK (chunk_text_sha256 = encode(sha256(convert_to(chunk_text, 'UTF8'::name)), 'hex'::text))",
+        "target": "-",
+        "columns": [
+          "chunk_text_sha256",
+          "chunk_text"
+        ],
+        "target_columns": []
+      },
+      {
+        "name": "chunks_check1",
+        "type": "c",
+        "definition": "CHECK (embedding IS NULL AND embedding_model IS NULL AND dimensions IS NULL AND input_sha256 IS NULL AND embedded_at IS NULL OR embedding IS NOT NULL AND embedding_model IS NOT NULL AND dimensions IS NOT NULL AND input_sha256 IS NOT NULL AND embedded_at IS NOT NULL AND embedding_model = 'text-embedding-3-small'::text AND dimensions = 1536 AND vector_norm(embedding) > 0::double precision AND input_sha256 = chunk_text_sha256)",
+        "target": "-",
+        "columns": [
+          "embedding",
+          "embedding_model",
+          "dimensions",
+          "input_sha256",
+          "embedded_at",
+          "chunk_text_sha256"
+        ],
+        "target_columns": []
+      },
+      {
+        "name": "chunks_chunk_text_check",
+        "type": "c",
+        "definition": "CHECK (length(chunk_text) > 0)",
+        "target": "-",
+        "columns": [
+          "chunk_text"
+        ],
+        "target_columns": []
+      },
+      {
+        "name": "chunks_chunk_text_sha256_check",
+        "type": "c",
+        "definition": "CHECK (chunk_text_sha256 ~ '^[0-9a-f]{64}$'::text)",
+        "target": "-",
+        "columns": [
+          "chunk_text_sha256"
+        ],
+        "target_columns": []
+      },
+      {
+        "name": "chunks_display_order_check",
+        "type": "c",
+        "definition": "CHECK (display_order > 0)",
+        "target": "-",
+        "columns": [
+          "display_order"
+        ],
+        "target_columns": []
+      },
+      {
+        "name": "chunks_document_id_display_order_key",
+        "type": "u",
+        "definition": "UNIQUE (document_id, display_order)",
+        "target": "-",
+        "columns": [
+          "document_id",
+          "display_order"
+        ],
+        "target_columns": []
+      },
+      {
+        "name": "chunks_document_id_fkey",
+        "type": "f",
+        "definition": "FOREIGN KEY (document_id) REFERENCES knowledge.documents(document_id)",
+        "target": "knowledge.documents",
+        "columns": [
+          "document_id"
+        ],
+        "target_columns": [
+          "document_id"
+        ]
+      },
+      {
+        "name": "chunks_metadata_check",
+        "type": "c",
+        "definition": "CHECK (jsonb_typeof(metadata) = 'object'::text)",
+        "target": "-",
+        "columns": [
+          "metadata"
+        ],
+        "target_columns": []
+      },
+      {
+        "name": "chunks_pkey",
+        "type": "p",
+        "definition": "PRIMARY KEY (chunk_id)",
+        "target": "-",
+        "columns": [
+          "chunk_id"
+        ],
+        "target_columns": []
+      }
+    ]
+  },
+  "knowledge.documents": {
+    "columns": [
+      {
+        "column": "document_id",
+        "type": "text",
+        "not_null": true,
+        "default": null,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "column": "category",
+        "type": "text",
+        "not_null": true,
+        "default": null,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "column": "title",
+        "type": "text",
+        "not_null": true,
+        "default": null,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "column": "document_kind",
+        "type": "text",
+        "not_null": true,
+        "default": null,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "column": "created_at",
+        "type": "timestamp with time zone",
+        "not_null": true,
+        "default": "now()",
+        "identity": "",
+        "generated": ""
+      }
+    ],
+    "pk": [
+      "document_id"
+    ],
+    "fks": [],
+    "constraints": [
+      {
+        "name": "documents_category_check",
+        "type": "c",
+        "definition": "CHECK (category = ANY (ARRAY['수자원공사 정보'::text, '사내 생활안내'::text]))",
+        "target": "-",
+        "columns": [
+          "category"
+        ],
+        "target_columns": []
+      },
+      {
+        "name": "documents_document_kind_check",
+        "type": "c",
+        "definition": "CHECK (document_kind = ANY (ARRAY['report'::text, 'plan'::text, 'web_page'::text, 'guide'::text]))",
+        "target": "-",
+        "columns": [
+          "document_kind"
+        ],
+        "target_columns": []
+      },
+      {
+        "name": "documents_pkey",
+        "type": "p",
+        "definition": "PRIMARY KEY (document_id)",
+        "target": "-",
+        "columns": [
+          "document_id"
+        ],
+        "target_columns": []
+      },
+      {
+        "name": "documents_title_check",
+        "type": "c",
+        "definition": "CHECK (length(title) > 0)",
+        "target": "-",
+        "columns": [
+          "title"
         ],
         "target_columns": []
       }

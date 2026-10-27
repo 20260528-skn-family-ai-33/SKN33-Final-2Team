@@ -13,7 +13,7 @@ docs/07_데이터베이스_저장소_설계/ERD_최종.html -text
 
 # Import manifests hash exact bytes; preserve them on Windows and Linux checkout.
 database/** -text whitespace=trailing-space,space-before-tab,cr-at-eol
-docs/07_데이터베이스_저장소_설계/** -text
+docs/07_데이터베이스_저장소_설계/** -text whitespace=trailing-space,space-before-tab,cr-at-eol
 docs/08_데이터_전처리_결과서/** -text
 docs/09_벡터DB_구축_결과서/** -text
 README.md -text

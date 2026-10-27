@@ -28,7 +28,7 @@ def digest(path):
 
 
 def inventory(c):
-    schemas=("public","regulations","growpath_meta","growpath_legacy")
+    schemas=("public","regulations","growpath_meta","growpath_legacy","knowledge")
     tables=c.execute("SELECT schemaname,tablename FROM pg_tables WHERE schemaname=ANY(%s) ORDER BY 1,2",(list(schemas),)).fetchall()
     counts={}
     for row in tables:
@@ -93,7 +93,7 @@ def restore(args):
     password=os.getenv("POSTGRES_PASSWORD") or values.get("POSTGRES_PASSWORD") or getpass.getpass("PostgreSQL password (not printed): ")
     binary=Path(args.pg_bin).resolve() if args.pg_bin else native_bin()
     if not (binary/"pg_restore.exe").is_file():
-        raise ValueError("Run scripts/install_postgres.ps1 first or specify --pg-bin")
+        raise ValueError("PostgreSQL 17 tools missing; set POSTGRES_BIN_DIR or specify --pg-bin (see database/RESTORE.md)")
     env=os.environ.copy();env.update(PGHOST=args.host,PGPORT=str(args.port),PGUSER=args.user,PGPASSWORD=password,PGSSLMODE="disable")
     env["PATH"]=str(binary)+os.pathsep+env.get("PATH","")
     log=ROOT/"data/local_db/transfer.log";log.parent.mkdir(parents=True,exist_ok=True)
@@ -124,7 +124,9 @@ def restore(args):
         actual=inventory(c)
         if comparable_inventory(actual)!=comparable_inventory(manifest["inventory"]):raise RuntimeError("Restored inventory differs from backup; database preserved for inspection")
         vector_checks={}
-        for schema,table in [("public","learning_resource_embeddings"),("regulations","rag_chunk_embeddings")]:
+        for schema,table in [("public","learning_resource_embeddings"),("regulations","rag_chunk_embeddings"),("knowledge","chunks")]:
+            if not c.execute('SELECT to_regclass(%s) AS id',(schema+'.'+table,)).fetchone()['id']:
+                continue
             result=c.execute(sql.SQL("SELECT embedding <=> embedding AS distance FROM {}.{} WHERE embedding IS NOT NULL LIMIT 1").format(sql.Identifier(schema),sql.Identifier(table))).fetchone()
             vector_checks[schema+"."+table]=result is None or abs(result["distance"])<1e-5
         if not all(vector_checks.values()):raise RuntimeError("Vector similarity check failed")
@@ -139,7 +141,7 @@ def restore(args):
 def main():
     parser=argparse.ArgumentParser(description=__doc__);sub=parser.add_subparsers(dest="action",required=True)
     p=sub.add_parser("backup");p.add_argument("--output",type=Path,required=True)
-    p=sub.add_parser("restore");p.add_argument("--archive",type=Path,required=True);p.add_argument("--database",default="growpath");p.add_argument("--host",default="127.0.0.1");p.add_argument("--port",type=int,default=55433);p.add_argument("--user",default="postgres");p.add_argument("--pg-bin");p.add_argument("--initialize",action="store_true");p.add_argument("--write-config",action="store_true");p.add_argument("--verify-only",action="store_true")
+    p=sub.add_parser("restore");p.add_argument("--archive",type=Path,required=True);p.add_argument("--database",default="growpath");p.add_argument("--host",default="127.0.0.1");p.add_argument("--port",type=int,default=55435);p.add_argument("--user",default="postgres");p.add_argument("--pg-bin");p.add_argument("--initialize",action="store_true");p.add_argument("--write-config",action="store_true");p.add_argument("--verify-only",action="store_true")
     args=parser.parse_args()
     try:print(json.dumps(backup(args.output) if args.action=="backup" else restore(args),ensure_ascii=False,indent=2))
     except Exception as error:

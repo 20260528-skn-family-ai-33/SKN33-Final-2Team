@@ -16,7 +16,7 @@ class CanonicalDatabaseTests(unittest.TestCase):
             return self.c.execute('INSERT INTO public.departments(institution_id,department_code,name,parent_department_id) VALUES(%s,%s,%s,%s) RETURNING department_id',(institution,str(uuid4()),name,parent)).fetchone()['department_id']
         root=department('검증 부서');child=department('검증 하위 부서',root);other=department('검증 다른 부서')
         def employee(dept,head=False):
-            return self.c.execute('INSERT INTO public.employees(name,email,source_type,institution_id,department_id,is_department_head) VALUES(%s,%s,%s,%s,%s,%s) RETURNING employee_id',('롤백 검증 직원',str(uuid4())+'@growpath.example.invalid','TEST_MANUAL',institution,dept,head)).fetchone()['employee_id']
+            return self.c.execute('INSERT INTO public.employees(name,email,employee_number,source_type,institution_id,department_id,is_department_head) VALUES(%s,%s,%s,%s,%s,%s,%s) RETURNING employee_id',('롤백 검증 직원',str(uuid4())+'@growpath.example.invalid','CHECK-'+str(uuid4()),'TEST_MANUAL',institution,dept,head)).fetchone()['employee_id']
         self.head=employee(root,True);self.owner=employee(child);self.other=employee(other)
         self.pid=self.db.create_roadmap_session(self.owner,'롤백 검증 프로젝트')
         self.content={'milestones':[{'phase_name':'DB 학습','duration':'1주','key_actions':['실제 데이터 쿼리 연습']}]}

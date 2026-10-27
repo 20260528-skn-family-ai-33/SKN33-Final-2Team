@@ -1,8 +1,6 @@
 # DB 테이블과 관계
 
-2026-10-21 전달 백업·현재 스키마 메타데이터 기준이다. 실행 DB를 이번 이관에서 조회한 결과는 아니다.
-
-전체 50개 테이블(운영 42·관리 2·보관 6), 29,903행이다. [구현·산출물 대응과 검증 범위](README.md)를 함께 확인한다.
+2026-10-27 최종 ERD·스키마·외부 백업 manifest 기준. 전체 53테이블(운영45·관리2·보관6), 22,284행·87개 FK다. [구현·검증](README.md)과 함께 확인한다.
 
 ## `growpath_legacy.agent_generations` · 71행
 
@@ -22,10 +20,9 @@
 | `status` | character varying(20) | 아니오 |
 | `created_at` | timestamp with time zone | 아니오 |
 
-외래키:
+- FK `prompt_version_id` → `public.prompt_versions(prompt_version_id)`
 
-- `FOREIGN KEY (prompt_version_id) REFERENCES prompt_versions(prompt_version_id)`
-- `FOREIGN KEY (request_id) REFERENCES growpath_legacy.roadmap_requests(request_id) ON DELETE CASCADE`
+- FK `request_id` → `growpath_legacy.roadmap_requests(request_id)`
 
 ## `growpath_legacy.agent_selections` · 20행
 
@@ -41,10 +38,9 @@
 | `user_type` | character varying(20) | 아니오 |
 | `created_at` | timestamp with time zone | 아니오 |
 
-외래키:
+- FK `chosen_generation_id` → `growpath_legacy.agent_generations(generation_id)`
 
-- `FOREIGN KEY (chosen_generation_id) REFERENCES growpath_legacy.agent_generations(generation_id) ON DELETE CASCADE`
-- `FOREIGN KEY (request_id) REFERENCES growpath_legacy.roadmap_requests(request_id) ON DELETE CASCADE`
+- FK `request_id` → `growpath_legacy.roadmap_requests(request_id)`
 
 ## `growpath_legacy.finetuning_datasets` · 2행
 
@@ -76,11 +72,11 @@
 | `user_type` | character varying(20) | 아니오 |
 | `created_at` | timestamp with time zone | 아니오 |
 
-외래키:
+- FK `chosen_generation_id` → `growpath_legacy.agent_generations(generation_id)`
 
-- `FOREIGN KEY (chosen_generation_id) REFERENCES growpath_legacy.agent_generations(generation_id) ON DELETE CASCADE`
-- `FOREIGN KEY (rejected_generation_id) REFERENCES growpath_legacy.agent_generations(generation_id) ON DELETE CASCADE`
-- `FOREIGN KEY (request_id) REFERENCES growpath_legacy.roadmap_requests(request_id) ON DELETE CASCADE`
+- FK `rejected_generation_id` → `growpath_legacy.agent_generations(generation_id)`
+
+- FK `request_id` → `growpath_legacy.roadmap_requests(request_id)`
 
 ## `growpath_legacy.roadmap_requests` · 25행
 
@@ -115,7 +111,7 @@
 | `work_context_summary` | text | 아니오 |
 | `created_at` | timestamp with time zone | 아니오 |
 
-## `growpath_meta.catalog_api_sources` · 4,639행
+## `growpath_meta.catalog_api_sources` · 2433행
 
 기본키: resource_type, source, external_key
 
@@ -129,7 +125,7 @@
 | `mapping_evidence` | jsonb | 아니오 |
 | `fetched_at` | timestamp with time zone | 아니오 |
 
-## `growpath_meta.schema_migrations` · 12행
+## `growpath_meta.schema_migrations` · 22행
 
 기본키: version
 
@@ -138,6 +134,40 @@
 | `version` | text | 아니오 |
 | `sha256` | text | 아니오 |
 | `applied_at` | timestamp with time zone | 아니오 |
+
+## `knowledge.chunks` · 442행
+
+기본키: chunk_id
+
+| 컬럼 | 자료형 | NULL 허용 |
+|---|---|---|
+| `chunk_id` | text | 아니오 |
+| `document_id` | text | 아니오 |
+| `display_order` | integer | 아니오 |
+| `chunk_text` | text | 아니오 |
+| `chunk_text_sha256` | text | 아니오 |
+| `is_virtual` | boolean | 아니오 |
+| `metadata` | jsonb | 아니오 |
+| `embedding_model` | text | 예 |
+| `dimensions` | integer | 예 |
+| `input_sha256` | text | 예 |
+| `embedding` | vector(1536) | 예 |
+| `embedded_at` | timestamp with time zone | 예 |
+| `created_at` | timestamp with time zone | 아니오 |
+
+- FK `document_id` → `knowledge.documents(document_id)`
+
+## `knowledge.documents` · 4행
+
+기본키: document_id
+
+| 컬럼 | 자료형 | NULL 허용 |
+|---|---|---|
+| `document_id` | text | 아니오 |
+| `category` | text | 아니오 |
+| `title` | text | 아니오 |
+| `document_kind` | text | 아니오 |
+| `created_at` | timestamp with time zone | 아니오 |
 
 ## `public.assessment_questions` · 25행
 
@@ -156,11 +186,11 @@
 | `created_at` | timestamp with time zone | 아니오 |
 | `diagnostic_round_id` | uuid | 아니오 |
 
-외래키:
+- FK `diagnostic_round_id, project_id` → `public.diagnostic_rounds(diagnostic_round_id, project_id)`
 
-- `FOREIGN KEY (diagnostic_round_id, project_id) REFERENCES diagnostic_rounds(diagnostic_round_id, project_id) ON DELETE CASCADE`
-- `FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE`
-- `FOREIGN KEY (skill_id) REFERENCES skill_tags(skill_id)`
+- FK `project_id` → `public.projects(project_id)`
+
+- FK `skill_id` → `public.skill_tags(skill_id)`
 
 ## `public.assessment_responses` · 25행
 
@@ -176,12 +206,11 @@
 | `score` | integer | 아니오 |
 | `answered_at` | timestamp with time zone | 아니오 |
 
-외래키:
+- FK `project_id` → `public.projects(project_id)`
 
-- `FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE`
-- `FOREIGN KEY (question_id, project_id, assessment_type) REFERENCES assessment_questions(question_id, project_id, assessment_type) ON DELETE CASCADE`
+- FK `question_id, project_id, assessment_type` → `public.assessment_questions(question_id, project_id, assessment_type)`
 
-## `public.book_skills` · 4,205행
+## `public.book_skills` · 506행
 
 기본키: isbn, skill_id
 
@@ -190,12 +219,11 @@
 | `isbn` | character varying(20) | 아니오 |
 | `skill_id` | integer | 아니오 |
 
-외래키:
+- FK `isbn` → `public.books(isbn)`
 
-- `FOREIGN KEY (isbn) REFERENCES books(isbn) ON DELETE CASCADE`
-- `FOREIGN KEY (skill_id) REFERENCES skill_tags(skill_id) ON DELETE CASCADE`
+- FK `skill_id` → `public.skill_tags(skill_id)`
 
-## `public.books` · 3,327행
+## `public.books` · 334행
 
 기본키: isbn
 
@@ -214,8 +242,9 @@
 | `source_verified_at` | timestamp with time zone | 예 |
 | `description` | text | 예 |
 | `image_url` | text | 예 |
+| `ai_mention` | text | 예 |
 
-## `public.certification_skills` · 110행
+## `public.certification_skills` · 43행
 
 기본키: cert_id, skill_id
 
@@ -224,12 +253,11 @@
 | `cert_id` | integer | 아니오 |
 | `skill_id` | integer | 아니오 |
 
-외래키:
+- FK `cert_id` → `public.certifications(cert_id)`
 
-- `FOREIGN KEY (cert_id) REFERENCES certifications(cert_id) ON DELETE CASCADE`
-- `FOREIGN KEY (skill_id) REFERENCES skill_tags(skill_id) ON DELETE CASCADE`
+- FK `skill_id` → `public.skill_tags(skill_id)`
 
-## `public.certifications` · 68행
+## `public.certifications` · 26행
 
 기본키: cert_id
 
@@ -249,8 +277,9 @@
 | `source_verified_at` | timestamp with time zone | 예 |
 | `description` | text | 예 |
 | `image_url` | text | 예 |
+| `ai_mention` | text | 예 |
 
-## `public.course_skills` · 1,485행
+## `public.course_skills` · 3658행
 
 기본키: course_id, skill_id
 
@@ -259,12 +288,11 @@
 | `course_id` | character varying(50) | 아니오 |
 | `skill_id` | integer | 아니오 |
 
-외래키:
+- FK `course_id` → `public.courses(course_id)`
 
-- `FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE`
-- `FOREIGN KEY (skill_id) REFERENCES skill_tags(skill_id) ON DELETE CASCADE`
+- FK `skill_id` → `public.skill_tags(skill_id)`
 
-## `public.courses` · 1,149행
+## `public.courses` · 2060행
 
 기본키: course_id
 
@@ -288,8 +316,12 @@
 | `content_status` | text | 예 |
 | `source_verified_at` | timestamp with time zone | 예 |
 | `image_url` | text | 예 |
+| `enrollment_start` | timestamp with time zone | 예 |
+| `enrollment_end` | timestamp with time zone | 예 |
+| `enrollment_period_type` | text | 아니오 |
+| `ai_mention` | text | 예 |
 
-## `public.departments` · 5행
+## `public.departments` · 14행
 
 기본키: department_id
 
@@ -301,10 +333,9 @@
 | `name` | text | 아니오 |
 | `parent_department_id` | bigint | 예 |
 
-외래키:
+- FK `institution_id` → `public.institutions(institution_id)`
 
-- `FOREIGN KEY (institution_id) REFERENCES institutions(institution_id)`
-- `FOREIGN KEY (parent_department_id, institution_id) REFERENCES departments(department_id, institution_id)`
+- FK `parent_department_id, institution_id` → `public.departments(department_id, institution_id)`
 
 ## `public.diagnostic_rounds` · 2행
 
@@ -322,11 +353,9 @@
 | `post_completed_at` | timestamp with time zone | 예 |
 | `created_at` | timestamp with time zone | 아니오 |
 
-외래키:
+- FK `project_id` → `public.projects(project_id)`
 
-- `FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE`
-
-## `public.employee_certifications` · 0행
+## `public.employee_certifications` · 96행
 
 기본키: employee_id, certification_id
 
@@ -335,12 +364,11 @@
 | `employee_id` | integer | 아니오 |
 | `certification_id` | integer | 아니오 |
 
-외래키:
+- FK `certification_id` → `public.certifications(cert_id)`
 
-- `FOREIGN KEY (certification_id) REFERENCES certifications(cert_id)`
-- `FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE CASCADE`
+- FK `employee_id` → `public.employees(employee_id)`
 
-## `public.employee_education_records` · 0행
+## `public.employee_education_records` · 100행
 
 기본키: education_record_id
 
@@ -352,11 +380,30 @@
 | `education_level` | text | 아니오 |
 | `department_name` | text | 예 |
 | `major_id` | integer | 예 |
+| `enrollment_date` | date | 예 |
+| `graduation_date` | date | 예 |
 
-외래키:
+- FK `employee_id` → `public.employees(employee_id)`
 
-- `FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE CASCADE`
-- `FOREIGN KEY (major_id) REFERENCES majors(major_id)`
+- FK `major_id` → `public.majors(major_id)`
+
+## `public.employee_input_profiles` · 0행
+
+기본키: employee_id
+
+| 컬럼 | 자료형 | NULL 허용 |
+|---|---|---|
+| `employee_id` | integer | 아니오 |
+| `experience_summary` | text | 예 |
+| `development_years` | numeric(6,2) | 예 |
+| `technology_experience` | text | 예 |
+| `project_experience` | text | 예 |
+| `learning_history` | text | 예 |
+| `learning_preferences` | jsonb | 아니오 |
+| `submission_note` | text | 예 |
+| `updated_at` | timestamp with time zone | 아니오 |
+
+- FK `employee_id` → `public.employees(employee_id)`
 
 ## `public.employee_recommended_prompts` · 0행
 
@@ -370,11 +417,9 @@
 | `display_order` | smallint | 예 |
 | `updated_at` | timestamp with time zone | 예 |
 
-외래키:
+- FK `employee_id` → `public.employees(employee_id)`
 
-- `FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE CASCADE`
-
-## `public.employee_skills` · 0행
+## `public.employee_skills` · 293행
 
 기본키: employee_id, skill_id
 
@@ -383,12 +428,11 @@
 | `employee_id` | integer | 아니오 |
 | `skill_id` | integer | 아니오 |
 
-외래키:
+- FK `employee_id` → `public.employees(employee_id)`
 
-- `FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE CASCADE`
-- `FOREIGN KEY (skill_id) REFERENCES skill_tags(skill_id)`
+- FK `skill_id` → `public.skill_tags(skill_id)`
 
-## `public.employees` · 14행
+## `public.employees` · 105행
 
 기본키: employee_id
 
@@ -411,13 +455,18 @@
 | `department_id` | bigint | 예 |
 | `job_grade_id` | bigint | 예 |
 | `is_department_head` | boolean | 아니오 |
+| `hire_date` | date | 예 |
+| `department_start_date` | date | 예 |
+| `planned_project_description` | text | 예 |
+| `unlisted_certifications` | text | 예 |
 
-외래키:
+- FK `department_id, institution_id` → `public.departments(department_id, institution_id)`
 
-- `FOREIGN KEY (department_id, institution_id) REFERENCES departments(department_id, institution_id)`
-- `FOREIGN KEY (job_grade_id, institution_id) REFERENCES job_grades(job_grade_id, institution_id)`
-- `FOREIGN KEY (institution_id) REFERENCES institutions(institution_id)`
-- `FOREIGN KEY (job_id) REFERENCES jobs(job_id) ON DELETE SET NULL`
+- FK `job_grade_id, institution_id` → `public.job_grades(job_grade_id, institution_id)`
+
+- FK `institution_id` → `public.institutions(institution_id)`
+
+- FK `job_id` → `public.jobs(job_id)`
 
 ## `public.growth_reports` · 1행
 
@@ -432,11 +481,11 @@
 | `created_at` | timestamp with time zone | 아니오 |
 | `roadmap_id` | uuid | 아니오 |
 
-외래키:
+- FK `project_id` → `public.projects(project_id)`
 
-- `FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE`
-- `FOREIGN KEY (roadmap_id) REFERENCES roadmaps(roadmap_id) ON DELETE CASCADE`
-- `FOREIGN KEY (roadmap_id, project_id) REFERENCES roadmaps(roadmap_id, project_id) ON DELETE CASCADE`
+- FK `roadmap_id` → `public.roadmaps(roadmap_id)`
+
+- FK `roadmap_id, project_id` → `public.roadmaps(roadmap_id, project_id)`
 
 ## `public.institutions` · 1행
 
@@ -460,11 +509,9 @@
 | `name` | text | 아니오 |
 | `sort_order` | integer | 아니오 |
 
-외래키:
+- FK `institution_id` → `public.institutions(institution_id)`
 
-- `FOREIGN KEY (institution_id) REFERENCES institutions(institution_id)`
-
-## `public.job_skills` · 31행
+## `public.job_skills` · 8행
 
 기본키: job_id, skill_id
 
@@ -473,12 +520,11 @@
 | `job_id` | integer | 아니오 |
 | `skill_id` | integer | 아니오 |
 
-외래키:
+- FK `job_id` → `public.jobs(job_id)`
 
-- `FOREIGN KEY (job_id) REFERENCES jobs(job_id) ON DELETE CASCADE`
-- `FOREIGN KEY (skill_id) REFERENCES skill_tags(skill_id) ON DELETE CASCADE`
+- FK `skill_id` → `public.skill_tags(skill_id)`
 
-## `public.jobs` · 80행
+## `public.jobs` · 6행
 
 기본키: job_id
 
@@ -494,7 +540,7 @@
 | `source_verified_at` | timestamp with time zone | 예 |
 | `description` | text | 예 |
 
-## `public.learning_resource_embeddings` · 4,792행
+## `public.learning_resource_embeddings` · 2469행
 
 기본키: resource_type, resource_id, embedding_model
 
@@ -515,16 +561,19 @@
 | `job_id` | integer | 예 |
 | `major_id` | integer | 예 |
 
-외래키:
+- FK `certification_id` → `public.certifications(cert_id)`
 
-- `FOREIGN KEY (certification_id) REFERENCES certifications(cert_id) ON DELETE CASCADE`
-- `FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE`
-- `FOREIGN KEY (isbn) REFERENCES books(isbn) ON DELETE CASCADE`
-- `FOREIGN KEY (job_id) REFERENCES jobs(job_id) ON DELETE CASCADE`
-- `FOREIGN KEY (major_id) REFERENCES majors(major_id) ON DELETE CASCADE`
-- `FOREIGN KEY (skill_id) REFERENCES skill_tags(skill_id) ON DELETE CASCADE`
+- FK `course_id` → `public.courses(course_id)`
 
-## `public.major_skills` · 202행
+- FK `isbn` → `public.books(isbn)`
+
+- FK `job_id` → `public.jobs(job_id)`
+
+- FK `major_id` → `public.majors(major_id)`
+
+- FK `skill_id` → `public.skill_tags(skill_id)`
+
+## `public.major_skills` · 14행
 
 기본키: major_id, skill_id
 
@@ -533,12 +582,11 @@
 | `major_id` | integer | 아니오 |
 | `skill_id` | integer | 아니오 |
 
-외래키:
+- FK `major_id` → `public.majors(major_id)`
 
-- `FOREIGN KEY (major_id) REFERENCES majors(major_id) ON DELETE CASCADE`
-- `FOREIGN KEY (skill_id) REFERENCES skill_tags(skill_id) ON DELETE CASCADE`
+- FK `skill_id` → `public.skill_tags(skill_id)`
 
-## `public.majors` · 132행
+## `public.majors` · 7행
 
 기본키: major_id
 
@@ -581,11 +629,11 @@
 | `draft_prompt_version_id` | uuid | 예 |
 | `plan_prompt_version_id` | uuid | 예 |
 
-외래키:
+- FK `draft_prompt_version_id` → `public.prompt_versions(prompt_version_id)`
 
-- `FOREIGN KEY (draft_prompt_version_id) REFERENCES prompt_versions(prompt_version_id)`
-- `FOREIGN KEY (plan_prompt_version_id) REFERENCES prompt_versions(prompt_version_id)`
-- `FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE CASCADE`
+- FK `plan_prompt_version_id` → `public.prompt_versions(prompt_version_id)`
+
+- FK `employee_id` → `public.employees(employee_id)`
 
 ## `public.prompt_versions` · 6행
 
@@ -603,9 +651,7 @@
 | `created_at` | timestamp with time zone | 아니오 |
 | `deactivated_at` | timestamp with time zone | 예 |
 
-외래키:
-
-- `FOREIGN KEY (parent_version_id) REFERENCES prompt_versions(prompt_version_id)`
+- FK `parent_version_id` → `public.prompt_versions(prompt_version_id)`
 
 ## `public.roadmap_comments` · 0행
 
@@ -621,12 +667,11 @@
 | `updated_at` | timestamp with time zone | 아니오 |
 | `modification_completed_at` | timestamp with time zone | 예 |
 
-외래키:
+- FK `author_employee_id` → `public.employees(employee_id)`
 
-- `FOREIGN KEY (author_employee_id) REFERENCES employees(employee_id)`
-- `FOREIGN KEY (roadmap_id) REFERENCES roadmaps(roadmap_id) ON DELETE CASCADE`
+- FK `roadmap_id` → `public.roadmaps(roadmap_id)`
 
-## `public.roadmap_step_resources` · 9행
+## `public.roadmap_step_resources` · 1행
 
 기본키: step_resource_id
 
@@ -638,12 +683,13 @@
 | `isbn` | character varying(20) | 예 |
 | `certification_id` | integer | 예 |
 
-외래키:
+- FK `certification_id` → `public.certifications(cert_id)`
 
-- `FOREIGN KEY (certification_id) REFERENCES certifications(cert_id)`
-- `FOREIGN KEY (course_id) REFERENCES courses(course_id)`
-- `FOREIGN KEY (isbn) REFERENCES books(isbn)`
-- `FOREIGN KEY (step_id) REFERENCES roadmap_steps(step_id) ON DELETE CASCADE`
+- FK `course_id` → `public.courses(course_id)`
+
+- FK `isbn` → `public.books(isbn)`
+
+- FK `step_id` → `public.roadmap_steps(step_id)`
 
 ## `public.roadmap_steps` · 3행
 
@@ -664,9 +710,7 @@
 | `completed_at` | timestamp with time zone | 예 |
 | `details` | jsonb | 아니오 |
 
-외래키:
-
-- `FOREIGN KEY (roadmap_id) REFERENCES roadmaps(roadmap_id) ON DELETE CASCADE`
+- FK `roadmap_id` → `public.roadmaps(roadmap_id)`
 
 ## `public.roadmaps` · 1행
 
@@ -688,11 +732,11 @@
 | `diagnostic_round_id` | uuid | 아니오 |
 | `prompt_version_id` | uuid | 예 |
 
-외래키:
+- FK `project_id` → `public.projects(project_id)`
 
-- `FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE`
-- `FOREIGN KEY (diagnostic_round_id, project_id) REFERENCES diagnostic_rounds(diagnostic_round_id, project_id) ON DELETE CASCADE`
-- `FOREIGN KEY (prompt_version_id) REFERENCES prompt_versions(prompt_version_id)`
+- FK `diagnostic_round_id, project_id` → `public.diagnostic_rounds(diagnostic_round_id, project_id)`
+
+- FK `prompt_version_id` → `public.prompt_versions(prompt_version_id)`
 
 ## `public.skill_tags` · 36행
 
@@ -726,11 +770,11 @@
 | `display_order` | integer | 아니오 |
 | `definition_note` | text | 예 |
 
-외래키:
+- FK `parent_item_id, evaluation_result_schema_id` → `regulations.evaluation_item_definitions(evaluation_item_definition_id, evaluation_result_schema_id)`
 
-- `FOREIGN KEY (parent_item_id, evaluation_result_schema_id) REFERENCES regulations.evaluation_item_definitions(evaluation_item_definition_id, evaluation_result_schema_id)`
-- `FOREIGN KEY (evaluation_result_schema_id) REFERENCES regulations.evaluation_result_schemas(evaluation_result_schema_id)`
-- `FOREIGN KEY (skill_id) REFERENCES skill_tags(skill_id)`
+- FK `evaluation_result_schema_id` → `regulations.evaluation_result_schemas(evaluation_result_schema_id)`
+
+- FK `skill_id` → `public.skill_tags(skill_id)`
 
 ## `regulations.evaluation_result_schemas` · 11행
 
@@ -754,9 +798,7 @@
 | `calculation_status` | character varying(40) | 아니오 |
 | `source_note` | text | 예 |
 
-외래키:
-
-- `FOREIGN KEY (institution_id) REFERENCES institutions(institution_id)`
+- FK `institution_id` → `public.institutions(institution_id)`
 
 ## `regulations.evaluation_schema_sources` · 172행
 
@@ -772,13 +814,13 @@
 | `review_status` | character varying(40) | 아니오 |
 | `source_note` | text | 예 |
 
-외래키:
+- FK `evaluation_item_definition_id, evaluation_result_schema_id` → `regulations.evaluation_item_definitions(evaluation_item_definition_id, evaluation_result_schema_id)`
 
-- `FOREIGN KEY (evaluation_item_definition_id, evaluation_result_schema_id) REFERENCES regulations.evaluation_item_definitions(evaluation_item_definition_id, evaluation_result_schema_id)`
-- `FOREIGN KEY (regulation_node_id) REFERENCES regulations.regulation_nodes(regulation_node_id)`
-- `FOREIGN KEY (evaluation_result_schema_id) REFERENCES regulations.evaluation_result_schemas(evaluation_result_schema_id)`
+- FK `regulation_node_id` → `regulations.regulation_nodes(regulation_node_id)`
 
-## `regulations.rag_chunk_embeddings` · 1,410행
+- FK `evaluation_result_schema_id` → `regulations.evaluation_result_schemas(evaluation_result_schema_id)`
+
+## `regulations.rag_chunk_embeddings` · 1410행
 
 기본키: rag_chunk_id, embedding_model
 
@@ -793,11 +835,9 @@
 | `created_at` | timestamp with time zone | 아니오 |
 | `updated_at` | timestamp with time zone | 아니오 |
 
-외래키:
+- FK `rag_chunk_id` → `regulations.rag_chunks(rag_chunk_id)`
 
-- `FOREIGN KEY (rag_chunk_id) REFERENCES regulations.rag_chunks(rag_chunk_id) ON DELETE CASCADE`
-
-## `regulations.rag_chunk_sources` · 1,774행
+## `regulations.rag_chunk_sources` · 1774행
 
 기본키: rag_chunk_source_id
 
@@ -810,12 +850,11 @@
 | `source_role` | character varying(40) | 아니오 |
 | `source_span` | jsonb | 예 |
 
-외래키:
+- FK `rag_chunk_id` → `regulations.rag_chunks(rag_chunk_id)`
 
-- `FOREIGN KEY (rag_chunk_id) REFERENCES regulations.rag_chunks(rag_chunk_id)`
-- `FOREIGN KEY (regulation_node_id) REFERENCES regulations.regulation_nodes(regulation_node_id)`
+- FK `regulation_node_id` → `regulations.regulation_nodes(regulation_node_id)`
 
-## `regulations.rag_chunks` · 1,552행
+## `regulations.rag_chunks` · 1552행
 
 기본키: rag_chunk_id
 
@@ -834,9 +873,7 @@
 | `created_at` | timestamp with time zone | 아니오 |
 | `token_count` | integer | 예 |
 
-외래키:
-
-- `FOREIGN KEY (regulation_version_id) REFERENCES regulations.regulation_versions(regulation_version_id)`
+- FK `regulation_version_id` → `regulations.regulation_versions(regulation_version_id)`
 
 ## `regulations.regulation_files` · 28행
 
@@ -859,12 +896,11 @@
 | `parse_status` | character varying(40) | 아니오 |
 | `access_level` | character varying(40) | 아니오 |
 
-외래키:
+- FK `regulation_version_id` → `regulations.regulation_versions(regulation_version_id)`
 
-- `FOREIGN KEY (regulation_version_id) REFERENCES regulations.regulation_versions(regulation_version_id)`
-- `FOREIGN KEY (source_file_id) REFERENCES regulations.regulation_files(regulation_file_id)`
+- FK `source_file_id` → `regulations.regulation_files(regulation_file_id)`
 
-## `regulations.regulation_nodes` · 3,451행
+## `regulations.regulation_nodes` · 3451행
 
 기본키: regulation_node_id
 
@@ -886,11 +922,11 @@
 | `extraction_status` | character varying(40) | 아니오 |
 | `review_note` | text | 예 |
 
-외래키:
+- FK `parent_node_id` → `regulations.regulation_nodes(regulation_node_id)`
 
-- `FOREIGN KEY (parent_node_id) REFERENCES regulations.regulation_nodes(regulation_node_id)`
-- `FOREIGN KEY (regulation_file_id) REFERENCES regulations.regulation_files(regulation_file_id)`
-- `FOREIGN KEY (regulation_version_id) REFERENCES regulations.regulation_versions(regulation_version_id)`
+- FK `regulation_file_id` → `regulations.regulation_files(regulation_file_id)`
+
+- FK `regulation_version_id` → `regulations.regulation_versions(regulation_version_id)`
 
 ## `regulations.regulation_references` · 462행
 
@@ -908,12 +944,13 @@
 | `resolution_status` | character varying(40) | 아니오 |
 | `review_note` | text | 예 |
 
-외래키:
+- FK `regulation_node_id` → `regulations.regulation_nodes(regulation_node_id)`
 
-- `FOREIGN KEY (regulation_node_id) REFERENCES regulations.regulation_nodes(regulation_node_id)`
-- `FOREIGN KEY (target_node_id) REFERENCES regulations.regulation_nodes(regulation_node_id)`
-- `FOREIGN KEY (target_regulation_id) REFERENCES regulations.regulations(regulation_id)`
-- `FOREIGN KEY (target_version_id) REFERENCES regulations.regulation_versions(regulation_version_id)`
+- FK `target_node_id` → `regulations.regulation_nodes(regulation_node_id)`
+
+- FK `target_regulation_id` → `regulations.regulations(regulation_id)`
+
+- FK `target_version_id` → `regulations.regulation_versions(regulation_version_id)`
 
 ## `regulations.regulation_scopes` · 389행
 
@@ -929,10 +966,9 @@
 | `applies_to_node_id` | character varying(64) | 예 |
 | `review_status` | character varying(40) | 아니오 |
 
-외래키:
+- FK `applies_to_node_id` → `regulations.regulation_nodes(regulation_node_id)`
 
-- `FOREIGN KEY (applies_to_node_id) REFERENCES regulations.regulation_nodes(regulation_node_id)`
-- `FOREIGN KEY (regulation_node_id) REFERENCES regulations.regulation_nodes(regulation_node_id)`
+- FK `regulation_node_id` → `regulations.regulation_nodes(regulation_node_id)`
 
 ## `regulations.regulation_versions` · 28행
 
@@ -955,10 +991,9 @@
 | `previous_version_id` | character varying(64) | 예 |
 | `review_note` | text | 예 |
 
-외래키:
+- FK `previous_version_id` → `regulations.regulation_versions(regulation_version_id)`
 
-- `FOREIGN KEY (previous_version_id) REFERENCES regulations.regulation_versions(regulation_version_id)`
-- `FOREIGN KEY (regulation_id) REFERENCES regulations.regulations(regulation_id)`
+- FK `regulation_id` → `regulations.regulations(regulation_id)`
 
 ## `regulations.regulations` · 28행
 
@@ -972,6 +1007,4 @@
 | `category` | character varying(40) | 아니오 |
 | `document_kind` | character varying(40) | 아니오 |
 
-외래키:
-
-- `FOREIGN KEY (institution_id) REFERENCES institutions(institution_id)`
+- FK `institution_id` → `public.institutions(institution_id)`

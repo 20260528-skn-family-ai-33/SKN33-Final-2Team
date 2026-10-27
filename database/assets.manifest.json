@@ -16,6 +16,16 @@
       "location": null,
       "location_status": "needs_team_storage_location",
       "manifest": "data/exports/pgvector_pg17_windows_x64/manifest.json"
+    },
+    {
+      "id": "full_database_current",
+      "filename": "growpath_latest.dump",
+      "bytes": 36343649,
+      "sha256": "9ce26041c5bf95ea9e6ad88c5ea8d3817e3c6097e7e85c0f99512123098001fb",
+      "location": null,
+      "location_status": "needs_team_storage_location",
+      "manifest": "data/exports/growpath_latest.manifest.json",
+      "version": "2026-10-27-after-skill-corrections"
     }
   ],
   "regulation_originals": [
@@ -368,5 +378,58 @@
       "location": null
     }
   ],
-  "notes": "Only metadata is versioned. External locations are not yet assigned; the credential-bearing delivered ZIP is not a distribution URL."
+  "notes": "Only metadata is versioned. External locations are not yet assigned; the credential-bearing delivered ZIP is not a distribution URL.",
+  "current_database_asset": "full_database_current",
+  "external_evidence": {
+    "course_skill_review": {
+      "location": null,
+      "files": [
+        {
+          "path": "data/import_sources/skill_link_review_20261027/correction_plan.json",
+          "sha256": "b2748f854f5a9b015783ccd3a35418246a888c7c16ae1d35ec0b76529bd62e29",
+          "bytes": 24446
+        },
+        {
+          "path": "data/import_sources/skill_link_review_20261027/application_verification.json",
+          "sha256": "33d3016fa1c0ce04d3da34469221e903be42ffe0095565136f5925589a983195",
+          "bytes": 2860
+        },
+        {
+          "path": "data/import_sources/skill_link_review_20261027/clone_verification.json",
+          "sha256": "ee8594f97c24b56085f36296c1e4173197643abe73623232ec42537b309d72df",
+          "bytes": 3516
+        },
+        {
+          "path": "data/import_sources/skill_link_review_20261027/final_verification.json",
+          "sha256": "efbca487164d3bfaf6eb71cc74654ecac3f0ac79eaec168d9dfe4c3bda41d95f",
+          "bytes": 696180
+        }
+      ]
+    },
+    "knowledge_inputs": {
+      "location": null,
+      "files": [
+        {
+          "path": "data/import_sources/company_workplace_20261026/import_manifest.json",
+          "sha256": "852feec566aa691df4e4393328f95ed15af90e7df959c017b25026bd23ec3435",
+          "bytes": 20216
+        }
+      ]
+    },
+    "course_ingestion": {
+      "location": null,
+      "files": [
+        {
+          "path": "data/import_sources/site_expansion_20261026/application_progress.json",
+          "sha256": "5d4f3c84914869bd1b02ed6e1b90b6500b6b38052827480293240e73d54b4be5",
+          "bytes": 65161
+        },
+        {
+          "path": "data/import_sources/site_expansion_20261026/backup_verification.json",
+          "sha256": "70c9cf9e4ef0cb2b31cc690660e3bc69d6cc2e444d5c504c5d2aecba2618b861",
+          "bytes": 886
+        }
+      ]
+    }
+  }
 }

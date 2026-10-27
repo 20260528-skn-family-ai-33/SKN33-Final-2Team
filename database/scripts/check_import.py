@@ -29,7 +29,8 @@ def verify() -> dict:
     html = (ROOT / "docs/07_데이터베이스_저장소_설계/ERD_최종.html").read_text(encoding="utf-8")
     start = re.search(r"const\s+D\s*=\s*", html).end()
     erd = json.JSONDecoder().raw_decode(html[start:])[0]
-    snapshot = json.loads((DATABASE / "data/exports/growpath_full_20261021.manifest.json").read_text(encoding="utf-8"))
+    snapshot_path = manifest.get("current_snapshot_manifest", "database/data/exports/growpath_full_20261021.manifest.json")
+    snapshot = json.loads((ROOT / snapshot_path).read_text(encoding="utf-8"))
     if set(erd) != set(schema) or set(erd) != set(snapshot["inventory"]["tables"]):
         errors.append("ERD/schema/backup table sets differ")
     for table, spec in schema.items():
