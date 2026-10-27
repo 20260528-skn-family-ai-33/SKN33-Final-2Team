@@ -174,6 +174,7 @@ frontend/                화면(React + Vite + TypeScript) · 개발 안내 fron
 backend/                 5차 FastAPI 백엔드(팀 백엔드 준비 전 참고용) · backend/README.md
 docker-compose.yml       DB·팀 DB 백업 복원·보충 자료·백엔드·화면을 한 번에 실행
 .env.example             실행 설정 예시(가짜 값 · 복사해 .env 로 씀)
+requirements.txt         실행 요구 사항 한곳 정리(화면·백엔드·DB · pip 은 backend + database 패키지)
 scripts/                 빈 DB일 때만 팀 DB 백업 복원
 team_db/                 팀 DB 백업·규정 원문 PDF를 넣는 곳(파일은 Git 제외)
 database/                DB 코드·마이그레이션·테스트·실행/복원 안내
@@ -216,7 +217,13 @@ README.md                 프로젝트 소개와 협업 안내
 
 ## 11. 개발 환경 실행
 
-DB(PostgreSQL 17 + pgvector) → 팀 DB 백업 복원 → 보충 자료 → 백엔드 → 화면(nginx)을 Docker로 한 번에 실행합니다. 준비물은 Docker Desktop이며, 화면을 고칠 때는 Node.js 20.19 이상(24 권장)이 필요합니다.
+DB(PostgreSQL 17 + pgvector) → 팀 DB 백업 복원 → 보충 자료 → 백엔드 → 화면(nginx)을 Docker로 한 번에 실행합니다. 할 일에 따라 필요한 것은 맨 위 [requirements.txt](requirements.txt)에도 모아 두었습니다.
+
+| 할 일 | 필요한 것 | 설치 |
+|---|---|---|
+| 전체 실행(기본) | Docker Desktop(compose v2) | 따로 없음 — `docker compose up -d --build`가 DB·백엔드·화면 의존성을 이미지 안에 설치 |
+| 화면 고치기 | Node.js 20.19 이상(24 권장)·npm | `npm ci --prefix frontend` (버전은 `frontend/package-lock.json`에 고정) |
+| 파이썬으로 직접 실행·DB 작업 | Python 3.12 | `pip install -r requirements.txt` (`backend/requirements.txt` + `database/requirements.txt`) |
 
 1. `.env.example`을 복사해 `.env`로 두고 `GP5_DB_PASSWORD`·`GP5_DEMO_PASSWORD`를 정합니다(값은 저장소에 적지 않습니다).
 2. DB 담당에게 받은 팀 DB 백업을 `team_db/`에, 규정 원문 PDF를 `team_db/regulations/`에, 직원 가데이터 엑셀을 `backend/data/seed/`에 넣습니다(각 폴더 README 참고).
