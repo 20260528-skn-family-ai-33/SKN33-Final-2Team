@@ -14,7 +14,7 @@ import type { DocState } from '@/api/types/draft';
 import { BText } from '@/shared/ui/bound';
 import { Icon } from '@/shared/ui/Icon';
 import { AgentRow, Note, OpsBox, Page, runSub } from '@/shared/ui/parts';
-import { draftCall, ensureDraft, pullDraft, takeDraft } from '../draftSync';
+import { DraftSaveError, draftCall, ensureDraft, pullDraft, takeDraft } from '../draftSync';
 import { docIdle, goalOk } from '../model';
 import { StaleNote } from '../stale';
 import { Stepper } from '../Stepper';
@@ -329,7 +329,7 @@ async function uploadProject(file: File): Promise<void> {
       s.draft.project = null;
       s.draft.doc = null;
     });
-    useGoalStore.setState({ docErr: { name: file.name, cause: cause(err) } });
+    useGoalStore.setState({ docErr: { name: file.name, cause: cause(err instanceof DraftSaveError ? err.original : err) } });
   }
 }
 

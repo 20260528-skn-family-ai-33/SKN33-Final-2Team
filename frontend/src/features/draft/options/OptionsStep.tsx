@@ -18,7 +18,7 @@ import { updateWs, useWs, ws } from '@/shared/state/workspace';
 import { BText } from '@/shared/ui/bound';
 import { Icon } from '@/shared/ui/Icon';
 import { ActThumb, Note, OpsBox, Page } from '@/shared/ui/parts';
-import { draftCall, flush, takeDraft } from '../draftSync';
+import { DraftSaveError, draftCall, flush, takeDraft } from '../draftSync';
 import { useKickSupport } from '../generation/GenerationStep';
 import { Stepper } from '../Stepper';
 import { useDraftWatch } from '../useDraftWatch';
@@ -42,7 +42,7 @@ export async function choose(go: ReturnType<typeof useGo>, id: string): Promise<
     takeDraft(await draftsApi.select(ws().draftId as string, id));
     go(paths.newReview);
   } catch (err) {
-    failToast(err, '안을 고르지 못했어요');
+    if (!(err instanceof DraftSaveError)) failToast(err, '안을 고르지 못했어요');
   }
 }
 
@@ -60,7 +60,11 @@ async function ver(pid: string, dir: number): Promise<void> {
     gg.options[pid] = list[i];
     if (s.draftPlan && s.draftPlan.opt === pid) s.draftPlan = null;
   });
-  await flush();
+  try {
+    await flush();
+  } catch {
+    /* 저장 실패는 이미 알렸고, 다음 입력이나 안 고르기 때 다시 저장한다 */
+  }
 }
 
 /* 다시 만들기 요청 창: 바라는 점(문장) + 빠른 칩 + 활동별 그대로/빼기/바꾸기. 아무것도 고르지 않으면 활동 구성이 다른 안을 새로 쓴다 */

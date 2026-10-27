@@ -34,8 +34,18 @@ function bodyOf(st: WsState): Record<string, unknown> {
 let applying = false;
 let lastSent: string | null = null;
 let timer: ReturnType<typeof setTimeout> | undefined;
-let queue: Promise<void> = Promise.resolve();
+/** 저장 줄: 저장마다 성공 여부로 끝난다(실패해도 줄은 이어지고 다음 저장이 다시 시도한다) */
+let queue: Promise<boolean> = Promise.resolve(true);
 let pending: (() => Record<string, unknown>) | null = null;
+let saveError: unknown = null;
+
+/** 작성 내용 저장이 실패해 다음 작업(문항·진단·3안 생성, 안 고르기, 확정)을 멈췄다는 표시. 저장 실패 알림은 이미 띄웠다(PR #23 리뷰 2026-10-27) */
+export class DraftSaveError extends Error {
+  constructor(readonly original: unknown) {
+    super('작성 내용을 저장하지 못했어요');
+    this.name = 'DraftSaveError';
+  }
+}
 
 /** 서버 응답 → 상태. soft: 입력 저장 응답이라 화면이 고치는 값은 화면 것을 둔다(타이핑 중에 덮지 않게) */
 export function takeDraftInto(st: WsState, r: Partial<DraftResponse> | null | undefined, soft = false): void {
@@ -68,7 +78,7 @@ export function takeDraft(r: Partial<DraftResponse> | null | undefined, soft = f
   if (!soft) lastSent = snap(ws());
 }
 
-function send(): Promise<void> {
+function send(): Promise<boolean> {
   const make = pending;
   pending = null;
   if (!make) return queue;
@@ -76,14 +86,22 @@ function send(): Promise<void> {
   queue = queue.then(async () => {
     const body = make();
     const st = ws();
-    if (st.owner !== owner) return;
+    if (st.owner !== owner) return true;
     try {
       const r = st.draftId ? await draftsApi.patch(st.draftId, body) : await draftsApi.create({ draft: body, lastNew: st.lastNew });
       if (ws().owner === owner) takeDraft(r, true);
+      saveError = null;
+      return true;
     } catch (err) {
       lastSent = null;
-      if (err instanceof ApiError && err.status === 404) updateWs((s) => void (s.draftId = null));
-      else failToast(err, '작성 내용을 저장하지 못했어요');
+      // 작성 문서가 서버에서 없어졌으면 ensureDraft 가 지금 입력으로 새로 만든다
+      if (err instanceof ApiError && err.status === 404) {
+        updateWs((s) => void (s.draftId = null));
+        return true;
+      }
+      saveError = err;
+      failToast(err, '작성 내용을 저장하지 못했어요');
+      return false;
     }
   });
   return queue;
@@ -103,7 +121,7 @@ useWs.subscribe((st) => {
   }, 400);
 });
 
-/** 에이전트 호출 전에 쓰던 입력을 먼저 서버에 저장한다 */
+/** 에이전트 호출 전에 쓰던 입력을 먼저 서버에 저장한다. 저장이 실패하면 DraftSaveError 로 멈춘다(서버의 예전 값으로 다음 작업을 하지 않게) */
 export async function flush(): Promise<void> {
   const st = ws();
   if (!st.owner) return;
@@ -113,7 +131,7 @@ export async function flush(): Promise<void> {
     pending = () => bodyOf(ws());
     void send();
   }
-  await queue;
+  if (!(await queue)) throw new DraftSaveError(saveError);
 }
 
 export async function ensureDraft(): Promise<string> {
@@ -155,7 +173,7 @@ export async function draftCall<T extends Partial<DraftResponse>>(what: string, 
     if (r && r.draft !== undefined) takeDraft(r, opts?.soft);
     return r || ({} as T);
   } catch (err) {
-    failToast(err, what);
+    if (!(err instanceof DraftSaveError)) failToast(err, what);
     return null;
   }
 }

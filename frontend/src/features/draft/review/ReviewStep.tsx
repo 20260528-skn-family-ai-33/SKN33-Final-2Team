@@ -10,7 +10,7 @@ import { recs, updateWs, useWs, ws } from '@/shared/state/workspace';
 import { Icon } from '@/shared/ui/Icon';
 import { Note, Page, Stats } from '@/shared/ui/parts';
 import { StagesView } from '@/shared/ui/StagesView';
-import { flush, reloadWorkspace } from '../draftSync';
+import { DraftSaveError, flush, reloadWorkspace } from '../draftSync';
 import { useKickSupport } from '../generation/GenerationStep';
 import { openRegenSheet } from '../options/OptionsStep';
 import { SupCell, SupNote } from '../options/support';
@@ -25,7 +25,7 @@ export async function confirmDraft(go: ReturnType<typeof useGo>): Promise<void> 
     updateWs((s) => void (s.lastNew = null));
     go(paths.confirmed(r.planId), { force: true });
   } catch (err) {
-    failToast(err, '로드맵을 확정하지 못했어요');
+    if (!(err instanceof DraftSaveError)) failToast(err, '로드맵을 확정하지 못했어요');
   }
 }
 

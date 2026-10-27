@@ -1,4 +1,4 @@
-/* 사후 점검·결과 보고서 만들기 (5차 scr.post · savePost·ensurePostDeep·waitReport·make-report)
+/* 사후 점검·결과 보고서 만들기 (5차 scr.post · ensurePostDeep · 저장·보고서 요청은 postActions.ts)
    응답은 고칠 때마다 서버에 저장한다(API-49). 결과물 파일은 서버 폴더에 올린 뒤 이름만 붙인다.
    사후 심화 질문(10/23): 사전에 심화를 고른 로드맵이면 화면에 들어올 때 서버가 같은 개념의 새 문제를 만든다. 실패는 '다시 시도'를 눌러야만 */
 import { useEffect } from 'react';
@@ -6,54 +6,19 @@ import { plansApi } from '@/api/endpoints/plans';
 import { waitJob } from '@/api/jobs';
 import type { PlanRecord, PostDeep } from '@/api/types/plan';
 import { paths } from '@/app/paths';
-import { reloadWorkspace } from '@/features/draft/draftSync';
 import { PlanGate } from '@/features/roadmap/parts';
-import { pullPlan, takePlan } from '@/features/roadmap/planActions';
+import { pullPlan } from '@/features/roadmap/planActions';
 import { D } from '@/shared/constants/data';
 import { useGo } from '@/shared/hooks/useGo';
 import { failToast } from '@/shared/lib/fail';
 import { st } from '@/shared/lib/plan';
 import { ai, cause, errText } from '@/shared/state/ai';
-import { onBound, setAt } from '@/shared/state/bind';
-import { me } from '@/shared/state/session';
-import { toast } from '@/shared/state/ui';
+import { setAt } from '@/shared/state/bind';
 import { updateWs, ws } from '@/shared/state/workspace';
 import { Icon } from '@/shared/ui/Icon';
 import { AgentRow, FailPage, Note, OpsBox, Page, runSub, via } from '@/shared/ui/parts';
+import { deepOpen, makeReport, savePost, waitReport } from './postActions';
 import { QuizBody } from './quizParts';
-
-/** 사후 심화 답은 문항이 준비되고 보고서를 만들기 전까지만 보낸다(보고서를 만든 뒤에는 서버가 고정) */
-const deepOpen = (dp: PostDeep | null | undefined) => !!(dp && dp.status === 'ready' && !dp.judge);
-let postQ: Promise<void> = Promise.resolve();
-
-function savePost(pid: string, extra?: Record<string, unknown> | null): Promise<void> {
-  postQ = postQ.then(async () => {
-    const cur = ws().plans[pid];
-    if (!cur) return;
-    const dp = cur.post.deep;
-    const body = { answers: cur.post.answers, goalSelf: cur.post.goalSelf, ...(deepOpen(dp) ? { deepMcq: dp!.mcq || {}, deepEssay: dp!.essay || {} } : {}), ...(extra || {}) };
-    try {
-      const res = await plansApi.savePost(pid, body);
-      /* 보내는 사이 서술형을 더 썼으면 서버 응답이 덮지 않게 화면의 심화 답을 그대로 둔다 */
-      const mine = ws().plans[pid]?.post;
-      const keep = mine && deepOpen(mine.deep) ? { mcq: mine.deep!.mcq, essay: mine.deep!.essay } : null;
-      takePlan(res);
-      if (keep && deepOpen(ws().plans[pid]?.post.deep)) updateWs((s) => Object.assign(s.plans[pid].post.deep as PostDeep, keep));
-    } catch (err) {
-      failToast(err, '사후 점검 응답을 저장하지 못했어요');
-    }
-  });
-  return postQ;
-}
-
-/* 입력 연결 뒤처리: 사후 점검 응답은 바로 서버에 저장한다(글자 입력은 0.6초 기다림) */
-let postT: ReturnType<typeof setTimeout> | undefined;
-onBound((_s, path, evt) => {
-  const m = /^plans\.([^.]+)\.post\.(.+)$/.exec(path);
-  if (!m || m[2] === 'file') return;
-  clearTimeout(postT);
-  postT = setTimeout(() => void savePost(m[1]), evt === 'input' ? 600 : 50);
-});
 
 const POST_DEEP_AGENT = '진단 에이전트 · 사후 심화 질문 생성';
 const pdAsk = new Set<string>();
@@ -78,47 +43,6 @@ async function ensurePostDeep(pid: string): Promise<void> {
   }
   pdAsk.delete(pid);
   await pullPlan(pid);
-}
-
-/* 보고서 작성(API-50): 서버 작업. 끝나면 보고서 목록을 다시 읽고 보고서 화면으로 간다 */
-const repWait = new Set<string>();
-async function waitReport(go: ReturnType<typeof useGo>, pid: string, jobId: string): Promise<void> {
-  if (repWait.has(jobId)) return;
-  repWait.add(jobId);
-  let out: { reportId?: string } | null = null;
-  try {
-    out = await waitJob<{ reportId?: string }>(jobId);
-  } catch {
-    /* 실패 원인은 서버(post.fail)에 남아 있다 */
-  }
-  repWait.delete(jobId);
-  if (!me()) return;
-  const here = () => window.location.pathname === paths.post(pid);
-  if (out && out.reportId) {
-    await reloadWorkspace();
-    if (here()) go(paths.report(out.reportId));
-    else toast('결과 보고서가 나왔어요 · 점검·보고서에서 볼 수 있어요');
-  } else await pullPlan(pid);
-}
-
-async function makeReport(go: ReturnType<typeof useGo>, pid: string): Promise<void> {
-  const R = ws().plans[pid];
-  if (!R || R.post.running) return;
-  clearTimeout(postT);
-  await savePost(pid, R.post.fail ? { clearFail: true } : null);
-  updateWs((s) => {
-    s.plans[pid].post.running = true;
-    s.plans[pid].post.fail = null;
-  });
-  try {
-    const j = await plansApi.makeReport(pid);
-    updateWs((s) => void (s.plans[pid].post.jobId = j.jobId));
-    void waitReport(go, pid, j.jobId);
-  } catch (err) {
-    updateWs((s) => void (s.plans[pid].post.running = false));
-    failToast(err, '결과 보고서를 만들지 못했어요');
-    await pullPlan(pid);
-  }
 }
 
 const postValid = (R: PlanRecord): boolean => {
@@ -209,8 +133,7 @@ function Post({ R }: { R: PlanRecord }) {
             <button
               className="btn line"
               onClick={async () => {
-                await savePost(R.id, { clearFail: true });
-                updateWs((s) => void (s.plans[R.id].post.fail = null));
+                if (await savePost(R.id, { clearFail: true })) updateWs((s) => void (s.plans[R.id].post.fail = null));
               }}
             >
               <Icon name="left" />
@@ -292,7 +215,8 @@ function Post({ R }: { R: PlanRecord }) {
                   updateWs((s) => void (s.plans[R.id].post.file = { name: file.name, size: file.size }));
                   try {
                     const up = await plansApi.attach(R.id, 'post', file);
-                    await savePost(R.id, { file: { fileId: up.fileId, name: up.name, size: up.size } });
+                    // 저장이 실패하면(알림은 savePost 가 띄움) 붙인 것처럼 보이지 않게 되돌린다
+                    if (!(await savePost(R.id, { file: { fileId: up.fileId, name: up.name, size: up.size } }))) updateWs((s) => void (s.plans[R.id].post.file = null));
                   } catch (err) {
                     updateWs((s) => void (s.plans[R.id].post.file = null));
                     failToast(err, '결과물을 올리지 못했어요');
