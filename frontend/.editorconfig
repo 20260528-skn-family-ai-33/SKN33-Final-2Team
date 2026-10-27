@@ -1,0 +1,10 @@
+# 화면 코드 편집 설정(이 폴더 안에서만) — 줄 끝 LF · 2칸 들여쓰기(팀 규칙: JavaScript 2칸)
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2

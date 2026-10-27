@@ -1,0 +1,47 @@
+# 화면(frontend) 자동 검사 — PR마다 타입 검사·린트·단위 테스트·빌드를 돌린다.
+# DB·백엔드 없이 돌아가는 검사만 둔다. 화면 흐름은 PR 리뷰어가 로컬에서 확인한다(frontend/README.md).
+name: frontend
+
+on:
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-ci.yml'
+
+permissions:
+  contents: read
+
+# 같은 브랜치에 새로 올리면 앞 검사는 멈춘다
+concurrency:
+  group: frontend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: 설치
+        run: npm ci --no-audit --no-fund
+      - name: 타입 검사
+        run: npm run typecheck
+      - name: 린트
+        run: npm run lint
+      - name: 단위 테스트
+        run: npm test
+      - name: 빌드
+        run: npm run build
