@@ -2,6 +2,7 @@
 import { useEffect, type ReactNode } from 'react';
 import { Navigate, Outlet, useLocation, useMatches } from 'react-router';
 import { paths } from '@/app/paths';
+import { AdminSide } from '@/features/admin/AdminSide';
 import { AssistantHost } from '@/features/assistant/AssistantHost';
 import { DraftNavGuard } from '@/features/draft/stale';
 import { ai, PROV, useAiMode } from '@/shared/state/ai';
@@ -72,8 +73,7 @@ export function AppShell() {
       </header>
       <div className="app">
         <aside className="side" id="side">
-          {/* 관리자 메뉴는 이슈 #20 PR의 관리자 화면 커밋에서 들어와요 */}
-          {booted && acct && !admin ? <Sidebar active={h.nav || ''} /> : null}
+          {booted && acct ? admin ? <AdminSide /> : <Sidebar active={h.nav || ''} /> : null}
         </aside>
         <main className="main">
           <div id="view" className={`view ${width}`}>

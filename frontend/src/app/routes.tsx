@@ -1,10 +1,16 @@
 /* 주소 ↔ 화면. handle: 좌측 메뉴 강조(nav)·제목(title)·본문 폭(width)·권한(role) — 5차 화면 정의(scr.*)의 nav·title·width·role 그대로 */
 import { createBrowserRouter, Navigate, type RouteObject } from 'react-router';
+import { DatasetPage } from '@/features/admin/DatasetPage';
+import { HistoryPage } from '@/features/admin/HistoryPage';
+import { OverviewPage } from '@/features/admin/OverviewPage';
+import { PreviewPage } from '@/features/admin/PreviewPage';
+import { RegulationsPage } from '@/features/admin/RegulationsPage';
 import { ChecksPage } from '@/features/assessment/ChecksPage';
 import { PostCheckPage } from '@/features/assessment/PostCheckPage';
 import { LoginPage } from '@/features/auth/LoginPage';
 import { HomePage } from '@/features/home/HomePage';
 import { MePage } from '@/features/profile/MePage';
+import { CommentSentPage, MemberListPage, MemberPlansPage, MemberReportPage, MemberRoadPage } from '@/features/team/TeamPages';
 import { ReportPage } from '@/features/report/ReportPage';
 import { ResourcePage, ResourcesPage } from '@/features/resources/ResourcePages';
 import { CommentsRoute } from '@/features/roadmap/CommentsRoute';
@@ -19,11 +25,7 @@ import { QuizStep } from '@/features/draft/quiz/QuizStep';
 import { ResultEdit, ResultStep } from '@/features/draft/result/ResultStep';
 import { ReviewStep } from '@/features/draft/review/ReviewStep';
 import { AppShell, type ScreenHandle } from './layout/AppShell';
-import { Page } from '@/shared/ui/parts';
 import { paths } from './paths';
-
-/* 다음 커밋에서 옮길 화면 자리(이슈 #20 PR의 중간 커밋에만 있음) */
-const Soon = () => <Page title="다음 커밋에서 옮겨요" lead="이 화면은 이슈 #20 PR의 다음 커밋에서 React로 옮겨요. 커밋을 하나씩 확인할 때만 보이는 자리예요." />;
 
 const r = (path: string, element: React.ReactNode, handle: ScreenHandle): RouteObject => ({ path, element, handle });
 
@@ -58,20 +60,20 @@ export const router = createBrowserRouter([
       r(paths.resources, <ResourcesPage />, { nav: 'resources', title: '학습 자료', width: 'wide' }),
       r('/resources/:id', <ResourcePage />, { nav: 'resources', title: '학습 자료' }),
       // 부서장
-      r(paths.team, <Soon />, { nav: 'm-list', title: '소속 직원 계획', width: 'wide', role: 'mgr' }),
-      r('/team/:uid', <Soon />, { nav: 'm-list', title: '직원 로드맵', width: 'wide', role: 'mgr' }),
-      r('/team/:uid/plans/:pid', <Soon />, { nav: 'm-list', title: '직원 로드맵', width: 'wide', role: 'mgr' }),
-      r('/team/:uid/plans/:pid/sent', <Soon />, { nav: 'm-list', title: '코멘트 전달', role: 'mgr' }),
-      r('/team/:uid/reports/:rid', <Soon />, { nav: 'm-list', title: '직원 결과 보고서', width: 'wide', role: 'mgr' }),
+      r(paths.team, <MemberListPage />, { nav: 'm-list', title: '소속 직원 계획', width: 'wide', role: 'mgr' }),
+      r('/team/:uid', <MemberPlansPage />, { nav: 'm-list', title: '직원 로드맵', width: 'wide', role: 'mgr' }),
+      r('/team/:uid/plans/:pid', <MemberRoadPage />, { nav: 'm-list', title: '직원 로드맵', width: 'wide', role: 'mgr' }),
+      r('/team/:uid/plans/:pid/sent', <CommentSentPage />, { nav: 'm-list', title: '코멘트 전달', role: 'mgr' }),
+      r('/team/:uid/reports/:rid', <MemberReportPage />, { nav: 'm-list', title: '직원 결과 보고서', width: 'wide', role: 'mgr' }),
       // 관리자
-      r(paths.admin, <Soon />, { title: '관리자', width: 'wide', role: 'admin' }),
-      r('/admin/data/:ds', <Soon />, { title: '관리자', width: 'wide adm-ds', role: 'admin' }),
-      r(paths.adminRegulations, <Soon />, { title: '관리자', width: 'wide', role: 'admin' }),
+      r(paths.admin, <OverviewPage />, { title: '관리자', width: 'wide', role: 'admin' }),
+      r('/admin/data/:ds', <DatasetPage />, { title: '관리자', width: 'wide adm-ds', role: 'admin' }),
+      r(paths.adminRegulations, <RegulationsPage />, { title: '관리자', width: 'wide', role: 'admin' }),
       // 예전 규정 표 주소(2026-10-26 원문 PDF 화면으로 바뀜)
-      r(paths.adminData('regulations'), <Soon />, { title: '관리자', role: 'admin' }),
-      r('/admin/uploads/:id', <Soon />, { title: '관리자', width: 'wide', role: 'admin' }),
-      r(paths.adminHistory, <Soon />, { title: '관리자', width: 'wide', role: 'admin' }),
-      r('/admin/*', <Soon />, { title: '관리자', role: 'admin' }),
+      r(paths.adminData('regulations'), <Navigate to={paths.adminRegulations} replace />, { title: '관리자', role: 'admin' }),
+      r('/admin/uploads/:id', <PreviewPage />, { title: '관리자', width: 'wide', role: 'admin' }),
+      r(paths.adminHistory, <HistoryPage />, { title: '관리자', width: 'wide', role: 'admin' }),
+      r('/admin/*', <Navigate to={paths.admin} replace />, { title: '관리자', role: 'admin' }),
       { path: '*', element: <Navigate to={paths.home} replace /> },
     ],
   },
