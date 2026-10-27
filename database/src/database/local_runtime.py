@@ -2,10 +2,31 @@
 from pathlib import Path
 import argparse,json,os,subprocess
 from dotenv import load_dotenv
+from psycopg.adapt import Loader
 from psycopg.conninfo import conninfo_to_dict
 from src.database.deployment import ROOT,connect
 
 DATA=ROOT/'data/local_db/postgres'
+
+
+class _RawPathLoader(Loader):
+    def load(self, data) -> bytes:
+        return bytes(data)
+
+
+def server_data_directory(conn) -> Path:
+    """Read OS paths without treating Windows ANSI bytes as database UTF-8."""
+    with conn.cursor() as cursor:
+        cursor.adapters.register_loader('text', _RawPathLoader)
+        cursor.execute('SHOW data_directory')
+        raw = cursor.fetchone()['data_directory']
+    try:
+        value = raw.decode('utf-8')
+    except UnicodeDecodeError:
+        if os.name != 'nt':
+            raise
+        value = raw.decode('mbcs')
+    return Path(value)
 
 def native_bin():
     load_dotenv(ROOT/'.env.local',override=True)
@@ -34,8 +55,7 @@ def status():
     if running:
         with connect('SUPABASE_DB_URL') as c:
             c.execute('SET TRANSACTION READ ONLY')
-            actual=c.execute('SHOW data_directory').fetchone()['data_directory']
-            if Path(actual).resolve()!=DATA.resolve():raise ValueError('Application points at another PostgreSQL instance.')
+            if server_data_directory(c).resolve()!=DATA.resolve():raise ValueError('Application points at another PostgreSQL instance.')
             result.update(database=c.info.dbname,host=c.info.host,port=c.info.port,
                           server_version=c.execute('SHOW server_version').fetchone()['server_version'])
     return result
@@ -44,7 +64,7 @@ def backup(output):
     output=output.resolve()
     if output.exists():raise ValueError('Backup destination exists; not overwriting.')
     with connect('SUPABASE_DB_URL') as c:
-        if Path(c.execute('SHOW data_directory').fetchone()['data_directory']).resolve()!=DATA.resolve():
+        if server_data_directory(c).resolve()!=DATA.resolve():
             raise ValueError('Refusing to back up an unexpected database.')
     params=conninfo_to_dict(os.environ['SUPABASE_DB_URL']);env=os.environ.copy()
     for key,field in [('PGHOST','host'),('PGPORT','port'),('PGUSER','user'),('PGPASSWORD','password'),('PGDATABASE','dbname')]:
