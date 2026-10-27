@@ -34,3 +34,7 @@ qwen_factory/data/
 **/checkpoints/
 **/outputs/
 **/reports/
+
+# Local DB work evidence and employee fixtures remain external.
+database/migration_work/
+database/src/database/demo_users.sql

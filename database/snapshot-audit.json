@@ -78,5 +78,50 @@
     "job_id": 0,
     "password_hash": 14
   },
-  "scope": "Static dump audit only; PostgreSQL restore, triggers, live authorization and retrieval relevance were not executed."
+  "scope": "Static dump audit only; PostgreSQL restore, triggers, live authorization and retrieval relevance were not executed.",
+  "original_audit_note": "Existing top-level fields describe the 2026-10-21 import, not the current snapshot.",
+  "current_snapshot": {
+    "version": "2026-10-27",
+    "tables": 53,
+    "rows": 22284,
+    "foreign_keys": 87,
+    "constraints": 227,
+    "archive_sha256": "9ce26041c5bf95ea9e6ad88c5ea8d3817e3c6097e7e85c0f99512123098001fb",
+    "full_53_table_restore_fingerprints_match": true,
+    "courses": 2060,
+    "recommendable_courses": 2045,
+    "course_skill_links": 3658,
+    "resource_vectors": 2469,
+    "knowledge_chunks": 442,
+    "source_report_sha256": "efbca487164d3bfaf6eb71cc74654ecac3f0ac79eaec168d9dfe4c3bda41d95f",
+    "git_preparation_tests": {
+      "checked_at_utc": "2026-10-26T16:43:23.339330+00:00",
+      "unit": {
+        "collected": 182,
+        "started_including_skips": 171,
+        "executed": 166,
+        "passed": 166,
+        "skipped": 5,
+        "failures": 0,
+        "errors": 0,
+        "successful": true
+      },
+      "paid_api_calls": 0,
+      "integration": {
+        "collected": 23,
+        "started_including_skips": 23,
+        "executed": 23,
+        "passed": 23,
+        "skipped": 0,
+        "failures": 0,
+        "errors": 0,
+        "successful": true
+      },
+      "test_clone_removed": true,
+      "configuration_copied": false
+    },
+    "new_paid_calls_in_git_preparation": 0,
+    "screen_verification": "blocked_current_browser_url_not_verified",
+    "human_review": "pending"
+  }
 }

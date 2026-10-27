@@ -4,7 +4,7 @@
   "source_repository": "https://github.com/necknam/fine-tuning",
   "source_commit": "a61c879096a422e0bf4e7821389a8fa268c550fa",
   "source_kind": "user_delivered_snapshot",
-  "official_submission_status": "drive_current_files_verified_management_sheet_links_differ",
+  "official_submission_status": "code_preparation_only_historical_deliverables_preserved",
   "team_base_commit": "93b98fb5e5ea003bdea35852e770ac2a0605d55a",
   "files": [
     {
@@ -13,8 +13,8 @@
       "source_sha256": "2f9b8b0c367c97704addef663bc0b2bcedd964e457809869ad8a1c3f746f5efd",
       "source_bytes": 154,
       "source_kind": "team_existing_file",
-      "sha256": "ad2e5eb8ca56f35f46ce031370145bb7df36d0eb14eb05e80aa29ad532dd15eb",
-      "bytes": 849,
+      "sha256": "f8a298bbd0285bd23fd0873845081abf1e33314e1f1b9109f8934e317d8cebdd",
+      "bytes": 902,
       "handling": "adjusted",
       "change_note": "Add DB import instructions, artifact links, exclusion settings or verification metadata."
     },
@@ -24,10 +24,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "709be4c8cc6d1044455854d4fc89b88d16b58d6dd38cffb223ae4304bf7cb7de",
-      "bytes": 615,
-      "handling": "added",
-      "change_note": "Add DB import instructions, artifact links, exclusion settings or verification metadata."
+      "sha256": "cd0d69c1f0f6819bae49415783d65ec3f1e821b23cca0013d6db575537f4baad",
+      "bytes": 757,
+      "handling": "adjusted",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions."
     },
     {
       "path": "AGENTS.md",
@@ -46,10 +46,10 @@
       "source_sha256": "15e8559b61d8db92a1a322ba0a1be86852fb1f4555ecf80b89be366d9b289fcf",
       "source_bytes": 11326,
       "source_kind": "team_existing_file",
-      "sha256": "0a651e9fe3b90ead585ddd070dd1e1ad9e0c44e7bb72acc159693914d95615e0",
-      "bytes": 13530,
+      "sha256": "41c9d10345ebbbde122b832bd007d020192424e816df3edf371123fa06a2ac8d",
+      "bytes": 13842,
       "handling": "adjusted",
-      "change_note": "Add DB import instructions, artifact links, exclusion settings or verification metadata."
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions."
     },
     {
       "path": "database/.env.example",
@@ -57,10 +57,25 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "138e9a863453a7e75053efbde3592211941395f05988a2a03c008458cd787d4c",
-      "bytes": 671,
-      "handling": "added",
-      "change_note": "Add DB import instructions, artifact links, exclusion settings or verification metadata."
+      "sha256": "ce0cd1ca368e2993c8208fa55bc300a08748571530425cb516c8a61b072631a7",
+      "bytes": 603,
+      "handling": "adjusted",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions."
+    },
+    {
+      "path": "database/IT_SCOPE.md",
+      "source_path": "IT_SCOPE.md",
+      "source_sha256": "b5ddd87307618f22848c659db6529b08f21629de15814134a60f6e7eb16f54e7",
+      "source_bytes": 15426,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "5f7a74b1fd82c7ff1b2a179f2e020ee2ce803d7b7715f25cf6b03437fe3915d9",
+      "bytes": 15535,
+      "handling": "adjusted",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "IT_SCOPE.md",
+        "sha256": "b5ddd87307618f22848c659db6529b08f21629de15814134a60f6e7eb16f54e7"
+      }
     },
     {
       "path": "database/README.md",
@@ -68,10 +83,14 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "c8aa1d892ca496c1fe5dc14586026584977c1fbb220daf57e30823402a79f082",
-      "bytes": 4430,
-      "handling": "added",
-      "change_note": "Add DB import instructions, artifact links, exclusion settings or verification metadata."
+      "sha256": "0fc691f204184750372bdd25680c5557663379b944a6d3bf65c7d7e1615872cf",
+      "bytes": 6984,
+      "handling": "adjusted",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "README.md",
+        "sha256": "e872d64ea58c53311d098dc1c769f5bc3232ad947d690054b75a0a0a20c6d8c6"
+      }
     },
     {
       "path": "database/RESTORE.md",
@@ -79,10 +98,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "04f59cbc7abe9c7fb239045738f73b11639b9376144c084c08ccd2020acd6297",
-      "bytes": 3405,
-      "handling": "added",
-      "change_note": "Add DB import instructions, artifact links, exclusion settings or verification metadata."
+      "sha256": "3ed87da8fc18839557e5e0d840e60f61294d802b4d3f5ad074cd2dc74cc481d5",
+      "bytes": 2854,
+      "handling": "adjusted",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions."
     },
     {
       "path": "database/assets.manifest.json",
@@ -90,10 +109,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "a593971c6efb06bb077d98da0adeb21ba55d13bcdf218141edb86bb70dfad94c",
-      "bytes": 20902,
-      "handling": "added",
-      "change_note": "Add DB import instructions, artifact links, exclusion settings or verification metadata."
+      "sha256": "3cadd329879e6ba7fed03b6fcb2e681152448af7e61725f3291c915572331268",
+      "bytes": 23268,
+      "handling": "adjusted",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions."
     },
     {
       "source_path": "database/config/paths.yaml",
@@ -101,9 +120,14 @@
       "source_sha256": "f3c6661660777e2f9618d07b3649eceec758b11d1c7b902bd1c2beffcac7781e",
       "source_bytes": 2936,
       "source_kind": "source_commit_file",
-      "sha256": "f3c6661660777e2f9618d07b3649eceec758b11d1c7b902bd1c2beffcac7781e",
-      "bytes": 2936,
-      "handling": "byte_preserved"
+      "sha256": "cd340a8305f78fa4f9e94fd02d66f51835f6667e307d1f085f5095bf5ce8a6ee",
+      "bytes": 2944,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "config/paths.yaml",
+        "sha256": "cd340a8305f78fa4f9e94fd02d66f51835f6667e307d1f085f5095bf5ce8a6ee"
+      }
     },
     {
       "source_path": "database/config/rules.yaml",
@@ -111,9 +135,29 @@
       "source_sha256": "bb55cb6479b5b05c2dfce804a11ea460a2ddf8fa7cf984c0809e47fef65e3209",
       "source_bytes": 11412,
       "source_kind": "source_commit_file",
-      "sha256": "bb55cb6479b5b05c2dfce804a11ea460a2ddf8fa7cf984c0809e47fef65e3209",
-      "bytes": 11412,
-      "handling": "byte_preserved"
+      "sha256": "0619e66ca204316ae89d717eb9b6a97dfda160069424bc489ce60d8be015bdc8",
+      "bytes": 11694,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "config/rules.yaml",
+        "sha256": "0619e66ca204316ae89d717eb9b6a97dfda160069424bc489ce60d8be015bdc8"
+      }
+    },
+    {
+      "path": "database/config/snapshot_migrations.json",
+      "source_path": "config/snapshot_migrations.json",
+      "source_sha256": "663548a6290397446efabc0d74714b71137f8040e636fa62a328e37323fc1916",
+      "source_bytes": 5266,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "663548a6290397446efabc0d74714b71137f8040e636fa62a328e37323fc1916",
+      "bytes": 5266,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "config/snapshot_migrations.json",
+        "sha256": "663548a6290397446efabc0d74714b71137f8040e636fa62a328e37323fc1916"
+      }
     },
     {
       "source_path": "database/data/exports/growpath_full_20261021.manifest.json",
@@ -124,6 +168,21 @@
       "sha256": "dcc3061a25cc441fb920a5562c808235852488308dabbbad1fed8bd61f949814",
       "bytes": 52970,
       "handling": "byte_preserved"
+    },
+    {
+      "path": "database/data/exports/growpath_latest.manifest.json",
+      "source_path": "data/exports/growpath_latest.manifest.json",
+      "source_sha256": "59e13c3fd7bdde78922da1df1c242b08838925e9c3a5e19d8333070d46726420",
+      "source_bytes": 59668,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "59e13c3fd7bdde78922da1df1c242b08838925e9c3a5e19d8333070d46726420",
+      "bytes": 59668,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "data/exports/growpath_latest.manifest.json",
+        "sha256": "59e13c3fd7bdde78922da1df1c242b08838925e9c3a5e19d8333070d46726420"
+      }
     },
     {
       "source_path": "database/data/exports/pgvector_pg17_windows_x64/LICENSE",
@@ -156,14 +215,34 @@
       "handling": "byte_preserved"
     },
     {
+      "path": "database/docs/erd_template.html",
+      "source_path": "docs/erd_template.html",
+      "source_sha256": "396678c21b28f70044f441e7624b54c9f2809f3b7b694cd9f45f22c1f58d75a8",
+      "source_bytes": 39492,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "396678c21b28f70044f441e7624b54c9f2809f3b7b694cd9f45f22c1f58d75a8",
+      "bytes": 39492,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "docs/erd_template.html",
+        "sha256": "396678c21b28f70044f441e7624b54c9f2809f3b7b694cd9f45f22c1f58d75a8"
+      }
+    },
+    {
       "source_path": "database/load_data.py",
       "path": "database/load_data.py",
       "source_sha256": "625ab83498ba3c6cd966b86cf194da5b22dfd13b06bf771f925185fe6074a416",
       "source_bytes": 2713,
       "source_kind": "source_commit_file",
-      "sha256": "625ab83498ba3c6cd966b86cf194da5b22dfd13b06bf771f925185fe6074a416",
-      "bytes": 2713,
-      "handling": "byte_preserved"
+      "sha256": "306f028a1e7623f95b2b8e4cf9f2ed36faa72a43891bc718bb8779dbcd356223",
+      "bytes": 2984,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "load_data.py",
+        "sha256": "306f028a1e7623f95b2b8e4cf9f2ed36faa72a43891bc718bb8779dbcd356223"
+      }
     },
     {
       "source_path": "database/requirements-db.txt",
@@ -192,10 +271,14 @@
       "source_sha256": "8812c10feace75161e5ab920c2f1a214af24810d810af086d17d1739103a9cb9",
       "source_bytes": 145,
       "source_kind": "source_commit_file",
-      "sha256": "b753c1b55d504924c94c4dd6cd66d196900bcf264685b876fab02c2660cd424a",
-      "bytes": 211,
-      "handling": "adjusted",
-      "change_note": "Add and pin OpenAI SDK used by existing embedding/search functions."
+      "sha256": "3181b2e69ede70e58fc8bccc708569708270dd6866189aaee8ddf11d90100229",
+      "bytes": 212,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "requirements.txt",
+        "sha256": "3181b2e69ede70e58fc8bccc708569708270dd6866189aaee8ddf11d90100229"
+      }
     },
     {
       "path": "database/scripts/check_import.py",
@@ -203,10 +286,40 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "1398fc8f7da29e3cc11ea7873d27165136c883546f55113192562f95b75ecb5c",
-      "bytes": 2834,
-      "handling": "added",
-      "change_note": "Add DB import instructions, artifact links, exclusion settings or verification metadata."
+      "sha256": "3de5f509e345c7aafb6cc6cdf81b54aaa3c36006a4404f27838d536a3f7513de",
+      "bytes": 2916,
+      "handling": "adjusted",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions."
+    },
+    {
+      "path": "database/scripts/check_workspace.py",
+      "source_path": "scripts/check_workspace.py",
+      "source_sha256": "82327b5737f40c891484955c2eb2ce490a53b0de46990408d4b6f9708441991d",
+      "source_bytes": 4420,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "24a7108a7d8105237a29933873dc6253eeddb5240cd0fbb07e243967b592de31",
+      "bytes": 4550,
+      "handling": "adjusted",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "scripts/check_workspace.py",
+        "sha256": "82327b5737f40c891484955c2eb2ce490a53b0de46990408d4b6f9708441991d"
+      }
+    },
+    {
+      "path": "database/scripts/correct_course_skills.py",
+      "source_path": "scripts/correct_course_skills.py",
+      "source_sha256": "600d8a3987aa32ba587d26cc4795d64cb82c4ccb0d9c9176bd7406fa852d0e6d",
+      "source_bytes": 5060,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "600d8a3987aa32ba587d26cc4795d64cb82c4ccb0d9c9176bd7406fa852d0e6d",
+      "bytes": 5060,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "scripts/correct_course_skills.py",
+        "sha256": "600d8a3987aa32ba587d26cc4795d64cb82c4ccb0d9c9176bd7406fa852d0e6d"
+      }
     },
     {
       "source_path": "database/scripts/db.py",
@@ -217,6 +330,36 @@
       "sha256": "8c9f7455c788ddf5a341132168c36485acd1dae16c2d2c0f10fc402336a7e071",
       "bytes": 394,
       "handling": "byte_preserved"
+    },
+    {
+      "path": "database/scripts/employee_form.py",
+      "source_path": "scripts/employee_form.py",
+      "source_sha256": "d5484fa9a2f85b61f431241a96dfaf632a59356be3356246f48faf9f8193c3f5",
+      "source_bytes": 3085,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "d5484fa9a2f85b61f431241a96dfaf632a59356be3356246f48faf9f8193c3f5",
+      "bytes": 3085,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "scripts/employee_form.py",
+        "sha256": "d5484fa9a2f85b61f431241a96dfaf632a59356be3356246f48faf9f8193c3f5"
+      }
+    },
+    {
+      "path": "database/scripts/import_knowledge.py",
+      "source_path": "scripts/import_knowledge.py",
+      "source_sha256": "38281030d70596442ee458dad92d60fff981417d821a9957c876fd3f79823632",
+      "source_bytes": 2897,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "38281030d70596442ee458dad92d60fff981417d821a9957c876fd3f79823632",
+      "bytes": 2897,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "scripts/import_knowledge.py",
+        "sha256": "38281030d70596442ee458dad92d60fff981417d821a9957c876fd3f79823632"
+      }
     },
     {
       "source_path": "database/scripts/install_postgres.ps1",
@@ -240,6 +383,36 @@
       "handling": "byte_preserved"
     },
     {
+      "path": "database/scripts/prepare_course_expansion.py",
+      "source_path": "scripts/prepare_course_expansion.py",
+      "source_sha256": "144a7cde113698ca0301208d4d669c07a18df2dbcbb98f057211d0973a2fe987",
+      "source_bytes": 7437,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "144a7cde113698ca0301208d4d669c07a18df2dbcbb98f057211d0973a2fe987",
+      "bytes": 7437,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "scripts/prepare_course_expansion.py",
+        "sha256": "144a7cde113698ca0301208d4d669c07a18df2dbcbb98f057211d0973a2fe987"
+      }
+    },
+    {
+      "path": "database/scripts/reset_it_catalog.py",
+      "source_path": "scripts/reset_it_catalog.py",
+      "source_sha256": "c2806d6894749c7e911468cfec153ce4d264c7c40f128b880d426b7f00d80be2",
+      "source_bytes": 1945,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "c2806d6894749c7e911468cfec153ce4d264c7c40f128b880d426b7f00d80be2",
+      "bytes": 1945,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "scripts/reset_it_catalog.py",
+        "sha256": "c2806d6894749c7e911468cfec153ce4d264c7c40f128b880d426b7f00d80be2"
+      }
+    },
+    {
       "source_path": "database/scripts/restore_db.py",
       "path": "database/scripts/restore_db.py",
       "source_sha256": "a366f47d57ee0dcfb50cb03c2572e6b5ca6a13e6737783356cb85b19a300a5f7",
@@ -250,15 +423,75 @@
       "handling": "byte_preserved"
     },
     {
+      "path": "database/scripts/supplement_course_catalog.py",
+      "source_path": "scripts/supplement_course_catalog.py",
+      "source_sha256": "ded38fe4b6c9ebe60bc7bb1fc079ccf2b56aff93da20279120b8e3e81c5b7465",
+      "source_bytes": 6628,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "ded38fe4b6c9ebe60bc7bb1fc079ccf2b56aff93da20279120b8e3e81c5b7465",
+      "bytes": 6628,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "scripts/supplement_course_catalog.py",
+        "sha256": "ded38fe4b6c9ebe60bc7bb1fc079ccf2b56aff93da20279120b8e3e81c5b7465"
+      }
+    },
+    {
+      "path": "database/scripts/supplement_courses.py",
+      "source_path": "scripts/supplement_courses.py",
+      "source_sha256": "50112048fa7eb49834684c3b04753484ce8e8ca5b88a18345f3bb5f1cac56317",
+      "source_bytes": 3234,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "50112048fa7eb49834684c3b04753484ce8e8ca5b88a18345f3bb5f1cac56317",
+      "bytes": 3234,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "scripts/supplement_courses.py",
+        "sha256": "50112048fa7eb49834684c3b04753484ce8e8ca5b88a18345f3bb5f1cac56317"
+      }
+    },
+    {
+      "path": "database/scripts/verify_course_catalog.py",
+      "source_path": "scripts/verify_course_catalog.py",
+      "source_sha256": "f13f59871d6e02392b647b11c8a4b609165ed52be8672efc50c703049d77d782",
+      "source_bytes": 6643,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "f13f59871d6e02392b647b11c8a4b609165ed52be8672efc50c703049d77d782",
+      "bytes": 6643,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "scripts/verify_course_catalog.py",
+        "sha256": "f13f59871d6e02392b647b11c8a4b609165ed52be8672efc50c703049d77d782"
+      }
+    },
+    {
+      "path": "database/scripts/verify_course_expansion_live.py",
+      "source_path": "scripts/verify_course_expansion_live.py",
+      "source_sha256": "1913e15c8140bedf755ca0e077aa58be54cc4b85f51666ac35adc28687109127",
+      "source_bytes": 6814,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "1913e15c8140bedf755ca0e077aa58be54cc4b85f51666ac35adc28687109127",
+      "bytes": 6814,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "scripts/verify_course_expansion_live.py",
+        "sha256": "1913e15c8140bedf755ca0e077aa58be54cc4b85f51666ac35adc28687109127"
+      }
+    },
+    {
       "path": "database/snapshot-audit.json",
       "source_path": null,
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "238f81ddbfe5bc0b4bbf58df4e166040994fde2b50a9afe9da40f172ff94f7b9",
-      "bytes": 2089,
-      "handling": "added",
-      "change_note": "Add DB import instructions, artifact links, exclusion settings or verification metadata."
+      "sha256": "fd29473406fe3e9556a08a341ff1432320c188c7c5e6ce16848f8865f9b32645",
+      "bytes": 3583,
+      "handling": "adjusted",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions."
     },
     {
       "source_path": "database/src/__init__.py",
@@ -286,9 +519,14 @@
       "source_sha256": "eb216325686a4012cb644482e3d94176f1d03f4fed4d86105b2bc991c75d14f7",
       "source_bytes": 23665,
       "source_kind": "source_commit_file",
-      "sha256": "eb216325686a4012cb644482e3d94176f1d03f4fed4d86105b2bc991c75d14f7",
-      "bytes": 23665,
-      "handling": "byte_preserved"
+      "sha256": "5312c43797771f3e96120295349975bd6e1609af8ef0ff14ba5592769fd63c1c",
+      "bytes": 24575,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "src/database/app_store.py",
+        "sha256": "5312c43797771f3e96120295349975bd6e1609af8ef0ff14ba5592769fd63c1c"
+      }
     },
     {
       "source_path": "database/src/database/catalog.current.json",
@@ -296,9 +534,14 @@
       "source_sha256": "60099e9c5f394bb8cda0bd4dd89aabc85cc28c4ba02047495eea8b6bcd269a3b",
       "source_bytes": 191247,
       "source_kind": "source_commit_file",
-      "sha256": "60099e9c5f394bb8cda0bd4dd89aabc85cc28c4ba02047495eea8b6bcd269a3b",
-      "bytes": 191247,
-      "handling": "byte_preserved"
+      "sha256": "c1309a15de25ff5e5447c5d1b2440ab17c374fc67f0c34c76e28aaab7c7576f9",
+      "bytes": 208289,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "src/database/catalog.current.json",
+        "sha256": "c1309a15de25ff5e5447c5d1b2440ab17c374fc67f0c34c76e28aaab7c7576f9"
+      }
     },
     {
       "source_path": "database/src/database/catalog.json",
@@ -309,6 +552,51 @@
       "sha256": "24376c9f9915542e561f6a0059e599ca34874c252b890caf7e4ee016c5ee43c5",
       "bytes": 69565,
       "handling": "byte_preserved"
+    },
+    {
+      "path": "database/src/database/catalog_reset.py",
+      "source_path": "src/database/catalog_reset.py",
+      "source_sha256": "94d64cb858ee1c9926066452d5359b8c111c9d9c2527f1ca30a2bdba20d6a26e",
+      "source_bytes": 7671,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "94d64cb858ee1c9926066452d5359b8c111c9d9c2527f1ca30a2bdba20d6a26e",
+      "bytes": 7671,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "src/database/catalog_reset.py",
+        "sha256": "94d64cb858ee1c9926066452d5359b8c111c9d9c2527f1ca30a2bdba20d6a26e"
+      }
+    },
+    {
+      "path": "database/src/database/catalog_verification.py",
+      "source_path": "src/database/catalog_verification.py",
+      "source_sha256": "d8e6b581991c77f9d10a8045ffbbb130cf6aa19d24db7136bb641a379a7222f2",
+      "source_bytes": 1359,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "d8e6b581991c77f9d10a8045ffbbb130cf6aa19d24db7136bb641a379a7222f2",
+      "bytes": 1359,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "src/database/catalog_verification.py",
+        "sha256": "d8e6b581991c77f9d10a8045ffbbb130cf6aa19d24db7136bb641a379a7222f2"
+      }
+    },
+    {
+      "path": "database/src/database/course_skill_corrections.py",
+      "source_path": "src/database/course_skill_corrections.py",
+      "source_sha256": "7aa76a91fc389a8f3f7aee2850e7336a37227a6a1bd1e5bbc3e962319e6ec2fb",
+      "source_bytes": 5426,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "7aa76a91fc389a8f3f7aee2850e7336a37227a6a1bd1e5bbc3e962319e6ec2fb",
+      "bytes": 5426,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "src/database/course_skill_corrections.py",
+        "sha256": "7aa76a91fc389a8f3f7aee2850e7336a37227a6a1bd1e5bbc3e962319e6ec2fb"
+      }
     },
     {
       "source_path": "database/src/database/db_client.py",
@@ -326,10 +614,29 @@
       "source_sha256": "1a0743aba068db82e77567c4f7b84c589b7f1c5bc3292ec2b9f33e640c43e1b2",
       "source_bytes": 47311,
       "source_kind": "source_commit_file",
-      "sha256": "93e2a1778ff1851f28755c270caf9e34ea92046ae287b9a0b4f41ee4ab5a4358",
-      "bytes": 47549,
+      "sha256": "4ef0e101ccdbad92ace607abcd1d5acc98128f530b2cd1a6f35cfe067e744c51",
+      "bytes": 47547,
       "handling": "adjusted",
-      "change_note": "Require external reviewed employee fixtures and remove automatic shared seed password."
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "src/database/deployment.py",
+        "sha256": "1a0743aba068db82e77567c4f7b84c589b7f1c5bc3292ec2b9f33e640c43e1b2"
+      }
+    },
+    {
+      "path": "database/src/database/employee_form.py",
+      "source_path": "src/database/employee_form.py",
+      "source_sha256": "d7cb0ae9c05f1e06db87e87fb6a61824ceae31f75716497fc2df6d3d0cf0f548",
+      "source_bytes": 17691,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "d7cb0ae9c05f1e06db87e87fb6a61824ceae31f75716497fc2df6d3d0cf0f548",
+      "bytes": 17691,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "src/database/employee_form.py",
+        "sha256": "d7cb0ae9c05f1e06db87e87fb6a61824ceae31f75716497fc2df6d3d0cf0f548"
+      }
     },
     {
       "source_path": "database/src/database/erd.py",
@@ -337,10 +644,14 @@
       "source_sha256": "2c2ec56094cda560f240a4d7987e5aed4e0a12283c32b5c486af93f74014e629",
       "source_bytes": 13777,
       "source_kind": "source_commit_file",
-      "sha256": "23816bf6dd3ebbc566cbcb39438b1ce85ef90fac95811eba82eca94b018a42ee",
-      "bytes": 3648,
+      "sha256": "5cfa417a29b6cf9efce065db043076ab1b1e0264b09605ae5dc11880f1ca8054",
+      "bytes": 4808,
       "handling": "adjusted",
-      "change_note": "Preserve the full external ERD layout/controls when refreshing schema JSON; use the registered artifact output path."
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "src/database/erd.py",
+        "sha256": "d417669a6445c2a000608464d869fd27e628b8707e3a5e82e8b3f4260bc18da5"
+      }
     },
     {
       "source_path": "database/src/database/final_schema.py",
@@ -348,9 +659,14 @@
       "source_sha256": "63e9e63089eea4ed4ab451760ac264d2ca98dce445f0e96c9c194fa463fe8fca",
       "source_bytes": 12163,
       "source_kind": "source_commit_file",
-      "sha256": "63e9e63089eea4ed4ab451760ac264d2ca98dce445f0e96c9c194fa463fe8fca",
-      "bytes": 12163,
-      "handling": "byte_preserved"
+      "sha256": "352b55c9bff710819eea5a88ff06659a882d42cf9e2d4985c110828eb5add48a",
+      "bytes": 12291,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "src/database/final_schema.py",
+        "sha256": "352b55c9bff710819eea5a88ff06659a882d42cf9e2d4985c110828eb5add48a"
+      }
     },
     {
       "source_path": "database/src/database/ingestion/__init__.py",
@@ -363,14 +679,94 @@
       "handling": "byte_preserved"
     },
     {
+      "path": "database/src/database/ingestion/ai_catalog_filter.py",
+      "source_path": "src/database/ingestion/ai_catalog_filter.py",
+      "source_sha256": "be06197095e4327a9a0d8d930a4f5668cc08be7d00b500a92056ba07c09a393e",
+      "source_bytes": 7682,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "be06197095e4327a9a0d8d930a4f5668cc08be7d00b500a92056ba07c09a393e",
+      "bytes": 7682,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "src/database/ingestion/ai_catalog_filter.py",
+        "sha256": "be06197095e4327a9a0d8d930a4f5668cc08be7d00b500a92056ba07c09a393e"
+      }
+    },
+    {
       "source_path": "database/src/database/ingestion/catalog_details.py",
       "path": "database/src/database/ingestion/catalog_details.py",
       "source_sha256": "2e4224cefe1ac999556f62b3fb75d0ce2d2eb2b8d960faf774023049970d693a",
       "source_bytes": 19021,
       "source_kind": "source_commit_file",
-      "sha256": "2e4224cefe1ac999556f62b3fb75d0ce2d2eb2b8d960faf774023049970d693a",
-      "bytes": 19021,
-      "handling": "byte_preserved"
+      "sha256": "da3e63f814be9b356931cd69f7242f53b662a1ac57438fd5ce9ad5f1eb4e81ab",
+      "bytes": 19899,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "src/database/ingestion/catalog_details.py",
+        "sha256": "da3e63f814be9b356931cd69f7242f53b662a1ac57438fd5ce9ad5f1eb4e81ab"
+      }
+    },
+    {
+      "path": "database/src/database/ingestion/catalog_finalization.py",
+      "source_path": "src/database/ingestion/catalog_finalization.py",
+      "source_sha256": "e568b5447a02f5a1d944397d03cf044d0a4a1f53c8a22131a82868035d3c299f",
+      "source_bytes": 4885,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "e568b5447a02f5a1d944397d03cf044d0a4a1f53c8a22131a82868035d3c299f",
+      "bytes": 4885,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "src/database/ingestion/catalog_finalization.py",
+        "sha256": "e568b5447a02f5a1d944397d03cf044d0a4a1f53c8a22131a82868035d3c299f"
+      }
+    },
+    {
+      "path": "database/src/database/ingestion/course_supplement.py",
+      "source_path": "src/database/ingestion/course_supplement.py",
+      "source_sha256": "66a020a87d5b7dbde1e893cdbb80acf8d2b5ff719cf90ef9b474acced0f5d2f7",
+      "source_bytes": 9587,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "66a020a87d5b7dbde1e893cdbb80acf8d2b5ff719cf90ef9b474acced0f5d2f7",
+      "bytes": 9587,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "src/database/ingestion/course_supplement.py",
+        "sha256": "66a020a87d5b7dbde1e893cdbb80acf8d2b5ff719cf90ef9b474acced0f5d2f7"
+      }
+    },
+    {
+      "path": "database/src/database/ingestion/knowledge_documents.py",
+      "source_path": "src/database/ingestion/knowledge_documents.py",
+      "source_sha256": "28194c612d095b32c55f69a6e5989e11e9b73849d5df2ecadff88fa17bac715a",
+      "source_bytes": 9636,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "28194c612d095b32c55f69a6e5989e11e9b73849d5df2ecadff88fa17bac715a",
+      "bytes": 9636,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "src/database/ingestion/knowledge_documents.py",
+        "sha256": "28194c612d095b32c55f69a6e5989e11e9b73849d5df2ecadff88fa17bac715a"
+      }
+    },
+    {
+      "path": "database/src/database/ingestion/knowledge_search.py",
+      "source_path": "src/database/ingestion/knowledge_search.py",
+      "source_sha256": "4ae04c82afc955a9194f0cac10743bc6294ddf6e1325733321d7527feb0d4cb4",
+      "source_bytes": 5988,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "4ae04c82afc955a9194f0cac10743bc6294ddf6e1325733321d7527feb0d4cb4",
+      "bytes": 5988,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "src/database/ingestion/knowledge_search.py",
+        "sha256": "4ae04c82afc955a9194f0cac10743bc6294ddf6e1325733321d7527feb0d4cb4"
+      }
     },
     {
       "source_path": "database/src/database/ingestion/real_data_ingestor.py",
@@ -378,9 +774,14 @@
       "source_sha256": "0432c150ef770fc7abbd9257e95ad88f34555d9dc102080826dd6d11ade3e6b1",
       "source_bytes": 41897,
       "source_kind": "source_commit_file",
-      "sha256": "0432c150ef770fc7abbd9257e95ad88f34555d9dc102080826dd6d11ade3e6b1",
-      "bytes": 41897,
-      "handling": "byte_preserved"
+      "sha256": "7382ff2768333b8ddb77d2dc0322025351944c5acedc9036c8a33dec8920ca1b",
+      "bytes": 47588,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "src/database/ingestion/real_data_ingestor.py",
+        "sha256": "7382ff2768333b8ddb77d2dc0322025351944c5acedc9036c8a33dec8920ca1b"
+      }
     },
     {
       "source_path": "database/src/database/local_runtime.py",
@@ -388,9 +789,14 @@
       "source_sha256": "df755507f33a314424e8026f30a6750fd22b6a937990f2ed167c8c17bd2024a3",
       "source_bytes": 4341,
       "source_kind": "source_commit_file",
-      "sha256": "df755507f33a314424e8026f30a6750fd22b6a937990f2ed167c8c17bd2024a3",
-      "bytes": 4341,
-      "handling": "byte_preserved"
+      "sha256": "ef4da75cb616796474d0a05295857b5ccf180fff944b33277f8c680cb51a578d",
+      "bytes": 4872,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "src/database/local_runtime.py",
+        "sha256": "ef4da75cb616796474d0a05295857b5ccf180fff944b33277f8c680cb51a578d"
+      }
     },
     {
       "source_path": "database/src/database/migrations/001_existing_schema.sql",
@@ -513,6 +919,36 @@
       "handling": "byte_preserved"
     },
     {
+      "path": "database/src/database/migrations/021_employee_input_compatibility.sql",
+      "source_path": "src/database/migrations/021_employee_input_compatibility.sql",
+      "source_sha256": "1902cc59574bc4e70bf5d2d6758cdd08f7fecd5a510e6474c7fc4e7a196259f3",
+      "source_bytes": 1622,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "1902cc59574bc4e70bf5d2d6758cdd08f7fecd5a510e6474c7fc4e7a196259f3",
+      "bytes": 1622,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "src/database/migrations/021_employee_input_compatibility.sql",
+        "sha256": "1902cc59574bc4e70bf5d2d6758cdd08f7fecd5a510e6474c7fc4e7a196259f3"
+      }
+    },
+    {
+      "path": "database/src/database/migrations/022_knowledge_documents.sql",
+      "source_path": "src/database/migrations/022_knowledge_documents.sql",
+      "source_sha256": "654f7319515dffdf49483da7196c6847d36212b44a8e8a9b5b36dee44296ee95",
+      "source_bytes": 3039,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "654f7319515dffdf49483da7196c6847d36212b44a8e8a9b5b36dee44296ee95",
+      "bytes": 3039,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "src/database/migrations/022_knowledge_documents.sql",
+        "sha256": "654f7319515dffdf49483da7196c6847d36212b44a8e8a9b5b36dee44296ee95"
+      }
+    },
+    {
       "source_path": "database/src/database/operator_setup.py",
       "path": "database/src/database/operator_setup.py",
       "source_sha256": "7eb6bb1ee3ce6d7709e5de89e84a2a3ec25b7e96954d4c920e97d010e2660139",
@@ -528,10 +964,14 @@
       "source_sha256": "4f4e7b5a1e62d17b2d9f17af28afcf33ed21cafa5d372e2cdc37a62f361d9ddb",
       "source_bytes": 9872,
       "source_kind": "source_commit_file",
-      "sha256": "e2963efe366a92d4e4f868e62f973bb8b7f707fa8d24cec7aa6a3d8dd9a8107c",
-      "bytes": 10106,
+      "sha256": "17cd6b2ac3db9024d61f6e381dadbd6968bfb0f654f1386a207738e051ecd482",
+      "bytes": 10302,
       "handling": "adjusted",
-      "change_note": "Fail on missing external backup/manifest before password or DB access."
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "src/database/portable.py",
+        "sha256": "cac3e83dfacd3d7971659a78f55ab014ba95cae8766eae6d9fb37ee912475a0c"
+      }
     },
     {
       "source_path": "database/src/database/schema.sql",
@@ -539,10 +979,14 @@
       "source_sha256": "3df593e6d2884191d546d7102a07124ec81be4e2084731845313168fe7d4680f",
       "source_bytes": 406,
       "source_kind": "source_commit_file",
-      "sha256": "5aa14750ce87945ae106b13619ce5108547f23f1fe241be5409339038e343c1d",
-      "bytes": 418,
-      "handling": "adjusted",
-      "change_note": "Correct obsolete-schema guidance to the retained canonical migration path."
+      "sha256": "3df593e6d2884191d546d7102a07124ec81be4e2084731845313168fe7d4680f",
+      "bytes": 406,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "src/database/schema.sql",
+        "sha256": "3df593e6d2884191d546d7102a07124ec81be4e2084731845313168fe7d4680f"
+      }
     },
     {
       "source_path": "database/src/database/schema_components.py",
@@ -553,6 +997,21 @@
       "sha256": "11acefd9f0df66193fbca3f5e359d5a61dc5ad1492eae87c4772b31bf8edc5a3",
       "bytes": 1168,
       "handling": "byte_preserved"
+    },
+    {
+      "path": "database/src/database/snapshot_provenance.py",
+      "source_path": "src/database/snapshot_provenance.py",
+      "source_sha256": "97a4b849ab3eb6b3a3cbd463102b045d791b6375189827f3c96171d19c01ae55",
+      "source_bytes": 3142,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "97a4b849ab3eb6b3a3cbd463102b045d791b6375189827f3c96171d19c01ae55",
+      "bytes": 3142,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "src/database/snapshot_provenance.py",
+        "sha256": "97a4b849ab3eb6b3a3cbd463102b045d791b6375189827f3c96171d19c01ae55"
+      }
     },
     {
       "source_path": "database/src/database/vectors/__init__.py",
@@ -580,9 +1039,14 @@
       "source_sha256": "5f3a506dcc0e59a7d76a27f84d07a4646cae73a3062fd8689e107184056514f1",
       "source_bytes": 11968,
       "source_kind": "source_commit_file",
-      "sha256": "5f3a506dcc0e59a7d76a27f84d07a4646cae73a3062fd8689e107184056514f1",
-      "bytes": 11968,
-      "handling": "byte_preserved"
+      "sha256": "868d5609aded079c923ffb672753a7cf84b351af90e91b2139a0f464a916eb0e",
+      "bytes": 12151,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "src/database/vectors/resource_vectors.py",
+        "sha256": "868d5609aded079c923ffb672753a7cf84b351af90e91b2139a0f464a916eb0e"
+      }
     },
     {
       "source_path": "database/src/db/__init__.py",
@@ -660,9 +1124,14 @@
       "source_sha256": "9d063abbc3baf8c1412d4bbd58ec7aa0f1dae5b25278c76f4cdce2512914545e",
       "source_bytes": 5979,
       "source_kind": "source_commit_file",
-      "sha256": "9d063abbc3baf8c1412d4bbd58ec7aa0f1dae5b25278c76f4cdce2512914545e",
-      "bytes": 5979,
-      "handling": "byte_preserved"
+      "sha256": "74efcdf85759aadfd26e2aade948cce66453c749ab15a6ccf88c4cee65eeba47",
+      "bytes": 10392,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "src/shared/catalog_eligibility.py",
+        "sha256": "74efcdf85759aadfd26e2aade948cce66453c749ab15a6ccf88c4cee65eeba47"
+      }
     },
     {
       "source_path": "database/src/shared/catalog_quality.py",
@@ -675,6 +1144,21 @@
       "handling": "byte_preserved"
     },
     {
+      "path": "database/src/shared/catalog_scope.py",
+      "source_path": "src/shared/catalog_scope.py",
+      "source_sha256": "fcf62e38edceec7298965eb8ec1ea7031b25dcb862798f3a40bf6a372934cd14",
+      "source_bytes": 7583,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "fcf62e38edceec7298965eb8ec1ea7031b25dcb862798f3a40bf6a372934cd14",
+      "bytes": 7583,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "src/shared/catalog_scope.py",
+        "sha256": "fcf62e38edceec7298965eb8ec1ea7031b25dcb862798f3a40bf6a372934cd14"
+      }
+    },
+    {
       "source_path": "database/src/shared/config_loader.py",
       "path": "database/src/shared/config_loader.py",
       "source_sha256": "e26e37bb046d357d8078db6fcc64233b1d3541d6965f38d50493ad20eb5da51a",
@@ -685,14 +1169,64 @@
       "handling": "byte_preserved"
     },
     {
+      "path": "database/src/shared/course_sources.py",
+      "source_path": "src/shared/course_sources.py",
+      "source_sha256": "474015352d017376e519f35ccac688a8d23f4f4e2cab59e92d87987aae201dd2",
+      "source_bytes": 5702,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "474015352d017376e519f35ccac688a8d23f4f4e2cab59e92d87987aae201dd2",
+      "bytes": 5702,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "src/shared/course_sources.py",
+        "sha256": "474015352d017376e519f35ccac688a8d23f4f4e2cab59e92d87987aae201dd2"
+      }
+    },
+    {
+      "path": "database/src/shared/instructional_content.py",
+      "source_path": "src/shared/instructional_content.py",
+      "source_sha256": "83860509eec6a7963775d10f8cd7310af9407233a16b9b244e12816c9aef0063",
+      "source_bytes": 2774,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "83860509eec6a7963775d10f8cd7310af9407233a16b9b244e12816c9aef0063",
+      "bytes": 2774,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "src/shared/instructional_content.py",
+        "sha256": "83860509eec6a7963775d10f8cd7310af9407233a16b9b244e12816c9aef0063"
+      }
+    },
+    {
       "source_path": "database/src/shared/skill_matching.py",
       "path": "database/src/shared/skill_matching.py",
       "source_sha256": "f74d89de9acbc9e801fc448cceac30d2abd1099c33199e628cca21ffaeaefef6",
       "source_bytes": 8507,
       "source_kind": "source_commit_file",
-      "sha256": "f74d89de9acbc9e801fc448cceac30d2abd1099c33199e628cca21ffaeaefef6",
-      "bytes": 8507,
-      "handling": "byte_preserved"
+      "sha256": "2341cc2a5051e79337d9a9dab04e1ec9b4f3438e0892d0a2a2182125936433e6",
+      "bytes": 12823,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "src/shared/skill_matching.py",
+        "sha256": "2341cc2a5051e79337d9a9dab04e1ec9b4f3438e0892d0a2a2182125936433e6"
+      }
+    },
+    {
+      "path": "database/tests/test_ai_catalog_filter.py",
+      "source_path": "tests/test_ai_catalog_filter.py",
+      "source_sha256": "06d2926a4a4ba989f6b27b30f61c745ebda5e72d2ae3a04354dba4ce9d052dd0",
+      "source_bytes": 10562,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "06d2926a4a4ba989f6b27b30f61c745ebda5e72d2ae3a04354dba4ce9d052dd0",
+      "bytes": 10562,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "tests/test_ai_catalog_filter.py",
+        "sha256": "06d2926a4a4ba989f6b27b30f61c745ebda5e72d2ae3a04354dba4ce9d052dd0"
+      }
     },
     {
       "source_path": "database/tests/test_canonical_database.py",
@@ -700,9 +1234,14 @@
       "source_sha256": "f1ee1a6b9642bf1e05ae0c4b606e2c015dc215101132c0ffed9ae75abc26be04",
       "source_bytes": 6709,
       "source_kind": "source_commit_file",
-      "sha256": "f1ee1a6b9642bf1e05ae0c4b606e2c015dc215101132c0ffed9ae75abc26be04",
-      "bytes": 6709,
-      "handling": "byte_preserved"
+      "sha256": "73ba095366dc5d71d041b265a0d26271146043dea402638d4f874f539c48ea01",
+      "bytes": 6750,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "tests/test_canonical_database.py",
+        "sha256": "73ba095366dc5d71d041b265a0d26271146043dea402638d4f874f539c48ea01"
+      }
     },
     {
       "source_path": "database/tests/test_catalog_expansion.py",
@@ -710,9 +1249,59 @@
       "source_sha256": "2531e5882b559cf5c00b304f6847638f9121ab3a5911681498af953746ac6045",
       "source_bytes": 9909,
       "source_kind": "source_commit_file",
-      "sha256": "2531e5882b559cf5c00b304f6847638f9121ab3a5911681498af953746ac6045",
-      "bytes": 9909,
-      "handling": "byte_preserved"
+      "sha256": "12e77bbd46d7eefb6737aadb178fdf228d07e18d201b3eba772aee57b1a807ae",
+      "bytes": 9983,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "tests/test_catalog_expansion.py",
+        "sha256": "12e77bbd46d7eefb6737aadb178fdf228d07e18d201b3eba772aee57b1a807ae"
+      }
+    },
+    {
+      "path": "database/tests/test_catalog_scope.py",
+      "source_path": "tests/test_catalog_scope.py",
+      "source_sha256": "98ab285ab3493778cd460aa11c9b6e925d53e1ad2aea8b34a70478dfa9fa6650",
+      "source_bytes": 16101,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "98ab285ab3493778cd460aa11c9b6e925d53e1ad2aea8b34a70478dfa9fa6650",
+      "bytes": 16101,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "tests/test_catalog_scope.py",
+        "sha256": "98ab285ab3493778cd460aa11c9b6e925d53e1ad2aea8b34a70478dfa9fa6650"
+      }
+    },
+    {
+      "path": "database/tests/test_course_sources.py",
+      "source_path": "tests/test_course_sources.py",
+      "source_sha256": "00342bcd2ecda21ca45f1bd722cdf3198b01a83af92632cb56b108dc4cd2f22f",
+      "source_bytes": 9917,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "00342bcd2ecda21ca45f1bd722cdf3198b01a83af92632cb56b108dc4cd2f22f",
+      "bytes": 9917,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "tests/test_course_sources.py",
+        "sha256": "00342bcd2ecda21ca45f1bd722cdf3198b01a83af92632cb56b108dc4cd2f22f"
+      }
+    },
+    {
+      "path": "database/tests/test_course_supplement.py",
+      "source_path": "tests/test_course_supplement.py",
+      "source_sha256": "692230c011e682369aa9050ed7c56456eb76fa582e6aa892eeadfe22ef17c3c2",
+      "source_bytes": 15170,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "692230c011e682369aa9050ed7c56456eb76fa582e6aa892eeadfe22ef17c3c2",
+      "bytes": 15170,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "tests/test_course_supplement.py",
+        "sha256": "692230c011e682369aa9050ed7c56456eb76fa582e6aa892eeadfe22ef17c3c2"
+      }
     },
     {
       "source_path": "database/tests/test_db_deployment.py",
@@ -723,6 +1312,36 @@
       "sha256": "9f6dda8220928e40e2257cafcda4ba493a43effb661cbf6a3e25e41764f053b4",
       "bytes": 13286,
       "handling": "byte_preserved"
+    },
+    {
+      "path": "database/tests/test_employee_form.py",
+      "source_path": "tests/test_employee_form.py",
+      "source_sha256": "63feea90a4f37c97ee0cf462ccb9069eda47d95b857a19d11538ac8eb2df0e87",
+      "source_bytes": 19042,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "63feea90a4f37c97ee0cf462ccb9069eda47d95b857a19d11538ac8eb2df0e87",
+      "bytes": 19042,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "tests/test_employee_form.py",
+        "sha256": "63feea90a4f37c97ee0cf462ccb9069eda47d95b857a19d11538ac8eb2df0e87"
+      }
+    },
+    {
+      "path": "database/tests/test_final_database.py",
+      "source_path": "tests/test_final_database.py",
+      "source_sha256": "54593a29e10330f1dcbf6dfd4ac134ffc3c6ea09764e7d54a061d6dd40e1f716",
+      "source_bytes": 5203,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "54593a29e10330f1dcbf6dfd4ac134ffc3c6ea09764e7d54a061d6dd40e1f716",
+      "bytes": 5203,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "tests/test_final_database.py",
+        "sha256": "54593a29e10330f1dcbf6dfd4ac134ffc3c6ea09764e7d54a061d6dd40e1f716"
+      }
     },
     {
       "path": "database/tests/test_import_package.py",
@@ -736,6 +1355,66 @@
       "change_note": "Add DB import instructions, artifact links, exclusion settings or verification metadata."
     },
     {
+      "path": "database/tests/test_instructional_content.py",
+      "source_path": "tests/test_instructional_content.py",
+      "source_sha256": "fdd34a48eb3e81a1ece718aac0337f1705a78f6d8620f0088874d32f778bb3d7",
+      "source_bytes": 5455,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "fdd34a48eb3e81a1ece718aac0337f1705a78f6d8620f0088874d32f778bb3d7",
+      "bytes": 5455,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "tests/test_instructional_content.py",
+        "sha256": "fdd34a48eb3e81a1ece718aac0337f1705a78f6d8620f0088874d32f778bb3d7"
+      }
+    },
+    {
+      "path": "database/tests/test_knowledge_documents.py",
+      "source_path": "tests/test_knowledge_documents.py",
+      "source_sha256": "777048997c31359fbcf6d8b516c728196a640a0a4789ae1167bb61673aa0de90",
+      "source_bytes": 4580,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "777048997c31359fbcf6d8b516c728196a640a0a4789ae1167bb61673aa0de90",
+      "bytes": 4580,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "tests/test_knowledge_documents.py",
+        "sha256": "777048997c31359fbcf6d8b516c728196a640a0a4789ae1167bb61673aa0de90"
+      }
+    },
+    {
+      "path": "database/tests/test_knowledge_search.py",
+      "source_path": "tests/test_knowledge_search.py",
+      "source_sha256": "c175d0a865e96c4765b63a1bbf210257541c39dd9b546ad69b83e7d66d5715a7",
+      "source_bytes": 5398,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "c175d0a865e96c4765b63a1bbf210257541c39dd9b546ad69b83e7d66d5715a7",
+      "bytes": 5398,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "tests/test_knowledge_search.py",
+        "sha256": "c175d0a865e96c4765b63a1bbf210257541c39dd9b546ad69b83e7d66d5715a7"
+      }
+    },
+    {
+      "path": "database/tests/test_local_runtime.py",
+      "source_path": "tests/test_local_runtime.py",
+      "source_sha256": "ec7236b49e62828ea661e6d061e11f90d2a088542c955cbd5192dad8f5a275a9",
+      "source_bytes": 2304,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "ec7236b49e62828ea661e6d061e11f90d2a088542c955cbd5192dad8f5a275a9",
+      "bytes": 2304,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "tests/test_local_runtime.py",
+        "sha256": "ec7236b49e62828ea661e6d061e11f90d2a088542c955cbd5192dad8f5a275a9"
+      }
+    },
+    {
       "source_path": "database/tests/test_regulation_vectors.py",
       "path": "database/tests/test_regulation_vectors.py",
       "source_sha256": "24dfe9be6910eb8ccaf3af1eaddafef075d91d365e1e4b88efa2032ebc442100",
@@ -746,15 +1425,34 @@
       "handling": "byte_preserved"
     },
     {
+      "path": "database/tests/test_snapshot_compatibility.py",
+      "source_path": "tests/test_snapshot_compatibility.py",
+      "source_sha256": "d2fa61999e45e3250dcf70b4a12af9e49942ecb45e45a2f453124f10d03de961",
+      "source_bytes": 4622,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "d2fa61999e45e3250dcf70b4a12af9e49942ecb45e45a2f453124f10d03de961",
+      "bytes": 4622,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "tests/test_snapshot_compatibility.py",
+        "sha256": "d2fa61999e45e3250dcf70b4a12af9e49942ecb45e45a2f453124f10d03de961"
+      }
+    },
+    {
       "source_path": "../ERD_최종반영.html",
       "path": "docs/07_데이터베이스_저장소_설계/ERD_최종.html",
       "source_sha256": "f5260d82fdb90d1b6f3309f4cb3f6062034be533133406f25cf5060a27b90b2b",
       "source_bytes": 166111,
       "source_kind": "user_delivered_external_erd",
-      "sha256": "9cb7406b70e37fc2aa066a73b93beacf4deeda689c89b7d0f82e5a7a2373a56a",
-      "bytes": 167827,
-      "handling": "adjusted",
-      "change_note": "Use the user-selected external ERD layout/controls and synchronize 3 prompt columns/FKs and 10 row counts to current metadata."
+      "sha256": "68cd694ae64009304fa7f663861a80e9f93d3a8f67ef84e479971e4f709c66f2",
+      "bytes": 180371,
+      "handling": "copied",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "local_update_source": {
+        "path": "docs/ERD_최종.html",
+        "sha256": "68cd694ae64009304fa7f663861a80e9f93d3a8f67ef84e479971e4f709c66f2"
+      }
     },
     {
       "path": "docs/07_데이터베이스_저장소_설계/README.md",
@@ -762,10 +1460,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "e2c68fef8ac7a199140247b59312e116105846cee0a1be6b3a7021f8f61087bf",
-      "bytes": 7885,
-      "handling": "added",
-      "change_note": "Add DB import instructions, artifact links, exclusion settings or verification metadata."
+      "sha256": "33d8e7d3770d9b35bce703fcebafeb6ef97a03bf61971a468037462b56f2425e",
+      "bytes": 8904,
+      "handling": "adjusted",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions."
     },
     {
       "path": "docs/07_데이터베이스_저장소_설계/SCHEMA.md",
@@ -773,10 +1471,25 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "1e30a33f85cfa8df38ded507c6437f3b1291941b2a9aa5c7879fd66267717319",
-      "bytes": 33472,
-      "handling": "added",
-      "change_note": "Add DB import instructions, artifact links, exclusion settings or verification metadata."
+      "sha256": "1083b6a89d6201255a001f660a07bf56e567fe6af8b56ab5c5544c11404a55e3",
+      "bytes": 33247,
+      "handling": "adjusted",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions."
+    },
+    {
+      "path": "docs/07_데이터베이스_저장소_설계/schema_final.sql",
+      "source_path": "docs/schema_final.sql",
+      "source_sha256": "92f6b5a8e16e0391d15ca0f30940f56ef6b74109855ff463d7620ec5e71aad76",
+      "source_bytes": 133911,
+      "source_kind": "local_final_database_snapshot",
+      "sha256": "80658e2f347ac4268218fd3456d54eaf0cbfe6f14b1c8d2356a670883141b6b9",
+      "bytes": 133910,
+      "handling": "adjusted",
+      "change_note": "Preserve schema-only SQL; remove extra blank lines at EOF for Git whitespace validation.",
+      "local_update_source": {
+        "path": "docs/schema_final.sql",
+        "sha256": "92f6b5a8e16e0391d15ca0f30940f56ef6b74109855ff463d7620ec5e71aad76"
+      }
     },
     {
       "source_path": "docs/데이터베이스_저장소_설계_통합본.docx",
@@ -794,10 +1507,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "5f4c62acab37778d0c521308c4c203ebae1acca3985bd88cc96febaaf9f0cf82",
-      "bytes": 3053,
-      "handling": "added",
-      "change_note": "Add DB import instructions, artifact links, exclusion settings or verification metadata."
+      "sha256": "3724d26ddceb2c4c68381ea51358d6f2a4f0338e5e0f45c6e5cbf51b18d09c69",
+      "bytes": 3880,
+      "handling": "adjusted",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions."
     },
     {
       "source_path": "docs/데이터_전처리_결과서_통합본.docx",
@@ -815,10 +1528,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "f43475063f3b143d1540493b330a9da4cf376158e033031f8e9cef680c533f9a",
-      "bytes": 2886,
-      "handling": "added",
-      "change_note": "Add DB import instructions, artifact links, exclusion settings or verification metadata."
+      "sha256": "fe2ed729b6dcaa0aada78ae155d97b2dc54f99ec636bd3555bb0d66593b8faef",
+      "bytes": 3682,
+      "handling": "adjusted",
+      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions."
     },
     {
       "source_path": "docs/벡터DB·GraphDB 구축 결과서_33기_2팀.docx",
@@ -842,22 +1555,38 @@
     "qwen_factory",
     "private IDE and cache"
   ],
-  "packaging_scope": "One DB source/artifact registration change. No new business features or paid API calls.",
+  "packaging_scope": "Current DB code and schema-only artifacts. Historical Word/PDF source files remain unchanged; Drive current-file verification was not repeated.",
   "validation": {
-    "python": "3.12",
-    "unit_collected": 42,
-    "unit_passed": 38,
-    "unit_skipped_missing_regulation_packages": 4,
-    "live_database_tests": "not_run",
-    "pip_check": "pass",
-    "cli_help_commands": 8,
-    "business_gaps": [
-      "supervisory_group_scope",
-      "profile_consent_and_learning_inputs",
-      "per_activity_tracking",
-      "comment_state_and_version"
-    ],
-    "stale_book_vectors": 25
+    "git_preparation": {
+      "checked_at_utc": "2026-10-26T16:43:23.339330+00:00",
+      "unit": {
+        "collected": 182,
+        "started_including_skips": 171,
+        "executed": 166,
+        "passed": 166,
+        "skipped": 5,
+        "failures": 0,
+        "errors": 0,
+        "successful": true
+      },
+      "paid_api_calls": 0,
+      "integration": {
+        "collected": 23,
+        "started_including_skips": 23,
+        "executed": 23,
+        "passed": 23,
+        "skipped": 0,
+        "failures": 0,
+        "errors": 0,
+        "successful": true
+      },
+      "test_clone_removed": true,
+      "configuration_copied": false
+    },
+    "database_changed_in_git_preparation": false,
+    "paid_api_calls_in_git_preparation": 0,
+    "screen": "new knowledge area not visually checked; Windows browser URL policy stopped computer use",
+    "human_review": "pending"
   },
   "drive_verification": {
     "checked_at": "2026-10-21T07:54:35Z",
@@ -918,5 +1647,25 @@
     "row_count_source": "database/data/exports/growpath_full_20261021.manifest.json",
     "source_file_modified": false,
     "layout_and_controls_preserved": true
+  },
+  "updated_on": "2026-10-27",
+  "team_update_base_commit": "098465471fc5cbbe38be398009c79c6aee513ca0",
+  "current_snapshot_manifest": "database/data/exports/growpath_latest.manifest.json",
+  "update_scope": "Final DB source, employee form compatibility, category-scoped hybrid knowledge search, course source/skill filtering, schema/ERD and execution metadata. External source/HR/vector/runtime data are excluded.",
+  "historical_validation": {
+    "python": "3.12",
+    "unit_collected": 42,
+    "unit_passed": 38,
+    "unit_skipped_missing_regulation_packages": 4,
+    "live_database_tests": "not_run",
+    "pip_check": "pass",
+    "cli_help_commands": 8,
+    "business_gaps": [
+      "supervisory_group_scope",
+      "profile_consent_and_learning_inputs",
+      "per_activity_tracking",
+      "comment_state_and_version"
+    ],
+    "stale_book_vectors": 25
   }
 }

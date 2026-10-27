@@ -1,47 +1,30 @@
-# 외부 DB 자료와 복원
+# 외부 DB 자료와 복원 · 2026-10-27
 
-[assets.manifest.json](assets.manifest.json)은 필요한 자료의 파일명·버전·해시를 기록한다. `location`은 아직 미지정이다. 담당자에게 접근 가능한 보관 위치를 받아 해시를 대조한 뒤 사용한다. 실제 비밀 설정이 포함된 전달 ZIP은 배포용으로 쓰지 않는다.
+최신 기준은 `growpath_latest.dump`와 같은 위치의 `growpath_latest.manifest.json`이다. SHA-256 `9ce26041c5bf95ea9e6ad88c5ea8d3817e3c6097e7e85c0f99512123098001fb`, 36,343,649바이트, 53테이블·22,284행·227개 제약조건이다. 별도 새 DB 복원에서 전체 53개 표 지문과 벡터 연산 일치를 확인했다. 10/21 백업은 역사 기록으로 보존하며 현재 복원 기준과 구분한다.
 
-| 자료 | 확인 방법 |
-|---|---|
-| `growpath_full_20261021.dump` | 45,390,365바이트. 옆의 `growpath_full_20261021.manifest.json`과 SHA-256 비교 |
-| `pgvector_pg17_windows_x64` 폴더 | 저장소 `data/exports/pgvector_pg17_windows_x64/manifest.json`의 파일별 해시 비교 |
-| 규정 원문 | `assets.manifest.json`의 파일별 해시와 DB 파일 출처의 `storage_key` 확인 |
+[외부 자료 manifest](assets.manifest.json)의 공유 위치는 미지정이다. 입수한 파일을 SHA-256으로 대조한다. 직원 seed·기본 비밀번호·실제 `.env`·회사/생활안내 원문·수집 상세·벡터·실행 DB는 Git에 없다. 실제 키나 비밀번호가 포함된 ZIP을 배포하지 않는다.
 
-직원 초기 데이터·테스트 비밀번호는 별도 검토해 전달한다. 이 저장소에는 seed SQL과 공용 기본 비밀번호가 없다.
+## 새 환경
 
-## Windows 새 환경
-
-Python 3.12 의존성 설치는 [README](README.md)를 따른다. 전달자의 기준은 PostgreSQL 17.11 + pgvector 0.8.2 Windows x64다. 다른 OS/메이저 버전에는 해당 환경의 확장이 필요하다.
-
-아래 `<외부 ... 경로>`는 입수한 실제 경로로 바꾼다. 설치 스크립트는 pgvector 파일·해시를 먼저 검사한다.
+Python 3.12, PostgreSQL 17, pgvector가 필요하다. 검증 환경은 PostgreSQL 17.11·pgvector 0.8.2 Windows였다. 설치는 [README](README.md)를 따른다. 가상환경을 활성화한 뒤 `database/`에서 실행한다.
 
 ```powershell
-# 팀 저장소 루트; Miniforge가 필요함
-powershell -ExecutionPolicy Bypass -File database/scripts/install_postgres.ps1 -VectorBundle "<외부 pgvector 폴더>"
-cd database
-python scripts/restore_db.py restore --archive "<외부 백업 폴더>/growpath_full_20261021.dump" --initialize --write-config
-```
-
-덤프와 `.manifest.json`을 같은 폴더에 둔다. 가상환경을 활성화하거나 해당 Python 경로로 명령을 실행한다. 관리자 비밀번호는 터미널에서 직접 입력한다. 새 서버는 127.0.0.1:55433에 생성된다. PostgreSQL 실행 경로가 기본 Miniforge 위치와 다르면 `--pg-bin`으로 지정한다.
-
-기존 서버에는 새로운 DB 이름으로 복원한다.
-
-```powershell
-python scripts/restore_db.py restore --archive "<외부 백업 폴더>/growpath_full_20261021.dump" --database growpath_review
+python scripts/restore_db.py restore --archive "<외부 백업 폴더>/growpath_latest.dump" --initialize --write-config --port 55435 --pg-bin "C:/실제_PostgreSQL_설치/bin"
+python scripts/db.py migrate
 python scripts/db.py verify
 python -m src.database.vectors.resource_vectors status
-python -m src.database.vectors.regulation_vectors status
 ```
 
-기존 DB·설정은 덮어쓰지 않는다. 실패한 새 DB는 자동 삭제하지 않으므로 로그 확인 후 관리자가 정리한다. 검증 전 기존 연결을 전환하지 않는다. 되돌릴 때는 마이그레이션 재작성이나 PostgreSQL 내부 파일 복사 대신 검증된 별도 백업을 새 DB에 복원해 연결을 전환한다.
+비밀번호는 출력되지 않는 터미널 입력을 사용한다. 기존 DB·데이터 디렉터리·`.env.local`은 덮어쓰지 않는다. 기존 서버라면 `--initialize`를 생략하고 비어 있는 새 DB 이름을 지정한다. 포트가 사용 중이면 먼저 점유자를 확인한다. 설치 바이너리와 서버 확장은 별도로 준비한다.
 
-## 백업과 검증 범위
+013~020 SQL이 없어 빈 DB를 SQL만으로 재구성하거나 구판 10/21 DB에 021·022만 적용하는 방식은 지원하지 않는다. 최신 백업의 001~022 이력을 검증한다. 001~012·021·022 SQL을 수정해 이력을 맞추지 않는다. 기존 REAL_USER 5명의 사번 누락은 전달 스냅샷의 알려진 경고이며 값을 임의 생성하지 않는다.
+
+## 백업·되돌리기
 
 ```powershell
-python scripts/restore_db.py backup --output "<외부 백업 폴더>/growpath_full_새날짜.dump"
+python scripts/restore_db.py backup --output "<외부 백업 폴더>/growpath_새버전.dump"
 ```
 
-동일 스냅샷의 메타데이터와 해시 manifest를 함께 만든다. `local_db.py backup`은 덤프만 만들므로 manifest 기반 전달에는 위 명령을 쓴다.
+동일 스냅샷의 전체 덤프와 manifest를 생성한다. 되돌릴 때는 검증된 이전 백업을 새 DB에 복원해 검사한 뒤 연결을 전환한다. 현재 입력이 추가됐다면 먼저 보존한다. PostgreSQL 내부 파일이나 다른 PC의 `.venv`를 복사해 실행 환경으로 사용하지 않는다. 복원은 OpenAI API가 필요 없다.
 
-전달 백업은 50개 테이블·29,903행·202개 제약조건이다. 전달자의 복원 PASS와 이번 정적 검사는 [DB 대응표](../docs/07_데이터베이스_저장소_설계/README.md)에 구분했다. 새 환경의 실제 복원·트리거·권한·검색은 따로 확인해야 한다. 도서 25건의 벡터 최신성 문제는 백업에 남아 있으므로 복원 성공으로 해결되지는 않는다.
+최신 백업 이전판은 `growpath_latest_before_skill_correction_20261027.dump`다. 원본·증빙 묶음은 [assets.manifest.json](assets.manifest.json)에 해시를 연결했다. 수신 PC의 실제 실행과 앱 연동은 미검증이다.
