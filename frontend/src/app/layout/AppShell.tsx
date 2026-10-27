@@ -67,8 +67,6 @@ export function AppShell() {
   return (
     <>
       <header className="ribbon">
-        <b>GrowPath 5차 목업 · Claude</b>
-        <span className="vlabel">팀 DB(PostgreSQL) · FastAPI · RunPod-Ollama·OpenAI API 시연</span>
         <ModeChip />
       </header>
       <div className="app">
