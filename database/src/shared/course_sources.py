@@ -12,8 +12,10 @@ def source_time(value, *, step=False):
                 tzinfo=timezone(timedelta(hours=9))).astimezone(timezone.utc)
         if isinstance(value, datetime):
             return value if value.tzinfo else None
-        if re.fullmatch(r'\d{10}', str(value)):
-            return datetime.fromtimestamp(int(value), tz=timezone.utc)
+        numeric = str(value).strip()
+        if numeric.isascii() and numeric.isdigit() and len(numeric) in (10, 13):
+            seconds = int(numeric) / (1000 if len(numeric) == 13 else 1)
+            return datetime.fromtimestamp(seconds, tz=timezone.utc)
         parsed = datetime.fromisoformat(str(value).replace('Z', '+00:00'))
         return parsed if parsed.tzinfo else None
     except (ValueError, TypeError, OverflowError, OSError):

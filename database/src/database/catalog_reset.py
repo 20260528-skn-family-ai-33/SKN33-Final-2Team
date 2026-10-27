@@ -11,6 +11,20 @@ from src.shared.skill_matching import SkillMatcher
 TABLES = {"books":("isbn","book_skills"),"courses":("course_id","course_skills"),
           "certifications":("cert_id","certification_skills"),"jobs":("job_id","job_skills"),"majors":("major_id","major_skills")}
 
+
+def protected_catalog_ids(conn):
+    """Keep identities referenced by employee data throughout a catalog reset."""
+    protected = {kind: set() for kind in TABLES}
+    for kind, table, column in (
+            ('jobs', 'employees', 'job_id'),
+            ('certifications', 'employee_certifications', 'certification_id'),
+            ('majors', 'employee_education_records', 'major_id')):
+        rows = conn.execute(f'SELECT DISTINCT {column}::text AS id FROM public.{table} '
+                            f'WHERE {column} IS NOT NULL').fetchall()
+        protected[kind] = {row['id'] for row in rows}
+    return protected
+
+
 def replace_catalogs(conn, batch, *, embed=False):
     from src.database.vectors import resource_vectors
     if set(batch["rows"]) != set(TABLES) or any(not batch["rows"][kind] for kind in TABLES):
@@ -45,11 +59,9 @@ def replace_catalogs(conn, batch, *, embed=False):
                 if not set(row["matches"]) <= set(matches):raise ValueError("Invalid AI skill subset")
         conn.execute("LOCK TABLE "+",".join("public."+t for t in TABLES)+" IN SHARE ROW EXCLUSIVE MODE")
         delete_catalog_rows(conn)
-        protected={kind:set() for kind in TABLES}
+        protected=protected_catalog_ids(conn)
         report={}
         for kind,(pk,mapping) in TABLES.items():
-            conn.execute(sql.SQL("DELETE FROM public.{} WHERE NOT ({}::text=ANY(%s))").format(sql.Identifier(kind),sql.Identifier(pk)),(list(protected[kind]),))
-            conn.execute(sql.SQL("UPDATE public.{} SET content_status='scope_excluded' WHERE {}::text=ANY(%s)").format(sql.Identifier(kind),sql.Identifier(pk)),(list(protected[kind]),))
             columns={r["column_name"] for r in conn.execute("SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name=%s",(kind,)).fetchall()}
             admitted=set()
             for row in batch["rows"][kind]:
@@ -64,7 +76,10 @@ def replace_catalogs(conn, batch, *, embed=False):
                     conn.execute(sql.SQL("INSERT INTO public.{} ({},skill_id) VALUES (%s,%s)").format(sql.Identifier(mapping),sql.Identifier(pk)),(key,sid))
                 conn.execute("""INSERT INTO growpath_meta.catalog_api_sources
                     (resource_type,source,external_key,entity_key,payload,mapping_evidence,fetched_at)
-                    VALUES (%s,%s,%s,%s,%s,%s,%s)""",(kind,row["source"],row["external_key"],str(key),Jsonb(row["raw"]),Jsonb(row["matches"]),row["fetched_at"]))
+                    VALUES (%s,%s,%s,%s,%s,%s,%s)
+                    ON CONFLICT (resource_type,source,external_key) DO UPDATE SET
+                    entity_key=EXCLUDED.entity_key,payload=EXCLUDED.payload,
+                    mapping_evidence=EXCLUDED.mapping_evidence,fetched_at=EXCLUDED.fetched_at""",(kind,row["source"],row["external_key"],str(key),Jsonb(row["raw"]),Jsonb(row["matches"]),row["fetched_at"]))
             report[kind]={"ready":len(admitted),"historical_reference_only":len(protected[kind]-admitted)}
         vectors=resource_vectors.embed(conn) if embed else resource_vectors.status(conn)
         from src.shared.catalog_eligibility import eligible_keys
@@ -77,25 +92,37 @@ def replace_catalogs(conn, batch, *, embed=False):
 
 
 def delete_catalog_rows(conn, *, excluded_only=False):
-    """Delete catalog rows and their resource associations, never parent roadmaps or schema."""
+    """Explicit reset clears learning links but retains employee-referenced identities."""
     predicate="content_status IS DISTINCT FROM 'ready'" if excluded_only else 'TRUE'
     with conn.transaction():
         conn.execute('SELECT pg_advisory_xact_lock(763250131)')
         conn.execute("SET LOCAL lock_timeout='10s'")
         conn.execute('LOCK TABLE '+','.join('public.'+t for t in TABLES)+' IN SHARE ROW EXCLUSIVE MODE')
+        # Freeze referencing writes until deletion ends; a newly assigned job
+        # must not slip between the protected-ID snapshot and ON DELETE SET NULL.
+        conn.execute('''LOCK TABLE public.employees, public.employee_certifications,
+            public.employee_education_records, public.roadmap_step_resources IN SHARE MODE''')
+        protected = protected_catalog_ids(conn)
         counts={};detached=0
         for kind,(pk,mapping) in TABLES.items():
+            kept = list(protected[kind])
+            deletable = f'({predicate}) AND NOT ({pk}::text=ANY(%s::text[]))'
             if kind in ('books','courses','certifications'):
                 column={'books':'isbn','courses':'course_id','certifications':'certification_id'}[kind]
                 detached+=conn.execute(f'DELETE FROM public.roadmap_step_resources WHERE {column} IN (SELECT {pk} FROM public.{kind} WHERE {predicate})').rowcount
             conn.execute(f'DELETE FROM public.{mapping} WHERE {pk} IN (SELECT {pk} FROM public.{kind} WHERE {predicate})')
             conn.execute(f'DELETE FROM public.learning_resource_embeddings WHERE resource_type=%s AND resource_id IN (SELECT {pk}::text FROM public.{kind} WHERE {predicate})',(kind,))
-            conn.execute(f'DELETE FROM growpath_meta.catalog_api_sources WHERE resource_type=%s AND entity_key IN (SELECT {pk}::text FROM public.{kind} WHERE {predicate})',(kind,))
-            counts[kind]=conn.execute(f'DELETE FROM public.{kind} WHERE {predicate}').rowcount
+            # Keep the old external-key/ID binding for retained rows so a later
+            # collection upserts the same identity rather than allocating a new one.
+            conn.execute(f'DELETE FROM growpath_meta.catalog_api_sources WHERE resource_type=%s AND entity_key IN (SELECT {pk}::text FROM public.{kind} WHERE {deletable})',(kind,kept))
+            counts[kind]=conn.execute(f'DELETE FROM public.{kind} WHERE {deletable}',(kept,)).rowcount
+            conn.execute(f"UPDATE public.{kind} SET content_status='scope_excluded' WHERE ({predicate}) AND {pk}::text=ANY(%s::text[])",(kept,))
         if not excluded_only:conn.execute("DELETE FROM public.learning_resource_embeddings WHERE resource_type='skills'")
-        return {'deleted':counts,'removed_resource_associations':detached,'skill_ids_preserved':True,'parent_roadmaps_preserved':True}
+        return {'deleted':counts,'removed_resource_associations':detached,'skill_ids_preserved':True,
+                'parent_roadmaps_preserved':True,'employee_references_preserved':True,
+                'retained_employee_catalog_rows':{kind:len(ids) for kind,ids in protected.items()}}
 
 
 def reset_skill_catalogs(conn):
-    """Fully clear skill-linked catalogs, including old resource links. Never leave historical rows."""
+    """Explicitly reset learning catalogs; keep rows needed by employee records."""
     return delete_catalog_rows(conn)

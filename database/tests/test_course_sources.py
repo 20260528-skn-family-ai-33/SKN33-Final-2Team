@@ -4,7 +4,7 @@ import unittest
 from urllib.parse import urlencode
 
 from src.shared.catalog_eligibility import exclusion_reason
-from src.shared.course_sources import step_reason, kmooc_reason
+from src.shared.course_sources import step_reason, kmooc_reason, source_time
 from src.shared.skill_matching import SkillMatcher
 from src.database.ingestion.course_supplement import validate_rows, validate_catalog, canonical_url
 
@@ -49,6 +49,28 @@ def new_course(source='WEB_STEP', *, audit=False, course_seq='22'):
 
 
 class CourseSourceTests(unittest.TestCase):
+    def test_kmooc_seconds_and_milliseconds_have_identical_availability(self):
+        for with_detail in (False, True):
+            row = new_course('API_KMOOC')
+            if not with_detail:
+                row['raw'].pop('public_detail', None)
+            millis = deepcopy(row)
+            for name in ('enrollment_start', 'enrollment_end', 'study_end'):
+                millis['raw'][name] = str(int(millis['raw'][name]) * 1000)
+            self.assertIsNone(kmooc_reason(row['fields'], row['raw'], NOW))
+            self.assertIsNone(kmooc_reason(millis['fields'], millis['raw'], NOW))
+            for name in ('enrollment_start', 'enrollment_end', 'study_end'):
+                self.assertEqual(source_time(row['raw'][name]), source_time(millis['raw'][name]))
+
+    def test_millisecond_parser_preserves_step_and_invalid_input_rules(self):
+        seconds = 1790812800
+        self.assertEqual(source_time(seconds), source_time(str(seconds * 1000)))
+        self.assertEqual(source_time(str(seconds * 1000 + 123)).microsecond, 123000)
+        self.assertEqual(source_time('20261001000000', step=True).isoformat(),
+                         '2026-09-30T15:00:00+00:00')
+        for bad in (None, '', 'not-a-date', '123456789012', '2026-10-01'):
+            self.assertIsNone(source_time(bad))
+
     def test_public_page_title_spacing_is_not_a_false_mismatch(self):
         from scripts.prepare_course_expansion import public_title_matches
         self.assertTrue(public_title_matches('  소프트웨어  설계와 파이썬 ', '강좌 소개 소프트웨어 설계와 파이썬 강의계획'))

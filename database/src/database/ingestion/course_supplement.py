@@ -19,6 +19,8 @@ FIELDS = {'course_id', 'title', 'org_name', 'platform', 'url', 'source_url', 'co
 
 
 def canonical_url(value: str) -> tuple:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError('강좌 URL이 비어 있습니다.')
     parsed = urlsplit(value)
     host, query = parsed.hostname, ''
     if host in ('kocw.net', 'www.kocw.net'):
@@ -38,7 +40,7 @@ def validate_rows(rows: list, skills: list, existing: list, *, now=None) -> list
         raise ValueError('보충 강좌는 1~50개로 제한합니다.')
     matcher = SkillMatcher(skills)
     ids = {r['course_id'] for r in existing}
-    urls = {canonical_url(r['url']) for r in existing}
+    urls = {canonical_url(r['url']) for r in existing if r.get('url') and r['url'].strip()}
     result = []
     for item in rows:
         fields = dict(item['fields'])

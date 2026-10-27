@@ -42,8 +42,12 @@ def finalize_catalog(conn, *, embed=True, embedding_client=None):
                 conn.execute('DELETE FROM public.learning_resource_embeddings WHERE resource_type=%s AND resource_id=%s',(kind,str(rid)))
                 if fields.get('content_status')=='ready':
                     conn.execute(f"UPDATE public.{kind} SET content_status='scope_excluded' WHERE {pk}=%s",(rid,));excluded+=1
-    from src.database.catalog_reset import delete_catalog_rows
-    deleted=delete_catalog_rows(conn,excluded_only=True)
+    # Availability controls new recommendations, not the lifetime of a saved
+    # roadmap resource or an employee's existing qualification/major/job reference.
+    # Physical deletion is confined to the explicit reset/replacement path.
+    deleted={'deleted':{kind:0 for kind in TABLES},'removed_resource_associations':0,
+             'skill_ids_preserved':True,'parent_roadmaps_preserved':True,
+             'existing_references_preserved':True}
     result=resource_vectors.embed(conn,client=embedding_client) if embed else resource_vectors.status(conn)
     allowed,_=eligible_keys(conn);counts={};link_count=0
     for kind,(pk,mapping) in TABLES.items():

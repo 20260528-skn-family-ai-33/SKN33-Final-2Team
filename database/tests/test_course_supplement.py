@@ -30,6 +30,26 @@ def course():
 
 
 class CourseSupplementTests(unittest.TestCase):
+    def test_existing_null_or_blank_url_does_not_block_a_new_course(self):
+        for old_url in (None, '', '   '):
+            with self.subTest(old_url=old_url):
+                rows = validate_rows([course()], SKILLS,
+                                     [{'course_id': 'UNRELATED', 'url': old_url}], now=NOW)
+                self.assertEqual(len(rows), 1)
+
+    def test_missing_existing_url_does_not_disable_id_duplicate_check(self):
+        row = course()
+        with self.assertRaisesRegex(ValueError, '중복'):
+            validate_rows([row], SKILLS,
+                          [{'course_id': row['fields']['course_id'], 'url': None}], now=NOW)
+
+    def test_new_course_requires_a_nonempty_url(self):
+        for value in (None, '', '   '):
+            row = course()
+            row['fields']['url'] = value
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                validate_rows([row], SKILLS, [], now=NOW)
+
     def reason(self, row):
         return exclusion_reason('courses', row['fields'], row['source'], row['raw'], row['fetched_at'], now=NOW)
 

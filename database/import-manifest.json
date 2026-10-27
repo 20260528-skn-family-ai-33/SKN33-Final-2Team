@@ -68,10 +68,10 @@
       "source_sha256": "b5ddd87307618f22848c659db6529b08f21629de15814134a60f6e7eb16f54e7",
       "source_bytes": 15426,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "5f7a74b1fd82c7ff1b2a179f2e020ee2ce803d7b7715f25cf6b03437fe3915d9",
-      "bytes": 15535,
+      "sha256": "eba8a2f76210f6d21429a95178d76c17d74d214b8c5b572e552f406bebd7b10a",
+      "bytes": 15929,
       "handling": "adjusted",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "change_note": "PR #22: preserve employee catalog identities and saved roadmap resources; accept millisecond dates; skip empty historical URLs; add free regressions and verification record.",
       "local_update_source": {
         "path": "IT_SCOPE.md",
         "sha256": "b5ddd87307618f22848c659db6529b08f21629de15814134a60f6e7eb16f54e7"
@@ -83,10 +83,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "0fc691f204184750372bdd25680c5557663379b944a6d3bf65c7d7e1615872cf",
-      "bytes": 6984,
+      "sha256": "b5427526f2a37724d6b63fc310f8a6569aa9f0db67aee27d10cc1defd371e410",
+      "bytes": 8332,
       "handling": "adjusted",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "change_note": "PR #22: preserve employee catalog identities and saved roadmap resources; accept millisecond dates; skip empty historical URLs; add free regressions and verification record.",
       "local_update_source": {
         "path": "README.md",
         "sha256": "e872d64ea58c53311d098dc1c769f5bc3232ad947d690054b75a0a0a20c6d8c6"
@@ -297,10 +297,10 @@
       "source_sha256": "82327b5737f40c891484955c2eb2ce490a53b0de46990408d4b6f9708441991d",
       "source_bytes": 4420,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "24a7108a7d8105237a29933873dc6253eeddb5240cd0fbb07e243967b592de31",
-      "bytes": 4550,
+      "sha256": "c95a800e1ef6bf0d1f7978a021567e7e763b79cabf11e717b01a6460ee07d3d2",
+      "bytes": 4579,
       "handling": "adjusted",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "change_note": "PR #22: preserve employee catalog identities and saved roadmap resources; accept millisecond dates; skip empty historical URLs; add free regressions and verification record.",
       "local_update_source": {
         "path": "scripts/check_workspace.py",
         "sha256": "82327b5737f40c891484955c2eb2ce490a53b0de46990408d4b6f9708441991d"
@@ -488,10 +488,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "fd29473406fe3e9556a08a341ff1432320c188c7c5e6ce16848f8865f9b32645",
-      "bytes": 3583,
+      "sha256": "af4a3b2b16dd6ffd7fcf488b3601b2c4035a3e6da816bcfda5b62ba06a358086",
+      "bytes": 5497,
       "handling": "adjusted",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions."
+      "change_note": "PR #22: preserve employee catalog identities and saved roadmap resources; accept millisecond dates; skip empty historical URLs; add free regressions and verification record."
     },
     {
       "source_path": "database/src/__init__.py",
@@ -559,10 +559,10 @@
       "source_sha256": "94d64cb858ee1c9926066452d5359b8c111c9d9c2527f1ca30a2bdba20d6a26e",
       "source_bytes": 7671,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "94d64cb858ee1c9926066452d5359b8c111c9d9c2527f1ca30a2bdba20d6a26e",
-      "bytes": 7671,
+      "sha256": "b524cc9d2bedd4e44fb15ff46ef4cd3502b14dd00e456281294d8bd44dd55792",
+      "bytes": 9183,
       "handling": "copied",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "change_note": "PR #22: preserve employee catalog identities and saved roadmap resources; accept millisecond dates; skip empty historical URLs; add free regressions and verification record.",
       "local_update_source": {
         "path": "src/database/catalog_reset.py",
         "sha256": "94d64cb858ee1c9926066452d5359b8c111c9d9c2527f1ca30a2bdba20d6a26e"
@@ -714,10 +714,10 @@
       "source_sha256": "e568b5447a02f5a1d944397d03cf044d0a4a1f53c8a22131a82868035d3c299f",
       "source_bytes": 4885,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "e568b5447a02f5a1d944397d03cf044d0a4a1f53c8a22131a82868035d3c299f",
-      "bytes": 4885,
+      "sha256": "91fc7c07987c9008344d5c68c6931d1216a9494022e1d0d04f645e30e72bbc02",
+      "bytes": 5217,
       "handling": "copied",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "change_note": "PR #22: preserve employee catalog identities and saved roadmap resources; accept millisecond dates; skip empty historical URLs; add free regressions and verification record.",
       "local_update_source": {
         "path": "src/database/ingestion/catalog_finalization.py",
         "sha256": "e568b5447a02f5a1d944397d03cf044d0a4a1f53c8a22131a82868035d3c299f"
@@ -729,10 +729,10 @@
       "source_sha256": "66a020a87d5b7dbde1e893cdbb80acf8d2b5ff719cf90ef9b474acced0f5d2f7",
       "source_bytes": 9587,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "66a020a87d5b7dbde1e893cdbb80acf8d2b5ff719cf90ef9b474acced0f5d2f7",
-      "bytes": 9587,
+      "sha256": "e187bc8431b54e55e18cf80f93b6dc945a66cc684d12392f69531f4d530fe527",
+      "bytes": 9743,
       "handling": "copied",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "change_note": "PR #22: preserve employee catalog identities and saved roadmap resources; accept millisecond dates; skip empty historical URLs; add free regressions and verification record.",
       "local_update_source": {
         "path": "src/database/ingestion/course_supplement.py",
         "sha256": "66a020a87d5b7dbde1e893cdbb80acf8d2b5ff719cf90ef9b474acced0f5d2f7"
@@ -1174,10 +1174,10 @@
       "source_sha256": "474015352d017376e519f35ccac688a8d23f4f4e2cab59e92d87987aae201dd2",
       "source_bytes": 5702,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "474015352d017376e519f35ccac688a8d23f4f4e2cab59e92d87987aae201dd2",
-      "bytes": 5702,
+      "sha256": "a5b8c87862e14ef401e87ed90e0a8539335d922e231d79a11e4d93f12864915c",
+      "bytes": 5842,
       "handling": "copied",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "change_note": "PR #22: preserve employee catalog identities and saved roadmap resources; accept millisecond dates; skip empty historical URLs; add free regressions and verification record.",
       "local_update_source": {
         "path": "src/shared/course_sources.py",
         "sha256": "474015352d017376e519f35ccac688a8d23f4f4e2cab59e92d87987aae201dd2"
@@ -1279,10 +1279,10 @@
       "source_sha256": "00342bcd2ecda21ca45f1bd722cdf3198b01a83af92632cb56b108dc4cd2f22f",
       "source_bytes": 9917,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "00342bcd2ecda21ca45f1bd722cdf3198b01a83af92632cb56b108dc4cd2f22f",
-      "bytes": 9917,
+      "sha256": "2c4f760a46c6386e6c60fe745b1b152da47d5e4d865847c894fc5da539e6027a",
+      "bytes": 11230,
       "handling": "copied",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "change_note": "PR #22: preserve employee catalog identities and saved roadmap resources; accept millisecond dates; skip empty historical URLs; add free regressions and verification record.",
       "local_update_source": {
         "path": "tests/test_course_sources.py",
         "sha256": "00342bcd2ecda21ca45f1bd722cdf3198b01a83af92632cb56b108dc4cd2f22f"
@@ -1294,10 +1294,10 @@
       "source_sha256": "692230c011e682369aa9050ed7c56456eb76fa582e6aa892eeadfe22ef17c3c2",
       "source_bytes": 15170,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "692230c011e682369aa9050ed7c56456eb76fa582e6aa892eeadfe22ef17c3c2",
-      "bytes": 15170,
+      "sha256": "a0c352ff7404c210229b5e186e03cced8a622fc22be10351913245932777d1ed",
+      "bytes": 16123,
       "handling": "copied",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "change_note": "PR #22: preserve employee catalog identities and saved roadmap resources; accept millisecond dates; skip empty historical URLs; add free regressions and verification record.",
       "local_update_source": {
         "path": "tests/test_course_supplement.py",
         "sha256": "692230c011e682369aa9050ed7c56456eb76fa582e6aa892eeadfe22ef17c3c2"
@@ -1542,6 +1542,17 @@
       "sha256": "c45ee5e5ab0ee2ae50822fcd13bb132e6ace8f71e6642d7db807dc5d3e6a5bb9",
       "bytes": 3679929,
       "handling": "byte_preserved"
+    },
+    {
+      "path": "database/tests/test_catalog_history.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "review_regression_test",
+      "handling": "added",
+      "change_note": "PR #22: preserve employee catalog identities and saved roadmap resources; accept millisecond dates; skip empty historical URLs; add free regressions and verification record.",
+      "sha256": "3bc21201d7e214d40f252f86a8b30a5f94c6c9d2a953fa227113a61c0d0867c8",
+      "bytes": 11750
     }
   ],
   "excluded": [
@@ -1586,7 +1597,62 @@
     "database_changed_in_git_preparation": false,
     "paid_api_calls_in_git_preparation": 0,
     "screen": "new knowledge area not visually checked; Windows browser URL policy stopped computer use",
-    "human_review": "pending"
+    "human_review": "pending",
+    "pr22_review_fixes": {
+      "review_comment": "https://github.com/20260528-skn-family-ai-33/SKN33-Final-2Team/pull/22#issuecomment-6430748406",
+      "reviewed_commit": "11344c8e38da6b1480d5df1e54957a8856cf6a1c",
+      "verification": {
+        "checked_at_utc": "2026-10-27T00:55:35.925287+00:00",
+        "unit": {
+          "collected": 187,
+          "started_including_skips": 176,
+          "executed": 171,
+          "passed": 171,
+          "skipped": 5,
+          "failures": 0,
+          "errors": 0,
+          "successful": true
+        },
+        "paid_api_calls": 0,
+        "checked_at_kst": "2026-10-27T10:00:39.310542+09:00",
+        "integration": {
+          "collected": 29,
+          "started_including_skips": 29,
+          "executed": 29,
+          "passed": 29,
+          "skipped": 0,
+          "failures": 0,
+          "errors": 0,
+          "successful": true
+        },
+        "test_clone_removed": true,
+        "source_all_53_tables_unchanged": true
+      },
+      "report_path": "database/migration_work/test_results.json",
+      "report_sha256": "b1f1b7fa30d722a9f8090fddd4c964897d887b4a2588deb52969339eb92dba39",
+      "report_storage": "local_git_excluded",
+      "new_schema_migrations": 0,
+      "original_database_writes": false,
+      "mocked_in_replacement_test": [
+        "AI admission and scope evidence",
+        "eligibility result",
+        "embedding status"
+      ],
+      "real_postgresql_checks": [
+        "employee catalog references and external ID",
+        "repeat replacement",
+        "transaction rollback",
+        "concurrent write lock",
+        "expired and rejected saved roadmap resources"
+      ],
+      "unverified": [
+        "ERD screen",
+        "frontend/chatbot integration",
+        "other PC restore",
+        "paid API behavior"
+      ],
+      "human_review": "pending"
+    }
   },
   "drive_verification": {
     "checked_at": "2026-10-21T07:54:35Z",

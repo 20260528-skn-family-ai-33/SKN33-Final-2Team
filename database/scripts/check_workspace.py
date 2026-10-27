@@ -61,7 +61,7 @@ def main(argv=None):
             import tests.test_canonical_database as canonical
             def isolated_connect(_):return psycopg.connect(test_url,row_factory=dict_row)
             with patch.dict(os.environ,{'EMPLOYEE_FORM_TEST_DB_URL':test_url}),patch.object(canonical,'connect',side_effect=isolated_connect):
-                report['integration']=run_tests(['tests.test_employee_form.EmployeeFormDatabaseTests','tests.test_canonical_database','tests.test_final_database'],out/'integration_tests.log')
+                report['integration']=run_tests(['tests.test_employee_form.EmployeeFormDatabaseTests','tests.test_canonical_database','tests.test_final_database','tests.test_catalog_history'],out/'integration_tests.log')
         finally:
             with psycopg.connect(**admin_params,autocommit=True) as admin:
                 if not clone.startswith('growpath_employee_form_test_20261026_'):raise ValueError('Unexpected cleanup target')
