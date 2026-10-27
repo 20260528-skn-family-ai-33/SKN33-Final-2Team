@@ -24,3 +24,11 @@ AGENTS.md -text
 # ── 화면(frontend) · 이슈 #20 ──
 # 이 폴더만 줄 끝을 LF로 고정한다(Windows·Linux 체크아웃이 같은 파일이 되게). 저장소 전체 규칙은 바꾸지 않는다
 frontend/** text=auto eol=lf
+
+# ── 실행 환경(Docker) · 이슈 #20 ──
+# Docker 안에서 쓰는 파일은 줄 끝을 LF로 고정한다
+backend/** text=auto eol=lf
+scripts/*.sh text eol=lf
+docker-compose.yml text eol=lf
+# 적용된 보조 스키마 SQL 은 바이트를 보존한다(database/ 마이그레이션 규칙과 같은 취지)
+backend/db/*.sql -text

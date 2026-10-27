@@ -1,0 +1,14 @@
+# GrowPath 5차 목업 · 앱 이미지 (FastAPI + 화면)
+# AWS(ECS·App Runner 등)에 올릴 때도 이 이미지를 그대로 쓰고, 설정은 환경변수(DATABASE_URL·키)로만 넣는다.
+FROM python:3.12-slim
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+WORKDIR /srv/growpath
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY app ./app
+COPY web ./web
+COPY db ./db
+COPY tools ./tools
+COPY data/seed ./data/seed
+EXPOSE 8785
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8785"]

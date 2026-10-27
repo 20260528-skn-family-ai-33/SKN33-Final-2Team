@@ -1,0 +1,10 @@
+# GrowPath 5차 목업 서버 의존성 (Python 3.12 · 2026-10-21 설치 확인 버전)
+fastapi==0.156.4          # API 서버 (설계서 /api/v1)
+uvicorn[standard]==0.54.0 # ASGI 실행
+SQLAlchemy==2.1.5         # DB 연결 풀 + SQL(text) 실행 — 팀 DB 표는 팀원이 SQL 마이그레이션으로 관리하므로 ORM 모델·마이그레이션은 쓰지 않음
+psycopg[binary]==3.3.6    # PostgreSQL 드라이버
+argon2-cffi==25.1.0       # 비밀번호 해시 (팀 DB employees.password_hash 는 $argon2id$ 형식만 허용)
+python-multipart==0.0.32  # 관리자 엑셀·CSV, 기획서 파일 업로드(multipart)
+openpyxl==3.1.5           # 엑셀 읽기·쓰기 (관리자 업로드·다운로드, 초기 자료 이전)
+pypdf==6.21.1             # 기획서 PDF 글자 꺼내기 (없으면 PDF만 안내)
+olefile==0.47             # 기획서 HWP(옛 형식) 글자 꺼내기 (없으면 HWP만 안내)

@@ -1,0 +1,90 @@
+# GrowPath 통합 개발 환경 · docker compose
+#
+#   docker compose up -d --build        DB → 팀 DB 백업 복원 → 보충 자료 → 참고용 백엔드 → 화면(nginx)까지 모두 켬
+#   docker compose up -d backend        화면은 로컬에서 개발할 때(frontend 폴더에서 npm run dev): DB·백엔드만 켬
+#   docker compose down                 끄기 (데이터는 볼륨에 남음) · down -v 는 DB까지 지움
+#
+# 값은 같은 폴더의 .env 에서 읽는다(.env.example 참고). 비밀번호·키를 이 파일에 쓰지 않는다.
+# 같은 PC의 다른 환경과 겹치지 않게 이름(=볼륨 이름 앞부분)·포트는 .env 로 바꾼다.
+name: ${COMPOSE_PROJECT_NAME:-growpath}
+
+x-backend: &backend
+  build: ./backend
+  env_file: .env
+  environment:
+    # 컨테이너 안에서는 db 서비스 이름으로 붙는다(.env 의 DATABASE_URL·GP5_DB_PORT 는 로컬 파이썬 실행용)
+    DATABASE_URL: postgresql+psycopg://${GP5_DB_USER:-growpath}:${GP5_DB_PASSWORD:?.env 에 GP5_DB_PASSWORD 를 넣어 주세요}@db:5432/${GP5_DB_NAME:-growpath}
+    # 규정 원문 PDF(팀 규정 묶음의 source/ · team_db/README.md) — 관리자 '지금 규정' 내려받기
+    GP5_REGULATION_FILES_DIR: /srv/growpath/regulation_files
+
+services:
+  # PostgreSQL 17 + pgvector — 팀 DB(PostgreSQL 17.11 + pgvector 0.8.x)와 버전을 맞춤
+  db:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: ${GP5_DB_NAME:-growpath}
+      POSTGRES_USER: ${GP5_DB_USER:-growpath}
+      POSTGRES_PASSWORD: ${GP5_DB_PASSWORD:?.env 에 GP5_DB_PASSWORD 를 넣어 주세요}
+    ports:
+      - "127.0.0.1:${GP5_DB_PORT:-55465}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  # 빈 DB일 때만 팀 DB 전체 백업(team_db/)을 복원한다. 이미 표가 있으면 건너뜀(여러 번 켜도 같은 결과)
+  db-restore:
+    image: pgvector/pgvector:pg17
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGUSER: ${GP5_DB_USER:-growpath}
+      PGPASSWORD: ${GP5_DB_PASSWORD}
+      PGDATABASE: ${GP5_DB_NAME:-growpath}
+      TEAM_DB_FILE: ${TEAM_DB_FILE:-growpath_ai_it_20261022.dump}
+    volumes:
+      - ./team_db:/dump:ro
+      - ./scripts/db-restore.sh:/db-restore.sh:ro
+    entrypoint: ["sh", "/db-restore.sh"]
+    restart: "no"
+
+  # 보조 스키마(app_ext)·직원 가데이터·학습 자료 보조 값·규정 묶음·목표 후보 (참고용 백엔드의 tools/setup_db.py)
+  backend-setup:
+    <<: *backend
+    depends_on:
+      db-restore:
+        condition: service_completed_successfully
+    command: ["python", "tools/setup_db.py"]
+    restart: "no"
+
+  # 참고용 백엔드(5차 FastAPI 그대로). 팀원 백엔드가 준비되면 이 서비스만 바꾸면 된다
+  backend:
+    <<: *backend
+    depends_on:
+      backend-setup:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8815}:8785"
+    volumes:
+      # 관리자가 올린 규정 PDF 는 var/uploads/regulations/ 에 남는다(시스템 관리자가 docker compose cp 로 꺼냄)
+      - uploads:/srv/growpath/var
+      - ./team_db/regulations:/srv/growpath/regulation_files:ro
+
+  # 화면: React 빌드 결과를 nginx 가 제공하고 /api 는 backend 로 넘긴다(같은 주소라 로그인 쿠키가 그대로 동작)
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    environment:
+      API_UPSTREAM: http://backend:8785
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8816}:80"
+
+volumes:
+  pgdata:
+  uploads:
