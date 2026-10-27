@@ -448,7 +448,7 @@ export function MePage() {
             </div>
           ) : null}
           <p className="small muted me-foot">
-            고친 내용은 서버(팀 DB 보조 표)에 저장되고, 처음 들어온 값은 따로 남아요.
+            고친 내용은 팀 DB의 직원 입력 정보에 저장되고, 처음 들어온 값은 되돌릴 수 있게 따로 남아요.
             {e.edited && !ed ? (
               <>
                 {' '}

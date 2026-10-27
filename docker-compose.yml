@@ -46,14 +46,14 @@ services:
       PGUSER: ${GP5_DB_USER:-growpath}
       PGPASSWORD: ${GP5_DB_PASSWORD}
       PGDATABASE: ${GP5_DB_NAME:-growpath}
-      TEAM_DB_FILE: ${TEAM_DB_FILE:-growpath_ai_it_20261022.dump}
+      TEAM_DB_FILE: ${TEAM_DB_FILE:-growpath_latest.dump}
     volumes:
       - ./team_db:/dump:ro
       - ./scripts/db-restore.sh:/db-restore.sh:ro
     entrypoint: ["sh", "/db-restore.sh"]
     restart: "no"
 
-  # 보조 스키마(app_ext)·직원 가데이터·학습 자료 보조 값·규정 묶음·목표 후보 (참고용 백엔드의 tools/setup_db.py)
+  # 보조 스키마(app_ext)·관리자 계정·학습 자료 보조 값·규정 묶음·목표 후보 (참고용 백엔드의 tools/setup_db.py)
   backend-setup:
     <<: *backend
     depends_on:

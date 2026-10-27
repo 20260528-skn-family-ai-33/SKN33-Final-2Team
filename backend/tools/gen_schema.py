@@ -5,7 +5,7 @@
 순서: 확장·스키마·시퀀스 → 표(열·PK·UNIQUE·CHECK) → FK(ALTER TABLE). FK를 마지막에 붙여 표 순서를 신경 쓰지 않게 했다.
 FK 대상은 정의 문장의 표 이름 대신 JSON의 target(스키마 포함)으로 적는다(검색 경로에 따라 스키마가 빠질 수 있어서).
 
-실행: python tools/gen_schema.py data/seed/ERD_최종_20261021.html db/01_erd_schema.sql
+실행: python tools/gen_schema.py ../docs/07_데이터베이스_저장소_설계/ERD_최종.html db/01_erd_schema.sql
 """
 from __future__ import annotations
 

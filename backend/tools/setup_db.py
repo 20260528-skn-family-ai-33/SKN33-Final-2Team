@@ -3,11 +3,11 @@
   python tools/setup_db.py            # 빈 Docker DB면 복원부터(백업 기본 위치 team_db/), 아니면 보충만 (여러 번 실행해도 같은 결과)
   python tools/setup_db.py --supplement-only   # 팀원이 운영하는 DB(복사본)에 붙을 때: 복원 없이 보조 스키마·보충만 · 그 DB 팀 표에 데이터를 쓴다
 
-보충 자료 (2026-10-21 사용자 결정):
+보충 자료 (2026-10-21 사용자 결정 · 2026-10-27 팀 최신 DB 기준으로 정리):
   - 관리자 전용 계정 1개(아이디 .env GP5_ADMIN_LOGIN · 비밀번호 GP5_DEMO_PASSWORD)
-  - 팀 직원 가데이터 2.9.0 의 16명: 부서 계층·부서장·직급·인사 보조 항목·본인 입력·평정·학력·보유 자격 연결.
-    직무는 팀 DB 직무표와 맞는 이름이 없어 job_id 를 채우지 않고 직무명만 글자로 둔다(팀 DB 원칙: 미확정 값은 추정하지 않음)
-  - 팀 테스트 직원 14명의 비밀번호를 이 로컬 사본에서만 시연 비밀번호로 바꾼다
+  - 직원·부서·보유 스킬·자격·학력은 팀 DB(#22 최신 백업)의 것을 그대로 쓴다. 예전 직원 가데이터 엑셀(2.9.0)은 쓰지 않는다
+  - 사번이 있는 팀 시험 직원의 비밀번호를 이 로컬 사본에서만 시연 비밀번호로 바꾼다. 사번이 없는 계정(REAL_USER)은
+    로그인할 수 없고 팀 DB 의 사번 필수 제약 때문에 고칠 수도 없어 건드리지 않는다
     (--keep-team-passwords 면 그대로 · --supplement-only 는 남의 DB라 늘 그대로 · 2026-10-23 사용자 결정)
   - 학습 자료 보조 값(형식·시간·단계·비용)을 규칙으로 채우고 '추정'으로 표시, 자격증 분야 묶음
   - 규정 묶음(적용 직원 구분·국외근무 전용·짧은 키)
@@ -19,26 +19,19 @@ import argparse
 import re
 import subprocess
 import sys
-from datetime import date
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-import openpyxl  # noqa: E402
-
 from app import db  # noqa: E402
 from app.auth import hash_password, verify_password  # noqa: E402
 from app.config import S, env  # noqa: E402
 
-# 팀 직원 가데이터 2.9.0: 이 폴더 data/seed 사본을 먼저, 없으면 팀원 DB 저장소 사본
-XLSX_DEFAULT = next((p for p in (ROOT / 'data/seed/사내DB_직원가상데이터_구성초안_2.9.0.xlsx',
-                                 ROOT.parent / 'project_full_20261021_151824/project/database/data/regulations/사내DB_직원가상데이터_구성초안_2.9.0.xlsx') if p.exists()),
-                    ROOT / 'data/seed/사내DB_직원가상데이터_구성초안_2.9.0.xlsx')
 # 복원 대상 컨테이너 = '{compose 이름}-db-1'. 고정값이면 다른 compose 프로젝트의 DB에 복원할 수 있어 설정으로 뺐다(2026-10-26)
 COMPOSE_PROJECT = env('COMPOSE_PROJECT_NAME', 'gp5')
 # 팀 DB 백업 기본 위치(.env TEAM_DB_DUMP 가 비면): 팀원이 받은 파일을 이 폴더 team_db/ 에 넣기만 하면 되게(2026-10-23 사용자 결정)
-DUMP_DEFAULT = 'team_db/growpath_ai_it_20261022.dump'
+DUMP_DEFAULT = 'team_db/growpath_latest.dump'
 
 
 def say(msg: str) -> None:
@@ -95,151 +88,15 @@ def admin_account() -> None:
 def team_passwords() -> None:
     n = 0
     with db.tx() as t:
-        for e in t.all('SELECT employee_id, password_hash FROM public.employees WHERE employee_id NOT IN (SELECT employee_id FROM app_ext.employee_hr)'):
+        # 사번 없는 행은 로그인할 수 없고, 팀 DB 의 사번 필수 제약(NOT VALID)이 그런 행의 어떤 수정도 막는다
+        for e in t.all("SELECT employee_id, password_hash FROM public.employees WHERE coalesce(btrim(employee_number), '') <> ''"):
             if not verify_password(e['password_hash'], S.demo_password):
                 t.run('UPDATE public.employees SET password_hash = :h WHERE employee_id = :i', h=hash_password(S.demo_password), i=e['employee_id'])
                 n += 1
-    say(f'팀 테스트 직원 비밀번호(로컬 사본만): {n}명 바꿈')
+    say(f'팀 시험 직원 비밀번호(로컬 사본만 · 사번 있는 계정): {n}명 바꿈')
 
 
-# ── 3. 직원 가데이터 2.9.0 ──
-NONE_ROW = '(행 없음)'
-
-
-def _lines(v) -> list[str]:
-    s = '' if v is None else str(v).strip()
-    return [] if s in ('', '0건', 'null', NONE_ROW, '없음') else [x.strip() for x in s.split('\n') if x.strip()]
-
-
-def _text(v):
-    s = None if v is None else str(v).strip()
-    return None if s in (None, '', 'null', NONE_ROW, '미입력(열 생략)') else s
-
-
-def _date(v):
-    s = _text(v)
-    return date.fromisoformat(s[:10]) if s and re.match(r'^\d{4}-\d{2}-\d{2}', s) else None
-
-
-def _evals(v) -> list[dict]:
-    """'기간 제목: 등급, 점수, 학습 사용 동의 예/아니오' (엑셀 열 이름은 옛 명칭 · 화면은 '목표 추천 활용 동의')"""
-    out = []
-    for ln in _lines(v):
-        m = re.match(r'^(\S+)\s+(.*?):\s*(.*)$', ln)
-        period, title, rest = (m.group(1), m.group(2), m.group(3)) if m else ('', ln, '')
-        parts = [p.strip() for p in rest.split(',')]
-        consent = next((p for p in parts if p.startswith('학습 사용 동의')), '')
-        out.append({'period': period, 'title': title, 'grade': parts[0] if parts else '', 'score': parts[1] if len(parts) > 1 and parts[1] != '점수 없음' else '',
-                    'consent': consent.endswith('예')})
-    return out
-
-
-LEVEL = {'학사': 'bachelor', '석사': 'master', '박사': 'doctorate', '전문학사': 'associate', '고졸': 'high_school'}
-CERT_ALIAS = {'SQLD': 'SQL 개발자', 'SQLP': 'SQL 전문가', 'ADsP': '데이터 분석 준전문가', 'ADP': '데이터 분석 전문가', 'DAsP': '데이터아키텍처 준전문가',
-              'DAP': '데이터아키텍처 전문가', '빅데이터분석기사': '빅데이터분석기사'}
-GRADE_ORDER = {'1급': 1, '2급(갑)': 2, '2급(을)': 3, '3급': 4, '4급': 5, '5급': 6}
-
-
-def employees(xlsx: Path) -> None:
-    wb = openpyxl.load_workbook(xlsx, read_only=True, data_only=True)
-    rows = list(wb['직원'].iter_rows(values_only=True))
-    head = [str(h) if h is not None else '' for h in rows[1]]
-    col = lambda r, n: r[head.index(n)] if n in head else None  # noqa: E731
-    people = [r for r in rows[5:] if r and r[0]]
-    with db.tx() as t:
-        inst = t.val("SELECT institution_id FROM public.institutions WHERE name = '한국수자원공사' LIMIT 1")
-        # 부서: 엑셀 부서 키(BIZ·INFRA…)를 부서 코드로, 상위 부서는 이름으로 잇고 없으면 만든다(AI본부·경영부문)
-        depts = {(str(col(r, 'department_id')), _text(col(r, 'department_label')), _text(col(r, '상위 부서'))) for r in people}
-        code_of = {name: code for code, name, _ in depts}
-        parent_of = {name: parent for _, name, parent in depts}
-        tops = {p for p in parent_of.values() if p and p not in code_of}
-        top_codes = {'AI본부': 'AIHQ', '경영부문': 'MGMT'}
-        ids: dict[str, int] = {}
-
-        def ensure(name: str, code: str, parent: str | None) -> int:
-            if name in ids:
-                return ids[name]
-            pid = ensure(parent, code_of.get(parent) or top_codes.get(parent) or f'GP-{parent}', parent_of.get(parent)) if parent else None
-            row = t.one('SELECT department_id FROM public.departments WHERE institution_id = :i AND department_code = :c', i=inst, c=code)
-            if row:
-                t.run('UPDATE public.departments SET name = :n, parent_department_id = :p WHERE department_id = :d', n=name, p=pid, d=row['department_id'])
-                ids[name] = row['department_id']
-            else:
-                ids[name] = t.val('INSERT INTO public.departments(institution_id, department_code, name, parent_department_id) VALUES(:i, :c, :n, :p) RETURNING department_id',
-                                  i=inst, c=code, n=name, p=pid)
-            return ids[name]
-
-        for name in sorted(tops):
-            ensure(name, top_codes.get(name, f'GP-{name}'), None)
-        for code, name, parent in sorted(depts):
-            ensure(name, code, parent)
-        # 직급: 팀 DB 이름 규칙('일반직 4급')을 따른다
-        grade_ids = {}
-        for g in sorted({_text(col(r, 'grade_label')) for r in people}, key=lambda x: GRADE_ORDER.get(x, 9)):
-            gname = f'일반직 {g}'
-            row = t.one('SELECT job_grade_id FROM public.job_grades WHERE institution_id = :i AND name = :n', i=inst, n=gname)
-            grade_ids[g] = row['job_grade_id'] if row else t.val('INSERT INTO public.job_grades(institution_id, name, sort_order) VALUES(:i, :n, :s) RETURNING job_grade_id',
-                                                                  i=inst, n=gname, s=GRADE_ORDER.get(g, 9))
-        majors = {r['title']: r['major_id'] for r in t.all('SELECT major_id, title FROM public.majors')}
-        certs = {r['title']: r['cert_id'] for r in t.all('SELECT cert_id, title FROM public.certifications')}
-        pw = hash_password(S.demo_password)
-        added = 0
-        for r in people:
-            num = str(col(r, 'employee_code'))
-            dept = _text(col(r, 'department_label'))
-            head_ = str(col(r, '상급자 권한') or '') == '예'
-            row = t.one('SELECT employee_id FROM public.employees WHERE institution_id = :i AND employee_number = :n', i=inst, n=num)
-            vals = dict(n=str(col(r, 'display_name')), em=f'{num}@kwater-virtual.example.invalid', jt=_text(col(r, '직무명')), i=inst, num=num,
-                        d=ids[dept], g=grade_ids[_text(col(r, 'grade_label'))], h=head_)
-            if row:
-                eid = row['employee_id']
-                t.run("""UPDATE public.employees SET name = :n, email = :em, job_title = :jt, department = NULL, grade = NULL, department_id = :d, job_grade_id = :g,
-                         is_department_head = :h, updated_at = now() WHERE employee_id = :eid""", eid=eid, **{k: v for k, v in vals.items() if k not in ('i', 'num')})
-            else:
-                eid = t.val("""INSERT INTO public.employees(name, email, job_title, institution_id, employee_number, department_id, job_grade_id, is_department_head,
-                               source_type, password_hash) VALUES(:n, :em, :jt, :i, :num, :d, :g, :h, 'TEST_MANUAL', :pw) RETURNING employee_id""", pw=pw, **vals)
-                added += 1
-            t.run("""INSERT INTO app_ext.employee_hr(employee_id, employee_group, hire_date, position, job_family, task, employment_status, account_status,
-                         grade_since, valid_from, change_reason) VALUES(:e, :g, :hd, :p, :jf, :tk, :es, :ac, :gs, :vf, :cr)
-                     ON CONFLICT (employee_id) DO UPDATE SET employee_group = EXCLUDED.employee_group, hire_date = EXCLUDED.hire_date, position = EXCLUDED.position,
-                         job_family = EXCLUDED.job_family, task = EXCLUDED.task, employment_status = EXCLUDED.employment_status, account_status = EXCLUDED.account_status,
-                         grade_since = EXCLUDED.grade_since, valid_from = EXCLUDED.valid_from, change_reason = EXCLUDED.change_reason, updated_at = now()""",
-                  e=eid, g=_text(col(r, 'employee_group')), hd=_date(col(r, 'hire_date')), p=_text(col(r, 'position_label')), jf=_text(col(r, 'job_family_label')),
-                  tk=_text(col(r, 'task_summary')), es=_text(col(r, 'employment_status')) or '재직', ac=_text(col(r, 'account_status')) or 'active',
-                  gs=_date(col(r, '현 직급 임용일')), vf=_date(col(r, 'valid_from')), cr=_text(col(r, 'change_reason')))
-            # 본인 입력(사내 DB 초기값). 직원이 내 정보에서 고친 값(edited)은 건드리지 않는다
-            has = _text(col(r, 'work_description')) is not None or str(col(r, 'experience_status') or '') not in ('', NONE_ROW)
-            st = lambda k: str(col(r, f'input_status.{k}') or 'unprovided')  # noqa: E731
-            yrs = _text(col(r, 'development_years'))
-            base = {'workDesc': _text(col(r, 'work_description')), 'expStatus': _text(col(r, 'experience_status')), 'expSummary': _text(col(r, 'experience_summary')),
-                    'devYears': float(yrs) if yrs and re.match(r'^[\d.]+$', yrs) else None,
-                    'inputStatus': {'certs': st('owned_certifications'), 'learning': st('learning_history'), 'projects': st('project_history'), 'tech': st('technology_stack')},
-                    'tech': _lines(col(r, '기술 경험')), 'certs': _lines(col(r, '보유 자격')), 'learning': _lines(col(r, '교육 이력')), 'projects': _lines(col(r, '프로젝트')),
-                    'present': has}
-            t.run('INSERT INTO app_ext.employee_self_inputs(employee_id, baseline) VALUES(:e, :b) ON CONFLICT (employee_id) DO UPDATE SET baseline = EXCLUDED.baseline',
-                  e=eid, b=db.J(base))
-            for ev in _evals(col(r, '본인 입력 평가')):
-                t.run("""INSERT INTO app_ext.employee_evaluations(employee_id, period, title, grade, score, consent_default) VALUES(:e, :p, :t, :g, :s, :c)
-                         ON CONFLICT (employee_id, period) DO UPDATE SET title = EXCLUDED.title, grade = EXCLUDED.grade, score = EXCLUDED.score, consent_default = EXCLUDED.consent_default""",
-                      e=eid, p=ev['period'], t=ev['title'], g=ev['grade'], s=ev['score'], c=ev['consent'])
-            # 학력(ERD employee_education_records) — 학과 이름이 팀 DB 전공과 똑같을 때만 전공에 잇는다
-            t.run('DELETE FROM public.employee_education_records WHERE employee_id = :e', e=eid)
-            for ln in _lines(col(r, '학력')):
-                m = re.match(r'^(\S+)\s+(\S+)\s*\((\S+?),', ln)
-                if m:
-                    t.run("""INSERT INTO public.employee_education_records(employee_id, school_name, education_level, department_name, major_id)
-                             VALUES(:e, :s, :l, :d, :m)""", e=eid, s=m.group(1), l=LEVEL.get(m.group(3), 'other'), d=m.group(2), m=majors.get(m.group(2)))
-            # 보유 자격(ERD employee_certifications) — 팀 DB 자격 이름과 맞는 것만
-            t.run('DELETE FROM public.employee_certifications WHERE employee_id = :e', e=eid)
-            for ln in base['certs']:
-                key = ln.split(' (')[0].strip()
-                cid = certs.get(CERT_ALIAS.get(key, key))
-                if cid:
-                    t.run('INSERT INTO public.employee_certifications(employee_id, certification_id) VALUES(:e, :c) ON CONFLICT DO NOTHING', e=eid, c=cid)
-    say(f'직원 가데이터 {xlsx.name}: {len(people)}명 (새로 넣음 {added}명) · 부서 {len(ids)}개')
-
-
-# ── 4. 학습 자료 보조 값 ──
+# ── 3. 학습 자료 보조 값 ──
 DIFF_STAGE = {'BEGINNER': 1, 'INTERMEDIATE': 2, 'ADVANCED': 3}
 AI_SKILLS = {'RAG & 생성형 AI 에이전트', '자연어 처리(NLP) & LLM 기초', '머신러닝 지도/비지도 학습', 'MLOps & 모델 서빙', 'ETL & 데이터 파이프라인',
              '탐색적 데이터 분석(EDA) & 전처리', '데이터 웨어하우스 & OLAP', '딥러닝 신경망 아키텍처', 'PyTorch/TensorFlow 딥러닝 구현', '컴퓨터 비전(CV) 모델링'}
@@ -290,7 +147,7 @@ def resources() -> None:
     say(f'학습 자료 보조 값(추정) 새로 넣음: {n}건')
 
 
-# ── 5. 규정 묶음 ──
+# ── 4. 규정 묶음 ──
 GENERAL = ['인재개발규정', '취업규칙', '유연근무제 운영기준', '근무및부업관리규정', '여비규정', '인사규정', '인사규정시행세칙', '연봉규정', '연봉규정시행세칙',
            '복지후생규정', '복지후생규정시행세칙', '직제규정', '직제규정 시행세칙', '위임전결규정', '인사규정 채용 세칙', '내부임용시험시행지침']
 OVERSEAS = ['국외근무직원복무규정', '국외근무직원연봉및복지후생규정']
@@ -335,7 +192,6 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument('--supplement-only', action='store_true')
     ap.add_argument('--keep-team-passwords', action='store_true')
-    ap.add_argument('--xlsx', default=str(XLSX_DEFAULT))
     args = ap.parse_args()
     print('GrowPath 5차 DB 준비')
     if not args.supplement_only:
@@ -344,15 +200,11 @@ def main() -> None:
         else:
             say('DB에 이미 표가 있어 복원은 건너뜀')
     apply_app_ext()
-    # 시연 비밀번호·직원 가데이터는 저장소 밖에서 받는다(팀 database/RESTORE.md · 2026-10-26). 없으면 그 단계만 건너뛴다
+    # 시연 비밀번호는 저장소 밖에서 정한다(팀 database/RESTORE.md · 2026-10-26). 없으면 계정 단계만 건너뛴다
     if not S.demo_password:
-        say('GP5_DEMO_PASSWORD 가 비어 있어 관리자 계정·직원 가데이터·팀 테스트 비밀번호 단계를 건너뜀(.env 에 넣고 다시 실행)')
+        say('GP5_DEMO_PASSWORD 가 비어 있어 관리자 계정·팀 테스트 비밀번호 단계를 건너뜀(.env 에 넣고 다시 실행)')
     else:
         admin_account()
-        if Path(args.xlsx).exists():
-            employees(Path(args.xlsx))
-        else:
-            say(f'직원 가데이터 엑셀이 없어 건너뜀: {args.xlsx} (담당자에게 받아 data/seed/ 에 넣고 다시 실행)')
         if args.supplement_only:
             say('팀 테스트 직원 비밀번호: 그대로 둠(--supplement-only · 팀원이 운영하는 DB)')
         elif not args.keep_team_passwords:

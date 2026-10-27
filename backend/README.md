@@ -9,7 +9,6 @@
 | `app/` | FastAPI 앱(라우터·서비스·에이전트·관리자 엑셀) |
 | `tools/setup_db.py` | 팀 DB 백업 복원 뒤 보조 스키마(app_ext)·보충 자료를 넣는 스크립트 |
 | `db/` | 보조 스키마 SQL |
-| `data/seed/` | 저장소 밖에서 받는 직원 가데이터 엑셀을 넣는 곳([안내](data/seed/README.md)) |
 | `web/` | 5차 옛 화면(새 React 화면과 나란히 비교하는 용도 · <http://localhost:8815>) |
 
 ## 5차 원본과 다른 곳 (설정으로 빼기 · 공개 저장소 대응만)
@@ -19,7 +18,7 @@
 | `app/auth.py` | 로그인 쿠키 이름을 `GP5_SESSION_COOKIE`로 설정(기본값은 원본과 같은 `gp5_session`) | 같은 PC·같은 브라우저에서 다른 환경과 번갈아 열 때 로그인이 서로 덮이지 않게 |
 | `tools/setup_db.py` | 복원 대상 컨테이너 이름을 `COMPOSE_PROJECT_NAME`으로(기본값은 원본과 같은 `gp5`) | 고정값이면 다른 compose 프로젝트의 DB에 복원할 수 있어서 |
 | `app/config.py`, `app/auth.py`(설명), `web/assets/gp-core.js`(주석) | 시연 초기 비밀번호를 코드에 적힌 기본값 없이 `.env`의 `GP5_DEMO_PASSWORD`로만 받음 | 공개 저장소에 공용 기본 비밀번호를 두지 않는 팀 원칙(`database/RESTORE.md`) |
-| `tools/setup_db.py` | 시연 비밀번호가 비면 관리자 계정·직원 가데이터·팀 테스트 비밀번호 단계를 건너뜀. 직원 가데이터 엑셀이 없으면 그 단계만 건너뜀 | 비밀번호·직원 가데이터는 저장소 밖에서 받아요 |
+| `tools/setup_db.py` | 시연 비밀번호가 비면 관리자 계정·팀 시험 비밀번호 단계를 건너뜀 | 비밀번호는 저장소 밖에서 정해요 |
 | `app/admin_io/hr.py` | 시연 비밀번호가 비어 있으면 새 직원 추가를 막고 안내 | 빈 비밀번호로 계정이 생기지 않게 |
 | `app/llm.py`, `app/regstore.py`, `app/agents/regulation.py`, `app/routers/admin.py`·`account.py`, `app/config.py`, `app/errors.py` | 규정 검색 임베딩을 RunPod-Ollama·OpenAI 모드 모두 OpenAI `text-embedding-3-small`(`OPENAI_EMBED_MODEL`)로 통일하고 `OLLAMA_EMBED_MODEL`을 없앰. OpenAI 키가 없으면 키워드로 바꾸지 않고 오류로 알림(가데이터만 키워드). 관리자 색인 만들기는 모드를 고르지 않음(받은 `provider`는 무시 · 색인 만들기는 뒤에 아래 '규정 원문 PDF' 줄에서 없앰) | 팀 합의(2026-10-26): 팀 DB 벡터가 그 모델로 만들어져 있음. 원본은 모드별 임베딩이라 Ollama 모드가 키워드 검색으로 떨어져 조항을 못 찾는 일이 있었음 |
 | `app/agents/regulation.py`(`REG_SYS`) | 되묻기(`clarify`) 조건을 넓힘: 규정 질문의 뜻이 여러 가지로 읽히고 찾은 조항이 그중 일부 뜻에만 답하면 되묻기. 뜻이 분명하거나 되물은 뒤 고른 질문이면 되묻지 않음 | 원본은 '유형이 애매할 때만' 되물어서, 뜻이 갈리는 규정 질문을 모델마다 한 뜻으로 답하거나 '확인 불가'로 둠(2026-10-26 '근로 시작일' 질문) |
@@ -33,7 +32,16 @@
 
 나머지는 5차 원본의 `app`·`tools`·`db`·`web`과 같아요(2026-10-26 비교).
 
-`data/seed/`의 직원 가데이터 엑셀과 ERD 사본은 저장소에 올리지 않아요([data/seed/README.md](data/seed/README.md)). ERD 원본은 팀 저장소 `docs/07_데이터베이스_저장소_설계/ERD_최종.html`에 있어요.
+### 팀 최신 DB(#22) 기준으로 맞춘 곳 (2026-10-27 사용자 결정: 무조건 최신 DB 기준)
+
+| 파일 | 바꾼 것 | 이유 |
+| --- | --- | --- |
+| `tools/setup_db.py`, `Dockerfile` | 직원 가데이터 엑셀(2.9.0) 단계와 `data/seed/` 폴더를 없앰. 기본 백업을 `team_db/growpath_latest.dump`로 | 최신 백업에 시험 직원 100명·부서장 5명·스킬·자격·학력이 들어 있고, 예전 가데이터 16명은 부서장 중복(`employees_one_department_head`)으로 들어가지 않음 |
+| `tools/setup_db.py` | 시험 비밀번호(로컬 사본만)를 사번이 있는 계정에만 넣음 | 사번 없는 `REAL_USER` 행은 로그인할 수 없고, 새 사번 필수 제약(`employees_number_required` · NOT VALID)이 그 행의 어떤 수정도 막음 |
+| `app/services/profile.py` | 내 정보의 본인 입력을 팀 표에서 읽고 씀: 경험 요약·개발 경력·사용 기술·프로젝트·교육은 `employee_input_profiles`, 자격은 `employee_certifications`(팀 자격표에 있는 이름) + `employees.unlisted_certifications`(없는 이름). 본인 입력 전에는 보유 스킬(`employee_skills`)을 사용 기술 처음 값으로 보여 줌. 팀 표에 자리가 없는 업무 설명·없음 확인과 되돌리기용 처음 값만 `app_ext.employee_self_inputs`에. 학력 단계 코드는 한글로 | 팀 직원 입력 양식(`database/src/database/employee_form.py`)과 같은 표·열에 저장 · API 모양(API-06)은 그대로 |
+| `app/services/profile.py`, `app/admin_io/hr.py` | 입사일·현재 근무 시작일을 `employees.hire_date`·`department_start_date`에서 읽고 관리자 인적 데이터 반영도 그 열에 씀. 직원 구분이 비면 직급 이름('일반직 4급')의 앞부분 | 최신 DB 에 생긴 열 · 직원 구분은 규정 묶음 선택에 씀 |
+
+ERD 원본은 팀 저장소 `docs/07_데이터베이스_저장소_설계/ERD_최종.html`에 있어요.
 
 ## 실행
 

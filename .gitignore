@@ -49,7 +49,5 @@ frontend/coverage/
 # 팀 DB 백업은 담당자에게 받아 team_db/ 에 넣는다(안내 파일만 추적 · *.dump 는 위 규칙이 이미 막음)
 team_db/*
 !team_db/README.md
-# 참고용 백엔드: 실행 중 생기는 파일, 저장소 밖에서 받는 직원 가데이터
+# 참고용 백엔드: 실행 중 생기는 파일
 backend/var/
-backend/data/seed/*
-!backend/data/seed/README.md

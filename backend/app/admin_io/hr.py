@@ -6,6 +6,8 @@
 - 사번이 없는 직원(팀 테스트 계정 일부)은 엑셀로 다루지 않는다(열쇠가 없음).
 - 새 직원의 비밀번호는 시연 초기 비밀번호(.env GP5_DEMO_PASSWORD)를 해시로 넣는다.
 - 반영 뒤 바뀐 직원의 목표 후보를 다시 만든다(FR-05 · 직원 데이터가 갱신될 때 미리 생성).
+- 입사일·현재 근무 시작일은 팀 DB employees.hire_date·department_start_date 에 쓴다(2026-10-27 · 팀 최신 DB 기준).
+  직원 구분이 비면 직급 이름('일반직 4급')의 앞부분을 보여 준다.
 """
 from __future__ import annotations
 
@@ -13,6 +15,7 @@ from .. import db
 from ..auth import hash_password
 from ..config import S
 from ..errors import ApiError
+from ..services.profile import EMP_GROUP_SQL
 from .base import Col, Row, Sheet, merged
 
 NAME, TITLE = 'hr', '인적 데이터'
@@ -85,9 +88,9 @@ def current(sheet: str) -> dict:
         return {(r['department_code'],): {'code': r['department_code'], 'name': r['name'], 'parent': r['parent'], 'head_name': r['head_name'], 'members': r['members'],
                                           '_id': r['department_id']} for r in rows}
     if sheet == '직원':
-        rows = db.all_("""SELECT e.employee_id, e.employee_number, e.name, e.email, e.is_department_head, e.department_id, d.department_code, d.name AS dept_name,
-                coalesce(g.name, e.grade) AS grade, coalesce(j.title, e.job_title) AS job, h.employee_group, h.employment_status, h.account_status, h.hire_date,
-                h.position, h.job_family, h.task, h.valid_from, h.change_reason
+        rows = db.all_(f"""SELECT e.employee_id, e.employee_number, e.name, e.email, e.is_department_head, e.department_id, d.department_code, d.name AS dept_name,
+                coalesce(g.name, e.grade) AS grade, coalesce(j.title, e.job_title) AS job, {EMP_GROUP_SQL} AS employee_group, h.employment_status, h.account_status,
+                coalesce(e.hire_date, h.hire_date) AS hire_date, h.position, h.job_family, h.task, coalesce(e.department_start_date, h.valid_from) AS valid_from, h.change_reason
             FROM public.employees e LEFT JOIN public.departments d ON d.department_id = e.department_id
             LEFT JOIN public.job_grades g ON g.job_grade_id = e.job_grade_id LEFT JOIN public.jobs j ON j.job_id = e.job_id
             LEFT JOIN app_ext.employee_hr h ON h.employee_id = e.employee_id
@@ -115,7 +118,8 @@ def options(sheet: str) -> dict:
     if sheet == '직원':
         return {'dept_code': depts,
                 'grade': {'items': [{'value': r['name']} for r in db.all_('SELECT DISTINCT name FROM public.job_grades ORDER BY name')]},
-                'emp_group': {'items': [{'value': r['g']} for r in db.all_('SELECT DISTINCT employee_group AS g FROM app_ext.employee_hr WHERE employee_group IS NOT NULL ORDER BY 1')]}}
+                'emp_group': {'items': [{'value': r['g']} for r in db.all_("""SELECT DISTINCT g FROM (SELECT employee_group AS g FROM app_ext.employee_hr
+                    UNION SELECT substring(name from '^([^ ]+직) ') FROM public.job_grades) x WHERE g IS NOT NULL ORDER BY 1""")]}}
     if sheet == '평정':
         return {'code': {'strict': True, 'items': [{'value': r['employee_number'], 'label': r['name']}
                                                    for r in db.all_('SELECT employee_number, name FROM public.employees WHERE employee_number IS NOT NULL ORDER BY employee_number')]}}
@@ -277,26 +281,29 @@ def apply(t: db.Tx, found: dict[str, list[Row]], cur: dict[str, dict], ctx: dict
             grade_ids[g] = t.val('INSERT INTO public.job_grades(institution_id, name, sort_order) VALUES(:i, :n, 9) RETURNING job_grade_id', i=inst, n=g)
         dept_id = ids.get(v.get('dept_code')) if v.get('dept_code') else None
         cols = dict(n=v['name'], m=v.get('email'), d=dept_id, dn=dept_names.get(v.get('dept_code')) if v.get('dept_code') else None,
-                    g=grade_ids.get(g) if g else None, gn=g, jt=v.get('job'), j=job_ids.get(v.get('job') or ''), h=bool(v.get('head')), i=inst)
+                    g=grade_ids.get(g) if g else None, gn=g, jt=v.get('job'), j=job_ids.get(v.get('job') or ''), h=bool(v.get('head')), i=inst,
+                    hd=v.get('hire_date'), vf=v.get('valid_from'))
         if r.action == 'add':
             if not S.demo_password:
                 raise ApiError(409, 'NO_DEMO_PASSWORD', '새 직원의 초기 비밀번호가 설정되지 않아 추가할 수 없어요', '.env 의 GP5_DEMO_PASSWORD 를 넣고 서버를 다시 켜 주세요')
             demo_hash = demo_hash or hash_password(S.demo_password)
             eid = t.val("""INSERT INTO public.employees(name, email, employee_number, institution_id, department_id, department, job_grade_id, grade, job_title, job_id,
-                           is_department_head, source_type, password_hash, created_at, updated_at)
-                           VALUES(:n, :m, :c, :i, :d, :dn, :g, :gn, :jt, :j, :h, :src, :pw, now(), now()) RETURNING employee_id""",
+                           is_department_head, hire_date, department_start_date, source_type, password_hash, created_at, updated_at)
+                           VALUES(:n, :m, :c, :i, :d, :dn, :g, :gn, :jt, :j, :h, CAST(:hd AS date), CAST(:vf AS date), :src, :pw, now(), now()) RETURNING employee_id""",
                         c=r.key[0], pw=demo_hash, src='ADMIN_FORM' if ctx.get('source') == 'form' else 'ADMIN_UPLOAD', **cols)
         else:
             eid = old['_id']
             t.run("""UPDATE public.employees SET name = :n, email = :m, department_id = :d, department = :dn, job_grade_id = :g, grade = :gn, job_title = :jt,
-                     job_id = :j, is_department_head = :h, updated_at = now() WHERE employee_id = :e""", e=eid, **{k: x for k, x in cols.items() if k != 'i'})
+                     job_id = :j, is_department_head = :h, hire_date = CAST(:hd AS date), department_start_date = CAST(:vf AS date), updated_at = now()
+                     WHERE employee_id = :e""", e=eid, **{k: x for k, x in cols.items() if k != 'i'})
+        # 입사일·현재 근무 시작일은 위에서 팀 표에 썼으므로 보조 표에는 비워 둔다(옛 값이 팀 값을 가리지 않게)
         t.run("""INSERT INTO app_ext.employee_hr(employee_id, employee_group, hire_date, position, job_family, task, employment_status, account_status, valid_from, change_reason, updated_at)
                  VALUES(:e, :eg, CAST(:hd AS date), :po, :jf, :ta, :st, :ac, CAST(:vf AS date), :cr, now())
                  ON CONFLICT (employee_id) DO UPDATE SET employee_group = EXCLUDED.employee_group, hire_date = EXCLUDED.hire_date, position = EXCLUDED.position,
                    job_family = EXCLUDED.job_family, task = EXCLUDED.task, employment_status = EXCLUDED.employment_status, account_status = EXCLUDED.account_status,
                    valid_from = EXCLUDED.valid_from, change_reason = EXCLUDED.change_reason, updated_at = now()""",
-              e=eid, eg=v.get('emp_group'), hd=v.get('hire_date'), po=v.get('position'), jf=v.get('job_family'), ta=v.get('task'), st=v.get('status') or '재직',
-              ac=ACCOUNT_IN.get(v.get('account') or '사용', 'active'), vf=v.get('valid_from'), cr=v.get('change_reason'))
+              e=eid, eg=v.get('emp_group'), hd=None, po=v.get('position'), jf=v.get('job_family'), ta=v.get('task'), st=v.get('status') or '재직',
+              ac=ACCOUNT_IN.get(v.get('account') or '사용', 'active'), vf=None, cr=v.get('change_reason'))
         # 인사이동·부서장 권한 이력
         if old and (old.get('dept_code') != v.get('dept_code') or bool(old.get('head')) != bool(v.get('head'))):
             t.run("""INSERT INTO app_ext.employee_transfers(employee_id, from_department_id, to_department_id, from_department_name, to_department_name, head_before, head_after,

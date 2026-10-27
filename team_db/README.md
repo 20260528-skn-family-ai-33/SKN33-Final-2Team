@@ -2,8 +2,8 @@
 
 이 폴더의 백업 파일은 Git에 올리지 않아요(`.gitignore`). 이 안내 파일만 올라가요.
 
-- 넣을 파일: `growpath_ai_it_20261022.dump` (2026-10-22 AI·IT 판 · pg_dump custom 형식 · 약 15MB)
-- 받는 곳: 팀 DB 담당 팀원 (팀 DB 자료의 `data/exports` 폴더)
+- 넣을 파일: `growpath_latest.dump` (2026-10-27 최신판 · #22 · pg_dump custom 형식 · 36,343,649바이트). 직원·부서·보유 스킬·자격·학력이 모두 이 백업에 들어 있어요(따로 받는 직원 엑셀 없음).
+- 받는 곳: 팀 산출물 드라이브의 `데이터 수집 및 저장 › DB` 폴더(DB 담당). 크기·SHA-256은 `database/data/exports/growpath_latest.manifest.json`과 같아야 해요.
 - 넣은 뒤: 저장소 맨 위에서 `docker compose up -d --build` → DB가 비어 있을 때만 이 파일로 복원해요.
 - 이름이 다른 백업을 쓰려면 `.env`의 `TEAM_DB_FILE`을 그 이름으로 고쳐요.
 

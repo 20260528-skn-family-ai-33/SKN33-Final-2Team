@@ -41,8 +41,9 @@ CREATE TABLE IF NOT EXISTS app_ext.employee_hr (
   change_reason text,
   updated_at timestamptz NOT NULL DEFAULT now()
 );
--- 본인 입력 정보: baseline 은 사내 DB(인사 담당이 받은 값), edited 는 직원이 내 정보에서 고친 값(없으면 baseline 사용).
--- 형식 { workDesc, expSummary, expStatus, devYears, inputStatus{tech,certs,learning,projects}, tech[], certs[], learning[], projects[] }
+-- 본인 입력 정보(2026-10-27 팀 최신 DB 기준): 값은 팀 표(employee_input_profiles·employee_certifications·employees.unlisted_certifications)에 둔다.
+-- 이 표에는 팀 표에 자리가 없는 값(edited: { workDesc, inputStatus{tech,certs,learning,projects} })과
+-- 되돌리기용 처음 팀 표 값(baseline: { profile, certIds, unlisted })만 둔다(services/profile.py).
 CREATE TABLE IF NOT EXISTS app_ext.employee_self_inputs (
   employee_id integer PRIMARY KEY REFERENCES public.employees(employee_id) ON DELETE CASCADE,
   baseline jsonb,
