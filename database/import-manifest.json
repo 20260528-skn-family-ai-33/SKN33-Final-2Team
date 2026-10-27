@@ -57,10 +57,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "ce0cd1ca368e2993c8208fa55bc300a08748571530425cb516c8a61b072631a7",
-      "bytes": 603,
+      "sha256": "f6e37370e5d41e15c0b73696457d3512c92c494bc6f5c981665e2b2715e12a4a",
+      "bytes": 707,
       "handling": "adjusted",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions."
+      "change_note": "PR #22 follow-up: incremental defaults, explicit reset and committed-change reporting; paid dry-run and operational guidance; deterministic ERD newline; free regressions."
     },
     {
       "path": "database/IT_SCOPE.md",
@@ -68,10 +68,10 @@
       "source_sha256": "b5ddd87307618f22848c659db6529b08f21629de15814134a60f6e7eb16f54e7",
       "source_bytes": 15426,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "eba8a2f76210f6d21429a95178d76c17d74d214b8c5b572e552f406bebd7b10a",
-      "bytes": 15929,
+      "sha256": "7eb78b55ee40e8541f1e663c9b5b206d9936079f502b707b02a2d0f83445cddb",
+      "bytes": 16364,
       "handling": "adjusted",
-      "change_note": "PR #22: preserve employee catalog identities and saved roadmap resources; accept millisecond dates; skip empty historical URLs; add free regressions and verification record.",
+      "change_note": "PR #22 follow-up: incremental defaults, explicit reset and committed-change reporting; paid dry-run and operational guidance; deterministic ERD newline; free regressions.",
       "local_update_source": {
         "path": "IT_SCOPE.md",
         "sha256": "b5ddd87307618f22848c659db6529b08f21629de15814134a60f6e7eb16f54e7"
@@ -83,10 +83,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "b5427526f2a37724d6b63fc310f8a6569aa9f0db67aee27d10cc1defd371e410",
-      "bytes": 8332,
+      "sha256": "38e59dcb2dd6d6ced4c2f4dff28a813a0b85b413f360decacfee88dc6fbbd9d5",
+      "bytes": 10487,
       "handling": "adjusted",
-      "change_note": "PR #22: preserve employee catalog identities and saved roadmap resources; accept millisecond dates; skip empty historical URLs; add free regressions and verification record.",
+      "change_note": "PR #22 follow-up: incremental defaults, explicit reset and committed-change reporting; paid dry-run and operational guidance; deterministic ERD newline; free regressions.",
       "local_update_source": {
         "path": "README.md",
         "sha256": "e872d64ea58c53311d098dc1c769f5bc3232ad947d690054b75a0a0a20c6d8c6"
@@ -98,10 +98,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "3ed87da8fc18839557e5e0d840e60f61294d802b4d3f5ad074cd2dc74cc481d5",
-      "bytes": 2854,
+      "sha256": "ec1a1daf182e78aa287bfa501af2ca8c7b7dac1dea7922a7d4dac82cc3531a66",
+      "bytes": 3379,
       "handling": "adjusted",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions."
+      "change_note": "PR #22 follow-up: incremental defaults, explicit reset and committed-change reporting; paid dry-run and operational guidance; deterministic ERD newline; free regressions."
     },
     {
       "path": "database/assets.manifest.json",
@@ -235,10 +235,10 @@
       "source_sha256": "625ab83498ba3c6cd966b86cf194da5b22dfd13b06bf771f925185fe6074a416",
       "source_bytes": 2713,
       "source_kind": "source_commit_file",
-      "sha256": "306f028a1e7623f95b2b8e4cf9f2ed36faa72a43891bc718bb8779dbcd356223",
-      "bytes": 2984,
+      "sha256": "86ad1d6cc0680ce795e4fe02f44461bb42a4e173e9a78dcfff7b86c5c7514dfa",
+      "bytes": 3383,
       "handling": "copied",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "change_note": "PR #22 follow-up: incremental defaults, explicit reset and committed-change reporting; paid dry-run and operational guidance; deterministic ERD newline; free regressions.",
       "local_update_source": {
         "path": "load_data.py",
         "sha256": "306f028a1e7623f95b2b8e4cf9f2ed36faa72a43891bc718bb8779dbcd356223"
@@ -297,10 +297,10 @@
       "source_sha256": "82327b5737f40c891484955c2eb2ce490a53b0de46990408d4b6f9708441991d",
       "source_bytes": 4420,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "c95a800e1ef6bf0d1f7978a021567e7e763b79cabf11e717b01a6460ee07d3d2",
-      "bytes": 4579,
+      "sha256": "4eb005819c3b3ef64bb6e97a0248c374796767a123a329d99b3c06c916b77d6f",
+      "bytes": 4612,
       "handling": "adjusted",
-      "change_note": "PR #22: preserve employee catalog identities and saved roadmap resources; accept millisecond dates; skip empty historical URLs; add free regressions and verification record.",
+      "change_note": "PR #22 follow-up: incremental defaults, explicit reset and committed-change reporting; paid dry-run and operational guidance; deterministic ERD newline; free regressions.",
       "local_update_source": {
         "path": "scripts/check_workspace.py",
         "sha256": "82327b5737f40c891484955c2eb2ce490a53b0de46990408d4b6f9708441991d"
@@ -488,10 +488,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "af4a3b2b16dd6ffd7fcf488b3601b2c4035a3e6da816bcfda5b62ba06a358086",
-      "bytes": 5497,
+      "sha256": "42071466db0642826acff8bbe4796b7864bf74f101c8170fc1c76791218775e0",
+      "bytes": 7967,
       "handling": "adjusted",
-      "change_note": "PR #22: preserve employee catalog identities and saved roadmap resources; accept millisecond dates; skip empty historical URLs; add free regressions and verification record."
+      "change_note": "PR #22 follow-up: incremental defaults, explicit reset and committed-change reporting; paid dry-run and operational guidance; deterministic ERD newline; free regressions."
     },
     {
       "source_path": "database/src/__init__.py",
@@ -644,10 +644,10 @@
       "source_sha256": "2c2ec56094cda560f240a4d7987e5aed4e0a12283c32b5c486af93f74014e629",
       "source_bytes": 13777,
       "source_kind": "source_commit_file",
-      "sha256": "5cfa417a29b6cf9efce065db043076ab1b1e0264b09605ae5dc11880f1ca8054",
-      "bytes": 4808,
+      "sha256": "4355bde7d85bc9142d00dc6239ddf47d367949e37d99937ce8c060d185c2d1fb",
+      "bytes": 4892,
       "handling": "adjusted",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "change_note": "PR #22 follow-up: incremental defaults, explicit reset and committed-change reporting; paid dry-run and operational guidance; deterministic ERD newline; free regressions.",
       "local_update_source": {
         "path": "src/database/erd.py",
         "sha256": "d417669a6445c2a000608464d869fd27e628b8707e3a5e82e8b3f4260bc18da5"
@@ -774,10 +774,10 @@
       "source_sha256": "0432c150ef770fc7abbd9257e95ad88f34555d9dc102080826dd6d11ade3e6b1",
       "source_bytes": 41897,
       "source_kind": "source_commit_file",
-      "sha256": "7382ff2768333b8ddb77d2dc0322025351944c5acedc9036c8a33dec8920ca1b",
-      "bytes": 47588,
+      "sha256": "7f54e67f3004e8fd9c56270cacff6a3e9eb75afd073bf68709ca6c27c6ea5e48",
+      "bytes": 48890,
       "handling": "copied",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "change_note": "PR #22 follow-up: incremental defaults, explicit reset and committed-change reporting; paid dry-run and operational guidance; deterministic ERD newline; free regressions.",
       "local_update_source": {
         "path": "src/database/ingestion/real_data_ingestor.py",
         "sha256": "7382ff2768333b8ddb77d2dc0322025351944c5acedc9036c8a33dec8920ca1b"
@@ -964,10 +964,10 @@
       "source_sha256": "4f4e7b5a1e62d17b2d9f17af28afcf33ed21cafa5d372e2cdc37a62f361d9ddb",
       "source_bytes": 9872,
       "source_kind": "source_commit_file",
-      "sha256": "17cd6b2ac3db9024d61f6e381dadbd6968bfb0f654f1386a207738e051ecd482",
+      "sha256": "51b342452a57505cbd1899ea4981ad4abbe081cffd688ff74b1d7bc5a3986506",
       "bytes": 10302,
       "handling": "adjusted",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "change_note": "PR #22 follow-up: incremental defaults, explicit reset and committed-change reporting; paid dry-run and operational guidance; deterministic ERD newline; free regressions.",
       "local_update_source": {
         "path": "src/database/portable.py",
         "sha256": "cac3e83dfacd3d7971659a78f55ab014ba95cae8766eae6d9fb37ee912475a0c"
@@ -979,10 +979,10 @@
       "source_sha256": "3df593e6d2884191d546d7102a07124ec81be4e2084731845313168fe7d4680f",
       "source_bytes": 406,
       "source_kind": "source_commit_file",
-      "sha256": "3df593e6d2884191d546d7102a07124ec81be4e2084731845313168fe7d4680f",
-      "bytes": 406,
+      "sha256": "5aa14750ce87945ae106b13619ce5108547f23f1fe241be5409339038e343c1d",
+      "bytes": 418,
       "handling": "copied",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "change_note": "PR #22 follow-up: incremental defaults, explicit reset and committed-change reporting; paid dry-run and operational guidance; deterministic ERD newline; free regressions.",
       "local_update_source": {
         "path": "src/database/schema.sql",
         "sha256": "3df593e6d2884191d546d7102a07124ec81be4e2084731845313168fe7d4680f"
@@ -1219,10 +1219,10 @@
       "source_sha256": "06d2926a4a4ba989f6b27b30f61c745ebda5e72d2ae3a04354dba4ce9d052dd0",
       "source_bytes": 10562,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "06d2926a4a4ba989f6b27b30f61c745ebda5e72d2ae3a04354dba4ce9d052dd0",
-      "bytes": 10562,
+      "sha256": "2c10bd36927dcf4810e2222a6ffe393d4614b199913f1fe9d2ed5681f49afa1c",
+      "bytes": 10608,
       "handling": "copied",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "change_note": "PR #22 follow-up: incremental defaults, explicit reset and committed-change reporting; paid dry-run and operational guidance; deterministic ERD newline; free regressions.",
       "local_update_source": {
         "path": "tests/test_ai_catalog_filter.py",
         "sha256": "06d2926a4a4ba989f6b27b30f61c745ebda5e72d2ae3a04354dba4ce9d052dd0"
@@ -1349,10 +1349,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "bceeec05003594246a4e5715b9ea296259dcaa2f1910f06af19e0c1cef06f527",
-      "bytes": 3605,
+      "sha256": "3b6f9cb00d8d3b75c0ac0f81cb7e2e585b254b521e9810e50f951062b38734f1",
+      "bytes": 4456,
       "handling": "added",
-      "change_note": "Add DB import instructions, artifact links, exclusion settings or verification metadata."
+      "change_note": "PR #22 follow-up: incremental defaults, explicit reset and committed-change reporting; paid dry-run and operational guidance; deterministic ERD newline; free regressions."
     },
     {
       "path": "database/tests/test_instructional_content.py",
@@ -1550,9 +1550,20 @@
       "source_bytes": null,
       "source_kind": "review_regression_test",
       "handling": "added",
-      "change_note": "PR #22: preserve employee catalog identities and saved roadmap resources; accept millisecond dates; skip empty historical URLs; add free regressions and verification record.",
-      "sha256": "3bc21201d7e214d40f252f86a8b30a5f94c6c9d2a953fa227113a61c0d0867c8",
-      "bytes": 11750
+      "change_note": "PR #22 follow-up: incremental defaults, explicit reset and committed-change reporting; paid dry-run and operational guidance; deterministic ERD newline; free regressions.",
+      "sha256": "8d9b4904d3a572c552f80b0cc3a071883888d6149d1f1fe038a112dc13787905",
+      "bytes": 17084
+    },
+    {
+      "path": "database/tests/test_ingestion_execution.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "review_regression_test",
+      "handling": "added",
+      "sha256": "c2cd03743f42c7d64c1dd1e67ec89f0318bd76f08624c475b5dbe90f0d0e828a",
+      "bytes": 8635,
+      "change_note": "PR #22 follow-up: incremental defaults, explicit reset and committed-change reporting; paid dry-run and operational guidance; deterministic ERD newline; free regressions."
     }
   ],
   "excluded": [
@@ -1628,7 +1639,7 @@
         "test_clone_removed": true,
         "source_all_53_tables_unchanged": true
       },
-      "report_path": "database/migration_work/test_results.json",
+      "report_path": "database/migration_work/pr22_first_fix_test_results.json",
       "report_sha256": "b1f1b7fa30d722a9f8090fddd4c964897d887b4a2588deb52969339eb92dba39",
       "report_storage": "local_git_excluded",
       "new_schema_migrations": 0,
@@ -1645,6 +1656,75 @@
         "concurrent write lock",
         "expired and rejected saved roadmap resources"
       ],
+      "unverified": [
+        "ERD screen",
+        "frontend/chatbot integration",
+        "other PC restore",
+        "paid API behavior"
+      ],
+      "human_review": "pending"
+    },
+    "pr22_execution_followup": {
+      "review_comment": "https://github.com/20260528-skn-family-ai-33/SKN33-Final-2Team/pull/22#issuecomment-6431416744",
+      "reviewed_commit": "4d915bfed183c98ab20e8742d17c1919440847c5",
+      "verification": {
+        "checked_at_utc": "2026-10-27T01:38:56.459804+00:00",
+        "unit": {
+          "collected": 198,
+          "started_including_skips": 187,
+          "executed": 182,
+          "passed": 182,
+          "skipped": 5,
+          "failures": 0,
+          "errors": 0,
+          "successful": true
+        },
+        "paid_api_calls": 0,
+        "checked_at_kst": "2026-10-27T10:39:11.087779+09:00",
+        "integration": {
+          "collected": 33,
+          "started_including_skips": 33,
+          "executed": 33,
+          "passed": 33,
+          "skipped": 0,
+          "failures": 0,
+          "errors": 0,
+          "successful": true
+        },
+        "test_clone_removed": true,
+        "source_all_53_tables_unchanged": true
+      },
+      "report_path": "database/migration_work/pr22_followup_tests.json",
+      "report_sha256": "271c207a666c4177c7b80b15254cb7a392b5ada0bfcc0c1096d4654f02591727",
+      "report_storage": "local_git_excluded",
+      "new_schema_migrations": 0,
+      "original_database_writes": false,
+      "erd_published_template_roundtrip_bytes_unchanged": true,
+      "erd_newline": "explicit_CRLF",
+      "new_pipeline_tests": {
+        "users": 2,
+        "cases": [
+          "default success",
+          "default source failure",
+          "explicit reset success",
+          "source failure after reset"
+        ],
+        "real_postgresql": [
+          "catalog reset SQL",
+          "FK constraints",
+          "saved resource readback",
+          "employee fingerprints"
+        ],
+        "mocked": [
+          "AI admission",
+          "collection",
+          "apply",
+          "backup creation",
+          "local runtime directory guard"
+        ],
+        "fixture_cleanup": "outer rollback transaction then disposable clone removal"
+      },
+      "compatibility": "Default CLI/library execution is incremental; --incremental remains accepted; --reset opts into destructive catalog reset.",
       "unverified": [
         "ERD screen",
         "frontend/chatbot integration",

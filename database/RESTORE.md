@@ -17,6 +17,8 @@ python -m src.database.vectors.resource_vectors status
 
 비밀번호는 출력되지 않는 터미널 입력을 사용한다. 기존 DB·데이터 디렉터리·`.env.local`은 덮어쓰지 않는다. 기존 서버라면 `--initialize`를 생략하고 비어 있는 새 DB 이름을 지정한다. 포트가 사용 중이면 먼저 점유자를 확인한다. 설치 바이너리와 서버 확장은 별도로 준비한다.
 
+복원 도구는 포트를 지정할 수 있지만 `import_knowledge.py`, `supplement_courses.py`, `supplement_course_catalog.py`, `correct_course_skills.py`, `verify_course_catalog.py`, `verify_course_expansion_live.py`는 승인된 최종 DB인 `127.0.0.1:55435/growpath`로 대상을 제한한다. 다른 포트·DB 이름으로 복원했다면 이 도구들은 거절한다. 일부 도구는 현재 작업 폴더의 로컬 클러스터 경로도 확인하므로 연결 설정만 바꿔 제한을 우회하지 않는다.
+
 013~020 SQL이 없어 빈 DB를 SQL만으로 재구성하거나 구판 10/21 DB에 021·022만 적용하는 방식은 지원하지 않는다. 최신 백업의 001~022 이력을 검증한다. 001~012·021·022 SQL을 수정해 이력을 맞추지 않는다. 기존 REAL_USER 5명의 사번 누락은 전달 스냅샷의 알려진 경고이며 값을 임의 생성하지 않는다.
 
 ## 백업·되돌리기

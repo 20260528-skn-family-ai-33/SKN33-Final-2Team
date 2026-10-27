@@ -93,7 +93,7 @@ def restore(args):
     password=os.getenv("POSTGRES_PASSWORD") or values.get("POSTGRES_PASSWORD") or getpass.getpass("PostgreSQL password (not printed): ")
     binary=Path(args.pg_bin).resolve() if args.pg_bin else native_bin()
     if not (binary/"pg_restore.exe").is_file():
-        raise ValueError("PostgreSQL 17 tools missing; set POSTGRES_BIN_DIR or specify --pg-bin (see RESTORE_OTHER_PC.md)")
+        raise ValueError("PostgreSQL 17 tools missing; set POSTGRES_BIN_DIR or specify --pg-bin (see database/RESTORE.md)")
     env=os.environ.copy();env.update(PGHOST=args.host,PGPORT=str(args.port),PGUSER=args.user,PGPASSWORD=password,PGSSLMODE="disable")
     env["PATH"]=str(binary)+os.pathsep+env.get("PATH","")
     log=ROOT/"data/local_db/transfer.log";log.parent.mkdir(parents=True,exist_ok=True)

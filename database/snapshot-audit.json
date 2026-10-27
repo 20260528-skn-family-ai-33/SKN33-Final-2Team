@@ -153,7 +153,7 @@
         "test_clone_removed": true,
         "source_all_53_tables_unchanged": true
       },
-      "report_path": "database/migration_work/test_results.json",
+      "report_path": "database/migration_work/pr22_first_fix_test_results.json",
       "report_sha256": "b1f1b7fa30d722a9f8090fddd4c964897d887b4a2588deb52969339eb92dba39",
       "report_storage": "local_git_excluded",
       "new_schema_migrations": 0,
@@ -170,6 +170,75 @@
         "concurrent write lock",
         "expired and rejected saved roadmap resources"
       ],
+      "unverified": [
+        "ERD screen",
+        "frontend/chatbot integration",
+        "other PC restore",
+        "paid API behavior"
+      ],
+      "human_review": "pending"
+    },
+    "pr22_execution_followup_tests": {
+      "review_comment": "https://github.com/20260528-skn-family-ai-33/SKN33-Final-2Team/pull/22#issuecomment-6431416744",
+      "reviewed_commit": "4d915bfed183c98ab20e8742d17c1919440847c5",
+      "verification": {
+        "checked_at_utc": "2026-10-27T01:38:56.459804+00:00",
+        "unit": {
+          "collected": 198,
+          "started_including_skips": 187,
+          "executed": 182,
+          "passed": 182,
+          "skipped": 5,
+          "failures": 0,
+          "errors": 0,
+          "successful": true
+        },
+        "paid_api_calls": 0,
+        "checked_at_kst": "2026-10-27T10:39:11.087779+09:00",
+        "integration": {
+          "collected": 33,
+          "started_including_skips": 33,
+          "executed": 33,
+          "passed": 33,
+          "skipped": 0,
+          "failures": 0,
+          "errors": 0,
+          "successful": true
+        },
+        "test_clone_removed": true,
+        "source_all_53_tables_unchanged": true
+      },
+      "report_path": "database/migration_work/pr22_followup_tests.json",
+      "report_sha256": "271c207a666c4177c7b80b15254cb7a392b5ada0bfcc0c1096d4654f02591727",
+      "report_storage": "local_git_excluded",
+      "new_schema_migrations": 0,
+      "original_database_writes": false,
+      "erd_published_template_roundtrip_bytes_unchanged": true,
+      "erd_newline": "explicit_CRLF",
+      "new_pipeline_tests": {
+        "users": 2,
+        "cases": [
+          "default success",
+          "default source failure",
+          "explicit reset success",
+          "source failure after reset"
+        ],
+        "real_postgresql": [
+          "catalog reset SQL",
+          "FK constraints",
+          "saved resource readback",
+          "employee fingerprints"
+        ],
+        "mocked": [
+          "AI admission",
+          "collection",
+          "apply",
+          "backup creation",
+          "local runtime directory guard"
+        ],
+        "fixture_cleanup": "outer rollback transaction then disposable clone removal"
+      },
+      "compatibility": "Default CLI/library execution is incremental; --incremental remains accepted; --reset opts into destructive catalog reset.",
       "unverified": [
         "ERD screen",
         "frontend/chatbot integration",

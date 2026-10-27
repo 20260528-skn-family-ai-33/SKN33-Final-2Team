@@ -43,6 +43,13 @@ class SourceError(RuntimeError):
         self.details = details
 
 
+class PipelineExecutionError(RuntimeError):
+    """Carry committed reset results without exposing the underlying API/DB error."""
+    def __init__(self, report: dict):
+        super().__init__(report['message'])
+        self.report = report
+
+
 
 def text(value, limit=None):
     if value is None:
@@ -656,11 +663,12 @@ class RealDataIngestor:
                     'sources':batch['sources'],'skipped':batch['failures'], 'vectors':vector_result,
                     'validation':validation,'certification_status_changes':certification_status_changes,
                     'quality':batch.get('quality',{}),'selection':batch.get('selection',{}),'collection_complete':batch.get('collection_complete',False),
-                    'skills_changed':False,'regulations_changed':False,'user_data_changed':False,
+                    'skills_changed':False,'regulations_changed':False,
+                    'user_data_changed':validation['removed_rows']['removed_resource_associations']>0,
                     'vector_scope':'six-resource canonical vector index with source FKs; stable source IDs preserved',
                     'database_changes':True,'original_embedding_columns_changed':False}
 
-    def execute_full_pipeline(self,*,dry_run=False,max_pages=None,allow_partial=False,skip_embeddings=False,db_env='SUPABASE_DB_URL',reset_catalog=True):
+    def execute_full_pipeline(self,*,dry_run=False,max_pages=None,allow_partial=False,skip_embeddings=False,db_env='SUPABASE_DB_URL',reset_catalog=False):
         with deployment.connect(db_env) as conn:
             conn.execute('SET TRANSACTION READ ONLY')
             skills=conn.execute('SELECT skill_id,name,category FROM public.skill_tags ORDER BY skill_id').fetchall()
@@ -680,38 +688,53 @@ class RealDataIngestor:
                     raise ValueError('자동 초기화는 로컬 DB만 허용합니다.')
                 if server_data_directory(conn).resolve()!=DATA.resolve():
                     raise ValueError('예상한 로컬 DB가 아닙니다.')
-                reset_result=reset_skill_catalogs(conn)
+                pending_reset=reset_skill_catalogs(conn)
+            # Do not report a reset as committed until the connection exits successfully.
+            reset_result=pending_reset
             logging.getLogger('LOAD_DATA').info('스킬 관련 자료 초기화 완료. 이제 수집·AI 심사를 시작합니다.')
-        batch=self.collect(skills,max_pages=max_pages)
-        if batch['failures'] and not dry_run and not allow_partial:
-            return {'status':'FAILED','error_type':'SourceError','database_changes':bool(reset_result),
-                    'embedding_api_called':False,'message':'수집에 실패했습니다. 초기화 모드라면 스킬 자료는 비워진 상태입니다. 재실행하거나 초기화 전 백업을 복원하세요.',
-                    'counts':{k:len(v) for k,v in batch['rows'].items()},
-                    'failures':batch['failures'],'sources':batch['sources'],
-                    'quality':batch.get('quality',{}),'selection':batch.get('selection',{}),
-                    'collection_complete':batch.get('collection_complete',False)}
-        if dry_run:
-            return {'status':'READY' if not batch['failures'] and batch.get('collection_complete',False) else 'INCOMPLETE','database_changes':False,
-                    'embedding_api_called':False,'counts':{k:len(v) for k,v in batch['rows'].items()},
-                    'sources':batch['sources'],'failures':batch['failures'],
-                    'quality':batch.get('quality',{}),'selection':batch.get('selection',{}),'collection_complete':batch.get('collection_complete',False),
-                    'unresolved_rule_names':batch['unresolved_rule_names'],
-                    'skill_coverage':dict(Counter(sid for rows in batch['rows'].values() for r in rows for sid in r['matches']))}
-        with deployment.connect(db_env) as conn:
-            result=self.apply(conn,batch,embed=not skip_embeddings,allow_partial=allow_partial)
-            # Advance the legacy serial sequence under the table lock only on actual application.
-            # Tests call apply() in a rollback transaction and do not touch non-transactional sequences.
-            if 'certifications' in result['tables']:
-                seq=conn.execute("SELECT pg_get_serial_sequence('public.certifications','cert_id') AS name").fetchone()['name']
-                if seq:
-                    top=conn.execute('SELECT max(cert_id) AS id FROM public.certifications').fetchone()['id']
-                    # nextval never moves backwards; do not lower a sequence already ahead of max(id).
-                    current=conn.execute('SELECT nextval(%s::regclass) AS id',(seq,)).fetchone()['id']
-                    if top and current<top:conn.execute('SELECT setval(%s::regclass,%s,true)',(seq,top))
-        if reset_result is not None:
-            result['reset']=reset_result
-            result['backup']=backup_result['backup']
-        return result
+
+        def execution_report(result: dict) -> dict:
+            result['user_data_changed']=bool(result.get('user_data_changed',False) or
+                (reset_result and reset_result.get('removed_resource_associations',0)>0))
+            if reset_result is not None:
+                result.update(reset=reset_result,backup=backup_result['backup'],database_changes=True)
+            return result
+
+        try:
+            batch=self.collect(skills,max_pages=max_pages)
+            if batch['failures'] and not dry_run and not allow_partial:
+                message='수집에 실패했습니다. 적재는 실행하지 않았습니다.'
+                if reset_result is not None:
+                    message+=' 초기화는 이미 반영됐습니다. 초기화 결과와 백업 경로를 확인해 복원 여부를 결정하세요.'
+                return execution_report({'status':'FAILED','error_type':'SourceError','database_changes':False,
+                        'embedding_api_called':False,'message':message,
+                        'counts':{k:len(v) for k,v in batch['rows'].items()},
+                        'failures':batch['failures'],'sources':batch['sources'],
+                        'quality':batch.get('quality',{}),'selection':batch.get('selection',{}),
+                        'collection_complete':batch.get('collection_complete',False)})
+            if dry_run:
+                return execution_report({'status':'READY' if not batch['failures'] and batch.get('collection_complete',False) else 'INCOMPLETE','database_changes':False,
+                        'embedding_api_called':False,'counts':{k:len(v) for k,v in batch['rows'].items()},
+                        'sources':batch['sources'],'failures':batch['failures'],
+                        'quality':batch.get('quality',{}),'selection':batch.get('selection',{}),'collection_complete':batch.get('collection_complete',False),
+                        'unresolved_rule_names':batch['unresolved_rule_names'],
+                        'skill_coverage':dict(Counter(sid for rows in batch['rows'].values() for r in rows for sid in r['matches']))})
+            with deployment.connect(db_env) as conn:
+                result=self.apply(conn,batch,embed=not skip_embeddings,allow_partial=allow_partial)
+                # Tests call apply() in a rollback transaction and do not touch sequences.
+                if 'certifications' in result['tables']:
+                    seq=conn.execute("SELECT pg_get_serial_sequence('public.certifications','cert_id') AS name").fetchone()['name']
+                    if seq:
+                        top=conn.execute('SELECT max(cert_id) AS id FROM public.certifications').fetchone()['id']
+                        # nextval never moves backwards; do not lower a sequence already ahead of max(id).
+                        current=conn.execute('SELECT nextval(%s::regclass) AS id',(seq,)).fetchone()['id']
+                        if top and current<top:conn.execute('SELECT setval(%s::regclass,%s,true)',(seq,top))
+            return execution_report(result)
+        except Exception as exc:
+            if reset_result is None:
+                raise
+            raise PipelineExecutionError(execution_report({'status':'FAILED','error_type':type(exc).__name__,
+                'message':'수집·적재에 실패했습니다. 초기화는 이미 반영됐습니다. 초기화 결과와 백업 경로를 확인하세요.'})) from exc
 
     def clear_all_tables(self):
         raise RuntimeError('전체 삭제 기능을 제거했습니다. load_data.py로 증분 갱신하세요.')

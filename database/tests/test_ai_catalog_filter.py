@@ -115,7 +115,7 @@ class AIAdmissionTests(TestCase):
             batch=ing.collect(SKILLS)
         self.assertEqual(set(batch['rows']['books'][0]['matches']),{1})
         self.assertEqual(batch['sources']['books_ai'],{'approved':1,'excluded':0})
-    def test_reset_precedes_collection_and_is_reported_on_failure(self):
+    def test_explicit_reset_precedes_collection_and_is_reported_on_failure(self):
         from src.database.local_runtime import DATA
         ing=RealDataIngestor(config={},ai_client=client());conn=MagicMock();conn.info.host='127.0.0.1'
         conn.execute.return_value.fetchall.return_value=SKILLS
@@ -127,7 +127,7 @@ class AIAdmissionTests(TestCase):
              patch('src.database.local_runtime.server_data_directory',return_value=DATA), \
              patch('src.database.catalog_reset.reset_skill_catalogs',side_effect=lambda c:order.append('reset') or {'reset':True}), \
              patch.object(ing,'collect',side_effect=lambda *a,**k:order.append('collect') or {'rows':{},'sources':{},'failures':{'books':'FAILED'}}):
-            result=ing.execute_full_pipeline()
+            result=ing.execute_full_pipeline(reset_catalog=True)
         self.assertEqual(order,['backup','reset','collect']);self.assertTrue(result['database_changes'])
     def test_dry_run_does_not_reset(self):
         ing=RealDataIngestor(config={},ai_client=client());context=MagicMock()
@@ -136,5 +136,5 @@ class AIAdmissionTests(TestCase):
         with patch('src.database.deployment.connect',return_value=context), \
              patch('src.database.local_runtime.backup') as backup, \
              patch('src.database.catalog_reset.reset_skill_catalogs') as reset,patch.object(ing,'collect',return_value=batch):
-            result=ing.execute_full_pipeline(dry_run=True)
+            result=ing.execute_full_pipeline(dry_run=True,reset_catalog=True)
         backup.assert_not_called();reset.assert_not_called();self.assertFalse(result['database_changes'])

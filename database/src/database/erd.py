@@ -46,7 +46,8 @@ def render(conn, template, output):
     source=template.read_text(encoding='utf-8')
     html = render_html(data, source)
     output.parent.mkdir(parents=True,exist_ok=True)
-    output.write_text(html,encoding='utf-8')
+    # Match the published artifact bytes on Windows and Linux alike.
+    output.write_text(html,encoding='utf-8',newline='\r\n')
     return {'file':str(output),'tables':len(data),
             'foreign_keys':sum(len(spec['fks']) for spec in data.values()),
             'form':'existing orthogonal ERD with drag, search, zoom and FK arrows'}

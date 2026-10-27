@@ -1,4 +1,5 @@
 """Reference-preservation regressions against an explicitly disposable PG clone."""
+from contextlib import contextmanager
 from datetime import datetime, timezone
 import os
 import unittest
@@ -63,6 +64,92 @@ class CatalogHistoryDatabaseTests(unittest.TestCase):
         names = ('public.employees', 'public.employee_certifications', 'public.employee_education_records',
                  'public.employee_input_profiles')
         return {k: v for k, v in fingerprints(self.conn).items() if k in names}
+
+    def two_saved_roadmaps(self):
+        course = self.conn.execute('SELECT course_id FROM public.courses ORDER BY course_id LIMIT 1').fetchone()['course_id']
+        steps = []
+        for _ in range(2):
+            employee = self.employee()
+            project = self.conn.execute("INSERT INTO public.projects(employee_id,project_name) VALUES (%s,'PR22 실행 검증') RETURNING project_id", (employee,)).fetchone()['project_id']
+            round_id = self.conn.execute("INSERT INTO public.diagnostic_rounds(project_id,round_number,project_snapshot) VALUES (%s,1,'{}') RETURNING diagnostic_round_id", (project,)).fetchone()['diagnostic_round_id']
+            roadmap = self.conn.execute("INSERT INTO public.roadmaps(project_id,diagnostic_round_id,strategy_type,content,baseline_content) VALUES (%s,%s,'BALANCED','{}','{}') RETURNING roadmap_id", (project, round_id)).fetchone()['roadmap_id']
+            step = self.conn.execute("INSERT INTO public.roadmap_steps(roadmap_id,step_order,title) VALUES (%s,1,'검증') RETURNING step_id", (roadmap,)).fetchone()['step_id']
+            self.conn.execute('INSERT INTO public.roadmap_step_resources(step_id,course_id) VALUES (%s,%s)', (step, course))
+            steps.append(step)
+        return steps
+
+    def exercise_pipeline(self, *, reset=False, source_failure=False):
+        from src.database.ingestion.real_data_ingestor import RealDataIngestor
+        from src.database.local_runtime import DATA
+        ing = RealDataIngestor(config={'ingestion': {}})
+        batch = {'rows': {}, 'sources': {}, 'failures': {'books': 'FAILED'} if source_failure else {}}
+        calls = 0
+
+        @contextmanager
+        def connected(_):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                # The pipeline's initial connection really is read-only.
+                with psycopg.connect(self.url, row_factory=dict_row) as conn:
+                    yield conn
+            else:
+                # Reset SQL runs in the fixture's outer rollback transaction.
+                yield self.conn
+
+        with patch('src.database.deployment.connect', side_effect=connected), \
+             patch('src.database.ingestion.real_data_ingestor.AICatalogFilter'), \
+             patch('src.database.local_runtime.server_data_directory', return_value=DATA), \
+             patch('src.database.local_runtime.backup', return_value={'backup': 'mock-reset.dump'}) as backup, \
+             patch.object(ing, 'collect', return_value=batch), \
+             patch.object(ing, 'apply', return_value={'status': 'SUCCESS', 'tables': {},
+                 'database_changes': True, 'user_data_changed': False}) as apply:
+            result = ing.execute_full_pipeline(**({'reset_catalog': True} if reset else {}))
+        return result, backup.call_count, apply.call_count
+
+    def assert_saved_resources(self, steps, expected):
+        self.assertEqual(self.conn.execute('SELECT count(*) AS n FROM public.roadmap_step_resources WHERE step_id=ANY(%s)', (steps,)).fetchone()['n'], expected)
+        self.assertEqual(self.conn.execute('SELECT count(*) AS n FROM public.roadmap_steps WHERE step_id=ANY(%s)', (steps,)).fetchone()['n'], 2)
+
+    def test_pipeline_default_success_preserves_two_users_resources(self):
+        steps = self.two_saved_roadmaps()
+        before = self.hr_fingerprints()
+        result, backups, applied = self.exercise_pipeline()
+        self.assertEqual(result['status'], 'SUCCESS')
+        self.assertFalse(result['user_data_changed'])
+        self.assertEqual((backups, applied), (0, 1))
+        self.assert_saved_resources(steps, 2)
+        self.assertEqual(before, self.hr_fingerprints())
+
+    def test_pipeline_default_source_failure_preserves_two_users_resources(self):
+        steps = self.two_saved_roadmaps()
+        before = fingerprints(self.conn)
+        result, backups, applied = self.exercise_pipeline(source_failure=True)
+        self.assertEqual(result['status'], 'FAILED')
+        self.assertFalse(result['user_data_changed'])
+        self.assertFalse(result['database_changes'])
+        self.assertEqual((backups, applied), (0, 0))
+        self.assert_saved_resources(steps, 2)
+        self.assertEqual(before, fingerprints(self.conn))
+
+    def assert_explicit_pipeline_reset(self, *, source_failure):
+        steps = self.two_saved_roadmaps()
+        before = self.hr_fingerprints()
+        result, backups, applied = self.exercise_pipeline(reset=True, source_failure=source_failure)
+        self.assertEqual(result['status'], 'FAILED' if source_failure else 'SUCCESS')
+        self.assertTrue(result['user_data_changed'])
+        self.assertTrue(result['database_changes'])
+        self.assertGreaterEqual(result['reset']['removed_resource_associations'], 2)
+        self.assertEqual(result['backup'], 'mock-reset.dump')
+        self.assertEqual((backups, applied), (1, 0 if source_failure else 1))
+        self.assert_saved_resources(steps, 0)
+        self.assertEqual(before, self.hr_fingerprints())
+
+    def test_pipeline_explicit_reset_reports_two_users_detachments(self):
+        self.assert_explicit_pipeline_reset(source_failure=False)
+
+    def test_pipeline_source_failure_after_reset_reports_two_users_detachments(self):
+        self.assert_explicit_pipeline_reset(source_failure=True)
 
     def test_reset_preserves_employee_references_and_external_identity(self):
         ids = self.employee_references()
