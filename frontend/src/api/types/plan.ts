@@ -176,8 +176,9 @@ export interface Report {
   still: ReportItem[];
   doneTitles: string[];
   restTitles: string[];
-  goalSelf: string;
-  file: { name: string; size?: number } | null;
+  /** 부서장 화면에는 오지 않음(사후 점검 원본 응답 · 첨부 비공개) */
+  goalSelf?: string;
+  file?: { name: string; size?: number } | null;
   good: string[];
   improve: string[];
   next: { goal: string; why: string } | null;

@@ -3,8 +3,11 @@ import type { User } from './account';
 import type { RegBundle, ResourceMap } from './catalog';
 import type { PlanRecord, Report } from './plan';
 
+/** 부서장 화면이 받는 직원 정보: 소속·직급·직위와 부서장 여부만(평정·본인 입력 등은 서버가 보내지 않음 · PR #23 리뷰) */
+export type TeamUser = Pick<User, 'id' | 'code' | 'name' | 'role' | 'dept' | 'parentDept' | 'grade' | 'position' | 'supervisor'>;
+
 export interface TeamMember {
-  user: User;
+  user: TeamUser;
   activePlans: number;
   pastPlans: number;
   reports: number;
@@ -17,7 +20,7 @@ export interface TeamList {
 }
 
 export interface MemberState {
-  user: User;
+  user: TeamUser;
   plans: Record<string, PlanRecord>;
   reports: Report[];
   res?: ResourceMap;

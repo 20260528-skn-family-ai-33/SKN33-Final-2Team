@@ -41,6 +41,15 @@
 | `app/services/profile.py` | 내 정보의 본인 입력을 팀 표에서 읽고 씀: 경험 요약·개발 경력·사용 기술·프로젝트·교육은 `employee_input_profiles`, 자격은 `employee_certifications`(팀 자격표에 있는 이름) + `employees.unlisted_certifications`(없는 이름). 본인 입력 전에는 보유 스킬(`employee_skills`)을 사용 기술 처음 값으로 보여 줌. 팀 표에 자리가 없는 업무 설명·없음 확인과 되돌리기용 처음 값만 `app_ext.employee_self_inputs`에. 학력 단계 코드는 한글로 | 팀 직원 입력 양식(`database/src/database/employee_form.py`)과 같은 표·열에 저장 · API 모양(API-06)은 그대로 |
 | `app/services/profile.py`, `app/admin_io/hr.py` | 입사일·현재 근무 시작일을 `employees.hire_date`·`department_start_date`에서 읽고 관리자 인적 데이터 반영도 그 열에 씀. 직원 구분이 비면 직급 이름('일반직 4급')의 앞부분 | 최신 DB 에 생긴 열 · 직원 구분은 규정 묶음 선택에 씀 |
 
+### PR #23 리뷰로 고친 곳 (2026-10-27)
+
+| 파일 | 바꾼 것 | 이유 |
+| --- | --- | --- |
+| `app/services/profile.py`(`team_view`), `app/services/plans.py` | 부서장 직원 목록·상세의 직원 정보를 이름·사번·소속·직급·직위·부서장 여부만 보냄 | 원본은 내 정보 전체(평정·본인 입력·학력 등)를 보내 화면에서 숨겨도 응답으로 받을 수 있었음(설계서 공개 범위) |
+| `app/services/plans.py`(`reports`) | 부서장 보고서에서 목표 달성 답(`goalSelf`)·결과물 첨부(`file`)를 뺌 | 사후 점검 원본 응답·첨부 비공개(부서장 로드맵 기록에서는 이미 뺐음) |
+| `app/routers/work.py`(첨부 올리기) | 본인의 진행 중 로드맵인지, 그 로드맵의 활동(또는 사후 점검 `post`)인지 먼저 확인 | 원본은 로그인만 확인하고 없는·남의 로드맵에도 파일을 저장했음 |
+| `app/services/plans.py`(`_base_rows`) | 주소의 로드맵 id 모양이 틀리면 404 | 원본은 DB 형 변환 오류로 500 |
+
 ERD 원본은 팀 저장소 `docs/07_데이터베이스_저장소_설계/ERD_최종.html`에 있어요.
 
 ## 실행

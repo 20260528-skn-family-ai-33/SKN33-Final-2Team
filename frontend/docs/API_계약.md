@@ -28,7 +28,7 @@
 | --- | --- |
 | `POST /auth/login` · `POST /auth/logout` · `GET /me` | 로그인·로그아웃·새로 고침 때 계정 |
 | `GET /me/workspace` | 로그인 뒤 내 기록 전체(작성 문서·로드맵·보고서) |
-| `GET /me/profile` · `PUT`/`DELETE /me/profile/self` · `PUT /me/evaluations/{period}/consent` | 내 정보 |
+| `GET /me/profile` · `PUT`/`DELETE /me/profile/self` · `PUT /me/evaluations/{period}/consent` | 내 정보(동의는 `{period, consent}`를 돌려줌) |
 | `GET /me/goal-suggestions` · `POST /me/goal-suggestions/regenerate` | 작성 1단계 목표 후보 |
 | `GET /ai/providers` · `PUT /me/ai-provider` · `GET /ai/status?provider=` · `GET /ai/log` | 좌측 AI 모델 고르기·연결 상태·에이전트 동작 보기(시연·디버그 전용 · 직원·관리자 계정 모두 · 누가 호출했든 모든 계정의 최근 호출을 `employee`(누구의 일)·`by`(관리자 화면에서 시작하면 '관리자')와 함께 줌 · 운영에서는 끔) |
 | `GET /demo/accounts` · `PUT /me/demo-settings` · `POST /demo/reset` · `POST /demo/jump` | 시연 전용(로그인 직원 고르기·가데이터·실패 시연·단계 이동·초기화) |
@@ -51,7 +51,7 @@
 | 요청 | 쓰는 곳 |
 | --- | --- |
 | `GET /plans/{id}` · `PUT /plans/{id}/activities/{act}/progress` | 로드맵 읽기 · 활동 기록(완료·메모) |
-| `POST /plans/{id}/activities/{act}/attachments` | 결과물·수료증 첨부(사후 점검 파일도 `act='post'`로 같은 곳) |
+| `POST /plans/{id}/activities/{act}/attachments` | 결과물·수료증 첨부(사후 점검 파일도 `act='post'`로 같은 곳) · 본인의 진행 중 로드맵과 그 로드맵의 활동만(아니면 404·409) |
 | `POST /plans/{id}/archive` · `.../resume` | 보관·다시 진행 |
 | `POST /plans/{id}/revisions` · `.../revisions/support/retry` · `POST /revisions/{rid}/accept` · `DELETE /revisions/{rid}` | 수정 요청(작업) · 지원 조건 다시 · 수정안 확정 · 버리기 |
 | `POST /plans/{id}/comments/{cid}/read` | 부서장 코멘트 읽음 |
@@ -77,7 +77,7 @@
 
 | 요청 | 쓰는 곳 |
 | --- | --- |
-| `GET /team/members` · `GET /team/members/{uid}/plans` | 소속 직원 목록 · 직원 기록(공개 범위만 · 심화 질문 결과 제외) |
+| `GET /team/members` · `GET /team/members/{uid}/plans` | 소속 직원 목록 · 직원 기록(공개 범위만). 직원 정보는 이름·사번·소속·직급·직위·부서장 여부만(`TeamUser`), 보고서에서는 심화 질문 결과·목표 달성 답·결과물 첨부를 뺌 |
 | `POST /team/plans/{pid}/comments` · `PATCH /team/plans/{pid}/comments/{cid}` | 코멘트 보내기 · 고치기(설계서 밖 추가 · 10/23) |
 
 ### 관리자 — `admin.ts` (5차 목업에서 추가 · 2026-10-21 사용자 결정 · 설계서 반영 여부는 사람 확인 필요)

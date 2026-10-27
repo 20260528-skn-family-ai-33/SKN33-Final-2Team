@@ -195,6 +195,15 @@ def view(employee_id: int, rows: list[dict] | None = None) -> dict | None:
     }
 
 
+# 부서장 화면에 주는 직원 정보: 소속·직급·직위와 부서장 여부만(설계서 공개 범위 · PR #23 리뷰 2026-10-27).
+# 평정·본인 입력·학력·입사일·계정 상태 등은 화면에서 숨겨도 응답으로 받을 수 있으므로 보내지 않는다
+TEAM_FIELDS = ('id', 'code', 'name', 'role', 'dept', 'parentDept', 'grade', 'position')
+
+
+def team_view(v: dict) -> dict:
+    return {**{k: v.get(k) for k in TEAM_FIELDS}, 'supervisor': bool(v.get('supervisor') and v.get('members'))}
+
+
 def accounts() -> list[dict]:
     """로그인 화면의 '직원 고르기'(시연 전용 · 설계서 부록 A): 부서별, 부서장 표시. 사번이 없는 계정은 로그인할 수 없어 뺀다"""
     rows = _rows()

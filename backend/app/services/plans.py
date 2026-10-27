@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import copy
 import json
+import uuid
 from datetime import date
 
 from .. import catalog, db, jobs, regstore
@@ -70,6 +71,12 @@ def shared_with(employee_id: int) -> dict:
 
 # ── 기록 조립 (화면 4차 모양: plans[id] · reports[]) ──
 def _base_rows(employee_id: int, roadmap_id: str | None = None) -> list[dict]:
+    if roadmap_id is not None:
+        # 주소의 로드맵 id 모양이 틀리면 DB 형 변환 오류(500) 대신 '없음'(404)으로 다룬다(PR #23 리뷰 확인 중 발견)
+        try:
+            roadmap_id = str(uuid.UUID(str(roadmap_id)))
+        except ValueError:
+            return []
     return db.all_("""SELECT r.roadmap_id, r.project_id, r.content, r.created_at, r.diagnostic_round_id, p.status, p.employee_id,
                          m.version, m.done_at, m.archived_at, m.resumed_at
                       FROM public.roadmaps r JOIN public.projects p ON p.project_id = r.project_id
@@ -216,14 +223,17 @@ def _owned(employee_id: int, roadmap_id: str) -> dict:
     return rows[0]
 
 
+MGR_HIDDEN = ('deep', 'goalSelf', 'file')
+
+
 def reports(employee_id: int, for_mgr: bool = False) -> list[dict]:
     rows = db.all_("""SELECT g.report_id, g.roadmap_id, g.report_content, g.created_at, coalesce(m.confirmed, false) AS confirmed
                       FROM public.growth_reports g JOIN public.projects p ON p.project_id = g.project_id LEFT JOIN app_ext.report_meta m ON m.report_id = g.report_id
                       WHERE p.employee_id = :e AND g.report_content ? 'gained' ORDER BY g.created_at DESC""", e=employee_id)
     out = []
     for r in rows:
-        # 수준값은 화면에 보내지 않는다. 심화 질문 결과는 본인만(부서장 화면에는 빼고 보냄 · 10/23)
-        c = {k: v for k, v in r['report_content'].items() if k != 'hidden' and not (for_mgr and k == 'deep')}
+        # 수준값은 화면에 보내지 않는다. 부서장 화면에는 심화 질문 결과(10/23)와 사후 점검 원본 응답·첨부(목표 달성 답·결과물 파일 · PR #23 리뷰)를 빼고 보낸다
+        c = {k: v for k, v in r['report_content'].items() if k != 'hidden' and not (for_mgr and k in MGR_HIDDEN)}
         c.update(id=str(r['report_id']), planId=str(r['roadmap_id']), confirmed=bool(r['confirmed']), createdAt=_d(r['created_at']))
         out.append(c)
     return out
@@ -721,7 +731,7 @@ def team_members(head_id: int) -> dict:
         recs = records(r['employee_id'], for_mgr=True)
         reps = reports(r['employee_id'])
         act = [x for x in recs.values() if x['status'] == 'active']
-        out.append({'user': v, 'activePlans': len(act), 'pastPlans': len(recs) - len(act), 'reports': len(reps),
+        out.append({'user': profile.team_view(v), 'activePlans': len(act), 'pastPlans': len(recs) - len(act), 'reports': len(reps),
                     'unreadComments': sum(1 for x in act for c in x['comments'] if c['status'] == 'new')})
     return {'group': me.get('supGroup'), 'members': out}
 
@@ -730,4 +740,4 @@ def member_state(head_id: int, member_id: int) -> dict:
     if member_id not in profile.member_ids(head_id):
         raise forbidden('소속 직원이 아니에요')
     recs = records(member_id, for_mgr=True)
-    return {'user': profile.view(member_id), 'plans': recs, 'reports': reports(member_id, for_mgr=True), 'res': resources_of(recs), 'reg': reg_of(recs)}
+    return {'user': profile.team_view(profile.view(member_id)), 'plans': recs, 'reports': reports(member_id, for_mgr=True), 'res': resources_of(recs), 'reg': reg_of(recs)}

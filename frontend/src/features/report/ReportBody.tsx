@@ -47,18 +47,27 @@ export function ReportBody({ r }: { r: Report }) {
           <dd>{r.doneTitles.join(', ') || '없음'}</dd>
           <dt>진행 중</dt>
           <dd className="muted">{r.restTitles.join(', ') || '없음'}</dd>
-          <dt>목표 달성</dt>
-          <dd>{r.goalSelf}</dd>
-          <dt>결과물</dt>
-          <dd>
-            {r.file ? (
-              <>
-                {r.file.name} <span className="small muted">· 내용 미검증</span>
-              </>
-            ) : (
-              '붙이지 않음'
-            )}
-          </dd>
+          {/* 목표 달성 답·결과물은 본인 화면에만 온다(부서장 응답에는 없음 · 없을 때 '붙이지 않음'으로 보이지 않게 줄째 숨김) */}
+          {r.goalSelf !== undefined ? (
+            <>
+              <dt>목표 달성</dt>
+              <dd>{r.goalSelf}</dd>
+            </>
+          ) : null}
+          {r.file !== undefined ? (
+            <>
+              <dt>결과물</dt>
+              <dd>
+                {r.file ? (
+                  <>
+                    {r.file.name} <span className="small muted">· 내용 미검증</span>
+                  </>
+                ) : (
+                  '붙이지 않음'
+                )}
+              </dd>
+            </>
+          ) : null}
         </dl>
       </div>
       <div className="sec">

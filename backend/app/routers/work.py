@@ -219,7 +219,13 @@ def api_progress(plan_id: str, act_id: str, body: dict, a: Account = Depends(req
 
 @r.post('/plans/{plan_id}/activities/{act_id}/attachments')
 async def api_attach(plan_id: str, act_id: str, file: UploadFile = File(...), a: Account = Depends(require_employee)):
-    """결과물·수료증 첨부(API-39). 5차는 서버 폴더(var/uploads)에 둔다 — 배포 때는 같은 자리를 S3 같은 저장소로 바꾼다"""
+    """결과물·수료증 첨부(API-39). 5차는 서버 폴더(var/uploads)에 둔다 — 배포 때는 같은 자리를 S3 같은 저장소로 바꾼다.
+    활동 기록·사후 점검 저장과 같은 규칙으로 대상을 먼저 확인한다: 본인의 진행 중 로드맵, 그 로드맵의 활동(사후 점검 첨부는 'post')"""
+    row = PL._owned(a.id, plan_id)
+    if PL.STATUS.get(row['status']) != 'active':
+        raise ApiError(409, 'NOT_ACTIVE', '진행 중인 로드맵에만 파일을 붙일 수 있어요')
+    if act_id != 'post' and not any(x['id'] == act_id for x in row['content']['acts']):
+        raise not_found('활동')
     raw = await file.read(MAX_DOC + 1)
     if len(raw) > MAX_DOC:
         raise ApiError(413, 'FILE_TOO_BIG', '파일이 너무 커요(15MB까지)')

@@ -4,9 +4,8 @@
 import { Navigate, useParams } from 'react-router';
 import { teamApi } from '@/api/endpoints/team';
 import { ApiError } from '@/api/client';
-import type { User } from '@/api/types/account';
 import type { Comment, PlanRecord, Report } from '@/api/types/plan';
-import type { TeamMember } from '@/api/types/team';
+import type { TeamMember, TeamUser } from '@/api/types/team';
 import { paths } from '@/app/paths';
 import { ReportBody } from '@/features/report/ReportBody';
 import { CmItem, CmTag, cmMine } from '@/features/roadmap/comments';
@@ -16,7 +15,7 @@ import { failToast } from '@/shared/lib/fail';
 import { count } from '@/shared/lib/plan';
 import { cause } from '@/shared/state/ai';
 import { setAt, useAt } from '@/shared/state/bind';
-import { isSup, meLine, useMe } from '@/shared/state/session';
+import { meLine, useMe } from '@/shared/state/session';
 import { toast } from '@/shared/state/ui';
 import { newComments, updateWs, useWs, type MgrDraft } from '@/shared/state/workspace';
 import { BText } from '@/shared/ui/bound';
@@ -26,8 +25,8 @@ import { StagesView } from '@/shared/ui/StagesView';
 import { mk, useMemberOf, useMemberState, useRefreshTeam, useTeam } from './teamData';
 
 const ST_TAG: Record<string, React.ReactNode> = { done: <span className="tag line">마침</span>, archived: <span className="tag line">보관</span> };
-const who = (e: User) => `${e.name} · ${meLine(e)}`;
-const Av = ({ e }: { e: User }) => <span className="avatar">{e.name.slice(1)}</span>;
+const who = (e: TeamUser) => `${e.name} · ${meLine(e)}`;
+const Av = ({ e }: { e: TeamUser }) => <span className="avatar">{e.name.slice(1)}</span>;
 const Privacy = () => (
   <Note>
     직원의 소속·직급·직위, 확정한 로드맵, 활동 진행 상태, 결과 보고서(사전→사후 점검 응답 변화 포함)를 볼 수 있어요. 활동 메모·첨부, 진단 수준값, 작성 중인 로드맵은 공개되지 않아요.
@@ -37,7 +36,7 @@ const Privacy = () => (
 function TeamRow({ m }: { m: TeamMember }) {
   const go = useGo();
   const e = m.user;
-  const tag = isSup(e) ? (
+  const tag = e.supervisor ? (
     <>
       {' '}
       <span className="tag line">부서장</span>
