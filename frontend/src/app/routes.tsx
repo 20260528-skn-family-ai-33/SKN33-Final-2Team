@@ -1,6 +1,15 @@
 /* 주소 ↔ 화면. handle: 좌측 메뉴 강조(nav)·제목(title)·본문 폭(width)·권한(role) — 5차 화면 정의(scr.*)의 nav·title·width·role 그대로 */
 import { createBrowserRouter, Navigate, type RouteObject } from 'react-router';
+import { ChecksPage } from '@/features/assessment/ChecksPage';
+import { PostCheckPage } from '@/features/assessment/PostCheckPage';
 import { LoginPage } from '@/features/auth/LoginPage';
+import { HomePage } from '@/features/home/HomePage';
+import { MePage } from '@/features/profile/MePage';
+import { ReportPage } from '@/features/report/ReportPage';
+import { ResourcePage, ResourcesPage } from '@/features/resources/ResourcePages';
+import { CommentsRoute } from '@/features/roadmap/CommentsRoute';
+import { RevisePage } from '@/features/roadmap/RevisePage';
+import { ConfirmedPage, RoadmapPage } from '@/features/roadmap/RoadmapPages';
 import { DetailsCheck, DetailsStep } from '@/features/draft/details/DetailsStep';
 import { DraftScreen, editGate, genGate, optionsGate } from '@/features/draft/DraftScreen';
 import { GenerationStep } from '@/features/draft/generation/GenerationStep';
@@ -23,8 +32,8 @@ export const router = createBrowserRouter([
     element: <AppShell />,
     children: [
       r(paths.login, <LoginPage />, { title: '로그인', role: 'public' }),
-      r(paths.home, <Soon />, { nav: 'home', title: '홈', width: 'wide' }),
-      r(paths.me, <Soon />, { nav: 'me', title: '내 정보', width: 'wide' }),
+      r(paths.home, <HomePage />, { nav: 'home', title: '홈', width: 'wide' }),
+      r(paths.me, <MePage />, { nav: 'me', title: '내 정보', width: 'wide' }),
       // 새 로드맵 작성
       r(paths.newGoal, <DraftScreen><GoalStep /></DraftScreen>, { nav: 'new', title: '새 로드맵 작성', width: 'wide' }),
       r(paths.newDetails, <DraftScreen step="details"><DetailsStep /></DraftScreen>, { nav: 'new', title: '세부 사항', width: 'wide' }),
@@ -36,18 +45,18 @@ export const router = createBrowserRouter([
       r(paths.newOptions, <DraftScreen extra={optionsGate} step="goal"><OptionsStep /></DraftScreen>, { nav: 'new', title: '로드맵 3안', width: 'xwide' }),
       r(paths.newReview, <DraftScreen step="review"><ReviewStep /></DraftScreen>, { nav: 'new', title: '검토·확정', width: 'wide' }),
       // 내 로드맵
-      r(paths.roadmaps, <Soon />, { nav: 'roadmap', title: '내 로드맵', width: 'wide' }),
-      r('/roadmaps/:pid', <Soon />, { nav: 'roadmap', title: '내 로드맵', width: 'wide' }),
-      r('/roadmaps/:pid/confirmed', <Soon />, { nav: 'roadmap', title: '로드맵 확정' }),
-      r('/roadmaps/:pid/revise', <Soon />, { nav: 'roadmap', title: '수정 요청', width: 'wide' }),
-      r('/roadmaps/:pid/comments', <Soon />, { nav: 'roadmap', title: '부서장 코멘트' }),
-      r('/roadmaps/:pid/post', <Soon />, { nav: 'checks', title: '사후 점검', width: 'wide' }),
+      r(paths.roadmaps, <RoadmapPage />, { nav: 'roadmap', title: '내 로드맵', width: 'wide' }),
+      r('/roadmaps/:pid', <RoadmapPage />, { nav: 'roadmap', title: '내 로드맵', width: 'wide' }),
+      r('/roadmaps/:pid/confirmed', <ConfirmedPage />, { nav: 'roadmap', title: '로드맵 확정' }),
+      r('/roadmaps/:pid/revise', <RevisePage />, { nav: 'roadmap', title: '수정 요청', width: 'wide' }),
+      r('/roadmaps/:pid/comments', <CommentsRoute />, { nav: 'roadmap', title: '부서장 코멘트' }),
+      r('/roadmaps/:pid/post', <PostCheckPage />, { nav: 'checks', title: '사후 점검', width: 'wide' }),
       // 점검·보고서
-      r(paths.checks, <Soon />, { nav: 'checks', title: '점검·보고서', width: 'wide' }),
-      r('/reports/:rid', <Soon />, { nav: 'checks', title: '결과 보고서', width: 'wide' }),
+      r(paths.checks, <ChecksPage />, { nav: 'checks', title: '점검·보고서', width: 'wide' }),
+      r('/reports/:rid', <ReportPage />, { nav: 'checks', title: '결과 보고서', width: 'wide' }),
       // 학습 자료
-      r(paths.resources, <Soon />, { nav: 'resources', title: '학습 자료', width: 'wide' }),
-      r('/resources/:id', <Soon />, { nav: 'resources', title: '학습 자료' }),
+      r(paths.resources, <ResourcesPage />, { nav: 'resources', title: '학습 자료', width: 'wide' }),
+      r('/resources/:id', <ResourcePage />, { nav: 'resources', title: '학습 자료' }),
       // 부서장
       r(paths.team, <Soon />, { nav: 'm-list', title: '소속 직원 계획', width: 'wide', role: 'mgr' }),
       r('/team/:uid', <Soon />, { nav: 'm-list', title: '직원 로드맵', width: 'wide', role: 'mgr' }),
