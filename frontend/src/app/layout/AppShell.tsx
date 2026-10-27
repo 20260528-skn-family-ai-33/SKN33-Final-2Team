@@ -2,6 +2,8 @@
 import { useEffect, type ReactNode } from 'react';
 import { Navigate, Outlet, useLocation, useMatches } from 'react-router';
 import { paths } from '@/app/paths';
+import { AssistantHost } from '@/features/assistant/AssistantHost';
+import { DraftNavGuard } from '@/features/draft/stale';
 import { ai, PROV, useAiMode } from '@/shared/state/ai';
 import { isSup, meOf, useSession } from '@/shared/state/session';
 import { updateWs } from '@/shared/state/workspace';
@@ -79,6 +81,12 @@ export function AppShell() {
           </div>
         </main>
       </div>
+      {booted && acct && !admin ? (
+        <>
+          <AssistantHost />
+          <DraftNavGuard />
+        </>
+      ) : null}
       <SheetHost />
       <ToastHost />
     </>

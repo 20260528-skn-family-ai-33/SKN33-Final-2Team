@@ -1,6 +1,14 @@
 /* 주소 ↔ 화면. handle: 좌측 메뉴 강조(nav)·제목(title)·본문 폭(width)·권한(role) — 5차 화면 정의(scr.*)의 nav·title·width·role 그대로 */
 import { createBrowserRouter, Navigate, type RouteObject } from 'react-router';
 import { LoginPage } from '@/features/auth/LoginPage';
+import { DetailsCheck, DetailsStep } from '@/features/draft/details/DetailsStep';
+import { DraftScreen, editGate, genGate, optionsGate } from '@/features/draft/DraftScreen';
+import { GenerationStep } from '@/features/draft/generation/GenerationStep';
+import { GoalStep } from '@/features/draft/goal/GoalStep';
+import { OptionsStep } from '@/features/draft/options/OptionsStep';
+import { QuizStep } from '@/features/draft/quiz/QuizStep';
+import { ResultEdit, ResultStep } from '@/features/draft/result/ResultStep';
+import { ReviewStep } from '@/features/draft/review/ReviewStep';
 import { AppShell, type ScreenHandle } from './layout/AppShell';
 import { Page } from '@/shared/ui/parts';
 import { paths } from './paths';
@@ -18,15 +26,15 @@ export const router = createBrowserRouter([
       r(paths.home, <Soon />, { nav: 'home', title: '홈', width: 'wide' }),
       r(paths.me, <Soon />, { nav: 'me', title: '내 정보', width: 'wide' }),
       // 새 로드맵 작성
-      r(paths.newGoal, <Soon />, { nav: 'new', title: '새 로드맵 작성', width: 'wide' }),
-      r(paths.newDetails, <Soon />, { nav: 'new', title: '세부 사항', width: 'wide' }),
-      r(paths.newDetailsCheck, <Soon />, { nav: 'new', title: '세부 사항 확인', width: 'wide' }),
-      r(paths.newQuiz, <Soon />, { nav: 'new', title: '사전 점검', width: 'wide' }),
-      r(paths.newResult, <Soon />, { nav: 'new', title: '점검 결과', width: 'wide' }),
-      r(paths.newResultEdit, <Soon />, { nav: 'new', title: '점검 결과 수정', width: 'wide' }),
-      r(paths.newGen, <Soon />, { nav: 'new', title: '로드맵 3안 작성', width: 'wide' }),
-      r(paths.newOptions, <Soon />, { nav: 'new', title: '로드맵 3안', width: 'xwide' }),
-      r(paths.newReview, <Soon />, { nav: 'new', title: '검토·확정', width: 'wide' }),
+      r(paths.newGoal, <DraftScreen><GoalStep /></DraftScreen>, { nav: 'new', title: '새 로드맵 작성', width: 'wide' }),
+      r(paths.newDetails, <DraftScreen step="details"><DetailsStep /></DraftScreen>, { nav: 'new', title: '세부 사항', width: 'wide' }),
+      r(paths.newDetailsCheck, <DraftScreen step="details"><DetailsCheck /></DraftScreen>, { nav: 'new', title: '세부 사항 확인', width: 'wide' }),
+      r(paths.newQuiz, <DraftScreen step="quiz"><QuizStep /></DraftScreen>, { nav: 'new', title: '사전 점검', width: 'wide' }),
+      r(paths.newResult, <DraftScreen step="result"><ResultStep /></DraftScreen>, { nav: 'new', title: '점검 결과', width: 'wide' }),
+      r(paths.newResultEdit, <DraftScreen step="result" extra={editGate}><ResultEdit /></DraftScreen>, { nav: 'new', title: '점검 결과 수정', width: 'wide' }),
+      r(paths.newGen, <DraftScreen extra={genGate} step="goal" remember={false}><GenerationStep /></DraftScreen>, { nav: 'new', title: '로드맵 3안 작성', width: 'wide' }),
+      r(paths.newOptions, <DraftScreen extra={optionsGate} step="goal"><OptionsStep /></DraftScreen>, { nav: 'new', title: '로드맵 3안', width: 'xwide' }),
+      r(paths.newReview, <DraftScreen step="review"><ReviewStep /></DraftScreen>, { nav: 'new', title: '검토·확정', width: 'wide' }),
       // 내 로드맵
       r(paths.roadmaps, <Soon />, { nav: 'roadmap', title: '내 로드맵', width: 'wide' }),
       r('/roadmaps/:pid', <Soon />, { nav: 'roadmap', title: '내 로드맵', width: 'wide' }),
