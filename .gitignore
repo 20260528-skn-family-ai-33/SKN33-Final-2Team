@@ -38,3 +38,16 @@ qwen_factory/data/
 # Local DB work evidence and employee fixtures remain external.
 database/migration_work/
 database/src/database/demo_users.sql
+
+# ── 화면(frontend) · 이슈 #20 ──
+# 패키지·빌드 결과는 다시 만들 수 있어 올리지 않는다(.env·.env.* 는 위 규칙이 이미 막음)
+node_modules/
+frontend/dist/
+frontend/coverage/
+
+# ── 실행 환경(Docker) · 이슈 #20 ──
+# 팀 DB 백업은 담당자에게 받아 team_db/ 에 넣는다(안내 파일만 추적 · *.dump 는 위 규칙이 이미 막음)
+team_db/*
+!team_db/README.md
+# 참고용 백엔드: 실행 중 생기는 파일
+backend/var/

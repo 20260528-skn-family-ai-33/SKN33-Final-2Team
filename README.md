@@ -148,6 +148,8 @@ flowchart LR
 | 요청 분류 | TF-IDF + 로지스틱 회귀, 한국어 사전학습 분류 모델 |
 | 학습 환경 | RunPod GPU 대여 |
 | 저장소·검색 | 관계형 DB + 벡터 색인 |
+| 화면 | React + Vite + TypeScript |
+| 실행 환경 | Docker (docker compose · nginx) |
 
 <br>
 
@@ -168,8 +170,15 @@ flowchart LR
 ## 9. 저장소 구조
 
 ```
-mockup/                  4차 화면 목업과 로컬 실행 안내
+frontend/                화면(React + Vite + TypeScript) · 개발 안내 frontend/README.md
+backend/                 5차 FastAPI 백엔드(팀 백엔드 준비 전 참고용) · backend/README.md
+docker-compose.yml       DB·팀 DB 백업 복원·보충 자료·백엔드·화면을 한 번에 실행
+.env.example             실행 설정 예시(가짜 값 · 복사해 .env 로 씀)
+requirements.txt         실행 요구 사항 한곳 정리(화면·백엔드·DB · pip 은 backend + database 패키지)
+scripts/                 빈 DB일 때만 팀 DB 백업 복원
+team_db/                 팀 DB 백업·규정 원문 PDF를 넣는 곳(파일은 Git 제외)
 database/                DB 코드·마이그레이션·테스트·실행/복원 안내
+models/                  요청 분류 ML·DL 실험 자료
 docs/
 ├── 01_요구사항_정의서/   요구사항 정의서 (XLSX)
 ├── 02_WBS/               WBS (XLSX)
@@ -181,14 +190,16 @@ docs/
 ├── 08_데이터_전처리_결과서/     전처리 전달본·코드 대응표
 └── 09_벡터DB_구축_결과서/       벡터DB 전달본·코드 대응표
 .github/
-└── ISSUE_TEMPLATE/
-    ├── task.md           작업 요청 템플릿
-    └── bug_report.md     버그 보고 템플릿
+├── ISSUE_TEMPLATE/
+│   ├── task.md           작업 요청 템플릿
+│   └── bug_report.md     버그 보고 템플릿
+└── workflows/
+    └── frontend-ci.yml   화면 자동 검사(설치·타입·린트·테스트·빌드)
 AGENTS.md                 코딩 에이전트 작업 규칙
 README.md                 프로젝트 소개와 협업 안내
 ```
 
-[4차 화면 목업 실행 안내](mockup/README.md): Python 3.12에서 실행환경을 확인한 로컬 시연용 목업입니다. 별도 프런트 빌드나 Docker 없이 실행하며, 가상 직원과 브라우저 저장소를 사용합니다.
+[화면 개발 안내](frontend/README.md) · [백엔드 안내](backend/README.md): 실행 방법은 아래 [11. 개발 환경 실행](#11-개발-환경-실행)을 따릅니다. 4차 화면 목업(`mockup/`)은 React 화면으로 옮기면서 삭제했습니다(#20).
 
 <br>
 
@@ -201,3 +212,22 @@ README.md                 프로젝트 소개와 협업 안내
 - 커밋·PR 제목은 `type: 변경 내용 (#이슈번호)` 형식입니다 (`feat`, `fix`, `docs`, `refactor`, `test`, `chore`).
 - 오타·링크 수정, 단순 산출물 업데이트, 이미 합의된 내용이나 확인된 현황의 문서 간 동기화는 이슈 없이 PR만 올릴 수 있습니다. 이때 브랜치는 `docs/짧은-설명`, 커밋·PR 제목은 `docs: 변경 내용`으로 씁니다. 기능·코드·공통 계약 변경이 함께 포함되면 이슈를 기준으로 진행하며, 커밋·푸시 승인과 사람 리뷰 규칙은 그대로 적용합니다.
 - API 키 같은 비밀값, 개인정보, 모델 가중치, 대용량 데이터는 저장소에 올리지 않습니다.
+
+<br>
+
+## 11. 개발 환경 실행
+
+DB(PostgreSQL 17 + pgvector) → 팀 DB 백업 복원 → 보충 자료 → 백엔드 → 화면(nginx)을 Docker로 한 번에 실행합니다. 할 일에 따라 필요한 것은 맨 위 [requirements.txt](requirements.txt)에도 모아 두었습니다.
+
+| 할 일 | 필요한 것 | 설치 |
+|---|---|---|
+| 전체 실행(기본) | Docker Desktop(compose v2) | 따로 없음 — `docker compose up -d --build`가 DB·백엔드·화면 의존성을 이미지 안에 설치 |
+| 화면 고치기 | Node.js 20.19 이상(24 권장)·npm | `npm ci --prefix frontend` (버전은 `frontend/package-lock.json`에 고정) |
+| 파이썬으로 직접 실행·DB 작업 | Python 3.12 | `pip install -r requirements.txt` (`backend/requirements.txt` + `database/requirements.txt`) |
+
+1. `.env.example`을 복사해 `.env`로 두고 `GP5_DB_PASSWORD`·`GP5_DEMO_PASSWORD`를 정합니다(값은 저장소에 적지 않습니다). RunPod-Ollama를 쓰려면 `OLLAMA_BASE_URL`·`OLLAMA_API_KEY`를 넣습니다. 예시 기본값은 모델 `qwen3.8:27b`, 생각(thinking) 모드 끔, 응답 제한 시간 300초입니다.
+2. 팀 DB 최신 백업 `growpath_latest.dump`(#22 · 직원·부서·스킬·자격 포함)를 `team_db/`에, 규정 원문 PDF를 `team_db/regulations/`에 넣습니다([team_db/README.md](team_db/README.md) 참고).
+3. `docker compose up -d --build`로 실행합니다. 화면은 <http://localhost:8816>, 백엔드 API 문서는 <http://localhost:8815/api/docs>입니다.
+4. `docker compose down`으로 끕니다(데이터는 볼륨에 남습니다).
+
+화면만 고칠 때는 `docker compose up -d backend`로 DB·백엔드만 켜고, `frontend/`에서 `npm ci` → `npm run dev`(<http://localhost:5185>)로 개발합니다. 검사는 `npm run typecheck`·`npm run lint`·`npm test`·`npm run build`이며, `frontend/`를 바꾸는 PR마다 GitHub Actions가 같은 순서로 실행합니다. 자세한 내용은 [frontend/README.md](frontend/README.md)와 [backend/README.md](backend/README.md)를 따릅니다.

@@ -1,0 +1,11 @@
+# GrowPath 실행 요구 사항 — 저장소를 클론한 뒤 필요한 것을 한곳에 모은다. 자세한 순서는 README "11. 개발 환경 실행"
+#
+# 1) Docker 로 실행(기본): Docker Desktop(compose v2)만 있으면 된다. DB(PostgreSQL 17 + pgvector)·백엔드·화면 의존성은
+#    `docker compose up -d --build` 가 이미지 안에 설치하므로 아래 2)·3)을 따로 설치하지 않아도 된다.
+# 2) 화면(frontend/)을 고칠 때: Node.js 20.19 이상(24 권장) + npm. 버전은 frontend/package.json·package-lock.json 에 고정
+#      npm ci --prefix frontend
+# 3) 파이썬으로 직접 실행·DB 작업할 때(Python 3.12): 이 파일이 백엔드(backend/)와 DB 도구(database/) 패키지를 함께 설치한다.
+#    버전은 각 폴더 파일에서 관리하고 여기서는 묶기만 한다(두 파일에 같이 있는 psycopg·argon2-cffi 는 같은 버전).
+#      pip install -r requirements.txt
+-r backend/requirements.txt
+-r database/requirements.txt

@@ -1,0 +1,11 @@
+# 이미지에 넣지 않는 것: 비밀 설정·가상환경·실행 중 생긴 파일
+.env
+.env.*
+!.env.example
+.venv
+var
+# 팀 DB 백업(team_db/*.dump)은 DB 복원용이라 앱 이미지에 넣지 않는다
+team_db
+**/*.dump
+**/__pycache__
+**/*.pyc

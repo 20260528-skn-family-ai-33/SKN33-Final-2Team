@@ -65,7 +65,7 @@
 
 - `database/`는 전달된 DB 기반 코드를 등록한 영역이다. 실행·외부 자료는 `database/README.md`와 `database/RESTORE.md`, 원본·이관 해시는 `database/import-manifest.json`을 따른다. Python 3.12 가상환경에서 의존성 설치 후 `database/`를 작업 경로로 두고 `python -m unittest tests.test_db_deployment tests.test_catalog_expansion tests.test_regulation_vectors tests.test_import_package -v`로 외부 연결 없는 검사를 실행한다. `tests.test_canonical_database`는 실제 복원 DB가 필요하므로 단위 검사와 분리한다. 이 검사를 목업 통합·실 DB 권한·검색 품질 검증으로 확대하지 않는다. 적용된 마이그레이션은 바이트·해시를 보존한다.
 
-- `mockup/`은 원본 4차 화면 목업을 로컬에서 실행하는 폴더다. 실행 방법은 `mockup/README.md`, 문서 읽기 의존성은 `mockup/requirements.txt`를 따른다. 가상환경에서 `python check_env.py`, `python -m pip check`, `python -m py_compile server.py docread.py check_env.py tools/mock_ollama.py`로 환경·문법을 확인하고 실제 화면 흐름은 별도로 확인한다. 이 목업의 환경을 제품 전체 스택 확정으로 확대하지 않는다.
+- `frontend/`는 React + Vite + TypeScript 화면이다. 실행·검사 방법은 `frontend/README.md`를 따른다. `frontend/`를 작업 경로로 `npm ci` 뒤 `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`로 검사하고(PR마다 GitHub Actions `frontend`가 같은 순서로 실행), 실제 화면 흐름은 브라우저에서 별도로 확인한다. `backend/`는 5차 FastAPI 백엔드(팀 백엔드 준비 전 참고용)이며 원본과 다른 곳은 `backend/README.md`를 따른다. DB·백엔드·화면은 저장소 맨 위 `docker compose`로 함께 실행하고(README '11. 개발 환경 실행'), 파이썬 문법은 `python -m py_compile`로 확인한다.
 
 - 실제 저장소의 README, 패키지 설정, CI에서 검사 명령을 확인한다. 존재하지 않는 경로나 도구를 가정해 실행하지 않는다.
 - 문서만 바꿨다면 내용의 일관성, 링크·경로, 예시, Markdown 구조를 확인한다. 의미 없는 코드 테스트를 추가하지 않는다.
