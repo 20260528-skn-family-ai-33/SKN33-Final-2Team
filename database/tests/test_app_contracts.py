@@ -180,6 +180,43 @@ class AppContractTests(unittest.TestCase):
         self.assertIsNotNone(row['consent_changed_at'])
         self.assertEqual(self.client('peer').put(path, json={'consent': True}).status_code, 404)
 
+    def test_database_work_description_reaches_model_self_override_and_revert(self):
+        from app.agents.goals import goal_input
+        from app.agents.diag import work_profile
+        eid = self.ids['member']
+        with self.db.tx() as t:
+            t.run('UPDATE public.employees SET planned_project_description=:w WHERE employee_id=:e',
+                  w='DB supplied work description', e=eid)
+        c = self.client('member')
+        v = c.get('/api/v1/me/profile').json()['view']
+        self.assertEqual(v['profile']['workDesc'], 'DB supplied work description')
+        self.assertFalse(v['edited'])
+        self.assertEqual(goal_input(v)['profile']['workDescription'], 'DB supplied work description')
+        self.assertEqual(work_profile(v)['workDescription'], 'DB supplied work description')
+        response = c.put('/api/v1/me/profile/self', json={'workDesc': 'Personal override', 'devYears': 0})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()['view']['profile']['workDesc'], 'Personal override')
+        with self.db.tx() as t:
+            t.run('UPDATE public.employees SET planned_project_description=:w WHERE employee_id=:e',
+                  w='Updated DB work description', e=eid)
+        self.assertEqual(c.get('/api/v1/me/profile').json()['view']['profile']['workDesc'], 'Personal override')
+        self.assertEqual(c.delete('/api/v1/me/profile/self').status_code, 200)
+        v = c.get('/api/v1/me/profile').json()['view']
+        self.assertEqual(v['profile']['workDesc'], 'Updated DB work description')
+        self.assertFalse(v['edited'])
+        self.assertNotIn('profile', self.profile.team_view(self.profile.view(eid)))
+
+    def test_explicit_empty_work_override_and_legacy_missing_description(self):
+        eid = self.ids['member']
+        self.assertIsNone(self.profile.view(eid)['profile'])
+        with self.db.tx() as t:
+            t.run('UPDATE public.employees SET planned_project_description=:w WHERE employee_id=:e', w='DB default', e=eid)
+            t.run('INSERT INTO app_ext.employee_self_inputs(employee_id,edited) VALUES(:e,:v)', e=eid, v=self.db.J({'workDesc': None}))
+        self.assertIsNone(self.profile.view(eid)['profile'])
+        with self.db.tx() as t:
+            t.run('UPDATE app_ext.employee_self_inputs SET edited=:v WHERE employee_id=:e', e=eid, v=self.db.J({'inputStatus': {}}))
+        self.assertEqual(self.profile.view(eid)['profile']['workDesc'], 'DB default')
+
     def test_progress_retry_owner_only_and_manager_redaction(self):
         path = '/api/v1/plans/' + self.roadmap + '/activities/fixture-activity/progress'
         body = {'status': 'done', 'memo': 'Private memo', 'file': {'name': 'fixture.txt', 'size': 12}}

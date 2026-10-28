@@ -83,10 +83,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "42da682336c7bc5bf66d2f2737554994434889109dc4b7a627a02638ac036a38",
-      "bytes": 22789,
+      "sha256": "c57e602414fc764e481973bd3b55604211a3d2f317886513cdd9cf2e516b66bd",
+      "bytes": 26812,
       "handling": "adjusted",
-      "change_note": "Issue #15: reconcile PR #24 main merge with permission/API contracts and retain both regression suites (2026-10-28).",
+      "change_note": "Issue #27: fictional profiles, protected real employees, work description fallback and regression evidence.",
       "local_update_source": {
         "path": "README.md",
         "sha256": "e872d64ea58c53311d098dc1c769f5bc3232ad947d690054b75a0a0a20c6d8c6"
@@ -109,10 +109,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "ab2ab628b2851c16467901fd9d4ff6a20714f5d608c22f505efe8fd8a33d1775",
-      "bytes": 23477,
+      "sha256": "a018b44795674ecb89d4fec89890d1bac6bb018b855cf0a32ac5cf173095c085",
+      "bytes": 23824,
       "handling": "adjusted",
-      "change_note": "2026-10-27 #15 same-department-only permissions, regression tests and snapshot metadata; HR rows remain external."
+      "change_note": "Issue #27: fictional profiles, protected real employees, work description fallback and regression evidence."
     },
     {
       "source_path": "database/config/paths.yaml",
@@ -297,10 +297,10 @@
       "source_sha256": "82327b5737f40c891484955c2eb2ce490a53b0de46990408d4b6f9708441991d",
       "source_bytes": 4420,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "e8bbbcd5b7a3f8a6497ea7d72a68749fcc402546c351ec77e9229c3c0cab1360",
-      "bytes": 5281,
+      "sha256": "de0c24eb1629991659114a7b43329ad44136bf0afe75f686696c2cace2a6116c",
+      "bytes": 5380,
       "handling": "adjusted",
-      "change_note": "Issue #15: reconcile PR #24 main merge with permission/API contracts and retain both regression suites (2026-10-28).",
+      "change_note": "Issue #27: fictional profiles, protected real employees, work description fallback and regression evidence.",
       "local_update_source": {
         "path": "scripts/check_workspace.py",
         "sha256": "82327b5737f40c891484955c2eb2ce490a53b0de46990408d4b6f9708441991d"
@@ -488,10 +488,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "1e9dd6e255c8085a049d972e3765409e8b32c151e397d783eb232a3743db233c",
-      "bytes": 13647,
+      "sha256": "b4a3631640e35e21ba9c075122750ac8b665ee7168dc3772a0287e0686809ccf",
+      "bytes": 14475,
       "handling": "adjusted",
-      "change_note": "Issue #15: authenticated HTTP contract verification on latest main (2026-10-28)."
+      "change_note": "Issue #27: fictional profiles, protected real employees, work description fallback and regression evidence."
     },
     {
       "source_path": "database/src/__init__.py",
@@ -1606,9 +1606,9 @@
       "source_bytes": null,
       "source_kind": "team_followup_implementation",
       "handling": "adjusted",
-      "sha256": "96a313788c64820cf84990ee0fea6ea0e61e4215d357e4d1c7f8d99fc2cf89d5",
-      "bytes": 18815,
-      "change_note": "Issue #15: reconcile latest main, implementation/contracts, regression coverage and verification metadata (2026-10-28)."
+      "sha256": "bf8354247723f86a1d1ed344991f99705a4d78172668cbce493d3f0b8d32ca24",
+      "bytes": 21317,
+      "change_note": "Issue #27: fictional profiles, protected real employees, work description fallback and regression evidence."
     },
     {
       "path": "backend/app/routers/account.py",
@@ -1628,9 +1628,9 @@
       "source_bytes": null,
       "source_kind": "team_followup_implementation",
       "handling": "adjusted",
-      "sha256": "1fd902178cf4cf47bed9c97cef37d43c2793f6f14aa271680e6ce401c946d380",
-      "bytes": 17950,
-      "change_note": "Issue #15: reconcile latest main, implementation/contracts, regression coverage and verification metadata (2026-10-28)."
+      "sha256": "06cd2192fbb1213ca964dcc2d751f3d299397c820bf6952dd3b161b5f19852e1",
+      "bytes": 18284,
+      "change_note": "Issue #27: fictional profiles, protected real employees, work description fallback and regression evidence."
     },
     {
       "path": "frontend/docs/API_계약.md",
@@ -1639,9 +1639,9 @@
       "source_bytes": null,
       "source_kind": "team_followup_implementation",
       "handling": "adjusted",
-      "sha256": "3a8a1530b09f016847f158d901219e0fd7a93bbfcc473011e651f34fe2dbcca5",
-      "bytes": 12395,
-      "change_note": "Issue #15: reconcile latest main, implementation/contracts, regression coverage and verification metadata (2026-10-28)."
+      "sha256": "b94fff8e36e94d0aa0055a533c9641fe3df268155ad6af4e06d04e63e093fea9",
+      "bytes": 13062,
+      "change_note": "Issue #27: fictional profiles, protected real employees, work description fallback and regression evidence."
     },
     {
       "path": "database/tests/test_resource_refresh.py",
@@ -1664,6 +1664,61 @@
       "sha256": "ce1c780c1ef73a768e9895cf72129a9145a1cb03a5590dab309b9acdc046eed0",
       "bytes": 5339,
       "change_note": "Issue #14: reconcile latest main, implementation/contracts, regression coverage and verification metadata (2026-10-28)."
+    },
+    {
+      "path": "database/data/exports/synthetic_profiles_20261028.manifest.json",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "issue27_implementation_or_verification",
+      "sha256": "dac91b717a6a66ac8ecbc2422fae99a3b8b19a43d6729a1ac46b8192abe79b34",
+      "bytes": 1052,
+      "handling": "adjusted",
+      "change_note": "Issue #27: fictional profiles, protected real employees, work description fallback and regression evidence."
+    },
+    {
+      "path": "database/scripts/enrich_synthetic_employees.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "issue27_implementation_or_verification",
+      "sha256": "91cd54bcd85ade97f6eaba15c15ded07f2e712f539df83df74da9a1f7f101b75",
+      "bytes": 2051,
+      "handling": "adjusted",
+      "change_note": "Issue #27: fictional profiles, protected real employees, work description fallback and regression evidence."
+    },
+    {
+      "path": "database/src/database/synthetic_employee_profiles.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "issue27_implementation_or_verification",
+      "sha256": "7d41e434c86928ccdfe1770ee4f7a2cad05e3d9e72806d7568742912640e37b9",
+      "bytes": 22584,
+      "handling": "adjusted",
+      "change_note": "Issue #27: fictional profiles, protected real employees, work description fallback and regression evidence."
+    },
+    {
+      "path": "database/tests/test_synthetic_employee_database.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "issue27_implementation_or_verification",
+      "sha256": "85dd8aaf0770e6bd3050e8527b794dabede47bb3d77e02ce1c0b0005610cf90a",
+      "bytes": 4989,
+      "handling": "adjusted",
+      "change_note": "Issue #27: fictional profiles, protected real employees, work description fallback and regression evidence."
+    },
+    {
+      "path": "database/tests/test_synthetic_employee_profiles.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "issue27_implementation_or_verification",
+      "sha256": "6bea51625a26d5c426cbb0db8674b8c90fbc76e7778bed2709a883bd64b54921",
+      "bytes": 3900,
+      "handling": "adjusted",
+      "change_note": "Issue #27: fictional profiles, protected real employees, work description fallback and regression evidence."
     }
   ],
   "excluded": [

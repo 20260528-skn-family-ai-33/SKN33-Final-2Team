@@ -35,6 +35,8 @@
 
 평정 동의 요청은 `{ "consent": true }` 또는 `{ "consent": false }`만 받는다. 누락·NULL·문자열·숫자는 `422 / CONSENT_REQUIRED`이며 기존 동의값을 보존한다. 개인 입력의 `devYears`가 숫자로 바뀌지 않거나 0~50년 범위를 벗어나면 `422 / DEV_YEARS_RANGE`를 반환하고 기존 입력을 보존한다. #15의 격리 DB·실제 인증 API 검사로 확인했다.
 
+업무 설명(`view.profile.workDesc`·`self.profile.workDesc`)은 본인의 `employee_self_inputs.edited.workDesc` 키가 있으면 그 값(NULL 포함)을 우선하고, 키가 없으면 `employees.planned_project_description`을 사용한다. DB 값만 표시할 때는 직접 수정 상태로 기록하지 않는다. `DELETE /me/profile/self`는 현재 DB 설명을 다시 표시하며 DB 원문을 변경하지 않는다. 같은 설명을 목표 후보·진단·로드맵 업무 정보에 전달한다. 부서장용 `team_view`에는 본인 입력을 포함하지 않는다. 응답 필드 형식은 유지한다. #27의 실제 인증 API 검사로 확인했다.
+
 ### 새 로드맵 작성 — `drafts.ts`
 
 | 요청 | 쓰는 곳 |

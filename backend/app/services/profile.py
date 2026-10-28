@@ -31,7 +31,8 @@ def _rows() -> list[dict]:
             coalesce(d.name, e.department) AS dept, pd.name AS parent_dept,
             coalesce(g.name, e.grade) AS grade, coalesce(j.title, e.job_title) AS job,
             {EMP_GROUP_SQL} AS employee_group, coalesce(e.hire_date, h.hire_date) AS hire_date, h.position, h.job_family, h.task,
-            h.employment_status, h.account_status, h.grade_since, coalesce(e.department_start_date, h.valid_from) AS valid_from, h.change_reason
+            h.employment_status, h.account_status, h.grade_since, coalesce(e.department_start_date, h.valid_from) AS valid_from, h.change_reason,
+            e.planned_project_description
         FROM public.employees e
         LEFT JOIN public.departments d ON d.department_id = e.department_id
         LEFT JOIN public.departments pd ON pd.department_id = d.parent_department_id
@@ -143,7 +144,7 @@ def _restore_team(t: db.Tx, employee_id: int, st: dict) -> None:
     _write_certs(t, employee_id, list(st.get('certIds') or []), st.get('unlisted'))
 
 
-def _self_of(employee_id: int) -> tuple[dict, bool, datetime | None]:
+def _self_of(employee_id: int, work_description: str | None = None) -> tuple[dict, bool, datetime | None]:
     """화면에 줄 본인 입력 값(팀 표 + 업무 설명·입력 상태), 직원이 내 정보에서 고쳤는지, 고친 때"""
     with db.tx() as t:
         vals = _team_values(t, employee_id, _team_state(t, employee_id))
@@ -151,7 +152,10 @@ def _self_of(employee_id: int) -> tuple[dict, bool, datetime | None]:
     extra = x.get('edited') or {}
     status = {k: 'reported' if vals[k] else 'unprovided' for k in LISTS}
     status.update({k: v for k, v in (extra.get('inputStatus') or {}).items() if v == 'none_confirmed' and not vals.get(k)})
-    src = {**vals, 'workDesc': extra.get('workDesc'), 'expStatus': 'reported' if vals['expSummary'] else 'unprovided', 'inputStatus': status}
+    # Explicit self input (including a cleared value) wins; reverting removes it
+    # and reveals the current HR/form description without copying it into edited.
+    wd = extra['workDesc'] if 'workDesc' in extra else work_description
+    src = {**vals, 'workDesc': wd, 'expStatus': 'reported' if vals['expSummary'] else 'unprovided', 'inputStatus': status}
     src['present'] = bool(src['workDesc'] or vals['expSummary'] or vals['devYears'] is not None or any(vals[k] for k in LISTS))
     return src, x.get('edited_at') is not None, x.get('edited_at')
 
@@ -168,7 +172,7 @@ def view(employee_id: int, rows: list[dict] | None = None) -> dict | None:
     r = next((x for x in rows if x['employee_id'] == employee_id), None)
     if not r:
         return None
-    src, edited, at = _self_of(employee_id)
+    src, edited, at = _self_of(employee_id, r.get('planned_project_description'))
     has_profile = src['present']
     sup = supervisor_of(r, rows)
     ms = members_of(r, rows)

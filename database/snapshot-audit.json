@@ -397,5 +397,25 @@
       "invalid development years returns 422"
     ],
     "consent_history_retention_policy": "consumer review pending; current value plus changed timestamp only"
+  },
+  "synthetic_profiles_20261028": {
+    "issue": 27,
+    "team_base_commit": "5acc940",
+    "applied_to_local_source_db": true,
+    "employees": 100,
+    "protected_real_user_accounts": 5,
+    "unit_passed": 199,
+    "unit_skipped": 5,
+    "postgres_passed": 6,
+    "http_passed": 10,
+    "app_profiles_verified": 100,
+    "model_input_capture_roles": 6,
+    "paid_api_calls": 0,
+    "actual_model_inference": false,
+    "other_48_tables_and_all_identity_permissions_preserved": true,
+    "restore_verified_tables": 53,
+    "plan_manifest": "data/exports/synthetic_profiles_20261028.manifest.json",
+    "commit_push_pr": "user_authorized_commit_and_push; PR_not_requested",
+    "scope_note": "Existing schema/ERD/current_snapshot_manifest remain the branch baseline. New local backup also contains unmerged issue26 fields."
   }
 }

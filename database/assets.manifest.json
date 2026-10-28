@@ -27,6 +27,14 @@
       "manifest": "data/exports/growpath_latest.manifest.json",
       "version": "2026-10-27-real-user-and-same-department-scope",
       "manifest_location": "https://drive.google.com/file/d/1iUVAugkFpXHNeO3IlWhFkol-6oID691C/view?usp=drivesdk"
+    },
+    {
+      "id": "synthetic_profiles_20261028",
+      "filename": "synthetic_profiles.v1.json",
+      "sha256": "bfc173ec4b28eb18d250aa09510006636e2724ba20373129caa42db4ac58f8c4",
+      "location": null,
+      "location_status": "local_only_not_uploaded",
+      "manifest": "data/exports/synthetic_profiles_20261028.manifest.json"
     }
   ],
   "regulation_originals": [

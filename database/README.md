@@ -131,6 +131,30 @@ ERD 파일 출력은 현재 산출물과 같은 CRLF로 명시해 운영체제�
 
 남은 검토: 근거가 약한 MLOps 10건, 강사 경력으로 OS 보안에 연결된 KMOOC_7204의 CI/CD 재분류, 실제 추천 화면·챗봇·관리 화면 전체·다른 PC 실행·사용 측 사람 리뷰. #14의 선택 벡터 갱신 기능은 PR #24로 병합됐다. #15는 위 저장 계약 확인과 코드 반영·리뷰·병합을 구분한다.
 
+## 가상 직원 프로필 보완 · 이슈 #27
+
+`TEST_MANUAL` 100명은 부서 업무와 직무·경험·보유 스킬·자격을 연결해 보완한다. `REAL_USER` 5명은 모든 직원 필드와 연관 데이터를 보존한다. 신원·사번·암호·소속·직급·입사/배치일·부서장 권한은 바꾸지 않는다. 부서별 인물 설정은 균형 있는 추천 검증용 가정이며 실제 직원 구성의 통계가 아니다. `submission_note`에 가상 출처·작성 버전·기준일을 기록한다. 기존 학력은 보존하며 전공명이 마스터와 정확히 일치하는 연결만 보정한다.
+
+추가 테이블이나 DDL 마이그레이션은 필요 없다. `scripts/enrich_synthetic_employees.py`와 `src/database/synthetic_employee_profiles.py`가 **외부 검토 계획 → 해시 확인 → 명시적 원자적 적용**의 데이터 변경 절차다. 배포 초기화에서 자동 실행하지 않는다. 실제 인물 자료와 검토 JSON·DB 백업은 Git에 넣지 않고 `data/exports/synthetic_profiles_20261028.manifest.json`으로 버전·해시·집계를 연결한다.
+
+```powershell
+# database/에서. 먼저 현재 DB를 백업하고 검토 계획을 저장한다(이 단계는 DB 쓰기 없음).
+python scripts/enrich_synthetic_employees.py --as-of 2026-10-28 --output "$env:TEMP/growpath-synthetic-review.json"
+# 파일을 검토한 뒤 현재 DB와 차이만 확인한다.
+python scripts/enrich_synthetic_employees.py --plan "$env:TEMP/growpath-synthetic-review.json"
+# 실제 적용은 검토한 파일 해시를 명시해야 한다.
+$profilePlanHash = (Get-FileHash -LiteralPath "$env:TEMP/growpath-synthetic-review.json" -Algorithm SHA256).Hash.ToLowerInvariant()
+python scripts/enrich_synthetic_employees.py --plan "$env:TEMP/growpath-synthetic-review.json" --sha256 $profilePlanHash --apply
+```
+
+대상 100명이 달라지거나 실제 직원 ID·중복 ID·소유자가 다른 학력·허용하지 않은 필드가 섞이면 거절한다. 계획 이후 값이 바뀐 직원은 덮어쓰지 않고 재검토를 요구한다. SQL 제약 실패는 앞서 저장한 직원까지 전체 롤백한다. 같은 계획의 반복 적용은 0건이다. 기존 개인 학습 선호는 보존한다. 스킬 태그는 경험 분야이며 태그 전체의 숙련 인증을 뜻하지 않으므로 기술별 수행 범위도 함께 읽는다. 프로젝트 독립 수행 이력이 없는 사례는 명시적으로 구분한다.
+
+앱은 직접 수정한 업무 설명을 우선하며, 수정 키가 없을 때 `employees.planned_project_description`을 읽는다. DB 값은 직접 수정 상태로 기록하지 않는다. 되돌리기는 현재 DB 설명을 다시 표시한다. 목표 후보·진단·로드맵에 업무 맥락을 전달하고 부서장 응답의 본인 입력 비공개 범위는 유지한다. **DB 적재와 앱 코드 배포가 각각 필요**하다. 팀원 5명이 작성하지 않은 내용을 가상 설정으로 채우지 않는다.
+
+검증: 무료 단위 199개 통과·5개 제외, 격리 PostgreSQL 6개, 실제 인증 HTTP 10개 통과. 가상 100명 앱 입력과 6개 직무 목표 모델 입력을 확인했다. 실제 모델 추론은 하지 않았다. 팀원 5명·계정 식별/권한 값·나머지 48개 canonical 표의 불변을 대조했다. `tests.test_synthetic_employee_database`는 현재 보정 전후의 전체 백업을 임시 DB에 복원한 뒤 실행한다. 보조 표 초기화와 앱 검사 의존성은 위 #15 절차를 따른다.
+
+복구: 적용 전 전체 덤프를 새 DB에 복원하고 적용 후 사용자 입력을 보존·대조한 뒤 연결을 전환한다. 현재 DB 전체를 즉시 덮어쓰지 않는다. 새 로컬 보완 백업에는 미커밋 #26의 시간·목차(025·026)도 포함되므로, 이 #27 데이터 보완 코드와 #26의 코드 전달은 별도로 검토한다. 기존 Drive 공유본이 자동 갱신되지는 않는다. 사람 리뷰·커밋·푸시·배포는 별도 상태로 확인한다.
+
 ## 자료 벡터 갱신 계획과 선택 실행
 
 이슈 #14 후속 기능이다. `plan`은 실제 DB에 읽기 전용으로 연결해 갱신할 유형·ID·누락/오래됨 여부·UTF-8 입력 바이트·32건 단위 배치 수를 출력한다. 원문, API 키와 벡터 값은 출력하지 않는다. 바이트 수는 토큰 수나 비용 견적이 아니다.
