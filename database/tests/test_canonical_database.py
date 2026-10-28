@@ -17,7 +17,7 @@ class CanonicalDatabaseTests(unittest.TestCase):
         root=department('검증 부서');child=department('검증 하위 부서',root);other=department('검증 다른 부서')
         def employee(dept,head=False):
             return self.c.execute('INSERT INTO public.employees(name,email,employee_number,source_type,institution_id,department_id,is_department_head) VALUES(%s,%s,%s,%s,%s,%s,%s) RETURNING employee_id',('롤백 검증 직원',str(uuid4())+'@growpath.example.invalid','CHECK-'+str(uuid4()),'TEST_MANUAL',institution,dept,head)).fetchone()['employee_id']
-        self.head=employee(root,True);self.owner=employee(child);self.other=employee(other)
+        self.head=employee(child,True);self.owner=employee(child);self.other=employee(other)
         self.pid=self.db.create_roadmap_session(self.owner,'롤백 검증 프로젝트')
         self.content={'milestones':[{'phase_name':'DB 학습','duration':'1주','key_actions':['실제 데이터 쿼리 연습']}]}
         self.db.save_roadmap_generations(self.pid,[{'strategy_type':'BALANCED','strategy_title':'검증','roadmap_content':self.content}])
@@ -61,7 +61,7 @@ class CanonicalDatabaseTests(unittest.TestCase):
         job=self.c.execute('SELECT job_id FROM public.jobs ORDER BY job_id LIMIT 1').fetchone()['job_id']
         self.db.update_employee_assignment(self.owner,institution_id=row['institution_id'],employee_number='CHECK-'+str(self.owner),department_id=row['department_id'],job_grade_id=grade,job_id=job)
         self.c.execute('UPDATE public.departments SET name=%s WHERE department_id=%s',('변경된 부서명',row['department_id']))
-        profile=self.db.get_employee_profile(self.owner)
+        profile=self.db.get_employee_profile(self.owner,actor_employee_id=self.owner)
         self.assertEqual(profile['department'],'변경된 부서명')
         self.assertNotIn('password_hash',profile)
         old=self.c.execute('SELECT department,grade,job_title FROM public.employees WHERE employee_id=%s',(self.owner,)).fetchone()

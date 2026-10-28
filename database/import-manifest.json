@@ -13,10 +13,10 @@
       "source_sha256": "2f9b8b0c367c97704addef663bc0b2bcedd964e457809869ad8a1c3f746f5efd",
       "source_bytes": 154,
       "source_kind": "team_existing_file",
-      "sha256": "f8a298bbd0285bd23fd0873845081abf1e33314e1f1b9109f8934e317d8cebdd",
-      "bytes": 902,
+      "sha256": "913916207791ff99b0d202d58cb4d5bc3a89b3b217249c580850e439e98b1173",
+      "bytes": 1472,
       "handling": "adjusted",
-      "change_note": "Add DB import instructions, artifact links, exclusion settings or verification metadata."
+      "change_note": "Issue #15: reconcile latest main, implementation/contracts, regression coverage and verification metadata (2026-10-28)."
     },
     {
       "path": ".gitignore",
@@ -24,10 +24,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "cd0d69c1f0f6819bae49415783d65ec3f1e821b23cca0013d6db575537f4baad",
-      "bytes": 757,
+      "sha256": "6eece9fb8d525315cbd0c5576d2e04b88968119fb8e50b3ac94948eca052af2b",
+      "bytes": 1252,
       "handling": "adjusted",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions."
+      "change_note": "Issue #15: reconcile latest main, implementation/contracts, regression coverage and verification metadata (2026-10-28)."
     },
     {
       "path": "AGENTS.md",
@@ -35,10 +35,10 @@
       "source_sha256": "c837b93bc675336e3a2aa54fb601a4654f5c609029af8369ed99cfcd3673cab0",
       "source_bytes": 16414,
       "source_kind": "team_existing_file",
-      "sha256": "8c9a52fb7d7b3b8a2b1b18ce145e9e37cb3d7c233a5ff8e4e9be8c40b7ee3605",
-      "bytes": 17166,
+      "sha256": "9f773bf2aba965389ad6d5f29caa59b9e46225b739d8b5884c0aaa134f760946",
+      "bytes": 17364,
       "handling": "adjusted",
-      "change_note": "Add DB import instructions, artifact links, exclusion settings or verification metadata."
+      "change_note": "Issue #15: reconcile latest main, implementation/contracts, regression coverage and verification metadata (2026-10-28)."
     },
     {
       "path": "README.md",
@@ -46,10 +46,10 @@
       "source_sha256": "15e8559b61d8db92a1a322ba0a1be86852fb1f4555ecf80b89be366d9b289fcf",
       "source_bytes": 11326,
       "source_kind": "team_existing_file",
-      "sha256": "41c9d10345ebbbde122b832bd007d020192424e816df3edf371123fa06a2ac8d",
-      "bytes": 13842,
+      "sha256": "0bee51bb46030754819d36ba02e703cda0d0c3314757d019b66b53f53a42d9ad",
+      "bytes": 16917,
       "handling": "adjusted",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions."
+      "change_note": "Issue #15: reconcile latest main, implementation/contracts, regression coverage and verification metadata (2026-10-28)."
     },
     {
       "path": "database/.env.example",
@@ -83,10 +83,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "38e59dcb2dd6d6ced4c2f4dff28a813a0b85b413f360decacfee88dc6fbbd9d5",
-      "bytes": 10487,
+      "sha256": "cdb295a3e8da87ffaad9208d9af05d2ef96e8e51bb61818ce47605b277822573",
+      "bytes": 19234,
       "handling": "adjusted",
-      "change_note": "PR #22 follow-up: incremental defaults, explicit reset and committed-change reporting; paid dry-run and operational guidance; deterministic ERD newline; free regressions.",
+      "change_note": "Issue #15: reconcile latest main, implementation/contracts, regression coverage and verification metadata (2026-10-28).",
       "local_update_source": {
         "path": "README.md",
         "sha256": "e872d64ea58c53311d098dc1c769f5bc3232ad947d690054b75a0a0a20c6d8c6"
@@ -98,10 +98,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "ec1a1daf182e78aa287bfa501af2ca8c7b7dac1dea7922a7d4dac82cc3531a66",
-      "bytes": 3379,
+      "sha256": "7ad1937ed13c398b5ea535aed3efe6c1d4b378372de46d77cb7dc4c71be02375",
+      "bytes": 4247,
       "handling": "adjusted",
-      "change_note": "PR #22 follow-up: incremental defaults, explicit reset and committed-change reporting; paid dry-run and operational guidance; deterministic ERD newline; free regressions."
+      "change_note": "Issue #15: reconcile latest main, implementation/contracts, regression coverage and verification metadata (2026-10-28)."
     },
     {
       "path": "database/assets.manifest.json",
@@ -109,10 +109,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "3cadd329879e6ba7fed03b6fcb2e681152448af7e61725f3291c915572331268",
-      "bytes": 23268,
+      "sha256": "ab2ab628b2851c16467901fd9d4ff6a20714f5d608c22f505efe8fd8a33d1775",
+      "bytes": 23477,
       "handling": "adjusted",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions."
+      "change_note": "2026-10-27 #15 same-department-only permissions, regression tests and snapshot metadata; HR rows remain external."
     },
     {
       "source_path": "database/config/paths.yaml",
@@ -175,10 +175,10 @@
       "source_sha256": "59e13c3fd7bdde78922da1df1c242b08838925e9c3a5e19d8333070d46726420",
       "source_bytes": 59668,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "59e13c3fd7bdde78922da1df1c242b08838925e9c3a5e19d8333070d46726420",
+      "sha256": "41113f09040d8896864f2e3d066d0ae33a953192c6ed4132de1e00a1d191d06e",
       "bytes": 59668,
-      "handling": "copied",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "handling": "adjusted",
+      "change_note": "2026-10-27 #15 same-department-only permissions, regression tests and snapshot metadata; HR rows remain external.",
       "local_update_source": {
         "path": "data/exports/growpath_latest.manifest.json",
         "sha256": "59e13c3fd7bdde78922da1df1c242b08838925e9c3a5e19d8333070d46726420"
@@ -297,10 +297,10 @@
       "source_sha256": "82327b5737f40c891484955c2eb2ce490a53b0de46990408d4b6f9708441991d",
       "source_bytes": 4420,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "4eb005819c3b3ef64bb6e97a0248c374796767a123a329d99b3c06c916b77d6f",
-      "bytes": 4612,
+      "sha256": "181fc6336ed0a19cbd604b76d5774e9f3909ebad95b6fdcaae596ab49b9838fe",
+      "bytes": 5212,
       "handling": "adjusted",
-      "change_note": "PR #22 follow-up: incremental defaults, explicit reset and committed-change reporting; paid dry-run and operational guidance; deterministic ERD newline; free regressions.",
+      "change_note": "Issue #15: reconcile latest main, implementation/contracts, regression coverage and verification metadata (2026-10-28).",
       "local_update_source": {
         "path": "scripts/check_workspace.py",
         "sha256": "82327b5737f40c891484955c2eb2ce490a53b0de46990408d4b6f9708441991d"
@@ -488,10 +488,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "42071466db0642826acff8bbe4796b7864bf74f101c8170fc1c76791218775e0",
-      "bytes": 7967,
+      "sha256": "1e9dd6e255c8085a049d972e3765409e8b32c151e397d783eb232a3743db233c",
+      "bytes": 13647,
       "handling": "adjusted",
-      "change_note": "PR #22 follow-up: incremental defaults, explicit reset and committed-change reporting; paid dry-run and operational guidance; deterministic ERD newline; free regressions."
+      "change_note": "Issue #15: authenticated HTTP contract verification on latest main (2026-10-28)."
     },
     {
       "source_path": "database/src/__init__.py",
@@ -519,10 +519,10 @@
       "source_sha256": "eb216325686a4012cb644482e3d94176f1d03f4fed4d86105b2bc991c75d14f7",
       "source_bytes": 23665,
       "source_kind": "source_commit_file",
-      "sha256": "5312c43797771f3e96120295349975bd6e1609af8ef0ff14ba5592769fd63c1c",
-      "bytes": 24575,
-      "handling": "copied",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "sha256": "a5d1086a0a623a223e91c2c35027d336dcaf7ca2d35eedacfd2ebf410d8121b6",
+      "bytes": 25265,
+      "handling": "adjusted",
+      "change_note": "2026-10-27 #15 direct-report permissions and REAL_USER snapshot metadata; keep applied migrations and HR data private.",
       "local_update_source": {
         "path": "src/database/app_store.py",
         "sha256": "5312c43797771f3e96120295349975bd6e1609af8ef0ff14ba5592769fd63c1c"
@@ -1234,10 +1234,10 @@
       "source_sha256": "f1ee1a6b9642bf1e05ae0c4b606e2c015dc215101132c0ffed9ae75abc26be04",
       "source_bytes": 6709,
       "source_kind": "source_commit_file",
-      "sha256": "73ba095366dc5d71d041b265a0d26271146043dea402638d4f874f539c48ea01",
-      "bytes": 6750,
-      "handling": "copied",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "sha256": "4a17d74294cf7ae7b846194b612d83f6b303d31095f6a60d752ecf9a16b3e6be",
+      "bytes": 6780,
+      "handling": "adjusted",
+      "change_note": "2026-10-27 #15 direct-report permissions and REAL_USER snapshot metadata; keep applied migrations and HR data private.",
       "local_update_source": {
         "path": "tests/test_canonical_database.py",
         "sha256": "73ba095366dc5d71d041b265a0d26271146043dea402638d4f874f539c48ea01"
@@ -1309,9 +1309,10 @@
       "source_sha256": "9f6dda8220928e40e2257cafcda4ba493a43effb661cbf6a3e25e41764f053b4",
       "source_bytes": 13286,
       "source_kind": "source_commit_file",
-      "sha256": "9f6dda8220928e40e2257cafcda4ba493a43effb661cbf6a3e25e41764f053b4",
-      "bytes": 13286,
-      "handling": "byte_preserved"
+      "sha256": "4dd67eb2410919ada32d297e2749b0448522cb5d7579d7799d0467f602cc9793",
+      "bytes": 13869,
+      "handling": "adjusted",
+      "change_note": "2026-10-27 #15 direct-report permissions and REAL_USER snapshot metadata; keep applied migrations and HR data private."
     },
     {
       "path": "database/tests/test_employee_form.py",
@@ -1445,10 +1446,10 @@
       "source_sha256": "f5260d82fdb90d1b6f3309f4cb3f6062034be533133406f25cf5060a27b90b2b",
       "source_bytes": 166111,
       "source_kind": "user_delivered_external_erd",
-      "sha256": "68cd694ae64009304fa7f663861a80e9f93d3a8f67ef84e479971e4f709c66f2",
+      "sha256": "f999187c852e87af639a61be6383c82de82d8825e332c70a1500fd18f1a47ad1",
       "bytes": 180371,
-      "handling": "copied",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "handling": "adjusted",
+      "change_note": "2026-10-27 #15 same-department-only permissions, regression tests and snapshot metadata; HR rows remain external.",
       "local_update_source": {
         "path": "docs/ERD_최종.html",
         "sha256": "68cd694ae64009304fa7f663861a80e9f93d3a8f67ef84e479971e4f709c66f2"
@@ -1460,10 +1461,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "33d8e7d3770d9b35bce703fcebafeb6ef97a03bf61971a468037462b56f2425e",
-      "bytes": 8904,
+      "sha256": "66539dc8e6da8ec17f2e8e6868d5c83c9ef88400ce12adc8f71f6d1406739e07",
+      "bytes": 9278,
       "handling": "adjusted",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions."
+      "change_note": "2026-10-27 #15 same-department-only permissions, regression tests and snapshot metadata; HR rows remain external."
     },
     {
       "path": "docs/07_데이터베이스_저장소_설계/SCHEMA.md",
@@ -1471,10 +1472,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "1083b6a89d6201255a001f660a07bf56e567fe6af8b56ab5c5544c11404a55e3",
+      "sha256": "9d8002fe1174936992c3090819a093caf463b4f2cffbedbb42a7e001fd39c091",
       "bytes": 33247,
       "handling": "adjusted",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions."
+      "change_note": "2026-10-27 #15 same-department-only permissions, regression tests and snapshot metadata; HR rows remain external."
     },
     {
       "path": "docs/07_데이터베이스_저장소_설계/schema_final.sql",
@@ -1482,10 +1483,10 @@
       "source_sha256": "92f6b5a8e16e0391d15ca0f30940f56ef6b74109855ff463d7620ec5e71aad76",
       "source_bytes": 133911,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "80658e2f347ac4268218fd3456d54eaf0cbfe6f14b1c8d2356a670883141b6b9",
-      "bytes": 133910,
+      "sha256": "83b34bf34c1897978e8db0e4eb5978ecbfe742c586f3cd6bbfe58a58a5583ef3",
+      "bytes": 134440,
       "handling": "adjusted",
-      "change_note": "Preserve schema-only SQL; remove extra blank lines at EOF for Git whitespace validation.",
+      "change_note": "2026-10-27 #15 same-department-only permissions, regression tests and snapshot metadata; HR rows remain external.",
       "local_update_source": {
         "path": "docs/schema_final.sql",
         "sha256": "92f6b5a8e16e0391d15ca0f30940f56ef6b74109855ff463d7620ec5e71aad76"
@@ -1564,6 +1565,83 @@
       "sha256": "c2cd03743f42c7d64c1dd1e67ec89f0318bd76f08624c475b5dbe90f0d0e828a",
       "bytes": 8635,
       "change_note": "PR #22 follow-up: incremental defaults, explicit reset and committed-change reporting; paid dry-run and operational guidance; deterministic ERD newline; free regressions."
+    },
+    {
+      "path": "database/src/database/migrations/023_direct_department_visibility.sql",
+      "source_path": null,
+      "source_sha256": "5b4ac59ba1ee49eb12387f427936aeff126331da4e112f8ec82376b5b415b808",
+      "source_bytes": 1577,
+      "source_kind": "authorized_direct_manager_scope_fix",
+      "sha256": "5b4ac59ba1ee49eb12387f427936aeff126331da4e112f8ec82376b5b415b808",
+      "bytes": 1577,
+      "handling": "adjusted",
+      "change_note": "2026-10-27 #15 direct-report permissions and REAL_USER snapshot metadata; keep applied migrations and HR data private."
+    },
+    {
+      "path": "database/tests/test_department_access.py",
+      "source_path": null,
+      "source_sha256": "ddcb3c01200ac482869639c41fe6c002381284c9e796c3b2139d72e293cad84f",
+      "source_bytes": 8798,
+      "source_kind": "authorized_direct_manager_scope_fix",
+      "sha256": "995d10e637997697660b1c784142350fd282edb6082b56ad9191425f0f12b111",
+      "bytes": 10141,
+      "handling": "adjusted",
+      "change_note": "2026-10-27 #15 same-department-only permissions, regression tests and snapshot metadata; HR rows remain external."
+    },
+    {
+      "path": "database/src/database/migrations/024_same_department_visibility.sql",
+      "source_path": null,
+      "source_sha256": "cf9b91896567c3ed5eee7671403819ea5d6a5d9580307de051169c9cc932bb5f",
+      "source_bytes": 1015,
+      "source_kind": "authorized_same_department_scope_fix",
+      "sha256": "cf9b91896567c3ed5eee7671403819ea5d6a5d9580307de051169c9cc932bb5f",
+      "bytes": 1015,
+      "handling": "adjusted",
+      "change_note": "2026-10-27 #15 same-department-only permissions, regression tests and snapshot metadata; HR rows remain external."
+    },
+    {
+      "path": "database/tests/test_app_contracts.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_followup_implementation",
+      "handling": "adjusted",
+      "sha256": "96a313788c64820cf84990ee0fea6ea0e61e4215d357e4d1c7f8d99fc2cf89d5",
+      "bytes": 18815,
+      "change_note": "Issue #15: reconcile latest main, implementation/contracts, regression coverage and verification metadata (2026-10-28)."
+    },
+    {
+      "path": "backend/app/routers/account.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_followup_implementation",
+      "handling": "adjusted",
+      "sha256": "0d4bd298e8745a49919bb14656e82dd735292c7edd195568bcec8c59ba5cf451",
+      "bytes": 7587,
+      "change_note": "Issue #15: reconcile latest main, implementation/contracts, regression coverage and verification metadata (2026-10-28)."
+    },
+    {
+      "path": "backend/app/services/profile.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_followup_implementation",
+      "handling": "adjusted",
+      "sha256": "1fd902178cf4cf47bed9c97cef37d43c2793f6f14aa271680e6ce401c946d380",
+      "bytes": 17950,
+      "change_note": "Issue #15: reconcile latest main, implementation/contracts, regression coverage and verification metadata (2026-10-28)."
+    },
+    {
+      "path": "frontend/docs/API_계약.md",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_followup_implementation",
+      "handling": "adjusted",
+      "sha256": "3a8a1530b09f016847f158d901219e0fd7a93bbfcc473011e651f34fe2dbcca5",
+      "bytes": 12395,
+      "change_note": "Issue #15: reconcile latest main, implementation/contracts, regression coverage and verification metadata (2026-10-28)."
     }
   ],
   "excluded": [
@@ -1794,8 +1872,8 @@
     "source_file_modified": false,
     "layout_and_controls_preserved": true
   },
-  "updated_on": "2026-10-27",
-  "team_update_base_commit": "098465471fc5cbbe38be398009c79c6aee513ca0",
+  "updated_on": "2026-10-28",
+  "team_update_base_commit": "438b011a0c496fb0cfc6a443c4b7c3f733241a24",
   "current_snapshot_manifest": "database/data/exports/growpath_latest.manifest.json",
   "update_scope": "Final DB source, employee form compatibility, category-scoped hybrid knowledge search, course source/skill filtering, schema/ERD and execution metadata. External source/HR/vector/runtime data are excluded.",
   "historical_validation": {
@@ -1813,5 +1891,26 @@
       "comment_state_and_version"
     ],
     "stale_book_vectors": 25
+  },
+  "direct_manager_scope_issue": "https://github.com/20260528-skn-family-ai-33/SKN33-Final-2Team/issues/15",
+  "issue_15_followup": {
+    "base_commit": "438b011a0c496fb0cfc6a443c4b7c3f733241a24",
+    "checked_on": "2026-10-28",
+    "unit_passed": 183,
+    "unit_skipped": 5,
+    "integration_passed": 45,
+    "integration_skipped": 3,
+    "integration_mode": "verified latest dump restored to an owned disposable local PostgreSQL DB",
+    "paid_api_calls": 0,
+    "human_review": "pending",
+    "git_delivery_record": "See branch commits and the issue-linked pull request; these verification results precede publication.",
+    "authenticated_http_tests_passed": 8,
+    "actual_model_generation_tested": false,
+    "app_tables": "backend/db/02_app_ext.sql",
+    "fixes": [
+      "strict boolean consent",
+      "invalid development years returns 422"
+    ],
+    "consent_history_retention_policy": "consumer review pending; current value plus changed timestamp only"
   }
 }
