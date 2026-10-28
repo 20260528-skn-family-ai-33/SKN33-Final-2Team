@@ -90,24 +90,47 @@ COMMENT ON EXTENSION vector IS 'vector data type and ivfflat and hnsw access met
 
 
 --
+-- Name: employee_can_read_employee(integer, integer); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.employee_can_read_employee(actor integer, target integer)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE
+AS $function$
+ SELECT EXISTS (
+  SELECT 1
+  FROM public.employees viewer
+  JOIN public.employees owner ON owner.employee_id=target
+  WHERE viewer.employee_id=actor AND (
+   owner.employee_id=viewer.employee_id OR
+   (viewer.is_department_head
+    AND viewer.institution_id=owner.institution_id
+    AND viewer.department_id=owner.department_id)
+  )
+ )
+$function$
+
+COMMENT ON FUNCTION public.employee_can_read_employee(integer, integer) IS '본인 또는 같은 기관·같은 부서의 부서장만 조회 허용. 부서 상하 관계는 조회 권한에 사용하지 않음.';
+
+
+--
 -- Name: employee_can_read_project(integer, uuid); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.employee_can_read_project(actor integer, target uuid) RETURNS boolean
-    LANGUAGE sql STABLE
-    AS $$
- SELECT EXISTS(
-  SELECT 1 FROM public.projects p JOIN public.employees owner ON owner.employee_id=p.employee_id
-  JOIN public.employees viewer ON viewer.employee_id=actor
-  WHERE p.project_id=target AND (owner.employee_id=actor OR
-   (viewer.is_department_head AND viewer.institution_id=owner.institution_id AND EXISTS(
-    WITH RECURSIVE tree AS (
-     SELECT department_id FROM public.departments WHERE department_id=viewer.department_id
-     UNION SELECT d.department_id FROM public.departments d JOIN tree x ON d.parent_department_id=x.department_id
-    ) SELECT 1 FROM tree WHERE department_id=owner.department_id
-   )))
+CREATE FUNCTION public.employee_can_read_project(actor integer, target uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE
+AS $function$
+ SELECT EXISTS (
+  SELECT 1 FROM public.projects project
+  WHERE project.project_id=target
+    AND public.employee_can_read_employee(actor,project.employee_id)
  )
-$$;
+$function$
+
+COMMENT ON FUNCTION public.employee_can_read_project(integer, uuid) IS '프로젝트 소유자 본인 또는 소유자와 같은 기관·같은 부서의 부서장만 조회 허용.';
 
 
 --

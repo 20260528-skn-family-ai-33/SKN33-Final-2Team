@@ -12,6 +12,16 @@ from src.database import deployment as db
 
 
 class DeploymentTests(unittest.TestCase):
+    def test_profile_read_requires_an_authenticated_actor_before_database_access(self):
+        from unittest.mock import MagicMock
+        from src.database.db_client import DatabaseClient
+        connection = MagicMock()
+        client = DatabaseClient(connection)
+        with self.assertRaises(TypeError):client.get_employee_profile(1)
+        with self.assertRaises(TypeError):client.list_visible_employee_profiles()
+        with self.assertRaises(ValueError):client.get_employee_profile(1, actor_employee_id='invalid')
+        connection.execute.assert_not_called()
+
     def test_unknown_vector_backup_readable_but_import_blocked_before_db(self):
         with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parent) as folder:
             directory = Path(folder)

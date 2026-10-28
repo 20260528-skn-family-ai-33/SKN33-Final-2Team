@@ -20,12 +20,13 @@
     {
       "id": "full_database_current",
       "filename": "growpath_latest.dump",
-      "bytes": 36343649,
-      "sha256": "9ce26041c5bf95ea9e6ad88c5ea8d3817e3c6097e7e85c0f99512123098001fb",
-      "location": null,
-      "location_status": "needs_team_storage_location",
+      "bytes": 36345626,
+      "sha256": "be3648e42907cd566d9716354437665260ccb3c26041a0dcdcb20e13db643189",
+      "location": "https://drive.google.com/file/d/1YBhxTVQjNfm53FbcLJnO7SKi-hsycxz4/view?usp=drivesdk",
+      "location_status": "uploaded_existing_drive_file",
       "manifest": "data/exports/growpath_latest.manifest.json",
-      "version": "2026-10-27-after-skill-corrections"
+      "version": "2026-10-27-real-user-and-same-department-scope",
+      "manifest_location": "https://drive.google.com/file/d/1iUVAugkFpXHNeO3IlWhFkol-6oID691C/view?usp=drivesdk"
     }
   ],
   "regulation_originals": [

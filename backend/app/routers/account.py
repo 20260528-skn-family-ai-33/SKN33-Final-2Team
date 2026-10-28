@@ -81,9 +81,12 @@ def api_self_revert(a: Account = Depends(require_employee)):
 
 @r.put('/me/evaluations/{period}/consent')
 def api_consent(period: str, body: dict, a: Account = Depends(require_employee)):
-    profile.set_consent(a.id, period, bool(body.get('consent')))
+    consent = body.get('consent')
+    if type(consent) is not bool:
+        raise ApiError(422, 'CONSENT_REQUIRED', '평정 활용 동의 여부를 true 또는 false로 보내 주세요')
+    profile.set_consent(a.id, period, consent)
     goals.request(a.id, 'consent')
-    return {'period': period, 'consent': bool(body.get('consent'))}
+    return {'period': period, 'consent': consent}
 
 
 @r.get('/me/goal-suggestions')

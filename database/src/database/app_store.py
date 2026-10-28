@@ -75,7 +75,7 @@ def extend(Base):
             r=c.execute('SELECT draft_conversations FROM public.projects WHERE project_id=%s',(session_id,)).fetchone()
             return r['draft_conversations'] if r else []
 
-    def _employee_profiles(self,c,employee_id=None,test_only=False):
+    def _employee_profiles(self,c,employee_id=None,test_only=False,actor_employee_id=None):
         return c.execute("""SELECT e.employee_id,e.employee_id AS user_id,e.name,e.email,e.source_type,
             e.institution_id,e.employee_number,e.department_id,e.job_grade_id,e.job_id,e.is_department_head,
             coalesce(d.name,e.department,'') AS department,
@@ -83,16 +83,27 @@ def extend(Base):
             FROM public.employees e LEFT JOIN public.departments d USING(department_id)
             LEFT JOIN public.job_grades g USING(job_grade_id) LEFT JOIN public.jobs j USING(job_id)
             WHERE (%s::integer IS NULL OR e.employee_id=%s)
-            AND (NOT %s OR e.source_type IN ('TEST_MANUAL','TEST_AUTO')) ORDER BY e.employee_id""",(employee_id,employee_id,test_only)).fetchall()
+            AND (NOT %s OR e.source_type IN ('TEST_MANUAL','TEST_AUTO'))
+            AND (%s::integer IS NULL OR public.employee_can_read_employee(%s,e.employee_id))
+            ORDER BY e.employee_id""",(employee_id,employee_id,test_only,actor_employee_id,actor_employee_id)).fetchall()
 
     def list_test_users(self):
         with self.transaction() as c:return self._employee_profiles(c,test_only=True)
 
-    def get_employee_profile(self,employee_id):
+    def get_employee_profile(self,employee_id,*,actor_employee_id):
         from .db_client import user_id_value
+        actor=user_id_value(actor_employee_id)
         with self.transaction() as c:
-            rows=self._employee_profiles(c,user_id_value(employee_id))
-            return rows[0] if rows else None
+            rows=self._employee_profiles(c,user_id_value(employee_id),actor_employee_id=actor)
+            if not rows:raise ValueError('Employee profile is not visible in this scope')
+            return rows[0]
+
+    def list_visible_employee_profiles(self,*,actor_employee_id):
+        """The caller must supply the employee ID from its authenticated session."""
+        from .db_client import user_id_value
+        actor=user_id_value(actor_employee_id)
+        with self.transaction() as c:
+            return self._employee_profiles(c,actor_employee_id=actor)
 
     def update_employee_assignment(self,employee_id,*,institution_id,employee_number,department_id,job_grade_id,job_id):
         from .db_client import user_id_value

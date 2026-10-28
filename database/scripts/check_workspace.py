@@ -27,7 +27,10 @@ def run_tests(names,log_path):
 def main(argv=None):
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--integration',action='store_true')
+    parser.add_argument('--app-contracts',action='store_true',help='Include authenticated reference API contracts; install backend requirements first')
     args=parser.parse_args(argv)
+    if args.app_contracts and not args.integration:
+        parser.error('--app-contracts requires --integration')
     out=ROOT/'migration_work';out.mkdir(exist_ok=True)
     scratch=out/'test_tmp';scratch.mkdir(exist_ok=True);tempfile.tempdir=str(scratch)
     unit_names=['tests.test_import_package','tests.test_db_deployment','tests.test_catalog_expansion','tests.test_regulation_vectors',
@@ -58,10 +61,15 @@ def main(argv=None):
             admin.execute(sql.SQL('CREATE DATABASE {} TEMPLATE {}').format(sql.Identifier(clone),sql.Identifier(params['dbname'])))
         test_url=make_conninfo(**{**params,'dbname':clone})
         try:
+            if args.app_contracts:
+                with psycopg.connect(test_url) as conn:
+                    conn.execute((ROOT.parent/'backend/db/02_app_ext.sql').read_text(encoding='utf-8'))
             import tests.test_canonical_database as canonical
             def isolated_connect(_):return psycopg.connect(test_url,row_factory=dict_row)
             with patch.dict(os.environ,{'EMPLOYEE_FORM_TEST_DB_URL':test_url}),patch.object(canonical,'connect',side_effect=isolated_connect):
-                report['integration']=run_tests(['tests.test_employee_form.EmployeeFormDatabaseTests','tests.test_canonical_database','tests.test_final_database','tests.test_catalog_history','tests.test_resource_refresh_database'],out/'integration_tests.log')
+                names=['tests.test_employee_form.EmployeeFormDatabaseTests','tests.test_canonical_database','tests.test_final_database','tests.test_catalog_history','tests.test_department_access','tests.test_resource_refresh_database']
+                if args.app_contracts:names.append('tests.test_app_contracts')
+                report['integration']=run_tests(names,out/'integration_tests.log')
         finally:
             with psycopg.connect(**admin_params,autocommit=True) as admin:
                 if not clone.startswith('growpath_employee_form_test_20261026_'):raise ValueError('Unexpected cleanup target')

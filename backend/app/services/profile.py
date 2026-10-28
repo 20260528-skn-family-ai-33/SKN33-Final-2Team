@@ -224,7 +224,10 @@ def save_self(employee_id: int, body: dict) -> None:
     """본인 입력 저장(API-06). 하나라도 적으면 업무 설명 필수(사내 DB 규칙). 사내 DB 값과 같으면 '직접 고침'으로 두지 않는다"""
     wd, ex = str(body.get('workDesc') or '').strip(), str(body.get('expSummary') or '').strip()
     yrs = body.get('devYears')
-    yrs = None if yrs in ('', None) else float(yrs)
+    try:
+        yrs = None if yrs in ('', None) else float(yrs)
+    except (TypeError, ValueError, OverflowError):
+        raise ApiError(422, 'DEV_YEARS_RANGE', '개발 경험은 0~50년 사이의 숫자로 적거나 비워 주세요.') from None
     if yrs is not None and not 0 <= yrs <= 50:
         raise ApiError(422, 'DEV_YEARS_RANGE', '개발 경험은 0~50년 사이로 적거나 비워 주세요.')
     lists = {k: [str(x).strip() for x in body.get(k) or [] if str(x).strip()][:20] for k in LISTS}
