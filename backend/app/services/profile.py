@@ -89,8 +89,8 @@ def _team_state(t: db.Tx, employee_id: int) -> dict:
 
 def _team_values(t: db.Tx, employee_id: int, st: dict) -> dict:
     p = st['profile'] or {}
-    certs = [r['title'] for r in t.all("""SELECT c.title FROM public.employee_certifications ec JOIN public.certifications c ON c.cert_id = ec.certification_id
-                                         WHERE ec.employee_id = :e ORDER BY c.title""", e=employee_id)] + _split(st['unlisted'])
+    certs = [r['title'] for r in t.all("""SELECT title FROM public.certifications
+                                         WHERE cert_id = ANY(CAST(:ids AS integer[])) ORDER BY title""", ids=st['certIds'])] + _split(st['unlisted'])
     if st['profile'] is None:
         # 본인 입력 전에는 사내 DB 의 보유 스킬을 사용 기술 처음 값으로 보여 준다
         tech = [r['name'] for r in t.all("""SELECT s.name FROM public.employee_skills es JOIN public.skill_tags s USING (skill_id)
@@ -241,17 +241,24 @@ def save_self(employee_id: int, body: dict) -> None:
         raise ApiError(422, 'WORK_DESC_REQUIRED', '업무 설명을 적어 주세요. 본인 입력 정보를 저장할 때 업무 설명은 꼭 있어야 해요.')
     st = lambda k: 'reported' if lists[k] else 'none_confirmed' if none.get(k) else 'unprovided'  # noqa: E731
     new = {'expSummary': ex or None, 'devYears': yrs, **lists}
-    extra = {'workDesc': wd or None, 'inputStatus': {k: st(k) for k in LISTS}}
+    extra = {'inputStatus': {k: st(k) for k in LISTS}}
     with db.tx() as t:
+        db_work = (t.val('SELECT planned_project_description FROM public.employees WHERE employee_id = :e FOR UPDATE', e=employee_id) or '').strip()
+        if wd != db_work:
+            extra['workDesc'] = wd or None
         row = t.one('SELECT baseline FROM app_ext.employee_self_inputs WHERE employee_id = :e', e=employee_id)
         # 처음 고칠 때의 팀 표 값을 되돌리기용으로 남긴다(사내 DB 값으로 되돌리기)
-        base = row['baseline'] if row and row['baseline'] else _team_state(t, employee_id)
-        _write_team(t, employee_id, new)
-        if _team_state(t, employee_id) == base and not wd and not any(none.get(k) for k in LISTS):
-            # 처음 값과 같아졌고 팀 표 밖 값도 없으면 '직접 고침'이 아니다
-            _restore_team(t, employee_id, base)
+        current = _team_state(t, employee_id)
+        base = row['baseline'] if row and row['baseline'] else current
+        # Compare visible values before writing: a missing profile can display
+        # skills from HR and must stay missing after an unchanged form save.
+        if new == _team_values(t, employee_id, base) and 'workDesc' not in extra and not any(none.get(k) for k in LISTS):
+            if current != base:
+                _restore_team(t, employee_id, base)
             t.run('DELETE FROM app_ext.employee_self_inputs WHERE employee_id = :e', e=employee_id)
             return
+        if new != _team_values(t, employee_id, current):
+            _write_team(t, employee_id, new)
         t.run("""INSERT INTO app_ext.employee_self_inputs(employee_id, baseline, edited, edited_at) VALUES(:e, :b, :v, now())
                  ON CONFLICT (employee_id) DO UPDATE SET baseline = EXCLUDED.baseline, edited = EXCLUDED.edited, edited_at = now()""",
               e=employee_id, b=db.J(base), v=db.J(extra))

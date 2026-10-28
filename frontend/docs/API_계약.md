@@ -37,6 +37,8 @@
 
 업무 설명(`view.profile.workDesc`·`self.profile.workDesc`)은 본인의 `employee_self_inputs.edited.workDesc` 키가 있으면 그 값(NULL 포함)을 우선하고, 키가 없으면 `employees.planned_project_description`을 사용한다. DB 값만 표시할 때는 직접 수정 상태로 기록하지 않는다. `DELETE /me/profile/self`는 현재 DB 설명을 다시 표시하며 DB 원문을 변경하지 않는다. 같은 설명을 목표 후보·진단·로드맵 업무 정보에 전달한다. 부서장용 `team_view`에는 본인 입력을 포함하지 않는다. 응답 필드 형식은 유지한다. #27의 실제 인증 API 검사로 확인했다.
 
+개인 입력 저장 때 업무 설명이 현재 DB 설명과 같으면 `edited.workDesc` 키를 저장하지 않는다. 화면의 초기값을 그대로 저장하면 `edited=false`이며, 원래 없던 입력 프로필이나 기술 사본도 만들지 않는다. 기술·자격만 수정하면 해당 변경은 유지하고 업무 설명은 이후 DB 갱신을 계속 따른다. DB와 다른 설명을 직접 적었거나 ‘없음 확인’을 선택한 경우는 수정 상태로 유지한다. 최초 값과 비교할 때는 최초 자격 ID를 사용해 재저장으로 변경한 자격이 사라지지 않게 한다.
+
 ### 새 로드맵 작성 — `drafts.ts`
 
 | 요청 | 쓰는 곳 |

@@ -217,6 +217,120 @@ class AppContractTests(unittest.TestCase):
             t.run('UPDATE app_ext.employee_self_inputs SET edited=:v WHERE employee_id=:e', e=eid, v=self.db.J({'inputStatus': {}}))
         self.assertEqual(self.profile.view(eid)['profile']['workDesc'], 'DB default')
 
+    @staticmethod
+    def self_body(view):
+        """Use the same prefilled values as MePage's full personal-input save."""
+        p = view.get('profile') or {}
+        return {'workDesc': p.get('workDesc') or '', 'expSummary': p.get('expSummary') or '',
+                'devYears': p.get('devYears'),
+                **{k: list(view[k]) for k in ('tech', 'certs', 'learning', 'projects')},
+                'noneConfirmed': {k: p.get('inputStatus', {}).get(k) == 'none_confirmed'
+                                  for k in ('tech', 'certs', 'learning', 'projects')}}
+
+    def test_unchanged_prefilled_self_save_preserves_original_rows(self):
+        for role, with_profile in (('member', False), ('peer', True)):
+            with self.subTest(with_profile=with_profile):
+                eid = self.ids[role]
+                with self.db.tx() as t:
+                    t.run('UPDATE public.employees SET planned_project_description=:w WHERE employee_id=:e', w='DB work', e=eid)
+                    t.run('INSERT INTO public.employee_skills(employee_id,skill_id) SELECT :e,skill_id FROM public.skill_tags ORDER BY skill_id LIMIT 1', e=eid)
+                    if with_profile:
+                        self.profile._write_profile(t, eid, {'experience_summary': 'Saved experience', 'development_years': 0,
+                            'technology_experience': 'Saved technology', 'project_experience': 'Saved project', 'learning_history': 'Saved training'})
+                before = self.db.one('SELECT * FROM public.employee_input_profiles WHERE employee_id=:e', e=eid)
+                stamp = self.db.val('SELECT updated_at FROM public.employees WHERE employee_id=:e', e=eid)
+                c = self.client(role)
+                body = self.self_body(c.get('/api/v1/me/profile').json()['view'])
+                for _ in range(2):
+                    r = c.put('/api/v1/me/profile/self', json=body)
+                    self.assertEqual(r.status_code, 200, r.text)
+                    self.assertFalse(r.json()['self']['edited'])
+                self.assertIsNone(self.db.one('SELECT * FROM app_ext.employee_self_inputs WHERE employee_id=:e', e=eid))
+                self.assertEqual(self.db.one('SELECT * FROM public.employee_input_profiles WHERE employee_id=:e', e=eid), before)
+                self.assertEqual(self.db.val('SELECT updated_at FROM public.employees WHERE employee_id=:e', e=eid), stamp)
+                with self.db.tx() as t:
+                    t.run('UPDATE public.employees SET planned_project_description=:w WHERE employee_id=:e', w='New DB work', e=eid)
+                self.assertEqual(c.get('/api/v1/me/profile').json()['view']['profile']['workDesc'], 'New DB work')
+
+    def test_technology_only_save_keeps_work_description_inherited_and_can_restore(self):
+        eid = self.ids['member']
+        with self.db.tx() as t:
+            t.run('UPDATE public.employees SET planned_project_description=:w WHERE employee_id=:e', w='DB work', e=eid)
+            t.run('INSERT INTO public.employee_skills(employee_id,skill_id) SELECT :e,skill_id FROM public.skill_tags ORDER BY skill_id LIMIT 1', e=eid)
+        c = self.client('member')
+        original = self.self_body(c.get('/api/v1/me/profile').json()['view'])
+        body = dict(original, tech=original['tech'] + ['Added technology'])
+        for _ in range(2):
+            r = c.put('/api/v1/me/profile/self', json=body)
+            self.assertEqual(r.status_code, 200, r.text)
+            self.assertTrue(r.json()['self']['edited'])
+            self.assertNotIn('workDesc', self.db.val('SELECT edited FROM app_ext.employee_self_inputs WHERE employee_id=:e', e=eid))
+        with self.db.tx() as t:
+            t.run('UPDATE public.employees SET planned_project_description=:w WHERE employee_id=:e', w='New DB work', e=eid)
+        v = c.get('/api/v1/me/profile').json()['view']
+        self.assertEqual(v['profile']['workDesc'], 'New DB work')
+        self.assertIn('Added technology', v['tech'])
+        body = self.self_body(v)
+        body['tech'] = original['tech']
+        r = c.put('/api/v1/me/profile/self', json=body)
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertFalse(r.json()['self']['edited'])
+        self.assertIsNone(self.db.one('SELECT * FROM public.employee_input_profiles WHERE employee_id=:e', e=eid))
+
+    def test_description_only_override_and_equal_db_value_do_not_copy_team_fields(self):
+        eid = self.ids['member']
+        with self.db.tx() as t:
+            t.run('UPDATE public.employees SET planned_project_description=:w WHERE employee_id=:e', w='DB work', e=eid)
+        c = self.client('member')
+        body = self.self_body(c.get('/api/v1/me/profile').json()['view'])
+        body['workDesc'] = 'Personal work'
+        r = c.put('/api/v1/me/profile/self', json=body)
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertTrue(r.json()['self']['edited'])
+        self.assertIsNone(self.db.one('SELECT * FROM public.employee_input_profiles WHERE employee_id=:e', e=eid))
+        with self.db.tx() as t:
+            t.run('UPDATE public.employees SET planned_project_description=:w WHERE employee_id=:e', w='Personal work', e=eid)
+        r = c.put('/api/v1/me/profile/self', json=body)
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertFalse(r.json()['self']['edited'])
+        with self.db.tx() as t:
+            t.run('UPDATE public.employees SET planned_project_description=:w WHERE employee_id=:e', w='Later DB work', e=eid)
+        self.assertEqual(c.get('/api/v1/me/profile').json()['view']['profile']['workDesc'], 'Later DB work')
+
+    def test_certificate_only_retry_preserves_edited_links_and_can_restore(self):
+        eid = self.ids['member']
+        certs = self.db.all_('SELECT cert_id,title FROM public.certifications ORDER BY cert_id LIMIT 2')
+        self.assertEqual(len(certs), 2)
+        with self.db.tx() as t:
+            t.run('UPDATE public.employees SET planned_project_description=:w WHERE employee_id=:e', w='DB work', e=eid)
+            t.run('INSERT INTO public.employee_certifications(employee_id,certification_id) VALUES(:e,:c)', e=eid, c=certs[0]['cert_id'])
+        c = self.client('member')
+        original = self.self_body(c.get('/api/v1/me/profile').json()['view'])
+        body = dict(original, certs=[x['title'] for x in certs])
+        for _ in range(2):
+            r = c.put('/api/v1/me/profile/self', json=body)
+            self.assertEqual(r.status_code, 200, r.text)
+            self.assertTrue(r.json()['self']['edited'])
+            self.assertEqual(set(r.json()['self']['certs']), {x['title'] for x in certs})
+            self.assertNotIn('workDesc', self.db.val('SELECT edited FROM app_ext.employee_self_inputs WHERE employee_id=:e', e=eid))
+        r = c.put('/api/v1/me/profile/self', json=original)
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertFalse(r.json()['self']['edited'])
+        self.assertEqual(r.json()['self']['certs'], [certs[0]['title']])
+
+    def test_none_confirmed_is_preserved_without_work_description_override(self):
+        eid = self.ids['member']
+        with self.db.tx() as t:
+            t.run('UPDATE public.employees SET planned_project_description=:w WHERE employee_id=:e', w='DB work', e=eid)
+        c = self.client('member')
+        body = self.self_body(c.get('/api/v1/me/profile').json()['view'])
+        body['noneConfirmed']['learning'] = True
+        r = c.put('/api/v1/me/profile/self', json=body)
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertTrue(r.json()['self']['edited'])
+        self.assertEqual(r.json()['self']['profile']['inputStatus']['learning'], 'none_confirmed')
+        self.assertNotIn('workDesc', self.db.val('SELECT edited FROM app_ext.employee_self_inputs WHERE employee_id=:e', e=eid))
+
     def test_progress_retry_owner_only_and_manager_redaction(self):
         path = '/api/v1/plans/' + self.roadmap + '/activities/fixture-activity/progress'
         body = {'status': 'done', 'memo': 'Private memo', 'file': {'name': 'fixture.txt', 'size': 12}}

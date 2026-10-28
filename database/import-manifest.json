@@ -83,10 +83,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "46543d8b0ec02035791464370b807e6f6c56c433d3c425b93f7a1c5f4419be25",
-      "bytes": 27440,
+      "sha256": "1fc403e9caa8a5556086bccc7a9a05848d89b013dc1bac407ca36c12b4d9047f",
+      "bytes": 28189,
       "handling": "adjusted",
-      "change_note": "Issue #15 review carried with #27: two schema SQL terminators, actual isolated psql verification; applied migrations unchanged.",
+      "change_note": "Issue #27: reproduce and fix inherited work description being copied by a self save; 15 authenticated HTTP checks.",
       "local_update_source": {
         "path": "README.md",
         "sha256": "e872d64ea58c53311d098dc1c769f5bc3232ad947d690054b75a0a0a20c6d8c6"
@@ -488,10 +488,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "887f27f46475238800b8a238a802592e855f4318c0e396f0e12f9141df3ffedc",
-      "bytes": 15258,
+      "sha256": "91d4c6e9ca504ce7ec65d8ffc371c5f975f8d3d2f3e36a03d0e6699264aee1be",
+      "bytes": 15892,
       "handling": "adjusted",
-      "change_note": "Issue #15 review carried with #27: two schema SQL terminators, actual isolated psql verification; applied migrations unchanged."
+      "change_note": "Issue #27: reproduce and fix inherited work description being copied by a self save; 15 authenticated HTTP checks."
     },
     {
       "source_path": "database/src/__init__.py",
@@ -1606,9 +1606,9 @@
       "source_bytes": null,
       "source_kind": "team_followup_implementation",
       "handling": "adjusted",
-      "sha256": "bf8354247723f86a1d1ed344991f99705a4d78172668cbce493d3f0b8d32ca24",
-      "bytes": 21317,
-      "change_note": "Issue #27: fictional profiles, protected real employees, work description fallback and regression evidence."
+      "sha256": "2afe785821f0063e36c8c384ddd31f93d3219fcdf4e259fdf3171b05318dc8d2",
+      "bytes": 29139,
+      "change_note": "Issue #27: reproduce and fix inherited work description being copied by a self save; 15 authenticated HTTP checks."
     },
     {
       "path": "backend/app/routers/account.py",
@@ -1628,9 +1628,9 @@
       "source_bytes": null,
       "source_kind": "team_followup_implementation",
       "handling": "adjusted",
-      "sha256": "06cd2192fbb1213ca964dcc2d751f3d299397c820bf6952dd3b161b5f19852e1",
-      "bytes": 18284,
-      "change_note": "Issue #27: fictional profiles, protected real employees, work description fallback and regression evidence."
+      "sha256": "3706b0ece944af5e55ec53c597d34627bfee78a72b209a77b6fc3468ca777cd2",
+      "bytes": 18624,
+      "change_note": "Issue #27: reproduce and fix inherited work description being copied by a self save; 15 authenticated HTTP checks."
     },
     {
       "path": "frontend/docs/API_계약.md",
@@ -1639,9 +1639,9 @@
       "source_bytes": null,
       "source_kind": "team_followup_implementation",
       "handling": "adjusted",
-      "sha256": "b94fff8e36e94d0aa0055a533c9641fe3df268155ad6af4e06d04e63e093fea9",
-      "bytes": 13062,
-      "change_note": "Issue #27: fictional profiles, protected real employees, work description fallback and regression evidence."
+      "sha256": "8ea9f916f4f9ddef2b7a31fea5a653647503df5577a18e9787d2bfcd2b5760a7",
+      "bytes": 13685,
+      "change_note": "Issue #27: reproduce and fix inherited work description being copied by a self save; 15 authenticated HTTP checks."
     },
     {
       "path": "database/tests/test_resource_refresh.py",

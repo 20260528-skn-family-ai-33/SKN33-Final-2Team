@@ -438,5 +438,19 @@
     "project_permission_cases": 3,
     "owned_test_database_removed": true,
     "merge_status": "prepared_on_fix/27-employee-profile; not_main_yet"
+  },
+  "personal_input_inheritance_20261028": {
+    "issue": 27,
+    "reproduced_before_fix": true,
+    "authenticated_http_passed": 15,
+    "new_regression_tests": 5,
+    "unchanged_prefill_preserves_profile_row_and_updated_at": true,
+    "technology_and_certificate_edits_keep_description_inherited": true,
+    "personal_description_none_confirmation_retry_and_revert_preserved": true,
+    "certificate_baseline_uses_saved_ids": true,
+    "source_db_modified": false,
+    "paid_api_calls": 0,
+    "deployment": "reference app source and local preview; other PCs not deployed",
+    "existing_self_overrides_not_bulk_rewritten": true
   }
 }
