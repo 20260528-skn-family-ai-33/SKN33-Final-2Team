@@ -417,5 +417,26 @@
     "plan_manifest": "data/exports/synthetic_profiles_20261028.manifest.json",
     "commit_push_pr": "user_authorized_commit_and_push; PR_not_requested",
     "scope_note": "Existing schema/ERD/current_snapshot_manifest remain the branch baseline. New local backup also contains unmerged issue26 fields."
+  },
+  "schema_sql_terminators_20261028": {
+    "issues": [
+      15,
+      27
+    ],
+    "file": "docs/07_데이터베이스_저장소_설계/schema_final.sql",
+    "fixed_terminators": 2,
+    "applied_migrations_unchanged": 16,
+    "verification": "PostgreSQL 17 psql -X --set ON_ERROR_STOP=1 --single-transaction --file, owned empty database",
+    "paid_api_calls": 0,
+    "source_database_modified": false,
+    "tables": 53,
+    "foreign_keys": 87,
+    "original_sql_reproduces_comment_syntax_error": true,
+    "failed_original_leaves_zero_tables": true,
+    "fixed_full_sql_psql_exit_code": 0,
+    "employee_permission_cases": 4,
+    "project_permission_cases": 3,
+    "owned_test_database_removed": true,
+    "merge_status": "prepared_on_fix/27-employee-profile; not_main_yet"
   }
 }

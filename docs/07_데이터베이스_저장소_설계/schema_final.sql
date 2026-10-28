@@ -109,7 +109,7 @@ AS $function$
     AND viewer.department_id=owner.department_id)
   )
  )
-$function$
+$function$;
 
 COMMENT ON FUNCTION public.employee_can_read_employee(integer, integer) IS '본인 또는 같은 기관·같은 부서의 부서장만 조회 허용. 부서 상하 관계는 조회 권한에 사용하지 않음.';
 
@@ -128,7 +128,7 @@ AS $function$
   WHERE project.project_id=target
     AND public.employee_can_read_employee(actor,project.employee_id)
  )
-$function$
+$function$;
 
 COMMENT ON FUNCTION public.employee_can_read_project(integer, uuid) IS '프로젝트 소유자 본인 또는 소유자와 같은 기관·같은 부서의 부서장만 조회 허용.';
 

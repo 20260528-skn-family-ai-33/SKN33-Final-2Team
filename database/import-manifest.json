@@ -83,10 +83,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "c57e602414fc764e481973bd3b55604211a3d2f317886513cdd9cf2e516b66bd",
-      "bytes": 26812,
+      "sha256": "46543d8b0ec02035791464370b807e6f6c56c433d3c425b93f7a1c5f4419be25",
+      "bytes": 27440,
       "handling": "adjusted",
-      "change_note": "Issue #27: fictional profiles, protected real employees, work description fallback and regression evidence.",
+      "change_note": "Issue #15 review carried with #27: two schema SQL terminators, actual isolated psql verification; applied migrations unchanged.",
       "local_update_source": {
         "path": "README.md",
         "sha256": "e872d64ea58c53311d098dc1c769f5bc3232ad947d690054b75a0a0a20c6d8c6"
@@ -488,10 +488,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "b4a3631640e35e21ba9c075122750ac8b665ee7168dc3772a0287e0686809ccf",
-      "bytes": 14475,
+      "sha256": "887f27f46475238800b8a238a802592e855f4318c0e396f0e12f9141df3ffedc",
+      "bytes": 15258,
       "handling": "adjusted",
-      "change_note": "Issue #27: fictional profiles, protected real employees, work description fallback and regression evidence."
+      "change_note": "Issue #15 review carried with #27: two schema SQL terminators, actual isolated psql verification; applied migrations unchanged."
     },
     {
       "source_path": "database/src/__init__.py",
@@ -1483,10 +1483,10 @@
       "source_sha256": "92f6b5a8e16e0391d15ca0f30940f56ef6b74109855ff463d7620ec5e71aad76",
       "source_bytes": 133911,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "83b34bf34c1897978e8db0e4eb5978ecbfe742c586f3cd6bbfe58a58a5583ef3",
-      "bytes": 134440,
+      "sha256": "1461a6d22cd297b70b40fa7d749dffa74d34b1d1451ed5be531c19fedd75d18e",
+      "bytes": 134442,
       "handling": "adjusted",
-      "change_note": "2026-10-27 #15 same-department-only permissions, regression tests and snapshot metadata; HR rows remain external.",
+      "change_note": "Issue #15 review carried with #27: two schema SQL terminators, actual isolated psql verification; applied migrations unchanged.",
       "local_update_source": {
         "path": "docs/schema_final.sql",
         "sha256": "92f6b5a8e16e0391d15ca0f30940f56ef6b74109855ff463d7620ec5e71aad76"
