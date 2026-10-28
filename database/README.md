@@ -81,3 +81,30 @@ ERD 파일 출력은 현재 산출물과 같은 CRLF로 명시해 운영체제�
 [import-manifest.json](import-manifest.json)은 원래 출처·해시와 이번 로컬 최종본의 파일 해시를 구분한다. [snapshot-audit.json](snapshot-audit.json)은 과거 정적 검사와 최신 복원·보정 검증을 구분한다. `src/db/` 호환 경로와 비밀값 미출력·외부 직원 seed 사전 거절 동작을 유지한다.
 
 남은 검토: 근거가 약한 MLOps 10건, 강사 경력으로 OS 보안에 연결된 KMOOC_7204의 CI/CD 재분류, 사번이 없는 기존 REAL_USER 5명의 실제 사번 확인, 실제 추천 화면·챗봇 연동·다른 PC 실행·사람 리뷰. #14의 선택 벡터 갱신 작업과 #15의 권한·활동·코멘트 계약은 별도 작업이며 이번 준비로 완료 처리하지 않는다.
+
+## 자료 벡터 갱신 계획과 선택 실행
+
+이슈 #14 후속 기능이다. `plan`은 실제 DB에 읽기 전용으로 연결해 갱신할 유형·ID·누락/오래됨 여부·UTF-8 입력 바이트·32건 단위 배치 수를 출력한다. 원문, API 키와 벡터 값은 출력하지 않는다. 바이트 수는 토큰 수나 비용 견적이 아니다.
+
+```powershell
+# database/에서 실행. 실제 DB 필요. 임베딩 API 호출·DB 쓰기 없음.
+python -m src.database.vectors.resource_vectors plan --resource-type books --max-records 25
+# 필요하면 --resource-id를 반복해 ISBN별로 선택한다.
+python -m src.database.vectors.resource_vectors plan --resource-type books --resource-id ISBN
+```
+
+원본은 전달 백업 이후 바뀔 수 있으므로 25건을 고정된 운영 수치로 보지 않는다. 최대 건수를 넘으면 일부만 처리하지 않고 실패한다. ID 선택에는 하나의 유형을 지정해야 하며 잘못된 ID·0 이하 최대 건수·8,000 UTF-8 바이트 초과 입력도 쓰기·유료 호출 전에 거절한다.
+
+아래 `embed`는 **유료 API와 DB 쓰기**를 수행한다. 담당자·예산·실행 승인을 확인하고 현재 DB 백업을 보존한 후 실행한다. 이번 후속 준비에서는 실행하지 않았다.
+
+```powershell
+python -m src.database.vectors.resource_vectors embed --resource-type books --max-records 25
+python -m src.database.vectors.resource_vectors plan --resource-type books --max-records 25
+python -m src.database.vectors.resource_vectors status
+```
+
+실제 입력을 다시 임베딩한 결과와 해시를 함께 저장한다. 최신 자료는 다시 처리하지 않고 입력 해시만 바꿔 최신으로 표시하지 않는다. 기존 `embed`의 전체 유형 실행도 유지한다. API 실패·입력 변경은 DB 트랜잭션을 롤백하지만 이미 호출한 외부 API 비용은 복구되지 않는다. 적용 후 갱신 계획의 `pending_count=0`과 검색 경로를 실제 DB에서 확인해야 한다. 되돌릴 때는 실행 전 백업을 별도 DB에 복원해 대상 벡터를 복구하고 원본/입력 해시·모델 버전을 다시 대조한다. 해시만 과거 값으로 바꾸지 않는다.
+
+10/28 최신 `main`의 `438b011`로 맞춘 뒤 `python scripts/check_workspace.py`에서 무료 단위 192개 통과·5개 제외를 확인했다. `tests.test_resource_refresh`의 선택·최대 건수·누락·UTF-8 한도·입력 변경·API 실패 검사 10개가 포함된다. 별도 복제 PostgreSQL에서 `tests.test_resource_refresh_database` 5개로 선택 갱신·무변경 재시도·갱신 후 pgvector 검색·API 실패·FK 실패·입력 변경 시 실제 롤백을 확인했다. 임베딩 응답만 고정 벡터로 대체했고 유료 호출은 0회다.
+
+최신 실제 DB의 읽기 전용 `plan`·`status` 결과는 추천 대상 2,425개(스킬 36·강좌 2,045·자격 23·직무 6·전공 7·도서 308)가 모두 최신이며 갱신 대상은 0개다. 저장된 2,469개 중 44개는 현재 추천 적격 범위 밖이라 검색 대상에서 제외되며 삭제하거나 다시 임베딩하지 않았다. 10/21의 도서 25건은 과거 상태이므로 이번 유료 처리 대상으로 사용하지 않는다. 전체 DB 원본·벡터는 변경하지 않았다. 실제 추천/챗봇 검색 품질은 별도 평가 대상이다.
