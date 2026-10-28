@@ -37,7 +37,7 @@ def main(argv=None):
                 'tests.test_ai_catalog_filter','tests.test_catalog_scope','tests.test_employee_form',
                 'tests.test_local_runtime','tests.test_snapshot_compatibility','tests.test_course_supplement',
                 'tests.test_knowledge_documents','tests.test_knowledge_search','tests.test_course_sources',
-                'tests.test_instructional_content','tests.test_ingestion_execution']
+                'tests.test_instructional_content','tests.test_ingestion_execution','tests.test_resource_refresh']
     with patch.dict(os.environ,{'EMPLOYEE_FORM_TEST_DB_URL':''}):
         unit=run_tests(unit_names,out/'unit_tests.log')
     report={'checked_at_utc':datetime.now(timezone.utc).isoformat(),'unit':unit,'paid_api_calls':0}
@@ -67,7 +67,7 @@ def main(argv=None):
             import tests.test_canonical_database as canonical
             def isolated_connect(_):return psycopg.connect(test_url,row_factory=dict_row)
             with patch.dict(os.environ,{'EMPLOYEE_FORM_TEST_DB_URL':test_url}),patch.object(canonical,'connect',side_effect=isolated_connect):
-                names=['tests.test_employee_form.EmployeeFormDatabaseTests','tests.test_canonical_database','tests.test_final_database','tests.test_catalog_history','tests.test_department_access']
+                names=['tests.test_employee_form.EmployeeFormDatabaseTests','tests.test_canonical_database','tests.test_final_database','tests.test_catalog_history','tests.test_department_access','tests.test_resource_refresh_database']
                 if args.app_contracts:names.append('tests.test_app_contracts')
                 report['integration']=run_tests(names,out/'integration_tests.log')
         finally:

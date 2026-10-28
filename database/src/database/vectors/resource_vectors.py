@@ -1,12 +1,14 @@
 """Known-model vectors for existing skills and learning resources.
 
 python -m src.database.vectors.resource_vectors status
+python -m src.database.vectors.resource_vectors plan --resource-type books --max-records 25
 python -m src.database.vectors.resource_vectors embed
 Source records are unchanged; vectors are stored in the canonical vector table.
 """
 from __future__ import annotations
 
 import argparse
+from collections.abc import Iterable
 import hashlib
 import json
 
@@ -151,15 +153,57 @@ def status(conn):
             'database_changes': False, 'embedding_api_called': False}
 
 
-def embed(conn, client=None):
+class RefreshPlanError(ValueError):
+    """A safe validation message that contains no source text or credentials."""
+
+
+def pending_sources(rows: dict, previous: dict, resource_types: Iterable[str] | None = None,
+                    resource_ids: Iterable[str] | None = None,
+                    max_records: int | None = None) -> tuple[dict, list]:
+    """Validate the complete selection before schema writes or paid calls."""
+    kinds = set(SPECS if resource_types is None else resource_types)
+    ids = set(resource_ids or ())
+    if not kinds or not kinds <= SPECS.keys():
+        raise RefreshPlanError('Select a known resource type.')
+    if ids and len(kinds) != 1:
+        raise RefreshPlanError('Resource IDs require exactly one resource type.')
+    if max_records is not None and (type(max_records) is not int or max_records < 1):
+        raise RefreshPlanError('max_records must be a positive integer.')
+    selected = {k: v for k, v in rows.items() if k[0] in kinds and (not ids or k[1] in ids)}
+    if ids - {k[1] for k in selected}:
+        raise RefreshPlanError('One or more selected resource IDs do not exist.')
+    pending = [(k, v) for k, v in sorted(selected.items()) if not is_current(v, previous.get(k))]
+    if max_records is not None and len(pending) > max_records:
+        raise RefreshPlanError(f'Pending resources ({len(pending)}) exceed max_records ({max_records}). Run plan and review the selection.')
+    if any(len(v['text'].encode('utf-8')) > 8000 for _, v in pending):
+        raise RefreshPlanError('Resource text exceeds 8000 UTF-8 bytes; review the source before indexing.')
+    return selected, pending
+
+
+def plan(conn, resource_types: Iterable[str] | None = None,
+         resource_ids: Iterable[str] | None = None, max_records: int | None = None) -> dict:
+    """Report only identifiers and input sizes; never create vectors or expose text."""
+    rows, previous = sources(conn), stored(conn)
+    selected, pending = pending_sources(rows, previous, resource_types, resource_ids, max_records)
+    return {'embedding_model': MODEL, 'dimensions': DIMENSIONS,
+            'selected_count': len(selected), 'current_count': len(selected) - len(pending),
+            'pending_count': len(pending), 'batch_count': (len(pending) + 31) // 32,
+            'input_utf8_bytes': sum(len(v['text'].encode('utf-8')) for _, v in pending),
+            'pending': [{'resource_type': k[0], 'resource_id': k[1],
+                         'reason': 'stale' if k in previous else 'missing',
+                         'input_utf8_bytes': len(v['text'].encode('utf-8'))}
+                        for k, v in pending],
+            'database_changes': False, 'embedding_api_called': False}
+
+
+def embed(conn, client=None, *, resource_types: Iterable[str] | None = None,
+          resource_ids: Iterable[str] | None = None, max_records: int | None = None) -> dict:
     """Atomic, repeatable ingestion; missing/stale records only, batches of 32."""
     with conn.transaction():
-        conn.execute(DDL)
         rows, previous = sources(conn), stored(conn)
-        pending = [(k, v) for k, v in rows.items() if not is_current(v, previous.get(k))]
-        # Fail before any paid call when the source needs explicit re-chunking.
-        if any(len(v['text'].encode('utf-8')) > 8000 for _, v in pending):
-            raise ValueError('Resource text exceeds 8000 UTF-8 bytes; review the source before indexing.')
+        selected, pending = pending_sources(rows, previous, resource_types, resource_ids, max_records)
+        if pending:
+            conn.execute(DDL)
         for start in range(0, len(pending), 32):
             batch = pending[start:start + 32]
             vectors = embed_texts([v['text'] for _, v in batch], client=client)
@@ -176,7 +220,7 @@ def embed(conn, client=None):
         if {k: v['hash'] for k, v in sources(conn).items()} != {k: v['hash'] for k, v in rows.items()}:
             raise ValueError('DB sources changed during embedding. Rolled back; retry with stable sources.')
         result = status(conn)
-        result.update(embedded_count=len(pending), database_changes=True,
+        result.update(selected_count=len(selected), embedded_count=len(pending), database_changes=bool(pending),
                       embedding_api_called=bool(pending), original_embeddings_changed=False)
         return result
 
@@ -200,21 +244,36 @@ def similarities(conn, rows, keys, query_vector):
             for r in scored if (r['resource_type'], r['resource_id']) in keys}
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--db-env', default='SUPABASE_DB_URL')
-    parser.add_argument('command', choices=('status', 'embed'))
-    args = parser.parse_args()
+    parser.add_argument('command', choices=('status', 'plan', 'embed'))
+    parser.add_argument('--resource-type', action='append', choices=tuple(SPECS), dest='resource_types')
+    parser.add_argument('--resource-id', action='append', dest='resource_ids', help='Repeat for specific IDs; requires one resource type.')
+    parser.add_argument('--max-records', type=int, help='Fail rather than truncate when the pending count exceeds this cap.')
+    args = parser.parse_args(argv)
+    if args.command == 'status' and (args.resource_types or args.resource_ids or args.max_records is not None):
+        parser.error('Selection options apply to plan/embed only.')
+    if args.resource_ids and len(set(args.resource_types or ())) != 1:
+        parser.error('--resource-id requires exactly one --resource-type.')
+    if args.max_records is not None and args.max_records < 1:
+        parser.error('--max-records must be positive.')
     try:
         with connect(args.db_env) as conn:
-            if args.command == 'status':
+            if args.command in ('status', 'plan'):
                 conn.execute('SET TRANSACTION READ ONLY')
-            result = status(conn) if args.command == 'status' else embed(conn)
+            options = dict(resource_types=args.resource_types, resource_ids=args.resource_ids, max_records=args.max_records)
+            if args.command == 'status':
+                result = status(conn)
+            elif args.command == 'plan':
+                result = plan(conn, **options)
+            else:
+                result = embed(conn, **options)
         print(json.dumps(result, ensure_ascii=False, indent=2))
     except Exception as exc:
         # Connection errors can include host/credentials; do not dump raw exceptions.
         print(json.dumps({'status': 'FAILED', 'error_type': type(exc).__name__,
-                          'message': 'DB 연결·원본 테이블·OPENAI_API_KEY·임베딩 한도를 확인하세요. 기존 데이터는 유지됩니다.'},
+                          'message': str(exc) if isinstance(exc, RefreshPlanError) else 'DB 연결·원본 테이블·OPENAI_API_KEY·임베딩 한도를 확인하세요. 기존 데이터는 유지됩니다.'},
                          ensure_ascii=False))
         raise SystemExit(1)
 

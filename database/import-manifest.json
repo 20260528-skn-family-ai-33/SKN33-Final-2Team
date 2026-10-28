@@ -83,10 +83,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "cdb295a3e8da87ffaad9208d9af05d2ef96e8e51bb61818ce47605b277822573",
-      "bytes": 19234,
+      "sha256": "42da682336c7bc5bf66d2f2737554994434889109dc4b7a627a02638ac036a38",
+      "bytes": 22789,
       "handling": "adjusted",
-      "change_note": "Issue #15: reconcile latest main, implementation/contracts, regression coverage and verification metadata (2026-10-28).",
+      "change_note": "Issue #15: reconcile PR #24 main merge with permission/API contracts and retain both regression suites (2026-10-28).",
       "local_update_source": {
         "path": "README.md",
         "sha256": "e872d64ea58c53311d098dc1c769f5bc3232ad947d690054b75a0a0a20c6d8c6"
@@ -297,10 +297,10 @@
       "source_sha256": "82327b5737f40c891484955c2eb2ce490a53b0de46990408d4b6f9708441991d",
       "source_bytes": 4420,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "181fc6336ed0a19cbd604b76d5774e9f3909ebad95b6fdcaae596ab49b9838fe",
-      "bytes": 5212,
+      "sha256": "e8bbbcd5b7a3f8a6497ea7d72a68749fcc402546c351ec77e9229c3c0cab1360",
+      "bytes": 5281,
       "handling": "adjusted",
-      "change_note": "Issue #15: reconcile latest main, implementation/contracts, regression coverage and verification metadata (2026-10-28).",
+      "change_note": "Issue #15: reconcile PR #24 main merge with permission/API contracts and retain both regression suites (2026-10-28).",
       "local_update_source": {
         "path": "scripts/check_workspace.py",
         "sha256": "82327b5737f40c891484955c2eb2ce490a53b0de46990408d4b6f9708441991d"
@@ -1039,10 +1039,10 @@
       "source_sha256": "5f3a506dcc0e59a7d76a27f84d07a4646cae73a3062fd8689e107184056514f1",
       "source_bytes": 11968,
       "source_kind": "source_commit_file",
-      "sha256": "868d5609aded079c923ffb672753a7cf84b351af90e91b2139a0f464a916eb0e",
-      "bytes": 12151,
-      "handling": "copied",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "sha256": "938b30397b3a27640798923ed8517c8a04533fd1da4c31a6bab8d729912e9de1",
+      "bytes": 16172,
+      "handling": "adjusted",
+      "change_note": "Issue #14: reconcile latest main, implementation/contracts, regression coverage and verification metadata (2026-10-28).",
       "local_update_source": {
         "path": "src/database/vectors/resource_vectors.py",
         "sha256": "868d5609aded079c923ffb672753a7cf84b351af90e91b2139a0f464a916eb0e"
@@ -1642,6 +1642,28 @@
       "sha256": "3a8a1530b09f016847f158d901219e0fd7a93bbfcc473011e651f34fe2dbcca5",
       "bytes": 12395,
       "change_note": "Issue #15: reconcile latest main, implementation/contracts, regression coverage and verification metadata (2026-10-28)."
+    },
+    {
+      "path": "database/tests/test_resource_refresh.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_followup_implementation",
+      "handling": "adjusted",
+      "sha256": "692bd00ef7a8e4a2db3c11a8c43242a19b8c5194f82a66b301a34138a3bf6b0b",
+      "bytes": 8302,
+      "change_note": "Issue #14: reconcile latest main, implementation/contracts, regression coverage and verification metadata (2026-10-28)."
+    },
+    {
+      "path": "database/tests/test_resource_refresh_database.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_followup_implementation",
+      "handling": "adjusted",
+      "sha256": "ce1c780c1ef73a768e9895cf72129a9145a1cb03a5590dab309b9acdc046eed0",
+      "bytes": 5339,
+      "change_note": "Issue #14: reconcile latest main, implementation/contracts, regression coverage and verification metadata (2026-10-28)."
     }
   ],
   "excluded": [
@@ -1911,6 +1933,58 @@
       "strict boolean consent",
       "invalid development years returns 422"
     ],
-    "consent_history_retention_policy": "consumer review pending; current value plus changed timestamp only"
+    "consent_history_retention_policy": "consumer review pending; current value plus changed timestamp only",
+    "main_sync": {
+      "base_commit": "9d5164c23b5a1d68ce14306b26d99ddbda40f966",
+      "upstream_pull_request": 24,
+      "checked_on": "2026-10-28",
+      "conflicts_resolved": [
+        "database/README.md",
+        "database/scripts/check_workspace.py",
+        "database/import-manifest.json"
+      ],
+      "unit": {
+        "collected": 209,
+        "started_including_skips": 198,
+        "executed": 193,
+        "passed": 193,
+        "skipped": 5,
+        "failures": 0,
+        "errors": 0,
+        "successful": true
+      },
+      "integration": {
+        "collected": 53,
+        "started_including_skips": 53,
+        "executed": 50,
+        "passed": 50,
+        "skipped": 3,
+        "failures": 0,
+        "errors": 0,
+        "successful": true
+      },
+      "paid_api_calls": 0,
+      "source_53_table_fingerprints_unchanged": true,
+      "test_clone_removed": true,
+      "actual_model_generation_tested": false
+    }
+  },
+  "issue_14_followup": {
+    "base_commit": "438b011a0c496fb0cfc6a443c4b7c3f733241a24",
+    "checked_on": "2026-10-28",
+    "unit_passed": 192,
+    "unit_skipped": 5,
+    "integration_passed": 5,
+    "integration_skipped": 0,
+    "integration_mode": "verified latest dump restored to an owned disposable local PostgreSQL DB",
+    "paid_api_calls": 0,
+    "human_review": "pending",
+    "git_delivery_record": "See branch commits and the issue-linked pull request; these verification results precede publication.",
+    "live_eligible_sources": 2425,
+    "live_current_vectors": 2425,
+    "live_pending_vectors": 0,
+    "ignored_ineligible_vectors": 44,
+    "mock_embedding_response": true,
+    "actual_database_vector_writes": false
   }
 }

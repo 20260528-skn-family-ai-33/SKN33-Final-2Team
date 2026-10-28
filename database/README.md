@@ -84,7 +84,7 @@ python scripts/correct_course_skills.py --help
 
 최신 023 DB는 `python scripts/db.py migrate`로 024만 적용하고 `verify`로 확인한다. 최신 022 DB는 023·024를 순서대로 적용한다. 그 이전 구판은 최신 전체 백업을 새 DB에 복원한다. 기존 001~023 적용 SQL은 수정하지 않았다. 복구는 024 적용 전 검증 백업을 새 DB에 복원한 뒤 연결을 전환하며 그 사이 추가된 입력은 먼저 보존한다. 권한 회귀 검사는 `tests/test_department_access.py`에서 수행한다.
 
-2026-10-28에 [PR #23](https://github.com/20260528-skn-family-ai-33/SKN33-Final-2Team/pull/23)이 병합된 최신 `main`의 `438b011`로 맞추고 준비 중인 변경을 보존했다. `fix/15-direct-manager-scope`에서 이슈 #15의 변경을 검토한다. 앱의 같은 부서 범위 구현을 재사용하며 인증 세션·저장 계약을 실제 API로 검사했다.
+2026-10-28에 [PR #24](https://github.com/20260528-skn-family-ai-33/SKN33-Final-2Team/pull/24)가 병합된 최신 `main`의 `9d5164c`를 `fix/15-direct-manager-scope`에 반영했다. README·검사 실행기·manifest의 충돌을 조정해 #14의 선택 벡터 갱신 검사와 #15의 권한·인증 API 검사를 함께 유지한다. 앱의 같은 부서 범위 구현을 재사용한다.
 
 기존 Docker DB는 백업 파일을 교체해도 자동으로 복원되지 않으므로 현재 DB 버전에 맞는 마이그레이션 또는 새 DB 복원 절차를 사용한다. DB 권한 적용과 API 입력 검증 코드 배포도 각각 필요하다. Git 전달과 사람 리뷰·병합·배포는 각각의 기록으로 확인한다.
 
@@ -104,7 +104,7 @@ python scripts/correct_course_skills.py --help
 
 개발 연수에 숫자로 바꿀 수 없는 입력이 오면 500 대신 422를 반환하도록 보완했다. 현재 프런트엔드는 동의값을 boolean으로 보내므로 정상 호출 형식은 유지한다. 오류 계약은 [API 계약](../frontend/docs/API_계약.md)에 연결했다.
 
-10/28 검사 결과는 단위 183개 통과·5개 제외, 격리 DB 통합 45개 통과·3개 제외다. 통합 검사에는 `tests/test_app_contracts.py`의 실제 인증 HTTP 검사 8개가 포함된다. 3개 제외는 사번 누락 계정이 현재 없기 때문이다. LLM·임베딩·목표 생성 작업은 호출하지 않았으며 SQL·FK·세션·라우터는 실제 구현을 사용했다.
+10/28 PR #24 동기화 후 검사 결과는 단위 193개 통과·5개 제외, 격리 DB 통합 50개 통과·3개 제외다. 통합 검사에는 `tests/test_app_contracts.py`의 실제 인증 HTTP 검사 8개와 #14의 선택 벡터 갱신 검사 5개가 포함된다. 3개 제외는 사번 누락 계정이 현재 없기 때문이다. LLM·임베딩·목표 생성 작업은 호출하지 않았으며 SQL·FK·세션·라우터는 실제 구현을 사용했다. 검사 전후 원본 DB 53개 표의 지문이 같고 검사용 복제본은 제거했다.
 
 ```powershell
 # 저장소 루트에서 앱 검사 의존성 추가 설치
@@ -129,4 +129,31 @@ ERD 파일 출력은 현재 산출물과 같은 CRLF로 명시해 운영체제�
 
 [import-manifest.json](import-manifest.json)은 원래 출처·해시와 이번 로컬 최종본의 파일 해시를 구분한다. [snapshot-audit.json](snapshot-audit.json)은 과거 정적 검사와 최신 복원·보정 검증을 구분한다. `src/db/` 호환 경로와 비밀값 미출력·외부 직원 seed 사전 거절 동작을 유지한다.
 
-남은 검토: 근거가 약한 MLOps 10건, 강사 경력으로 OS 보안에 연결된 KMOOC_7204의 CI/CD 재분류, 실제 추천 화면·챗봇·관리 화면 전체·다른 PC 실행·사용 측 사람 리뷰. #14의 선택 벡터 갱신 기능은 별도 브랜치에서 준비한다. #15는 위 저장 계약 확인과 코드 반영·리뷰·병합을 구분한다.
+남은 검토: 근거가 약한 MLOps 10건, 강사 경력으로 OS 보안에 연결된 KMOOC_7204의 CI/CD 재분류, 실제 추천 화면·챗봇·관리 화면 전체·다른 PC 실행·사용 측 사람 리뷰. #14의 선택 벡터 갱신 기능은 PR #24로 병합됐다. #15는 위 저장 계약 확인과 코드 반영·리뷰·병합을 구분한다.
+
+## 자료 벡터 갱신 계획과 선택 실행
+
+이슈 #14 후속 기능이다. `plan`은 실제 DB에 읽기 전용으로 연결해 갱신할 유형·ID·누락/오래됨 여부·UTF-8 입력 바이트·32건 단위 배치 수를 출력한다. 원문, API 키와 벡터 값은 출력하지 않는다. 바이트 수는 토큰 수나 비용 견적이 아니다.
+
+```powershell
+# database/에서 실행. 실제 DB 필요. 임베딩 API 호출·DB 쓰기 없음.
+python -m src.database.vectors.resource_vectors plan --resource-type books --max-records 25
+# 필요하면 --resource-id를 반복해 ISBN별로 선택한다.
+python -m src.database.vectors.resource_vectors plan --resource-type books --resource-id ISBN
+```
+
+원본은 전달 백업 이후 바뀔 수 있으므로 25건을 고정된 운영 수치로 보지 않는다. 최대 건수를 넘으면 일부만 처리하지 않고 실패한다. ID 선택에는 하나의 유형을 지정해야 하며 잘못된 ID·0 이하 최대 건수·8,000 UTF-8 바이트 초과 입력도 쓰기·유료 호출 전에 거절한다.
+
+아래 `embed`는 **유료 API와 DB 쓰기**를 수행한다. 담당자·예산·실행 승인을 확인하고 현재 DB 백업을 보존한 후 실행한다. 이번 후속 준비에서는 실행하지 않았다.
+
+```powershell
+python -m src.database.vectors.resource_vectors embed --resource-type books --max-records 25
+python -m src.database.vectors.resource_vectors plan --resource-type books --max-records 25
+python -m src.database.vectors.resource_vectors status
+```
+
+실제 입력을 다시 임베딩한 결과와 해시를 함께 저장한다. 최신 자료는 다시 처리하지 않고 입력 해시만 바꿔 최신으로 표시하지 않는다. 기존 `embed`의 전체 유형 실행도 유지한다. API 실패·입력 변경은 DB 트랜잭션을 롤백하지만 이미 호출한 외부 API 비용은 복구되지 않는다. 적용 후 갱신 계획의 `pending_count=0`과 검색 경로를 실제 DB에서 확인해야 한다. 되돌릴 때는 실행 전 백업을 별도 DB에 복원해 대상 벡터를 복구하고 원본/입력 해시·모델 버전을 다시 대조한다. 해시만 과거 값으로 바꾸지 않는다.
+
+10/28 최신 `main`의 `438b011`로 맞춘 뒤 `python scripts/check_workspace.py`에서 무료 단위 192개 통과·5개 제외를 확인했다. `tests.test_resource_refresh`의 선택·최대 건수·누락·UTF-8 한도·입력 변경·API 실패 검사 10개가 포함된다. 별도 복제 PostgreSQL에서 `tests.test_resource_refresh_database` 5개로 선택 갱신·무변경 재시도·갱신 후 pgvector 검색·API 실패·FK 실패·입력 변경 시 실제 롤백을 확인했다. 임베딩 응답만 고정 벡터로 대체했고 유료 호출은 0회다.
+
+최신 실제 DB의 읽기 전용 `plan`·`status` 결과는 추천 대상 2,425개(스킬 36·강좌 2,045·자격 23·직무 6·전공 7·도서 308)가 모두 최신이며 갱신 대상은 0개다. 저장된 2,469개 중 44개는 현재 추천 적격 범위 밖이라 검색 대상에서 제외되며 삭제하거나 다시 임베딩하지 않았다. 10/21의 도서 25건은 과거 상태이므로 이번 유료 처리 대상으로 사용하지 않는다. 전체 DB 원본·벡터는 변경하지 않았다. 실제 추천/챗봇 검색 품질은 별도 평가 대상이다.
