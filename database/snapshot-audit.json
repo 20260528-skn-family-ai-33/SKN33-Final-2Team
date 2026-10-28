@@ -397,5 +397,155 @@
       "invalid development years returns 422"
     ],
     "consent_history_retention_policy": "consumer review pending; current value plus changed timestamp only"
+  },
+  "course_duration_20261028": {
+    "confirmed": 1730,
+    "estimated": 330,
+    "all_courses_have_planning_time": true,
+    "migration": "025_course_duration.sql",
+    "unit_passed": 189,
+    "unit_skipped": 5,
+    "postgres_duration_tests_passed": 2,
+    "frontend_tests_passed": 41,
+    "frontend_typecheck": "PASS",
+    "frontend_lint": "PASS with 37 existing warnings",
+    "frontend_build": "PASS",
+    "original_course_fields_preserved": true,
+    "other_tables_and_vectors_preserved": true,
+    "all_53_restore_fingerprints_match": true,
+    "display_rounding_minutes": 10,
+    "platform_labels_verified": true,
+    "paid_api_calls": 0,
+    "human_review": "pending",
+    "drive_upload": "not_performed",
+    "browser": "local preview with a synthetic actor on the owned test clone; no model inference"
+  },
+  "course_curriculum_20261028": {
+    "confirmed": 1730,
+    "estimated": 330,
+    "all_courses_have_planning_time": true,
+    "migration": "026_course_curriculum.sql",
+    "unit_passed": 213,
+    "unit_skipped": 5,
+    "postgres_duration_tests_passed": 3,
+    "full_outlines": 2051,
+    "partial_outlines": 3,
+    "description_only": 6,
+    "public_pages_supplemented": 111,
+    "visual_transcription_courses": 6,
+    "captured_model_payloads": 2,
+    "actual_model_inference": false,
+    "frontend_tests_passed": 41,
+    "frontend_typecheck": "PASS",
+    "frontend_lint": "PASS with 37 existing warnings",
+    "frontend_build": "PASS",
+    "original_course_fields_preserved": true,
+    "other_tables_and_vectors_preserved": true,
+    "all_53_restore_fingerprints_match": true,
+    "display_rounding_minutes": 10,
+    "platform_labels_verified": true,
+    "paid_api_calls": 0,
+    "human_review": "pending",
+    "drive_upload": "not_performed",
+    "browser": "local preview with a synthetic actor on the owned test clone; no model inference"
+  },
+  "course_publication_20261028": {
+    "issue": 26,
+    "base_commit": "f8b37ed9ae3b0fb6c6b43aa9a0b7ae29686848d1",
+    "delivery_order": "course #26 before employee #27; closed PR #29 stays deferred",
+    "employee_profile_file_matches_main": true,
+    "latest_resource_refresh_and_app_contract_suites_preserved": true,
+    "source_database_modified_during_publication": false,
+    "paid_api_calls": 0,
+    "preservation_stash": "53c95b3ccabea20b05bcbca5e5a9e3082887d678",
+    "docs_sync_stash": "6fb4b1e7c79782980caebf60e4358a09e0087709",
+    "normalized_curriculum_excluded_from_legacy_scope_input": true,
+    "human_review": "pending",
+    "verification": {
+      "base_commit": "5acc9403383d6a0a7103f3cf9c289e6841f25d11",
+      "source_database_writes": 0,
+      "paid_api_calls": 0,
+      "restored_checkpoint": {
+        "tables": 53,
+        "rows": 22300,
+        "migration_count": 26,
+        "sha256": "c401c1f60e0b7d2e513dce031225cc2dad0d879ec22674900608b55c31d2c48c"
+      },
+      "schema_sql": {
+        "psql_on_error_stop": true,
+        "foreign_keys": 87,
+        "course_columns": 5
+      },
+      "integration": {
+        "collected": 56,
+        "started_including_skips": 56,
+        "skipped": 3,
+        "passed": 53,
+        "errors": 0,
+        "failures": 0,
+        "paid_api_calls": 0
+      },
+      "app": {
+        "courses": 2060,
+        "confirmed": 1730,
+        "estimated": 330,
+        "all_courses_have_planning_hours": true,
+        "api_status": 200,
+        "manual_override_preserved_after_sync": true,
+        "planner_uses_source_and_curriculum_hours": true,
+        "sample": {
+          "confirmed": 4.0,
+          "estimated": 10.0,
+          "weeks": 4
+        },
+        "paid_api_calls": 0
+      },
+      "curriculum": {
+        "postgres_tests_passed": 3,
+        "api_full_description_and_outline": true,
+        "portable_java_outline_items": 55,
+        "ms_missing_outline_recovered": true,
+        "image_outline_topics_delivered": true,
+        "missing_outline_explicit": true,
+        "kocw_fragment_grouping": true,
+        "diagnostic_and_roadmap_payloads_captured": 2,
+        "actual_model_inference": false,
+        "paid_api_calls": 0
+      },
+      "owned_test_clones_removed": 2,
+      "publication_base_commit": "f8b37ed9ae3b0fb6c6b43aa9a0b7ae29686848d1",
+      "later_main_docs_only_sync": {
+        "pull_request": 31,
+        "runtime_files_unchanged": true,
+        "files": [
+          "README.md",
+          "backend/README.md",
+          "backend/RunPod_Ollama_연결_절차.md"
+        ]
+      },
+      "pre_fix_attempts": {
+        "first_integration_timeout_seconds": 180,
+        "second_run_cancelled_after_scope_compatibility_issue_found": true,
+        "included_in_final_pass_counts": false
+      },
+      "frontend": {
+        "typecheck": "PASS",
+        "lint_errors": 0,
+        "existing_lint_warnings": 37,
+        "test_files": 10,
+        "tests_passed": 41,
+        "build": "PASS"
+      }
+    },
+    "unit": {
+      "collected": 229,
+      "started_including_skips": 218,
+      "executed": 213,
+      "passed": 213,
+      "skipped": 5,
+      "failures": 0,
+      "errors": 0,
+      "successful": true
+    }
   }
 }

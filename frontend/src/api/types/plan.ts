@@ -6,6 +6,8 @@ import type { ActDef, DeepQuiz, DeepGrade, DeepJudge, Handoff, OptionDef, Prefs,
 /** 계획에 들어간 활동(주차 계산 포함) */
 export interface Activity extends ActDef {
   hours: number;
+  hoursEstimated?: boolean;
+  hoursBasis?: string;
   wFrom: number;
   wTo: number;
 }

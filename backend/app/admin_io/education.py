@@ -276,6 +276,8 @@ def apply(t: db.Tx, found: dict[str, list[Row]], cur: dict[str, dict], ctx: dict
                      content_status = :st, last_batch_updated = now() WHERE course_id = :k""",
                   k=r.key[0], ti=v['title'], pl=v['platform'], o=v.get('org'), u=v.get('url'), im=_img(v), d=DIFF_IN.get(v.get('difficulty') or ''), w=v.get('weeks'), s=v.get('summary'), st=keep)
         _upsert_meta(t, r.key[0], 'course', 'course_id', r.key[0], v, _est_of(r, old, v))
+        if any(change.get('field') == 'hours' for change in r.changes) or (r.action == 'add' and v.get('hours') is not None):
+            t.run("UPDATE app_ext.resource_meta SET hours_origin='manual' WHERE resource_key=:k", k=r.key[0])
         if 'skills' in r.present:
             _set_skills(t, 'course_skills', 'course_id', r.key[0], v.get('skills') or [], sid)
         res['강좌'][r.action] += 1

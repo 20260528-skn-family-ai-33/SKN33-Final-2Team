@@ -1,10 +1,10 @@
 /* 단계별 활동 목록 (5차 P.stagesView) — 검토·확정 · 내 로드맵 · 부서장 화면이 같이 쓴다 */
 import type { PlanContent, Progress } from '@/api/types/plan';
 import { D } from '@/shared/constants/data';
-import { hrs } from '@/shared/lib/format';
+import { roundedDuration } from '@/shared/lib/resourceTime';
 import { actMeta, range, st, stageActs } from '@/shared/lib/plan';
-import { resOf, useCatalog } from '@/shared/state/catalog';
-import { ActThumb, Est, Stt } from './parts';
+import { useCatalog } from '@/shared/state/catalog';
+import { ActThumb, Stt } from './parts';
 
 export function StagesView({ pl, progress, status, memo }: { pl: PlanContent; progress?: Record<string, Progress>; status?: boolean; memo?: boolean }) {
   useCatalog((s) => s.res);
@@ -38,8 +38,7 @@ export function StagesView({ pl, progress, status, memo }: { pl: PlanContent; pr
                         {m ? <small className="memo">메모 · {m}</small> : null}
                       </div>
                       <span className="h">
-                        {hrs(a.hours)}
-                        {a.res ? <Est r={resOf(a.res)} k="hours" /> : null}
+                        <span title={a.hoursBasis || '로드맵에 저장된 계획 시간입니다'}>계획 {roundedDuration(a.hours)}{a.hoursEstimated ? ' (추정)' : ''}</span>
                       </span>
                     </li>
                   );

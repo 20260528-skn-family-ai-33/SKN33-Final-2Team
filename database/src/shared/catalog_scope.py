@@ -42,8 +42,12 @@ OUTSIDE = re.compile(r"문학|소설|사유|시집|(?<!자)동화|수필|에세�
 PRACTICE = re.compile(r"구현|개발|설계|실습|프로그래밍|코딩|학습|훈련|쿼리|분석|알고리즘|모델링|구축|배포|운영|디버깅|최적화|처리|보안|작성|관리|컴파일|테스트|프로토콜[^\n.!?。]{0,30}이해|\b(?:implement|develop|design|build|deploy|configure|train|query|code|programming|manage|analy[sz]|secure|test)\w*", re.I)
 
 def body_text(fields):
+    # The normalized course JSON is UI/model evidence, not a change to the
+    # original text used by reviewed skill links and vector eligibility.
+    # Legacy text curricula (for example majors) retain their existing meaning.
     body = "\n".join(dict.fromkeys(str(fields.get(k) or "") for k in
-                       ("syllabus_summary", "description", "test_subjects", "curriculum", "ncs_units")))
+                       ("syllabus_summary", "description", "test_subjects", "curriculum", "ncs_units")
+                       if not (k == "curriculum" and isinstance(fields.get(k), dict))))
     return teaching_text(body) if fields.get('syllabus_summary') else body
 
 def applied_ai_course(title, body):

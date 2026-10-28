@@ -46,10 +46,10 @@
       "source_sha256": "15e8559b61d8db92a1a322ba0a1be86852fb1f4555ecf80b89be366d9b289fcf",
       "source_bytes": 11326,
       "source_kind": "team_existing_file",
-      "sha256": "0bee51bb46030754819d36ba02e703cda0d0c3314757d019b66b53f53a42d9ad",
-      "bytes": 16917,
+      "sha256": "14ce21426101a3c5240320f3c00a2c93ef960a5f01eacdf513cd6e0d84dcc706",
+      "bytes": 17031,
       "handling": "adjusted",
-      "change_note": "Issue #15: reconcile latest main, implementation/contracts, regression coverage and verification metadata (2026-10-28)."
+      "change_note": "Issue #26 course-first publication: preserve latest #14/#15 main; time, outlines, UI and snapshot only."
     },
     {
       "path": "database/.env.example",
@@ -83,10 +83,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "42da682336c7bc5bf66d2f2737554994434889109dc4b7a627a02638ac036a38",
-      "bytes": 22789,
+      "sha256": "f0b41a7ad331cca1c03924135cff6defc8f74e2c0355261f0a468f6cb1407469",
+      "bytes": 30873,
       "handling": "adjusted",
-      "change_note": "Issue #15: reconcile PR #24 main merge with permission/API contracts and retain both regression suites (2026-10-28).",
+      "change_note": "Issue #26 course-first publication: preserve latest #14/#15 main; time, outlines, UI and snapshot only.",
       "local_update_source": {
         "path": "README.md",
         "sha256": "e872d64ea58c53311d098dc1c769f5bc3232ad947d690054b75a0a0a20c6d8c6"
@@ -109,10 +109,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "ab2ab628b2851c16467901fd9d4ff6a20714f5d608c22f505efe8fd8a33d1775",
-      "bytes": 23477,
+      "sha256": "3728ef9742b5f9f252c7f76b1bebbcc2dfba5f507bfd145f5a2fc0073fd40359",
+      "bytes": 24375,
       "handling": "adjusted",
-      "change_note": "2026-10-27 #15 same-department-only permissions, regression tests and snapshot metadata; HR rows remain external."
+      "change_note": "Issue #26 course-first publication: preserve latest #14/#15 main; time, outlines, UI and snapshot only."
     },
     {
       "source_path": "database/config/paths.yaml",
@@ -297,10 +297,10 @@
       "source_sha256": "82327b5737f40c891484955c2eb2ce490a53b0de46990408d4b6f9708441991d",
       "source_bytes": 4420,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "e8bbbcd5b7a3f8a6497ea7d72a68749fcc402546c351ec77e9229c3c0cab1360",
-      "bytes": 5281,
+      "sha256": "f692f82cc4f1bf56fac9ac579599a469ede22d52196b617019b5c9006094498a",
+      "bytes": 5396,
       "handling": "adjusted",
-      "change_note": "Issue #15: reconcile PR #24 main merge with permission/API contracts and retain both regression suites (2026-10-28).",
+      "change_note": "Issue #26 course-first publication: preserve latest #14/#15 main; time, outlines, UI and snapshot only.",
       "local_update_source": {
         "path": "scripts/check_workspace.py",
         "sha256": "82327b5737f40c891484955c2eb2ce490a53b0de46990408d4b6f9708441991d"
@@ -488,10 +488,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "1e9dd6e255c8085a049d972e3765409e8b32c151e397d783eb232a3743db233c",
-      "bytes": 13647,
+      "sha256": "ec073d9d6dda4a4685f859f5987320eb88d4c7c5940557e7249675ba5952b9e1",
+      "bytes": 18719,
       "handling": "adjusted",
-      "change_note": "Issue #15: authenticated HTTP contract verification on latest main (2026-10-28)."
+      "change_note": "Issue #26 course-first publication: preserve latest #14/#15 main; time, outlines, UI and snapshot only."
     },
     {
       "source_path": "database/src/__init__.py",
@@ -534,10 +534,10 @@
       "source_sha256": "60099e9c5f394bb8cda0bd4dd89aabc85cc28c4ba02047495eea8b6bcd269a3b",
       "source_bytes": 191247,
       "source_kind": "source_commit_file",
-      "sha256": "c1309a15de25ff5e5447c5d1b2440ab17c374fc67f0c34c76e28aaab7c7576f9",
-      "bytes": 208289,
-      "handling": "copied",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "sha256": "909bb6fb477eebb1837cf800010105100a7c82ae3dd4f4e97834d5066adec964",
+      "bytes": 210890,
+      "handling": "adjusted",
+      "change_note": "Issue #26 course-first publication: preserve latest #14/#15 main; time, outlines, UI and snapshot only.",
       "local_update_source": {
         "path": "src/database/catalog.current.json",
         "sha256": "c1309a15de25ff5e5447c5d1b2440ab17c374fc67f0c34c76e28aaab7c7576f9"
@@ -714,10 +714,10 @@
       "source_sha256": "e568b5447a02f5a1d944397d03cf044d0a4a1f53c8a22131a82868035d3c299f",
       "source_bytes": 4885,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "91fc7c07987c9008344d5c68c6931d1216a9494022e1d0d04f645e30e72bbc02",
-      "bytes": 5217,
-      "handling": "copied",
-      "change_note": "PR #22: preserve employee catalog identities and saved roadmap resources; accept millisecond dates; skip empty historical URLs; add free regressions and verification record.",
+      "sha256": "5205cfe0c821908ed6371e1cff59fed2b8e417a84d76a496ffd75aa4b62c128f",
+      "bytes": 5427,
+      "handling": "adjusted",
+      "change_note": "Issue #26 course-first publication: preserve latest #14/#15 main; time, outlines, UI and snapshot only.",
       "local_update_source": {
         "path": "src/database/ingestion/catalog_finalization.py",
         "sha256": "e568b5447a02f5a1d944397d03cf044d0a4a1f53c8a22131a82868035d3c299f"
@@ -1149,10 +1149,10 @@
       "source_sha256": "fcf62e38edceec7298965eb8ec1ea7031b25dcb862798f3a40bf6a372934cd14",
       "source_bytes": 7583,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "fcf62e38edceec7298965eb8ec1ea7031b25dcb862798f3a40bf6a372934cd14",
-      "bytes": 7583,
-      "handling": "copied",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "sha256": "1c28e57fedbd938b99aea930b13d2dd64cc18cf62e94cdcd1bdab37b59758b59",
+      "bytes": 7901,
+      "handling": "adjusted",
+      "change_note": "Issue #26 course-first publication: preserve latest #14/#15 main; time, outlines, UI and snapshot only.",
       "local_update_source": {
         "path": "src/shared/catalog_scope.py",
         "sha256": "fcf62e38edceec7298965eb8ec1ea7031b25dcb862798f3a40bf6a372934cd14"
@@ -1446,10 +1446,10 @@
       "source_sha256": "f5260d82fdb90d1b6f3309f4cb3f6062034be533133406f25cf5060a27b90b2b",
       "source_bytes": 166111,
       "source_kind": "user_delivered_external_erd",
-      "sha256": "f999187c852e87af639a61be6383c82de82d8825e332c70a1500fd18f1a47ad1",
-      "bytes": 180371,
+      "sha256": "83aaff2391221f2601b6673efd4f3e7af882e31a8f65ff476a428fc9b1cfbd64",
+      "bytes": 182151,
       "handling": "adjusted",
-      "change_note": "2026-10-27 #15 same-department-only permissions, regression tests and snapshot metadata; HR rows remain external.",
+      "change_note": "Issue #26 course-first publication: preserve latest #14/#15 main; time, outlines, UI and snapshot only.",
       "local_update_source": {
         "path": "docs/ERD_최종.html",
         "sha256": "68cd694ae64009304fa7f663861a80e9f93d3a8f67ef84e479971e4f709c66f2"
@@ -1461,10 +1461,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "66539dc8e6da8ec17f2e8e6868d5c83c9ef88400ce12adc8f71f6d1406739e07",
-      "bytes": 9278,
+      "sha256": "1622023fba331146e6a5c17d26621734dd04f914d632227fa7c3ed9b1c6d110b",
+      "bytes": 9442,
       "handling": "adjusted",
-      "change_note": "2026-10-27 #15 same-department-only permissions, regression tests and snapshot metadata; HR rows remain external."
+      "change_note": "Issue #26 course-first publication: preserve latest #14/#15 main; time, outlines, UI and snapshot only."
     },
     {
       "path": "docs/07_데이터베이스_저장소_설계/SCHEMA.md",
@@ -1472,10 +1472,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "9d8002fe1174936992c3090819a093caf463b4f2cffbedbb42a7e001fd39c091",
-      "bytes": 33247,
+      "sha256": "64ce4c2a6a3a2e86a78783afcdf417a56a090f493b82cb05d35211e4a8472e6a",
+      "bytes": 33458,
       "handling": "adjusted",
-      "change_note": "2026-10-27 #15 same-department-only permissions, regression tests and snapshot metadata; HR rows remain external."
+      "change_note": "Issue #26 course-first publication: preserve latest #14/#15 main; time, outlines, UI and snapshot only."
     },
     {
       "path": "docs/07_데이터베이스_저장소_설계/schema_final.sql",
@@ -1483,10 +1483,10 @@
       "source_sha256": "92f6b5a8e16e0391d15ca0f30940f56ef6b74109855ff463d7620ec5e71aad76",
       "source_bytes": 133911,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "83b34bf34c1897978e8db0e4eb5978ecbfe742c586f3cd6bbfe58a58a5583ef3",
-      "bytes": 134440,
+      "sha256": "85edf9b795851754be4dfb0975432c39ef6500805dffb8526365c07b4da386e3",
+      "bytes": 136855,
       "handling": "adjusted",
-      "change_note": "2026-10-27 #15 same-department-only permissions, regression tests and snapshot metadata; HR rows remain external.",
+      "change_note": "Issue #26 course-first publication: preserve latest #14/#15 main; time, outlines, UI and snapshot only.",
       "local_update_source": {
         "path": "docs/schema_final.sql",
         "sha256": "92f6b5a8e16e0391d15ca0f30940f56ef6b74109855ff463d7620ec5e71aad76"
@@ -1639,9 +1639,9 @@
       "source_bytes": null,
       "source_kind": "team_followup_implementation",
       "handling": "adjusted",
-      "sha256": "3a8a1530b09f016847f158d901219e0fd7a93bbfcc473011e651f34fe2dbcca5",
-      "bytes": 12395,
-      "change_note": "Issue #15: reconcile latest main, implementation/contracts, regression coverage and verification metadata (2026-10-28)."
+      "sha256": "28e56cc04412b42e14a37a7e8699bb478b3a87dd0b47b9afaf0d2609060b1018",
+      "bytes": 13273,
+      "change_note": "Issue #26 course-first publication: preserve latest #14/#15 main; time, outlines, UI and snapshot only."
     },
     {
       "path": "database/tests/test_resource_refresh.py",
@@ -1664,6 +1664,347 @@
       "sha256": "ce1c780c1ef73a768e9895cf72129a9145a1cb03a5590dab309b9acdc046eed0",
       "bytes": 5339,
       "change_note": "Issue #14: reconcile latest main, implementation/contracts, regression coverage and verification metadata (2026-10-28)."
+    },
+    {
+      "path": "backend/app/admin_io/education.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "5097714772595f0acc8c97aff3ba95a73f18e3221c2af230286b718d6630895a",
+      "bytes": 24718,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "backend/app/agents/roadmap.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "57c912bf9052ff216f9acf220fa8bc0b2e36c5d16c32a2df28d5ab5072d73cf3",
+      "bytes": 40873,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "backend/app/catalog.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "e6971590158542a324d8f0eacc488145208cbef5cc5c8d6565ce42b841987003",
+      "bytes": 15895,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "backend/app/course_time.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "6d1ed1f8635b0580e522154d2816f23e5da8d03afe4efc68e298407cef64955f",
+      "bytes": 3500,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "backend/db/02_app_ext.sql",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "1eb645af8e1d4cd532175fd2294bffa2fb0951c0538ec4e0c9bccd9a64851fcb",
+      "bytes": 15306,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "backend/tools/setup_db.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "70e74f3b683ce2448db1b786e25450442f16c9a65b7df82d15d656f083378b66",
+      "bytes": 14489,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "database/data/exports/growpath_duration_20261028.manifest.json",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "9bf8f604cdf21674a95eaf5370a34ce923b0cc1ea661d0cd37814a76a53b65df",
+      "bytes": 59214,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "database/scripts/backfill_course_duration.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "5be6e4a83fd0bb7d45e9e30c3f810f920fdb50c58b1ffddfe5e3457474e226d8",
+      "bytes": 747,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "database/src/database/course_duration.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "49c50eafb8ae0e6668b82434f94851938bdc9b2e4efa0488f55ea681b09a3259",
+      "bytes": 8987,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "database/src/database/migrations/025_course_duration.sql",
+      "source_path": null,
+      "source_sha256": "ce5403a706a6f533f6d696e6af8b574c7251027a31ddf950b86bb2b271cf2fe8",
+      "source_bytes": 1660,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "ce5403a706a6f533f6d696e6af8b574c7251027a31ddf950b86bb2b271cf2fe8",
+      "bytes": 1660,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "database/tests/test_course_duration.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "b87dc33c9854e4b7e05f96e17220eb4249a59e623cd3b2b0950f5714fbc48ed2",
+      "bytes": 6046,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "database/tests/test_course_duration_database.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "f7a0c851b7a873497f0d36853373684aa0f8a27a261dd88336305983c1f4a821",
+      "bytes": 4459,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "frontend/src/api/types/catalog.ts",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "e822d6454f3670dbc455331fc06173d8205a76c6d91a8525b34b9fc5e89d07ef",
+      "bytes": 2870,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "frontend/src/api/types/plan.ts",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "85e5685abf150007e13df9cfc69fed34c9ed10ce84085bffdcdb6172ccc6c738",
+      "bytes": 5430,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "frontend/src/features/draft/result/ResultStep.tsx",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "8adb6f1d0ed27f598279933be09834029b982c2df513dd7351f3e279684b022b",
+      "bytes": 19173,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "frontend/src/features/resources/ResourcePages.tsx",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "27ed58be0430265f7769fb7b51cc23ef970870aa2ea7b944c3d32fbecfb37405",
+      "bytes": 9346,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "frontend/src/features/roadmap/RecordSheet.tsx",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "cbdf620bc0a9a5f7e4db67302bf2e0f2d089a53454b86993dfc30e219db0ef8f",
+      "bytes": 5904,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "frontend/src/shared/lib/plan.ts",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "52d4d641f049c23bb09e7110b75d4b5a38ba07654224847b56edbef79ac0ae58",
+      "bytes": 5981,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "frontend/src/shared/lib/resourceSource.test.ts",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "da4400a7b490a43cf9b6e9d21032111ec796c684530328c0e531169ac4d46127",
+      "bytes": 676,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "frontend/src/shared/lib/resourceSource.ts",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "cf6847576b9591a48c1248a089c0d915944ff884816f541c9e371d04db8923fb",
+      "bytes": 764,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "frontend/src/shared/lib/resourceTime.test.ts",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "0d8419514b9e8807596db316978ca667351962e777649698fecd8dd926b20a7e",
+      "bytes": 1132,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "frontend/src/shared/lib/resourceTime.ts",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "ac16412950e6b2f5715bf8031f5796870c643e9745bd3404aa97e9ad17b7b2e0",
+      "bytes": 1076,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "frontend/src/shared/ui/ResPicker.tsx",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "ed00ca1b827a81f0ff2159c45c2d6523319fb5b4440fd4a8796512407e4889aa",
+      "bytes": 4424,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "frontend/src/shared/ui/StagesView.tsx",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "e0a84ce94ee62f05f884f4daa37411de3fce36e26ad28f145d64f8e0d7a9a9f9",
+      "bytes": 2200,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "backend/app/agents/diag.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "ba3f95d6672a5414be0338168e351ae87dcaeedeb42de744fa95bc8dbc236838",
+      "bytes": 27594,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "backend/app/catalog_evidence.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "8665fb69f88ff5eb78549218f8e5b8af6356960b6ccf3bb2732269b1e8c59b02",
+      "bytes": 3886,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "database/data/exports/growpath_curriculum_20261028.manifest.json",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "e81fd36cb9bd98524ffc10a79683f0dd29f31431094e450f71ddc89b0f79b3bd",
+      "bytes": 59418,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "database/scripts/backfill_course_curriculum.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "87a1a02a72f30d692aad3121eb795a9025a9f0818b8605d7afebc1bc4e150fd2",
+      "bytes": 1035,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "database/src/database/course_curriculum.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "75f3dc00783d8811eb38aee77a404a44dd7bdcd562577451f8986c540408f7dc",
+      "bytes": 11444,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "database/src/database/migrations/026_course_curriculum.sql",
+      "source_path": null,
+      "source_sha256": "71141de5ddb08a60563c5e7e685d509b7d9ea0e157752fe7d3dd0985c83983b0",
+      "source_bytes": 454,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "71141de5ddb08a60563c5e7e685d509b7d9ea0e157752fe7d3dd0985c83983b0",
+      "bytes": 454,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "database/tests/test_course_curriculum.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "219af74c46497b59fcb018d81a4c4d65e769c64dca7766a45babe94452a9a958",
+      "bytes": 7482,
+      "change_note": "Issue #26 course-first publication: preserve latest #14/#15 main; time, outlines, UI and snapshot only."
     }
   ],
   "excluded": [
@@ -1895,8 +2236,8 @@
     "layout_and_controls_preserved": true
   },
   "updated_on": "2026-10-28",
-  "team_update_base_commit": "438b011a0c496fb0cfc6a443c4b7c3f733241a24",
-  "current_snapshot_manifest": "database/data/exports/growpath_latest.manifest.json",
+  "team_update_base_commit": "f8b37ed9ae3b0fb6c6b43aa9a0b7ae29686848d1",
+  "current_snapshot_manifest": "database/data/exports/growpath_curriculum_20261028.manifest.json",
   "update_scope": "Final DB source, employee form compatibility, category-scoped hybrid knowledge search, course source/skill filtering, schema/ERD and execution metadata. External source/HR/vector/runtime data are excluded.",
   "historical_validation": {
     "python": "3.12",
@@ -1986,5 +2327,35 @@
     "ignored_ineligible_vectors": 44,
     "mock_embedding_response": true,
     "actual_database_vector_writes": false
-  }
+  },
+  "course_curriculum_verification": {
+    "confirmed": 1730,
+    "estimated": 330,
+    "all_courses_have_planning_time": true,
+    "migration": "026_course_curriculum.sql",
+    "unit_passed": 213,
+    "unit_skipped": 5,
+    "postgres_duration_tests_passed": 3,
+    "full_outlines": 2051,
+    "partial_outlines": 3,
+    "description_only": 6,
+    "public_pages_supplemented": 111,
+    "visual_transcription_courses": 6,
+    "captured_model_payloads": 2,
+    "actual_model_inference": false,
+    "frontend_tests_passed": 41,
+    "frontend_typecheck": "PASS",
+    "frontend_lint": "PASS with 37 existing warnings",
+    "frontend_build": "PASS",
+    "original_course_fields_preserved": true,
+    "other_tables_and_vectors_preserved": true,
+    "all_53_restore_fingerprints_match": true,
+    "display_rounding_minutes": 10,
+    "platform_labels_verified": true,
+    "paid_api_calls": 0,
+    "human_review": "pending",
+    "drive_upload": "not_performed",
+    "browser": "local preview with a synthetic actor on the owned test clone; no model inference"
+  },
+  "course_publication_order": "course #26 before employee #27"
 }
