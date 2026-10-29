@@ -91,12 +91,14 @@ def _team_state(t: db.Tx, employee_id: int) -> dict:
 
 def _team_values(t: db.Tx, employee_id: int, st: dict) -> dict:
     p = st['profile'] or {}
-    certs = [r['title'] for r in t.all("""SELECT title FROM public.certifications
-                                         WHERE cert_id = ANY(CAST(:ids AS integer[])) ORDER BY title""", ids=st['certIds'])] + _split(st['unlisted'])
+    # DB 복원 환경의 collation이 달라도 추천 입력 해시가 같도록 마스터 목록은 Python에서 정렬한다.
+    # 직접 입력한 여러 줄의 순서는 그대로 보존한다.
+    certs = sorted(r['title'] for r in t.all("""SELECT title FROM public.certifications
+                                         WHERE cert_id = ANY(CAST(:ids AS integer[]))""", ids=st['certIds'])) + _split(st['unlisted'])
     if st['profile'] is None:
         # 본인 입력 전에는 사내 DB 의 보유 스킬을 사용 기술 처음 값으로 보여 준다
-        tech = [r['name'] for r in t.all("""SELECT s.name FROM public.employee_skills es JOIN public.skill_tags s USING (skill_id)
-                                            WHERE es.employee_id = :e ORDER BY s.name""", e=employee_id)]
+        tech = sorted(r['name'] for r in t.all("""SELECT s.name FROM public.employee_skills es JOIN public.skill_tags s USING (skill_id)
+                                            WHERE es.employee_id = :e""", e=employee_id))
     else:
         tech = _split(p.get('technology_experience'))
     return {'workDesc': st.get('workDesc'), 'expSummary': p.get('experience_summary'), 'devYears': p.get('development_years'), 'tech': tech, 'certs': certs,
