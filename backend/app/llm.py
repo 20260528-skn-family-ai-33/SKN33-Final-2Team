@@ -130,6 +130,19 @@ def _level_name(v) -> str:
     return 'on' if v is True else 'off' if v is False else str(v)
 
 
+# 모델 이름 → /api/show 로 확인한 추론 정도 단계(연결 확인·호출 때 채움). 화면에 보인 단계와 같은 기준으로 직원 값을 거른다
+_think_cache: dict[str, list[str]] = {}
+
+
+def _ollama_takes(model: str, level: str) -> bool:
+    """그 모델이 이 단계를 받는지. 화면은 모델이 받는 단계만 보여 주므로, 모델을 바꾼 뒤 남은 옛 선택(예: high)은
+    서버 기본값으로 돌린다(PR #40 리뷰). 단계를 확인하지 못하면(연결 확인 실패) 고른 값을 그대로 보낸다"""
+    if model not in _think_cache:
+        think_levels(model)
+    levels = _think_cache.get(model)
+    return levels is None or level in levels
+
+
 def chat(provider: str, messages: list, role: str = 'default', json_mode: bool = True, reasoning: str | None = None) -> dict:
     """한 번의 대화 호출 → {content, model, provider, loadMs, totalMs}.
     reasoning: 직원이 화면에서 고른 추론 정도(단계 이름). 없으면 .env 기본값(OLLAMA_THINK / OPENAI_REASONING_EFFORT),
@@ -147,7 +160,10 @@ def chat(provider: str, messages: list, role: str = 'default', json_mode: bool =
             payload['options'] = {'num_ctx': S.ollama_num_ctx}
         if S.ollama_keep_alive:
             payload['keep_alive'] = S.ollama_keep_alive
-        level = OLLAMA_REGULATION_THINK if role == 'regulation' else mine or S.ollama_think
+        if role == 'regulation':
+            level = OLLAMA_REGULATION_THINK
+        else:
+            level = (mine if mine and _ollama_takes(model, mine) else None) or S.ollama_think
         if level:
             payload['think'] = _think(level)
         res = ollama('api/chat', payload)
@@ -191,7 +207,8 @@ def think_levels(name: str) -> dict | None:
         default = None if t.get('default') is None else _level_name(t['default'])
     else:
         levels, default = (['off', 'on'] if 'thinking' in (res.get('capabilities') or []) else []), None
-    return {'levels': levels if len(levels) > 1 else [], 'default': default}
+    _think_cache[name] = levels = levels if len(levels) > 1 else []
+    return {'levels': levels, 'default': default}
 
 
 def ping(provider: str) -> dict:

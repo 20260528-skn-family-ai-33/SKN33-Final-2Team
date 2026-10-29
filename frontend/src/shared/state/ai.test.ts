@@ -164,6 +164,62 @@ describe('추론 정도', () => {
     expect(useAi.getState().settings.reasoning).toEqual({ ollama: 'off' });
   });
 
+  /** 저장 요청을 붙잡아 두고 순서를 정해 끝낸다(늦은 응답·실패 재현) */
+  const holdSaves = () => {
+    const calls: { level: string | null; done: (r: { reasoning: ReasoningPicks }) => void; fail: (e: unknown) => void }[] = [];
+    vi.spyOn(aiApi, 'setReasoning').mockImplementation(
+      (_p, level) => new Promise((done, fail) => calls.push({ level, done, fail })),
+    );
+    return calls;
+  };
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+
+  it('빠르게 바꾸면 저장은 차례로 보내고, 앞 요청의 늦은 응답이 마지막 선택을 덮지 않는다', async () => {
+    setup({});
+    const calls = holdSaves();
+    const first = setReasoning('ollama', 'low');
+    const second = setReasoning('ollama', 'xhigh');
+    await tick();
+    expect(calls.map((c) => c.level)).toEqual(['low']);
+    calls[0].done({ reasoning: { ollama: 'low' } });
+    await first;
+    expect(ai.reasoning('ollama')).toBe('xhigh');
+    await tick();
+    expect(calls.map((c) => c.level)).toEqual(['low', 'xhigh']);
+    calls[1].done({ reasoning: { ollama: 'xhigh' } });
+    await second;
+    expect(ai.reasoning('ollama')).toBe('xhigh');
+  });
+
+  it('앞 요청이 실패해도 마지막 선택을 되돌리지 않는다', async () => {
+    setup({ mine: { ollama: 'off' } });
+    const calls = holdSaves();
+    const first = setReasoning('ollama', 'low');
+    const second = setReasoning('ollama', 'xhigh');
+    await tick();
+    calls[0].fail(new ApiError(500, { code: 'SERVER', message: '저장하지 못했어요' }));
+    await expect(first).rejects.toBeInstanceOf(ApiError);
+    expect(ai.reasoning('ollama')).toBe('xhigh');
+    await tick();
+    calls[1].done({ reasoning: { ollama: 'xhigh' } });
+    await second;
+    expect(ai.reasoning('ollama')).toBe('xhigh');
+  });
+
+  it('마지막 요청이 실패하면 서버에 마지막으로 저장된 값으로 돌린다', async () => {
+    setup({ mine: { ollama: 'off' } });
+    const calls = holdSaves();
+    const first = setReasoning('ollama', 'low');
+    const second = setReasoning('ollama', 'xhigh');
+    await tick();
+    calls[0].done({ reasoning: { ollama: 'low' } });
+    await first;
+    await tick();
+    calls[1].fail(new ApiError(500, { code: 'SERVER', message: '저장하지 못했어요' }));
+    await expect(second).rejects.toBeInstanceOf(ApiError);
+    expect(useAi.getState().settings.reasoning).toEqual({ ollama: 'low' });
+  });
+
   it('단계 이름은 아는 것만 한글로, 모델이 정한 이름은 그대로 보인다', () => {
     expect(levelLabel('xhigh')).toBe('매우 높음');
     expect(levelLabel('off')).toBe('끔');

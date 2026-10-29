@@ -126,18 +126,34 @@ export async function setChoice(p: UiProvider): Promise<void> {
   await aiApi.setProvider(toSrv(p));
 }
 
-/** 모드별 추론 정도 저장(null 이면 기본값으로). 저장에 실패하면 화면 값을 되돌린다(서버 값과 어긋나지 않게) */
+/* 추론 정도 저장은 하나씩 차례로 보낸다: 빠르게 바꾸면 앞 요청의 늦은 응답·실패가 마지막 선택을 덮지 않게
+   (PR #40 리뷰). 화면은 마지막 선택만 서버 응답으로 맞추고, 그것이 실패하면 서버에 마지막으로 저장된 값으로 돌린다 */
+let reasoningQueue: Promise<unknown> = Promise.resolve();
+let reasoningLatest = 0;
+/** 저장이 진행 중일 때 서버에 마지막으로 저장된 값(진행 중이 아니면 null · 화면 값이 곧 서버 값) */
+let reasoningSaved: UserSettings['reasoning'] | null = null;
+
+/** 모드별 추론 정도 저장(null 이면 기본값으로) */
 export async function setReasoning(p: UiProvider, level: string | null): Promise<void> {
-  const prev = g().settings.reasoning;
-  const next = { ...prev };
+  const seq = ++reasoningLatest;
+  const cur = g().settings.reasoning;
+  if (reasoningSaved === null) reasoningSaved = cur;
+  const next = { ...cur };
   if (level) next[toSrv(p)] = level;
   else delete next[toSrv(p)];
   useAi.setState((s) => ({ settings: { ...s.settings, reasoning: next } }));
+  const req = reasoningQueue.then(() => aiApi.setReasoning(toSrv(p), level));
+  reasoningQueue = req.catch(() => undefined);
+  const show = (reasoning: UserSettings['reasoning']) => {
+    if (seq !== reasoningLatest) return;
+    useAi.setState((s) => ({ settings: { ...s.settings, reasoning } }));
+    reasoningSaved = null;
+  };
   try {
-    const r = await aiApi.setReasoning(toSrv(p), level);
-    useAi.setState((s) => ({ settings: { ...s.settings, reasoning: r.reasoning || {} } }));
+    reasoningSaved = (await req).reasoning || {};
+    show(reasoningSaved);
   } catch (err) {
-    useAi.setState((s) => ({ settings: { ...s.settings, reasoning: prev } }));
+    show(reasoningSaved || cur);
     throw err;
   }
 }

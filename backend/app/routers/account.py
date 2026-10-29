@@ -152,15 +152,14 @@ def api_set_reasoning(body: dict, a: Account = Depends(require_employee)):
         raise ApiError(422, 'BAD_REASONING', '추론 정도는 단계 이름 또는 null(서버 기본값)로 보내 주세요')
     if p == 'openai' and level is not None and level not in S.openai_reasoning_levels:
         raise ApiError(422, 'BAD_REASONING', 'OpenAI 모델이 받는 추론 정도가 아니에요', '.env 의 OPENAI_REASONING_LEVELS 에 있는 단계만 고를 수 있어요')
-    cur = dict(_settings(a.id)['reasoning'])
-    if level is None:
-        cur.pop(p, None)
-    else:
-        cur[p] = level
+    # 그 모드의 키만 한 문장으로 바꾼다: 읽고 고쳐 통째로 쓰면 두 모드를 동시에 저장할 때 한쪽이 사라진다(PR #40 리뷰)
+    mine = {} if level is None else {p: level}
     with db.tx() as t:
-        t.run("""INSERT INTO app_ext.user_settings(employee_id, reasoning) VALUES(:e, :r)
-                 ON CONFLICT (employee_id) DO UPDATE SET reasoning = EXCLUDED.reasoning, updated_at = now()""", e=a.id, r=db.J(cur))
-    return {'reasoning': cur}
+        row = t.one("""INSERT INTO app_ext.user_settings(employee_id, reasoning) VALUES(:e, :m)
+                       ON CONFLICT (employee_id) DO UPDATE
+                         SET reasoning = (app_ext.user_settings.reasoning - CAST(:p AS text)) || EXCLUDED.reasoning, updated_at = now()
+                       RETURNING reasoning""", e=a.id, p=p, m=db.J(mine))
+    return {'reasoning': row['reasoning'] or {}}
 
 
 @r.get('/ai/status')
