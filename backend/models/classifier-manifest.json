@@ -1,6 +1,6 @@
 {
   "model_file": "klue_roberta_full_model.pt",
-  "source": "사용자 제공 models/klue_roberta_full_model.pt (런타임: backend/models/klue_roberta_full_model.pt)",
+  "source": "사용자 제공 backend/models/klue_roberta_full_model.pt (고정 경로)",
   "tokenizer_source": "models/Chatbot_classification/DL_models/roberta_tuning_best/klue_roberta",
   "labels": [
     "범위 밖",

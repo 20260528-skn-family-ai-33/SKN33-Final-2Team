@@ -3,11 +3,12 @@
 FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 OMP_NUM_THREADS=2 MKL_NUM_THREADS=2
 WORKDIR /srv/growpath
-COPY requirements.txt requirements-classifier.txt ./
+COPY requirements.txt ./
+COPY database/requirements.txt database/requirements-db.txt ./database/
 RUN pip install --no-cache-dir -r requirements.txt
-COPY app ./app
-COPY web ./web
-COPY db ./db
-COPY tools ./tools
+COPY backend/app ./app
+COPY backend/web ./web
+COPY backend/db ./db
+COPY backend/tools ./tools
 EXPOSE 8785
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8785"]

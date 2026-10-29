@@ -1,4 +1,0 @@
-# 학습 기록과 같은 버전. Docker/로컬 CPU 추론용이며 CUDA 패키지는 받지 않는다.
---extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.11.0+cpu
-transformers==5.20.2

@@ -26,9 +26,9 @@ class ClassifierFilesTest(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.directory = Path(self.temp.name)
-        self.env = patch.dict(os.environ, {'GP5_CLASSIFIER_DIR': str(self.directory)})
-        self.env.start()
-        self.addCleanup(self.env.stop)
+        self.model_dir = patch.object(classifier, 'MODEL_DIR', self.directory)
+        self.model_dir.start()
+        self.addCleanup(self.model_dir.stop)
 
     def write_manifest(self, **changes):
         files = ('klue_roberta_full_model.pt', 'tokenizer.json', 'tokenizer_config.json', 'config.json')

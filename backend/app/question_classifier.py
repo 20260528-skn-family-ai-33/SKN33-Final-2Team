@@ -6,12 +6,12 @@ import json
 import pickle
 import threading
 import time
-from pathlib import Path
 from typing import Any
 
-from .config import ROOT, env
+from .config import ROOT
 from .llm import LlmError
 
+MODEL_DIR = ROOT / 'models'
 LABELS = ('범위 밖', '사내 규정', '사내 생활안내', '수자원공사 정보')
 _lock = threading.RLock()
 _loaded: tuple[Any, Any, Any, dict] | None = None
@@ -21,7 +21,7 @@ def _load() -> tuple[Any, Any, Any, dict]:
     global _loaded
     if _loaded is not None:
         return _loaded
-    directory = Path(env('GP5_CLASSIFIER_DIR', str(ROOT / 'models')))
+    directory = MODEL_DIR
     try:
         manifest = json.loads((directory / 'classifier-manifest.json').read_text(encoding='utf-8'))
         if tuple(manifest['labels']) != LABELS or manifest['max_length'] != 128:

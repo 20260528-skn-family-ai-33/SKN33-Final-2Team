@@ -74,7 +74,7 @@ docker compose up -d backend
 파이썬으로 직접 띄울 때(선택 · Python 3.12 · 이번 작업에서는 확인하지 않은 방법): 이 폴더에서 패키지를 설치하고, 맨 위 `.env`를 `GP5_ENV_FILE`로 알려 준 뒤 실행해요(앱은 기본으로 이 폴더의 `.env`를 읽어요). DB는 Docker의 `db` 서비스를 그대로 써요(`.env`의 `GP5_DB_PORT`). 도커의 `backend`와 같은 8815를 쓰므로 둘 중 하나만 켜요.
 
 ```bash
-pip install -r requirements.txt
+pip install -r ../requirements.txt
 ```
 
 ```bash
