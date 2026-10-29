@@ -15,7 +15,7 @@ beforeEach(() => {
   useGoalStore.setState({ gs:null });
 });
 
-it('checks each entry so a direct database update is detected even inside the old thirty-second cache', async () => {
+it('reads stored candidates on each entry through the endpoint that only prepares missing accounts', async () => {
   const ensure = vi.spyOn(accountApi, 'goalsEnsure').mockResolvedValue(stored);
   await loadGoals();
   loadGoalsIfOld();

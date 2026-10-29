@@ -1,11 +1,11 @@
 {
   "format": 1,
-  "created_at": "2026-10-29T06:39:19.787221+00:00",
+  "created_at": "2026-10-29T07:45:47.299384+00:00",
   "database": "growpath",
   "server_version": "17.11",
   "archive": "growpath_latest.dump",
-  "sha256": "beb9ac646a746434979f889f6fd564608534477b4e85c2f2e78dd95008285373",
-  "bytes": 38297980,
+  "sha256": "cb55423c93f78487ae527ae8d815b3655dfa8314d08fa3be264bed9579d42687",
+  "bytes": 38352349,
   "inventory": {
     "tables": {
       "growpath_legacy.agent_generations": 71,
@@ -31,7 +31,7 @@
       "public.employee_certifications": 10,
       "public.employee_education_records": 105,
       "public.employee_input_profiles": 103,
-      "public.employee_recommended_prompts": 12,
+      "public.employee_recommended_prompts": 312,
       "public.employee_skills": 389,
       "public.employees": 105,
       "public.growth_reports": 1,
@@ -1531,8 +1531,8 @@
       "digest": "d41d8cd98f00b204e9800998ecf8427e"
     },
     "app_ext.agent_calls": {
-      "rows": 4,
-      "digest": "f99e00683fbcfbbbc0637746a351cd4b"
+      "rows": 104,
+      "digest": "b4d632d5858fe7b087a10538e6385904"
     },
     "app_ext.cert_groups": {
       "rows": 0,
@@ -1559,16 +1559,16 @@
       "digest": "d41d8cd98f00b204e9800998ecf8427e"
     },
     "app_ext.goal_suggestion_meta": {
-      "rows": 12,
-      "digest": "40e87950891ddc3cff8b806f52a932e9"
+      "rows": 312,
+      "digest": "4531118c2f4b54f43d38e2d50fb8a440"
     },
     "app_ext.goal_suggestion_runs": {
-      "rows": 4,
-      "digest": "9e0173f5e0681a109f10822e532826f4"
+      "rows": 104,
+      "digest": "abb5cdb6aa2912103268bd1a38178464"
     },
     "app_ext.jobs": {
-      "rows": 4,
-      "digest": "4d9abad976a11a315b2c7be16ba19eae"
+      "rows": 104,
+      "digest": "7e31cdd0d49a6049a59e940aa6240b1a"
     },
     "app_ext.learning_docs": {
       "rows": 0,
@@ -1711,8 +1711,8 @@
       "digest": "75e6d3998ca5158fbd2d2406e593c87d"
     },
     "public.employee_recommended_prompts": {
-      "rows": 12,
-      "digest": "ad819af9a5919ce54da3666c3b95cf22"
+      "rows": 312,
+      "digest": "87591a8a8a38cd6d5adf89b011e7bb28"
     },
     "public.employee_skills": {
       "rows": 389,
@@ -1833,19 +1833,22 @@
   },
   "scope": "All schemas including app_ext, table data, vectors, functions, views and sequences; cluster roles/passwords and external storage files are separate.",
   "goal_preload": {
-    "model": "gpt-6-luna",
-    "actual_model_calls": 4,
-    "employees": 4,
-    "candidates": 12,
-    "input_tokens": 2309,
-    "output_tokens": 4778,
-    "total_tokens": 7087
+    "new_batch_model": "gpt-6-luna",
+    "new_batch_calls": 100,
+    "synthetic_employees": 100,
+    "synthetic_candidates": 300,
+    "preserved_real_user_candidates": 12,
+    "new_batch_input_tokens": 110507,
+    "new_batch_output_tokens": 91847,
+    "new_batch_total_tokens": 202354
   },
   "publication": {
-    "published_at": "2026-10-29T06:42:32.136007+00:00",
-    "checkpoint": "강좌 시간·커리큘럼, 가상 직원 100명 보완, REAL_USER 데모 입력 4명 및 실제 목표 후보 12개",
-    "source_archive": "growpath_profiles_goals_20261029.dump",
-    "excluded_real_user_preserved": true,
-    "drive_folder_id": "1DyJ67R5bYMEwKF-PChdOcxGF8TCNtPsx"
+    "published_at": "2026-10-29T07:49:18.898820+00:00",
+    "source_archive": "growpath_all_profiles_goals_20261029.dump",
+    "checkpoint": "시간·커리큘럼, 가상 직원 100명, REAL_USER 데모 입력 4명, 실제 목표 후보 312개",
+    "preserved_real_user_accounts": 5,
+    "synthetic_candidates_added": 300,
+    "drive_folder_id": "1DyJ67R5bYMEwKF-PChdOcxGF8TCNtPsx",
+    "website_saved_change_policy": "Application change tested locally; PR29 publication pending; DB backup does not deploy application code"
   }
 }

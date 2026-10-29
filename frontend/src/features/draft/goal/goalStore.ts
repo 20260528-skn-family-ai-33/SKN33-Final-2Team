@@ -1,4 +1,4 @@
-/* 로그인·입력 변경 때 준비한 후보를 읽는다. 진입 때 누락/입력 변경도 확인해 DB 직접 변경을 놓치지 않는다.
+/* 정보 저장 뒤 준비한 후보를 읽는다. 진입 때 후보가 없는 신규 계정만 처음 준비한다.
    서버는 같은 입력의 캐시·진행 작업을 재사용하며 실패 후 자동 재시도하지 않는다. */
 import { create } from 'zustand';
 import { accountApi } from '@/api/endpoints/account';
@@ -44,7 +44,7 @@ async function waitGoals(jobId: string): Promise<void> {
 }
 
 export function loadGoalsIfOld(): void {
-  // DB를 직접 고친 경우도 진입 시 확인한다. 같은 입력은 서버가 생성 없이 재사용한다.
+  // 저장된 후보를 읽고 신규 계정의 누락만 보완한다. 기존 후보를 자동으로 다시 만들지 않는다.
   void loadGoals();
 }
 

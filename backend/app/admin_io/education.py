@@ -252,6 +252,7 @@ def _upsert_meta(t: db.Tx, rkey: str, rtype: str, fk_col: str, fk, v: dict, est:
 def apply(t: db.Tx, found: dict[str, list[Row]], cur: dict[str, dict], ctx: dict) -> dict:
     sid = {r['name']: r['skill_id'] for r in t.all('SELECT skill_id, name FROM public.skill_tags')}
     res = {n: {'add': 0, 'update': 0, 'delete': 0, 'hidden': 0} for n in ('강좌', '도서', '자격증')}
+    res['goal_ids'] = []
     for r in found.get('강좌', []):
         old = cur['강좌'].get(r.key)
         if r.action == 'delete':
@@ -340,6 +341,10 @@ def apply(t: db.Tx, found: dict[str, list[Row]], cur: dict[str, dict], ctx: dict
                      content_status = :st, last_batch_updated = now() WHERE cert_id = :k""", k=cid, **args)
         _upsert_meta(t, f'cert_{cid}', 'cert', 'cert_id', cid, v, _est_of(r, old, v),
                      {'group': v.get('group'), 'short': v.get('short') or v['title'], 'sub': v.get('sub'), 'vendor': v.get('vendor'), 'code': str(cid)})
+        if old and old.get('title') != v['title']:
+            for employee in t.all('SELECT employee_id FROM public.employee_certifications WHERE certification_id=:c', c=cid):
+                if employee['employee_id'] not in res['goal_ids']:
+                    res['goal_ids'].append(employee['employee_id'])
         if 'skills' in r.present:
             _set_skills(t, 'certification_skills', 'cert_id', cid, v.get('skills') or [], sid)
         res['자격증'][r.action] += 1
@@ -348,3 +353,6 @@ def apply(t: db.Tx, found: dict[str, list[Row]], cur: dict[str, dict], ctx: dict
 
 def after(res: dict, ctx: dict) -> None:
     catalog.invalidate()
+    # 보유 자격의 표시 이름도 추천 입력이다. 성공한 저장 뒤 연결된 직원만 확인한다.
+    from . import hr
+    hr.after(res, ctx)

@@ -137,7 +137,7 @@ function GoalSuggestions() {
           <Icon name="spark" />
           목표 후보
         </b>
-        <span className="small muted">{g && g.status === 'default' ? 'AI 활용 업무 기본 후보' : '첫 로그인·내 정보 변경 때 미리 준비해요'}</span>
+        <span className="small muted">{g && g.status === 'default' ? 'AI 활용 업무 기본 후보' : '내 정보·인사 정보 변경 때 미리 준비해요'}</span>
         {tag}
       </div>
       {body}

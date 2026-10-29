@@ -458,10 +458,14 @@ class AppContractTests(unittest.TestCase):
         if state['jobId']:jobs.wait_result(state['jobId'],eid,timeout=5)
         return self.goals.get(eid)
 
-    def test_goal_preload_first_login_reuses_cache_and_only_regenerates_for_changed_input(self):
+    def test_goal_preload_runs_after_website_save_not_login_session_or_sql_edit(self):
         eid,out=self._goal_setup()
         with patch.object(self.goals,'request',self.actual_goal_request),patch.object(self.goals.G,'run',return_value=out) as generate:
             c=self.client('member')
+            self.assertEqual(c.get('/api/v1/me').status_code,200)
+            self.assertEqual(generate.call_count,0)
+            self.assertIsNone(self.db.one('SELECT status FROM app_ext.goal_suggestion_runs WHERE employee_id=:e',e=eid))
+            self.assertEqual(c.post('/api/v1/me/goal-suggestions/ensure').status_code,200)
             self.assertEqual(self._wait_goal(eid)['status'],'ready')
             self.assertEqual(generate.call_count,1)
             for _ in range(2):
@@ -471,9 +475,84 @@ class AppContractTests(unittest.TestCase):
             self.assertEqual(generate.call_count,1)
             with self.db.tx() as t:t.run('UPDATE public.employees SET planned_project_description=:w WHERE employee_id=:e',e=eid,w='변경된 데이터 점검 업무')
             self.assertEqual(c.get('/api/v1/me').status_code,200)
+            stale=c.post('/api/v1/me/goal-suggestions/ensure')
+            self.assertTrue(stale.json()['stale'])
+            self.assertEqual(generate.call_count,1)
+            body=self.self_body(c.get('/api/v1/me/profile').json()['view'])
+            body['workDesc']='홈페이지에서 바꾼 로그 분석 업무'
+            self.assertEqual(c.put('/api/v1/me/profile/self',json=body).status_code,200)
             self.assertEqual(self._wait_goal(eid)['status'],'ready')
             self.assertEqual(generate.call_count,2)
+            self.assertEqual(c.put('/api/v1/me/profile/self',json=body).status_code,200)
             self.assertEqual(c.get('/api/v1/me').status_code,200)
+            self.assertEqual(generate.call_count,2)
+            self.assertEqual(c.put('/api/v1/me/profile/self',json=dict(body,devYears=51)).status_code,422)
+            self.assertEqual(generate.call_count,2)
+            self.assertEqual(c.delete('/api/v1/me/profile/self').status_code,200)
+            self.assertEqual(self._wait_goal(eid)['status'],'ready')
+            self.assertEqual(generate.call_count,3)
+
+    def test_goal_preload_follows_website_evaluation_consent_changes(self):
+        eid,out=self._goal_setup()
+        with self.db.tx() as t:
+            t.run("INSERT INTO app_ext.employee_evaluations(employee_id,period,grade,consent_default) VALUES(:e,'2026','A',false)",e=eid)
+        with patch.object(self.goals,'request',self.actual_goal_request),patch.object(self.goals.G,'run',return_value=out) as generate:
+            c=self.client('member')
+            self.assertEqual(c.post('/api/v1/me/goal-suggestions/ensure').status_code,200)
+            self.assertEqual(self._wait_goal(eid)['status'],'ready')
+            self.assertEqual(c.put('/api/v1/me/evaluations/2026/consent',json={'consent':False}).status_code,200)
+            self.assertEqual(generate.call_count,1)
+            self.assertEqual(c.put('/api/v1/me/evaluations/2026/consent',json={'consent':True}).status_code,200)
+            self.assertEqual(self._wait_goal(eid)['status'],'ready')
+            self.assertEqual(generate.call_count,2)
+            self.assertEqual(c.put('/api/v1/me/evaluations/2026/consent',json={'consent':True}).status_code,200)
+            self.assertEqual(generate.call_count,2)
+
+    def test_department_rename_preloads_affected_members_after_admin_save(self):
+        from app.admin_io import base,hr
+        eid,out=self._goal_setup()
+        code=self.db.val('SELECT department_code FROM public.departments WHERE department_id=:d',d=self.dept)
+        row=base.Row('부서',2,{'code':code,'name':'웹에서 변경한 상위 부서'},{'code','name'},key=(code,))
+        row.action='update'
+        with patch.object(self.goals,'request',self.actual_goal_request),patch.object(self.goals.G,'run',return_value=out) as generate:
+            self.client('member').post('/api/v1/me/goal-suggestions/ensure')
+            self.assertEqual(self._wait_goal(eid)['status'],'ready')
+            with patch.object(hr,'_inst',return_value=self.inst):
+                cur={sheet:hr.current(sheet) for sheet in ('부서','직원','평정')}
+                with self.db.tx() as t:result=hr.apply(t,{'부서':[row]},cur,{})
+            self.assertEqual(set(result['goal_ids']),{self.ids[key] for key in ('head','member','peer','child_head','child_member')})
+            self.assertEqual(generate.call_count,1)
+            hr.after(result,{})
+            self.assertEqual(self._wait_goal(eid)['status'],'ready')
+            self.assertEqual(generate.call_count,2)
+            self.assertEqual(self.profile.view(eid)['dept'],'웹에서 변경한 상위 부서')
+
+    def test_owned_certificate_rename_preloads_only_linked_employees(self):
+        from app.admin_io import base,education
+        from app import catalog
+        eid,out=self._goal_setup()
+        with self.db.tx() as t:
+            cid=t.val("INSERT INTO public.certifications(title,provider,content_status) VALUES(:n,'fixture','ready') RETURNING cert_id",n='웹 변경 자격 '+uuid4().hex)
+            t.run('INSERT INTO public.employee_certifications(employee_id,certification_id) VALUES(:e,:c)',e=eid,c=cid)
+            t.run("INSERT INTO app_ext.resource_meta(resource_key,resource_type,cert_id,hours,stage,estimated_fields) VALUES(:k,'cert',:c,30,1,'[]'::jsonb)",k=f'cert_{cid}',c=cid)
+        def cleanup():
+            with self.db.tx() as t:
+                t.run('DELETE FROM public.employee_certifications WHERE certification_id=:c',c=cid)
+                t.run('DELETE FROM app_ext.resource_meta WHERE cert_id=:c',c=cid)
+                t.run('DELETE FROM public.certifications WHERE cert_id=:c',c=cid)
+            catalog.invalidate()
+        self.addCleanup(cleanup)
+        cur={'강좌':{},'도서':{},'자격증':{(cid,):education.current('자격증')[(cid,)]}}
+        row=base.Row('자격증',2,{'key':cid,'title':'홈페이지에서 바꾼 자격 명칭'},{'key','title'},key=(cid,))
+        row.action='update'
+        with patch.object(self.goals,'request',self.actual_goal_request),patch.object(self.goals.G,'run',return_value=out) as generate:
+            self.client('member').post('/api/v1/me/goal-suggestions/ensure')
+            self.assertEqual(self._wait_goal(eid)['status'],'ready')
+            with self.db.tx() as t:result=education.apply(t,{'자격증':[row]},cur,{})
+            self.assertEqual(result['goal_ids'],[eid])
+            self.assertEqual(generate.call_count,1)
+            education.after(result,{})
+            self.assertEqual(self._wait_goal(eid)['status'],'ready')
             self.assertEqual(generate.call_count,2)
 
     def test_goal_concurrent_preloads_share_one_job_and_running_state_precedes_worker(self):

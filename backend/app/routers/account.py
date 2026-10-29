@@ -31,8 +31,6 @@ def _me(a: Account) -> dict:
 def api_login(body: dict, response: Response):
     a = login(str(body.get('employeeNo') or ''), str(body.get('password') or ''))
     start_session(response, a.type, a.id, bool(body.get('keepSignedIn')))
-    if a.type == 'employee':
-        goals.request(a.id, 'login', only_if_stale=True)
     return _me(a)
 
 
@@ -56,8 +54,6 @@ def api_accounts():
 
 @r.get('/me')
 def api_me(a: Account = Depends(require_account)):
-    if a.type == 'employee':
-        goals.request(a.id, 'session', only_if_stale=True)
     return _me(a)
 
 
@@ -108,8 +104,12 @@ def api_goals_regen(request: Request, a: Account = Depends(require_employee)):
 
 @r.post('/me/goal-suggestions/ensure')
 def api_goals_ensure(a: Account = Depends(require_employee)):
-    goals.request(a.id, 'goal-entry', only_if_stale=True)
-    return goals.get(a.id)
+    state = goals.get(a.id)
+    # 정보 변경은 저장 성공 뒤 갱신한다. 목표 화면은 신규/미준비 계정만 보완한다.
+    if state['status'] == 'none':
+        goals.request(a.id, 'goal-missing', only_if_stale=True)
+        return goals.get(a.id)
+    return state
 
 
 # ── AI 모델 (API-10~12) ──

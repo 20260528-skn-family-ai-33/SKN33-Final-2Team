@@ -318,7 +318,7 @@ function UseCard({ e }: { e: User }) {
         <div className="row top">
           <Icon name="spark" />
           <span>
-            <b>목표 후보 제안</b> · 로그인 직후 최초 한 번, 또는 업무·프로젝트 등 추천에 쓰는 정보가 바뀌면 후보 3개를 미리 준비해요. 같은 정보로 다시 로그인하면 저장된 후보를 사용해요.{' '}
+            <b>목표 후보 제안</b> · 업무·프로젝트 등 추천에 쓰는 정보를 저장하면 후보 3개를 미리 준비해요. 로그인할 때는 저장된 후보를 사용하고, 후보가 없으면 목표 설정 화면에서 처음 준비해요.{' '}
             <button className="link" onClick={() => go(newIdToPath(lastNew))}>
               새 로드맵 작성 <Icon name="right" />
             </button>

@@ -83,10 +83,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "435dbf501ad3f6a1485d6760cd789e68f7fa3e6e38a3307ce0eff1d56b94724a",
-      "bytes": 42726,
+      "sha256": "ffc2ed7d9fa12fea0f2451d66b77394fcb1f4559ee2ce9dd995a521a77dab952",
+      "bytes": 44242,
       "handling": "adjusted",
-      "change_note": "Issue #27: verified integration of main 7d7de93 (PR #37), 2026-10-29.",
+      "change_note": "Issue #27: approved employee100 preload and website-save-only goal refresh, 2026-10-29.",
       "local_update_source": {
         "path": "README.md",
         "sha256": "e872d64ea58c53311d098dc1c769f5bc3232ad947d690054b75a0a0a20c6d8c6"
@@ -98,10 +98,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "d6f7287fc71f7e1190bcf19f41a1bbe26b48fd678dd58d0525fb302654f61a9e",
-      "bytes": 4915,
+      "sha256": "4e64d5f46fa8ba929fa0c85a3f434068674183feba5bfbed6c3e86073d2366cf",
+      "bytes": 5155,
       "handling": "adjusted",
-      "change_note": "Issue #27: verified real goal preloading and full Drive backup handoff (2026-10-29)."
+      "change_note": "Issue #27: approved employee100 preload and website-save-only goal refresh, 2026-10-29."
     },
     {
       "path": "database/assets.manifest.json",
@@ -109,10 +109,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "6864bec5846c13fd4bddfd40906a08d3c11d7b9ddd21df04062adde889de4003",
-      "bytes": 25674,
+      "sha256": "7b512dc70a95c1931192c5a5a1e2e81bb6a87dfecd5365757a6788b68c1cdb5b",
+      "bytes": 26090,
       "handling": "adjusted",
-      "change_note": "Issue #27: verified real goal preloading and full Drive backup handoff (2026-10-29)."
+      "change_note": "Issue #27: approved employee100 preload and website-save-only goal refresh, 2026-10-29."
     },
     {
       "source_path": "database/config/paths.yaml",
@@ -175,10 +175,10 @@
       "source_sha256": "59e13c3fd7bdde78922da1df1c242b08838925e9c3a5e19d8333070d46726420",
       "source_bytes": 59668,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "7a18b2c3e20933525a2f4e404a9b96302871589564f249e76a26df4942b74539",
-      "bytes": 70462,
+      "sha256": "16315e5cb35e760ea20e818f11b4d982b61bf82e70f0a92d894f8d446f70c2e4",
+      "bytes": 70749,
       "handling": "adjusted",
-      "change_note": "Issue #27: verified real goal preloading and full Drive backup handoff (2026-10-29).",
+      "change_note": "Issue #27: approved employee100 preload and website-save-only goal refresh, 2026-10-29.",
       "local_update_source": {
         "path": "data/exports/growpath_latest.manifest.json",
         "sha256": "59e13c3fd7bdde78922da1df1c242b08838925e9c3a5e19d8333070d46726420"
@@ -488,10 +488,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "17f3e96904a6d0bf7e838380f2699c2c56a5b8bcbe6e044f511ff193ec23ce94",
-      "bytes": 37933,
+      "sha256": "c42b6dcd12ccf82764b4e4b718bf3f8a85c6e93ab0f8ecaf1c2faa7b14c958a5",
+      "bytes": 42183,
       "handling": "adjusted",
-      "change_note": "Issue #27: verified integration of main 7d7de93 (PR #37), 2026-10-29."
+      "change_note": "Issue #27: approved employee100 preload and website-save-only goal refresh, 2026-10-29."
     },
     {
       "source_path": "database/src/__init__.py",
@@ -1606,9 +1606,9 @@
       "source_bytes": null,
       "source_kind": "team_followup_implementation",
       "handling": "adjusted",
-      "sha256": "a894af07a63d1f61a5e5e54521b87a8d2b908416d0ede5bf748a06eaa07cbb33",
-      "bytes": 45584,
-      "change_note": "Issue #27: team work/project context, guarded goal preloading and main 0a6dd08 compatibility (2026-10-29)."
+      "sha256": "18146a3106e8120a16a39df678ba3df88ec922655a124b51032506fced44bd08",
+      "bytes": 51284,
+      "change_note": "Issue #27: approved employee100 preload and website-save-only goal refresh, 2026-10-29."
     },
     {
       "path": "backend/app/routers/account.py",
@@ -1617,9 +1617,9 @@
       "source_bytes": null,
       "source_kind": "team_followup_implementation",
       "handling": "adjusted",
-      "sha256": "f904fb0ce01b19509bbc896efb5e7ccc7bfe771aaee00c00b7c7cf40454a76d6",
-      "bytes": 7990,
-      "change_note": "Issue #27: team work/project context, guarded goal preloading and main 0a6dd08 compatibility (2026-10-29)."
+      "sha256": "70c1662eb9ea20461ec1a0eeb5a93ea77c61dfb88d4c3f130517d32cb61c96a0",
+      "bytes": 8018,
+      "change_note": "Issue #27: approved employee100 preload and website-save-only goal refresh, 2026-10-29."
     },
     {
       "path": "backend/app/services/profile.py",
@@ -1639,9 +1639,9 @@
       "source_bytes": null,
       "source_kind": "team_followup_implementation",
       "handling": "adjusted",
-      "sha256": "b46bb87b0fd35582c07fa00542b100919b2f369766bd3722486f1971808f32d1",
-      "bytes": 18998,
-      "change_note": "Issue #27: verified integration of main 7d7de93 (PR #37), 2026-10-29."
+      "sha256": "29de19ddf331ca261e65014c38745ef2f854b629e33fe0fdf7177e5f63c97f6d",
+      "bytes": 19143,
+      "change_note": "Issue #27: approved employee100 preload and website-save-only goal refresh, 2026-10-29."
     },
     {
       "path": "database/tests/test_resource_refresh.py",
@@ -1672,9 +1672,9 @@
       "source_bytes": null,
       "source_kind": "team_course_duration_implementation",
       "handling": "adjusted",
-      "sha256": "cc6a9b5ef63a91ad4a3760ba175cdb500355d81cf8926bb5329c81fde804d4dc",
-      "bytes": 25054,
-      "change_note": "PR #32 selected fixes: admin confirmation, detail refresh/access, ten-minute labels (2026-10-29)."
+      "sha256": "692bcda7d4ad970ce5750774e2a6a8c100e603250b0bc8bda796420d382d526a",
+      "bytes": 25551,
+      "change_note": "Issue #27: approved employee100 preload and website-save-only goal refresh, 2026-10-29."
     },
     {
       "path": "backend/app/agents/roadmap.py",
@@ -2177,10 +2177,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "team_employee_context_update",
-      "sha256": "99a8378326d5c638851592b205b61bca0f985cbea0817012d9f0a35c06f6d277",
-      "bytes": 1634,
+      "sha256": "b76167b06d9666bf161d0ae53b20483f5dc2f02b1e9e3e7ac7c1420d1e6e956b",
+      "bytes": 1631,
       "handling": "adjusted",
-      "change_note": "Issue #27: team work/project context, guarded goal preloading and main 0a6dd08 compatibility (2026-10-29)."
+      "change_note": "Issue #27: approved employee100 preload and website-save-only goal refresh, 2026-10-29."
     },
     {
       "path": "backend/app/jobs.py",
@@ -2199,10 +2199,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "team_employee_context_update",
-      "sha256": "6a49b6c368ce2e19392587c0bd3a76e14973e54dec6b101c5e633d8f74ed2ff0",
-      "bytes": 11035,
+      "sha256": "19f091d4ea58dc4ac0c9abe56dfa289306cf6e95b23f77946097494898118b88",
+      "bytes": 11048,
       "handling": "adjusted",
-      "change_note": "Issue #27: team work/project context, guarded goal preloading and main 0a6dd08 compatibility (2026-10-29)."
+      "change_note": "Issue #27: approved employee100 preload and website-save-only goal refresh, 2026-10-29."
     },
     {
       "path": "backend/app/agents/goals.py",
@@ -2221,10 +2221,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "team_employee_context_update",
-      "sha256": "fe48658a17ff77826105c523f31fc10e99a4f85158f65b48b2c0e03cac9436e2",
-      "bytes": 25825,
+      "sha256": "69e739010f3688c7a73e6eddc5c8e0e54b3c31a67dee1c5f6424973e11cce9d4",
+      "bytes": 26571,
       "handling": "adjusted",
-      "change_note": "Issue #27: team work/project context, guarded goal preloading and main 0a6dd08 compatibility (2026-10-29)."
+      "change_note": "Issue #27: approved employee100 preload and website-save-only goal refresh, 2026-10-29."
     },
     {
       "path": "frontend/src/api/endpoints/account.ts",
@@ -2243,10 +2243,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "team_employee_context_update",
-      "sha256": "e6ea0727346e0180de7193515e4ded033fc9c69b27b5f85c359db91aa7b39f8f",
-      "bytes": 2800,
+      "sha256": "29b608a342d285ce3eba15b22b033eee41f9d91118b8cdac9a8eedea0654c2fa",
+      "bytes": 2782,
       "handling": "adjusted",
-      "change_note": "Issue #27: team work/project context, guarded goal preloading and main 0a6dd08 compatibility (2026-10-29)."
+      "change_note": "Issue #27: approved employee100 preload and website-save-only goal refresh, 2026-10-29."
     },
     {
       "path": "frontend/src/features/draft/generation/GenerationStep.tsx",
@@ -2265,10 +2265,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "team_employee_context_update",
-      "sha256": "62ff37692b501d76ec055737a3934cf44b60c7ba62741d18adf486385c39255c",
+      "sha256": "37f59a7d912c1f248d922c59f8422c02b02fdcc2aea69c3b65979a46b14529f4",
       "bytes": 16485,
       "handling": "adjusted",
-      "change_note": "Issue #27: team work/project context, guarded goal preloading and main 0a6dd08 compatibility (2026-10-29)."
+      "change_note": "Issue #27: approved employee100 preload and website-save-only goal refresh, 2026-10-29."
     },
     {
       "path": "frontend/src/features/profile/MePage.tsx",
@@ -2276,10 +2276,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "team_employee_context_update",
-      "sha256": "52149624d4d954e5a272b0062704dbc82640604676e2315c643521cbbff78ceb",
-      "bytes": 17869,
+      "sha256": "1aa27f883e1be03decce809c028c0eedab70501d71cb2013549282b8f04e8ddb",
+      "bytes": 17880,
       "handling": "adjusted",
-      "change_note": "Issue #27: team work/project context, guarded goal preloading and main 0a6dd08 compatibility (2026-10-29)."
+      "change_note": "Issue #27: approved employee100 preload and website-save-only goal refresh, 2026-10-29."
     },
     {
       "path": "frontend/src/features/draft/generation/GenerationStep.test.ts",
@@ -2302,6 +2302,17 @@
       "bytes": 2164,
       "handling": "adjusted",
       "change_note": "Issue #27: verified real goal preloading and full Drive backup handoff (2026-10-29)."
+    },
+    {
+      "path": "database/data/exports/employee100_goal_preload_20261029.manifest.json",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_goal_refresh_policy_update",
+      "sha256": "88908f16eafffa298d26f2f84adc302d433dbd537b93e4370ade5b3a8681f7ec",
+      "bytes": 4002,
+      "handling": "adjusted",
+      "change_note": "Issue #27: approved employee100 preload and website-save-only goal refresh, 2026-10-29."
     }
   ],
   "excluded": [

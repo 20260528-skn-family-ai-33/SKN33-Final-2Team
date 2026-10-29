@@ -334,6 +334,16 @@ def apply(t: db.Tx, found: dict[str, list[Row]], cur: dict[str, dict], ctx: dict
         res['평정'][r.action] += 1
         if eid and eid not in res['goal_ids']:
             res['goal_ids'].append(eid)
+    # 부서 이름/상위 부서 변경도 직무 문맥에 쓰인다. 해당 부서와 직속 하위 부서 직원을 포함한다.
+    if drows:
+        affected = [ids[r.key[0]] for r in drows]
+        for employee in t.all("""SELECT e.employee_id FROM public.employees e
+                JOIN public.departments d ON d.department_id = e.department_id
+                LEFT JOIN app_ext.employee_hr h ON h.employee_id = e.employee_id
+                WHERE (d.department_id = ANY(:ids) OR d.parent_department_id = ANY(:ids))
+                  AND coalesce(h.employment_status, '재직') <> '퇴직'""", ids=affected):
+            if employee['employee_id'] not in res['goal_ids']:
+                res['goal_ids'].append(employee['employee_id'])
     # 4) 부서 지우기(직원을 옮긴 뒤)
     for r in found.get('부서', []):
         if r.action == 'delete':
