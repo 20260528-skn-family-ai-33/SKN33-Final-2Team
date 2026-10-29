@@ -493,3 +493,465 @@ details.more[open] > summary { margin-bottom: 12px; }
   .choices.two { grid-template-columns: 1fr; }
   .hero { padding: 26px 22px; }
 }
+
+.api-picker {
+  position: relative;
+  margin-left: auto;
+}
+
+.api-picker-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  line-height: 1;
+  min-height: 0;
+  height: auto;
+}
+
+.api-picker-button.gray { color: #60646c; }
+.api-picker-button.red { color: #c62828; }
+.api-picker-button.green { color: #16783e; }
+.api-picker-button.orange { color: #a94b00; }
+.api-picker-button.blue { color: #245dcc; }
+
+.api-picker-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.api-picker-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: min(320px, calc(100vw - 24px));
+  max-height: 70vh;
+  overflow-y: auto;
+  white-space: normal;
+  background: var(--card, #fff);
+  color: var(--text, #222);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px;
+  box-shadow: 0 8px 28px rgb(0 0 0 / 18%);
+}
+
+.api-picker-panel .aim {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.api-picker-button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
+
+/* API 선택창은 화면 크기와 관계없이 세로 배치 */
+.api-picker-panel .aim {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+}
+
+.api-picker-panel .aim-o {
+  min-width: 0;
+}
+
+.api-picker-panel .aim-o input {
+  flex-shrink: 0;
+}
+
+.api-picker-panel .aim-o > span {
+  min-width: 0;
+}
+
+.api-picker-panel .aim-o b,
+.api-picker-panel .aim-o small {
+  display: block;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.reg-check {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 4px;
+  color: var(--ink-3, #777);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.reg-check-icon {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #999;
+}
+
+.reg-check-icon.running {
+  background: transparent;
+  border: 2px solid #ddd;
+  border-top-color: #888;
+  animation: reg-check-spin 0.8s linear infinite;
+}
+
+.reg-check-icon.done {
+  background: #198754;
+}
+
+.reg-check-icon.failed {
+  background: #c62828;
+}
+
+.reg-check .link {
+  font-size: inherit;
+}
+
+@keyframes reg-check-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 각 로드맵을 옅은 회색 영역으로 감싸기 */
+.gt.all .gt-roadmap-group {
+  position: relative;
+  margin: 0;
+  padding: 10px 0;
+  border: 0;
+  border-radius: 14px;
+  background: rgb(0 0 0 / 4%);
+}
+
+/* 로드맵 사이 간격 */
+.gt.all .gt-roadmap-group + .gt-roadmap-group {
+  margin-top: 16px;
+}
+
+/* 간격 부분만 흰색 처리 */
+.gt.all .gt-roadmap-group + .gt-roadmap-group::before {
+  content: '';
+  position: absolute;
+  top: -16px;
+  left: 0;
+  right: 0;
+  height: 16px;
+  background: #fff;
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* 기존 날짜 격자와 분홍색 강조 유지 */
+.gt.all .gt-grid {
+  display: grid;
+}
+
+/* 고정된 이름 칸 */
+.gt.all .gt-roadmap-group .gt-l {
+  background: #f5f5f5;
+}
+
+.gt.all .gt-roadmap-group > .gt-row.lv0 {
+  min-height: 58px;
+  border-top: 0;
+}
+
+.gt.all .gt-roadmap-group > .gt-row.lv0 .gt-name {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.gt-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  padding-bottom: 10px;
+  scrollbar-width: auto;
+  scrollbar-color: #888 #eee;
+}
+
+.gt-scroll::-webkit-scrollbar {
+  height: 12px;
+}
+
+.gt-scroll::-webkit-scrollbar-track {
+  background: #eee;
+  border-radius: 6px;
+}
+
+.gt-scroll::-webkit-scrollbar-thumb {
+  background: #888;
+  border: 2px solid #eee;
+  border-radius: 6px;
+}
+
+.gt-card:has(.gt.all) > .sec-h > h2 {
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: #fcfcfc;
+}
+
+/* 행 구분선을 둥근 영역 안으로 자르기 */
+.gt.all .gt-roadmap-group {
+  clip-path: inset(0 round 14px);
+}
+
+.gt.all .gt-roadmap-group + .gt-roadmap-group::before {
+  display: none;
+}
+
+.gt.all .gt-roadmap-group + .gt-roadmap-group {
+  margin-top: 0;
+  border-top: 16px solid #fff;
+}
+
+/* 날짜 머리글 아래 가로선 제거 */
+.gt.all .gt-h .gt-tl {
+  border-bottom: 0;
+}
+
+.roadmap-preview {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.roadmap-preview + .roadmap-preview {
+  margin-top: 12px;
+}
+
+.roadmap-preview-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.roadmap-preview-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.roadmap-preview-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.roadmap-preview-title b,
+.roadmap-preview-title small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.roadmap-preview-title small {
+  margin-top: 4px;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+.roadmap-preview-head > .btn {
+  flex-shrink: 0;
+}
+
+.roadmap-preview-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.roadmap-preview-body {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.roadmap-preview-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.roadmap-preview-stats dt {
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+.roadmap-preview-stats dd {
+  margin: 4px 0 0;
+  font-weight: 700;
+}
+
+.roadmap-preview-request {
+  margin-top: 16px;
+}
+
+.roadmap-preview-request p {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 600px) {
+  .roadmap-preview-head {
+    flex-wrap: wrap;
+  }
+
+  .roadmap-preview-stats {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 카드 사이 여백은 페이지 배경이 보이도록 */
+.list:has(> .roadmap-preview) {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.roadmap-title-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+}
+
+.roadmap-info-badge {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.check-plan-groups {
+  display: grid;
+  gap: 18px;
+}
+
+.check-plan-group {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.check-plan-title {
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.check-plan-empty {
+  margin: 0;
+  padding: 14px;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+
+/* 점검 기록: 로드맵별 활동 완료율과 상태 */
+.check-plan-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.check-plan-heading .check-plan-title { min-width: 0; margin: 0; }
+.check-plan-progress {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.check-plan-percent {
+  font-size: 17px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 600px) {
+  .check-plan-heading { flex-wrap: wrap; }
+  .check-plan-progress { margin-left: auto; }
+}
+
+.record-sort {
+  margin-left: auto;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+}
+
+
+/* 기록 제목 주변을 눌러 해당 로드맵으로 이동 */
+.check-plan-heading .check-plan-title { flex: 1; }
+.check-plan-open {
+  display: block;
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.check-plan-open:hover { background: var(--surface-2); }
+.check-plan-open:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+
+.hp-h {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+.hp-h .hp-shortcut {
+  flex-shrink: 0;
+  min-height: 0;
+  height: auto;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.hp-shortcut svg { width: 13px; height: 13px; }

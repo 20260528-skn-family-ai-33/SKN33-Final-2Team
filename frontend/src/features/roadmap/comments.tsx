@@ -1,3 +1,4 @@
+import { trackName } from '@/shared/constants/data';
 /* 부서장 코멘트 (10/14 · 5차 scr.comment · P.commentView·cmTag·cmItem·commentReq)
    쌓이고, 상태(새·확인함·vN에 반영)가 직원·부서장 화면에 같이 보인다. 답글은 없다 */
 import type { ReactNode } from 'react';
@@ -107,7 +108,7 @@ export function CommentsPage({ R }: { R: PlanRecord }) {
     }
   };
   return (
-    <Page back={paths.roadmap(R.id)} eyebrow={`${pl.name} · v${pl.version} · 부서장 코멘트 ${list.length}개`} title={n ? '로드맵에 대한 의견이 왔어요' : '받은 코멘트'} lead={pl.goal}>
+    <Page back={paths.roadmap(R.id)} eyebrow={`${trackName(pl.opt, pl.name)} · v${pl.version} · 부서장 코멘트 ${list.length}개`} title={n ? '로드맵에 대한 의견이 왔어요' : '받은 코멘트'} lead={pl.goal}>
       <div className="stack">
         {list.map((c) => (
           <CmItem

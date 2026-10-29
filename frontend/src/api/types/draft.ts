@@ -156,6 +156,7 @@ export interface OptionDef {
   revRequest?: string;
   revNotes?: string[];
   [k: string]: unknown;
+  displayTitle?: string;
 }
 
 export interface Gen {

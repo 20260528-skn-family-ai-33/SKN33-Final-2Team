@@ -1,3 +1,4 @@
+import { trackName } from '@/shared/constants/data';
 /* 5. 3안 비교표 (10/14 · 5차 scr['new-options']): 열 순서는 A1·A2·A3 고정.
    마음에 들지 않는 안은 요청을 적어 그 안만 다시 만들고(API-32 · 버전으로 쌓임), ‹ › 로 버전을 넘겨 본다 */
 import { useEffect, useRef } from 'react';
@@ -166,7 +167,7 @@ export function openRegenSheet(pid: string): void {
   const pl = buildPlan(o, paramsOf(d, o), d.goal);
   updateWs((s) => void (s.regenReq = { pid, note: '', chips: [], acts: {} }));
   openSheet({
-    title: `${pid} ${D.perspectives[pid].name} 다시 만들기`,
+    title: `${D.perspectives[pid].name} 다시 만들기`,
     wide: true,
     body: () => <RegenBody pl={pl} />,
     foot: () => (
@@ -263,7 +264,7 @@ export function OptionsStep() {
           <input type="radio" name="pick" value={p.opt} checked={cur === p.opt} onChange={() => setAt('draft.chosen', p.opt)} />
           <span>
             <b>
-              {p.opt} {p.name}
+              {trackName(p.opt, p.name)}
             </b>
             <small>{p.tagline}</small>
           </span>
@@ -317,7 +318,7 @@ export function OptionsStep() {
                 void choose(go, cur);
               }}
             >
-              고른 안으로 검토하기
+              해당 계획 검토하기
             </button>
           </>
         }
@@ -396,7 +397,7 @@ export function OptionsStep() {
         {ps.some((p) => p.costUnknown) ? <Note>‘확인 필요’는 팀 DB에 가격이 없는 자료(도서 가격·응시료·K-MOOC 수강료 등)가 들어 있다는 뜻이에요. 예상 비용에는 넣지 않았어요.</Note> : null}
         {missing.length ? (
           <Note>
-            {missing.map((id) => `${id} ${D.perspectives[id].name}`).join(', ')}은 작성에 실패해 빠졌어요. 세 안을 다시 받으려면 ‘점검 결과’에서 ‘로드맵 생성’을 다시 눌러 주세요.
+            {missing.map((id) => `${D.perspectives[id].name}`).join(', ')}은 작성에 실패해 빠졌어요. 세 안을 다시 받으려면 ‘점검 결과’에서 ‘로드맵 생성’을 다시 눌러 주세요.
           </Note>
         ) : null}
         <Note>

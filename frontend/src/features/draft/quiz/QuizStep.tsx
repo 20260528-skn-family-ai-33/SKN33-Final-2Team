@@ -15,6 +15,7 @@ import { deepOnOf, quizDone, quizKey } from '../model';
 import { StaleNote } from '../stale';
 import { Stepper } from '../Stepper';
 import { useDraftWatch } from '../useDraftWatch';
+import { toast } from '@/shared/state/ui';
 
 const QUIZ_AGENT = '진단 에이전트 · 사전 점검 문항 생성';
 let quizAsk = '';
@@ -94,7 +95,18 @@ export function QuizStep() {
               <Icon name="left" />
               이전
             </button>
-            <button className="btn pri" disabled={!quizDone(d)} onClick={() => go(paths.newResult)}>
+            <button
+              className="btn pri"
+              disabled={!ready}
+              onClick={() => {
+                if (!quizDone(d)) {
+                  toast('모든 문항 선택을 완료해 주세요.');
+                  return;
+                }
+
+                go(paths.newResult);
+              }}
+            >
               다음: 점검 결과
             </button>
           </>

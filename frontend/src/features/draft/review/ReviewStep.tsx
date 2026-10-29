@@ -1,3 +1,4 @@
+import { trackName } from '@/shared/constants/data';
 /* 6. 검토·확정 (5차 scr['new-review'] · P.confirm)
    확정(API-35): 새 로드맵 기록. 진행 중인 다른 로드맵은 보관하지 않고 함께 진행한다(10/14 · 묻지 않음) */
 import { draftsApi } from '@/api/endpoints/drafts';
@@ -44,13 +45,13 @@ export function ReviewStep() {
     <>
       <Stepper cur="review" />
       <Page
-        eyebrow={`${pl.opt} ${pl.name}${g && g.hist && (g.hist[pl.opt] || []).length > 1 ? ` · 버전 ${((g.cur || {})[pl.opt] || 0) + 1}` : ''}`}
+        eyebrow={`${trackName(pl.opt, pl.name)}${g && g.hist && (g.hist[pl.opt] || []).length > 1 ? ` · 버전 ${((g.cur || {})[pl.opt] || 0) + 1}` : ''}`}
         title="이 로드맵으로 확정할까요?"
         foot={
           <>
             <button className="btn line" onClick={() => go(paths.newOptions)}>
               <Icon name="left" />
-              이전
+              재선택
             </button>
             <button className="btn pri" onClick={() => void confirmDraft(go)}>
               확정하기

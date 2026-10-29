@@ -1,3 +1,4 @@
+import { trackName } from '@/shared/constants/data';
 /* 로드맵 일정(간트) 표시 (5차 ganttOne·ganttAll·gtStages·gtCard·gt-fold·설명 상자)
    로드맵이 하나면 '전체 진행' 카드 자리에, 여럿이면 하나로 합쳐 맨 위에 둔다. 이번 주 칸을 칠한다.
    예정 주차가 지나도 늦었다고 표시하지 않는다(스스로 정한 학습 계획). 처음엔 모두 펼치고, 접은 상태는 새로 고칠 때까지만 기억한다 */
@@ -269,7 +270,7 @@ export function GanttAll({ list }: { list: PlanRecord[] }) {
     const wk = weekNow(R);
     const at = `${wk <= w ? `지금 ${wk}주차 / ` : ''}전체 ${w}주`;
     return (
-      <Fragment key={R.id}>
+      <div className="gt-roadmap-group" key={R.id}>
         <Row
           lv={0}
           ins={[]}
@@ -277,9 +278,9 @@ export function GanttAll({ list }: { list: PlanRecord[] }) {
             <>
               <Tg k={R.id} name={pl.goal} onToggle={() => toggle(R.id)} />
               <button className="gt-r" onClick={() => go(paths.roadmap(R.id))}>
-                <span className="gt-name">{pl.goal}</span>
+                <span className="gt-name">{pl.displayTitle || pl.goal}</span>
                 <small>
-                  {at} · {pl.opt} {pl.name}
+                  {at} · {trackName(pl.opt, pl.name)}
                 </small>
               </button>
             </>
@@ -289,10 +290,10 @@ export function GanttAll({ list }: { list: PlanRecord[] }) {
               <i style={{ width: `${(c.done / c.t) * 100}%` }} />
             </span>
           }
-          tip={{ v: `${md(starts[i])}~${md(addDays(starts[i], 7 * w - 1))} · ${at}`, t: pl.goal, m: `${pl.opt} ${pl.name} · v${pl.version} · 활동 ${c.t}개 중 ${c.done}개 완료` }}
+          tip={{ v: `${md(starts[i])}~${md(addDays(starts[i], 7 * w - 1))} · ${at}`, t: pl.goal, m: `${trackName(pl.opt, pl.name)} · v${pl.version} · 활동 ${c.t}개 중 ${c.done}개 완료` }}
         />
         <Stages R={R} off={off} T={T} up={[R.id]} onToggle={toggle} />
-      </Fragment>
+      </div>
     );
   });
   return (

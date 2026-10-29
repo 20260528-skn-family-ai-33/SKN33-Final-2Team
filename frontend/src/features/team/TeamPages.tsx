@@ -1,3 +1,4 @@
+import { trackName } from '@/shared/constants/data';
 /* 부서장 (API-55~59 · 5차 gp-parts.js m-list·m-plan·m-road·m-report·m-done)
    부서장 범위(2026-10-27 팀 합의): 자기 부서 직원만(부서장의 계획은 본인만 봄). 서버가 소속 관계를 확인하고 공개 범위만 보낸다.
    공개 범위(설계서 v1.7 1.1): 직원 소속·직급·직위, 확정 로드맵(버전)·활동 진행 상태·결과 보고서(전체)·받은 코멘트 기록. 메모·첨부·진단·작성 중인 로드맵은 보내지 않는다 */
@@ -122,7 +123,7 @@ function MgrRoadRow({ uid, R }: { uid: string; R: PlanRecord }) {
       <div className="tx">
         <b>{pl.goal}</b>
         <small>
-          {pl.name} v{pl.version} · 활동 {c.done}/{c.t} 완료{mine ? ` · 보낸 코멘트 ${mine}개` : ''}
+          {trackName(pl.opt, pl.name)} v{pl.version} · 활동 {c.done}/{c.t} 완료{mine ? ` · 보낸 코멘트 ${mine}개` : ''}
         </small>
       </div>
       <span className="end">
@@ -143,7 +144,7 @@ function MgrRepRow({ uid, r }: { uid: string; r: Report }) {
       </span>
       <div className="tx">
         <b>
-          결과 보고서 · {r.opt} v{r.version}
+          결과 보고서 · {trackName(r.opt)} v{r.version}
         </b>
         <small>
           {r.goal} · {r.createdAt} · {r.confirmed ? '직원 확인함' : '직원 확인 전'}
@@ -404,7 +405,7 @@ export function MemberRoadPage() {
     >
       <div className="card">
         <p className="eyebrow">
-          {pl.name} · v{pl.version} · {R.createdAt} 확정{live ? '' : R.status === 'done' ? ' · 마침' : ' · 보관'}
+          {trackName(pl.opt, pl.name)} · v{pl.version} · {R.createdAt} 확정{live ? '' : R.status === 'done' ? ' · 마침' : ' · 보관'}
         </p>
         <p style={{ fontWeight: 650, fontSize: 16 }}>{pl.goal}</p>
         <div style={{ marginTop: 16 }}>
@@ -482,7 +483,7 @@ export function MemberReportPage() {
   if (!r) return <Navigate to={paths.member(uid)} replace />;
   const R = q.data.plans[r.planId];
   return (
-    <Page back={R ? paths.memberPlan(uid, R.id) : paths.member(uid)} eyebrow={`${who(e)} · 결과 보고서 · ${r.opt} v${r.version} · ${r.createdAt}`} title="학습 결과 보고서" lead={r.goal}>
+    <Page back={R ? paths.memberPlan(uid, R.id) : paths.member(uid)} eyebrow={`${who(e)} · 결과 보고서 · ${trackName(r.opt)} v${r.version} · ${r.createdAt}`} title="학습 결과 보고서" lead={r.goal}>
       <ReportBody r={r} />
       <Note>
         {e.name} 님이 {r.confirmed ? '확인한' : '아직 확인하지 않은'} 보고서예요. 부서장은 읽기만 할 수 있어요.

@@ -1,3 +1,4 @@
+import { trackName } from '@/shared/constants/data';
 /* 사후 점검·결과 보고서 만들기 (5차 scr.post · ensurePostDeep · 저장·보고서 요청은 postActions.ts)
    응답은 고칠 때마다 서버에 저장한다(API-49). 결과물 파일은 서버 폴더에 올린 뒤 이름만 붙인다.
    사후 심화 질문(10/23): 사전에 심화를 고른 로드맵이면 화면에 들어올 때 서버가 같은 개념의 새 문제를 만든다. 실패는 '다시 시도'를 눌러야만 */
@@ -154,7 +155,7 @@ function Post({ R }: { R: PlanRecord }) {
   return (
     <Page
       back={paths.checks}
-      eyebrow={`${pl.name} · v${pl.version} · ${pl.goal}`}
+      eyebrow={`${trackName(pl.opt, pl.name)} · v${pl.version} · ${pl.goal}`}
       title="사후 점검"
       lead="사전 점검과 같은 문항이에요. 지금 기준으로 1~5점을 골라 주세요. 진단 에이전트가 계산한 수준값은 보여드리지 않아요."
       foot={

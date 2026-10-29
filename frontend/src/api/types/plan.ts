@@ -26,6 +26,7 @@ export interface PlanContent {
   short: string;
   tagline: string;
   goal: string;
+  displayTitle?: string;
   def: OptionDef;
   params: PlanParams;
   start: number;

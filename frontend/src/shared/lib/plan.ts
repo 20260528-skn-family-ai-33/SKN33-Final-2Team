@@ -46,6 +46,7 @@ export function buildPlan(def: OptionDef, prm: Partial<PlanParams>, goal: string
   const cost = resIds.reduce((s, r) => s + (resOf(r)?.cost || 0), 0);
   const costUnknown = resIds.some((r) => !resOf(r) || resOf(r)?.cost == null);
   return {
+    displayTitle: def.displayTitle,
     opt: def.id,
     name: def.name,
     short: def.short,
