@@ -20,15 +20,15 @@
     {
       "id": "full_database_current",
       "filename": "growpath_latest.dump",
-      "bytes": 38375509,
-      "sha256": "4e3a792cbb34635497cedd6b1b83f6e8390a13326edd4a23f6faf58c55dc496d",
+      "bytes": 38402877,
+      "sha256": "e27fb83895f4080cbf8838765de577c360007d6b95cc8c2cc0c92b9979dd3ea7",
       "location": "https://drive.google.com/file/d/1YBhxTVQjNfm53FbcLJnO7SKi-hsycxz4/view?usp=drivesdk",
       "location_status": "uploaded_existing_drive_file",
       "manifest": "data/exports/growpath_latest.manifest.json",
-      "version": "2026-10-29-natural-profiles-goals315",
+      "version": "2026-10-29-final-quality-track-prompts-goals315",
       "manifest_location": "https://drive.google.com/file/d/1iUVAugkFpXHNeO3IlWhFkol-6oID691C/view?usp=drivesdk",
       "verified_all_tables": 78,
-      "verified_all_rows": 23561
+      "verified_all_rows": 23567
     },
     {
       "id": "course_duration_snapshot_20261028",

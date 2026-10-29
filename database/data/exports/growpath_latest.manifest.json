@@ -1,11 +1,11 @@
 {
   "format": 1,
-  "created_at": "2026-10-29T08:40:09.421652+00:00",
+  "created_at": "2026-10-29T13:55:51.301423+00:00",
   "database": "growpath",
-  "server_version": "17.11",
+  "server_version": "17.10 (Debian 17.10-1.pgdg12+1)",
   "archive": "growpath_latest.dump",
-  "sha256": "4e3a792cbb34635497cedd6b1b83f6e8390a13326edd4a23f6faf58c55dc496d",
-  "bytes": 38375509,
+  "sha256": "e27fb83895f4080cbf8838765de577c360007d6b95cc8c2cc0c92b9979dd3ea7",
+  "bytes": 38402877,
   "inventory": {
     "tables": {
       "growpath_legacy.agent_generations": 71,
@@ -43,7 +43,7 @@
       "public.major_skills": 14,
       "public.majors": 7,
       "public.projects": 2,
-      "public.prompt_versions": 6,
+      "public.prompt_versions": 12,
       "public.roadmap_comments": 0,
       "public.roadmap_step_resources": 1,
       "public.roadmap_steps": 3,
@@ -1517,6 +1517,7 @@
       }
     ]
   },
+  "scope": "All schemas and data, including app_ext. Server roles, external files and secrets are separate.",
   "all_schema_table_fingerprints": {
     "app_ext.activity_progress": {
       "rows": 0,
@@ -1684,11 +1685,11 @@
     },
     "public.course_skills": {
       "rows": 3658,
-      "digest": "d7d9de497ce765044ad45c0c4c13819f"
+      "digest": "8485a83fcc72eafb5b215e4dbd448fe0"
     },
     "public.courses": {
       "rows": 2060,
-      "digest": "714755975b62d1f677e5f42ca1806a9c"
+      "digest": "b070441ff553117f2d21756fcda15225"
     },
     "public.departments": {
       "rows": 14,
@@ -1744,7 +1745,7 @@
     },
     "public.learning_resource_embeddings": {
       "rows": 2469,
-      "digest": "26d8bcc80097db71486af2cafafdf85d"
+      "digest": "98b763e1e297bbde84c5ebfc06b206fc"
     },
     "public.major_skills": {
       "rows": 14,
@@ -1759,8 +1760,8 @@
       "digest": "025b70ceaa26c79a7a53a5b0b55fc790"
     },
     "public.prompt_versions": {
-      "rows": 6,
-      "digest": "3a9fb9fa22a61206905e03195f3d8545"
+      "rows": 12,
+      "digest": "8dceadbd06244a27366347bee0b613bf"
     },
     "public.roadmap_comments": {
       "rows": 0,
@@ -1831,42 +1832,342 @@
       "digest": "7d593aac2bfbc076a640306b05c5d4f2"
     }
   },
-  "scope": "All schemas including app_ext, table data, vectors, functions, views and sequences; cluster roles/passwords and external storage files are separate.",
-  "goal_preload": {
-    "model": "gpt-6-luna",
-    "actual_model_calls": 106,
-    "automatic_retries": 0,
-    "employees": 105,
-    "candidates": 315,
-    "input_tokens": 119439,
-    "output_tokens": 94329,
-    "total_tokens": 213768
+  "all_schema_table_count": 78,
+  "all_schema_row_count": 23567,
+  "verification": {
+    "all_table_fingerprints_match": true,
+    "all_table_counts": 78,
+    "all_rows": 23567,
+    "canonical_inventory_matches": true,
+    "schema_hash_matches": true,
+    "sequences_match": true,
+    "vector_self_distance_checks": {
+      "public.learning_resource_embeddings": true,
+      "regulations.rag_chunk_embeddings": true,
+      "knowledge.chunks": true
+    },
+    "idempotent_curriculum_backfill": {
+      "courses": 2060,
+      "changed_count": 0,
+      "coverage": {
+        "public_outline": 2045,
+        "partial_outline": 9,
+        "description_only": 6
+      },
+      "applied": false,
+      "embedding_api_called": false,
+      "vector_inputs_changed": false
+    },
+    "vector_status": {
+      "embedding_model": "text-embedding-3-small",
+      "dimensions": 1536,
+      "vector_table_exists": true,
+      "resources": {
+        "skills": {
+          "source_count": 36,
+          "current_vectors": 36,
+          "missing_or_stale_vectors": 0
+        },
+        "courses": {
+          "source_count": 2046,
+          "current_vectors": 2046,
+          "missing_or_stale_vectors": 0
+        },
+        "certifications": {
+          "source_count": 23,
+          "current_vectors": 23,
+          "missing_or_stale_vectors": 0
+        },
+        "jobs": {
+          "source_count": 6,
+          "current_vectors": 6,
+          "missing_or_stale_vectors": 0
+        },
+        "majors": {
+          "source_count": 7,
+          "current_vectors": 7,
+          "missing_or_stale_vectors": 0
+        },
+        "books": {
+          "source_count": 308,
+          "current_vectors": 308,
+          "missing_or_stale_vectors": 0
+        }
+      },
+      "orphan_vectors_ignored": 43,
+      "database_changes": false,
+      "embedding_api_called": false
+    }
   },
-  "display_cleanup": {
-    "employees": 105,
-    "renamed_synthetic_employees": 100,
-    "real_user_names_unchanged": 5,
-    "actual_model_calls": 106,
-    "candidates": 315,
+  "source_release": {
+    "sha256": "bb98e1801b8cb67513d19415031bfd8fd38dbc5554b2c073b01fbc975b9e3750",
+    "bytes": 38384275,
+    "code_main": "8c8041cb11c79650d0aea33a32018e8cf3b542b9",
+    "pr29_head": "37b6e1c0368a9989bb5d178793990e89043946a3",
+    "additional_code_changes": "PR29 working tree; pending explicit commit/push approval"
+  },
+  "data_changes": {
+    "skill_correction": {
+      "status": "applied",
+      "courses_changed": 1,
+      "embedded_count": 1,
+      "changed_tables": [
+        "public.course_skills",
+        "public.learning_resource_embeddings"
+      ],
+      "source_records_unchanged": true,
+      "all_eligible_vectors_current": true,
+      "original_ai_verdicts_unchanged": true
+    },
+    "curriculum": {
+      "courses": 2060,
+      "changed_count": 55,
+      "coverage": {
+        "public_outline": 2045,
+        "partial_outline": 9,
+        "description_only": 6
+      },
+      "applied": true,
+      "embedding_api_called": false,
+      "vector_inputs_changed": false
+    },
+    "curriculum_repeat": {
+      "courses": 2060,
+      "changed_count": 0,
+      "coverage": {
+        "public_outline": 2045,
+        "partial_outline": 9,
+        "description_only": 6
+      },
+      "applied": false,
+      "embedding_api_called": false,
+      "vector_inputs_changed": false
+    },
+    "changed_tables": [
+      "public.course_skills",
+      "public.courses",
+      "public.learning_resource_embeddings"
+    ],
+    "all_78_table_counts_unchanged": true,
+    "employees_candidates_and_private_data_unchanged": true
+  },
+  "paid_embedding": {
+    "approved_scope": "KMOOC_7204 only; maximum one API call; zero retries",
+    "model": "text-embedding-3-small",
+    "input_utf8_bytes": 3520,
+    "input_sha256": "a31f7131ef3a70fb54d30e05cb49bf8841bc6cf50823e6f607d195ee41ee1adc",
+    "started_at": "2026-10-29T13:53:59.840111+00:00",
+    "calls": 1,
     "automatic_retries": 0,
-    "separately_approved_retries": 1,
-    "oho_candidates": 3,
-    "oho_personal_data_unchanged": true,
-    "protected_identity_auth_permission_fields_unchanged": true,
-    "unmodified_tables": 70,
-    "before_backup_sha256": "52041f5859d6d2f6227062db9b0dcb1197b125a62df15f6585ea915f8e5175a8",
-    "display_changes_plan_sha256": "429522425bd30bb56a9bbdc447b52a2e9dafdf5f1ba8bf4c7bd26d778868a736",
-    "provenance_retained": true
+    "status": "succeeded",
+    "usage": {
+      "prompt_tokens": 1567,
+      "total_tokens": 1567
+    },
+    "finished_at": "2026-10-29T13:54:03.285586+00:00"
+  },
+  "quality_review": {
+    "format": 1,
+    "checked_on": "2026-10-29",
+    "scope": "Final shared DB, PR29 + main PR41 integration; AI audit, human review pending",
+    "courses": {
+      "total": 2060,
+      "checked_fields": [
+        "source/title/provider/description",
+        "URL shape and duplicates",
+        "negative/unknown price and app cache consistency",
+        "enrollment date order",
+        "positive confirmed/estimated duration",
+        "skill links",
+        "embedding currentness",
+        "curriculum provenance and item preservation"
+      ],
+      "corrected_course_count": 55,
+      "corrected_outline_items": 1091,
+      "actual_titles_recovered": 1075,
+      "explicit_missing_titles_added": 16,
+      "new_partial_course_ids": [
+        "KMOOC_19727",
+        "KMOOC_19991",
+        "KMOOC_19993",
+        "KMOOC_20832",
+        "KMOOC_21083",
+        "KMOOC_21085"
+      ],
+      "coverage": {
+        "public_outline": 2045,
+        "partial_outline": 9,
+        "description_only": 6
+      },
+      "price_unknown_preserved": 83,
+      "confirmed_time_count": 1730,
+      "estimated_time_count": 330,
+      "original_fields_and_source_hashes_preserved": true,
+      "detail_response_courses_checked": 55,
+      "live_website_revalidation": false
+    },
+    "employees": {
+      "total": 105,
+      "synthetic": 100,
+      "real": 5,
+      "structural_checks": {
+        "total": 105,
+        "synthetic": 100,
+        "synthetic_missing_context": 0,
+        "invalid_development_years": 0,
+        "invalid_employment_dates": 0
+      },
+      "invalid_education_dates": 0,
+      "all_personal_data_and_candidates_unchanged": true
+    },
+    "goals": {
+      "employees": 105,
+      "candidates": 315,
+      "structural_issues": [],
+      "cross_employee_duplicates": 0,
+      "lengths": {
+        "min": 39,
+        "max": 93
+      },
+      "jobs": {
+        "시스템소프트웨어개발자": 26,
+        "해당 없음": 1,
+        "정보보호전문가": 16,
+        "인공지능 엔지니어": 11,
+        "클라우드 시스템 엔지니어": 16,
+        "데이터베이스관리자": 25,
+        "지리정보시스템기사": 10
+      },
+      "very_short_experience": [
+        2
+      ],
+      "semantic_review_accounts": 23,
+      "semantic_review_candidates": 69,
+      "selection": "6 synthetic job families: lowest/highest development years and middle account, plus all 5 real accounts",
+      "human_review": false,
+      "assessment": "표본에서 심각한 직무 불일치·고급 경험 날조를 찾지 못함. 가상 프로필은 직무별 공통 틀을 사용해 표현 다양성이 제한됨. 실제 직원 이력이나 운영 모델 품질 평가를 뜻하지 않음."
+    },
+    "cache": {
+      "employees": 105,
+      "candidates": 315,
+      "all_original_generation_inputs_equal": true,
+      "all_ready_and_not_stale": true,
+      "generation_jobs_requested": 0,
+      "model_api_calls": 0,
+      "track_prompt_reads": 6,
+      "all_78_tables_unchanged": true
+    },
+    "skill_correction_plan": {
+      "review_method": "Codex source/curriculum review; human semantic review pending",
+      "corrections": [
+        {
+          "course_id": "KMOOC_7204",
+          "title": "오픈소스를 이용한 DevOps 구축 및 활용",
+          "syllabus_sha256": "5faed7b9f3cd31fe9ea573f78735e8d585a6a623ae3fd5036f5a0e364bda928c",
+          "before_skill_ids": [
+            33
+          ],
+          "after_skill_ids": [
+            21
+          ],
+          "reason": "강사 경력의 시스템 보안 문구가 학습 주제로 잘못 연결됨. 실제 목차의 CI/CD 구축·활용으로 연결한다.",
+          "evidence": [
+            "WEEK 11: CI & CD / 프로세스·시스템",
+            "WEEK 12: CI & CD 시스템 구축·환경설정",
+            "WEEK 13: SW 버전 관리 / Jenkins 시스템 연동 설정",
+            "WEEK 14: Periodic Build 설정 / SW Package 관리"
+          ],
+          "source_url": "https://www.kmooc.kr/view/course/detail/7204"
+        }
+      ]
+    },
+    "embedding": {
+      "approved_scope": "KMOOC_7204 only; maximum one API call; zero retries",
+      "model": "text-embedding-3-small",
+      "input_utf8_bytes": 3520,
+      "input_sha256": "a31f7131ef3a70fb54d30e05cb49bf8841bc6cf50823e6f607d195ee41ee1adc",
+      "started_at": "2026-10-29T13:53:59.840111+00:00",
+      "calls": 1,
+      "automatic_retries": 0,
+      "status": "succeeded",
+      "usage": {
+        "prompt_tokens": 1567,
+        "total_tokens": 1567
+      },
+      "finished_at": "2026-10-29T13:54:03.285586+00:00"
+    },
+    "remaining": [
+      "가격 미확인 83건은 미확인으로 유지; 무료로 추정하지 않음.",
+      "목차는 6강좌 소개만 제공, 9강좌 일부 제목 미제공; 원문에 없는 제목을 생성하지 않음.",
+      "330강좌 계획 시간은 추정치; 실제 영상 길이로 간주하지 않음.",
+      "가상 직원 프로필은 공통 문장 틀의 한계가 있으며 사람 검토가 남음.",
+      "Free Track 유료/미확인 자격증 데모 실패와 확정 전 가격 재검사 문제는 기존 코드 후속 작업."
+    ],
+    "track_prompts": [
+      {
+        "agent_id": "agent_certified",
+        "version_num": 3,
+        "sha256": "23cd7012df7d7c258cdaf48869582a862e0f83817fd7c171ad0da202b69fb1e7"
+      },
+      {
+        "agent_id": "agent_fasttrack",
+        "version_num": 4,
+        "sha256": "1630d90d393f41df8a3562cc10bc59193b810909a8c051828a0e255cb8904252"
+      },
+      {
+        "agent_id": "agent_plan_draft",
+        "version_num": 1,
+        "sha256": "edf99a7af3333583fdaddb7ee60e38ea9211ada881038e6effc477d33790c0b7"
+      },
+      {
+        "agent_id": "agent_plan_refine",
+        "version_num": 1,
+        "sha256": "e4274e334703552f32793d2711e43f2973d7b10853c92a09a098502c8d90ee9c"
+      },
+      {
+        "agent_id": "agent_practical",
+        "version_num": 3,
+        "sha256": "34eb6cdd5d1aeb86b9b77c39660b6d3dd96224b707c6923062812775ae08d448"
+      }
+    ]
+  },
+  "application_verification": {
+    "backend_unit_passed": 33,
+    "data_change_targeted_unit_passed": 30,
+    "new_dump_actual_api_smoke_passed": 35,
+    "catalog_details_checked": 55,
+    "cached_employee_inputs_checked": 105,
+    "known_free_track_issues_reproduced": 2,
+    "external_generation_calls": 0,
+    "browser_ui_verified": false,
+    "human_review": "pending",
+    "code_sha256": {
+      "backend/app/services/profile.py": "c54ecc93136c030cc7321906c0f86cb9faf89fe4e97b7de5a7d24efc3a3417d2",
+      "database/src/database/course_curriculum.py": "00c8531feacf9e4a8094face7ac7a677635465bfa7762dad8b90e82c38aa5812",
+      "database/src/shared/skill_matching.py": "2148be6dd4294d210b611dc48150cff3e6db11f02130be12e7c1dbd8f2df96ec"
+    },
+    "database_unit": {
+      "collected": 242,
+      "started_including_skips": 231,
+      "executed": 226,
+      "passed": 226,
+      "skipped": 5,
+      "failures": 0,
+      "errors": 0,
+      "successful": true
+    },
+    "initial_setup_notes": [
+      "Backend test temporary directory was changed from sandbox temp to workspace after a PermissionError; final 33 tests passed.",
+      "Skill update stopped before API because CI & CD was not matched; after the code correction exactly one approved embedding request succeeded."
+    ]
   },
   "publication": {
-    "published_at": "2026-10-29T08:41:17.897744+00:00",
-    "source_archive": "growpath_natural_profiles_goals_20261029.dump",
-    "checkpoint": "시간·커리큘럼, 직원 100명 이름·표시 문구 정리, 팀원 5명 보존, 실제 목표 후보 315개",
-    "drive_folder_id": "1DyJ67R5bYMEwKF-PChdOcxGF8TCNtPsx",
-    "actual_model_calls": 106,
-    "initial_calls": 105,
-    "separately_approved_retries": 1,
-    "automatic_retries": 0,
-    "website_saved_change_policy": "Application changes tested locally; current PR29 updates pending commit/push; backup does not deploy application code"
+    "dump_url": "https://drive.google.com/file/d/1YBhxTVQjNfm53FbcLJnO7SKi-hsycxz4/view",
+    "manifest_url": "https://drive.google.com/file/d/1iUVAugkFpXHNeO3IlWhFkol-6oID691C/view",
+    "previous_backup_folder_url": "https://drive.google.com/drive/folders/1wW9sey0PHMX2iSfNkNqu4RrTr0g0HjiZ",
+    "previous_dump_id": "175wels3fnOs9VTV7mqRuL7cp7-7XBHYS",
+    "previous_manifest_id": "1kfCRwZwjH2cNlbZDIwhiAplO1QA-ErJ9",
+    "previous_download_hashes_verified": true,
+    "version": "2026-10-29-final-quality-track-prompts-goals315"
   }
 }

@@ -1,0 +1,313 @@
+{
+  "format": 1,
+  "checked_on": "2026-10-29",
+  "scope": "Final shared DB, PR29 + main PR41 integration; AI audit, human review pending",
+  "courses": {
+    "total": 2060,
+    "checked_fields": [
+      "source/title/provider/description",
+      "URL shape and duplicates",
+      "negative/unknown price and app cache consistency",
+      "enrollment date order",
+      "positive confirmed/estimated duration",
+      "skill links",
+      "embedding currentness",
+      "curriculum provenance and item preservation"
+    ],
+    "corrected_course_count": 55,
+    "corrected_outline_items": 1091,
+    "actual_titles_recovered": 1075,
+    "explicit_missing_titles_added": 16,
+    "new_partial_course_ids": [
+      "KMOOC_19727",
+      "KMOOC_19991",
+      "KMOOC_19993",
+      "KMOOC_20832",
+      "KMOOC_21083",
+      "KMOOC_21085"
+    ],
+    "coverage": {
+      "public_outline": 2045,
+      "partial_outline": 9,
+      "description_only": 6
+    },
+    "price_unknown_preserved": 83,
+    "confirmed_time_count": 1730,
+    "estimated_time_count": 330,
+    "original_fields_and_source_hashes_preserved": true,
+    "detail_response_courses_checked": 55,
+    "live_website_revalidation": false
+  },
+  "employees": {
+    "total": 105,
+    "synthetic": 100,
+    "real": 5,
+    "structural_checks": {
+      "total": 105,
+      "synthetic": 100,
+      "synthetic_missing_context": 0,
+      "invalid_development_years": 0,
+      "invalid_employment_dates": 0
+    },
+    "invalid_education_dates": 0,
+    "all_personal_data_and_candidates_unchanged": true
+  },
+  "goals": {
+    "employees": 105,
+    "candidates": 315,
+    "structural_issues": [],
+    "cross_employee_duplicates": 0,
+    "lengths": {
+      "min": 39,
+      "max": 93
+    },
+    "jobs": {
+      "시스템소프트웨어개발자": 26,
+      "해당 없음": 1,
+      "정보보호전문가": 16,
+      "인공지능 엔지니어": 11,
+      "클라우드 시스템 엔지니어": 16,
+      "데이터베이스관리자": 25,
+      "지리정보시스템기사": 10
+    },
+    "very_short_experience": [
+      2
+    ],
+    "semantic_review_accounts": 23,
+    "semantic_review_candidates": 69,
+    "selection": "6 synthetic job families: lowest/highest development years and middle account, plus all 5 real accounts",
+    "human_review": false,
+    "assessment": "표본에서 심각한 직무 불일치·고급 경험 날조를 찾지 못함. 가상 프로필은 직무별 공통 틀을 사용해 표현 다양성이 제한됨. 실제 직원 이력이나 운영 모델 품질 평가를 뜻하지 않음."
+  },
+  "cache": {
+    "employees": 105,
+    "candidates": 315,
+    "all_original_generation_inputs_equal": true,
+    "all_ready_and_not_stale": true,
+    "generation_jobs_requested": 0,
+    "model_api_calls": 0,
+    "track_prompt_reads": 6,
+    "all_78_tables_unchanged": true
+  },
+  "skill_correction_plan": {
+    "review_method": "Codex source/curriculum review; human semantic review pending",
+    "corrections": [
+      {
+        "course_id": "KMOOC_7204",
+        "title": "오픈소스를 이용한 DevOps 구축 및 활용",
+        "syllabus_sha256": "5faed7b9f3cd31fe9ea573f78735e8d585a6a623ae3fd5036f5a0e364bda928c",
+        "before_skill_ids": [
+          33
+        ],
+        "after_skill_ids": [
+          21
+        ],
+        "reason": "강사 경력의 시스템 보안 문구가 학습 주제로 잘못 연결됨. 실제 목차의 CI/CD 구축·활용으로 연결한다.",
+        "evidence": [
+          "WEEK 11: CI & CD / 프로세스·시스템",
+          "WEEK 12: CI & CD 시스템 구축·환경설정",
+          "WEEK 13: SW 버전 관리 / Jenkins 시스템 연동 설정",
+          "WEEK 14: Periodic Build 설정 / SW Package 관리"
+        ],
+        "source_url": "https://www.kmooc.kr/view/course/detail/7204"
+      }
+    ]
+  },
+  "embedding": {
+    "approved_scope": "KMOOC_7204 only; maximum one API call; zero retries",
+    "model": "text-embedding-3-small",
+    "input_utf8_bytes": 3520,
+    "input_sha256": "a31f7131ef3a70fb54d30e05cb49bf8841bc6cf50823e6f607d195ee41ee1adc",
+    "started_at": "2026-10-29T13:53:59.840111+00:00",
+    "calls": 1,
+    "automatic_retries": 0,
+    "status": "succeeded",
+    "usage": {
+      "prompt_tokens": 1567,
+      "total_tokens": 1567
+    },
+    "finished_at": "2026-10-29T13:54:03.285586+00:00"
+  },
+  "remaining": [
+    "가격 미확인 83건은 미확인으로 유지; 무료로 추정하지 않음.",
+    "목차는 6강좌 소개만 제공, 9강좌 일부 제목 미제공; 원문에 없는 제목을 생성하지 않음.",
+    "330강좌 계획 시간은 추정치; 실제 영상 길이로 간주하지 않음.",
+    "가상 직원 프로필은 공통 문장 틀의 한계가 있으며 사람 검토가 남음.",
+    "Free Track 유료/미확인 자격증 데모 실패와 확정 전 가격 재검사 문제는 기존 코드 후속 작업."
+  ],
+  "track_prompts": [
+    {
+      "agent_id": "agent_certified",
+      "version_num": 3,
+      "sha256": "23cd7012df7d7c258cdaf48869582a862e0f83817fd7c171ad0da202b69fb1e7"
+    },
+    {
+      "agent_id": "agent_fasttrack",
+      "version_num": 4,
+      "sha256": "1630d90d393f41df8a3562cc10bc59193b810909a8c051828a0e255cb8904252"
+    },
+    {
+      "agent_id": "agent_plan_draft",
+      "version_num": 1,
+      "sha256": "edf99a7af3333583fdaddb7ee60e38ea9211ada881038e6effc477d33790c0b7"
+    },
+    {
+      "agent_id": "agent_plan_refine",
+      "version_num": 1,
+      "sha256": "e4274e334703552f32793d2711e43f2973d7b10853c92a09a098502c8d90ee9c"
+    },
+    {
+      "agent_id": "agent_practical",
+      "version_num": 3,
+      "sha256": "34eb6cdd5d1aeb86b9b77c39660b6d3dd96224b707c6923062812775ae08d448"
+    }
+  ],
+  "post_backup_ui_verification": {
+    "scope": "최신 공유 DB 복원본 + main(PR41 병합) + PR29 및 앞서 수정한 로컬 코드, 합성 직원 1명, 실제 화면 한 흐름",
+    "model": "gpt-6-luna",
+    "demo_mock": false,
+    "completed": [
+      "로그인",
+      "OpenAI gpt-6-luna 선택",
+      "업무·프로젝트 수정 저장",
+      "입력 기반 목표 후보 3개 생성",
+      "목표 선택",
+      "학습 여건 입력(주 4시간·8주·10만 원)",
+      "사전 점검 12문항 생성",
+      "미응답 제출 차단",
+      "12문항 응답",
+      "진단",
+      "3 Track 생성",
+      "지원 규정 조회",
+      "Fast Track 확정",
+      "새로고침 후 재조회",
+      "DevOps 강좌 검색·목차 28개·CI/CD 스킬 확인"
+    ],
+    "data_checks": {
+      "course_records": 2060,
+      "curriculum_count_mismatches": [],
+      "course_price_cache_mismatches": 0,
+      "protected_source_tables_checked": 23,
+      "protected_source_tables_changed": [],
+      "test_clone_changed_tables": [
+        "app_ext.admin_accounts",
+        "app_ext.agent_calls",
+        "app_ext.cert_groups",
+        "app_ext.employee_self_inputs",
+        "app_ext.goal_suggestion_meta",
+        "app_ext.goal_suggestion_runs",
+        "app_ext.jobs",
+        "app_ext.regulation_meta",
+        "app_ext.resource_meta",
+        "app_ext.roadmap_meta",
+        "app_ext.roadmap_versions",
+        "app_ext.sessions",
+        "app_ext.user_settings",
+        "public.assessment_questions",
+        "public.assessment_responses",
+        "public.diagnostic_rounds",
+        "public.employee_input_profiles",
+        "public.employee_recommended_prompts",
+        "public.employees",
+        "public.projects",
+        "public.roadmap_steps",
+        "public.roadmaps"
+      ],
+      "track_prompt_checks": [
+        {
+          "agent": "agent_certified",
+          "sent_exact_db_generation_prompt": true,
+          "prompt_version_id": "d142768f-243d-4a7d-bae8-c13d4c1a6dd8",
+          "sha256": "2780069c622c92861bd52f3efb0d031765f62003f102119472332b0911ceaef4"
+        },
+        {
+          "agent": "agent_fasttrack",
+          "sent_exact_db_generation_prompt": true,
+          "prompt_version_id": "75b49d37-a6f3-4f31-89b6-0baa9eed8d25",
+          "sha256": "5d985c63f4bb0a7895a94aa58859ba66b193d8d93a16b507d4fb1306be4034ff"
+        },
+        {
+          "agent": "agent_practical",
+          "sent_exact_db_generation_prompt": true,
+          "prompt_version_id": "18caf9ae-dde6-44ed-9967-6284c304d296",
+          "sha256": "177b436007774fe40f54d4f86a1a8b1f06d176fa7486b8bd69e2e9f02e844760"
+        }
+      ],
+      "additional_source_data_corrections_required_by_this_run": []
+    },
+    "model_usage": {
+      "chat_calls": 8,
+      "embedding_calls": 1,
+      "connectivity_gets": 3,
+      "failed_calls": [],
+      "chat_input_tokens": 34484,
+      "chat_output_tokens": 23020,
+      "embedding_tokens": 51,
+      "mcq_contract_repair_calls": 1,
+      "http_retries": 0,
+      "monetary_cost": "청구 금액은 미확인; 실제 usage만 기록"
+    },
+    "findings": [
+      {
+        "id": "F1",
+        "priority": "P2",
+        "kind": "검색·표시 코드",
+        "problem": "인재개발규정 제24조 제1~4항 및 별표 1이 DB에 있는데 등록되지 않은 기준으로 표시됨.",
+        "evidence": "regulation_presence.json의 활성 청크와 call_11.private.json의 검색 결과 6개 대조. 생성기에 해당 청크가 전달되지 않음.",
+        "fix": "인용된 같은 조의 나머지 항·별표를 보충 검색하고, DB 전체 등록 여부를 확인하지 않았으면 이번 검색에서 근거 미확보로 표시.",
+        "file": "backend/app/agents/regulation.py",
+        "lines": [
+          557,
+          575
+        ]
+      },
+      {
+        "id": "F2",
+        "priority": "P2",
+        "kind": "추천·제약 검증 코드",
+        "problem": "예산 100000원 입력에도 진단 미리보기에 141900원 강좌(INFLEARN_341253)가 표시됨. 최종 로드맵은 0원이라 실제 저장된 계획의 예산 초과는 없음.",
+        "fix": "진단용 후보 및 반환 resourceIds에 사용자의 예산·시간을 적용하고, 예외는 후보로 표시하기 전에 설명.",
+        "file": "backend/app/agents/diag.py",
+        "lines": [
+          252,
+          268
+        ]
+      },
+      {
+        "id": "F3",
+        "priority": "P2",
+        "kind": "DB 저장 코드",
+        "problem": "실제 활성 DB 프롬프트를 사용했지만 확정한 roadmaps.prompt_version_id가 NULL임.",
+        "fix": "생성 시 읽은 prompt_version_id를 후보에 보존해 확정·버전 이력에 저장. 확정 시점의 최신 버전을 추정해서 채우지 않음.",
+        "file": "backend/app/services/plans.py",
+        "lines": [
+          58,
+          63
+        ]
+      },
+      {
+        "id": "Q1",
+        "priority": "개선 권장",
+        "kind": "추천 품질",
+        "problem": "여러 방식 함께를 선택했으나 3안 모두 강좌 연결 없이 직접 과제만 7~8개·30시간. 관점별 차이가 작음.",
+        "evidence": "전체 DB에는 무료 SQL/PostgreSQL/pandas 제목 일치 86건이 있으나 이는 적합성 86건을 의미하지 않음. Free 후보는 상위 목록에서 가격 필터 후 4건만 전달됨.",
+        "fix": "전체 후보에서 비용 조건을 먼저 적용하고 부족한 학습 항목별 관련 자료를 확보한 다음 순위를 매김. DB 가격·목차를 추천에 맞춰 왜곡하지 않음.",
+        "file": "backend/app/agents/roadmap.py",
+        "lines": [
+          361,
+          363
+        ]
+      }
+    ],
+    "limits": [
+      "합성 계정 1개·실제 모델 1회 전체 흐름으로 모든 목표 조합의 품질을 보장하지 않음",
+      "기획서 업로드·심화 응답·자격증 선택·사후 점검은 이번 실행 범위 밖",
+      "이전에 확인한 Free Track 유료/미확인 자격증 데모 실패와 확정 직전 가격 재검증 문제는 이 테스트로 해결된 것이 아님",
+      "실제 제공처의 최신 가격·이용 조건 전체 재조사는 하지 않음"
+    ],
+    "shared_db_modified": false,
+    "product_code_modified_by_ui_test": false,
+    "saved_steps_match_content": true,
+    "saved_version_matches_content": true
+  }
+}

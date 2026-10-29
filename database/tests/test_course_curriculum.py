@@ -5,12 +5,48 @@ import sys
 import tempfile
 import unittest
 
-from src.database.course_curriculum import VERSION, normalize, plain
+from src.database.course_curriculum import VERSION, normalize, plain, repair_numbered_titles
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'backend'))
 from app.catalog_evidence import CATALOG_BYTES, content_text, evidence, pack, packed_bytes
 
 
 class CourseCurriculumTests(unittest.TestCase):
+    def test_week_and_lesson_numbers_use_the_same_source_row_title(self):
+        payload = {'summary': '<table><tr><th>주차</th><th>주제</th><th>차시</th><th>내용</th></tr>'
+                   '<tr><td>WEEK 1</td><td>SW 배포체계</td><td>1-1</td><td>배포 위험</td></tr>'
+                   '<tr><td>1-2</td><td>통합 배포 체계</td></tr></table>'}
+        value = normalize('API_KMOOC', payload)
+        self.assertEqual([r['title'] for r in value['items']], ['SW 배포체계', '통합 배포 체계'])
+        self.assertEqual(value['items'][0]['section'], 'WEEK 1')
+        self.assertEqual(value['items'][0]['description'], '1-1 / 배포 위험')
+        self.assertEqual(value['items'][0]['original_title'], 'WEEK 1')
+        self.assertEqual(value['items'][0]['original_description'], 'SW 배포체계 / 1-1 / 배포 위험')
+
+    def test_restored_outline_repairs_without_original_cache_and_is_idempotent(self):
+        import copy
+        value = {'source': 'API_KMOOC', 'payload_sha256': 'preserved', 'item_count': 2,
+                 'items': [{'title': '1 주차', 'section': '', 'description': 'SQL / SELECT'},
+                           {'title': '트랜잭션', 'section': '', 'description': '격리 수준'}]}
+        before = copy.deepcopy(value)
+        fixed = repair_numbered_titles(value)
+        self.assertEqual(value, before)
+        self.assertEqual(fixed['payload_sha256'], value['payload_sha256'])
+        self.assertEqual(fixed['item_count'], 2)
+        self.assertEqual(fixed['items'][1], value['items'][1])
+        self.assertEqual(fixed, repair_numbered_titles(fixed))
+
+    def test_kocw_video_metadata_is_preserved_and_no_missing_title_is_invented(self):
+        value = normalize('WEB_KOCW', {'lessons': [
+            {'title': '1-2', 'chapter': '1.', 'description': '파이썬 기본 이론', 'video_listed': True},
+            {'title': '2-1', 'description': ''}]})
+        self.assertEqual(value['items'][0]['title'], '파이썬 기본 이론')
+        self.assertEqual(value['items'][0]['section'], '1. / 1-2')
+        self.assertTrue(value['items'][0]['video'])
+        self.assertEqual(value['items'][1]['title'], '제목 미제공')
+        self.assertEqual(value['items'][1]['original_title'], '2-1')
+        self.assertTrue(value['items'][1]['title_missing'])
+        self.assertEqual(value['coverage'], 'partial_outline')
+
     def test_entire_ai_catalog_budget_and_four_skill_limit(self):
         records=[{'id':str(i),'title':'SQL 강좌 '+str(i),'kind':'강좌','type':'course','format':'영상',
                   'skills':['SQL']*12,'hours':1,'timeStatus':'estimated','content':'한글 소개 '*1000,

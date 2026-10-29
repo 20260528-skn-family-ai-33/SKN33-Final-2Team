@@ -1325,5 +1325,31 @@
     "raw_employee_data_in_git": false,
     "human_review": "pending",
     "application_publication": "prepared locally; new commit/push approval pending"
+  },
+  "final_quality_20261029": {
+    "manifest": "data/exports/final_quality_20261029.manifest.json",
+    "archive_sha256": "e27fb83895f4080cbf8838765de577c360007d6b95cc8c2cc0c92b9979dd3ea7",
+    "archive_bytes": 38402877,
+    "all_tables": 78,
+    "all_rows": 23567,
+    "restored_all_fingerprints_match": true,
+    "backend_unit_passed": 33,
+    "actual_api_smoke_passed": 35,
+    "known_code_issues_reproduced": 2,
+    "paid_embedding_calls": 1,
+    "human_review": "pending",
+    "git_commit_push": "User authorized publication in PR #29; see its final commit and CI status.",
+    "database_unit": {
+      "collected": 242,
+      "started_including_skips": 231,
+      "executed": 226,
+      "passed": 226,
+      "skipped": 5,
+      "failures": 0,
+      "errors": 0,
+      "successful": true
+    },
+    "post_backup_ui_verification": "data/exports/final_quality_20261029.manifest.json#post_backup_ui_verification",
+    "integrated_backend_unit_passed": 45
   }
 }

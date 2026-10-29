@@ -97,6 +97,37 @@ def cached_markup(payload, root):
     return parser
 
 
+def repair_numbered_titles(value):
+    """주차/차시만 제목인 항목은 같은 원문 행의 설명으로 표시하고 원래 값도 보존한다.
+
+    복원본의 원문 해시와 목차를 이용하므로 수집 PC의 HTML 캐시가 필요하지 않다.
+    내용을 추정하지 않으며 새 제목이 될 설명이 없으면 제목 미제공으로 구분한다.
+    """
+    if value.get('source') not in ('API_KMOOC', 'WEB_KOCW'):
+        return value
+    ordinal = re.compile(r'(?:WEEK\s*\d+|\d+\s*[-.]\s*\d+|\d+\s*(?:주차?|차시|강|회)?)', re.I)
+    items, changed = [], False
+    for item in value.get('items', []):
+        title = str(item.get('title') or '').strip()
+        parts = [part.strip() for part in str(item.get('description') or '').split(' / ')]
+        index = next((i for i, part in enumerate(parts) if part and not ordinal.fullmatch(part)), None)
+        if ordinal.fullmatch(title):
+            item = dict(item, title=parts[index] if index is not None else '제목 미제공',
+                        section=' / '.join(part for part in (item.get('section'), title) if part),
+                        description=' / '.join(parts[:index] + parts[index + 1:]) if index is not None else item.get('description', ''),
+                        original_title=item['title'], original_description=item.get('description', ''))
+            if index is None:
+                item['title_missing'] = True
+            changed = True
+        items.append(item)
+    if not changed:
+        return value
+    coverage = value.get('coverage')
+    if coverage == 'public_outline' and any(item.get('title_missing') for item in items):
+        coverage = 'partial_outline'
+    return dict(value, items=items, coverage=coverage, title_normalization_version='numbered-outline-title/v1')
+
+
 def normalize(source, payload, description='', *, url=None, previous=None, source_root=None, supplement=None):
     payload = payload or {}
     fingerprint = hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str).encode()).hexdigest()
@@ -104,7 +135,7 @@ def normalize(source, payload, description='', *, url=None, previous=None, sourc
     supplement_hash = hashlib.sha256(json.dumps(supplement, ensure_ascii=False, sort_keys=True).encode()).hexdigest() if supplement else None
     # A restored DB carries the outline, not a dependency on the collector PC's cache.
     if previous.get('version') == VERSION and previous.get('payload_sha256') == fingerprint and (not supplement or previous.get('supplement_input_sha256') == supplement_hash):
-        return dict(previous, description=plain(description), description_sha256=hashlib.sha256(str(description or '').encode()).hexdigest())
+        return repair_numbered_titles(dict(previous, description=plain(description), description_sha256=hashlib.sha256(str(description or '').encode()).hexdigest()))
     root = source_root or Path(__file__).resolve().parents[2]
     items, coverage = [], 'description_only'
 
@@ -182,7 +213,7 @@ def normalize(source, payload, description='', *, url=None, previous=None, sourc
             for row in transcription['items']:
                 add(row['title'], row.get('section'), row.get('description'))
         coverage = 'public_outline' if items else coverage
-    return {'version': VERSION, 'source': source, 'source_url': url or payload.get('url'),
+    return repair_numbered_titles({'version': VERSION, 'source': source, 'source_url': url or payload.get('url'),
             'payload_sha256': fingerprint, 'html_sha256': payload.get('html_sha256') or (payload.get('public_detail') or {}).get('html_sha256'),
             'description': plain(description), 'description_sha256': hashlib.sha256(str(description or '').encode()).hexdigest(),
             'supplement_sha256': (supplement or {}).get('html_sha256'),
@@ -192,7 +223,7 @@ def normalize(source, payload, description='', *, url=None, previous=None, sourc
             'visual_transcription_method': (supplement or {}).get('visual_transcription', {}).get('method'),
             'visual_transcription_human_review': (supplement or {}).get('visual_transcription', {}).get('human_review'),
             'coverage': coverage, 'items': items,
-            'item_count': len(items), 'expected_unit_count': len(payload.get('units') or []) or None}
+            'item_count': len(items), 'expected_unit_count': len(payload.get('units') or []) or None})
 
 
 def backfill(conn, *, apply=False, source_root=None, supplements=None):
