@@ -68,7 +68,7 @@ def main(argv=None):
             import tests.test_canonical_database as canonical
             def isolated_connect(_):return psycopg.connect(test_url,row_factory=dict_row)
             with patch.dict(os.environ,{'EMPLOYEE_FORM_TEST_DB_URL':test_url}),patch.object(canonical,'connect',side_effect=isolated_connect):
-                names=['tests.test_synthetic_employee_database','tests.test_employee_form.EmployeeFormDatabaseTests','tests.test_canonical_database','tests.test_final_database','tests.test_catalog_history','tests.test_department_access','tests.test_resource_refresh_database','tests.test_course_duration_database']
+                names=['tests.test_synthetic_employee_database','tests.test_employee_form.EmployeeFormDatabaseTests','tests.test_canonical_database','tests.test_final_database','tests.test_catalog_history','tests.test_department_access','tests.test_resource_refresh_database','tests.test_course_duration_database','tests.test_course_supplement_database']
                 if args.app_contracts:names.append('tests.test_app_contracts')
                 report['integration']=run_tests(names,out/'integration_tests.log')
         finally:

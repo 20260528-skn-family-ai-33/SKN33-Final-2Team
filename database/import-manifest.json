@@ -83,10 +83,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "cfdc67185b3edbf20784e6cb3bfbe1d5b8b582244f59794735e78ad7ad2c65b5",
-      "bytes": 46624,
+      "sha256": "4aaae71530b8996a929686176f5fcabf37da44eb4bce2455854c390055742aae",
+      "bytes": 47898,
       "handling": "adjusted",
-      "change_note": "Issue #27 final DB quality: deterministic profile ordering, evidence-preserving curriculum titles, DevOps link recognition and verified current backup metadata (2026-10-29).",
+      "change_note": "Issue #35: supplementary course normalization, verified outline cache upgrade, timezone-stable evidence and regression checks (2026-10-30).",
       "local_update_source": {
         "path": "README.md",
         "sha256": "e872d64ea58c53311d098dc1c769f5bc3232ad947d690054b75a0a0a20c6d8c6"
@@ -98,10 +98,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "4d1699aac587a5218b098a327de31d97a0cc89531ee1eaf1e6f79c037841e5c9",
-      "bytes": 9665,
+      "sha256": "a7c61ac147269c2c70cffa9e7733a2c0fa43496c743f95d67b1998f7ff70b55e",
+      "bytes": 10484,
       "handling": "adjusted",
-      "change_note": "Issue #27 final DB quality: deterministic profile ordering, evidence-preserving curriculum titles, DevOps link recognition and verified current backup metadata (2026-10-29)."
+      "change_note": "Issue #35: supplementary course normalization, verified outline cache upgrade, timezone-stable evidence and regression checks (2026-10-30)."
     },
     {
       "path": "database/assets.manifest.json",
@@ -297,10 +297,10 @@
       "source_sha256": "82327b5737f40c891484955c2eb2ce490a53b0de46990408d4b6f9708441991d",
       "source_bytes": 4420,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "ea4cc68a585e13c9e27f1407847f70d9942c71600d07ac610a6184be31aad37a",
-      "bytes": 5478,
+      "sha256": "13fd2d0821734b1462b4f73173b2ef2d0b50ee58150dded419a6a55d074aa42a",
+      "bytes": 5518,
       "handling": "adjusted",
-      "change_note": "Issue #27: reconcile employee changes with merged course main 44ef011; preserve course contracts (2026-10-29).",
+      "change_note": "Issue #35: supplementary course normalization, verified outline cache upgrade, timezone-stable evidence and regression checks (2026-10-30).",
       "local_update_source": {
         "path": "scripts/check_workspace.py",
         "sha256": "82327b5737f40c891484955c2eb2ce490a53b0de46990408d4b6f9708441991d"
@@ -729,10 +729,10 @@
       "source_sha256": "66a020a87d5b7dbde1e893cdbb80acf8d2b5ff719cf90ef9b474acced0f5d2f7",
       "source_bytes": 9587,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "e187bc8431b54e55e18cf80f93b6dc945a66cc684d12392f69531f4d530fe527",
-      "bytes": 9743,
+      "sha256": "2fe984db395ff80f484073f61bf034a39794ed6401ddf8b19b9dd428ee100390",
+      "bytes": 11168,
       "handling": "copied",
-      "change_note": "PR #22: preserve employee catalog identities and saved roadmap resources; accept millisecond dates; skip empty historical URLs; add free regressions and verification record.",
+      "change_note": "Issue #35: supplementary course normalization, verified outline cache upgrade, timezone-stable evidence and regression checks (2026-10-30).",
       "local_update_source": {
         "path": "src/database/ingestion/course_supplement.py",
         "sha256": "66a020a87d5b7dbde1e893cdbb80acf8d2b5ff719cf90ef9b474acced0f5d2f7"
@@ -1294,10 +1294,10 @@
       "source_sha256": "692230c011e682369aa9050ed7c56456eb76fa582e6aa892eeadfe22ef17c3c2",
       "source_bytes": 15170,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "a0c352ff7404c210229b5e186e03cced8a622fc22be10351913245932777d1ed",
-      "bytes": 16123,
+      "sha256": "091c2ebed9affdcbd021d918da63a7a261caa2af9e91f999ea9983413c6d3431",
+      "bytes": 18658,
       "handling": "copied",
-      "change_note": "PR #22: preserve employee catalog identities and saved roadmap resources; accept millisecond dates; skip empty historical URLs; add free regressions and verification record.",
+      "change_note": "Issue #35: supplementary course normalization, verified outline cache upgrade, timezone-stable evidence and regression checks (2026-10-30).",
       "local_update_source": {
         "path": "tests/test_course_supplement.py",
         "sha256": "692230c011e682369aa9050ed7c56456eb76fa582e6aa892eeadfe22ef17c3c2"
@@ -1606,9 +1606,9 @@
       "source_bytes": null,
       "source_kind": "team_followup_implementation",
       "handling": "adjusted",
-      "sha256": "a7193d3a368ff5779b79f5085eb744a35507415b093bfdc4681e43479ea52052",
-      "bytes": 52938,
-      "change_note": "Issue #27: goal input evidence, exact candidate contract and regression coverage (2026-10-29)."
+      "sha256": "5c5afe35b1daf9c810eb99ba4800740f863d7c4620668ecd538bc82e7a8f38af",
+      "bytes": 56023,
+      "change_note": "Issue #35: supplementary course normalization, verified outline cache upgrade, timezone-stable evidence and regression checks (2026-10-30)."
     },
     {
       "path": "backend/app/routers/account.py",
@@ -1760,9 +1760,9 @@
       "source_bytes": null,
       "source_kind": "team_course_duration_implementation",
       "handling": "adjusted",
-      "sha256": "49c50eafb8ae0e6668b82434f94851938bdc9b2e4efa0488f55ea681b09a3259",
-      "bytes": 8987,
-      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+      "sha256": "71551ab62091da181d7d84e39f70b95849f38270a87e6198be11ae695deed686",
+      "bytes": 9771,
+      "change_note": "Issue #35: supplementary course normalization, verified outline cache upgrade, timezone-stable evidence and regression checks (2026-10-30)."
     },
     {
       "path": "database/src/database/migrations/025_course_duration.sql",
@@ -1782,9 +1782,9 @@
       "source_bytes": null,
       "source_kind": "team_course_duration_implementation",
       "handling": "adjusted",
-      "sha256": "263e03e9b58a83c7fb325873b5523c70e4b21217b25d7f086fbaa9a37d162b83",
-      "bytes": 6501,
-      "change_note": "PR #32 selected fixes: admin confirmation, detail refresh/access, ten-minute labels (2026-10-29)."
+      "sha256": "513b96b2a6c03bb2e4a9f85b959b4e57151b5c4857096f4f2a93d94282edee61",
+      "bytes": 7139,
+      "change_note": "Issue #35: supplementary course normalization, verified outline cache upgrade, timezone-stable evidence and regression checks (2026-10-30)."
     },
     {
       "path": "database/tests/test_course_duration_database.py",
@@ -1793,9 +1793,9 @@
       "source_bytes": null,
       "source_kind": "team_course_duration_implementation",
       "handling": "adjusted",
-      "sha256": "8e8a7e765354a64a86eab03e284310f235e58582841226dc906315c6cafa51ca",
-      "bytes": 6502,
-      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
+      "sha256": "3a4f928bf3a08e35616c5de0398adee94438497423bdcd635662bcd2b7623d7a",
+      "bytes": 7330,
+      "change_note": "Issue #35: supplementary course normalization, verified outline cache upgrade, timezone-stable evidence and regression checks (2026-10-30)."
     },
     {
       "path": "frontend/src/api/types/catalog.ts",
@@ -1980,9 +1980,9 @@
       "source_bytes": null,
       "source_kind": "team_course_duration_implementation",
       "handling": "adjusted",
-      "sha256": "00c8531feacf9e4a8094face7ac7a677635465bfa7762dad8b90e82c38aa5812",
-      "bytes": 13298,
-      "change_note": "Issue #27 final DB quality: deterministic profile ordering, evidence-preserving curriculum titles, DevOps link recognition and verified current backup metadata (2026-10-29)."
+      "sha256": "e9fd80526b392a0cceb54a059da6010acb840a9807ab25aa7a031ddde3adb596",
+      "bytes": 14261,
+      "change_note": "Issue #35: supplementary course normalization, verified outline cache upgrade, timezone-stable evidence and regression checks (2026-10-30)."
     },
     {
       "path": "database/src/database/migrations/026_course_curriculum.sql",
@@ -2002,9 +2002,9 @@
       "source_bytes": null,
       "source_kind": "team_course_duration_implementation",
       "handling": "adjusted",
-      "sha256": "b9f6ce551307b29f70e227307517454b2db6b6443a6618fb34f5341c8a29fc93",
-      "bytes": 11339,
-      "change_note": "Issue #27 final DB quality: deterministic profile ordering, evidence-preserving curriculum titles, DevOps link recognition and verified current backup metadata (2026-10-29)."
+      "sha256": "7a1f86c4cc756f723bbef27c65199ef490fb6a7f4121ec7e6872be6cd68f1e79",
+      "bytes": 15250,
+      "change_note": "Issue #35: supplementary course normalization, verified outline cache upgrade, timezone-stable evidence and regression checks (2026-10-30)."
     },
     {
       "path": "backend/app/routers/work.py",
@@ -2375,10 +2375,21 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "team_verification_added",
-      "sha256": "997faddd52cff9fc265dc55e0d4bf91c7234645bb6541f6ad33e6c846472a992",
-      "bytes": 12400,
+      "sha256": "fcedaa5347def24215a4aad40ada54745bf5db9d06b2781afb09d238625082dc",
+      "bytes": 17275,
       "handling": "added",
-      "change_note": "Issue #27 final DB quality verification (2026-10-29)."
+      "change_note": "Issue #35: supplementary course normalization, verified outline cache upgrade, timezone-stable evidence and regression checks (2026-10-30)."
+    },
+    {
+      "path": "database/tests/test_course_supplement_database.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_issue35_regression_test",
+      "handling": "added",
+      "sha256": "dfdc9b814c0ccd9848ce96eddd3fcea85f079d33b5837940f08078dcd448994a",
+      "bytes": 9026,
+      "change_note": "Issue #35: supplementary course normalization, verified outline cache upgrade, timezone-stable evidence and regression checks (2026-10-30)."
     }
   ],
   "excluded": [

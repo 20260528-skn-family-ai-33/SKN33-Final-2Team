@@ -96,6 +96,54 @@ class AppContractTests(unittest.TestCase):
         catalog.invalidate()
         return rid
 
+    def test_supplemented_course_detail_returns_confirmed_hour_and_full_outline(self):
+        from datetime import datetime, timezone
+        from psycopg.rows import dict_row
+        from app import catalog
+        from src.database.ingestion.course_supplement import insert_approved
+        from src.database.vectors import resource_vectors
+        from tests.test_course_supplement import external_course
+        row = external_course()
+        key = str(uuid4().int % 10**12 + 10**12)
+        slug = 'fastapi-' + key
+        url = f'https://www.inflearn.com/course/{slug}?cid={key}'
+        rid = 'INFLEARN_' + key
+        now = datetime.now(timezone.utc)
+        row.update(external_key=key, fetched_at=now, matches={30: ['FastAPI']})
+        row['fields'].update(course_id=rid, platform='Inflearn', url=url, source_url=url, source_verified_at=now)
+        row['raw'].update(source_id=key, url=url)
+        row['raw']['course_info'].update(id=int(key), slug=slug)
+        for index, lesson in enumerate(row['raw']['lessons'], 1):
+            lesson.update(id=index, runtime=1800)
+        fake = [1.0] + [0.0] * (resource_vectors.DIMENSIONS - 1)
+        with psycopg.connect(os.environ['EMPLOYEE_FORM_TEST_DB_URL'], row_factory=dict_row) as c:
+            skills = c.execute('SELECT skill_id,name,category FROM public.skill_tags ORDER BY skill_id').fetchall()
+            with patch.object(resource_vectors, 'embed_texts', return_value=[fake]) as api:
+                insert_approved(c, [row], skills)
+                api.assert_called_once()
+        def remove():
+            with self.db.tx() as t:
+                t.run("DELETE FROM growpath_meta.catalog_api_sources WHERE resource_type='courses' AND entity_key=:k", k=rid)
+                t.run('DELETE FROM public.courses WHERE course_id=:k', k=rid)
+            catalog.invalidate()
+        self.addCleanup(remove)
+        with self.db.tx() as t:
+            # 구판의 임시 2시간 설정이 있어도 실제 제공처 1시간이 우선해야 한다.
+            t.run("""INSERT INTO app_ext.resource_meta(resource_key,resource_type,course_id,hours,hours_origin,estimated_fields,stage)
+                     VALUES(:k,'course',:c,2,'catalog',:e,1)""", k=rid, c=rid, e=self.db.J(['hours','stage']))
+        catalog.invalidate()
+        client = self.client('member')
+        response = client.get('/api/v1/resources/' + rid)
+        self.assertEqual(response.status_code, 200, response.text)
+        detail = response.json()
+        self.assertEqual((detail['hours'], detail['timeStatus'], detail['durationSeconds']), (1, 'confirmed', 3600))
+        self.assertNotIn('hours', detail['estimated'])
+        self.assertEqual(detail['curriculum']['coverage'], 'public_outline')
+        self.assertEqual([x['title'] for x in detail['curriculum']['items']], ['요청 처리', '응답 처리'])
+        summary = client.post('/api/v1/resources/lookup', json={'ids': [rid]}).json()[rid]
+        self.assertEqual(summary['hours'], 1)
+        self.assertEqual(summary['curriculum'], {'coverage': 'public_outline', 'item_count': 2})
+
     def test_admin_can_confirm_time_without_changing_the_number_and_sync_preserves_it(self):
         from app import catalog,course_time
         from app.admin_io import base,education

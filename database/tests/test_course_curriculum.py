@@ -103,6 +103,61 @@ class CourseCurriculumTests(unittest.TestCase):
         self.assertEqual(value['coverage'],'sample')
         self.assertEqual(normalize('API_MS_LEARN',{'units':['uid']})['coverage'],'description_only')
 
+    def test_sample_upgrades_when_the_same_source_cache_becomes_available(self):
+        with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parent) as folder:
+            root = Path(folder)
+            raw = b'<a class="depth_0" href="/course/1/11">First</a><a class="depth_1" href="/course/1/12">Second</a>'
+            payload = {'source_id': 1, 'html_path': 'course.html',
+                       'html_sha256': hashlib.sha256(raw).hexdigest(), 'lessons': [{'title': 'Sample'}]}
+            sample = normalize('WEB_OPENTUTORIALS', payload, source_root=root)
+            self.assertEqual(sample['coverage'], 'sample')
+            (root / 'course.html').write_bytes(raw)
+            full = normalize('WEB_OPENTUTORIALS', payload, previous=sample, source_root=root)
+            self.assertEqual(full['coverage'], 'public_outline')
+            self.assertEqual([row['title'] for row in full['items']], ['First', 'Second'])
+            self.assertEqual(full['payload_sha256'], sample['payload_sha256'])
+            self.assertEqual(normalize('WEB_OPENTUTORIALS', payload, previous=full, source_root=root), full)
+            (root / 'course.html').unlink()
+            self.assertEqual(normalize('WEB_OPENTUTORIALS', payload, previous=full, source_root=root), full)
+
+    def test_missing_outline_upgrades_from_verified_supplement_and_rejects_bad_hash(self):
+        with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parent) as folder:
+            root = Path(folder)
+            raw = b'<a class="unit-title" href="1">First</a><a class="unit-title" href="2">Second</a>'
+            payload = {'units': ['first', 'second']}
+            supplement = {'html_path': 'ms.html', 'html_sha256': hashlib.sha256(raw).hexdigest()}
+            missing = normalize('API_MS_LEARN', payload, source_root=root, supplement=supplement)
+            self.assertEqual(missing['coverage'], 'description_only')
+            (root / 'ms.html').write_bytes(b'wrong source')
+            with self.assertRaisesRegex(ValueError, 'checksum'):
+                normalize('API_MS_LEARN', payload, previous=missing, source_root=root, supplement=supplement)
+            (root / 'ms.html').write_bytes(raw)
+            full = normalize('API_MS_LEARN', payload, previous=missing, source_root=root, supplement=supplement)
+            self.assertEqual(full['coverage'], 'public_outline')
+            self.assertEqual(full['item_count'], 2)
+            self.assertEqual(full['supplement_input_sha256'], missing['supplement_input_sha256'])
+
+    def test_available_cache_does_not_replace_a_richer_partial_outline(self):
+        with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parent) as folder:
+            root = Path(folder)
+            raw = b'<a class="unit-title" href="1">First</a>'
+            payload = {'units': ['one', 'two', 'three'], 'html_path': 'ms.html',
+                       'html_sha256': hashlib.sha256(raw).hexdigest()}
+            description = '공개 단원\nFirst\nSecond'
+            partial = normalize('API_MS_LEARN', payload, description, source_root=root)
+            self.assertEqual(partial['item_count'], 2)
+            (root / 'ms.html').write_bytes(raw)
+            self.assertEqual(normalize('API_MS_LEARN', payload, description, previous=partial, source_root=root), partial)
+
+    def test_changed_source_or_normalizer_version_rebuilds_the_cached_outline(self):
+        payload = {'lessons': [{'title': 'Old', 'hasVideo': True}]}
+        original = normalize('WEB_INFLEARN', payload)
+        changed = normalize('WEB_INFLEARN', {'lessons': [{'title': 'New', 'hasVideo': True}]}, previous=original)
+        self.assertEqual(changed['items'][0]['title'], 'New')
+        stale_version = dict(original, version='old', items=[{'title': 'Stale'}])
+        rebuilt = normalize('WEB_INFLEARN', payload, previous=stale_version)
+        self.assertEqual(rebuilt['items'][0]['title'], 'Old')
+
     def test_ms_supplement_uses_public_titles_not_invented_uid_labels(self):
         with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parent) as folder:
             root=Path(folder);raw=b'<a class="unit-title" href="1-intro">Introduction</a>'

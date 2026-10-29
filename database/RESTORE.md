@@ -46,6 +46,8 @@ python -m src.database.vectors.resource_vectors status
 
 ## 백업·되돌리기
 
+10/30 #35 보충 적재·목차 캐시 수정은 PR #29 코드 배포에 포함된다. 공유 백업의 78표·23,567행을 복원해 확인한 결과 시간·목차 재보정 대상은 0건으로, Drive DB/manifest를 다시 교체하거나 별도 SQL 마이그레이션을 적용할 필요가 없다. 이후 신규 강좌는 등록 시 시간·목차를 함께 저장한다. 기존 샘플 목차의 전체 원문 HTML을 확보한 경우에는 `backfill_course_curriculum.py`의 읽기 전용 계획과 해시를 확인한 뒤 적용한다. 파일을 확보하지 못한 목차는 미확보 상태를 유지한다. 수집 시각의 UTC/한국 시간 표기만 다른 경우에는 기존 근거를 보존한다. 이 코드 수정은 별도 앱 후속 문제나 사람·RunPod 검증의 완료를 뜻하지 않는다.
+
 ```powershell
 python scripts/restore_db.py backup --output "<외부 백업 폴더>/growpath_새버전.dump"
 ```

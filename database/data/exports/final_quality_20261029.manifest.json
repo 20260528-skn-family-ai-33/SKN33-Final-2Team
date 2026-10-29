@@ -309,5 +309,112 @@
     "product_code_modified_by_ui_test": false,
     "saved_steps_match_content": true,
     "saved_version_matches_content": true
+  },
+  "issue35_followup_20261030": {
+    "checked_on": "2026-10-30",
+    "code_base_commit": "4a85eaf696a22afff1c45cd62a7f6b72789e3ae5",
+    "delivery": "Existing PR #29; related issue #35 remains open for human/operational verification",
+    "changes": [
+      "두 보충 적재 경로에서 공통 시간·목차 정규화 후 원문/스킬/벡터와 함께 저장",
+      "같은 원문 해시의 샘플/불완전 목차도 검증된 HTML 확보 후 갱신; 기존 전체 목차 및 더 풍부한 결과 보존",
+      "수집 시각을 UTC 기준으로 비교하고 같은 시각의 기존 근거 문자열은 보존"
+    ],
+    "regression_before_fix": {
+      "test_methods": 4,
+      "failures_including_subtests": 5
+    },
+    "unit_command": "cd database; python scripts/check_workspace.py",
+    "unit": {
+      "collected": 249,
+      "started_including_skips": 238,
+      "executed": 233,
+      "passed": 233,
+      "skipped": 5,
+      "failures": 0,
+      "errors": 0,
+      "successful": true
+    },
+    "real_postgres_command": "python -m unittest tests.test_course_supplement_database tests.test_course_duration_database -v",
+    "real_postgres_passed": 11,
+    "real_postgres_cases": [
+      "confirmed/estimated duration",
+      "both insert paths and duplicate rejection",
+      "batch checksum rejection before writes",
+      "embedding failure rollback",
+      "sample upgrade/read-only preview/repeatability/raw preservation",
+      "UTC/KST no-op and changed fetch time detection",
+      "existing migration/constraint checks"
+    ],
+    "http_command": "python -m unittest tests.test_app_contracts.AppContractTests.test_supplemented_course_detail_returns_confirmed_hour_and_full_outline -v",
+    "http_passed": 1,
+    "http_cases": [
+      "real login",
+      "detail: confirmed 1 hour, 3600 seconds, full 2-item outline",
+      "summary: confirmed 1 hour and outline count without full items"
+    ],
+    "http_initial_failure": "Test fixture reused one bind parameter for text/varchar columns; split bindings, rerun passed. Product code was not changed for this failure.",
+    "isolation": "Owned local PostgreSQL 17 + pgvector clone restored from shared dump; real SQL/vector writes; only embedding response replaced",
+    "paid_api_calls": 0,
+    "shared_db_check_after_rollback_only_tests_before_http_fixtures": {
+      "dump_sha256": "e27fb83895f4080cbf8838765de577c360007d6b95cc8c2cc0c92b9979dd3ea7",
+      "all_table_fingerprints_match_shared_manifest": true,
+      "table_count": 78,
+      "row_count": 23567,
+      "duration_backfill": {
+        "course_count": 2060,
+        "counts": {
+          "confirmed": 1730,
+          "WEB_INFLEARN": 1144,
+          "estimated": 330,
+          "API_KMOOC": 161,
+          "WEB_KOCW": 310,
+          "API_MS_LEARN": 292,
+          "WEB_OPENTUTORIALS": 17,
+          "WEB_STEP": 136
+        },
+        "changed_count": 0,
+        "applied": false,
+        "embedding_api_called": false,
+        "vector_inputs_changed": false
+      },
+      "curriculum_backfill": {
+        "courses": 2060,
+        "changed_count": 0,
+        "coverage": {
+          "public_outline": 2045,
+          "partial_outline": 9,
+          "description_only": 6
+        },
+        "applied": false,
+        "embedding_api_called": false,
+        "vector_inputs_changed": false
+      },
+      "original_data_changes": 0,
+      "paid_calls": 0
+    },
+    "initial_timezone_finding": {
+      "rows": 2060,
+      "changed_field_only": "duration_provenance.fetched_at",
+      "actual_duration_differences": 0,
+      "source_text_preserved_by_fix": true
+    },
+    "shared_dump_and_manifest_replaced": false,
+    "migrations_001_to_026_modified": false,
+    "source_files": {
+      "database/src/database/ingestion/course_supplement.py": "2fe984db395ff80f484073f61bf034a39794ed6401ddf8b19b9dd428ee100390",
+      "database/src/database/course_curriculum.py": "e9fd80526b392a0cceb54a059da6010acb840a9807ab25aa7a031ddde3adb596",
+      "database/src/database/course_duration.py": "71551ab62091da181d7d84e39f70b95849f38270a87e6198be11ae695deed686"
+    },
+    "logs": {
+      "issue35_db_final.log": "cb27b8d079b7b67e1b4c525fb082a933abbc0eaacbb7b649817e1fd39a6bdcc1",
+      "issue35_api.log": "bbdd33fd12e9347ce705da3f506c3365e889ceed435e7ed0a1952de009634fb1",
+      "issue35_audit.json": "9cc1244d4e267dd35d7faace4d92b366022e469eb3d016a89b0aa06e058e756f"
+    },
+    "limits": [
+      "실제 유료 임베딩/모델을 재호출하지 않음",
+      "이번 변경에서 브라우저 흐름은 재실행하지 않음",
+      "사람 리뷰/병합·이미지 전사 확인·수신 PC·실제 RunPod 검증은 남음",
+      "목차 미확보 K-MOOC 6개와 별도 앱 후속 문제를 해결했다고 처리하지 않음"
+    ]
   }
 }

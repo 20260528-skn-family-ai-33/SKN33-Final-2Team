@@ -133,10 +133,21 @@ def normalize(source, payload, description='', *, url=None, previous=None, sourc
     fingerprint = hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str).encode()).hexdigest()
     previous = previous or {}
     supplement_hash = hashlib.sha256(json.dumps(supplement, ensure_ascii=False, sort_keys=True).encode()).hexdigest() if supplement else None
-    # A restored DB carries the outline, not a dependency on the collector PC's cache.
-    if previous.get('version') == VERSION and previous.get('payload_sha256') == fingerprint and (not supplement or previous.get('supplement_input_sha256') == supplement_hash):
-        return repair_numbered_titles(dict(previous, description=plain(description), description_sha256=hashlib.sha256(str(description or '').encode()).hexdigest()))
     root = source_root or Path(__file__).resolve().parents[2]
+    cached = (previous.get('version') == VERSION and previous.get('payload_sha256') == fingerprint
+              and (not supplement or previous.get('supplement_input_sha256') == supplement_hash))
+    refresh_markup = None
+    if cached:
+        saved = repair_numbered_titles(dict(previous, description=plain(description),
+                                           description_sha256=hashlib.sha256(str(description or '').encode()).hexdigest()))
+        # 전체 목차는 복원 PC에 원문 파일이 없어도 보존한다. 불완전한 결과만 새로 확보한 파일로 보완한다.
+        if saved.get('coverage') == 'public_outline':
+            return saved
+        cache_input = {'API_MS_LEARN': supplement or payload,
+                       'WEB_OPENTUTORIALS': payload, 'API_KMOOC': supplement}.get(source)
+        refresh_markup = cached_markup(cache_input, root) if cache_input else None
+        if refresh_markup is None:
+            return saved
     items, coverage = [], 'description_only'
 
     def add(title, section='', description='', **extra):
@@ -155,7 +166,7 @@ def normalize(source, payload, description='', *, url=None, previous=None, sourc
                     video=bool(lesson.get('video_listed')), suspended=bool(lesson.get('suspended_marker')))
         coverage = 'partial_outline' if any(item.get('title_missing') for item in items) else 'public_outline' if items else coverage
     elif source == 'WEB_OPENTUTORIALS':
-        markup = cached_markup(payload, root)
+        markup = refresh_markup or cached_markup(payload, root)
         pattern = re.compile(r'/course/' + re.escape(str(payload.get('source_id'))) + r'/\d+(?:[/?#]|$)')
         seen = set()
         for attrs, title in markup.links if markup else []:
@@ -169,7 +180,7 @@ def normalize(source, payload, description='', *, url=None, previous=None, sourc
                 add(lesson.get('title'), url=lesson.get('url'))
             coverage = 'sample' if items else coverage
     elif source == 'API_MS_LEARN':
-        markup = cached_markup(supplement or payload, root)
+        markup = refresh_markup or cached_markup(supplement or payload, root)
         for attrs, title in markup.links if markup else []:
             if 'unit-title' in attrs.get('class', '').split():
                 add(title, url=urljoin((url or payload.get('url') or '').rstrip('/') + '/', attrs.get('href', '')))
@@ -184,7 +195,7 @@ def normalize(source, payload, description='', *, url=None, previous=None, sourc
             add(title)
         coverage = 'public_outline' if items else coverage
     elif source == 'API_KMOOC':
-        markup = cached_markup(supplement, root) if supplement else None
+        markup = (refresh_markup or cached_markup(supplement, root)) if supplement else None
         if markup is None:
             markup = _Markup()
             markup.feed(str(payload.get('summary') or ''))
@@ -213,7 +224,7 @@ def normalize(source, payload, description='', *, url=None, previous=None, sourc
             for row in transcription['items']:
                 add(row['title'], row.get('section'), row.get('description'))
         coverage = 'public_outline' if items else coverage
-    return repair_numbered_titles({'version': VERSION, 'source': source, 'source_url': url or payload.get('url'),
+    result = repair_numbered_titles({'version': VERSION, 'source': source, 'source_url': url or payload.get('url'),
             'payload_sha256': fingerprint, 'html_sha256': payload.get('html_sha256') or (payload.get('public_detail') or {}).get('html_sha256'),
             'description': plain(description), 'description_sha256': hashlib.sha256(str(description or '').encode()).hexdigest(),
             'supplement_sha256': (supplement or {}).get('html_sha256'),
@@ -224,6 +235,12 @@ def normalize(source, payload, description='', *, url=None, previous=None, sourc
             'visual_transcription_human_review': (supplement or {}).get('visual_transcription', {}).get('human_review'),
             'coverage': coverage, 'items': items,
             'item_count': len(items), 'expected_unit_count': len(payload.get('units') or []) or None})
+    if cached:
+        rank = {'description_only': 0, 'sample': 1, 'partial_outline': 2, 'public_outline': 3}
+        old_rank, new_rank = rank.get(saved.get('coverage'), 0), rank.get(result.get('coverage'), 0)
+        if new_rank < old_rank or (new_rank == old_rank and len(result['items']) < len(saved.get('items', []))):
+            return saved
+    return result
 
 
 def backfill(conn, *, apply=False, source_root=None, supplements=None):
