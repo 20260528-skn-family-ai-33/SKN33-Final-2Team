@@ -38,7 +38,7 @@
 
 추론 정도 요청은 `{ "provider": "ollama" | "openai", "level": "<단계 이름>" | null }`이고 모드별로 저장한 전체 `{reasoning: {ollama?, openai?}}`를 돌려준다. `null`은 그 모드를 서버 기본값으로 되돌린다. 단계 이름은 소문자·숫자·`_`·`-` 20자 이내만 받고 `true`·`false` 같은 값은 받지 않는다(`422 / BAD_REASONING`). OpenAI는 서버의 단계 목록 밖이면 같은 오류다. 고를 수 있는 단계는 이렇게 온다.
 
-- OpenAI: `GET /ai/providers`의 openai 항목 `reasoning: {levels, default}`(`.env`의 `OPENAI_REASONING_LEVELS`·`OPENAI_REASONING_EFFORT` · 목록이 비면 고르지 못함).
+- OpenAI: `GET /ai/providers`의 openai 항목 `reasoning: {levels, default, modelDefault}`. `levels`는 `.env`의 `OPENAI_REASONING_LEVELS`이고 비면 기본 모델 gpt-6-luna의 코드 값(`none`~`xhigh`)이다(다른 모델이면 빈 목록 = 고르지 못함). `default`는 `.env`의 `OPENAI_REASONING_EFFORT`(비면 `null` = 보내지 않음), `modelDefault`는 보내지 않을 때 모델이 쓰는 값(gpt-6-luna `medium` · 모르는 모델이면 `null`)이고 화면 '기본값 · 보통' 표시에만 쓴다.
 - RunPod-Ollama: 진단·로드맵 모델에만 고르고, 모델마다 달라 `GET /ai/providers`의 `reasoning.levels`는 `null`이다(`default`는 `.env` 기본값). `GET /ai/status?provider=ollama`에서 진단·로드맵 모델(`role: default`)의 `models[].think: {levels, default}`(Ollama `/api/show` `thinking.values` · 켜고 끄기는 `off`·`on`)로 온다. 확인하지 못하면 `null`, 고를 단계가 없으면 빈 목록이다. 규정 모델 줄의 `think`는 늘 `null`이다.
 
 직원이 고른 값은 `GET /me`·`PUT /me/demo-settings` 응답의 `reasoning`으로 온다. 서버는 고른 값 → `.env` 기본값 순으로 Ollama에는 `think`(on/off는 true/false, 나머지는 단계 이름), OpenAI에는 `reasoning_effort`로 보내고, 둘 다 없으면 보내지 않아 모델 기본값을 따른다. **RunPod-Ollama 규정 에이전트(사내 생활 도우미·안별 지원 조건 확인) 호출은 생각을 끄고 학습한 모델이라 고른 값·`.env`와 관계없이 늘 `think: false`다.** 이미지 읽기 모델에는 직원 값을 쓰지 않는다. 관리자가 모델을 골라 목표 후보를 다시 만들 때는 직원 값 대신 `.env` 기본값을 쓴다.

@@ -67,8 +67,9 @@ class Settings:
     openai_base: str
     openai_json: bool
     openai_vision: str
-    openai_reasoning_levels: tuple[str, ...]  # 모델이 받는 reasoning_effort 단계(.env). 비면 화면에서 고르지 못한다
+    openai_reasoning_levels: tuple[str, ...]  # 모델이 받는 reasoning_effort 단계(.env · 비면 기본 모델만 코드 값). 비면 화면에서 고르지 못한다
     openai_reasoning: str | None  # reasoning_effort 기본값. None 이면 보내지 않아 모델 기본값을 따른다
+    openai_model_reasoning: str | None  # 보내지 않을 때 모델이 쓰는 기본값(화면 '기본값 · 보통' 표시용). 모르는 모델이면 None
     # RunPod-Ollama
     ollama_url: str
     ollama_model: str  # 진단·로드맵
@@ -93,6 +94,12 @@ OLLAMA_TEAM_REGULATION_MODEL = 'growpath-regulation-4b'  # 규정 에이전트 �
 # 규정 에이전트는 생각(추론)을 끄고 학습한 모델이라 늘 끄고 부른다. 화면(직원)·.env 의 추론 정도로 바꾸지 않는다(사용자 결정 2026-10-29 · #28)
 OLLAMA_REGULATION_THINK = 'off'
 
+# OpenAI 기본 모델(OPENAI_MODEL 코드 기본값)의 추론 정도. OpenAI 는 모델이 받는 단계·기본값을 알려 주는 API 가 없어 확인한 값을 둔다:
+# gpt-6-luna 는 Chat Completions 에서 none~xhigh(모델 문서의 max 는 400 · 2026-10-28 실제 호출 오류), 기본 medium(모델 문서)
+OPENAI_DEFAULT_MODEL = 'gpt-6-luna'
+OPENAI_DEFAULT_LEVELS = ('none', 'low', 'medium', 'high', 'xhigh')
+OPENAI_DEFAULT_MODEL_REASONING = 'medium'
+
 
 def _level(key: str) -> str | None:
     """추론 정도 설정: 비우면 None. 단계 이름 모양이 아니면(오타 등) 시작할 때 멈춘다.
@@ -113,8 +120,12 @@ def _levels(key: str) -> tuple[str, ...]:
 
 
 def load() -> Settings:
-    # OpenAI 는 모델이 받는 단계를 알려 주는 API 가 없어 .env 에 적는다. 기본값이 그 목록 밖이면 호출마다 400 이라 시작할 때 멈춘다
-    openai_levels, openai_reasoning = _levels('OPENAI_REASONING_LEVELS'), _level('OPENAI_REASONING_EFFORT')
+    # OpenAI 는 모델이 받는 단계를 알려 주는 API 가 없다: 기본 모델(gpt-6-luna)은 코드의 확인한 값, 다른 모델은 .env 에 적는다.
+    # 기본값이 그 목록 밖이면 호출마다 400 이라 시작할 때 멈춘다
+    openai_model = env('OPENAI_MODEL', OPENAI_DEFAULT_MODEL)
+    known = openai_model == OPENAI_DEFAULT_MODEL
+    openai_levels = _levels('OPENAI_REASONING_LEVELS') or (OPENAI_DEFAULT_LEVELS if known else ())
+    openai_reasoning = _level('OPENAI_REASONING_EFFORT')
     if openai_reasoning and openai_levels and openai_reasoning not in openai_levels:
         raise ValueError(f'OPENAI_REASONING_EFFORT({openai_reasoning})가 OPENAI_REASONING_LEVELS 목록에 없어요')
     return Settings(
@@ -129,7 +140,7 @@ def load() -> Settings:
         # 팀 규정 묶음 폴더(그 안의 source/…/….pdf 가 팀 DB regulation_files.storage_key) · 관리자 '지금 규정' 내려받기에 쓴다
         regulation_files_dir=Path(env('GP5_REGULATION_FILES_DIR', str(ROOT.parent / 'team_db' / 'regulations'))),
         openai_key=env('OPENAI_API_KEY'),
-        openai_model=env('OPENAI_MODEL', 'gpt-6-luna'),
+        openai_model=openai_model,
         # 규정 검색 임베딩: RunPod-Ollama·OpenAI 모드 공통(팀 합의 2026-10-26) · 팀 DB 벡터와 같은 모델이어야 한다
         openai_embed=env('OPENAI_EMBED_MODEL', 'text-embedding-3-small'),
         openai_base=env('OPENAI_BASE_URL', 'https://api.openai.com/v1').rstrip('/'),
@@ -137,6 +148,7 @@ def load() -> Settings:
         openai_vision=env('OPENAI_VISION_MODEL'),
         openai_reasoning_levels=openai_levels,
         openai_reasoning=openai_reasoning,
+        openai_model_reasoning=OPENAI_DEFAULT_MODEL_REASONING if known else None,
         ollama_url=env('OLLAMA_BASE_URL').rstrip('/'),
         ollama_model=env('OLLAMA_MODEL', OLLAMA_TEAM_MODEL),
         ollama_model_regulation=env('OLLAMA_MODEL_REGULATION', OLLAMA_TEAM_REGULATION_MODEL),

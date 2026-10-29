@@ -116,7 +116,8 @@ def api_providers(a: Account = Depends(require_account)):
          'reasoning': {'levels': None, 'default': S.ollama_think}},
         {'id': 'openai', 'label': 'OpenAI API', 'available': llm.available('openai'), 'reason': unavailable_reason('openai'),
          'models': {'default': S.openai_model, 'roadmap': S.openai_model, 'regulation': S.openai_model, 'embed': S.openai_embed, 'vision': S.openai_vision},
-         'reasoning': {'levels': list(S.openai_reasoning_levels), 'default': S.openai_reasoning}}],
+         # modelDefault: 보내지 않을 때 모델이 쓰는 값(기본 모델 gpt-6-luna 만 코드에 있음 · 화면 '기본값 · 보통' 표시용)
+         'reasoning': {'levels': list(S.openai_reasoning_levels), 'default': S.openai_reasoning, 'modelDefault': S.openai_model_reasoning}}],
         'docLibs': {'pdf': _has('pypdf'), 'hwp': _has('olefile')}}
 
 

@@ -124,6 +124,13 @@ describe('추론 정도', () => {
     expect(ai.reasoningDefault('api')).toBeNull();
   });
 
+  it('OpenAI 는 .env 기본값이 없으면 서버가 아는 모델 기본값(gpt-6-luna: medium)을 보여 준다', () => {
+    setup({ openai: { levels: ['none', 'low', 'medium', 'high', 'xhigh'], default: null, modelDefault: 'medium' } });
+    expect(ai.reasoningDefault('api')).toBe('medium');
+    setup({ openai: { levels: ['none', 'low', 'medium', 'high', 'xhigh'], default: 'high', modelDefault: 'medium' } });
+    expect(ai.reasoningDefault('api')).toBe('high');
+  });
+
   it('직원이 고른 값은 모드마다 따로 읽는다(화면 api = 서버 openai)', () => {
     setup({ mine: { openai: 'high' } });
     expect(ai.reasoning('api')).toBe('high');

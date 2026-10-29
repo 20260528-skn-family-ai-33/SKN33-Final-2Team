@@ -28,9 +28,10 @@ export interface ProviderInfo {
   /** regulation: 규정 에이전트(도우미 답변·안별 지원 조건 확인) 모델 · 없는 옛 응답이면 default 를 쓴다 */
   models: { default: string; roadmap: string; regulation?: string; embed: string; vision: string };
   timeout?: number;
-  /** 추론 정도: default 는 서버 기본값(.env · null 이면 모델 기본값). levels 는 OpenAI 만 여기서 오고(.env),
-   *  RunPod-Ollama 는 모델마다 달라 null — 연결 확인 때 진단·로드맵 모델의 ModelState.think 에서 받는다 */
-  reasoning?: { levels: string[] | null; default: string | null };
+  /** 추론 정도: default 는 서버 기본값(.env · null 이면 모델 기본값). levels·modelDefault 는 OpenAI 만 여기서 오고
+   *  (.env · 비면 기본 모델 gpt-6-luna 의 코드 값), RunPod-Ollama 는 모델마다 달라 levels 가 null — 연결 확인 때
+   *  진단·로드맵 모델의 ModelState.think 에서 받는다. modelDefault 는 보내지 않을 때 모델이 쓰는 값(모르면 null) */
+  reasoning?: { levels: string[] | null; default: string | null; modelDefault?: string | null };
 }
 
 /** 모델이 고를 수 있는 추론 정도(on·off 또는 low·medium·high 등). levels 가 비면 고를 단계 없음 */

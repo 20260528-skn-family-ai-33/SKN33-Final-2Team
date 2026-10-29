@@ -71,8 +71,9 @@ export const ai = {
   /** 고를 수 있는 추론 정도 단계. OpenAI 는 서버 설정(.env), RunPod-Ollama 는 연결 확인 때 진단·로드맵 모델이 알려 준 단계
    *  (규정 에이전트 모델은 늘 꺼서 고르지 않음). null 이면 아직 모름(연결 확인 전·실패), 빈 목록이면 이 모델은 고를 단계가 없음 */
   reasoningLevels: (p: UiProvider): string[] | null => (p === 'api' ? prov('api').reasoning?.levels || [] : (ollamaThink()?.levels ?? null)),
-  /** 고르지 않았을 때 쓰는 값: 서버 기본값(.env) → (Ollama) 그 모델의 기본값. null 이면 모름 */
-  reasoningDefault: (p: UiProvider): string | null => prov(p).reasoning?.default ?? (p === 'ollama' ? ollamaThink()?.default : null) ?? null,
+  /** 고르지 않았을 때 쓰는 값: 서버 기본값(.env) → 모델 기본값(Ollama 는 연결 확인, OpenAI 는 서버가 아는 기본 모델 값). null 이면 모름 */
+  reasoningDefault: (p: UiProvider): string | null =>
+    prov(p).reasoning?.default ?? (p === 'ollama' ? ollamaThink()?.default : prov('api').reasoning?.modelDefault) ?? null,
   /** 직원이 고른 단계. null 이면 기본값을 따름 */
   reasoning: (p: UiProvider): string | null => g().settings.reasoning[toSrv(p)] ?? null,
   failSim: (): FailSim => ({ ...Object.fromEntries(SIM_KINDS.map((k) => [k, false])), ...(g().settings.failSim || {}) }),
