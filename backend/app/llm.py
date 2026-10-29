@@ -12,7 +12,7 @@ import urllib.error
 import urllib.request
 from urllib.parse import quote
 
-from .config import S
+from .config import OLLAMA_REGULATION_THINK, S
 
 
 class LlmError(Exception):
@@ -121,8 +121,21 @@ def _with_images(messages: list, provider: str) -> list:
     return out
 
 
-def chat(provider: str, messages: list, role: str = 'default', json_mode: bool = True) -> dict:
-    """한 번의 대화 호출 → {content, model, provider, loadMs, totalMs}"""
+def _think(level: str) -> bool | str:
+    """단계 이름 → Ollama think 값. on/off 는 켜고 끄기만 되는 모델(qwen 등)의 true/false, 나머지는 모델이 정한 단계 이름 그대로"""
+    return {'on': True, 'off': False}.get(level, level)
+
+
+def _level_name(v) -> str:
+    return 'on' if v is True else 'off' if v is False else str(v)
+
+
+def chat(provider: str, messages: list, role: str = 'default', json_mode: bool = True, reasoning: str | None = None) -> dict:
+    """한 번의 대화 호출 → {content, model, provider, loadMs, totalMs}.
+    reasoning: 직원이 화면에서 고른 추론 정도(단계 이름). 없으면 .env 기본값(OLLAMA_THINK / OPENAI_REASONING_EFFORT),
+    그것도 비면 보내지 않아 모델 기본값을 따른다. 이미지 읽기 모델은 화면에서 고르지 않아 직원 값을 쓰지 않는다.
+    RunPod-Ollama 규정 에이전트는 생각을 끄고 학습한 모델이라 직원 값·.env 와 관계없이 늘 끈다(OLLAMA_REGULATION_THINK)"""
+    mine = None if role == 'vision' else reasoning
     if provider == 'ollama':
         if role == 'vision' and not S.ollama_vision:
             raise LlmError('Ollama 비전 모델 설정이 없어요 (RunPod-Ollama 팀 모델은 이미지를 읽지 않음)')
@@ -134,8 +147,9 @@ def chat(provider: str, messages: list, role: str = 'default', json_mode: bool =
             payload['options'] = {'num_ctx': S.ollama_num_ctx}
         if S.ollama_keep_alive:
             payload['keep_alive'] = S.ollama_keep_alive
-        if S.ollama_think is not None:
-            payload['think'] = S.ollama_think
+        level = OLLAMA_REGULATION_THINK if role == 'regulation' else mine or S.ollama_think
+        if level:
+            payload['think'] = _think(level)
         res = ollama('api/chat', payload)
         ms = lambda ns: round((ns or 0) / 1e6)  # noqa: E731 - Ollama 시간 값은 나노초
         return {'content': (res.get('message') or {}).get('content') or '', 'model': res.get('model', model), 'provider': 'ollama',
@@ -146,6 +160,11 @@ def chat(provider: str, messages: list, role: str = 'default', json_mode: bool =
     payload = {'model': model, 'messages': _with_images(messages, 'openai')}
     if json_mode and S.openai_json:
         payload['response_format'] = {'type': 'json_object'}
+    # .env 의 단계 목록은 OPENAI_MODEL 의 것이라 다른 비전 모델에는 보내지 않는다.
+    # 목록에서 빠진 값(목록을 바꾼 뒤 남은 옛 선택)은 400 이 나므로 기본값으로 돌린다
+    level = (mine if mine in S.openai_reasoning_levels else S.openai_reasoning) if model == S.openai_model else None
+    if level:
+        payload['reasoning_effort'] = level
     res = openai('chat/completions', payload)
     return {'content': res['choices'][0]['message'].get('content') or '', 'model': res.get('model', model), 'provider': 'openai', 'loadMs': 0, 'totalMs': 0}
 
@@ -158,8 +177,25 @@ def embed(texts: list[str]) -> list[list[float]]:
     return [d['embedding'] for d in sorted(res['data'], key=lambda d: d['index'])]
 
 
+def think_levels(name: str) -> dict | None:
+    """Ollama 모델이 고를 수 있는 추론 정도 {levels, default} (/api/show 의 thinking.values · 토큰을 쓰지 않음).
+    thinking 이 없는 옛 Ollama 는 capabilities 의 'thinking' 만 보고 켜고 끄기로 본다. 고를 단계가 없으면 levels 가 빈 목록,
+    확인하지 못하면 None(화면은 '연결을 확인하면 고를 수 있어요')"""
+    try:
+        res = ollama('api/show', {'model': name}, timeout=15)
+    except LlmError:
+        return None
+    t = res.get('thinking') or {}
+    if t.get('values'):
+        levels = [_level_name(v) for v in t['values']]
+        default = None if t.get('default') is None else _level_name(t['default'])
+    else:
+        levels, default = (['off', 'on'] if 'thinking' in (res.get('capabilities') or []) else []), None
+    return {'levels': levels if len(levels) > 1 else [], 'default': default}
+
+
 def ping(provider: str) -> dict:
-    """연결 확인 (토큰을 쓰지 않음). Ollama: 버전 → 설치 모델 → GPU에 올라간 모델"""
+    """연결 확인 (토큰을 쓰지 않음). Ollama: 버전 → 설치 모델 → GPU에 올라간 모델 → 모델별 추론 정도 단계"""
     t0 = time.perf_counter()
     if provider == 'openai':
         res = openai(f"models/{quote(S.openai_model, safe='')}", None, timeout=15)
@@ -178,5 +214,7 @@ def ping(provider: str) -> dict:
     if S.ollama_model_regulation != S.ollama_model:
         roles.append(('regulation', S.ollama_model_regulation))
     return {'ok': True, 'provider': 'ollama', 'target': S.ollama_target, 'version': version,
-            'models': [{'role': r, 'name': n, 'installed': hit(n, have), 'loaded': hit(n, loaded)} for r, n in roles],
+            # 추론 정도는 진단·로드맵 모델만 고른다(규정 모델은 늘 끔) → 그 모델의 단계만 묻는다
+            'models': [{'role': r, 'name': n, 'installed': hit(n, have), 'loaded': hit(n, loaded),
+                        'think': think_levels(n) if r == 'default' and hit(n, have) else None} for r, n in roles],
             'ms': round((time.perf_counter() - t0) * 1000)}

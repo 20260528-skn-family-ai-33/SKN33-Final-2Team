@@ -31,9 +31,17 @@
 | `GET /me/profile` · `PUT`/`DELETE /me/profile/self` · `PUT /me/evaluations/{period}/consent` | 내 정보(동의는 `{period, consent}`를 돌려줌) |
 | `GET /me/goal-suggestions` · `POST /me/goal-suggestions/regenerate` | 작성 1단계 목표 후보 |
 | `GET /ai/providers` · `PUT /me/ai-provider` · `GET /ai/status?provider=` · `GET /ai/log` | 좌측 AI 모델 고르기·연결 상태·에이전트 동작 보기(시연·디버그 전용 · 직원·관리자 계정 모두 · 누가 호출했든 모든 계정의 최근 호출을 `employee`(누구의 일)·`by`(관리자 화면에서 시작하면 '관리자')와 함께 줌 · 운영에서는 끔) |
+| `PUT /me/reasoning` | 좌측 AI 모델에서 모델별 추론 정도 고르기(직원 계정만) |
 | `GET /demo/accounts` · `PUT /me/demo-settings` · `POST /demo/reset` · `POST /demo/jump` | 시연 전용(로그인 직원 고르기·가데이터·실패 시연·단계 이동·초기화) |
 
-`GET /ai/providers`의 `providers[].models`는 `{default, roadmap, regulation, embed, vision}`이에요. `default`는 진단 에이전트, `roadmap`은 로드맵 에이전트, `regulation`은 규정 에이전트(사내 생활 도우미 답변·안별 지원 조건 확인), `vision`은 기획서 이미지 읽기 모델이에요. `regulation`이 없는 옛 응답이면 화면은 `default`를 써요. `GET /ai/status?provider=ollama`의 `models[]`는 `{role, name, installed, loaded}`이고, `default` 다음에는 `default`와 이름이 다른 `roadmap`·`regulation`만 들어가요(같은 이름이면 Ollama에 한 번만 올라가서) (#33).
+`GET /ai/providers`의 `providers[].models`는 `{default, roadmap, regulation, embed, vision}`이에요. `default`는 진단 에이전트, `roadmap`은 로드맵 에이전트, `regulation`은 규정 에이전트(사내 생활 도우미 답변·안별 지원 조건 확인), `vision`은 기획서 이미지 읽기 모델이에요. `regulation`이 없는 옛 응답이면 화면은 `default`를 써요. `GET /ai/status?provider=ollama`의 `models[]`는 `{role, name, installed, loaded, think}`이고(`think`는 아래 추론 정도 · 진단·로드맵 모델만), `default` 다음에는 `default`와 이름이 다른 `roadmap`·`regulation`만 들어가요(같은 이름이면 Ollama에 한 번만 올라가서) (#33).
+
+추론 정도 요청은 `{ "provider": "ollama" | "openai", "level": "<단계 이름>" | null }`이고 모드별로 저장한 전체 `{reasoning: {ollama?, openai?}}`를 돌려준다. `null`은 그 모드를 서버 기본값으로 되돌린다. 단계 이름은 소문자·숫자·`_`·`-` 20자 이내만 받고 `true`·`false` 같은 값은 받지 않는다(`422 / BAD_REASONING`). OpenAI는 서버의 단계 목록 밖이면 같은 오류다. 고를 수 있는 단계는 이렇게 온다.
+
+- OpenAI: `GET /ai/providers`의 openai 항목 `reasoning: {levels, default}`(`.env`의 `OPENAI_REASONING_LEVELS`·`OPENAI_REASONING_EFFORT` · 목록이 비면 고르지 못함).
+- RunPod-Ollama: 진단·로드맵 모델에만 고르고, 모델마다 달라 `GET /ai/providers`의 `reasoning.levels`는 `null`이다(`default`는 `.env` 기본값). `GET /ai/status?provider=ollama`에서 진단·로드맵 모델(`role: default`)의 `models[].think: {levels, default}`(Ollama `/api/show` `thinking.values` · 켜고 끄기는 `off`·`on`)로 온다. 확인하지 못하면 `null`, 고를 단계가 없으면 빈 목록이다. 규정 모델 줄의 `think`는 늘 `null`이다.
+
+직원이 고른 값은 `GET /me`·`PUT /me/demo-settings` 응답의 `reasoning`으로 온다. 서버는 고른 값 → `.env` 기본값 순으로 Ollama에는 `think`(on/off는 true/false, 나머지는 단계 이름), OpenAI에는 `reasoning_effort`로 보내고, 둘 다 없으면 보내지 않아 모델 기본값을 따른다. **RunPod-Ollama 규정 에이전트(사내 생활 도우미·안별 지원 조건 확인) 호출은 생각을 끄고 학습한 모델이라 고른 값·`.env`와 관계없이 늘 `think: false`다.** 이미지 읽기 모델에는 직원 값을 쓰지 않는다. 관리자가 모델을 골라 목표 후보를 다시 만들 때는 직원 값 대신 `.env` 기본값을 쓴다.
 
 평정 동의 요청은 `{ "consent": true }` 또는 `{ "consent": false }`만 받는다. 누락·NULL·문자열·숫자는 `422 / CONSENT_REQUIRED`이며 기존 동의값을 보존한다. 개인 입력의 `devYears`가 숫자로 바뀌지 않거나 0~50년 범위를 벗어나면 `422 / DEV_YEARS_RANGE`를 반환하고 기존 입력을 보존한다. #15의 격리 DB·실제 인증 API 검사로 확인했다.
 

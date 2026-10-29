@@ -4,7 +4,7 @@
 import { create } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
 import { ApiError } from '@/api/client';
-import { aiApi, demoApi, type ModelState, type ProviderInfo } from '@/api/endpoints/account';
+import { aiApi, demoApi, type ModelState, type ProviderInfo, type ThinkLevels } from '@/api/endpoints/account';
 import type { FailSim, ServerProvider, UserSettings } from '@/api/types/account';
 import type { StoredCause } from '@/api/types/common';
 
@@ -42,7 +42,7 @@ interface AiState {
 
 export const useAi = create<AiState>(() => ({
   status: { checked: false, providers: {}, docLibs: {} },
-  settings: { aiProvider: 'ollama', demoMock: false, failSim: {} },
+  settings: { aiProvider: 'ollama', demoMock: false, failSim: {}, reasoning: {} },
   conn: { state: 'idle', provider: '', at: 0 },
 }));
 
@@ -68,8 +68,25 @@ export const ai = {
   },
   ollamaInfo: () => ({ model: prov('ollama').models?.default || '' }),
   openaiModel: (): string => prov('api').models?.default || '',
+  /** 고를 수 있는 추론 정도 단계. OpenAI 는 서버 설정(.env), RunPod-Ollama 는 연결 확인 때 진단·로드맵 모델이 알려 준 단계
+   *  (규정 에이전트 모델은 늘 꺼서 고르지 않음). null 이면 아직 모름(연결 확인 전·실패), 빈 목록이면 이 모델은 고를 단계가 없음 */
+  reasoningLevels: (p: UiProvider): string[] | null => (p === 'api' ? prov('api').reasoning?.levels || [] : (ollamaThink()?.levels ?? null)),
+  /** 고르지 않았을 때 쓰는 값: 서버 기본값(.env) → (Ollama) 그 모델의 기본값. null 이면 모름 */
+  reasoningDefault: (p: UiProvider): string | null => prov(p).reasoning?.default ?? (p === 'ollama' ? ollamaThink()?.default : null) ?? null,
+  /** 직원이 고른 단계. null 이면 기본값을 따름 */
+  reasoning: (p: UiProvider): string | null => g().settings.reasoning[toSrv(p)] ?? null,
   failSim: (): FailSim => ({ ...Object.fromEntries(SIM_KINDS.map((k) => [k, false])), ...(g().settings.failSim || {}) }),
 };
+
+/** RunPod-Ollama 진단·로드맵 모델의 추론 정도 단계(마지막 연결 확인 결과) */
+function ollamaThink(): ThinkLevels | null {
+  const c = g().conn;
+  return (c.provider === 'ollama' && c.models?.find((m) => m.role === 'default')?.think) || null;
+}
+
+const LEVEL_LABEL: Record<string, string> = { off: '끔', on: '켬', none: '없음', minimal: '최소', low: '낮음', medium: '보통', high: '높음', xhigh: '매우 높음', max: '최대' };
+/** 단계 이름 → 화면 글자. 모르는 이름(모델이 정한 이름)은 그대로 */
+export const levelLabel = (level: string): string => LEVEL_LABEL[level] || level;
 
 export const unavailableWhyText = (): string => ai.unavailableWhy(ai.choice());
 
@@ -94,13 +111,34 @@ export async function checkStatus(): Promise<void> {
 export function applySettings(s: Partial<UserSettings> | null | undefined): void {
   if (!s) return;
   useAi.setState((st) => ({
-    settings: { aiProvider: s.aiProvider || st.settings.aiProvider, demoMock: !!s.demoMock, failSim: s.failSim || {} },
+    settings: {
+      aiProvider: s.aiProvider || st.settings.aiProvider,
+      demoMock: !!s.demoMock,
+      failSim: s.failSim || {},
+      reasoning: s.reasoning !== undefined ? s.reasoning || {} : st.settings.reasoning,
+    },
   }));
 }
 
 export async function setChoice(p: UiProvider): Promise<void> {
   useAi.setState((s) => ({ settings: { ...s.settings, aiProvider: toSrv(p) } }));
   await aiApi.setProvider(toSrv(p));
+}
+
+/** 모드별 추론 정도 저장(null 이면 기본값으로). 저장에 실패하면 화면 값을 되돌린다(서버 값과 어긋나지 않게) */
+export async function setReasoning(p: UiProvider, level: string | null): Promise<void> {
+  const prev = g().settings.reasoning;
+  const next = { ...prev };
+  if (level) next[toSrv(p)] = level;
+  else delete next[toSrv(p)];
+  useAi.setState((s) => ({ settings: { ...s.settings, reasoning: next } }));
+  try {
+    const r = await aiApi.setReasoning(toSrv(p), level);
+    useAi.setState((s) => ({ settings: { ...s.settings, reasoning: r.reasoning || {} } }));
+  } catch (err) {
+    useAi.setState((s) => ({ settings: { ...s.settings, reasoning: prev } }));
+    throw err;
+  }
 }
 
 export async function setDemoMock(on: boolean): Promise<void> {
