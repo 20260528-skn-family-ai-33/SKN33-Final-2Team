@@ -4,7 +4,7 @@
 - 명시적 다시 만들기·관리자 일괄 생성은 즉시 실행하며 결과는 public.employee_recommended_prompts에 저장한다.
 - 새 로드맵 화면은 저장된 후보 3개를 보여 주고, '목표 후보 다시 만들기'를 누르면 이전 후보와 다른 후보로 다시 만든다.
 - 실패하면 이전 후보는 지우지 않고 실패 상태만 남긴다. 다시 시도는 사용자가 누를 때만(자동 재시도 없음).
-- 만들 때 쓰는 AI 모드는 그 직원이 고른 모드(시연 도구 '가데이터로 보기'면 가데이터). 본인 입력이 없으면 에이전트 없이 기본 후보.
+- 만들 때 쓰는 AI 모드는 그 직원이 고른 모드(시연 도구 '가데이터로 보기'면 가데이터). 본인 입력이 없어도 제공된 사내 정보를 사용하며 근거가 전혀 없을 때만 기본 후보.
 """
 from __future__ import annotations
 
@@ -84,7 +84,7 @@ def request(employee_id: int, trigger: str, avoid: list[str] | None = None, mode
 
 
 def _request(employee_id: int, trigger: str, avoid: list[str] | None, mode: str | None) -> str | None:
-    """미리 만들기·다시 만들기 작업을 시작한다. 본인 입력이 없으면 기본 후보를 바로 저장하고 작업을 만들지 않는다.
+    """미리 만들기·다시 만들기 작업을 시작한다. 사내/본인 입력 근거가 전혀 없을 때만 기본 후보를 저장한다.
     mode 'mock' 은 관리자가 고른 '시연용 가데이터로 만들기', 'ollama'·'openai' 는 관리자가 고른 모델(직원이 고른 AI 모드 대신 ·
     직원 설정은 바꾸지 않음 · 실패 시연 없음). 없으면 그 직원이 고른 모드"""
     me = profile.view(employee_id)

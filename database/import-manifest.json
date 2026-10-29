@@ -83,10 +83,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "ffc2ed7d9fa12fea0f2451d66b77394fcb1f4559ee2ce9dd995a521a77dab952",
-      "bytes": 44242,
+      "sha256": "eac37f49da53ff253c99a4bf68ba74b4df8ff16de97a28ce24bc2a6786ff6d77",
+      "bytes": 45627,
       "handling": "adjusted",
-      "change_note": "Issue #27: approved employee100 preload and website-save-only goal refresh, 2026-10-29.",
+      "change_note": "Issue #27: natural employee display, grounded goal contract and verified 315-candidate backup (2026-10-29).",
       "local_update_source": {
         "path": "README.md",
         "sha256": "e872d64ea58c53311d098dc1c769f5bc3232ad947d690054b75a0a0a20c6d8c6"
@@ -98,10 +98,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "4e64d5f46fa8ba929fa0c85a3f434068674183feba5bfbed6c3e86073d2366cf",
-      "bytes": 5155,
+      "sha256": "234ce1fcfc550e7acecca0b02fb90c5bb60666f1b572ef712940e8e333523d04",
+      "bytes": 5308,
       "handling": "adjusted",
-      "change_note": "Issue #27: approved employee100 preload and website-save-only goal refresh, 2026-10-29."
+      "change_note": "Issue #27: natural employee display, grounded goal contract and verified 315-candidate backup (2026-10-29)."
     },
     {
       "path": "database/assets.manifest.json",
@@ -109,10 +109,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "7b512dc70a95c1931192c5a5a1e2e81bb6a87dfecd5365757a6788b68c1cdb5b",
-      "bytes": 26090,
+      "sha256": "a73d2644e03fe41ff2ec6b6ac8adf305ca66fd395905844e306f3bb025c03c72",
+      "bytes": 26507,
       "handling": "adjusted",
-      "change_note": "Issue #27: approved employee100 preload and website-save-only goal refresh, 2026-10-29."
+      "change_note": "Issue #27: natural employee display, grounded goal contract and verified 315-candidate backup (2026-10-29)."
     },
     {
       "source_path": "database/config/paths.yaml",
@@ -175,10 +175,10 @@
       "source_sha256": "59e13c3fd7bdde78922da1df1c242b08838925e9c3a5e19d8333070d46726420",
       "source_bytes": 59668,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "16315e5cb35e760ea20e818f11b4d982b61bf82e70f0a92d894f8d446f70c2e4",
-      "bytes": 70749,
+      "sha256": "1181eabdf05fa0428948a657fe579be007350a160e5be91f93d9e3312f9d455a",
+      "bytes": 71408,
       "handling": "adjusted",
-      "change_note": "Issue #27: approved employee100 preload and website-save-only goal refresh, 2026-10-29.",
+      "change_note": "Issue #27: natural employee display, grounded goal contract and verified 315-candidate backup (2026-10-29).",
       "local_update_source": {
         "path": "data/exports/growpath_latest.manifest.json",
         "sha256": "59e13c3fd7bdde78922da1df1c242b08838925e9c3a5e19d8333070d46726420"
@@ -488,10 +488,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "c42b6dcd12ccf82764b4e4b718bf3f8a85c6e93ab0f8ecaf1c2faa7b14c958a5",
-      "bytes": 42183,
+      "sha256": "043ade4cb3d9e52ec583d3805ecfd34adee8d6822cd8ce0912410bf58781ef59",
+      "bytes": 47321,
       "handling": "adjusted",
-      "change_note": "Issue #27: approved employee100 preload and website-save-only goal refresh, 2026-10-29."
+      "change_note": "Issue #27: natural employee display, grounded goal contract and verified 315-candidate backup (2026-10-29)."
     },
     {
       "source_path": "database/src/__init__.py",
@@ -1606,9 +1606,9 @@
       "source_bytes": null,
       "source_kind": "team_followup_implementation",
       "handling": "adjusted",
-      "sha256": "18146a3106e8120a16a39df678ba3df88ec922655a124b51032506fced44bd08",
-      "bytes": 51284,
-      "change_note": "Issue #27: approved employee100 preload and website-save-only goal refresh, 2026-10-29."
+      "sha256": "a7193d3a368ff5779b79f5085eb744a35507415b093bfdc4681e43479ea52052",
+      "bytes": 52938,
+      "change_note": "Issue #27: goal input evidence, exact candidate contract and regression coverage (2026-10-29)."
     },
     {
       "path": "backend/app/routers/account.py",
@@ -2199,10 +2199,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "team_employee_context_update",
-      "sha256": "19f091d4ea58dc4ac0c9abe56dfa289306cf6e95b23f77946097494898118b88",
-      "bytes": 11048,
+      "sha256": "17090248c1dff84e8564954fce261c769284327bd1b6443c12fc87906eb8b099",
+      "bytes": 11087,
       "handling": "adjusted",
-      "change_note": "Issue #27: approved employee100 preload and website-save-only goal refresh, 2026-10-29."
+      "change_note": "Issue #27: goal input evidence, exact candidate contract and regression coverage (2026-10-29)."
     },
     {
       "path": "backend/app/agents/goals.py",
@@ -2210,10 +2210,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "team_employee_context_update",
-      "sha256": "96f27ac877cab133c69c19e9c3f722fade38c713185215ea0a5b601c2a944724",
-      "bytes": 6647,
+      "sha256": "1d374df479828e0ffb5354035b08c22d8a3f49b4c9df085661665f92a0064488",
+      "bytes": 8095,
       "handling": "adjusted",
-      "change_note": "Issue #27: team work/project context, guarded goal preloading and main 0a6dd08 compatibility (2026-10-29)."
+      "change_note": "Issue #27: goal input evidence, exact candidate contract and regression coverage (2026-10-29)."
     },
     {
       "path": "backend/app/admin_io/hr.py",
@@ -2276,10 +2276,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "team_employee_context_update",
-      "sha256": "1aa27f883e1be03decce809c028c0eedab70501d71cb2013549282b8f04e8ddb",
-      "bytes": 17880,
+      "sha256": "4d7532450b8b6d5fee27d22046d7c79c8d3fa0e1a3ca057db7bfe0904dd4defc",
+      "bytes": 17870,
       "handling": "adjusted",
-      "change_note": "Issue #27: approved employee100 preload and website-save-only goal refresh, 2026-10-29."
+      "change_note": "Issue #27: natural employee display, grounded goal contract and verified 315-candidate backup (2026-10-29)."
     },
     {
       "path": "frontend/src/features/draft/generation/GenerationStep.test.ts",
@@ -2313,6 +2313,50 @@
       "bytes": 4002,
       "handling": "adjusted",
       "change_note": "Issue #27: approved employee100 preload and website-save-only goal refresh, 2026-10-29."
+    },
+    {
+      "path": "backend/tests/test_goal_candidates.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "import_documentation_or_verification",
+      "handling": "added",
+      "sha256": "3a58152c1c73b92431392e3ddf61c663e95ab40cf7bab898a911301f29592134",
+      "bytes": 3584,
+      "change_note": "Issue #27: goal input evidence, exact candidate contract and regression coverage (2026-10-29)."
+    },
+    {
+      "path": "database/data/exports/natural105_goals_20261029.manifest.json",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "import_documentation_or_verification",
+      "handling": "added",
+      "sha256": "a944391d912aad9b2cf917ca92907a5dcf5c3ea20538bdac651c68d550879c7a",
+      "bytes": 4882,
+      "change_note": "Issue #27: natural employee display, grounded goal contract and verified 315-candidate backup (2026-10-29)."
+    },
+    {
+      "path": "frontend/src/features/auth/LoginPage.tsx",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "import_documentation_or_verification",
+      "handling": "added",
+      "sha256": "4269c3bb9a3ca10caf06507a3fccef09e2e9d1bce7735369ee1988b5baabb08a",
+      "bytes": 10046,
+      "change_note": "Issue #27: natural employee display, grounded goal contract and verified 315-candidate backup (2026-10-29)."
+    },
+    {
+      "path": "frontend/src/features/assistant/AssistantHost.tsx",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "import_documentation_or_verification",
+      "handling": "added",
+      "sha256": "0b028308aa0843f8bab737e065483a497e442e7a5b775db898fa56dd43da4f90",
+      "bytes": 16873,
+      "change_note": "Issue #27: natural employee display, grounded goal contract and verified 315-candidate backup (2026-10-29)."
     }
   ],
   "excluded": [

@@ -523,9 +523,31 @@ class AppContractTests(unittest.TestCase):
             self.assertEqual(set(result['goal_ids']),{self.ids[key] for key in ('head','member','peer','child_head','child_member')})
             self.assertEqual(generate.call_count,1)
             hr.after(result,{})
-            self.assertEqual(self._wait_goal(eid)['status'],'ready')
-            self.assertEqual(generate.call_count,2)
+            for affected in result['goal_ids']:
+                self.assertEqual(self._wait_goal(affected)['status'],'ready')
+            self.assertEqual(generate.call_count,6)
             self.assertEqual(self.profile.view(eid)['dept'],'웹에서 변경한 상위 부서')
+
+    def test_org_only_goal_uses_same_llm_contract_for_app_entry_and_preload(self):
+        from app import llm,jobs
+        from app.agents import runtime
+        first,second=self.ids['member'],self.ids['peer']
+        with self.db.tx() as t:
+            for eid in (first,second):
+                t.run("INSERT INTO app_ext.user_settings(employee_id,ai_provider,demo_mock) VALUES(:e,'openai',false)",e=eid)
+        result={'candidates':[{'goal':f'{topic}의 기초를 학습하고 싶어요.','why':'소속 부서를 참고한 기초 목표예요.','basis':['직급·부서']}
+                              for topic in ('문서 검색','데이터 분석','서비스 운영')],'note':'담당 업무 입력이 없어 기초 방향으로 제안했어요.'}
+        with patch.object(self.goals,'request',self.actual_goal_request),patch.object(llm,'available',return_value=True), \
+             patch.object(runtime,'llm_json',return_value=result) as model:
+            c=self.client('member')
+            self.assertEqual(c.post('/api/v1/me/goal-suggestions/ensure').status_code,200)
+            self.assertEqual(self._wait_goal(first)['source'],'openai')
+            jid=self.actual_goal_request(second,'admin-preload',mode='openai',only_if_stale=True)
+            jobs.wait_result(jid,second,timeout=5)
+            self.assertEqual(self._wait_goal(second)['source'],'openai')
+            self.assertEqual(model.call_count,2)
+            self.assertEqual(model.call_args_list[0].args[1:],model.call_args_list[1].args[1:])
+            self.assertEqual(len(self.goals.get(first)['candidates']),3)
 
     def test_owned_certificate_rename_preloads_only_linked_employees(self):
         from app.admin_io import base,education

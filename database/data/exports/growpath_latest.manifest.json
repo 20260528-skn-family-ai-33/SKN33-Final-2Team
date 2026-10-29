@@ -1,11 +1,11 @@
 {
   "format": 1,
-  "created_at": "2026-10-29T07:45:47.299384+00:00",
+  "created_at": "2026-10-29T08:40:09.421652+00:00",
   "database": "growpath",
   "server_version": "17.11",
   "archive": "growpath_latest.dump",
-  "sha256": "cb55423c93f78487ae527ae8d815b3655dfa8314d08fa3be264bed9579d42687",
-  "bytes": 38352349,
+  "sha256": "4e3a792cbb34635497cedd6b1b83f6e8390a13326edd4a23f6faf58c55dc496d",
+  "bytes": 38375509,
   "inventory": {
     "tables": {
       "growpath_legacy.agent_generations": 71,
@@ -31,7 +31,7 @@
       "public.employee_certifications": 10,
       "public.employee_education_records": 105,
       "public.employee_input_profiles": 103,
-      "public.employee_recommended_prompts": 312,
+      "public.employee_recommended_prompts": 315,
       "public.employee_skills": 389,
       "public.employees": 105,
       "public.growth_reports": 1,
@@ -1531,8 +1531,8 @@
       "digest": "d41d8cd98f00b204e9800998ecf8427e"
     },
     "app_ext.agent_calls": {
-      "rows": 104,
-      "digest": "b4d632d5858fe7b087a10538e6385904"
+      "rows": 210,
+      "digest": "5f312933d7f4208b52fb9696181a4182"
     },
     "app_ext.cert_groups": {
       "rows": 0,
@@ -1559,16 +1559,16 @@
       "digest": "d41d8cd98f00b204e9800998ecf8427e"
     },
     "app_ext.goal_suggestion_meta": {
-      "rows": 312,
-      "digest": "4531118c2f4b54f43d38e2d50fb8a440"
+      "rows": 315,
+      "digest": "7ba5f99e1e5d1acf5ef8220d0ee9a6a9"
     },
     "app_ext.goal_suggestion_runs": {
-      "rows": 104,
-      "digest": "abb5cdb6aa2912103268bd1a38178464"
+      "rows": 105,
+      "digest": "23c28ab8df13c21499335255e955baf2"
     },
     "app_ext.jobs": {
-      "rows": 104,
-      "digest": "7e31cdd0d49a6049a59e940aa6240b1a"
+      "rows": 210,
+      "digest": "41a4bbb06de704cefd114b5cb293f0ea"
     },
     "app_ext.learning_docs": {
       "rows": 0,
@@ -1704,15 +1704,15 @@
     },
     "public.employee_education_records": {
       "rows": 105,
-      "digest": "890ac50491c9f2a473d6ba057105ad9c"
+      "digest": "8aa2b9727bc1f30a52ccb096170e9e69"
     },
     "public.employee_input_profiles": {
       "rows": 103,
-      "digest": "75e6d3998ca5158fbd2d2406e593c87d"
+      "digest": "059eab6bcae832d6c082a928774eb903"
     },
     "public.employee_recommended_prompts": {
-      "rows": 312,
-      "digest": "87591a8a8a38cd6d5adf89b011e7bb28"
+      "rows": 315,
+      "digest": "995653d4590c8de5a66131916a1039f8"
     },
     "public.employee_skills": {
       "rows": 389,
@@ -1720,7 +1720,7 @@
     },
     "public.employees": {
       "rows": 105,
-      "digest": "10dd5f63b9b34adf7d760650b1d981c5"
+      "digest": "84dc4ad4106bc8d7e1d6ef2fee976fe5"
     },
     "public.growth_reports": {
       "rows": 1,
@@ -1833,22 +1833,40 @@
   },
   "scope": "All schemas including app_ext, table data, vectors, functions, views and sequences; cluster roles/passwords and external storage files are separate.",
   "goal_preload": {
-    "new_batch_model": "gpt-6-luna",
-    "new_batch_calls": 100,
-    "synthetic_employees": 100,
-    "synthetic_candidates": 300,
-    "preserved_real_user_candidates": 12,
-    "new_batch_input_tokens": 110507,
-    "new_batch_output_tokens": 91847,
-    "new_batch_total_tokens": 202354
+    "model": "gpt-6-luna",
+    "actual_model_calls": 106,
+    "automatic_retries": 0,
+    "employees": 105,
+    "candidates": 315,
+    "input_tokens": 119439,
+    "output_tokens": 94329,
+    "total_tokens": 213768
+  },
+  "display_cleanup": {
+    "employees": 105,
+    "renamed_synthetic_employees": 100,
+    "real_user_names_unchanged": 5,
+    "actual_model_calls": 106,
+    "candidates": 315,
+    "automatic_retries": 0,
+    "separately_approved_retries": 1,
+    "oho_candidates": 3,
+    "oho_personal_data_unchanged": true,
+    "protected_identity_auth_permission_fields_unchanged": true,
+    "unmodified_tables": 70,
+    "before_backup_sha256": "52041f5859d6d2f6227062db9b0dcb1197b125a62df15f6585ea915f8e5175a8",
+    "display_changes_plan_sha256": "429522425bd30bb56a9bbdc447b52a2e9dafdf5f1ba8bf4c7bd26d778868a736",
+    "provenance_retained": true
   },
   "publication": {
-    "published_at": "2026-10-29T07:49:18.898820+00:00",
-    "source_archive": "growpath_all_profiles_goals_20261029.dump",
-    "checkpoint": "시간·커리큘럼, 가상 직원 100명, REAL_USER 데모 입력 4명, 실제 목표 후보 312개",
-    "preserved_real_user_accounts": 5,
-    "synthetic_candidates_added": 300,
+    "published_at": "2026-10-29T08:41:17.897744+00:00",
+    "source_archive": "growpath_natural_profiles_goals_20261029.dump",
+    "checkpoint": "시간·커리큘럼, 직원 100명 이름·표시 문구 정리, 팀원 5명 보존, 실제 목표 후보 315개",
     "drive_folder_id": "1DyJ67R5bYMEwKF-PChdOcxGF8TCNtPsx",
-    "website_saved_change_policy": "Application change tested locally; PR29 publication pending; DB backup does not deploy application code"
+    "actual_model_calls": 106,
+    "initial_calls": 105,
+    "separately_approved_retries": 1,
+    "automatic_retries": 0,
+    "website_saved_change_policy": "Application changes tested locally; current PR29 updates pending commit/push; backup does not deploy application code"
   }
 }

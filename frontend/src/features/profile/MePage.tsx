@@ -98,7 +98,7 @@ function HrCard({ e }: { e: User }) {
         <dt>현재 근무</dt>
         <dd>{e.validFrom ? `${e.validFrom}부터${e.changeReason ? ` · ${e.changeReason}` : ''}` : <None />}</dd>
       </dl>
-      <p className="small muted me-foot">인사 정보는 직접 고칠 수 없어요. 다르면 인사 담당 부서(인재경영실 · 가상)에 정정을 요청해 주세요. 담당자가 관리자 화면의 인적 데이터로 고쳐요.</p>
+      <p className="small muted me-foot">인사 정보는 직접 고칠 수 없어요. 다르면 인사 담당 부서(인재경영실)에 정정을 요청해 주세요. 담당자가 관리자 화면의 인적 데이터로 고쳐요.</p>
     </div>
   );
 }

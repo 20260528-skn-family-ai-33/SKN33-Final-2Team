@@ -1,8 +1,8 @@
 # 외부 DB 자료와 복원 · 2026-10-29
 
-최신 공유본은 `growpath_latest.dump`와 같은 위치의 `growpath_latest.manifest.json`이다. 덤프 SHA-256 `cb55423c93f78487ae527ae8d815b3655dfa8314d08fa3be264bed9579d42687`, 38,352,349바이트다. 강좌 시간·커리큘럼(025·026), 가상 직원 100명 보완, REAL_USER 4명의 데모 업무/프로젝트, `gpt-6-luna`로 생성한 팀원 후보 12개와 가상 직원 100명의 후보 300개(총 312개)를 포함한다. 제외 요청한 직원 1명은 바꾸지 않았다.
+최신 공유본은 `growpath_latest.dump`와 같은 위치의 `growpath_latest.manifest.json`이다. 덤프 SHA-256 `4e3a792cbb34635497cedd6b1b83f6e8390a13326edd4a23f6faf58c55dc496d`, 38,375,509바이트다. 강좌 시간·커리큘럼(025·026), 가상 직원 100명의 이름·표시 문구 정리와 기존 업무/경험, 팀원 5명 및 실제 목표 후보 315개(105명×3개)를 포함한다. 개인 입력을 제외했던 직원의 업무·경력·프로젝트는 추가하지 않고 기존 소속·직무·보유 자격으로 후보 3개를 생성했다. 데이터의 가상 출처 기록은 내부에 보존한다.
 
-[공유 폴더](https://drive.google.com/drive/folders/1DyJ67R5bYMEwKF-PChdOcxGF8TCNtPsx)에서 두 파일을 받는다. 기존 링크와 공유 권한을 유지했으며 업로드 후 다시 내려받아 두 파일의 SHA-256을 대조했다. [외부 자료 manifest](assets.manifest.json)와 [실제 생성 기록](data/exports/actual_goal_preload_20261029.manifest.json)에 버전·검증을 연결했다. 원문·개인 입력·덤프·비밀키는 Git에 넣지 않는다.
+[공유 폴더](https://drive.google.com/drive/folders/1DyJ67R5bYMEwKF-PChdOcxGF8TCNtPsx)에서 두 파일을 받는다. 기존 링크와 공유 권한을 유지했으며 업로드 후 다시 내려받아 두 파일의 SHA-256을 대조했다. [외부 자료 manifest](assets.manifest.json)와 [최신 표시 정리·실제 생성 기록](data/exports/natural105_goals_20261029.manifest.json)에 버전·검증을 연결했다. 원문·개인 입력·덤프·비밀키는 Git에 넣지 않는다.
 
 ## 새 DB 복원
 
@@ -17,9 +17,9 @@ python -m src.database.vectors.resource_vectors status
 
 비밀번호는 출력되지 않는 터미널 입력을 사용한다. 기존 DB·데이터 디렉터리·`.env.local`은 덮어쓰지 않는다. 기존 서버라면 `--initialize`를 생략하고 비어 있는 새 DB 이름을 지정한다. 포트가 사용 중이면 점유자를 먼저 확인한다. 설치 바이너리와 서버 확장은 별도로 준비한다. 복원에는 OpenAI 키나 유료 API 호출이 필요 없다.
 
-이번 전체 덤프는 기준 스키마 **53표·22,718행**과 기존 앱 보조 스키마 `app_ext` **25표·624행**, 합계 **78표·23,342행**이다. 기준 표 구조/ERD는 바꾸지 않았으며 정적 ERD의 건수는 강좌 checkpoint 22,300행이다. `inventory`는 기존 복원 도구와 호환되는 기준 53표이며, 전체 78표 지문은 manifest의 `all_schema_table_fingerprints`에 따로 기록한다. 기본 복원 도구는 기준 inventory를 대조하고, 작성 PC의 이번 추가 검사는 전체 78표와 실제 로그인 API까지 검증했다.
+이번 전체 덤프는 기준 스키마 **53표·22,721행**과 기존 앱 보조 스키마 `app_ext` **25표·840행**, 합계 **78표·23,561행**이다. 기준 표 구조/ERD는 바꾸지 않았으며 정적 ERD의 건수는 강좌 checkpoint 22,300행이다. `inventory`는 기존 복원 도구와 호환되는 기준 53표이며, 전체 78표 지문은 manifest의 `all_schema_table_fingerprints`에 따로 기록한다. 기본 복원 도구는 기준 inventory를 대조하고, 작성 PC의 이번 추가 검사는 전체 78표와 실제 로그인 API까지 검증했다.
 
-목표 후보는 `public.employee_recommended_prompts`, 이유·근거는 `app_ext.goal_suggestion_meta`, 입력 해시·상태는 `app_ext.goal_suggestion_runs`에 있다. `public`만 복원하면 사전 로딩 상태가 누락되므로 **전체 덤프를 복원한다**. 새 백업 복원본에서 100명 로그인·세션 조회·목표 화면 진입 시 기존 후보를 재사용하고 생성 요청·모델 호출 0회를 확인했다. 로그인의 변경 검사는 제거했으며 홈페이지 저장 성공 뒤 관련 직원만 갱신한다. SQL 직접 수정 후에는 후보를 명시적으로 다시 만든다. 새 업무/프로젝트 저장 계약과 자동 갱신에는 PR #29의 백엔드·프런트 배포도 필요하다.
+목표 후보는 `public.employee_recommended_prompts`, 이유·근거는 `app_ext.goal_suggestion_meta`, 입력 해시·상태는 `app_ext.goal_suggestion_runs`에 있다. `public`만 복원하면 사전 로딩 상태가 누락되므로 **전체 덤프를 복원한다**. 새 백업 복원본에서 105명 로그인·세션 조회·목표 화면 진입 시 기존 후보를 재사용하고 생성 요청·모델 호출 0회를 확인했다. 로그인의 변경 검사는 제거했으며 홈페이지 저장 성공 뒤 관련 직원만 갱신한다. SQL 직접 수정 후에는 후보를 명시적으로 다시 만든다. 새 업무/프로젝트 저장 계약과 자동 갱신에는 PR #29의 백엔드·프런트 배포도 필요하다.
 
 앱 추가 준비가 필요하면 `backend/tools/setup_db.py --supplement-only --keep-team-passwords`를 사용해 기존 직원 암호를 보존한다. 준비 도구는 저장된 목표 생성 상태가 있으면 초기 가데이터 후보로 덮지 않는다. API 키·직원 사번/암호·관리자 계정 설정은 저장소 밖에서 관리한다. 수신 PC의 실제 실행·배포는 아직 검증하지 않았다.
 

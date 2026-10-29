@@ -20,15 +20,15 @@
     {
       "id": "full_database_current",
       "filename": "growpath_latest.dump",
-      "bytes": 38352349,
-      "sha256": "cb55423c93f78487ae527ae8d815b3655dfa8314d08fa3be264bed9579d42687",
+      "bytes": 38375509,
+      "sha256": "4e3a792cbb34635497cedd6b1b83f6e8390a13326edd4a23f6faf58c55dc496d",
       "location": "https://drive.google.com/file/d/1YBhxTVQjNfm53FbcLJnO7SKi-hsycxz4/view?usp=drivesdk",
       "location_status": "uploaded_existing_drive_file",
       "manifest": "data/exports/growpath_latest.manifest.json",
-      "version": "2026-10-29-all-employee-goal-preload",
+      "version": "2026-10-29-natural-profiles-goals315",
       "manifest_location": "https://drive.google.com/file/d/1iUVAugkFpXHNeO3IlWhFkol-6oID691C/view?usp=drivesdk",
       "verified_all_tables": 78,
-      "verified_all_rows": 23342
+      "verified_all_rows": 23561
     },
     {
       "id": "course_duration_snapshot_20261028",
@@ -81,9 +81,18 @@
       "filename": "growpath_all_profiles_goals_20261029.dump",
       "sha256": "cb55423c93f78487ae527ae8d815b3655dfa8314d08fa3be264bed9579d42687",
       "bytes": 38352349,
+      "location": null,
+      "location_status": "historical_local_checkpoint_superseded_by_natural105",
+      "manifest": "data/exports/employee100_goal_preload_20261029.manifest.json"
+    },
+    {
+      "id": "natural105_goals_20261029",
+      "filename": "growpath_natural_profiles_goals_20261029.dump",
+      "sha256": "4e3a792cbb34635497cedd6b1b83f6e8390a13326edd4a23f6faf58c55dc496d",
+      "bytes": 38375509,
       "location": "https://drive.google.com/file/d/1YBhxTVQjNfm53FbcLJnO7SKi-hsycxz4/view?usp=drivesdk",
       "location_status": "included_in_verified_latest_drive_backup",
-      "manifest": "data/exports/employee100_goal_preload_20261029.manifest.json"
+      "manifest": "data/exports/natural105_goals_20261029.manifest.json"
     }
   ],
   "regulation_originals": [
