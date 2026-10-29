@@ -1,6 +1,6 @@
 # backend — 5차 FastAPI 백엔드 사본 (참고·로컬 실행용)
 
-화면 개발에 필요한 API를 로컬에서 띄우기 위한 **5차 목업 백엔드 사본**이에요. 백엔드는 팀원 담당이라 여기서 기능을 고치지 않아요. 팀원 백엔드가 준비되면 `docker-compose.yml`의 `backend` 서비스(또는 `frontend/.env.local`의 `API_PROXY_TARGET`)만 바꿔 끼워요.
+화면 개발에 필요한 API를 로컬에서 띄우기 위한 **5차 목업 백엔드 사본**이에요. 팀원 백엔드가 준비되면 `docker-compose.yml`의 `backend` 서비스(또는 `frontend/.env.local`의 `API_PROXY_TARGET`)만 바꿔 끼워요. 2026-10-29 사용자 요청으로 이 사본의 챗봇에 로컬 RoBERTa 질문 분류를 연결했어요. 팀원 백엔드에도 반영됐다는 뜻은 아니에요.
 
 ## 들어 있는 것
 
@@ -74,7 +74,7 @@ docker compose up -d backend
 파이썬으로 직접 띄울 때(선택 · Python 3.12 · 이번 작업에서는 확인하지 않은 방법): 이 폴더에서 패키지를 설치하고, 맨 위 `.env`를 `GP5_ENV_FILE`로 알려 준 뒤 실행해요(앱은 기본으로 이 폴더의 `.env`를 읽어요). DB는 Docker의 `db` 서비스를 그대로 써요(`.env`의 `GP5_DB_PORT`). 도커의 `backend`와 같은 8815를 쓰므로 둘 중 하나만 켜요.
 
 ```bash
-pip install -r requirements.txt
+pip install -r ../requirements.txt
 ```
 
 ```bash
@@ -82,6 +82,8 @@ GP5_ENV_FILE=../.env python -m uvicorn app.main:app --port 8815
 ```
 
 PowerShell에서는 `$env:GP5_ENV_FILE = '../.env'`를 먼저 실행한 뒤 `python -m uvicorn app.main:app --port 8815`를 실행해요.
+
+분류 모델 연결 흐름·파일별 역할·실행 방법·검증 기록은 [챗봇 질문 분류 안내](classification.md)를 참고하세요.
 
 ## 목표 후보 사전 준비
 
@@ -104,4 +106,4 @@ python tools/preload_goals.py --employee-id $preloadEmployeeId --provider ollama
 
 ## 고칠 것이 보이면
 
-여기서 고치지 말고 GitHub 이슈로 백엔드 담당에게 넘겨요. 화면이 기대하는 모양은 [API 계약](../frontend/docs/API_계약.md)에 있어요.
+추가 변경은 GitHub 이슈로 백엔드 담당과 조율해요. 화면이 기대하는 모양은 [API 계약](../frontend/docs/API_계약.md)에 있어요.

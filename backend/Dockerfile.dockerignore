@@ -1,0 +1,23 @@
+# 빌드 컨텍스트는 저장소 맨 위. 실행 코드와 의존성 파일만 전달한다.
+**
+!requirements.txt
+!backend/
+!backend/Dockerfile
+!backend/app/
+!backend/app/**
+!backend/web/
+!backend/web/**
+!backend/db/
+!backend/db/**
+!backend/tools/
+!backend/tools/**
+!database/
+!database/requirements.txt
+!database/requirements-db.txt
+# 허용한 하위 경로에도 비밀 설정·캐시·가중치·DB 백업은 포함하지 않는다.
+**/.env
+**/.env.*
+**/__pycache__/
+**/*.pyc
+**/*.pt
+**/*.dump

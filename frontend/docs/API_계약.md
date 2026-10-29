@@ -87,6 +87,10 @@
 
 ### 사내 생활 도우미 — `assistant.ts`
 
+수자원공사 정보로 분류되면 `knowledge.documents`·`knowledge.chunks`의 같은 범주·실제 자료만 벡터 검색해 답변 모델에 전달해요. 회사 답변은 `kind=general`, `source=work`이고 `summary`에 출처가 덧붙어요. 선택 필드 `answer.knowledgeSources[]`는 `{chunkId, documentId, documentTitle, sourceUrl, location, asOf, sourceLimits, isVirtual, textSha256, sourceFileSha256, textTruncated}`이며, 실제 인용한 검색 결과만 들어가요. `basis`는 규정 조항 전용으로 유지해요. 회사 자료에 맞는 근거가 없으면 `knowledgeSources=[]`와 확인 불가 안내예요. 다른 범주·가상 자료·없는 인용 ID·근거 없는 숫자는 허용하지 않아요.
+
+실제 모델 모드는 로컬 RoBERTa로 질문을 먼저 4분류해요. `meta.classification`(선택)은 `{model, label, confidence, ms, usedHistory}`이며 `label`은 `범위 밖`·`사내 규정`·`사내 생활안내`·`수자원공사 정보`예요. 기존 `answer.kind`는 유지하고 가데이터 모드에는 이 메타데이터가 없어요. 범위 밖은 검색/LLM을 호출하지 않고, 규정만 기존 규정 검색과 근거 검사를 거쳐요. 모델·토크나이저·해시 문제는 기존 오류 형식의 `code=AI_CLASSIFIER`, `kind=classifier`, `retryable=false`로 알려요. 모델과 응답 유형이 충돌하면 `AI_BAD_OUTPUT`이에요.
+
 | 요청 | 쓰는 곳 |
 | --- | --- |
 | `POST /assistant/ask` (작업) | 본문 `{question, history: [{q, a: 답 요약}]}` → 결과 `{answer, reg, meta}`. `answer.kind`: regulation(근거 조항 `basis`) · general(사내 홈페이지 안내 `intranet` / 업무·학습 / 앱 사용법 `links`) · clarify(되묻기 `options`) · out(범위 밖) |

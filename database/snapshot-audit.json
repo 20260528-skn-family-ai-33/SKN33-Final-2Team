@@ -1046,5 +1046,66 @@
       "drive_readback_sha256_verified": true,
       "new_source_backup_uploaded": true
     }
+  },
+  "main_sync_20261029_pr37": {
+    "base_main": "7d7de93573dd2ee458a743df7a16d94b327bec32",
+    "integrated_pr": 37,
+    "previous_feature_commit": "d31a596526bf04c66b925dc663457dd29dbdf563",
+    "readme_conflict_resolved": "Preserved classifier guidance and employee goal-preload guidance",
+    "upstream_files_preserved": [
+      "README.md",
+      "backend/.dockerignore",
+      "backend/Dockerfile",
+      "backend/Dockerfile.dockerignore",
+      "backend/app/agents/regulation.py",
+      "backend/app/errors.py",
+      "backend/app/knowledge.py",
+      "backend/app/question_classifier.py",
+      "backend/classification.md",
+      "backend/models/.gitattributes",
+      "backend/models/classifier-manifest.json",
+      "backend/models/config.json",
+      "backend/models/tokenizer.json",
+      "backend/models/tokenizer_config.json",
+      "backend/requirements.txt",
+      "backend/tests/test_question_classifier.py",
+      "backend/tools/check_classifier.py",
+      "docker-compose.yml",
+      "frontend/src/api/endpoints/assistant.ts",
+      "requirements.txt"
+    ],
+    "unit": {
+      "collected": 238,
+      "started_including_skips": 227,
+      "executed": 222,
+      "passed": 222,
+      "skipped": 5,
+      "failures": 0,
+      "errors": 0,
+      "successful": true
+    },
+    "database_api": {
+      "collected": 39,
+      "started_including_skips": 39,
+      "skipped": 0,
+      "passed": 39,
+      "errors": 0,
+      "failures": 0,
+      "paid_api_calls": 0
+    },
+    "classifier_unit_passed": 24,
+    "frontend_passed": 53,
+    "frontend_files": 15,
+    "typecheck": "PASS",
+    "lint_errors": 0,
+    "existing_lint_warnings": 37,
+    "build": "PASS",
+    "temporary_directory_retry": "Initial sandbox TEMP was unavailable; reruns with workspace TEMP/TMP/TMPDIR passed",
+    "paid_api_calls": 0,
+    "original_database_writes": 0,
+    "drive_backup_changed": false,
+    "actual_classifier_weight_inference": "not rerun; torch/transformers/weights are not installed in this DB test environment",
+    "container_deployment": "not rerun",
+    "human_review": "pending"
   }
 }

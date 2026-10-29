@@ -46,10 +46,10 @@
       "source_sha256": "15e8559b61d8db92a1a322ba0a1be86852fb1f4555ecf80b89be366d9b289fcf",
       "source_bytes": 11326,
       "source_kind": "team_existing_file",
-      "sha256": "042a1926bdce0d75d7ba8a4f02a3bbebb9f358f372b56567b0cd81d08800399d",
-      "bytes": 17648,
+      "sha256": "0f93a64dd546c8e37f7b84a044c16629a9b6daa601ac8a43e86c6868e134c03e",
+      "bytes": 17652,
       "handling": "adjusted",
-      "change_note": "Issue #27: team work/project context, guarded goal preloading and main 0a6dd08 compatibility (2026-10-29)."
+      "change_note": "Issue #27: verified integration of main 7d7de93 (PR #37), 2026-10-29."
     },
     {
       "path": "database/.env.example",
@@ -83,10 +83,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "3e6ca1c407d170f44742799acd617ffbe69e4a4048aaf4cafe3cfd209ce08738",
-      "bytes": 42042,
+      "sha256": "435dbf501ad3f6a1485d6760cd789e68f7fa3e6e38a3307ce0eff1d56b94724a",
+      "bytes": 42726,
       "handling": "adjusted",
-      "change_note": "Issue #27: verified real goal preloading and full Drive backup handoff (2026-10-29).",
+      "change_note": "Issue #27: verified integration of main 7d7de93 (PR #37), 2026-10-29.",
       "local_update_source": {
         "path": "README.md",
         "sha256": "e872d64ea58c53311d098dc1c769f5bc3232ad947d690054b75a0a0a20c6d8c6"
@@ -488,10 +488,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "8893a0bed9840117f25d4ac42922e62947480679a87e6e0e11288fb4e02aa12b",
-      "bytes": 35841,
+      "sha256": "17f3e96904a6d0bf7e838380f2699c2c56a5b8bcbe6e044f511ff193ec23ce94",
+      "bytes": 37933,
       "handling": "adjusted",
-      "change_note": "Issue #27: verified real goal preloading and full Drive backup handoff (2026-10-29)."
+      "change_note": "Issue #27: verified integration of main 7d7de93 (PR #37), 2026-10-29."
     },
     {
       "source_path": "database/src/__init__.py",
@@ -1639,9 +1639,9 @@
       "source_bytes": null,
       "source_kind": "team_followup_implementation",
       "handling": "adjusted",
-      "sha256": "8304bbb6f865ca0f8251a58c8773e406d214966543e3dab7e79d240488d75deb",
-      "bytes": 17592,
-      "change_note": "Issue #27: team work/project context, guarded goal preloading and main 0a6dd08 compatibility (2026-10-29)."
+      "sha256": "b46bb87b0fd35582c07fa00542b100919b2f369766bd3722486f1971808f32d1",
+      "bytes": 18998,
+      "change_note": "Issue #27: verified integration of main 7d7de93 (PR #37), 2026-10-29."
     },
     {
       "path": "database/tests/test_resource_refresh.py",

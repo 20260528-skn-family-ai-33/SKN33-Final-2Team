@@ -5,7 +5,24 @@
 # 2) 화면(frontend/)을 고칠 때: Node.js 20.19 이상(24 권장) + npm. 버전은 frontend/package.json·package-lock.json 에 고정
 #      npm ci --prefix frontend
 # 3) 파이썬으로 직접 실행·DB 작업할 때(Python 3.12): 이 파일이 백엔드(backend/)와 DB 도구(database/) 패키지를 함께 설치한다.
-#    버전은 각 폴더 파일에서 관리하고 여기서는 묶기만 한다(두 파일에 같이 있는 psycopg·argon2-cffi 는 같은 버전).
+#    백엔드·RoBERTa 버전은 이 파일에서 관리한다. DB 도구의 기존 의존성은 아래에서 함께 읽는다.
 #      pip install -r requirements.txt
--r backend/requirements.txt
+
+# GrowPath 5차 목업 서버 의존성 (Python 3.12 · 2026-10-21 설치 확인 버전)
+fastapi==0.156.4          # API 서버 (설계서 /api/v1)
+uvicorn[standard]==0.54.0 # ASGI 실행
+SQLAlchemy==2.1.5         # DB 연결 풀 + SQL(text) 실행 — 팀 DB 표는 팀원이 SQL 마이그레이션으로 관리하므로 ORM 모델·마이그레이션은 쓰지 않음
+psycopg[binary]==3.3.6    # PostgreSQL 드라이버
+argon2-cffi==25.1.0       # 비밀번호 해시 (팀 DB employees.password_hash 는 $argon2id$ 형식만 허용)
+python-multipart==0.0.32  # 관리자 엑셀·CSV, 기획서 파일 업로드(multipart)
+openpyxl==3.1.5           # 엑셀 읽기·쓰기 (관리자 업로드·다운로드, 초기 자료 이전)
+pypdf==6.21.1             # 기획서 PDF 글자 꺼내기 (없으면 PDF만 안내)
+olefile==0.47             # 기획서 HWP(옛 형식) 글자 꺼내기 (없으면 HWP만 안내)
+
+# 학습 기록과 같은 버전. Docker/로컬 CPU 추론용이며 CUDA 패키지는 받지 않는다.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.11.0+cpu
+transformers==5.20.2
+
+# DB 도구의 기존 의존성(원본 파일 유지)
 -r database/requirements.txt
