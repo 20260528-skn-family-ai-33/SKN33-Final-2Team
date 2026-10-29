@@ -66,13 +66,7 @@ export const ai = {
     if (!m) return '';
     return role === 'vision' ? m.vision || '' : role === 'default' ? m.default || '' : m[role] || m.default || '';
   },
-  /** others: 진단 모델과 이름이 다른 모델 수(로드맵·규정) · 같은 이름이면 Pod에 한 번만 올라가므로 세지 않는다 */
-  ollamaInfo: () => {
-    const m = prov('ollama').models;
-    const model = m?.default || '';
-    const others = new Set([m?.roadmap, m?.regulation].filter((n): n is string => !!n && n !== model));
-    return { model, others: others.size };
-  },
+  ollamaInfo: () => ({ model: prov('ollama').models?.default || '' }),
   openaiModel: (): string => prov('api').models?.default || '',
   failSim: (): FailSim => ({ ...Object.fromEntries(SIM_KINDS.map((k) => [k, false])), ...(g().settings.failSim || {}) }),
 };
