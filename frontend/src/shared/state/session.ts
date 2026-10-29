@@ -51,10 +51,11 @@ async function loadDemoAccounts(): Promise<void> {
 }
 
 export async function boot(): Promise<void> {
-  const acct: Account | null = await accountApi.me().catch(() => null);
+  let acct: Account | null = await accountApi.me().catch(() => null);
   try {
     await setAccount(acct);
   } catch {
+    acct = null;
     await setAccount(null);
   }
   if (!acct) await loadDemoAccounts();

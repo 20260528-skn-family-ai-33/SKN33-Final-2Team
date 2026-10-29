@@ -455,18 +455,18 @@ export const D: GpData = {
   },
   "perspectives": {
     "A1": {
-      "name": "비용 우선안",
-      "short": "비용",
+      "name": "Free Track",
+      "short": "Free",
       "focus": "비용 부담 최소화. 무료 강좌·공식 문서와 직접 실습 중심"
     },
     "A2": {
-      "name": "시간 우선안",
-      "short": "시간",
+      "name": "Fast Track",
+      "short": "Fast",
       "focus": "짧은 기간·적은 학습 부담. 핵심 강의와 꼭 필요한 실습만"
     },
     "A3": {
-      "name": "업무 적용 우선안",
-      "short": "업무 적용",
+      "name": "Challenge Track",
+      "short": "Challenge",
       "focus": "담당 업무에 바로 활용. 실제 업무 과제와 결과물 중심"
     }
   },
@@ -518,3 +518,6 @@ export const D: GpData = {
     ]
   ]
 };
+
+/** 내부 관점 ID를 사용자 표시 이름으로 변환한다. 기존 저장 데이터에도 적용. */
+export const trackName = (id: string, fallback = ""): string => D.perspectives[id]?.name || fallback;

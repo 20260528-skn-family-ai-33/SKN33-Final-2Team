@@ -17,7 +17,7 @@ import json
 import math
 import re
 
-from .. import catalog, llm
+from .. import catalog, db, llm
 from . import runtime as rt
 from .demo import D, TEMPLATES, TEMPLATES_ALT, domain_of
 
@@ -58,6 +58,8 @@ def finish_option(pid: str, raw: dict, source: str, off_domain: bool = False, ke
         r = _res(rid)
         if rid and not r:
             continue
+        if pid == 'A1' and r and r.get('cost') != 0:
+            raise llm.LlmError('Free Track은 비용이 0으로 확인된 무료 자료만 허용합니다.')
         try:
             stage = min(4, max(1, round(float(a.get('stage') or 2))))
         except (TypeError, ValueError):
@@ -80,7 +82,8 @@ def finish_option(pid: str, raw: dict, source: str, off_domain: bool = False, ke
         wh = float(raw.get('weeklyHours'))
     except (TypeError, ValueError):
         wh = 0
-    return {'id': pid, 'name': per['name'], 'short': per['short'], 'tagline': str(raw.get('tagline') or per['focus'])[:60], 'reason': str(raw.get('reason') or ''),
+    display_title = ' '.join(str(raw.get('displayTitle') or '').split())[:30]
+    return {'displayTitle': display_title, 'id': pid, 'name': per['name'], 'short': per['short'], 'tagline': str(raw.get('tagline') or per['focus'])[:60], 'reason': str(raw.get('reason') or ''),
             'pros': lst(raw.get('pros')), 'cons': lst(raw.get('cons')), 'scope': str(raw.get('scope') or ''), 'acts': acts,
             'weeklyHours': round(wh * 2) / 2 if 0.5 <= wh <= 40 else None, 'source': source, 'offDomain': bool(off_domain)}
 
@@ -108,7 +111,7 @@ def build_plan(d: dict, prm: dict, goal: str) -> dict:
     weeks = max(1, math.ceil(cum / hrs))
     res_ids = list(dict.fromkeys(a['res'] for a in acts if a['res']))
     costs = [(_res(r) or {}).get('cost') for r in res_ids]
-    return {'opt': d['id'], 'name': d['name'], 'short': d['short'], 'tagline': d['tagline'], 'goal': goal, 'def': d, 'params': p, 'start': p['start'],
+    return {'displayTitle': d.get('displayTitle') or '', 'opt': d['id'], 'name': d['name'], 'short': d['short'], 'tagline': d['tagline'], 'goal': goal, 'def': d, 'params': p, 'start': p['start'],
             'hours': hrs, 'format': p['format'], 'acts': acts, 'totalH': cum, 'weeks': weeks, 'cost': int(sum(c for c in costs if c)),
             'costUnknown': any(c is None for c in costs)}
 
@@ -333,13 +336,31 @@ R_SYS = """너는 GrowPath '로드맵 계획 에이전트'의 관점별 하위 �
 - tagline: 40자 안팎의 한 줄 요약. reason: 이 관점에서 왜 이렇게 짰는지 1~2문장. pros, cons: 각 1~3개. scope: 결과물의 범위 한 줄(이번 범위 밖이 있으면 함께).
 - 문장은 해요체로 쓴다.
 - 내보내기 전에 확인한다: 모든 실습 과제에 결과물과 완료 기준, skills가 있는가, gaps가 모두 활동이나 scope 중 한 곳에 있는가, 한도를 넘지 않는가.
-JSON 형식(형식만 보여 주는 예): {{"tagline":"...","reason":"...","pros":["..."],"cons":["..."],"scope":"...","weeklyHours":4,"acts":[{{"stage":2,"title":"...","res":"자료 id","hours":5,"how":"..."}},{{"stage":3,"title":"...","res":null,"hours":6,"how":"...","skills":["skillTags의 이름"]}}]}}"""
+JSON 형식(형식만 보여 주는 예): {{"tagline":"...","reason":"...","pros":["..."],"cons":["..."],"scope":"...","weeklyHours":4,"acts":[{{"stage":2,"title":"...","res":"자료 id","hours":5,"how":"..."}},{{"stage":3,"title":"...","res":null,"hours":6,"how":"...","skills":["skillTags의 이름"]}}]}}
+- displayTitle: 사용자 목표와 계획 내용을 요약한 한국어 제목. 30자 이내의 명사형으로 쓰고, "하고 싶어요" 같은 요청 표현은 제거한다. 원문에 없는 내용을 추가하지 않는다. 예: "사내 규정 RAG 챗봇 구축".
+"""
+
+
+TRACK_PROMPT_AGENTS = {'A1': 'agent_certified', 'A2': 'agent_fasttrack', 'A3': 'agent_practical'}
 
 
 def _sys(pid: str, tpl: str) -> str:
-    """R_SYS 는 {rules}, REV_SYS 는 {focus}(demo_data.json 관점 한 줄)를 쓴다"""
-    p = dict(D['perspectives'][pid], id=pid, rules=PERSPECTIVE_RULES[pid])
-    return tpl.format(**p)
+    """DB 활성 버전 사용. 누락 또는 중복 시 코드 프롬프트로 대체하지 않는다."""
+    rows = db.all_('SELECT system_prompt FROM public.prompt_versions WHERE agent_id = :agent AND is_active', agent=TRACK_PROMPT_AGENTS[pid])
+    if len(rows) != 1:
+        raise llm.LlmError('Track의 DB 활성 프롬프트가 정확히 하나 필요합니다.')
+    sections = rows[0]['system_prompt'].split('\n### REVISION\n', 1)
+    if len(sections) != 2 or not sections[0].startswith('### GENERATION\n'):
+        raise llm.LlmError('DB Track 프롬프트에 GENERATION/REVISION 구역이 필요합니다.')
+    text = sections[1] if tpl is REV_SYS else sections[0][len('### GENERATION\n'):]
+    if not text.strip():
+        raise llm.LlmError('DB Track 프롬프트가 비어 있습니다.')
+    return text.strip()
+
+
+def _track_catalog(pid: str, handoff: dict, extra_ids: list | None = None) -> list[dict]:
+    rows = agent_catalog(handoff, extra_ids)
+    return [r for r in rows if r.get('cost') == 0] if pid == 'A1' else rows
 
 
 def option(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
@@ -353,7 +374,7 @@ def option(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
                  '  · summary에 바꾼 점을 한 문장으로 쓰고, 반영하지 못한 요청은 notes에 쓴다. JSON에 "summary":"...","notes":[] 를 더한다.') if inp.get('request') else \
             ('\n- 사용자가 이 관점의 안을 다시 요청했다. previous와 활동 구성이 분명히 다르게 쓴다. 관점과 한도는 그대로 지킨다.' if inp.get('previous') else '')
         prev_ids = [a.get('res') for a in ((inp.get('previous') or {}).get('acts') or [])]
-        r = rt.llm_json(ctx, _sys(pid, R_SYS) + extra, {'handoff': inp['handoff'], 'catalog': agent_catalog(inp['handoff'], prev_ids), 'skillTags': catalog.skill_names(),
+        r = rt.llm_json(ctx, _sys(pid, R_SYS) + extra, {'handoff': inp['handoff'], 'catalog': _track_catalog(pid, inp['handoff'], prev_ids), 'skillTags': catalog.skill_names(),
                                                          'previous': inp.get('previous'), 'request': inp.get('request')}, role='roadmap')
         o = finish_option(pid, r, ctx.mode)
         if inp.get('request'):
@@ -496,7 +517,7 @@ REV_SYS = """너는 GrowPath '로드맵 계획 에이전트'의 관점별 하위
 
 [나머지 항목]
 - summary: 바꾼 내용 한 문장. notes: 요청 중 반영하지 못한 것과 이유(없으면 빈 배열). tagline: 40자 안팎의 한 줄 요약. 문장은 해요체로 쓴다.
-JSON 형식(형식만 보여 주는 예): {{"summary":"...","notes":[],"tagline":"...","reason":"...","pros":["..."],"cons":["..."],"weeklyHours":4,"acts":[{{"key":"current의 key 또는 null","stage":2,"title":"...","res":"자료 id","hours":5,"how":"..."}},{{"key":"current의 key 또는 null","stage":3,"title":"...","res":null,"hours":6,"how":"...","skills":["skillTags의 이름"]}}]}}"""
+JSON 형식(형식만 보여 주는 예): {{"summary":"...","notes":[],"displayTitle":"사내 규정 RAG 챗봇 구축","tagline":"...","reason":"...","pros":["..."],"cons":["..."],"weeklyHours":4,"acts":[{{"key":"current의 key 또는 null","stage":2,"title":"...","res":"자료 id","hours":5,"how":"..."}},{{"key":"current의 key 또는 null","stage":3,"title":"...","res":null,"hours":6,"how":"...","skills":["skillTags의 이름"]}}]}}"""
 
 
 def _drop_gone_keys(o: dict, changes: dict) -> dict:
@@ -518,7 +539,7 @@ def revise(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
                                  **({} if a.get('res') else {'skills': a.get('skills') or []})) for a in pl['acts']]}
         extra_ids = [a.get('res') for a in pl['acts']] + list(inp['changes'].get('addResources') or [])
         r = rt.llm_json(ctx, _sys(pid, REV_SYS), {'current': current, 'handoff': inp['handoff'], 'changes': inp['changes'], 'request': inp.get('request'),
-                                                  'catalog': agent_catalog(inp['handoff'], extra_ids), 'skillTags': catalog.skill_names()}, role='roadmap')
+                                                  'catalog': _track_catalog(pid, inp['handoff'], extra_ids), 'skillTags': catalog.skill_names()}, role='roadmap')
         o = finish_option(pid, r, ctx.mode, keep_key=True)
         o.update(summary=str(r.get('summary') or '').strip()[:80], notes=rt.arr(r.get('notes'), 4))
         return o

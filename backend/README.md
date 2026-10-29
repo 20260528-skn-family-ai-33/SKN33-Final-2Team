@@ -86,3 +86,19 @@ PowerShell에서는 `$env:GP5_ENV_FILE = '../.env'`를 먼저 실행한 뒤 `pyt
 ## 고칠 것이 보이면
 
 여기서 고치지 말고 GitHub 이슈로 백엔드 담당에게 넘겨요. 화면이 기대하는 모양은 [API 계약](../frontend/docs/API_계약.md)에 있어요.
+
+## Track 프롬프트 DB 연결 (#38)
+
+Free Track(A1→agent_certified), Fast Track(A2→agent_fasttrack), Challenge Track(A3→agent_practical)은 `public.prompt_versions`의 활성 버전을 매 요청 읽습니다. 기존 agent_id는 유지하며, 이름 변경 전 버전도 보존합니다. 각 본문은 `### GENERATION`과 `### REVISION` 구역으로 나뉩니다. 활성 버전 누락·중복·형식 오류는 명시적으로 실패하며 코드 기본값으로 대체하지 않습니다.
+
+새 환경에서는 기존 DB 백업을 보관한 후 아래 순서로 적용합니다. 모델 호출은 발생하지 않습니다.
+
+```bash
+docker compose up -d --no-deps --build backend
+docker compose exec -e PYTHONPATH=/srv/growpath backend python tools/install_track_prompts.py
+docker compose exec -e PYTHONPATH=/srv/growpath backend python tools/test_track_prompts.py
+```
+
+등록 도구는 이전 활성 버전을 비활성화하고 부모 버전에 연결한 새 버전을 트랜잭션으로 활성화합니다. 같은 내용으로 재실행하면 새 버전을 만들지 않습니다. Free Track에는 비용이 0으로 확인된 자료만 전달하고, 유료·비용 미확인 자료를 반환하면 서버에서도 거부합니다. 실제 AI 생성 품질 검증은 별도입니다.
+
+프롬프트를 되돌릴 때는 `prompt_versions`에서 이번 변경의 활성 버전·`parent_version_id`를 확인하고, 해당 agent_id의 현재 버전을 비활성화한 뒤 부모 버전을 활성화합니다. 이전 프롬프트는 새 구역 형식이 아니므로 **백엔드 코드도 DB 연결 도입 전 버전으로 함께 되돌려야 합니다.** 백엔드와 DB 버전을 각각만 되돌리면 호환되지 않습니다. 개인 로드맵 제목 데이터는 이 등록 도구가 변경하지 않습니다.

@@ -15,7 +15,7 @@ import { useMe } from '@/shared/state/session';
 import { toast } from '@/shared/state/ui';
 import { draftActive, recs, updateWs, useWs, ws } from '@/shared/state/workspace';
 import { Icon } from '@/shared/ui/Icon';
-import { GanttAll, GanttOne } from './Gantt';
+import { GanttAll } from './Gantt';
 
 function DraftBox() {
   const go = useGo();
@@ -58,7 +58,7 @@ function DraftBox() {
   );
 }
 
-/** 사후 점검은 언제든 시작할 수 있다(10/14). 다 끝냈으면 크게 권하고, 아니면 작은 링크 */
+/** 모든 활동을 마치면 사후 점검 시작 버튼을 표시한다. */
 function PostCta({ R }: { R: PlanRecord }) {
   const go = useGo();
   const c = count(R.plan, R.progress);
@@ -68,15 +68,7 @@ function PostCta({ R }: { R: PlanRecord }) {
         사후 점검 시작
       </button>
     </div>
-  ) : (
-    <p className="small muted post-l">
-      계획을 마무리하려면 언제든{' '}
-      <button className="link" onClick={() => postStart(go, R.id)}>
-        사후 점검
-      </button>
-      을 할 수 있어요.
-    </p>
-  );
+  ) : null;
 }
 
 function StageCard({ R, multi }: { R: PlanRecord; multi?: boolean }) {
@@ -109,7 +101,7 @@ function PastLink() {
   return (
     <p className="small muted past-l">
       <button className="link" onClick={() => go(paths.roadmaps)}>
-        지난 로드맵 {n}개 보기 <Icon name="right" />
+        지난 로드맵 보기 <Icon name="right" />
       </button>
     </p>
   );
@@ -163,32 +155,6 @@ export function HomePage() {
       </>
     );
   }
-  if (act.length === 1) {
-    const R = act[0];
-    const pl = R.plan;
-    const cur = curStage(pl, R.progress);
-    return (
-      <>
-        <p className="eyebrow">
-          {pl.name} · v{pl.version}
-        </p>
-        <h1 className="t">
-          이번 단계: {cur}단계 {stageName(cur)}
-        </h1>
-        <p className="lead">{pl.goal}</p>
-        <Alerts R={R} />
-        <StageCard R={R} />
-        <GanttOne R={R} />
-        <PostCta R={R} />
-        {drafting ? (
-          <div className="sec">
-            <DraftBox />
-          </div>
-        ) : null}
-        <PastLink />
-      </>
-    );
-  }
   return (
     <>
       <p className="eyebrow">안녕하세요, {hello} 님</p>
@@ -198,10 +164,15 @@ export function HomePage() {
       {act.map((R) => (
         <section className="hp" key={R.id}>
           <div className="hp-h">
-            <p className="eyebrow">
-              {R.plan.name} · v{R.plan.version}
-            </p>
-            <h2 className="hp-t">{R.plan.goal}</h2>
+            <h2 className="hp-t">{R.plan.displayTitle || R.plan.goal}</h2>
+            <button
+              type="button"
+              className="btn line sm hp-shortcut"
+              aria-label={`${R.plan.displayTitle || R.plan.goal} 바로가기`}
+              onClick={() => go(paths.roadmap(R.id))}
+            >
+              바로가기 <Icon name="right" />
+            </button>
           </div>
           <Alerts R={R} />
           <StageCard R={R} multi />

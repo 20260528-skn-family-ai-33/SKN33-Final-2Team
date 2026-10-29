@@ -10,9 +10,9 @@ import { draftActive, newComments, recs, useWs } from '@/shared/state/workspace'
 import { failToast } from '@/shared/lib/fail';
 import { AimStatus } from '@/shared/ui/conn';
 import { Icon } from '@/shared/ui/Icon';
-import { Brand, NavLink, ThemePicker } from '@/shared/ui/sideParts';
+import { Brand, NavLink } from '@/shared/ui/sideParts';
 
-function AiBox() {
+export function AiBox() {
   const { choice } = useAiMode();
   // 모델 상태(사용 가능 여부)는 ai.* 로 읽으므로, 바뀌면 다시 그리도록 구독만 한다
   useAi((s) => s.status);
@@ -106,9 +106,7 @@ export function Sidebar({ active }: { active: string }) {
         <span className="lbl">부록</span>
         <NavLink to={paths.resources} active={active === 'resources'} icon="book" label="학습 자료" />
       </nav>
-      <AiBox />
       <div className="side-foot">
-        <ThemePicker />
         <DemoTools />
         <button className="btn ghost sm logout" aria-label="로그아웃" onClick={() => void logoutAndReset(go)}>
           <Icon name="logout" />
