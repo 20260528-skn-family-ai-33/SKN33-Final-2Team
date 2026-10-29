@@ -3,8 +3,14 @@
 export const won = (n: number | null | undefined): string => (n ? Number(n).toLocaleString('ko-KR') + '원' : '0원');
 
 export const hrs = (n: number | string | null | undefined): string => {
+  if (n == null || n === '') return '시간 미확인';
   const v = Number(n);
-  return (Number.isInteger(v) ? v : v.toFixed(1)) + '시간';
+  if (!Number.isFinite(v) || v < 0) return '시간 미확인';
+  if (v === 0) return '0시간';
+  if (v < 5 / 60) return '10분 미만';
+  const minutes = Math.max(10, Math.round(v * 6) * 10);
+  const h = Math.floor(minutes / 60), m = minutes % 60;
+  return [h ? `${h}시간` : '', m ? `${m}분` : ''].filter(Boolean).join(' ');
 };
 
 export const kb = (n: number): string => `${Math.max(1, Math.round(n / 1024))}KB`;

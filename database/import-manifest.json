@@ -83,10 +83,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "1c9b0fb0bde6cfb9dff07d56326d0f5e66596a0827623d65e4f33b47baff40c5",
-      "bytes": 32844,
+      "sha256": "8ff9b601b15d44b7f30cbe7f11cb94f9a82d3c3c4b1e446e58e4ca9ffc4bdca7",
+      "bytes": 34339,
       "handling": "adjusted",
-      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels.",
+      "change_note": "PR #32 selected fixes: admin confirmation, detail refresh/access, ten-minute labels (2026-10-29).",
       "local_update_source": {
         "path": "README.md",
         "sha256": "e872d64ea58c53311d098dc1c769f5bc3232ad947d690054b75a0a0a20c6d8c6"
@@ -488,10 +488,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "a4811a6a2042fb19f79d2efd276e093699719f6c1d5eb2b5ea39766c1f090cc5",
-      "bytes": 24374,
+      "sha256": "a6ec701fbff1b0e720277afb2c1bb22699291bb27279cc8ce5d9afc78825b116",
+      "bytes": 26408,
       "handling": "adjusted",
-      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
+      "change_note": "PR #32 selected fixes: admin confirmation, detail refresh/access, ten-minute labels (2026-10-29)."
     },
     {
       "source_path": "database/src/__init__.py",
@@ -1606,9 +1606,9 @@
       "source_bytes": null,
       "source_kind": "team_followup_implementation",
       "handling": "adjusted",
-      "sha256": "96a313788c64820cf84990ee0fea6ea0e61e4215d357e4d1c7f8d99fc2cf89d5",
-      "bytes": 18815,
-      "change_note": "Issue #15: reconcile latest main, implementation/contracts, regression coverage and verification metadata (2026-10-28)."
+      "sha256": "d230c904aebea03e9c617a2af0f469540dbb6be43640644fdd4d7d2decc9bd9c",
+      "bytes": 22402,
+      "change_note": "PR #32 selected fixes: admin confirmation, detail refresh/access, ten-minute labels (2026-10-29)."
     },
     {
       "path": "backend/app/routers/account.py",
@@ -1639,9 +1639,9 @@
       "source_bytes": null,
       "source_kind": "team_followup_implementation",
       "handling": "adjusted",
-      "sha256": "43000752224e43b79b0a5f4999ee6405f87abb2cc557e715905f55ab32728dd3",
-      "bytes": 13860,
-      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
+      "sha256": "24e225f2ac2960da3ecd956a3298d0d5999eb052d75f8c65eba68b51944df70a",
+      "bytes": 14388,
+      "change_note": "PR #32 selected fixes: admin confirmation, detail refresh/access, ten-minute labels (2026-10-29)."
     },
     {
       "path": "database/tests/test_resource_refresh.py",
@@ -1672,9 +1672,9 @@
       "source_bytes": null,
       "source_kind": "team_course_duration_implementation",
       "handling": "adjusted",
-      "sha256": "5097714772595f0acc8c97aff3ba95a73f18e3221c2af230286b718d6630895a",
-      "bytes": 24718,
-      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+      "sha256": "cc6a9b5ef63a91ad4a3760ba175cdb500355d81cf8926bb5329c81fde804d4dc",
+      "bytes": 25054,
+      "change_note": "PR #32 selected fixes: admin confirmation, detail refresh/access, ten-minute labels (2026-10-29)."
     },
     {
       "path": "backend/app/agents/roadmap.py",
@@ -1705,9 +1705,9 @@
       "source_bytes": null,
       "source_kind": "team_course_duration_implementation",
       "handling": "adjusted",
-      "sha256": "6d1ed1f8635b0580e522154d2816f23e5da8d03afe4efc68e298407cef64955f",
-      "bytes": 3500,
-      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+      "sha256": "736f6df8976a1727a2c21afc5f0aacc2ca2083d641193ae0cf0f7cc04ec52884",
+      "bytes": 4225,
+      "change_note": "PR #32 selected fixes: admin confirmation, detail refresh/access, ten-minute labels (2026-10-29)."
     },
     {
       "path": "backend/db/02_app_ext.sql",
@@ -1782,9 +1782,9 @@
       "source_bytes": null,
       "source_kind": "team_course_duration_implementation",
       "handling": "adjusted",
-      "sha256": "b87dc33c9854e4b7e05f96e17220eb4249a59e623cd3b2b0950f5714fbc48ed2",
-      "bytes": 6046,
-      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+      "sha256": "263e03e9b58a83c7fb325873b5523c70e4b21217b25d7f086fbaa9a37d162b83",
+      "bytes": 6501,
+      "change_note": "PR #32 selected fixes: admin confirmation, detail refresh/access, ten-minute labels (2026-10-29)."
     },
     {
       "path": "database/tests/test_course_duration_database.py",
@@ -1837,9 +1837,9 @@
       "source_bytes": null,
       "source_kind": "team_course_duration_implementation",
       "handling": "adjusted",
-      "sha256": "ad57acc0326f192c6397fc17b6288beaea6be3908a1848dd195cb8f9452908ac",
-      "bytes": 9569,
-      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
+      "sha256": "eba8d60be0e573f7f2a70f21a1a8b0d3f9d1d651e6785722bb213a0f7a636675",
+      "bytes": 9555,
+      "change_note": "PR #32 selected fixes: admin confirmation, detail refresh/access, ten-minute labels (2026-10-29)."
     },
     {
       "path": "frontend/src/features/roadmap/RecordSheet.tsx",
@@ -1903,9 +1903,9 @@
       "source_bytes": null,
       "source_kind": "team_course_duration_implementation",
       "handling": "adjusted",
-      "sha256": "7b954978a6436add3efedaadc4e0dacb7dd65627f5735578c2ba24d8ee7d9789",
-      "bytes": 1799,
-      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
+      "sha256": "d9dc64f64f8931671dd9622f2b7669821f76c575c1103f94980659e46f0e4607",
+      "bytes": 1611,
+      "change_note": "PR #32 selected fixes: admin confirmation, detail refresh/access, ten-minute labels (2026-10-29)."
     },
     {
       "path": "frontend/src/shared/ui/ResPicker.tsx",
@@ -2024,9 +2024,9 @@
       "source_bytes": null,
       "source_kind": "team_course_review_fix",
       "handling": "adjusted",
-      "sha256": "41582e03fc9cda4ee0fdac8c6124226aba6b023045105bf7592f9a06bc1c03e5",
-      "bytes": 1032,
-      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
+      "sha256": "3a717e24b1c1c05eed52e04a2cd376b7d5d016f5d5d6b2c57550600d5e51639e",
+      "bytes": 2440,
+      "change_note": "PR #32 selected fixes: admin confirmation, detail refresh/access, ten-minute labels (2026-10-29)."
     },
     {
       "path": "frontend/src/shared/state/catalog.ts",
@@ -2035,9 +2035,53 @@
       "source_bytes": null,
       "source_kind": "team_course_review_fix",
       "handling": "adjusted",
-      "sha256": "9e1cd80dbb37fafcb7bd750cf14e94373c599d69e2c1378d5da318e6a48bf5cc",
-      "bytes": 2796,
-      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
+      "sha256": "8c877761828dc872a362518a11d7d59562527cbd6f628742d19e64bd51ffd1b8",
+      "bytes": 3198,
+      "change_note": "PR #32 selected fixes: admin confirmation, detail refresh/access, ten-minute labels (2026-10-29)."
+    },
+    {
+      "path": "backend/app/services/plans.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_review_fix",
+      "sha256": "7733940cf34b06ab6c0cb096e19ec4f1cb7afd981a9c40cbbfb4375107762545",
+      "bytes": 51132,
+      "handling": "adjusted",
+      "change_note": "PR #32 selected fixes: admin confirmation, detail refresh/access, ten-minute labels (2026-10-29)."
+    },
+    {
+      "path": "frontend/src/features/resources/ResourcePages.test.ts",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_review_fix",
+      "sha256": "c4c62e09331642d2776504a2cc94c6daaee559d7ad26a1e8a079aad3bbbb6705",
+      "bytes": 1333,
+      "handling": "adjusted",
+      "change_note": "PR #32 selected fixes: admin confirmation, detail refresh/access, ten-minute labels (2026-10-29)."
+    },
+    {
+      "path": "frontend/src/shared/lib/format.ts",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_review_fix",
+      "sha256": "b8cc95e2db882978be60e9c131317d3666002f0ebc04e01b463921e7421f9327",
+      "bytes": 1586,
+      "handling": "adjusted",
+      "change_note": "PR #32 selected fixes: admin confirmation, detail refresh/access, ten-minute labels (2026-10-29)."
+    },
+    {
+      "path": "frontend/src/shared/lib/format.test.ts",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_review_fix",
+      "sha256": "151eaf0cd179dbc96d8fd2ae3b1b7bbde65cd3624b4649120173976bab493e95",
+      "bytes": 703,
+      "handling": "adjusted",
+      "change_note": "PR #32 selected fixes: admin confirmation, detail refresh/access, ten-minute labels (2026-10-29)."
     }
   ],
   "excluded": [
@@ -2391,5 +2435,6 @@
     "browser": "local preview with a synthetic actor on the owned test clone; no model inference"
   },
   "course_publication_order": "course #26 before employee #27",
-  "course_review_verification": "database/snapshot-audit.json#course_review_20261029"
+  "course_review_verification": "database/snapshot-audit.json#course_review_20261029",
+  "course_selected_review_verification": "database/snapshot-audit.json#course_selected_review_fixes_20261029"
 }

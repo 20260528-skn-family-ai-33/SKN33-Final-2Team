@@ -1,4 +1,23 @@
 """Provider duration vs explicit curriculum planning allowance; preserve manual edits."""
+import math
+
+
+def display_hours(value) -> str:
+    """표시만 10분 단위로 반올림한다. 일정 계산·저장용 숫자는 바꾸지 않는다."""
+    try:
+        hours = float(value)
+    except (TypeError, ValueError):
+        return '시간 미확인'
+    if not math.isfinite(hours) or hours < 0:
+        return '시간 미확인'
+    if hours == 0:
+        return '0시간'
+    if hours < 5 / 60:
+        return '10분 미만'
+    # Python round의 짝수 반올림 대신 프런트 Math.round와 같은 양수 절반 올림.
+    minutes = max(10, math.floor(hours * 6 + 0.5) * 10)
+    h, m = divmod(minutes, 60)
+    return ' '.join(part for part in (f'{h}시간' if h else '', f'{m}분' if m else '') if part)
 
 
 def effective(course: dict, meta: dict) -> dict:

@@ -29,6 +29,20 @@ export function mergeRes(res: ResourceMap | null | undefined): void {
   });
 }
 
+/** 상세는 재진입 때 확인하고, 목록 캐시는 가볍게 유지한다. */
+export function resourceDetailQuery(id: string) {
+  return {
+    queryKey: ['resource', id] as const,
+    queryFn: async () => {
+      const detail = await catalogApi.resource(id);
+      mergeRes({ [id]: detail });
+      return detail;
+    },
+    enabled: Boolean(id),
+    refetchOnMount: 'always' as const,
+  };
+}
+
 export function mergeReg(b: RegBundle | null | undefined): void {
   if (!b) return;
   const arts = b.articles || {};

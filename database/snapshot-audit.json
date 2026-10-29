@@ -724,5 +724,64 @@
     "human_review": "pending",
     "publication_record": "GitHub PR #32; actual commit/push/comment result is recorded there",
     "user_authorized_commit_push_and_pr_comment": true
+  },
+  "course_selected_review_fixes_20261029": {
+    "checked_on": "2026-10-29",
+    "base_commit": "fd03d0c5ae17823792bb84351c5b829cef0eeaca",
+    "scope": [
+      "admin same-number time confirmation",
+      "detail refetch on reentry",
+      "full introduction access for all resource types",
+      "ten-minute display consistency"
+    ],
+    "excluded": [
+      "certificate input policy",
+      "supplementary ingestion normalization",
+      "sample curriculum cache refresh",
+      "AI evidence budget",
+      "employee data and code"
+    ],
+    "unit": {
+      "collected": 232,
+      "started_including_skips": 221,
+      "executed": 216,
+      "passed": 216,
+      "skipped": 5,
+      "failures": 0,
+      "errors": 0,
+      "successful": true
+    },
+    "integration": {
+      "collected": 16,
+      "started_including_skips": 16,
+      "skipped": 0,
+      "passed": 16,
+      "errors": 0,
+      "failures": 0,
+      "paid_api_calls": 0
+    },
+    "integration_source": "latest reviewed source restored to an owned disposable local PostgreSQL clone",
+    "integration_source_archive_sha256": "46dcbe3f9de42320f1a85434ce62e3f431b12e6ea674f3ee3ca0102512e2b293",
+    "frontend": {
+      "files": 13,
+      "passed": 47,
+      "typecheck": "PASS",
+      "lint_errors": 0,
+      "lint_existing_warnings": 37,
+      "build": "PASS"
+    },
+    "browser": [
+      "book summary links to full introduction",
+      "old detail cached -> real admin apply/after -> summary refresh -> detail reentry shows updated full introduction",
+      "stage list and execution record both show 5시간 50분"
+    ],
+    "browser_environment": "isolated local app with a synthetic actor and owned fixtures; external model HTTP blocked",
+    "original_database_writes": 0,
+    "paid_api_calls": 0,
+    "actual_model_inference": false,
+    "test_clone_removed": true,
+    "human_review": "pending",
+    "user_authorized_commit_push_and_pr_comment": true,
+    "publication_record": "GitHub PR #32; actual commit/push/comment result is recorded there"
   }
 }

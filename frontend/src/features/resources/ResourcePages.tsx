@@ -9,7 +9,7 @@ import { resourceTime } from '@/shared/lib/resourceTime';
 import { resourceSource } from '@/shared/lib/resourceSource';
 import { costText, stageName } from '@/shared/lib/plan';
 import { cause } from '@/shared/state/ai';
-import { mergeRes, useRes } from '@/shared/state/catalog';
+import { mergeRes, resourceDetailQuery, useRes } from '@/shared/state/catalog';
 import { Icon } from '@/shared/ui/Icon';
 import { Est, Loading, Note, Page, Thumb } from '@/shared/ui/parts';
 
@@ -30,6 +30,12 @@ export function ResKv({ r }: { r: Resource }) {
       ) : null}
       <dt>내용</dt>
       <dd style={{ whiteSpace: 'pre-line', maxHeight: 240, overflowY: 'auto' }}>{r.content || '내용 소개가 없어요'}</dd>
+      {!r.detailsLoaded ? (
+        <>
+          <dt>상세</dt>
+          <dd><Link className="link" to={paths.resource(r.id)}>전체 소개·상세 보기</Link></dd>
+        </>
+      ) : null}
       {r.type === 'course' ? (
         <>
           <dt>커리큘럼</dt>
@@ -50,7 +56,7 @@ export function ResKv({ r }: { r: Resource }) {
                 </ol>
               </details>
             ) : r.curriculum?.item_count ? (
-              <Link className="link" to={paths.resource(r.id)}>공개 목차 {r.curriculum.item_count}개 · 자료 상세 보기</Link>
+              <span className="small muted">공개 목차 {r.curriculum.item_count}개 · 전체 소개·상세 보기에서 확인할 수 있어요.</span>
             ) : <span className="small muted">별도 목차 미확보 · 소개와 학습 목표를 참고해 주세요.</span>}
           </dd>
         </>
@@ -213,16 +219,8 @@ export function ResourcesPage() {
 export function ResourcePage() {
   const { id = '' } = useParams();
   const r = useRes(id);
-  /* 목록은 요약이므로 상세를 별도로 받는다. 이미 받은 상세는 목록 재조회로 지우지 않는다. */
-  useQuery({
-    queryKey: ['resource', id],
-    queryFn: async () => {
-      const detail = await catalogApi.resource(id);
-      mergeRes({ [id]: detail });
-      return detail;
-    },
-    enabled: Boolean(id) && !r?.detailsLoaded,
-  });
+  /* 저장된 상세가 있어도 재진입 때 최신 내용을 받는다. */
+  useQuery(resourceDetailQuery(id));
   if (!r?.detailsLoaded) return <Page back={paths.resources} title="자료를 불러오는 중이에요" />;
   return (
     <Page back={paths.resources} eyebrow={`${r.kind} · ${r.real ? '실제 자료' : '가상 자료'}`} title={r.title} lead={resourceSource(r)}>

@@ -78,6 +78,66 @@ class AppContractTests(unittest.TestCase):
             self.roadmap = self.plans.insert_roadmap(t, self.project, self.round, self.plan)
         self.clients = {}
 
+    def duration_resource(self):
+        from app import catalog
+        rid='HTTP_DURATION_'+uuid4().hex
+        with self.db.tx() as t:
+            t.run("INSERT INTO public.courses(course_id,title,platform,content_status,estimated_duration_seconds) VALUES(:k,'시간 확인 검증','MS Learn','ready',3600)",k=rid)
+            t.run("""INSERT INTO app_ext.resource_meta(resource_key,resource_type,course_id,hours,hours_origin,estimated_fields,stage)
+                     VALUES(:k,'course',:c,1,'catalog',:e,1)""",k=rid,c=rid,e=self.db.J(['hours','stage']))
+        def remove():
+            with self.db.tx() as t:t.run('DELETE FROM public.courses WHERE course_id=:k',k=rid)
+            catalog.invalidate()
+        self.addCleanup(remove)
+        catalog.invalidate()
+        return rid
+
+    def test_admin_can_confirm_time_without_changing_the_number_and_sync_preserves_it(self):
+        from app import catalog,course_time
+        from app.admin_io import base,education
+        rid=self.duration_resource()
+        cur={'강좌':{(rid,):education.current('강좌')[(rid,)]},'도서':{},'자격증':{}}
+        row=base.Row('강좌',2,{'key':rid,'estimated':['단계']},{'key','estimated'},key=(rid,))
+        base.diff(education.COURSE,[row],cur['강좌'],lambda value:education.label('강좌',value))
+        self.assertEqual(row.action,'update')
+        self.assertEqual([c['field'] for c in row.changes],['estimated'])
+        with self.db.tx() as t:
+            education.apply(t,{'강좌':[row]},cur,{})
+            self.assertEqual(t.val('SELECT hours_origin FROM app_ext.resource_meta WHERE resource_key=:k',k=rid),'manual')
+            t.run('UPDATE public.courses SET estimated_duration_seconds=7200 WHERE course_id=:k',k=rid)
+            course_time.sync(t)
+        catalog.invalidate()
+        response=self.client('member').get('/api/v1/resources/'+rid)
+        self.assertEqual(response.status_code,200,response.text)
+        r=response.json()
+        self.assertEqual((r['hours'],r['timeStatus']),(1,'manual'))
+        self.assertNotIn('hours',r['estimated'])
+        self.assertIn('stage',r['estimated'])
+
+    def test_admin_unrelated_change_does_not_confirm_an_estimated_time(self):
+        from app import catalog
+        from app.admin_io import base,education
+        rid=self.duration_resource()
+        cur={'강좌':{(rid,):education.current('강좌')[(rid,)]},'도서':{},'자격증':{}}
+        row=base.Row('강좌',2,{'key':rid,'note':'시간 확인과 무관한 메모'},{'key','note'},key=(rid,))
+        base.diff(education.COURSE,[row],cur['강좌'],lambda value:education.label('강좌',value))
+        with self.db.tx() as t:
+            education.apply(t,{'강좌':[row]},cur,{})
+            self.assertEqual(t.val('SELECT hours_origin FROM app_ext.resource_meta WHERE resource_key=:k',k=rid),'catalog')
+        catalog.invalidate()
+        r=self.client('member').get('/api/v1/resources/'+rid).json()
+        self.assertEqual(r['timeStatus'],'estimated')
+        self.assertIn('hours',r['estimated'])
+
+    def test_step_duration_text_is_rounded_while_numeric_hours_keep_precision(self):
+        plan=copy.deepcopy(self.plan)
+        plan['acts'][0].update(hours=35/6,wFrom=1,wTo=2)
+        with self.db.tx() as t:
+            self.plans._write_steps(t,self.roadmap,plan)
+            step=t.one('SELECT estimated_duration,details FROM public.roadmap_steps WHERE roadmap_id=CAST(:r AS uuid)',r=self.roadmap)
+        self.assertEqual(step['estimated_duration'],'5시간 50분 · 1~2주차')
+        self.assertEqual(step['details']['hours'],35/6)
+
     def client(self, role):
         if role not in self.clients:
             c = self.enterContext(self.TestClient(self.api))

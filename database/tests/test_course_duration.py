@@ -7,10 +7,17 @@ import unittest
 
 from src.database.course_duration import normalize, positive_seconds, full_curriculum
 sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'backend'))
-from app.course_time import effective
+from app.course_time import display_hours, effective
 
 
 class CourseDurationTests(unittest.TestCase):
+    def test_display_rounding_boundaries(self):
+        for hours,label in [(35/6,'5시간 50분'),(65/60,'1시간 10분'),(25/60,'30분'),
+                            (5/60,'10분'),(1/60,'10분 미만'),(0,'0시간'),(None,'시간 미확인'),
+                            (float('nan'),'시간 미확인'),(-1,'시간 미확인')]:
+            with self.subTest(hours=hours):
+                self.assertEqual(display_hours(hours),label)
+
     def test_provider_units_are_not_weeks(self):
         for source,payload,seconds,kind in [
             ('API_MS_LEARN',{'duration_in_minutes':71},4260,'learning'),

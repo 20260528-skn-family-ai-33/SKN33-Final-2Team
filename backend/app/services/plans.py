@@ -14,7 +14,7 @@ import json
 import uuid
 from datetime import date
 
-from .. import catalog, db, jobs, regstore
+from .. import catalog, course_time, db, jobs, regstore
 from ..agents import deepcheck as DC
 from ..agents import diag as DG
 from ..agents import regulation as REG
@@ -45,7 +45,7 @@ def _write_steps(t: db.Tx, roadmap_id: str, plan: dict) -> None:
         res = items.get(a.get('res') or '')
         sid = t.val("""INSERT INTO public.roadmap_steps(roadmap_id, step_order, title, activity, estimated_duration, estimated_cost, is_completed, details)
                        VALUES(CAST(:r AS uuid), :o, :t, :a, :du, :c, :done, :d) RETURNING step_id""",
-                    r=roadmap_id, o=i, t=a['title'], a=a.get('how') or (res['title'] if res else None), du=f"{a['hours']:g}시간 · {a['wFrom']}~{a['wTo']}주차",
+                    r=roadmap_id, o=i, t=a['title'], a=a.get('how') or (res['title'] if res else None), du=f"{course_time.display_hours(a['hours'])} · {a['wFrom']}~{a['wTo']}주차",
                     c=res['cost'] if res and res['cost'] is not None else None, done=a['id'] in done,
                     d=db.J({k: a.get(k) for k in ('id', 'stage', 'res', 'task', 'hours', 'wFrom', 'wTo', 'skills')}))  # skills: 과제가 다루는 스킬 이름(10/23)
         if res and res['type'] in ('course', 'book', 'cert'):

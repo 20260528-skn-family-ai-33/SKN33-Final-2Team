@@ -1,13 +1,11 @@
 import type { Resource } from '@/api/types/catalog';
 import type { Activity } from '@/api/types/plan';
+import { hrs } from './format';
 
 /** Course runtime and a timetable allowance are distinct, even when both are numeric. */
 export function roundedDuration(hours: number): string {
   if (!Number.isFinite(hours) || hours <= 0) return '시간 미확인';
-  if (hours < 5 / 60) return '10분 미만';
-  const minutes = Math.max(10, Math.round(hours * 6) * 10);
-  const h = Math.floor(minutes / 60), m = minutes % 60;
-  return [h ? `${h}시간` : '', m ? `${m}분` : ''].filter(Boolean).join(' ');
+  return hrs(hours);
 }
 
 export function resourceTime(r: Resource | null | undefined): string {
