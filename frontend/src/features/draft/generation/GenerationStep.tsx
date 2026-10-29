@@ -163,7 +163,7 @@ function SupRow({ d }: { d: DraftDoc }) {
       <AgentRow
         st="fail"
         name={name}
-        sub={ai.live() ? via('default') : ''}
+        sub={ai.live() ? via('regulation') : ''}
         failLabel="확인 실패"
         tag="오류 발생"
         tagCls="fail"
@@ -172,7 +172,7 @@ function SupRow({ d }: { d: DraftDoc }) {
       />
     );
   }
-  if (os.some((o) => !o.support)) return <AgentRow st="run" name={name} sub={runSub('default', '안마다 유료 자료·학습 형태로 등록된 규정을 확인하고 있어요')} />;
+  if (os.some((o) => !o.support)) return <AgentRow st="run" name={name} sub={runSub('regulation', '안마다 유료 자료·학습 형태로 등록된 규정을 확인하고 있어요')} />;
   if (os.every((o) => o.support?.level === 'scope'))
     return (
       <AgentRow

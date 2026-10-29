@@ -302,7 +302,7 @@ function DocBox() {
                   '',
                   {
                     text: '비전 모델 설정 없음',
-                    hint: '.env에 OLLAMA_VISION_MODEL(RunPod-Ollama) 또는 OPENAI_VISION_MODEL(OpenAI API)을 넣고 서버를 다시 실행하면 이미지도 읽어요',
+                    hint: 'RunPod-Ollama 팀 모델은 이미지를 읽지 않아요. OpenAI API 모드에서 .env에 OPENAI_VISION_MODEL을 넣고 서버를 다시 실행하면 이미지도 읽어요',
                   },
                 ],
               ]}

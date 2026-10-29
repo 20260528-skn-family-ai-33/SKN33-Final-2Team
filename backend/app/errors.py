@@ -47,7 +47,7 @@ CAUSES = [
     (r'pypdf 없음|olefile 없음', 'doclib', '서버에 그 형식을 읽는 도구(pypdf·olefile)가 설치되지 않았어요'),
     (r'기획서 읽기 실패', 'docread', '기획서 파일을 읽지 못했어요'),
     (r'요청이 너무 커요', 'docbig', '파일이 너무 커요 (15MB까지)'),
-    (r'비전 모델 설정이 없', 'visioncfg', '.env에 비전 모델(OLLAMA_VISION_MODEL / OPENAI_VISION_MODEL) 설정이 없어요'),
+    (r'비전 모델 설정이 없', 'visioncfg', '이미지를 읽는 비전 모델이 없어요(RunPod-Ollama 팀 모델은 이미지를 읽지 않음 · OpenAI는 .env의 OPENAI_VISION_MODEL)'),
     (r'Ollama 설정이 없|OLLAMA_BASE_URL', 'config', '.env에 Ollama 주소(OLLAMA_BASE_URL)가 없어요'),
     (r'규정 검색 임베딩', 'config', '규정 검색 임베딩(text-embedding-3-small)에 쓰는 OpenAI 키(OPENAI_API_KEY)가 .env에 없어요 · RunPod-Ollama 모드도 필요해요'),
     (r'OPENAI_API_KEY', 'config', '.env에 OpenAI 키(OPENAI_API_KEY)가 없어요'),
@@ -76,14 +76,16 @@ CODE_OF = {'off': 'AI_UNAVAILABLE', 'lost': 'JOB_LOST', 'conn': 'AI_UNREACHABLE'
            'docfmt': 'DOC_FORMAT', 'doclib': 'DOC_LIB', 'docread': 'DOC_READ', 'docbig': 'DOC_TOO_BIG', 'config': 'AI_CONFIG', 'server': 'SERVER',
            'other': 'AI_ERROR'}
 HINT = {
-    'off': {'ollama': '.env에 OLLAMA_BASE_URL과 OLLAMA_MODEL을 넣고 서버를 다시 실행해 주세요. 가데이터로 보려면 시연 도구에서 직접 켜야 해요(자동 대체 없음)',
+    'off': {'ollama': '.env에 OLLAMA_BASE_URL을 넣고 서버를 다시 실행해 주세요. 가데이터로 보려면 시연 도구에서 직접 켜야 해요(자동 대체 없음)',
             'any': '.env에 OPENAI_API_KEY를 넣고 서버를 다시 실행해 주세요. 가데이터로 보려면 시연 도구에서 직접 켜야 해요(자동 대체 없음)'},
     'lost': {'any': '다시 시도하면 새 작업으로 만들어요'},
     'server': {'any': '서버(목업_실행.cmd)가 켜져 있는지 확인해 주세요'},
     'config': {'any': '.env를 고친 뒤 서버를 다시 실행해 주세요'},
     'conn': {'ollama': 'RunPod에서 Pod를 켠 뒤 다시 시도하거나, 좌측 ‘AI 모델’에서 다른 모드를 골라 주세요', 'any': '네트워크 상태를 확인한 뒤 다시 시도해 주세요'},
     'timeout': {'ollama': '모델을 GPU에 올리는 중이거나 여러 요청이 몰려 차례를 기다렸을 수 있어요. 잠시 뒤 다시 시도해 주세요', 'any': '잠시 뒤 다시 시도해 주세요'},
-    'model': {'ollama': 'Pod에서 모델을 받은 뒤(ollama pull) 다시 시도하거나, .env의 모델 이름을 확인해 주세요', 'any': '.env의 OPENAI_MODEL을 확인해 주세요'},
+    'model': {'ollama': 'Pod에서 팀 모델을 받아 growpath-27b·growpath-regulation-4b 이름으로 만든 뒤(RunPod 연결 절차 2-4) 다시 시도해 주세요. '
+                        '.env에 원본 모델 이름을 넣었다면 Pod의 ollama list 이름과 같은지 확인해 주세요',
+              'any': '.env의 OPENAI_MODEL을 확인해 주세요'},
     'memory': {'any': '더 큰 GPU의 Pod나 더 작게 양자화한 모델이 필요해요. 동시에 처리하는 요청이 줄면 될 수도 있어요'},
     'auth': {'ollama': '.env의 OLLAMA_API_KEY에 Pod의 키(/workspace/ollama_key.txt)를 그대로 넣고 백엔드를 다시 만들어 주세요(docker compose up -d --no-deps --force-recreate backend)',
              'any': '.env의 OPENAI_API_KEY를 확인해 주세요'},
@@ -93,7 +95,8 @@ HINT = {
     'doclib': {'any': 'PDF는 pip install pypdf, HWP는 pip install olefile 뒤 서버를 다시 실행해 주세요'},
     'docread': {'any': '파일이 손상됐거나 암호가 걸렸는지 확인해 주세요'},
     'docbig': {'any': '15MB 이하로 줄이거나 필요한 부분만 따로 저장해 주세요'},
-    'visioncfg': {'any': '.env에 비전 모델을 넣고 서버를 다시 실행해 주세요'},
+    'visioncfg': {'ollama': 'RunPod-Ollama 팀 모델은 이미지를 읽지 않아요. 이미지도 읽으려면 좌측 ‘AI 모델’에서 OpenAI API를 골라 주세요',
+                  'any': '.env에 OPENAI_VISION_MODEL을 넣고 서버를 다시 실행해 주세요'},
     'other': {'any': '잠시 뒤 다시 시도해 주세요'},
 }
 USER_TEXT = {
@@ -139,5 +142,5 @@ def provider_label(p: str) -> str:
 
 def unavailable_reason(p: str) -> str:
     if p == 'ollama':
-        return '.env에 OLLAMA_BASE_URL이 없어요' if not S.ollama_url else '.env에 OLLAMA_MODEL이 없어요' if not S.ollama_model else ''
+        return '.env에 OLLAMA_BASE_URL이 없어요' if not S.ollama_url else ''
     return '.env에 OPENAI_API_KEY가 없어요' if p == 'openai' and not S.openai_key else ''
