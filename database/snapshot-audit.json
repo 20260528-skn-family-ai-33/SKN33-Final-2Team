@@ -893,5 +893,158 @@
     "human_review": "pending",
     "publication_record": "GitHub PR #29; actual commit/push/reopen result is recorded there",
     "authorization": "Continue the previously authorized employee #27 commit/push/PR delivery after course #26 merge"
+  },
+  "work_context_teamdb_20261029": {
+    "issue": 27,
+    "target_pr": 29,
+    "base_main": "0a6dd08fb42c8eafb282a20a3ce9fcf91903a681",
+    "storage": {
+      "work_description": "public.employees.planned_project_description",
+      "personal_projects": "public.employee_input_profiles.project_experience",
+      "new_tables": 0,
+      "new_columns": 0,
+      "legacy_override_read_compatibility": true,
+      "legacy_conflict_migration_rolls_back": true
+    },
+    "policy": "Preload on initial login/session or changed recommendation inputs; reuse same inputs; manual retries after failure; optional explicit pre-share batch",
+    "unit": {
+      "collected": 238,
+      "started_including_skips": 227,
+      "executed": 222,
+      "passed": 222,
+      "skipped": 5,
+      "failures": 0,
+      "errors": 0,
+      "successful": true
+    },
+    "integration": {
+      "collected": 39,
+      "started_including_skips": 39,
+      "skipped": 0,
+      "passed": 39,
+      "errors": 0,
+      "failures": 0,
+      "paid_api_calls": 0
+    },
+    "frontend": {
+      "files": 15,
+      "passed": 53,
+      "typecheck": "PASS",
+      "lint_errors": 0,
+      "lint_existing_warnings": 37,
+      "build": "PASS"
+    },
+    "repeated_login_additional_check": {
+      "collected": 1,
+      "started_including_skips": 1,
+      "skipped": 0,
+      "passed": 1,
+      "errors": 0,
+      "failures": 0,
+      "paid_api_calls": 0
+    },
+    "browser": {
+      "project_only_view_and_save": "PASS",
+      "both_context_view": "PASS",
+      "stored_mock_candidates_display": "PASS",
+      "new_model_jobs_during_browser_test": 0,
+      "actual_model_inference": false,
+      "paid_api_calls": 0,
+      "owned_preview_removed": true
+    },
+    "source_data_apply": {
+      "modified_accounts": 4,
+      "excluded_account_unchanged": true,
+      "other_accounts_unchanged": 101,
+      "identity_password_department_permissions_preserved": true,
+      "other_tables_unchanged": 51,
+      "real_user_work_descriptions": 2,
+      "real_user_project_descriptions": 3,
+      "backup_sha256": "ed9f3a507da9768b2480b933a988380df7cff6f396ab01c872495a138539c77b",
+      "backup_bytes": 38245535,
+      "rows": 22406,
+      "paid_api_calls": 0
+    },
+    "backup_restore": {
+      "restored_tables_match": 53,
+      "restored_rows": 22406,
+      "test_clone_removed": true,
+      "paid_api_calls": 0,
+      "original_database_writes": 0
+    },
+    "excluded_real_user_preserved": true,
+    "existing_synthetic_100_preserved": true,
+    "actual_model_inference": true,
+    "original_goal_candidates_regenerated": true,
+    "paid_api_calls": 4,
+    "data_source": "User authorized four demo contexts; not verified duties or employment history",
+    "human_review": "pending",
+    "git_publication": "prepared; expanded scope commit/push approval pending",
+    "new_source_backup_uploaded": true,
+    "actual_preload": {
+      "model": "gpt-6-luna",
+      "actual_model_calls": 4,
+      "employees": 4,
+      "candidates": 12,
+      "quality_review": "AI directly read all 12 goals; distinct, supported by supplied work/projects/job/tech/experience; fictional context is not verified employment history",
+      "basis_available_in_input": true,
+      "no_unprovided_certifications_or_qualifications": true,
+      "input_tokens": 2309,
+      "output_tokens": 4778,
+      "total_tokens": 7087,
+      "original_database_writes": 0,
+      "cache_check": {
+        "employees": 4,
+        "logins": 12,
+        "session_reads": 12,
+        "goal_entries": 12,
+        "new_model_calls": 0,
+        "new_jobs": 0,
+        "passwords_restored": true,
+        "goal_entry_ms_min": 15.0,
+        "goal_entry_ms_max": 32.0
+      },
+      "human_review": "pending",
+      "final_backup": {
+        "filename": "growpath_profiles_goals_20261029.dump",
+        "sha256": "beb9ac646a746434979f889f6fd564608534477b4e85c2f2e78dd95008285373",
+        "bytes": 38297980,
+        "canonical_tables": 53,
+        "canonical_rows": 22418,
+        "all_tables": 78,
+        "all_rows": 22442
+      },
+      "restored_all_tables_match": true,
+      "restored_cache": {
+        "employees": 4,
+        "logins": 12,
+        "session_reads": 12,
+        "goal_entries": 12,
+        "new_model_calls": 0,
+        "new_jobs": 0,
+        "passwords_restored": true,
+        "goal_entry_ms_min": 15.0,
+        "goal_entry_ms_max": 31.0
+      },
+      "browser": {
+        "source": "openai",
+        "candidates": 3,
+        "new_jobs": 0,
+        "new_model_calls": 0,
+        "actual_candidates_displayed": true,
+        "project_only_view": "PASS",
+        "owned_preview_removed": true
+      },
+      "original_goal_candidates_regenerated": true,
+      "paid_api_calls": 4,
+      "original_employee_rows_unchanged": true,
+      "excluded_employee_preserved": true,
+      "source_non_candidate_canonical_tables_preserved": 52,
+      "application_schema": "Existing backend/db/02_app_ext.sql; initialized 25 app_ext tables, no new canonical DDL",
+      "drive_dump_url": "https://drive.google.com/file/d/1YBhxTVQjNfm53FbcLJnO7SKi-hsycxz4/view?usp=drivesdk",
+      "drive_manifest_url": "https://drive.google.com/file/d/1iUVAugkFpXHNeO3IlWhFkol-6oID691C/view?usp=drivesdk",
+      "drive_readback_sha256_verified": true,
+      "new_source_backup_uploaded": true
+    }
   }
 }

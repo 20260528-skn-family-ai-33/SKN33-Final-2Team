@@ -1,6 +1,5 @@
-/* 목표 후보 (FR-05 · 2026-10-21 사용자 요구 1): 서버가 직원 데이터가 바뀔 때 미리 만들어 팀 DB 에 둔다.
-   이 화면은 저장된 후보 3개를 보여 주기만 하고, '목표 후보 다시 만들기'를 누를 때만 다시 만든다.
-   실패하면 이전 후보를 그대로 두고 안내한다(자동 재시도 없음). 30초 안에 다시 들어오면 읽은 것을 쓴다 (5차 gs·loadGoals) */
+/* 로그인·입력 변경 때 준비한 후보를 읽는다. 진입 때 누락/입력 변경도 확인해 DB 직접 변경을 놓치지 않는다.
+   서버는 같은 입력의 캐시·진행 작업을 재사용하며 실패 후 자동 재시도하지 않는다. */
 import { create } from 'zustand';
 import { accountApi } from '@/api/endpoints/account';
 import type { GoalSuggestions } from '@/api/types/account';
@@ -20,12 +19,12 @@ interface S {
 export const useGoalStore = create<S>(() => ({ gs: null, docErr: null }));
 let tok = 0;
 
-export async function loadGoals(): Promise<void> {
+export async function loadGoals(ensure = true): Promise<void> {
   const t = ++tok;
   const owner = me()?.id;
   let v: GoalState;
   try {
-    v = { ...(await accountApi.goals()) };
+    v = { ...(await (ensure ? accountApi.goalsEnsure() : accountApi.goals())) };
   } catch (err) {
     v = { status: 'loadfail', loadError: cause(err), candidates: [] };
   }
@@ -41,12 +40,12 @@ async function waitGoals(jobId: string): Promise<void> {
   } catch {
     /* 실패 상태는 다시 읽어서 보여 준다 */
   }
-  if (t === tok) void loadGoals();
+  if (t === tok) void loadGoals(false);
 }
 
 export function loadGoalsIfOld(): void {
-  const gs = useGoalStore.getState().gs;
-  if (!gs || gs.owner !== me()?.id || Date.now() - (gs.at || 0) > 30000) void loadGoals();
+  // DB를 직접 고친 경우도 진입 시 확인한다. 같은 입력은 서버가 생성 없이 재사용한다.
+  void loadGoals();
 }
 
 export async function regenGoals(): Promise<void> {

@@ -29,15 +29,21 @@
 | `POST /auth/login` · `POST /auth/logout` · `GET /me` | 로그인·로그아웃·새로 고침 때 계정 |
 | `GET /me/workspace` | 로그인 뒤 내 기록 전체(작성 문서·로드맵·보고서) |
 | `GET /me/profile` · `PUT`/`DELETE /me/profile/self` · `PUT /me/evaluations/{period}/consent` | 내 정보(동의는 `{period, consent}`를 돌려줌) |
-| `GET /me/goal-suggestions` · `POST /me/goal-suggestions/regenerate` | 작성 1단계 목표 후보 |
+| `GET /me/goal-suggestions` · `POST /me/goal-suggestions/ensure` · `POST /me/goal-suggestions/regenerate` | 저장된 후보 조회 · 누락/변경 확인 · 명시적 다시 만들기 |
 | `GET /ai/providers` · `PUT /me/ai-provider` · `GET /ai/status?provider=` · `GET /ai/log` | 좌측 AI 모델 고르기·연결 상태·에이전트 동작 보기(시연·디버그 전용 · 직원·관리자 계정 모두 · 누가 호출했든 모든 계정의 최근 호출을 `employee`(누구의 일)·`by`(관리자 화면에서 시작하면 '관리자')와 함께 줌 · 운영에서는 끔) |
 | `GET /demo/accounts` · `PUT /me/demo-settings` · `POST /demo/reset` · `POST /demo/jump` | 시연 전용(로그인 직원 고르기·가데이터·실패 시연·단계 이동·초기화) |
 
+`GET /ai/providers`의 `providers[].models`는 `{default, roadmap, regulation, embed, vision}`이에요. `default`는 진단 에이전트, `roadmap`은 로드맵 에이전트, `regulation`은 규정 에이전트(사내 생활 도우미 답변·안별 지원 조건 확인), `vision`은 기획서 이미지 읽기 모델이에요. `regulation`이 없는 옛 응답이면 화면은 `default`를 써요. `GET /ai/status?provider=ollama`의 `models[]`는 `{role, name, installed, loaded}`이고, `default` 다음에는 `default`와 이름이 다른 `roadmap`·`regulation`만 들어가요(같은 이름이면 Ollama에 한 번만 올라가서) (#33).
+
 평정 동의 요청은 `{ "consent": true }` 또는 `{ "consent": false }`만 받는다. 누락·NULL·문자열·숫자는 `422 / CONSENT_REQUIRED`이며 기존 동의값을 보존한다. 개인 입력의 `devYears`가 숫자로 바뀌지 않거나 0~50년 범위를 벗어나면 `422 / DEV_YEARS_RANGE`를 반환하고 기존 입력을 보존한다. #15의 격리 DB·실제 인증 API 검사로 확인했다.
 
-업무 설명(`view.profile.workDesc`·`self.profile.workDesc`)은 본인의 `employee_self_inputs.edited.workDesc` 키가 있으면 그 값(NULL 포함)을 우선하고, 키가 없으면 `employees.planned_project_description`을 사용한다. DB 값만 표시할 때는 직접 수정 상태로 기록하지 않는다. `DELETE /me/profile/self`는 현재 DB 설명을 다시 표시하며 DB 원문을 변경하지 않는다. 같은 설명을 목표 후보·진단·로드맵 업무 정보에 전달한다. 부서장용 `team_view`에는 본인 입력을 포함하지 않는다. 응답 필드 형식은 유지한다. #27의 실제 인증 API 검사로 확인했다.
+업무 설명(`view.profile.workDesc`·`self.profile.workDesc`)은 `employees.planned_project_description`에서 읽고 같은 열에 저장한다. 빈 값은 NULL이며 최대 500자(`422 / WORK_DESC_LENGTH`)다. 프로젝트는 기존 `employee_input_profiles.project_experience`의 줄바꿈 목록을 사용한다. 둘 다 선택이므로 프로젝트만 입력해도 저장·맞춤 추천이 가능하다. 새 테이블/열은 추가하지 않는다. 새 저장은 `edited.workDesc`를 만들지 않고 처음 값과 변경 해시만 보존한다.
 
-개인 입력 저장 때 업무 설명이 현재 DB 설명과 같으면 `edited.workDesc` 키를 저장하지 않는다. 화면의 초기값을 그대로 저장하면 `edited=false`이며, 원래 없던 입력 프로필이나 기술 사본도 만들지 않는다. 기술·자격만 수정하면 해당 변경은 유지하고 업무 설명은 이후 DB 갱신을 계속 따른다. DB와 다른 설명을 직접 적었거나 ‘없음 확인’을 선택한 경우는 수정 상태로 유지한다. 최초 값과 비교할 때는 최초 자격 ID를 사용해 재저장으로 변경한 자격이 사라지지 않게 한다.
+무변경 저장은 원래 입력 프로필 행과 갱신 시점을 보존한다. 업무 설명만 고쳐도 빈 입력 프로필을 만들지 않는다. 되돌리기는 본인이 고친 설명을 처음 값으로 복원하되 기술만 고쳤거나 이후 관리자가 갱신한 설명은 덮지 않는다. 구판 `edited.workDesc`는 명시적 저장/이관 전까지 읽기 호환을 유지한다. 선택 이관 SQL `backend/db/migrate_self_work_descriptions.sql`은 팀 열과 충돌하면 전체 롤백하며 구판 사본에 없던 처음 설명을 추정하지 않는다. 부서장 응답에는 본인 입력을 보내지 않는다.
+
+목표 후보는 최초 로그인·세션 복원 때, 또는 본인 입력/평정 동의·관리자 입력의 **추천 입력 해시가 바뀌었을 때만** 백그라운드로 준비한다. 같은 프로필의 로그인·동시 요청은 후보/작업을 재사용한다. 생성 중 정보가 바뀌면 이전 결과는 저장하지 않고 지정한 모델을 유지해 최신 입력을 한 번 준비한다. 초기 설정용 mock 후보는 첫 사용 때 갱신한다. 실패하면 기존 후보를 보존하고 같은 입력으로 자동 재시도하지 않는다. `regenerate`는 사용자가 명시적으로 재시도/새 후보를 요청할 때만 실행한다. DB를 SQL로 직접 바꾸면 다음 로그인·세션 조회에서 감지하며 목표 화면의 `ensure`는 누락을 보완한다. 사전 생성 도구로 배포 전에 준비할 수도 있다.
+
+목표 추천은 본인 입력의 프로젝트를 사용하며, 진단 문항·진단 결과와 로드맵 전달에는 `profile.projectExperience`(최대 5개·각 300자)를 포함한다. 이는 경험 참고이며 업로드한 현재 기획서의 `projectSummary`나 숙련도 증빙으로 대체하지 않는다. 로드맵 전달 내용 화면에도 업무 설명과 프로젝트 경험을 표시한다.
 
 ### 새 로드맵 작성 — `drafts.ts`
 

@@ -225,7 +225,7 @@ DB(PostgreSQL 17 + pgvector) → 팀 DB 백업 복원 → 보충 자료 → 백�
 | 화면 고치기 | Node.js 20.19 이상(24 권장)·npm | `npm ci --prefix frontend` (버전은 `frontend/package-lock.json`에 고정) |
 | 파이썬으로 직접 실행·DB 작업 | Python 3.12 | `pip install -r requirements.txt` (`backend/requirements.txt` + `database/requirements.txt`) |
 
-1. `.env.example`을 복사해 `.env`로 두고 `GP5_DB_PASSWORD`·`GP5_DEMO_PASSWORD`를 정합니다(값은 저장소에 적지 않습니다). RunPod-Ollama를 쓰려면 `OLLAMA_BASE_URL`·`OLLAMA_API_KEY`를 넣습니다(Pod 준비와 키 잠금은 [RunPod-Ollama 연결 절차](backend/RunPod_Ollama_연결_절차.md)). 예시 기본값은 모델 `qwen3.8:27b`, 생각(thinking) 모드 끔, 응답 제한 시간 300초입니다.
+1. `.env.example`을 복사해 `.env`로 두고 `GP5_DB_PASSWORD`·`GP5_DEMO_PASSWORD`를 정합니다(값은 저장소에 적지 않습니다). RunPod-Ollama를 쓰려면 `OLLAMA_BASE_URL`·`OLLAMA_API_KEY`를 넣습니다(Pod 준비와 키 잠금은 [RunPod-Ollama 연결 절차](backend/RunPod_Ollama_연결_절차.md)). 예시 기본값은 생각(thinking) 모드 끔, 응답 제한 시간 300초입니다. 모델 줄(`OLLAMA_MODEL`·`OLLAMA_MODEL_REGULATION`·`OLLAMA_VISION_MODEL`)은 비워 두면 팀이 파인튜닝한 두 모델을 씁니다: 진단·로드맵 에이전트는 `growpath-27b`, 규정 에이전트(사내 생활 도우미)는 `growpath-regulation-4b`(코드 기본값 · `backend/app/config.py`). 두 이름은 Pod에서 허깅페이스 모델을 받아 만드는 이름이라 연결 절차 2-4를 먼저 합니다. 원본 Qwen과 비교할 때만 모델 줄에 Pod의 `ollama list` 이름을 적습니다. 팀 모델은 이미지 입력이 없어 RunPod-Ollama 모드에서는 기획서 이미지 읽기를 건너뜁니다.
 2. 팀 DB 최신 백업 `growpath_latest.dump`(#22 · 직원·부서·스킬·자격 포함)를 `team_db/`에, 규정 원문 PDF를 `team_db/regulations/`에 넣습니다([team_db/README.md](team_db/README.md) 참고).
 3. `docker compose up -d --build`로 실행합니다. 화면은 <http://localhost:8816>, 백엔드 API 문서는 <http://localhost:8815/api/docs>입니다.
 4. `docker compose down`으로 끕니다(데이터는 볼륨에 남습니다).

@@ -62,6 +62,12 @@ export function HandoffView({ h }: { h: Handoff }) {
             <dd className="pre">{h.projectSummary}</dd>
           </>
         ) : null}
+        {typeof h.profile?.workDescription === 'string' && h.profile.workDescription ? (
+          <><dt>본인 업무 설명</dt><dd className="pre">{h.profile.workDescription}</dd></>
+        ) : null}
+        {Array.isArray(h.profile?.projectExperience) && h.profile.projectExperience.length ? (
+          <><dt>본인 프로젝트 경험</dt><dd className="pre">{h.profile.projectExperience.map(String).join('\n')}</dd></>
+        ) : null}
         <dt>메모</dt>
         <dd>{h.userNotes.concat(h.agentNotes).join(' / ') || '없음'}</dd>
         <dt>자료 후보</dt>
@@ -163,7 +169,7 @@ function SupRow({ d }: { d: DraftDoc }) {
       <AgentRow
         st="fail"
         name={name}
-        sub={ai.live() ? via('default') : ''}
+        sub={ai.live() ? via('regulation') : ''}
         failLabel="확인 실패"
         tag="오류 발생"
         tagCls="fail"
@@ -172,7 +178,7 @@ function SupRow({ d }: { d: DraftDoc }) {
       />
     );
   }
-  if (os.some((o) => !o.support)) return <AgentRow st="run" name={name} sub={runSub('default', '안마다 유료 자료·학습 형태로 등록된 규정을 확인하고 있어요')} />;
+  if (os.some((o) => !o.support)) return <AgentRow st="run" name={name} sub={runSub('regulation', '안마다 유료 자료·학습 형태로 등록된 규정을 확인하고 있어요')} />;
   if (os.every((o) => o.support?.level === 'scope'))
     return (
       <AgentRow

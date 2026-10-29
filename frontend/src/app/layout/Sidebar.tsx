@@ -16,7 +16,6 @@ function AiBox() {
   const { choice } = useAiMode();
   // 모델 상태(사용 가능 여부)는 ai.* 로 읽으므로, 바뀌면 다시 그리도록 구독만 한다
   useAi((s) => s.status);
-  const ol = ai.ollamaInfo();
   const pick = (p: UiProvider) => {
     setChoice(p)
       .then(() => {
@@ -44,7 +43,7 @@ function AiBox() {
   return (
     <div className="aim" role="radiogroup" aria-label="AI 모델">
       <span className="lbl">AI 모델</span>
-      {opt('ollama', 'RunPod-Ollama', `로컬 LLM·sLLM · ${ol.model}${ol.roadmapModel && ol.roadmapModel !== ol.model ? ' 외 1' : ''}`)}
+      {opt('ollama', 'RunPod-Ollama', '로컬 LLM·sLLM')}
       {opt('api', 'OpenAI API', ai.openaiModel())}
       <div className="aim-st" id="aimSt" aria-live="polite">
         <AimStatus />

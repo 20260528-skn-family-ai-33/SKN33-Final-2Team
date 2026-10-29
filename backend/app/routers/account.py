@@ -31,6 +31,8 @@ def _me(a: Account) -> dict:
 def api_login(body: dict, response: Response):
     a = login(str(body.get('employeeNo') or ''), str(body.get('password') or ''))
     start_session(response, a.type, a.id, bool(body.get('keepSignedIn')))
+    if a.type == 'employee':
+        goals.request(a.id, 'login', only_if_stale=True)
     return _me(a)
 
 
@@ -54,6 +56,8 @@ def api_accounts():
 
 @r.get('/me')
 def api_me(a: Account = Depends(require_account)):
+    if a.type == 'employee':
+        goals.request(a.id, 'session', only_if_stale=True)
     return _me(a)
 
 
@@ -66,7 +70,7 @@ def api_profile(a: Account = Depends(require_employee)):
 @r.put('/me/profile/self')
 def api_self(body: dict, a: Account = Depends(require_employee)):
     profile.save_self(a.id, body)
-    goals.request(a.id, 'self-input')   # 목표 후보를 새 값으로 다시 만든다(API-06)
+    goals.request(a.id, 'self-input', only_if_stale=True)
     v = profile.view(a.id)
     return dict(profile.spec(v), view=v)
 
@@ -74,7 +78,7 @@ def api_self(body: dict, a: Account = Depends(require_employee)):
 @r.delete('/me/profile/self')
 def api_self_revert(a: Account = Depends(require_employee)):
     profile.revert_self(a.id)
-    goals.request(a.id, 'self-input-revert')
+    goals.request(a.id, 'self-input-revert', only_if_stale=True)
     v = profile.view(a.id)
     return dict(profile.spec(v), view=v)
 
@@ -85,7 +89,7 @@ def api_consent(period: str, body: dict, a: Account = Depends(require_employee))
     if type(consent) is not bool:
         raise ApiError(422, 'CONSENT_REQUIRED', '평정 활용 동의 여부를 true 또는 false로 보내 주세요')
     profile.set_consent(a.id, period, consent)
-    goals.request(a.id, 'consent')
+    goals.request(a.id, 'consent', only_if_stale=True)
     return {'period': period, 'consent': consent}
 
 
@@ -102,15 +106,22 @@ def api_goals_regen(request: Request, a: Account = Depends(require_employee)):
     return JSONResponse({'jobId': jid, 'status': 'running'}, status_code=202)
 
 
+@r.post('/me/goal-suggestions/ensure')
+def api_goals_ensure(a: Account = Depends(require_employee)):
+    goals.request(a.id, 'goal-entry', only_if_stale=True)
+    return goals.get(a.id)
+
+
 # ── AI 모델 (API-10~12) ──
 @r.get('/ai/providers')
 def api_providers(a: Account = Depends(require_account)):
     cur = _settings(a.id)['aiProvider'] if a.type == 'employee' else 'ollama'
     return {'current': cur, 'providers': [
         {'id': 'ollama', 'label': 'RunPod-Ollama', 'available': llm.available('ollama'), 'reason': unavailable_reason('ollama'), 'target': S.ollama_target if S.ollama_url else '',
-         'models': {'default': S.ollama_model, 'roadmap': S.ollama_model_roadmap, 'embed': llm.embed_model(), 'vision': S.ollama_vision}, 'timeout': S.ollama_timeout},
+         'models': dict({r: llm.model_name('ollama', r) for r in ('default', 'roadmap', 'regulation', 'vision')}, embed=llm.embed_model()),
+         'timeout': S.ollama_timeout},
         {'id': 'openai', 'label': 'OpenAI API', 'available': llm.available('openai'), 'reason': unavailable_reason('openai'),
-         'models': {'default': S.openai_model, 'roadmap': S.openai_model, 'embed': S.openai_embed, 'vision': S.openai_vision}}],
+         'models': {'default': S.openai_model, 'roadmap': S.openai_model, 'regulation': S.openai_model, 'embed': S.openai_embed, 'vision': S.openai_vision}}],
         'docLibs': {'pdf': _has('pypdf'), 'hwp': _has('olefile')}}
 
 

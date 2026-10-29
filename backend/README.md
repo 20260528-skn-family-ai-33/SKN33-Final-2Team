@@ -26,8 +26,9 @@
 | `app/agents/runtime.py`, `app/routers/account.py`, `app/services/goals.py` | '에이전트 동작 보기'(`GET /ai/log`)가 본인 호출 대신 모든 계정의 호출을 줌(직원·관리자 계정 모두). 기록마다 누구의 일인지(`employee`)와 관리자 화면에서 시작했는지(`by`)를 붙이고, 시각은 설정 시간대(`GP5_DB_TIMEZONE`)로 적음 | 시연·디버그 전용 기능이라 누가 호출했든 다 보이게(2026-10-26 사용자 결정 · 운영에서는 아무도 쓰지 않음 → B-1로 꺼야 함) · 컨테이너 시계가 UTC라 기록 시각이 9시간 어긋났음 |
 | `app/routers/admin.py`, `app/services/goals.py` | 관리자 목표 후보 다시 만들기에 모델 고르기(`mode`: `ollama`·`openai` 추가 · 이번 작업에만 쓰고 직원이 고른 AI 모드는 바꾸지 않음)와 직원 고르기(`employeeIds` · 새 `GET /admin/goal-suggestions/employees`) 추가 | 관리자가 모델을 정해 일괄로, 또는 몇 명만 골라 다시 만들 수 있게(2026-10-26 사용자 요청) · 원본은 가데이터 / 각 직원의 모드 두 가지로 재직 직원 전체만 |
 | `app/errors.py` | Ollama 401·403을 '키 문제(auth)'로 분류하고 `OLLAMA_API_KEY` 넣는 법을 조치로 안내(원본은 '잠시 뒤 다시 시도') | Pod 앞 nginx가 키를 확인하는 구성(RunPod Pod 연결 절차는 [RunPod_Ollama_연결_절차.md](RunPod_Ollama_연결_절차.md))에서 원인이 바로 보이게 (2026-10-26) |
-| `app/config.py`, `app/llm.py`, `app/errors.py` | `OLLAMA_MODEL` 코드 기본값(`qwen3.5:9b`)을 없앰. 비우면 RunPod-Ollama 모드를 '쓸 수 없음 · .env에 OLLAMA_MODEL이 없어요'로 보여 줌 | Pod에 받아 둔 모델만 쓸 수 있어 기본 이름이 의미 없음 · 모델은 `.env`에서만 정하게 (2026-10-26) |
+| `app/config.py`, `app/llm.py`, `app/errors.py` | RunPod-Ollama 기본 모델을 팀 모델로 둠(`app/config.py`의 `OLLAMA_TEAM_*`): 진단·로드맵 `growpath-27b`, 규정 에이전트 `growpath-regulation-4b`, 비전 없음. `.env`의 `OLLAMA_MODEL`·`OLLAMA_MODEL_REGULATION`·`OLLAMA_VISION_MODEL`은 비워 두면 기본값이고 원본 Qwen과 비교할 때만 적음. `OLLAMA_MODEL_ROADMAP`은 없앰(로드맵은 `OLLAMA_MODEL`과 같은 모델). `OLLAMA_BASE_URL`만 있으면 RunPod-Ollama 모드를 쓸 수 있음 | 팀 결정(2026-10-29 · #33): RunPod-Ollama는 팀이 파인튜닝한 두 모델을 기본으로 씀(이름은 Pod에서 만드는 별칭 · [RunPod_Ollama_연결_절차.md](RunPod_Ollama_연결_절차.md) 2-4). 원본(5차)은 `OLLAMA_MODEL` 기본 `qwen3.5:9b`, 그전(2026-10-26)에는 기본값 없이 `.env`로만 정했음 |
 | `app/config.py`, `app/llm.py` | Ollama 생각(thinking) 모드를 `.env`의 `OLLAMA_THINK`(on/off)로 정함. 비우면 원본처럼 `think`를 보내지 않음 | 생각 모드가 기본으로 켜진 모델(qwen3.8:27b)은 답 앞에 생각을 길게 써서 느림 · 끌 수 있게 (2026-10-26) |
+| `app/llm.py`, `app/agents/regulation.py`, `app/routers/account.py`, `tools/mock_ollama.py`·`mock_ollama.env` | 규정 에이전트(사내 생활 도우미 답변·안별 지원 조건 확인)가 `regulation` 역할로 규정 모델(기본 `growpath-regulation-4b`)을 부름. 연결 확인(`GET /ai/status`)이 그 모델의 설치·GPU 적재 여부도 보고, `GET /ai/providers`의 `models`에 `regulation`을 더함. 모의 Ollama 모델 이름을 팀 모델 이름으로 바꾸고 `no-regulation-model` 시나리오를 추가(`no-roadmap-model`은 로드맵이 진단과 같은 모델이 돼 없앰) | 팀 논의(2026-10-29 · #33): 진단·로드맵은 팀원이 파인튜닝한 27b, 규정 에이전트는 팀원이 파인튜닝한 4b를 한 Pod에 함께 올려 씀. 원본은 로드맵만 모델을 따로 정할 수 있었음 |
 | `app/regfiles.py`(새 파일), `app/routers/admin.py`, `app/admin_io/`(`regulations.py` 지움), `app/regstore.py`(설명), `app/config.py`, `db/02_app_ext.sql`, `docker-compose.yml` | 관리자의 규정 관리를 **원문 PDF 올리기·내려받기**로 바꿈. 규정·조항 엑셀/CSV·한 건 고치기(`/admin/datasets/regulations/*`)와 규정 색인 만들기(`POST /admin/regulations/index`)를 없애고, 지금 규정 목록(`GET /admin/regulations`)·원문 PDF 내려받기(`GET /admin/regulations/{id}/pdf`)·새 규정 PDF 올리기(`POST /admin/regulations/uploads`, 파일+메모)·올린 PDF 목록/내려받기·잘못 올린 PDF 삭제(`DELETE /admin/regulations/uploads/{id}` · 파일과 기록을 함께 지움)를 추가. 지금 규정 원문은 팀 규정 묶음의 `source/`(`GP5_REGULATION_FILES_DIR` · compose 는 `team_db/regulations` 를 읽기 전용으로 붙임), 올린 PDF는 `var/uploads/regulations/` 와 `app_ext.regulation_uploads`(처리 상태 없음). 개요 응답의 `regulations` 를 PDF 개수로 바꾸고 `providers` 를 맨 위로 옮김. 옛 화면(`web/`)의 규정 데이터 메뉴는 이제 동작하지 않음 | 사용자 결정(2026-10-26): 규정은 벡터 DB를 거친 RAG에 쓰여 관리자가 고치지 않고, 시스템 관리자(서비스 운영팀)가 올라온 PDF를 내려받아 임베딩·벡터 DB를 갱신(MVP 방식). 조항 표는 원문과 맞춰 보기 어려워 원문 PDF로 보게 함 |
 
 나머지는 5차 원본의 `app`·`tools`·`db`·`web`과 같아요(2026-10-26 비교).
@@ -38,7 +39,7 @@
 | --- | --- | --- |
 | `tools/setup_db.py`, `Dockerfile` | 직원 가데이터 엑셀(2.9.0) 단계와 `data/seed/` 폴더를 없앰. 기본 백업을 `team_db/growpath_latest.dump`로 | 최신 백업에 시험 직원 100명·부서장 5명·스킬·자격·학력이 들어 있고, 예전 가데이터 16명은 부서장 중복(`employees_one_department_head`)으로 들어가지 않음 |
 | `tools/setup_db.py` | 시험 비밀번호(로컬 사본만)를 사번이 있는 계정에만 넣음 | 사번 없는 `REAL_USER` 행은 로그인할 수 없고, 새 사번 필수 제약(`employees_number_required` · NOT VALID)이 그 행의 어떤 수정도 막음 |
-| `app/services/profile.py` | 내 정보의 본인 입력을 팀 표에서 읽고 씀: 경험 요약·개발 경력·사용 기술·프로젝트·교육은 `employee_input_profiles`, 자격은 `employee_certifications`(팀 자격표에 있는 이름) + `employees.unlisted_certifications`(없는 이름). 본인 입력 전에는 보유 스킬(`employee_skills`)을 사용 기술 처음 값으로 보여 줌. 팀 표에 자리가 없는 업무 설명·없음 확인과 되돌리기용 처음 값만 `app_ext.employee_self_inputs`에. 학력 단계 코드는 한글로 | 팀 직원 입력 양식(`database/src/database/employee_form.py`)과 같은 표·열에 저장 · API 모양(API-06)은 그대로 |
+| `app/services/profile.py` | 업무 설명은 `employees.planned_project_description`, 경험·개발 경력·기술·프로젝트·교육은 `employee_input_profiles`, 자격은 `employee_certifications` + `employees.unlisted_certifications`. 업무·프로젝트는 각각 선택. `app_ext.employee_self_inputs`에는 처음 값·입력 상태·설명 변경 해시만 저장. 구판 설명은 읽기 호환 유지 | 팀 직원 입력 양식과 같은 표·열에 저장. 새 표/열 없음. 선택 이관 SQL은 `db/migrate_self_work_descriptions.sql` |
 | `app/services/profile.py`, `app/admin_io/hr.py` | 입사일·현재 근무 시작일을 `employees.hire_date`·`department_start_date`에서 읽고 관리자 인적 데이터 반영도 그 열에 씀. 직원 구분이 비면 직급 이름('일반직 4급')의 앞부분 | 최신 DB 에 생긴 열 · 직원 구분은 규정 묶음 선택에 씀 |
 
 ### PR #23 리뷰로 고친 곳 (2026-10-27)
@@ -81,6 +82,25 @@ GP5_ENV_FILE=../.env python -m uvicorn app.main:app --port 8815
 ```
 
 PowerShell에서는 `$env:GP5_ENV_FILE = '../.env'`를 먼저 실행한 뒤 `python -m uvicorn app.main:app --port 8815`를 실행해요.
+
+## 목표 후보 사전 준비
+
+처음 로그인하거나 추천에 쓰는 업무·프로젝트·동의 정보가 바뀌었을 때만 백그라운드로 후보를 준비해요. 같은 입력으로 재로그인하면 저장된 후보를 쓰고, 동시 요청은 한 작업을 공유해요. 실패하면 이전 후보를 보존하고 사용자가 다시 시도해요. DB를 직접 수정한 경우 다음 로그인/세션 조회에서 감지해요.
+
+DB 공유 전에 미리 생성할 수도 있어요. `backend/`에서 실제 앱 DB 설정과 `db/02_app_ext.sql`을 준비한 뒤 대상 ID를 지정해요. 아래 ID는 예시이므로 실제 확인한 `employee_id`로 바꿔요. 원문·비밀번호·키는 출력하지 않아요.
+
+```powershell
+$preloadEmployeeId = 123  # 예시 ID
+python tools/preload_goals.py --employee-id $preloadEmployeeId
+# API/GPU 사용 범위를 승인받은 뒤에만 실행. 여러 명은 --employee-id를 반복해요(기본 최대 4명).
+python tools/preload_goals.py --employee-id $preloadEmployeeId --provider ollama --apply
+```
+
+기본 실행은 조회만 하며 추론/DB 쓰기가 없어요. `--apply`는 생성이 필요한 대상만 처리하고 `--provider openai`는 유료 API를 사용해요. `mock`은 가데이터로 표시되며 실제 추론으로 계산하지 않아요. 실패한 같은 입력은 자동 재시도하지 않으므로 화면의 다시 만들기를 사용해요. 기존 유효 후보는 모델을 지정해도 재사용해요.
+
+완료 후 `public.employee_recommended_prompts`와 `app_ext.goal_suggestion_meta`·`goal_suggestion_runs`를 포함한 **전체 DB 백업**을 공유해요. 후보뿐 아니라 이유·입력 해시·상태도 있어야 수신 PC 로그인에서 같은 후보를 재사용할 수 있어요. 업무 설명의 구판 값이 남아 있으면 새 앱이 읽기 호환을 유지하며, 선택 이관 SQL은 백업/충돌 확인 후 명시적으로 실행해요.
+
+2026-10-29 실제 검증: 사용자 지정 `gpt-6-luna`로 4명×3개 후보를 4회 호출해 사전 저장했어요. 직원 설정의 AI 모드는 바꾸지 않았어요. 같은 입력의 재로그인은 생성 모델이 아닌 저장된 후보를 재사용해요. 전체 백업에는 기존 `app_ext` 25개 표도 포함했고 복원 후에도 추가 호출 없이 표시됨을 확인했어요. 실제 생성 기록은 `database/data/exports/actual_goal_preload_20261029.manifest.json`을 봐 주세요.
 
 ## 고칠 것이 보이면
 

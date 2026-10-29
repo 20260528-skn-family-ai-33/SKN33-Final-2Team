@@ -28,7 +28,7 @@ JSON 형식: {"candidates":[{"goal":"...하고 싶어요.","why":"...","basis":[
 
 def profile_enough(e: dict) -> bool:
     p = e.get('profile') or {}
-    return bool(p.get('workDesc') or p.get('expSummary') or e.get('tech'))
+    return bool(p.get('workDesc') or p.get('expSummary') or e.get('tech') or e.get('projects'))
 
 
 def goal_input(e: dict) -> dict:

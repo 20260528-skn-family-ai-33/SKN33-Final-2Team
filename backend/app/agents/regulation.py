@@ -364,7 +364,7 @@ def _api(ctx: rt.Ctx, inp: dict) -> dict:
     if ref:
         payload['requested'] = {'regulation': ref['reg']['name'], 'where': ref['where'], 'found': bool(ref_ids), 'articleIds': ref_ids,
                                 'focus': ref['focus'] or '', 'note': ref['note']}
-    r = rt.llm_json(ctx, REG_SYS, payload, history=_hist_msgs(hist))
+    r = rt.llm_json(ctx, REG_SYS, payload, role='regulation', history=_hist_msgs(hist))
     lst = lambda v, n=3: [str(x).strip() for x in (v if isinstance(v, list) else []) if str(x).strip()][:n]  # noqa: E731
     kind = str(r.get('kind') or '').replace('out_of_scope', 'out')
     if kind == 'out':
@@ -409,7 +409,7 @@ def answer(ctx: rt.Ctx, question: str, history: list, context: dict, sim: str | 
     me = ctx.me
     inp = {'question': question, 'history': history or [], 'context': context, 'me': me}
     task = f"사내 생활 질문 분류·답변{f' (앞 대화 {len(history)}턴 포함)' if history else ''}"
-    a = rt.run(ctx, '규정 에이전트', task, inp, _mock, lambda i: _api(ctx, i), sim=sim, mock_delay=0.38,
+    a = rt.run(ctx, '규정 에이전트', task, inp, _mock, lambda i: _api(ctx, i), role='regulation', sim=sim, mock_delay=0.38,
                log_input={'question': question, 'context': context, 'history': history or []})
     return scope_answer(a, me) if a['kind'] == 'regulation' and not regstore.set_for(me.get('empGroup')) else a
 
@@ -476,7 +476,7 @@ def support(ctx: rt.Ctx, plans: list[dict], context: dict, sim: str | None = Non
         hits = regstore.search(SUP_QUERY.get(me.get('empGroup'), SUP_QUERY['일반직']), 6, me.get('empGroup'), ctx.mode)
         arts = [regstore.article(h['id']) for h in hits if regstore.article(h['id'])]
         ids = [a['id'] for a in arts]
-        r = rt.llm_json(ctx, SUP_SYS, {'plans': plans, 'user': context, 'articles': [_art_in(a) for a in arts]})
+        r = rt.llm_json(ctx, SUP_SYS, {'plans': plans, 'user': context, 'articles': [_art_in(a) for a in arts]}, role='regulation')
         out = {}
         for x in r.get('plans') if isinstance(r.get('plans'), list) else []:
             pid = str(x.get('pid') or '')
@@ -496,4 +496,4 @@ def support(ctx: rt.Ctx, plans: list[dict], context: dict, sim: str | None = Non
             raise llm.LlmError('지원 조건 확인 결과가 비어 있어요')
         return out
     return rt.run(ctx, '규정 에이전트', '안별 지원 조건 확인', {'plans': plans}, lambda i: {x['pid']: _mock_support_one(x, me) for x in i['plans']}, api,
-                  sim=sim, mock_delay=0.8)
+                  role='regulation', sim=sim, mock_delay=0.8)

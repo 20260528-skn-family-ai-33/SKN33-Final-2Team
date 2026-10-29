@@ -46,10 +46,10 @@
       "source_sha256": "15e8559b61d8db92a1a322ba0a1be86852fb1f4555ecf80b89be366d9b289fcf",
       "source_bytes": 11326,
       "source_kind": "team_existing_file",
-      "sha256": "14ce21426101a3c5240320f3c00a2c93ef960a5f01eacdf513cd6e0d84dcc706",
-      "bytes": 17031,
+      "sha256": "042a1926bdce0d75d7ba8a4f02a3bbebb9f358f372b56567b0cd81d08800399d",
+      "bytes": 17648,
       "handling": "adjusted",
-      "change_note": "Issue #26 course-first publication: preserve latest #14/#15 main; time, outlines, UI and snapshot only."
+      "change_note": "Issue #27: team work/project context, guarded goal preloading and main 0a6dd08 compatibility (2026-10-29)."
     },
     {
       "path": "database/.env.example",
@@ -83,10 +83,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "c016bae49963b65bbabf76381e6df5039b553a4e7b5ebd1cc364b48d777ee123",
-      "bytes": 40011,
+      "sha256": "3e6ca1c407d170f44742799acd617ffbe69e4a4048aaf4cafe3cfd209ce08738",
+      "bytes": 42042,
       "handling": "adjusted",
-      "change_note": "Issue #27: employee delivery reconciled and verified on merged course main 44ef011 (2026-10-29).",
+      "change_note": "Issue #27: verified real goal preloading and full Drive backup handoff (2026-10-29).",
       "local_update_source": {
         "path": "README.md",
         "sha256": "e872d64ea58c53311d098dc1c769f5bc3232ad947d690054b75a0a0a20c6d8c6"
@@ -98,10 +98,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "7ad1937ed13c398b5ea535aed3efe6c1d4b378372de46d77cb7dc4c71be02375",
-      "bytes": 4247,
+      "sha256": "d6f7287fc71f7e1190bcf19f41a1bbe26b48fd678dd58d0525fb302654f61a9e",
+      "bytes": 4915,
       "handling": "adjusted",
-      "change_note": "Issue #15: reconcile latest main, implementation/contracts, regression coverage and verification metadata (2026-10-28)."
+      "change_note": "Issue #27: verified real goal preloading and full Drive backup handoff (2026-10-29)."
     },
     {
       "path": "database/assets.manifest.json",
@@ -109,10 +109,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "ddda60569d0f53d7d34b4725adec52bd2f3e2d1280772932a7fdaca5b02792e5",
-      "bytes": 24722,
+      "sha256": "6864bec5846c13fd4bddfd40906a08d3c11d7b9ddd21df04062adde889de4003",
+      "bytes": 25674,
       "handling": "adjusted",
-      "change_note": "Issue #27: reconcile employee changes with merged course main 44ef011; preserve course contracts (2026-10-29)."
+      "change_note": "Issue #27: verified real goal preloading and full Drive backup handoff (2026-10-29)."
     },
     {
       "source_path": "database/config/paths.yaml",
@@ -175,10 +175,10 @@
       "source_sha256": "59e13c3fd7bdde78922da1df1c242b08838925e9c3a5e19d8333070d46726420",
       "source_bytes": 59668,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "41113f09040d8896864f2e3d066d0ae33a953192c6ed4132de1e00a1d191d06e",
-      "bytes": 59668,
+      "sha256": "7a18b2c3e20933525a2f4e404a9b96302871589564f249e76a26df4942b74539",
+      "bytes": 70462,
       "handling": "adjusted",
-      "change_note": "2026-10-27 #15 same-department-only permissions, regression tests and snapshot metadata; HR rows remain external.",
+      "change_note": "Issue #27: verified real goal preloading and full Drive backup handoff (2026-10-29).",
       "local_update_source": {
         "path": "data/exports/growpath_latest.manifest.json",
         "sha256": "59e13c3fd7bdde78922da1df1c242b08838925e9c3a5e19d8333070d46726420"
@@ -488,10 +488,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "2458afb17203d0b8c44c979ac46caeb42f4dcd01eb593db8e598ac529f25e293",
-      "bytes": 30533,
+      "sha256": "8893a0bed9840117f25d4ac42922e62947480679a87e6e0e11288fb4e02aa12b",
+      "bytes": 35841,
       "handling": "adjusted",
-      "change_note": "Issue #27: employee delivery reconciled and verified on merged course main 44ef011 (2026-10-29)."
+      "change_note": "Issue #27: verified real goal preloading and full Drive backup handoff (2026-10-29)."
     },
     {
       "source_path": "database/src/__init__.py",
@@ -1606,9 +1606,9 @@
       "source_bytes": null,
       "source_kind": "team_followup_implementation",
       "handling": "adjusted",
-      "sha256": "563f7f1f1335dcedba5283952b332451fcee459edf48220b949408bd7ecb70b2",
-      "bytes": 32726,
-      "change_note": "Issue #27: reconcile employee changes with merged course main 44ef011; preserve course contracts (2026-10-29)."
+      "sha256": "a894af07a63d1f61a5e5e54521b87a8d2b908416d0ede5bf748a06eaa07cbb33",
+      "bytes": 45584,
+      "change_note": "Issue #27: team work/project context, guarded goal preloading and main 0a6dd08 compatibility (2026-10-29)."
     },
     {
       "path": "backend/app/routers/account.py",
@@ -1617,9 +1617,9 @@
       "source_bytes": null,
       "source_kind": "team_followup_implementation",
       "handling": "adjusted",
-      "sha256": "0d4bd298e8745a49919bb14656e82dd735292c7edd195568bcec8c59ba5cf451",
-      "bytes": 7587,
-      "change_note": "Issue #15: reconcile latest main, implementation/contracts, regression coverage and verification metadata (2026-10-28)."
+      "sha256": "f904fb0ce01b19509bbc896efb5e7ccc7bfe771aaee00c00b7c7cf40454a76d6",
+      "bytes": 7990,
+      "change_note": "Issue #27: team work/project context, guarded goal preloading and main 0a6dd08 compatibility (2026-10-29)."
     },
     {
       "path": "backend/app/services/profile.py",
@@ -1628,9 +1628,9 @@
       "source_bytes": null,
       "source_kind": "team_followup_implementation",
       "handling": "adjusted",
-      "sha256": "3706b0ece944af5e55ec53c597d34627bfee78a72b209a77b6fc3468ca777cd2",
-      "bytes": 18624,
-      "change_note": "Issue #27: reconcile employee changes with merged course main 44ef011; preserve course contracts (2026-10-29)."
+      "sha256": "04c8575afc73b886c949a88976fd7030f06217d8eaa5efa4f293d0522da4d63c",
+      "bytes": 20008,
+      "change_note": "Issue #27: team work/project context, guarded goal preloading and main 0a6dd08 compatibility (2026-10-29)."
     },
     {
       "path": "frontend/docs/API_계약.md",
@@ -1639,9 +1639,9 @@
       "source_bytes": null,
       "source_kind": "team_followup_implementation",
       "handling": "adjusted",
-      "sha256": "9d5fe9996edb2c06469fb0854c5fae5a21faa891b656d473674930f142331044",
-      "bytes": 15678,
-      "change_note": "Issue #27: reconcile employee changes with merged course main 44ef011; preserve course contracts (2026-10-29)."
+      "sha256": "8304bbb6f865ca0f8251a58c8773e406d214966543e3dab7e79d240488d75deb",
+      "bytes": 17592,
+      "change_note": "Issue #27: team work/project context, guarded goal preloading and main 0a6dd08 compatibility (2026-10-29)."
     },
     {
       "path": "database/tests/test_resource_refresh.py",
@@ -1683,9 +1683,9 @@
       "source_bytes": null,
       "source_kind": "team_course_duration_implementation",
       "handling": "adjusted",
-      "sha256": "93cb2c696dd59892b93bf947e2f87175540cd1e974c682ffbab17297fb2508f7",
-      "bytes": 41299,
-      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
+      "sha256": "6924483e3a505797003161ff32b0cf13fe279f76cc7856ff46d4009e3b1e8798",
+      "bytes": 41551,
+      "change_note": "Issue #27: team work/project context, guarded goal preloading and main 0a6dd08 compatibility (2026-10-29)."
     },
     {
       "path": "backend/app/catalog.py",
@@ -1716,9 +1716,9 @@
       "source_bytes": null,
       "source_kind": "team_course_duration_implementation",
       "handling": "adjusted",
-      "sha256": "ea72ffee387fd93eabd598bd3df4cd9f98bd203af9c93adc96123b11d750e175",
-      "bytes": 15691,
-      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
+      "sha256": "2a3a37fa3f4b77b4c6eee9d661729e032458a12734b385bd39393ff54022d4ee",
+      "bytes": 15886,
+      "change_note": "Issue #27: team work/project context, guarded goal preloading and main 0a6dd08 compatibility (2026-10-29)."
     },
     {
       "path": "backend/tools/setup_db.py",
@@ -1936,9 +1936,9 @@
       "source_bytes": null,
       "source_kind": "team_course_duration_implementation",
       "handling": "adjusted",
-      "sha256": "f3ab5968cee1fc0e5376302b4cda1f3b943cb7afdce24b97ed668f374a5024ea",
-      "bytes": 27716,
-      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
+      "sha256": "88045ca121f260aeae2f3433d8c3153ce552a1a08aac5d0909f6ec56df090619",
+      "bytes": 28228,
+      "change_note": "Issue #27: team work/project context, guarded goal preloading and main 0a6dd08 compatibility (2026-10-29)."
     },
     {
       "path": "backend/app/catalog_evidence.py",
@@ -2137,6 +2137,171 @@
       "bytes": 3900,
       "handling": "adjusted",
       "change_note": "Issue #27: fictional profiles, protected real employees, work description fallback and regression evidence."
+    },
+    {
+      "path": "database/data/exports/real_user_demo_contexts_20261029.manifest.json",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_employee_context_update",
+      "sha256": "42be39508c97349a1103b61466f633df3b1f208d7006f8c9ee29072f0bf8652d",
+      "bytes": 1242,
+      "handling": "adjusted",
+      "change_note": "Issue #27: verified team work/project context and guarded preloading (2026-10-29)."
+    },
+    {
+      "path": "backend/db/migrate_self_work_descriptions.sql",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_employee_context_update",
+      "sha256": "efa004a63b53fa2be0c48b9c6e46e02dbe1f4cf650d823e5391fbeffef55a903",
+      "bytes": 1453,
+      "handling": "adjusted",
+      "change_note": "Issue #27: team work/project context, guarded goal preloading and main 0a6dd08 compatibility (2026-10-29)."
+    },
+    {
+      "path": "backend/tools/preload_goals.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_employee_context_update",
+      "sha256": "25086d5a06f6d8e4ec074b7470c850d431a3f9b2fc6b8910ea1584dd69b4a9fa",
+      "bytes": 2715,
+      "handling": "adjusted",
+      "change_note": "Issue #27: team work/project context, guarded goal preloading and main 0a6dd08 compatibility (2026-10-29)."
+    },
+    {
+      "path": "frontend/src/features/draft/goal/goalStore.test.ts",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_employee_context_update",
+      "sha256": "99a8378326d5c638851592b205b61bca0f985cbea0817012d9f0a35c06f6d277",
+      "bytes": 1634,
+      "handling": "adjusted",
+      "change_note": "Issue #27: team work/project context, guarded goal preloading and main 0a6dd08 compatibility (2026-10-29)."
+    },
+    {
+      "path": "backend/app/jobs.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_employee_context_update",
+      "sha256": "0ee87cc480fce44c20acff4cdbddcdb39423a1de4c5c02b1d7606e3ec9c33175",
+      "bytes": 6047,
+      "handling": "adjusted",
+      "change_note": "Issue #27: team work/project context, guarded goal preloading and main 0a6dd08 compatibility (2026-10-29)."
+    },
+    {
+      "path": "backend/app/services/goals.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_employee_context_update",
+      "sha256": "6a49b6c368ce2e19392587c0bd3a76e14973e54dec6b101c5e633d8f74ed2ff0",
+      "bytes": 11035,
+      "handling": "adjusted",
+      "change_note": "Issue #27: team work/project context, guarded goal preloading and main 0a6dd08 compatibility (2026-10-29)."
+    },
+    {
+      "path": "backend/app/agents/goals.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_employee_context_update",
+      "sha256": "96f27ac877cab133c69c19e9c3f722fade38c713185215ea0a5b601c2a944724",
+      "bytes": 6647,
+      "handling": "adjusted",
+      "change_note": "Issue #27: team work/project context, guarded goal preloading and main 0a6dd08 compatibility (2026-10-29)."
+    },
+    {
+      "path": "backend/app/admin_io/hr.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_employee_context_update",
+      "sha256": "fe48658a17ff77826105c523f31fc10e99a4f85158f65b48b2c0e03cac9436e2",
+      "bytes": 25825,
+      "handling": "adjusted",
+      "change_note": "Issue #27: team work/project context, guarded goal preloading and main 0a6dd08 compatibility (2026-10-29)."
+    },
+    {
+      "path": "frontend/src/api/endpoints/account.ts",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_employee_context_update",
+      "sha256": "68f5137eae18be60300fddec2aa84025e833eed84e41668500458253b2e54fbe",
+      "bytes": 3264,
+      "handling": "adjusted",
+      "change_note": "Issue #27: team work/project context, guarded goal preloading and main 0a6dd08 compatibility (2026-10-29)."
+    },
+    {
+      "path": "frontend/src/features/draft/goal/goalStore.ts",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_employee_context_update",
+      "sha256": "e6ea0727346e0180de7193515e4ded033fc9c69b27b5f85c359db91aa7b39f8f",
+      "bytes": 2800,
+      "handling": "adjusted",
+      "change_note": "Issue #27: team work/project context, guarded goal preloading and main 0a6dd08 compatibility (2026-10-29)."
+    },
+    {
+      "path": "frontend/src/features/draft/generation/GenerationStep.tsx",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_employee_context_update",
+      "sha256": "23af06e25310c1ab405a3629dca906d388994d4a4d334a8e8098342121872d80",
+      "bytes": 13746,
+      "handling": "adjusted",
+      "change_note": "Issue #27: team work/project context, guarded goal preloading and main 0a6dd08 compatibility (2026-10-29)."
+    },
+    {
+      "path": "frontend/src/features/draft/goal/GoalStep.tsx",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_employee_context_update",
+      "sha256": "62ff37692b501d76ec055737a3934cf44b60c7ba62741d18adf486385c39255c",
+      "bytes": 16485,
+      "handling": "adjusted",
+      "change_note": "Issue #27: team work/project context, guarded goal preloading and main 0a6dd08 compatibility (2026-10-29)."
+    },
+    {
+      "path": "frontend/src/features/profile/MePage.tsx",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_employee_context_update",
+      "sha256": "52149624d4d954e5a272b0062704dbc82640604676e2315c643521cbbff78ceb",
+      "bytes": 17869,
+      "handling": "adjusted",
+      "change_note": "Issue #27: team work/project context, guarded goal preloading and main 0a6dd08 compatibility (2026-10-29)."
+    },
+    {
+      "path": "frontend/src/features/draft/generation/GenerationStep.test.ts",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_employee_context_update",
+      "sha256": "406b3902f361421c461a30100bdf23f5ec9bb1b528b1d02af703ffde9f928627",
+      "bytes": 1228,
+      "handling": "adjusted",
+      "change_note": "Issue #27: verified team work/project context and guarded preloading (2026-10-29)."
+    },
+    {
+      "path": "database/data/exports/actual_goal_preload_20261029.manifest.json",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_employee_context_update",
+      "sha256": "896ae8b60ca7b7b8535d2761b233650b0e7f4fe73b496dad10cbd8489c5105f5",
+      "bytes": 2164,
+      "handling": "adjusted",
+      "change_note": "Issue #27: verified real goal preloading and full Drive backup handoff (2026-10-29)."
     }
   ],
   "excluded": [
@@ -2492,5 +2657,6 @@
   "course_publication_order": "course #26 before employee #27",
   "course_review_verification": "database/snapshot-audit.json#course_review_20261029",
   "course_selected_review_verification": "database/snapshot-audit.json#course_selected_review_fixes_20261029",
-  "employee_main_sync_verification": "database/snapshot-audit.json#employee_main_sync_20261029"
+  "employee_main_sync_verification": "database/snapshot-audit.json#employee_main_sync_20261029",
+  "work_context_teamdb_verification": "database/snapshot-audit.json#work_context_teamdb_20261029"
 }

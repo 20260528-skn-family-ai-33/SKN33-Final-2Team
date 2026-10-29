@@ -15,6 +15,7 @@ export const accountApi = {
   revertSelf: () => http.del<ProfileView>('/me/profile/self'),
   consent: (period: string, consent: boolean) => http.put<{ period: string; consent: boolean }>(`/me/evaluations/${enc(period)}/consent`, { consent }),
   goals: () => http.get<GoalSuggestions>('/me/goal-suggestions'),
+  goalsEnsure: () => http.post<GoalSuggestions>('/me/goal-suggestions/ensure'),
   goalsRegenerate: () => http.post<Partial<JobStarted> & Partial<GoalSuggestions>>('/me/goal-suggestions/regenerate'),
   workspace: () => http.get<Workspace>('/me/workspace'),
 };
@@ -25,7 +26,8 @@ export interface ProviderInfo {
   available: boolean;
   reason: string;
   target?: string;
-  models: { default: string; roadmap: string; embed: string; vision: string };
+  /** regulation: 규정 에이전트(도우미 답변·안별 지원 조건 확인) 모델 · 없는 옛 응답이면 default 를 쓴다 */
+  models: { default: string; roadmap: string; regulation?: string; embed: string; vision: string };
   timeout?: number;
 }
 

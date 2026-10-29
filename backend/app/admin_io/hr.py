@@ -343,10 +343,10 @@ def apply(t: db.Tx, found: dict[str, list[Row]], cur: dict[str, dict], ctx: dict
 
 
 def after(res: dict, ctx: dict) -> None:
-    """반영 뒤: 바뀐 직원의 목표 후보를 다시 만든다(실패해도 반영은 그대로 · 직원 화면에 실패로 보임)"""
+    """추천 입력이 바뀐 직원만 미리 생성한다. 명시한 관리자 생성 모드는 그대로 실행한다."""
     from ..services import goals
     for eid in res.get('goal_ids', []):
         try:
-            goals.request(eid, 'admin-upload', mode=ctx.get('goal_mode'))
+            goals.request(eid, 'admin-upload', mode=ctx.get('goal_mode'), only_if_stale=ctx.get('goal_mode') is None)
         except Exception as e:  # noqa: BLE001 - 한 직원 실패가 다른 직원을 막지 않게 하고 원인은 남긴다
             print(f'  목표 후보 다시 만들기 실패(직원 {eid}): {e}')

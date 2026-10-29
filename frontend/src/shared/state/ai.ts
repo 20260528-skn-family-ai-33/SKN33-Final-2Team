@@ -11,6 +11,8 @@ import type { StoredCause } from '@/api/types/common';
 /** 화면은 4차처럼 'api' 를 OpenAI 로 쓰고, 서버에는 'openai' 로 보낸다 */
 export type UiProvider = 'ollama' | 'api';
 export type Mode = UiProvider | 'mock' | 'off';
+/** 에이전트가 모델을 부르는 역할: 진단(default)·로드맵·규정·이미지 읽기 */
+export type ModelRole = 'default' | 'roadmap' | 'regulation' | 'vision';
 
 export const PROV: Record<string, string> = { ollama: 'RunPod-Ollama', api: 'OpenAI API', openai: 'OpenAI API', mock: '가데이터' };
 export const toUi = (p: string): UiProvider => (p === 'openai' ? 'api' : (p as UiProvider));
@@ -59,15 +61,12 @@ export const ai = {
   mode: (): Mode => modeOf(g()),
   live: (): boolean => ai.mode() === 'ollama' || ai.mode() === 'api',
   off: (): boolean => ai.mode() === 'off',
-  modelName: (role: 'default' | 'roadmap' | 'vision' = 'default'): string => {
+  modelName: (role: ModelRole = 'default'): string => {
     const m = prov(ai.mode()).models;
     if (!m) return '';
-    return role === 'vision' ? m.vision || '' : role === 'roadmap' ? m.roadmap || m.default || '' : m.default || '';
+    return role === 'vision' ? m.vision || '' : role === 'default' ? m.default || '' : m[role] || m.default || '';
   },
-  ollamaInfo: () => {
-    const ol = prov('ollama');
-    return { model: ol.models?.default || '', roadmapModel: ol.models?.roadmap || '' };
-  },
+  ollamaInfo: () => ({ model: prov('ollama').models?.default || '' }),
   openaiModel: (): string => prov('api').models?.default || '',
   failSim: (): FailSim => ({ ...Object.fromEntries(SIM_KINDS.map((k) => [k, false])), ...(g().settings.failSim || {}) }),
 };
@@ -164,7 +163,7 @@ export function connFor(role: string, c: Conn = g().conn): Conn {
       kind: 'model',
       error: `‘${miss.name}’ 모델이 Ollama에 없어요`,
       raw: `설치된 모델 목록(api/tags)에 ${miss.name}이 없음`,
-      hint: 'Pod에서 모델을 받은 뒤(ollama pull) 다시 시도하거나, .env의 모델 이름을 확인해 주세요',
+      hint: 'Pod에서 팀 모델을 받아 growpath-27b·growpath-regulation-4b 이름으로 만든 뒤(RunPod 연결 절차 2-4) 다시 시도해 주세요. .env에 원본 모델 이름을 넣었다면 Pod의 ollama list 이름과 같은지 확인해 주세요',
     };
   const wait = pick.filter((m) => m.role !== 'embed' && !m.loaded).map((m) => m.name);
   if (wait.length) return { ...c, state: 'cold', waiting: wait };

@@ -1,10 +1,10 @@
-# 외부 DB 자료와 복원 · 2026-10-27
+# 외부 DB 자료와 복원 · 2026-10-29
 
-최신 기준은 `growpath_latest.dump`와 같은 위치의 `growpath_latest.manifest.json`이다. SHA-256 `be3648e42907cd566d9716354437665260ccb3c26041a0dcdcb20e13db643189`, 36,345,626바이트, 53테이블·22,298행·227개 제약조건이다. 별도 새 DB 복원에서 전체 53개 표 지문과 벡터 연산 일치를 확인했다. 10/21 백업은 역사 기록으로 보존하며 현재 복원 기준과 구분한다.
+최신 공유본은 `growpath_latest.dump`와 같은 위치의 `growpath_latest.manifest.json`이다. 덤프 SHA-256 `beb9ac646a746434979f889f6fd564608534477b4e85c2f2e78dd95008285373`, 38,297,980바이트다. 강좌 시간·커리큘럼(025·026), 가상 직원 100명 보완, REAL_USER 4명의 데모 업무/프로젝트, `gpt-6-luna`로 생성한 목표 후보 12개를 포함한다. 제외 요청한 직원 1명은 바꾸지 않았다.
 
-[공유 폴더](https://drive.google.com/drive/folders/1DyJ67R5bYMEwKF-PChdOcxGF8TCNtPsx)의 두 파일을 받는다. [외부 자료 manifest](assets.manifest.json)에 최신 덤프 링크와 해시를 연결했다. 입수한 파일을 SHA-256으로 대조한다. 직원 seed·기본 비밀번호·실제 `.env`·회사/생활안내 원문·수집 상세·벡터·실행 DB는 Git에 없다. 실제 키나 비밀번호가 포함된 ZIP을 배포하지 않는다.
+[공유 폴더](https://drive.google.com/drive/folders/1DyJ67R5bYMEwKF-PChdOcxGF8TCNtPsx)에서 두 파일을 받는다. 기존 링크와 공유 권한을 유지했으며 업로드 후 다시 내려받아 두 파일의 SHA-256을 대조했다. [외부 자료 manifest](assets.manifest.json)와 [실제 생성 기록](data/exports/actual_goal_preload_20261029.manifest.json)에 버전·검증을 연결했다. 원문·개인 입력·덤프·비밀키는 Git에 넣지 않는다.
 
-## 새 환경
+## 새 DB 복원
 
 Python 3.12, PostgreSQL 17, pgvector가 필요하다. 검증 환경은 PostgreSQL 17.11·pgvector 0.8.2 Windows였다. 설치는 [README](README.md)를 따른다. 가상환경을 활성화한 뒤 `database/`에서 실행한다.
 
@@ -15,11 +15,15 @@ python scripts/db.py verify
 python -m src.database.vectors.resource_vectors status
 ```
 
-비밀번호는 출력되지 않는 터미널 입력을 사용한다. 기존 DB·데이터 디렉터리·`.env.local`은 덮어쓰지 않는다. 기존 서버라면 `--initialize`를 생략하고 비어 있는 새 DB 이름을 지정한다. 포트가 사용 중이면 먼저 점유자를 확인한다. 설치 바이너리와 서버 확장은 별도로 준비한다.
+비밀번호는 출력되지 않는 터미널 입력을 사용한다. 기존 DB·데이터 디렉터리·`.env.local`은 덮어쓰지 않는다. 기존 서버라면 `--initialize`를 생략하고 비어 있는 새 DB 이름을 지정한다. 포트가 사용 중이면 점유자를 먼저 확인한다. 설치 바이너리와 서버 확장은 별도로 준비한다. 복원에는 OpenAI 키나 유료 API 호출이 필요 없다.
 
-복원 도구는 포트를 지정할 수 있지만 `import_knowledge.py`, `supplement_courses.py`, `supplement_course_catalog.py`, `correct_course_skills.py`, `verify_course_catalog.py`, `verify_course_expansion_live.py`는 승인된 최종 DB인 `127.0.0.1:55435/growpath`로 대상을 제한한다. 다른 포트·DB 이름으로 복원했다면 이 도구들은 거절한다. 일부 도구는 현재 작업 폴더의 로컬 클러스터 경로도 확인하므로 연결 설정만 바꿔 제한을 우회하지 않는다.
+이번 전체 덤프는 기준 스키마 **53표·22,418행**과 기존 앱 보조 스키마 `app_ext` **25표·24행**, 합계 **78표·22,442행**이다. 기준 표 구조/ERD는 바꾸지 않았으며 정적 ERD의 건수는 강좌 checkpoint 22,300행이다. `inventory`는 기존 복원 도구와 호환되는 기준 53표이며, 전체 78표 지문은 manifest의 `all_schema_table_fingerprints`에 따로 기록한다. 기본 복원 도구는 기준 inventory를 대조하고, 작성 PC의 이번 추가 검사는 전체 78표와 실제 로그인 API까지 검증했다.
 
-013~020 SQL이 없어 빈 DB를 SQL만으로 재구성하거나 구판 10/21 DB에 021·022만 적용하는 방식은 지원하지 않는다. 최신 백업의 001~024 이력을 검증한다. 과거 적용 SQL을 수정해 이력을 맞추지 않는다. 팀원 작성 REAL_USER 5명의 실제 사번·소속·학력과 작성된 스킬·프로필이 최신 백업에 포함된다. 사번 필수 제약은 원본의 NOT VALID 상태를 유지하며 현재 누락 행은 0개다. 최신 023 DB에는 024만, 최신 022 DB에는 023·024를 적용한다.
+목표 후보는 `public.employee_recommended_prompts`, 이유·근거는 `app_ext.goal_suggestion_meta`, 입력 해시·상태는 `app_ext.goal_suggestion_runs`에 있다. `public`만 복원하면 사전 로딩 상태가 누락되므로 **전체 덤프를 복원한다**. 복원본에서 4명 각각 3회 재로그인·세션 조회·목표 화면 진입 시 기존 후보를 재사용하고 추가 모델 호출 0회를 확인했다. 새 업무/프로젝트 저장 계약과 자동 갱신에는 PR #29의 백엔드·프런트 배포도 필요하다.
+
+앱 추가 준비가 필요하면 `backend/tools/setup_db.py --supplement-only --keep-team-passwords`를 사용해 기존 직원 암호를 보존한다. 준비 도구는 저장된 목표 생성 상태가 있으면 초기 가데이터 후보로 덮지 않는다. API 키·직원 사번/암호·관리자 계정 설정은 저장소 밖에서 관리한다. 수신 PC의 실제 실행·배포는 아직 검증하지 않았다.
+
+013~020 원본 SQL이 없어 빈 DB를 SQL만으로 재구성하거나 구판 10/21 DB에 021·022만 적용하는 방식은 지원하지 않는다. 최신 백업의 001~026 이력을 검증하고 이미 적용한 SQL의 바이트·해시를 바꾸지 않는다. 024의 조회 정책은 본인 또는 같은 기관·같은 부서의 부서장에게만 허용하며 부서 상하 관계는 사용하지 않는다.
 
 ## 백업·되돌리기
 
@@ -27,6 +31,6 @@ python -m src.database.vectors.resource_vectors status
 python scripts/restore_db.py backup --output "<외부 백업 폴더>/growpath_새버전.dump"
 ```
 
-동일 스냅샷의 전체 덤프와 manifest를 생성한다. 되돌릴 때는 검증된 이전 백업을 새 DB에 복원해 검사한 뒤 연결을 전환한다. 현재 입력이 추가됐다면 먼저 보존한다. PostgreSQL 내부 파일이나 다른 PC의 `.venv`를 복사해 실행 환경으로 사용하지 않는다. 복원은 OpenAI API가 필요 없다.
+백업 도구는 `app_ext`를 포함한 모든 스키마를 덤프하지만 기본 inventory는 기준 53표다. 공유 전 앱 보조 표의 후보/이유/입력 해시를 별도로 확인한다. 복구는 검증된 이전 전체 백업을 새 DB에 복원·검사한 뒤 연결을 전환한다. 이후 사용자 입력이 있으면 먼저 보존·대조한다. PostgreSQL 내부 파일이나 다른 PC의 `.venv`를 실행 환경으로 복사하지 않는다.
 
-024 이전 백업은 담당자가 보관한 SHA-256 `4558b33e5f12bf41a9d78f45311cb108d4e558c88d5b9e045328af2f2d5e4106`이며 REAL_USER 작성값을 포함한다. 복구 시 이전 전체 백업을 새 DB에 복원하고 연결을 전환한다. 024는 본인 또는 같은 기관·같은 부서의 부서장만 조회를 허용한다. 부서 상하 관계는 권한에 사용하지 않는다. 원본·증빙 묶음은 [assets.manifest.json](assets.manifest.json)에 해시를 연결했다. 10/28 작성 PC의 복제 DB에서 실제 인증 API 계약 8개를 확인했으며 저장 위치와 재실행법은 [DB 안내](README.md)를 따른다. 앱의 `app_ext` 보조 표는 이 53개 표 백업과 별도로 초기화·백업해야 한다. 수신 PC의 실제 실행·배포·모델 통합은 미검증이다.
+시간·커리큘럼만 포함한 앞선 checkpoint는 `growpath_curriculum_20261028.dump` SHA-256 `c401c1f60e0b7d2e513dce031225cc2dad0d879ec22674900608b55c31d2c48c`이며 로컬 원본을 보존한다. 최신 Drive 파일에는 그 내용과 이후 인사/목표 작업이 함께 들어 있다. 중간 인사·실제 생성 전 백업의 해시는 각각의 외부 자료 manifest를 따른다.

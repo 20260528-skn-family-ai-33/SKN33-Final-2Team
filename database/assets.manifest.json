@@ -20,13 +20,15 @@
     {
       "id": "full_database_current",
       "filename": "growpath_latest.dump",
-      "bytes": 36345626,
-      "sha256": "be3648e42907cd566d9716354437665260ccb3c26041a0dcdcb20e13db643189",
+      "bytes": 38297980,
+      "sha256": "beb9ac646a746434979f889f6fd564608534477b4e85c2f2e78dd95008285373",
       "location": "https://drive.google.com/file/d/1YBhxTVQjNfm53FbcLJnO7SKi-hsycxz4/view?usp=drivesdk",
       "location_status": "uploaded_existing_drive_file",
       "manifest": "data/exports/growpath_latest.manifest.json",
-      "version": "2026-10-27-real-user-and-same-department-scope",
-      "manifest_location": "https://drive.google.com/file/d/1iUVAugkFpXHNeO3IlWhFkol-6oID691C/view?usp=drivesdk"
+      "version": "2026-10-29-profiles-and-actual-goal-preload",
+      "manifest_location": "https://drive.google.com/file/d/1iUVAugkFpXHNeO3IlWhFkol-6oID691C/view?usp=drivesdk",
+      "verified_all_tables": 78,
+      "verified_all_rows": 22442
     },
     {
       "id": "course_duration_snapshot_20261028",
@@ -55,6 +57,24 @@
       "location": null,
       "location_status": "local_only_not_uploaded",
       "manifest": "data/exports/synthetic_profiles_20261028.manifest.json"
+    },
+    {
+      "id": "real_user_demo_context_20261029",
+      "filename": "growpath_real_context_20261029.dump",
+      "sha256": "ed9f3a507da9768b2480b933a988380df7cff6f396ab01c872495a138539c77b",
+      "bytes": 38245535,
+      "location": null,
+      "location_status": "verified_local_export_not_uploaded",
+      "manifest": "data/exports/real_user_demo_contexts_20261029.manifest.json"
+    },
+    {
+      "id": "actual_goal_preload_20261029",
+      "filename": "growpath_profiles_goals_20261029.dump",
+      "sha256": "beb9ac646a746434979f889f6fd564608534477b4e85c2f2e78dd95008285373",
+      "bytes": 38297980,
+      "location": "https://drive.google.com/file/d/1YBhxTVQjNfm53FbcLJnO7SKi-hsycxz4/view?usp=drivesdk",
+      "location_status": "included_in_verified_latest_drive_backup",
+      "manifest": "data/exports/actual_goal_preload_20261029.manifest.json"
     }
   ],
   "regulation_originals": [

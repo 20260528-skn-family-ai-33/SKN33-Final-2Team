@@ -20,7 +20,8 @@ class LlmError(Exception):
 
 
 def available(provider: str) -> bool:
-    return bool(S.ollama_url and S.ollama_model) if provider == 'ollama' else bool(S.openai_key) if provider == 'openai' else False
+    # RunPod-Ollama 모델은 비워 두면 팀 모델(config.OLLAMA_TEAM_*)이라 주소만 있으면 쓸 수 있다
+    return bool(S.ollama_url) if provider == 'ollama' else bool(S.openai_key) if provider == 'openai' else False
 
 
 def _http(url: str, payload: dict | None, headers: dict, timeout: int):
@@ -89,7 +90,8 @@ def ollama(path: str, payload: dict | None, timeout: int | None = None) -> dict:
 
 def model_name(provider: str, role: str = 'default') -> str:
     if provider == 'ollama':
-        return S.ollama_vision if role == 'vision' else S.ollama_model_roadmap if role == 'roadmap' else S.ollama_model
+        # 로드맵은 진단과 같은 모델을 쓴다
+        return {'vision': S.ollama_vision, 'regulation': S.ollama_model_regulation}.get(role, S.ollama_model)
     if provider == 'openai':
         return S.openai_vision if role == 'vision' else S.openai_model
     return ''
@@ -123,7 +125,7 @@ def chat(provider: str, messages: list, role: str = 'default', json_mode: bool =
     """한 번의 대화 호출 → {content, model, provider, loadMs, totalMs}"""
     if provider == 'ollama':
         if role == 'vision' and not S.ollama_vision:
-            raise LlmError('Ollama 비전 모델 설정이 없어요 (.env 의 OLLAMA_VISION_MODEL)')
+            raise LlmError('Ollama 비전 모델 설정이 없어요 (RunPod-Ollama 팀 모델은 이미지를 읽지 않음)')
         model = model_name('ollama', role)
         payload = {'model': model, 'messages': _with_images(messages, 'ollama'), 'stream': False}
         if json_mode:
@@ -171,9 +173,10 @@ def ping(provider: str) -> dict:
     names = lambda ms: {n for m in ms for n in (m.get('name'), m.get('model')) if n}  # noqa: E731
     have, loaded = names(tags), names(ps)
     hit = lambda n, pool: n in pool or (':' not in n and f'{n}:latest' in pool)  # noqa: E731
+    # 진단 모델과 이름이 다른 역할만 더한다: 같은 이름이면 Ollama 에 한 번만 올라가므로 따로 확인할 필요가 없다
     roles = [('default', S.ollama_model)]
-    if S.ollama_model_roadmap != S.ollama_model:
-        roles.append(('roadmap', S.ollama_model_roadmap))
+    if S.ollama_model_regulation != S.ollama_model:
+        roles.append(('regulation', S.ollama_model_regulation))
     return {'ok': True, 'provider': 'ollama', 'target': S.ollama_target, 'version': version,
             'models': [{'role': r, 'name': n, 'installed': hit(n, have), 'loaded': hit(n, loaded)} for r, n in roles],
             'ms': round((time.perf_counter() - t0) * 1000)}

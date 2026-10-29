@@ -1,11 +1,11 @@
 {
   "format": 1,
-  "created_at": "2026-10-27T06:02:45.800471+00:00",
+  "created_at": "2026-10-29T06:39:19.787221+00:00",
   "database": "growpath",
   "server_version": "17.11",
   "archive": "growpath_latest.dump",
-  "sha256": "be3648e42907cd566d9716354437665260ccb3c26041a0dcdcb20e13db643189",
-  "bytes": 36345626,
+  "sha256": "beb9ac646a746434979f889f6fd564608534477b4e85c2f2e78dd95008285373",
+  "bytes": 38297980,
   "inventory": {
     "tables": {
       "growpath_legacy.agent_generations": 71,
@@ -15,7 +15,7 @@
       "growpath_legacy.roadmap_requests": 25,
       "growpath_legacy.test_mock_profiles": 39,
       "growpath_meta.catalog_api_sources": 2433,
-      "growpath_meta.schema_migrations": 24,
+      "growpath_meta.schema_migrations": 26,
       "knowledge.chunks": 442,
       "knowledge.documents": 4,
       "public.assessment_questions": 25,
@@ -28,11 +28,11 @@
       "public.courses": 2060,
       "public.departments": 14,
       "public.diagnostic_rounds": 2,
-      "public.employee_certifications": 96,
+      "public.employee_certifications": 10,
       "public.employee_education_records": 105,
-      "public.employee_input_profiles": 1,
-      "public.employee_recommended_prompts": 0,
-      "public.employee_skills": 299,
+      "public.employee_input_profiles": 103,
+      "public.employee_recommended_prompts": 12,
+      "public.employee_skills": 389,
       "public.employees": 105,
       "public.growth_reports": 1,
       "public.institutions": 1,
@@ -444,6 +444,30 @@
       {
         "schema": "public",
         "table_name": "courses",
+        "conname": "courses_curriculum_object",
+        "definition": "CHECK ((jsonb_typeof(curriculum) = 'object'::text))"
+      },
+      {
+        "schema": "public",
+        "table_name": "courses",
+        "conname": "courses_duration_kind_valid",
+        "definition": "CHECK (((((duration_seconds IS NULL) AND (duration_kind IS NULL)) OR ((duration_seconds IS NOT NULL) AND (duration_kind = ANY (ARRAY['video'::text, 'learning'::text])))) IS TRUE))"
+      },
+      {
+        "schema": "public",
+        "table_name": "courses",
+        "conname": "courses_duration_provenance_object",
+        "definition": "CHECK ((jsonb_typeof(duration_provenance) = 'object'::text))"
+      },
+      {
+        "schema": "public",
+        "table_name": "courses",
+        "conname": "courses_duration_seconds_positive",
+        "definition": "CHECK (((duration_seconds IS NULL) OR (duration_seconds > 0)))"
+      },
+      {
+        "schema": "public",
+        "table_name": "courses",
         "conname": "courses_enrollment_order_check",
         "definition": "CHECK (((enrollment_start IS NULL) OR (enrollment_end IS NULL) OR (enrollment_start <= enrollment_end)))"
       },
@@ -458,6 +482,12 @@
         "table_name": "courses",
         "conname": "courses_enrollment_values_check",
         "definition": "CHECK ((((enrollment_period_type = 'scheduled'::text) AND (enrollment_start IS NOT NULL) AND (enrollment_end IS NOT NULL)) OR ((enrollment_period_type = 'unrestricted'::text) AND (enrollment_start IS NULL) AND (enrollment_end IS NULL)) OR (enrollment_period_type = 'unknown'::text)))"
+      },
+      {
+        "schema": "public",
+        "table_name": "courses",
+        "conname": "courses_estimated_duration_seconds_positive",
+        "definition": "CHECK (((estimated_duration_seconds IS NULL) OR (estimated_duration_seconds > 0)))"
       },
       {
         "schema": "public",
@@ -1487,5 +1517,335 @@
       }
     ]
   },
-  "scope": "All schemas, table data, vectors, functions, views and sequences in this database; cluster roles/passwords and external PDF/storage files are separate."
+  "all_schema_table_fingerprints": {
+    "app_ext.activity_progress": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.admin_accounts": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.admin_uploads": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.agent_calls": {
+      "rows": 4,
+      "digest": "f99e00683fbcfbbbc0637746a351cd4b"
+    },
+    "app_ext.cert_groups": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.comment_meta": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.employee_evaluations": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.employee_hr": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.employee_self_inputs": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.employee_transfers": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.goal_suggestion_meta": {
+      "rows": 12,
+      "digest": "40e87950891ddc3cff8b806f52a932e9"
+    },
+    "app_ext.goal_suggestion_runs": {
+      "rows": 4,
+      "digest": "9e0173f5e0681a109f10822e532826f4"
+    },
+    "app_ext.jobs": {
+      "rows": 4,
+      "digest": "4d9abad976a11a315b2c7be16ba19eae"
+    },
+    "app_ext.learning_docs": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.post_checks": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.rag_chunk_vectors": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.regulation_meta": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.regulation_uploads": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.report_meta": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.resource_meta": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.roadmap_meta": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.roadmap_revisions": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.roadmap_versions": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.sessions": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.user_settings": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "growpath_legacy.agent_generations": {
+      "rows": 71,
+      "digest": "73d7885ad6d02cca4ae04149ce2860c1"
+    },
+    "growpath_legacy.agent_selections": {
+      "rows": 20,
+      "digest": "759e9e796b6468670a0857ba46accbf0"
+    },
+    "growpath_legacy.finetuning_datasets": {
+      "rows": 2,
+      "digest": "52a51f591c3278e8db4019546b227a2f"
+    },
+    "growpath_legacy.preference_pairs": {
+      "rows": 4,
+      "digest": "ca03706c8aa7108e7eb18a46398a08e2"
+    },
+    "growpath_legacy.roadmap_requests": {
+      "rows": 25,
+      "digest": "bc2382f90bb4eb0913344535a0e5b5db"
+    },
+    "growpath_legacy.test_mock_profiles": {
+      "rows": 39,
+      "digest": "6c2e47ef65e79198e513e89959d1f21c"
+    },
+    "growpath_meta.catalog_api_sources": {
+      "rows": 2433,
+      "digest": "2bd4d48c6120408f8b780acff643a37f"
+    },
+    "growpath_meta.schema_migrations": {
+      "rows": 26,
+      "digest": "e35f08e40d0b181609659eb835966ad3"
+    },
+    "knowledge.chunks": {
+      "rows": 442,
+      "digest": "2e92529d2e71386c55763cc14be82344"
+    },
+    "knowledge.documents": {
+      "rows": 4,
+      "digest": "addd8f25c94fb5a22e9edc547197777d"
+    },
+    "public.assessment_questions": {
+      "rows": 25,
+      "digest": "36abfc7d178f53000c63973e6d4f5201"
+    },
+    "public.assessment_responses": {
+      "rows": 25,
+      "digest": "6e90df4bc13a26089fe40e2c9780a5ed"
+    },
+    "public.book_skills": {
+      "rows": 506,
+      "digest": "91342628962126aeeb6490a870735551"
+    },
+    "public.books": {
+      "rows": 334,
+      "digest": "1b7fb323906485ec75a45007e73a3d7b"
+    },
+    "public.certification_skills": {
+      "rows": 43,
+      "digest": "e217c2bd0a1e979735d606f234991f11"
+    },
+    "public.certifications": {
+      "rows": 26,
+      "digest": "52008314919a0431a0599f86a4a0037b"
+    },
+    "public.course_skills": {
+      "rows": 3658,
+      "digest": "d7d9de497ce765044ad45c0c4c13819f"
+    },
+    "public.courses": {
+      "rows": 2060,
+      "digest": "714755975b62d1f677e5f42ca1806a9c"
+    },
+    "public.departments": {
+      "rows": 14,
+      "digest": "b97a7e91d0efc49670d7e9267dad3a00"
+    },
+    "public.diagnostic_rounds": {
+      "rows": 2,
+      "digest": "f28aa65545c96e07dd86d8dbb5b7b7b4"
+    },
+    "public.employee_certifications": {
+      "rows": 10,
+      "digest": "8e5c5aff89f79f6a16d457d31051cd37"
+    },
+    "public.employee_education_records": {
+      "rows": 105,
+      "digest": "890ac50491c9f2a473d6ba057105ad9c"
+    },
+    "public.employee_input_profiles": {
+      "rows": 103,
+      "digest": "75e6d3998ca5158fbd2d2406e593c87d"
+    },
+    "public.employee_recommended_prompts": {
+      "rows": 12,
+      "digest": "ad819af9a5919ce54da3666c3b95cf22"
+    },
+    "public.employee_skills": {
+      "rows": 389,
+      "digest": "34d32dc67bad1eb8c51aae3492098764"
+    },
+    "public.employees": {
+      "rows": 105,
+      "digest": "10dd5f63b9b34adf7d760650b1d981c5"
+    },
+    "public.growth_reports": {
+      "rows": 1,
+      "digest": "794db6711837a5ec3140512550173158"
+    },
+    "public.institutions": {
+      "rows": 1,
+      "digest": "a16dc924a6f61198b8dc16b342115a0f"
+    },
+    "public.job_grades": {
+      "rows": 5,
+      "digest": "463fd6c06d18bef1d94d85fa5840eb78"
+    },
+    "public.job_skills": {
+      "rows": 8,
+      "digest": "186ed4c1000d1098159c29fb0fd72500"
+    },
+    "public.jobs": {
+      "rows": 6,
+      "digest": "c8218eb7b08b53f2b5aae2f46296bda4"
+    },
+    "public.learning_resource_embeddings": {
+      "rows": 2469,
+      "digest": "26d8bcc80097db71486af2cafafdf85d"
+    },
+    "public.major_skills": {
+      "rows": 14,
+      "digest": "a3c38ff38889043afbe3d2f84f9053fc"
+    },
+    "public.majors": {
+      "rows": 7,
+      "digest": "723071e66051a534b296210cc73e2e19"
+    },
+    "public.projects": {
+      "rows": 2,
+      "digest": "025b70ceaa26c79a7a53a5b0b55fc790"
+    },
+    "public.prompt_versions": {
+      "rows": 6,
+      "digest": "3a9fb9fa22a61206905e03195f3d8545"
+    },
+    "public.roadmap_comments": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "public.roadmap_step_resources": {
+      "rows": 1,
+      "digest": "3951987c4707d17b3f575f4814a18f6e"
+    },
+    "public.roadmap_steps": {
+      "rows": 3,
+      "digest": "6cb67e3c0eb2b96eab2cee7083f7b745"
+    },
+    "public.roadmaps": {
+      "rows": 1,
+      "digest": "36d2b35209afbe2d0ecd05bb63e76cd7"
+    },
+    "public.skill_tags": {
+      "rows": 36,
+      "digest": "3538047c2cb517bc2d0d57991d069f3f"
+    },
+    "regulations.evaluation_item_definitions": {
+      "rows": 70,
+      "digest": "77a0470b31541240f9031f5effd00fa9"
+    },
+    "regulations.evaluation_result_schemas": {
+      "rows": 11,
+      "digest": "00eac58762d6ae56548de29d3299a01b"
+    },
+    "regulations.evaluation_schema_sources": {
+      "rows": 172,
+      "digest": "99936ce644205cfde0360530088ab404"
+    },
+    "regulations.rag_chunk_embeddings": {
+      "rows": 1410,
+      "digest": "43101f71b39289ecdf2025a45e83ac65"
+    },
+    "regulations.rag_chunk_sources": {
+      "rows": 1774,
+      "digest": "3432e3a4ba2bac7f8252094f72bb48d7"
+    },
+    "regulations.rag_chunks": {
+      "rows": 1552,
+      "digest": "0b2e8be88347c333844f818dcf1ca133"
+    },
+    "regulations.regulation_files": {
+      "rows": 28,
+      "digest": "d1ce48a85fbc610b60318add132f875c"
+    },
+    "regulations.regulation_nodes": {
+      "rows": 3451,
+      "digest": "e8234fde21c534274284937f08e15293"
+    },
+    "regulations.regulation_references": {
+      "rows": 462,
+      "digest": "a3036d80cc851b4c5e6e932a1122d892"
+    },
+    "regulations.regulation_scopes": {
+      "rows": 389,
+      "digest": "7d9fe7395bcd2f8952a1cd88975dc1b5"
+    },
+    "regulations.regulation_versions": {
+      "rows": 28,
+      "digest": "680deafdf0bfb021572f2cf5869aaddb"
+    },
+    "regulations.regulations": {
+      "rows": 28,
+      "digest": "7d593aac2bfbc076a640306b05c5d4f2"
+    }
+  },
+  "scope": "All schemas including app_ext, table data, vectors, functions, views and sequences; cluster roles/passwords and external storage files are separate.",
+  "goal_preload": {
+    "model": "gpt-6-luna",
+    "actual_model_calls": 4,
+    "employees": 4,
+    "candidates": 12,
+    "input_tokens": 2309,
+    "output_tokens": 4778,
+    "total_tokens": 7087
+  },
+  "publication": {
+    "published_at": "2026-10-29T06:42:32.136007+00:00",
+    "checkpoint": "강좌 시간·커리큘럼, 가상 직원 100명 보완, REAL_USER 데모 입력 4명 및 실제 목표 후보 12개",
+    "source_archive": "growpath_profiles_goals_20261029.dump",
+    "excluded_real_user_preserved": true,
+    "drive_folder_id": "1DyJ67R5bYMEwKF-PChdOcxGF8TCNtPsx"
+  }
 }
