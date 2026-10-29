@@ -83,10 +83,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "f0b41a7ad331cca1c03924135cff6defc8f74e2c0355261f0a468f6cb1407469",
-      "bytes": 30873,
+      "sha256": "1c9b0fb0bde6cfb9dff07d56326d0f5e66596a0827623d65e4f33b47baff40c5",
+      "bytes": 32844,
       "handling": "adjusted",
-      "change_note": "Issue #26 course-first publication: preserve latest #14/#15 main; time, outlines, UI and snapshot only.",
+      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels.",
       "local_update_source": {
         "path": "README.md",
         "sha256": "e872d64ea58c53311d098dc1c769f5bc3232ad947d690054b75a0a0a20c6d8c6"
@@ -488,10 +488,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "ec073d9d6dda4a4685f859f5987320eb88d4c7c5940557e7249675ba5952b9e1",
-      "bytes": 18719,
+      "sha256": "a4811a6a2042fb19f79d2efd276e093699719f6c1d5eb2b5ea39766c1f090cc5",
+      "bytes": 24374,
       "handling": "adjusted",
-      "change_note": "Issue #26 course-first publication: preserve latest #14/#15 main; time, outlines, UI and snapshot only."
+      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
     },
     {
       "source_path": "database/src/__init__.py",
@@ -1639,9 +1639,9 @@
       "source_bytes": null,
       "source_kind": "team_followup_implementation",
       "handling": "adjusted",
-      "sha256": "28e56cc04412b42e14a37a7e8699bb478b3a87dd0b47b9afaf0d2609060b1018",
-      "bytes": 13273,
-      "change_note": "Issue #26 course-first publication: preserve latest #14/#15 main; time, outlines, UI and snapshot only."
+      "sha256": "43000752224e43b79b0a5f4999ee6405f87abb2cc557e715905f55ab32728dd3",
+      "bytes": 13860,
+      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
     },
     {
       "path": "database/tests/test_resource_refresh.py",
@@ -1683,9 +1683,9 @@
       "source_bytes": null,
       "source_kind": "team_course_duration_implementation",
       "handling": "adjusted",
-      "sha256": "57c912bf9052ff216f9acf220fa8bc0b2e36c5d16c32a2df28d5ab5072d73cf3",
-      "bytes": 40873,
-      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+      "sha256": "93cb2c696dd59892b93bf947e2f87175540cd1e974c682ffbab17297fb2508f7",
+      "bytes": 41299,
+      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
     },
     {
       "path": "backend/app/catalog.py",
@@ -1694,9 +1694,9 @@
       "source_bytes": null,
       "source_kind": "team_course_duration_implementation",
       "handling": "adjusted",
-      "sha256": "e6971590158542a324d8f0eacc488145208cbef5cc5c8d6565ce42b841987003",
-      "bytes": 15895,
-      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+      "sha256": "3aedc6b42cb63083934f63a0d793ab0e42e826bb59d8eb53af38036e28b25665",
+      "bytes": 16187,
+      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
     },
     {
       "path": "backend/app/course_time.py",
@@ -1716,9 +1716,9 @@
       "source_bytes": null,
       "source_kind": "team_course_duration_implementation",
       "handling": "adjusted",
-      "sha256": "1eb645af8e1d4cd532175fd2294bffa2fb0951c0538ec4e0c9bccd9a64851fcb",
-      "bytes": 15306,
-      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+      "sha256": "ea72ffee387fd93eabd598bd3df4cd9f98bd203af9c93adc96123b11d750e175",
+      "bytes": 15691,
+      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
     },
     {
       "path": "backend/tools/setup_db.py",
@@ -1793,9 +1793,9 @@
       "source_bytes": null,
       "source_kind": "team_course_duration_implementation",
       "handling": "adjusted",
-      "sha256": "f7a0c851b7a873497f0d36853373684aa0f8a27a261dd88336305983c1f4a821",
-      "bytes": 4459,
-      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+      "sha256": "8e8a7e765354a64a86eab03e284310f235e58582841226dc906315c6cafa51ca",
+      "bytes": 6502,
+      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
     },
     {
       "path": "frontend/src/api/types/catalog.ts",
@@ -1804,9 +1804,9 @@
       "source_bytes": null,
       "source_kind": "team_course_duration_implementation",
       "handling": "adjusted",
-      "sha256": "e822d6454f3670dbc455331fc06173d8205a76c6d91a8525b34b9fc5e89d07ef",
-      "bytes": 2870,
-      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+      "sha256": "c4817e7a0e23d8afc381bec48caa1d2043495d637d06b05c1c723699ddc44119",
+      "bytes": 2897,
+      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
     },
     {
       "path": "frontend/src/api/types/plan.ts",
@@ -1837,9 +1837,9 @@
       "source_bytes": null,
       "source_kind": "team_course_duration_implementation",
       "handling": "adjusted",
-      "sha256": "27ed58be0430265f7769fb7b51cc23ef970870aa2ea7b944c3d32fbecfb37405",
-      "bytes": 9346,
-      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+      "sha256": "ad57acc0326f192c6397fc17b6288beaea6be3908a1848dd195cb8f9452908ac",
+      "bytes": 9569,
+      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
     },
     {
       "path": "frontend/src/features/roadmap/RecordSheet.tsx",
@@ -1892,9 +1892,9 @@
       "source_bytes": null,
       "source_kind": "team_course_duration_implementation",
       "handling": "adjusted",
-      "sha256": "0d8419514b9e8807596db316978ca667351962e777649698fecd8dd926b20a7e",
-      "bytes": 1132,
-      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+      "sha256": "8f92bb6bed5f4e1d2a8f75838a28099a511d4575e3d3f025a240434a1fb45457",
+      "bytes": 1769,
+      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
     },
     {
       "path": "frontend/src/shared/lib/resourceTime.ts",
@@ -1903,9 +1903,9 @@
       "source_bytes": null,
       "source_kind": "team_course_duration_implementation",
       "handling": "adjusted",
-      "sha256": "ac16412950e6b2f5715bf8031f5796870c643e9745bd3404aa97e9ad17b7b2e0",
-      "bytes": 1076,
-      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+      "sha256": "7b954978a6436add3efedaadc4e0dacb7dd65627f5735578c2ba24d8ee7d9789",
+      "bytes": 1799,
+      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
     },
     {
       "path": "frontend/src/shared/ui/ResPicker.tsx",
@@ -1925,9 +1925,9 @@
       "source_bytes": null,
       "source_kind": "team_course_duration_implementation",
       "handling": "adjusted",
-      "sha256": "e0a84ce94ee62f05f884f4daa37411de3fce36e26ad28f145d64f8e0d7a9a9f9",
-      "bytes": 2200,
-      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+      "sha256": "91b48cdff85864bd472f8b30ce6d973d73f99ed3df974b1a94f94153145f5013",
+      "bytes": 2139,
+      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
     },
     {
       "path": "backend/app/agents/diag.py",
@@ -1936,9 +1936,9 @@
       "source_bytes": null,
       "source_kind": "team_course_duration_implementation",
       "handling": "adjusted",
-      "sha256": "ba3f95d6672a5414be0338168e351ae87dcaeedeb42de744fa95bc8dbc236838",
-      "bytes": 27594,
-      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+      "sha256": "f3ab5968cee1fc0e5376302b4cda1f3b943cb7afdce24b97ed668f374a5024ea",
+      "bytes": 27716,
+      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
     },
     {
       "path": "backend/app/catalog_evidence.py",
@@ -1947,9 +1947,9 @@
       "source_bytes": null,
       "source_kind": "team_course_duration_implementation",
       "handling": "adjusted",
-      "sha256": "8665fb69f88ff5eb78549218f8e5b8af6356960b6ccf3bb2732269b1e8c59b02",
-      "bytes": 3886,
-      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+      "sha256": "575f759f84ebaadbb70c77541b5e78c539a9cde3c5c6bed2f02fbc313a052440",
+      "bytes": 5671,
+      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
     },
     {
       "path": "database/data/exports/growpath_curriculum_20261028.manifest.json",
@@ -2002,9 +2002,42 @@
       "source_bytes": null,
       "source_kind": "team_course_duration_implementation",
       "handling": "adjusted",
-      "sha256": "219af74c46497b59fcb018d81a4c4d65e769c64dca7766a45babe94452a9a958",
-      "bytes": 7482,
-      "change_note": "Issue #26 course-first publication: preserve latest #14/#15 main; time, outlines, UI and snapshot only."
+      "sha256": "9f4d9de479b54dba607978f37a0e4cff4f188d17e998a4c034b4ac0417486f81",
+      "bytes": 8930,
+      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
+    },
+    {
+      "path": "backend/app/routers/work.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_review_fix",
+      "handling": "adjusted",
+      "sha256": "a064ec890565458418fe378af57a98464ce3fef3e4b02c92d0cb5804b2a32165",
+      "bytes": 16898,
+      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
+    },
+    {
+      "path": "frontend/src/shared/state/catalog.test.ts",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_review_fix",
+      "handling": "adjusted",
+      "sha256": "41582e03fc9cda4ee0fdac8c6124226aba6b023045105bf7592f9a06bc1c03e5",
+      "bytes": 1032,
+      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
+    },
+    {
+      "path": "frontend/src/shared/state/catalog.ts",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_review_fix",
+      "handling": "adjusted",
+      "sha256": "9e1cd80dbb37fafcb7bd750cf14e94373c599d69e2c1378d5da318e6a48bf5cc",
+      "bytes": 2796,
+      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
     }
   ],
   "excluded": [
@@ -2357,5 +2390,6 @@
     "drive_upload": "not_performed",
     "browser": "local preview with a synthetic actor on the owned test clone; no model inference"
   },
-  "course_publication_order": "course #26 before employee #27"
+  "course_publication_order": "course #26 before employee #27",
+  "course_review_verification": "database/snapshot-audit.json#course_review_20261029"
 }

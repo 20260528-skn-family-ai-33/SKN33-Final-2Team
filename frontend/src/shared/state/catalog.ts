@@ -17,7 +17,16 @@ export const useCatalog = create<CatalogState>(() => ({ res: {}, certGroups: [],
 
 export function mergeRes(res: ResourceMap | null | undefined): void {
   if (!res || !Object.keys(res).length) return;
-  useCatalog.setState((s) => ({ res: { ...s.res, ...res } }));
+  useCatalog.setState((s) => {
+    const next = { ...s.res };
+    Object.entries(res).forEach(([id, incoming]) => {
+      const previous = next[id];
+      next[id] = previous?.detailsLoaded && !incoming.detailsLoaded
+        ? { ...incoming, content: previous.content, curriculum: previous.curriculum, detailsLoaded: true }
+        : incoming;
+    });
+    return { res: next };
+  });
 }
 
 export function mergeReg(b: RegBundle | null | undefined): void {

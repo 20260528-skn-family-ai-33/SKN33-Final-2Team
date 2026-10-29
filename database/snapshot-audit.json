@@ -547,5 +547,182 @@
       "errors": 0,
       "successful": true
     }
+  },
+  "course_review_20261029": {
+    "issue": 26,
+    "pull_request": 32,
+    "base_head": "2ec7e5bdd691431479373b8186c67bc466215962",
+    "catalog_utf8_bytes_limit": 12000,
+    "enriched_courses_max": 4,
+    "skills_max": 4,
+    "list_has_full_outline": false,
+    "legacy_hours_origin_check_verified": true,
+    "legacy_plan_hours_unchanged": true,
+    "legacy_plan_missing_provenance_label": "추정 여부 미기록",
+    "unit": {
+      "collected": 231,
+      "started_including_skips": 220,
+      "executed": 215,
+      "passed": 215,
+      "skipped": 5,
+      "failures": 0,
+      "errors": 0,
+      "successful": true
+    },
+    "integration_tests_passed": 13,
+    "frontend_tests_passed": 43,
+    "frontend_typecheck": "PASS",
+    "frontend_build": "PASS",
+    "existing_lint_warnings": 37,
+    "source_database_writes": 0,
+    "paid_api_calls": 0,
+    "actual_model_inference": false,
+    "tokenizer": {
+      "model": "Qwen/Qwen3.8-27B",
+      "revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+      "tokenizer_sha256": "0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3",
+      "format": "local HF chat template, thinking off; deployed Ollama template not verified",
+      "max_after_prompt_tokens": 6344,
+      "output_reserve": 4096,
+      "context": 16384
+    },
+    "token_measurements": [
+      {
+        "goal": "SQL 정규화와 트랜잭션 격리 수준 적용",
+        "agent": "diagnostic",
+        "before_prompt_tokens": 32152,
+        "after_prompt_tokens": 5582,
+        "before_catalog_chars": 71486,
+        "after_catalog_chars": 8718,
+        "candidates": 28,
+        "enriched_courses": 3
+      },
+      {
+        "goal": "SQL 정규화와 트랜잭션 격리 수준 적용",
+        "agent": "roadmap",
+        "before_prompt_tokens": 32826,
+        "after_prompt_tokens": 6256,
+        "before_catalog_chars": 71486,
+        "after_catalog_chars": 8718,
+        "candidates": 28,
+        "enriched_courses": 3
+      },
+      {
+        "goal": "네트워크 TCP/IP와 보안 실습",
+        "agent": "diagnostic",
+        "before_prompt_tokens": 32544,
+        "after_prompt_tokens": 5412,
+        "before_catalog_chars": 68529,
+        "after_catalog_chars": 8346,
+        "candidates": 28,
+        "enriched_courses": 2
+      },
+      {
+        "goal": "네트워크 TCP/IP와 보안 실습",
+        "agent": "roadmap",
+        "before_prompt_tokens": 33218,
+        "after_prompt_tokens": 6086,
+        "before_catalog_chars": 68529,
+        "after_catalog_chars": 8346,
+        "candidates": 28,
+        "enriched_courses": 2
+      },
+      {
+        "goal": "파이썬 업무 자동화 API 서버 개발",
+        "agent": "diagnostic",
+        "before_prompt_tokens": 33894,
+        "after_prompt_tokens": 5496,
+        "before_catalog_chars": 74934,
+        "after_catalog_chars": 8361,
+        "candidates": 28,
+        "enriched_courses": 1
+      },
+      {
+        "goal": "파이썬 업무 자동화 API 서버 개발",
+        "agent": "roadmap",
+        "before_prompt_tokens": 34568,
+        "after_prompt_tokens": 6170,
+        "before_catalog_chars": 74934,
+        "after_catalog_chars": 8361,
+        "candidates": 28,
+        "enriched_courses": 1
+      },
+      {
+        "goal": "클라우드 Docker 배포와 모니터링",
+        "agent": "diagnostic",
+        "before_prompt_tokens": 30394,
+        "after_prompt_tokens": 5509,
+        "before_catalog_chars": 67868,
+        "after_catalog_chars": 8569,
+        "candidates": 28,
+        "enriched_courses": 1
+      },
+      {
+        "goal": "클라우드 Docker 배포와 모니터링",
+        "agent": "roadmap",
+        "before_prompt_tokens": 31068,
+        "after_prompt_tokens": 6183,
+        "before_catalog_chars": 67868,
+        "after_catalog_chars": 8569,
+        "candidates": 28,
+        "enriched_courses": 1
+      },
+      {
+        "goal": "머신러닝 MLOps 모델 배포",
+        "agent": "diagnostic",
+        "before_prompt_tokens": 32664,
+        "after_prompt_tokens": 5670,
+        "before_catalog_chars": 71290,
+        "after_catalog_chars": 8635,
+        "candidates": 28,
+        "enriched_courses": 1
+      },
+      {
+        "goal": "머신러닝 MLOps 모델 배포",
+        "agent": "roadmap",
+        "before_prompt_tokens": 33338,
+        "after_prompt_tokens": 6344,
+        "before_catalog_chars": 71290,
+        "after_catalog_chars": 8635,
+        "candidates": 28,
+        "enriched_courses": 1
+      },
+      {
+        "goal": "RAG 챗봇 문서 검색 구축",
+        "agent": "diagnostic",
+        "before_prompt_tokens": 36320,
+        "after_prompt_tokens": 5654,
+        "before_catalog_chars": 77565,
+        "after_catalog_chars": 8714,
+        "candidates": 28,
+        "enriched_courses": 1
+      },
+      {
+        "goal": "RAG 챗봇 문서 검색 구축",
+        "agent": "roadmap",
+        "before_prompt_tokens": 36994,
+        "after_prompt_tokens": 6328,
+        "before_catalog_chars": 77565,
+        "after_catalog_chars": 8714,
+        "candidates": 28,
+        "enriched_courses": 1
+      }
+    ],
+    "list_response_sizes": [
+      {
+        "limit": 30,
+        "before_bytes": 440626,
+        "after_bytes": 62627
+      },
+      {
+        "limit": 100,
+        "before_bytes": 1259236,
+        "after_bytes": 201612
+      }
+    ],
+    "browser": "course-only owned clone with external model calls blocked; list summary -> explicit detail -> 48-item outline verified",
+    "human_review": "pending",
+    "publication_record": "GitHub PR #32; actual commit/push/comment result is recorded there",
+    "user_authorized_commit_push_and_pr_comment": true
   }
 }

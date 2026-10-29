@@ -7,10 +7,32 @@ import unittest
 
 from src.database.course_curriculum import VERSION, normalize, plain
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'backend'))
-from app.catalog_evidence import content_text, evidence
+from app.catalog_evidence import CATALOG_BYTES, content_text, evidence, pack, packed_bytes
 
 
 class CourseCurriculumTests(unittest.TestCase):
+    def test_entire_ai_catalog_budget_and_four_skill_limit(self):
+        records=[{'id':str(i),'title':'SQL 강좌 '+str(i),'kind':'강좌','type':'course','format':'영상',
+                  'skills':['SQL']*12,'hours':1,'timeStatus':'estimated','content':'한글 소개 '*1000,
+                  'curriculum':{'items':[{'title':'SQL 조인','description':'한글 목차 '*1000}]*100}}
+                 for i in range(28)]
+        result=pack(records,['SQL 조인'])
+        self.assertEqual(len(result),28)
+        self.assertLessEqual(packed_bytes(result),CATALOG_BYTES)
+        self.assertLessEqual(sum('curriculum' in r for r in result),4)
+        self.assertTrue(all(len(r['skills'])==4 for r in result))
+        self.assertTrue(all(r['timeStatus']=='estimated' for r in result))
+        self.assertLessEqual(sum(len(str(v)) for r in evidence(records[0])['curriculum'] for v in r.values()),240)
+
+    def test_huge_metadata_and_extra_candidates_cannot_bypass_catalog_budget(self):
+        records=[{'id':str(i),'title':'긴 강좌명 '*1000,'kind':'강좌','type':'course',
+                  'skills':['긴 스킬명 '*100]*30,'content':'내용'*10000} for i in range(60)]
+        result=pack(records)
+        self.assertGreater(len(result),0)
+        self.assertLess(len(result),len(records))
+        self.assertEqual(result[0]['id'],'0')
+        self.assertLessEqual(packed_bytes(result),CATALOG_BYTES)
+
     def test_kmooc_table_keeps_later_topics_and_continuation_rows(self):
         payload={'summary':'<h2>소개</h2><table><tr><th>주차</th><th>차시목차</th><th>세부목차</th></tr>'
                  '<tr><td>1</td><td>SQL</td><td>SELECT</td></tr><tr><td>JOIN</td></tr>'

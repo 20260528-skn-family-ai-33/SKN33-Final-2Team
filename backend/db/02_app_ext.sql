@@ -239,7 +239,7 @@ CREATE TABLE IF NOT EXISTS app_ext.resource_meta (
   doc_id text REFERENCES app_ext.learning_docs(doc_id) ON DELETE CASCADE,
   format text,
   hours numeric(12,6),
-  hours_origin text NOT NULL DEFAULT 'legacy' CHECK (hours_origin IN ('legacy','catalog','manual')),
+  hours_origin text NOT NULL DEFAULT 'legacy' CONSTRAINT resource_meta_hours_origin_check CHECK (hours_origin IN ('legacy','catalog','manual')),
   stage smallint CHECK (stage BETWEEN 1 AND 4),
   cost_won integer CHECK (cost_won >= 0),
   audience text,
@@ -261,11 +261,20 @@ CREATE TABLE IF NOT EXISTS app_ext.resource_meta (
   CHECK (num_nonnulls(course_id, isbn, cert_id, doc_id) = 1)
 );
 
--- ── 규정 보조 ──
 -- Existing manual values stay distinct from source-controlled duration on setup reruns.
 ALTER TABLE app_ext.resource_meta ADD COLUMN IF NOT EXISTS hours_origin text NOT NULL DEFAULT 'legacy';
 ALTER TABLE app_ext.resource_meta ALTER COLUMN hours TYPE numeric(12,6);
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                 WHERE conrelid='app_ext.resource_meta'::regclass AND conname='resource_meta_hours_origin_check') THEN
+    ALTER TABLE app_ext.resource_meta ADD CONSTRAINT resource_meta_hours_origin_check
+      CHECK (hours_origin IN ('legacy','catalog','manual'));
+  END IF;
+END
+$$;
 
+-- ── 규정 보조 ──
 -- 규정이 적용되는 직원 구분(일반직·실무직)·국외근무 전용 여부·화면 표시용 짧은 키. ERD regulations 에 열이 없다
 CREATE TABLE IF NOT EXISTS app_ext.regulation_meta (
   regulation_id varchar(64) PRIMARY KEY REFERENCES regulations.regulations(regulation_id) ON DELETE CASCADE,

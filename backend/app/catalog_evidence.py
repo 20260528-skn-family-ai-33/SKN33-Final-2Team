@@ -1,7 +1,13 @@
 """Bounded model evidence selected from the full stored course description/outline."""
+import json
 import re
 from html import unescape
 from html.parser import HTMLParser
+
+CATALOG_BYTES = 12_000
+EVIDENCE_COURSES = 4
+DESCRIPTION_CHARS = 240
+OUTLINE_CHARS = 240
 
 
 class _Text(HTMLParser):
@@ -59,9 +65,10 @@ def evidence(r: dict, texts: list[str] | None = None) -> dict:
     ranked = sorted(enumerate(rows), key=lambda pair: (-score(' '.join(str(pair[1].get(k) or '') for k in ('title', 'section', 'description'))), pair[0]))
     selected, used = [], 0
     for index, row in ranked:
-        entry = {k: excerpt(str(row.get(k) or ''), 180) for k in ('title', 'section', 'description') if row.get(k)}
+        entry = {k: excerpt(str(row.get(k) or ''), 40 if k == 'section' else 80)
+                 for k in ('title', 'section', 'description') if row.get(k)}
         size = sum(len(v) for v in entry.values())
-        if len(selected) >= 16 or used + size > 1800:
+        if len(selected) >= 3 or used + size > OUTLINE_CHARS:
             continue
         if row.get('suspended'):
             entry['suspended'] = True
@@ -69,20 +76,59 @@ def evidence(r: dict, texts: list[str] | None = None) -> dict:
         used += size
     content = str(r.get('content') or '')
     lines = content.splitlines()
-    if len(content) > 1000:
+    if len(content) > DESCRIPTION_CHARS:
         # Reserve an overview and relevant lines, rather than silently keeping a 600-char prefix.
         chosen = sorted(enumerate(lines), key=lambda pair: (-score(pair[1]), pair[0]))
-        fragments, remaining = [(0, content[:350])], 650
+        fragments, remaining = [(0, content[:80])], DESCRIPTION_CHARS - 80
         for index, line in chosen:
             if not score(line) or remaining <= 0:
                 continue
-            fragment = excerpt(line, min(300, remaining))
+            fragment = excerpt(line, min(120, remaining))
             fragments.append((index + 1, fragment))
             remaining -= len(fragment)
-        content = '\n'.join(text for _, text in sorted(fragments))[:1000]
+        content = '\n'.join(text for _, text in sorted(fragments))[:DESCRIPTION_CHARS]
     return {'content': content, 'contentTruncated': len(content) < len(str(r.get('content') or '')),
-            'audience': str(r.get('audience') or '')[:300], 'prereq': str(r.get('prereq') or '')[:300],
             'curriculum': [entry for _, entry in sorted(selected)], 'curriculumCount': len(rows),
             'curriculumOmitted': len(rows) - len(selected), 'curriculumCoverage': outline.get('coverage', 'description_only'),
-            'timeStatus': r.get('timeStatus'), 'timeNote': r.get('timeNote'),
-            'platform': r.get('platform'), 'url': r.get('url')}
+            'timeStatus': r.get('timeStatus'), 'timeNote': str(r.get('timeNote') or '')[:120]}
+
+
+def entry(r: dict, *, skill_names: bool = True) -> dict:
+    """Compact candidate identity; restore the original four-skill contract."""
+    return {'id': r['id'], 'title': r['title'][:120], 'kind': r['kind'], 'format': (r.get('format') or '')[:40],
+            'hours': r.get('hours'), 'timeStatus': r.get('timeStatus'),
+            'cost': r.get('cost'), 'stage': r.get('stage'), 'real': r.get('real'),
+            'skills': [str(s)[:80] for s in r.get('skills', [])[:4]] if skill_names else []}
+
+
+def packed_bytes(value: list[dict]) -> int:
+    # Match runtime.llm_json's JSON spacing and UTF-8, including keys and escaping.
+    return len(json.dumps(value, ensure_ascii=False, default=str).encode('utf-8'))
+
+
+def pack(records: list[dict], texts: list[str] | None = None) -> list[dict]:
+    """Bound the whole catalog, not each candidate multiplied by 28.
+
+    Keep compact candidates first; enrich at most the first four courses only
+    when the complete serialized catalog still fits. This byte budget is not
+    a token count or a guarantee about the rest of the model prompt.
+    """
+    result, kept = [], []
+    for r in records:
+        compact = entry(r)
+        if packed_bytes(result + [compact]) > CATALOG_BYTES:
+            continue
+        result.append(compact)
+        kept.append(r)
+    enriched = 0
+    for index, r in enumerate(kept):
+        if enriched >= EVIDENCE_COURSES:
+            break
+        if r.get('type') != 'course':
+            continue
+        detailed = dict(result[index], **evidence(r, texts))
+        candidate = result[:index] + [detailed] + result[index + 1:]
+        if packed_bytes(candidate) <= CATALOG_BYTES:
+            result[index] = detailed
+            enriched += 1
+    return result

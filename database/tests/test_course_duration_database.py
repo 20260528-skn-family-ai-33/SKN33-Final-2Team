@@ -13,6 +13,9 @@ from src.database.course_curriculum import backfill as curriculum_backfill
 
 
 class CourseDurationDatabaseTests(unittest.TestCase):
+    def app_schema(self):
+        return (Path(__file__).resolve().parents[2]/'backend/db/02_app_ext.sql').read_text(encoding='utf-8')
+
     def setUp(self):
         url=os.environ.get('EMPLOYEE_FORM_TEST_DB_URL','')
         if not url:self.skipTest('An isolated local test DB is required')
@@ -44,6 +47,28 @@ class CourseDurationDatabaseTests(unittest.TestCase):
                     self.c.execute('UPDATE public.courses SET duration_seconds=5000 WHERE course_id=%s',(self.id,))
                     self.c.execute('UPDATE public.courses SET '+assignment+' WHERE course_id=%s',(self.id,))
             self.assertEqual(self.c.execute('SELECT duration_seconds FROM public.courses WHERE course_id=%s',(self.id,)).fetchone()['duration_seconds'],4260)
+
+    def test_fresh_and_legacy_app_schema_share_the_same_hours_origin_check(self):
+        self.c.execute(self.app_schema())
+        self.c.execute('ALTER TABLE app_ext.resource_meta DROP CONSTRAINT resource_meta_hours_origin_check')
+        self.c.execute('ALTER TABLE app_ext.resource_meta DROP COLUMN hours_origin')
+        for _ in range(2):
+            self.c.execute(self.app_schema())
+        count=self.c.execute("SELECT count(*) AS n FROM pg_constraint WHERE conrelid='app_ext.resource_meta'::regclass AND conname='resource_meta_hours_origin_check'").fetchone()['n']
+        self.assertEqual(count,1)
+        for value in ('legacy','catalog','manual'):
+            self.c.execute("INSERT INTO app_ext.resource_meta(resource_key,resource_type,course_id,hours_origin) VALUES(%s,'course',%s,%s)",(self.id+value,self.id,value))
+        with self.assertRaises(psycopg.errors.CheckViolation),self.c.transaction():
+            self.c.execute("UPDATE app_ext.resource_meta SET hours_origin='invalid' WHERE resource_key=%s",(self.id+'legacy',))
+        self.assertEqual(self.c.execute('SELECT hours_origin FROM app_ext.resource_meta WHERE resource_key=%s',(self.id+'legacy',)).fetchone()['hours_origin'],'legacy')
+
+    def test_invalid_legacy_origin_fails_upgrade_without_silently_repairing_data(self):
+        self.c.execute(self.app_schema())
+        self.c.execute('ALTER TABLE app_ext.resource_meta DROP CONSTRAINT resource_meta_hours_origin_check')
+        self.c.execute("INSERT INTO app_ext.resource_meta(resource_key,resource_type,course_id,hours_origin) VALUES(%s,'course',%s,'invalid')",(self.id,self.id))
+        with self.assertRaises(psycopg.errors.CheckViolation),self.c.transaction():
+            self.c.execute(self.app_schema())
+        self.assertEqual(self.c.execute('SELECT hours_origin FROM app_ext.resource_meta WHERE resource_key=%s',(self.id,)).fetchone()['hours_origin'],'invalid')
 
     def test_curriculum_preview_repeatability_source_preservation_and_bad_json_rollback(self):
         original=self.c.execute('SELECT payload FROM growpath_meta.catalog_api_sources WHERE entity_key=%s',(self.id,)).fetchone()

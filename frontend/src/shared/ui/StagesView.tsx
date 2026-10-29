@@ -1,7 +1,7 @@
 /* 단계별 활동 목록 (5차 P.stagesView) — 검토·확정 · 내 로드맵 · 부서장 화면이 같이 쓴다 */
 import type { PlanContent, Progress } from '@/api/types/plan';
 import { D } from '@/shared/constants/data';
-import { roundedDuration } from '@/shared/lib/resourceTime';
+import { activityTime } from '@/shared/lib/resourceTime';
 import { actMeta, range, st, stageActs } from '@/shared/lib/plan';
 import { useCatalog } from '@/shared/state/catalog';
 import { ActThumb, Stt } from './parts';
@@ -28,6 +28,7 @@ export function StagesView({ pl, progress, status, memo }: { pl: PlanContent; pr
               <ul className="acts">
                 {acts.map((a) => {
                   const m = memo && progress?.[a.id]?.memo;
+                  const timing = activityTime(a);
                   return (
                     <li key={a.id}>
                       {status ? <Stt done={st(progress, a.id) === 'done'} /> : null}
@@ -38,7 +39,7 @@ export function StagesView({ pl, progress, status, memo }: { pl: PlanContent; pr
                         {m ? <small className="memo">메모 · {m}</small> : null}
                       </div>
                       <span className="h">
-                        <span title={a.hoursBasis || '로드맵에 저장된 계획 시간입니다'}>계획 {roundedDuration(a.hours)}{a.hoursEstimated ? ' (추정)' : ''}</span>
+                        <span title={timing.title}>{timing.text}</span>
                       </span>
                     </li>
                   );

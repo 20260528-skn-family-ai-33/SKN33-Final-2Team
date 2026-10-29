@@ -26,6 +26,7 @@ export interface Resource {
   audience?: string;
   prereq?: string;
   content?: string;
+  detailsLoaded?: boolean;
   curriculum?: ResourceCurriculum | null;
   note?: string;
   url?: string;

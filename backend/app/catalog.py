@@ -132,16 +132,22 @@ def get(key: str | None) -> dict | None:
     return items().get(key or '') if key else None
 
 
-def resources_for(keys) -> dict[str, dict]:
+def resources_for(keys, *, detail: bool = False) -> dict[str, dict]:
     """화면에 보낼 자료(쓰인 키만)"""
     all_ = items()
-    return {k: _public(all_[k]) for k in set(k for k in keys if k) if k in all_}
+    return {k: _public(all_[k], detail=detail) for k in set(k for k in keys if k) if k in all_}
 
 
-def _public(r: dict) -> dict:
-    return {k: r.get(k) for k in ('id', 'title', 'provider', 'kind', 'format', 'hours', 'cost', 'stage', 'real', 'skills', 'audience', 'prereq',
+def _public(r: dict, *, detail: bool = False) -> dict:
+    out = {k: r.get(k) for k in ('id', 'title', 'provider', 'kind', 'format', 'hours', 'cost', 'stage', 'real', 'skills', 'audience', 'prereq',
                                   'content', 'note', 'url', 'image', 'type', 'source', 'checked', 'estimated', 'certCode', 'platform', 'difficulty', 'weeks', 'author',
                                   'timeStatus','durationKind','durationSeconds','timeNote','curriculum')}
+    out['detailsLoaded'] = detail
+    if not detail:
+        out['content'] = str(r.get('content') or '')[:400]
+        if r.get('curriculum'):
+            out['curriculum'] = {k: r['curriculum'].get(k) for k in ('coverage', 'item_count')}
+    return out
 
 
 def _word_re(w: str) -> re.Pattern:
@@ -244,9 +250,12 @@ def for_agent(texts: list[str], cert_key: str | None = None, limit: int = 28, st
 
 def agent_view(r: dict, skill_names: bool = True, texts: list[str] | None = None) -> dict:
     """Keep original keys and add bounded, goal-relevant source evidence."""
-    return {'id': r['id'], 'title': r['title'], 'kind': r['kind'], 'format': r['format'], 'hours': r['hours'], 'cost': r['cost'],
-            'stage': r['stage'], 'real': r['real'], 'skills': r['skills'] if skill_names else [],
+    return {**catalog_evidence.entry(r, skill_names=skill_names),
             **catalog_evidence.evidence(r, texts)}
+
+
+def agent_views(records: list[dict], texts: list[str] | None = None) -> list[dict]:
+    return catalog_evidence.pack(records, texts)
 
 
 def cert_groups() -> list[dict]:

@@ -1,7 +1,7 @@
 /* 학습 자료 (API-53·54 · 팀 DB 강좌·도서·자격증, 검색·쪽 나누기 · 5차 scr.resources · scr.res) */
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 import { catalogApi } from '@/api/endpoints/catalog';
 import type { Resource } from '@/api/types/catalog';
 import { paths } from '@/app/paths';
@@ -49,6 +49,8 @@ export function ResKv({ r }: { r: Resource }) {
                   ))}
                 </ol>
               </details>
+            ) : r.curriculum?.item_count ? (
+              <Link className="link" to={paths.resource(r.id)}>공개 목차 {r.curriculum.item_count}개 · 자료 상세 보기</Link>
             ) : <span className="small muted">별도 목차 미확보 · 소개와 학습 목표를 참고해 주세요.</span>}
           </dd>
         </>
@@ -211,17 +213,17 @@ export function ResourcesPage() {
 export function ResourcePage() {
   const { id = '' } = useParams();
   const r = useRes(id);
-  /* 목록을 거치지 않고 들어오면(새로 고침 등) 그 자료만 받아 온다. 못 받으면 5차처럼 '불러오는 중'에 머문다 */
+  /* 목록은 요약이므로 상세를 별도로 받는다. 이미 받은 상세는 목록 재조회로 지우지 않는다. */
   useQuery({
     queryKey: ['resource', id],
     queryFn: async () => {
-      const m = await catalogApi.lookup([id]);
-      mergeRes(m);
-      return m[id] || null;
+      const detail = await catalogApi.resource(id);
+      mergeRes({ [id]: detail });
+      return detail;
     },
-    enabled: !r,
+    enabled: Boolean(id) && !r?.detailsLoaded,
   });
-  if (!r) return <Page back={paths.resources} title="자료를 불러오는 중이에요" />;
+  if (!r?.detailsLoaded) return <Page back={paths.resources} title="자료를 불러오는 중이에요" />;
   return (
     <Page back={paths.resources} eyebrow={`${r.kind} · ${r.real ? '실제 자료' : '가상 자료'}`} title={r.title} lead={resourceSource(r)}>
       <div className={`card res-card ${r.type || ''}`}>
