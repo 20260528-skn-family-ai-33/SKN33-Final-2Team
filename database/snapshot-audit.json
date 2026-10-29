@@ -397,5 +397,391 @@
       "invalid development years returns 422"
     ],
     "consent_history_retention_policy": "consumer review pending; current value plus changed timestamp only"
+  },
+  "course_duration_20261028": {
+    "confirmed": 1730,
+    "estimated": 330,
+    "all_courses_have_planning_time": true,
+    "migration": "025_course_duration.sql",
+    "unit_passed": 189,
+    "unit_skipped": 5,
+    "postgres_duration_tests_passed": 2,
+    "frontend_tests_passed": 41,
+    "frontend_typecheck": "PASS",
+    "frontend_lint": "PASS with 37 existing warnings",
+    "frontend_build": "PASS",
+    "original_course_fields_preserved": true,
+    "other_tables_and_vectors_preserved": true,
+    "all_53_restore_fingerprints_match": true,
+    "display_rounding_minutes": 10,
+    "platform_labels_verified": true,
+    "paid_api_calls": 0,
+    "human_review": "pending",
+    "drive_upload": "not_performed",
+    "browser": "local preview with a synthetic actor on the owned test clone; no model inference"
+  },
+  "course_curriculum_20261028": {
+    "confirmed": 1730,
+    "estimated": 330,
+    "all_courses_have_planning_time": true,
+    "migration": "026_course_curriculum.sql",
+    "unit_passed": 213,
+    "unit_skipped": 5,
+    "postgres_duration_tests_passed": 3,
+    "full_outlines": 2051,
+    "partial_outlines": 3,
+    "description_only": 6,
+    "public_pages_supplemented": 111,
+    "visual_transcription_courses": 6,
+    "captured_model_payloads": 2,
+    "actual_model_inference": false,
+    "frontend_tests_passed": 41,
+    "frontend_typecheck": "PASS",
+    "frontend_lint": "PASS with 37 existing warnings",
+    "frontend_build": "PASS",
+    "original_course_fields_preserved": true,
+    "other_tables_and_vectors_preserved": true,
+    "all_53_restore_fingerprints_match": true,
+    "display_rounding_minutes": 10,
+    "platform_labels_verified": true,
+    "paid_api_calls": 0,
+    "human_review": "pending",
+    "drive_upload": "not_performed",
+    "browser": "local preview with a synthetic actor on the owned test clone; no model inference"
+  },
+  "course_publication_20261028": {
+    "issue": 26,
+    "base_commit": "f8b37ed9ae3b0fb6c6b43aa9a0b7ae29686848d1",
+    "delivery_order": "course #26 before employee #27; closed PR #29 stays deferred",
+    "employee_profile_file_matches_main": true,
+    "latest_resource_refresh_and_app_contract_suites_preserved": true,
+    "source_database_modified_during_publication": false,
+    "paid_api_calls": 0,
+    "preservation_stash": "53c95b3ccabea20b05bcbca5e5a9e3082887d678",
+    "docs_sync_stash": "6fb4b1e7c79782980caebf60e4358a09e0087709",
+    "normalized_curriculum_excluded_from_legacy_scope_input": true,
+    "human_review": "pending",
+    "verification": {
+      "base_commit": "5acc9403383d6a0a7103f3cf9c289e6841f25d11",
+      "source_database_writes": 0,
+      "paid_api_calls": 0,
+      "restored_checkpoint": {
+        "tables": 53,
+        "rows": 22300,
+        "migration_count": 26,
+        "sha256": "c401c1f60e0b7d2e513dce031225cc2dad0d879ec22674900608b55c31d2c48c"
+      },
+      "schema_sql": {
+        "psql_on_error_stop": true,
+        "foreign_keys": 87,
+        "course_columns": 5
+      },
+      "integration": {
+        "collected": 56,
+        "started_including_skips": 56,
+        "skipped": 3,
+        "passed": 53,
+        "errors": 0,
+        "failures": 0,
+        "paid_api_calls": 0
+      },
+      "app": {
+        "courses": 2060,
+        "confirmed": 1730,
+        "estimated": 330,
+        "all_courses_have_planning_hours": true,
+        "api_status": 200,
+        "manual_override_preserved_after_sync": true,
+        "planner_uses_source_and_curriculum_hours": true,
+        "sample": {
+          "confirmed": 4.0,
+          "estimated": 10.0,
+          "weeks": 4
+        },
+        "paid_api_calls": 0
+      },
+      "curriculum": {
+        "postgres_tests_passed": 3,
+        "api_full_description_and_outline": true,
+        "portable_java_outline_items": 55,
+        "ms_missing_outline_recovered": true,
+        "image_outline_topics_delivered": true,
+        "missing_outline_explicit": true,
+        "kocw_fragment_grouping": true,
+        "diagnostic_and_roadmap_payloads_captured": 2,
+        "actual_model_inference": false,
+        "paid_api_calls": 0
+      },
+      "owned_test_clones_removed": 2,
+      "publication_base_commit": "f8b37ed9ae3b0fb6c6b43aa9a0b7ae29686848d1",
+      "later_main_docs_only_sync": {
+        "pull_request": 31,
+        "runtime_files_unchanged": true,
+        "files": [
+          "README.md",
+          "backend/README.md",
+          "backend/RunPod_Ollama_연결_절차.md"
+        ]
+      },
+      "pre_fix_attempts": {
+        "first_integration_timeout_seconds": 180,
+        "second_run_cancelled_after_scope_compatibility_issue_found": true,
+        "included_in_final_pass_counts": false
+      },
+      "frontend": {
+        "typecheck": "PASS",
+        "lint_errors": 0,
+        "existing_lint_warnings": 37,
+        "test_files": 10,
+        "tests_passed": 41,
+        "build": "PASS"
+      }
+    },
+    "unit": {
+      "collected": 229,
+      "started_including_skips": 218,
+      "executed": 213,
+      "passed": 213,
+      "skipped": 5,
+      "failures": 0,
+      "errors": 0,
+      "successful": true
+    }
+  },
+  "course_review_20261029": {
+    "issue": 26,
+    "pull_request": 32,
+    "base_head": "2ec7e5bdd691431479373b8186c67bc466215962",
+    "catalog_utf8_bytes_limit": 12000,
+    "enriched_courses_max": 4,
+    "skills_max": 4,
+    "list_has_full_outline": false,
+    "legacy_hours_origin_check_verified": true,
+    "legacy_plan_hours_unchanged": true,
+    "legacy_plan_missing_provenance_label": "추정 여부 미기록",
+    "unit": {
+      "collected": 231,
+      "started_including_skips": 220,
+      "executed": 215,
+      "passed": 215,
+      "skipped": 5,
+      "failures": 0,
+      "errors": 0,
+      "successful": true
+    },
+    "integration_tests_passed": 13,
+    "frontend_tests_passed": 43,
+    "frontend_typecheck": "PASS",
+    "frontend_build": "PASS",
+    "existing_lint_warnings": 37,
+    "source_database_writes": 0,
+    "paid_api_calls": 0,
+    "actual_model_inference": false,
+    "tokenizer": {
+      "model": "Qwen/Qwen3.8-27B",
+      "revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+      "tokenizer_sha256": "0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3",
+      "format": "local HF chat template, thinking off; deployed Ollama template not verified",
+      "max_after_prompt_tokens": 6344,
+      "output_reserve": 4096,
+      "context": 16384
+    },
+    "token_measurements": [
+      {
+        "goal": "SQL 정규화와 트랜잭션 격리 수준 적용",
+        "agent": "diagnostic",
+        "before_prompt_tokens": 32152,
+        "after_prompt_tokens": 5582,
+        "before_catalog_chars": 71486,
+        "after_catalog_chars": 8718,
+        "candidates": 28,
+        "enriched_courses": 3
+      },
+      {
+        "goal": "SQL 정규화와 트랜잭션 격리 수준 적용",
+        "agent": "roadmap",
+        "before_prompt_tokens": 32826,
+        "after_prompt_tokens": 6256,
+        "before_catalog_chars": 71486,
+        "after_catalog_chars": 8718,
+        "candidates": 28,
+        "enriched_courses": 3
+      },
+      {
+        "goal": "네트워크 TCP/IP와 보안 실습",
+        "agent": "diagnostic",
+        "before_prompt_tokens": 32544,
+        "after_prompt_tokens": 5412,
+        "before_catalog_chars": 68529,
+        "after_catalog_chars": 8346,
+        "candidates": 28,
+        "enriched_courses": 2
+      },
+      {
+        "goal": "네트워크 TCP/IP와 보안 실습",
+        "agent": "roadmap",
+        "before_prompt_tokens": 33218,
+        "after_prompt_tokens": 6086,
+        "before_catalog_chars": 68529,
+        "after_catalog_chars": 8346,
+        "candidates": 28,
+        "enriched_courses": 2
+      },
+      {
+        "goal": "파이썬 업무 자동화 API 서버 개발",
+        "agent": "diagnostic",
+        "before_prompt_tokens": 33894,
+        "after_prompt_tokens": 5496,
+        "before_catalog_chars": 74934,
+        "after_catalog_chars": 8361,
+        "candidates": 28,
+        "enriched_courses": 1
+      },
+      {
+        "goal": "파이썬 업무 자동화 API 서버 개발",
+        "agent": "roadmap",
+        "before_prompt_tokens": 34568,
+        "after_prompt_tokens": 6170,
+        "before_catalog_chars": 74934,
+        "after_catalog_chars": 8361,
+        "candidates": 28,
+        "enriched_courses": 1
+      },
+      {
+        "goal": "클라우드 Docker 배포와 모니터링",
+        "agent": "diagnostic",
+        "before_prompt_tokens": 30394,
+        "after_prompt_tokens": 5509,
+        "before_catalog_chars": 67868,
+        "after_catalog_chars": 8569,
+        "candidates": 28,
+        "enriched_courses": 1
+      },
+      {
+        "goal": "클라우드 Docker 배포와 모니터링",
+        "agent": "roadmap",
+        "before_prompt_tokens": 31068,
+        "after_prompt_tokens": 6183,
+        "before_catalog_chars": 67868,
+        "after_catalog_chars": 8569,
+        "candidates": 28,
+        "enriched_courses": 1
+      },
+      {
+        "goal": "머신러닝 MLOps 모델 배포",
+        "agent": "diagnostic",
+        "before_prompt_tokens": 32664,
+        "after_prompt_tokens": 5670,
+        "before_catalog_chars": 71290,
+        "after_catalog_chars": 8635,
+        "candidates": 28,
+        "enriched_courses": 1
+      },
+      {
+        "goal": "머신러닝 MLOps 모델 배포",
+        "agent": "roadmap",
+        "before_prompt_tokens": 33338,
+        "after_prompt_tokens": 6344,
+        "before_catalog_chars": 71290,
+        "after_catalog_chars": 8635,
+        "candidates": 28,
+        "enriched_courses": 1
+      },
+      {
+        "goal": "RAG 챗봇 문서 검색 구축",
+        "agent": "diagnostic",
+        "before_prompt_tokens": 36320,
+        "after_prompt_tokens": 5654,
+        "before_catalog_chars": 77565,
+        "after_catalog_chars": 8714,
+        "candidates": 28,
+        "enriched_courses": 1
+      },
+      {
+        "goal": "RAG 챗봇 문서 검색 구축",
+        "agent": "roadmap",
+        "before_prompt_tokens": 36994,
+        "after_prompt_tokens": 6328,
+        "before_catalog_chars": 77565,
+        "after_catalog_chars": 8714,
+        "candidates": 28,
+        "enriched_courses": 1
+      }
+    ],
+    "list_response_sizes": [
+      {
+        "limit": 30,
+        "before_bytes": 440626,
+        "after_bytes": 62627
+      },
+      {
+        "limit": 100,
+        "before_bytes": 1259236,
+        "after_bytes": 201612
+      }
+    ],
+    "browser": "course-only owned clone with external model calls blocked; list summary -> explicit detail -> 48-item outline verified",
+    "human_review": "pending",
+    "publication_record": "GitHub PR #32; actual commit/push/comment result is recorded there",
+    "user_authorized_commit_push_and_pr_comment": true
+  },
+  "course_selected_review_fixes_20261029": {
+    "checked_on": "2026-10-29",
+    "base_commit": "fd03d0c5ae17823792bb84351c5b829cef0eeaca",
+    "scope": [
+      "admin same-number time confirmation",
+      "detail refetch on reentry",
+      "full introduction access for all resource types",
+      "ten-minute display consistency"
+    ],
+    "excluded": [
+      "certificate input policy",
+      "supplementary ingestion normalization",
+      "sample curriculum cache refresh",
+      "AI evidence budget",
+      "employee data and code"
+    ],
+    "unit": {
+      "collected": 232,
+      "started_including_skips": 221,
+      "executed": 216,
+      "passed": 216,
+      "skipped": 5,
+      "failures": 0,
+      "errors": 0,
+      "successful": true
+    },
+    "integration": {
+      "collected": 16,
+      "started_including_skips": 16,
+      "skipped": 0,
+      "passed": 16,
+      "errors": 0,
+      "failures": 0,
+      "paid_api_calls": 0
+    },
+    "integration_source": "latest reviewed source restored to an owned disposable local PostgreSQL clone",
+    "integration_source_archive_sha256": "46dcbe3f9de42320f1a85434ce62e3f431b12e6ea674f3ee3ca0102512e2b293",
+    "frontend": {
+      "files": 13,
+      "passed": 47,
+      "typecheck": "PASS",
+      "lint_errors": 0,
+      "lint_existing_warnings": 37,
+      "build": "PASS"
+    },
+    "browser": [
+      "book summary links to full introduction",
+      "old detail cached -> real admin apply/after -> summary refresh -> detail reentry shows updated full introduction",
+      "stage list and execution record both show 5시간 50분"
+    ],
+    "browser_environment": "isolated local app with a synthetic actor and owned fixtures; external model HTTP blocked",
+    "original_database_writes": 0,
+    "paid_api_calls": 0,
+    "actual_model_inference": false,
+    "test_clone_removed": true,
+    "human_review": "pending",
+    "user_authorized_commit_push_and_pr_comment": true,
+    "publication_record": "GitHub PR #32; actual commit/push/comment result is recorded there"
   }
 }

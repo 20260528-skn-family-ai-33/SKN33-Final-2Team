@@ -2023,6 +2023,46 @@
         "default": null,
         "identity": "",
         "generated": ""
+      },
+      {
+        "column": "duration_seconds",
+        "type": "integer",
+        "not_null": false,
+        "default": null,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "column": "duration_kind",
+        "type": "text",
+        "not_null": false,
+        "default": null,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "column": "estimated_duration_seconds",
+        "type": "integer",
+        "not_null": false,
+        "default": null,
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "column": "duration_provenance",
+        "type": "jsonb",
+        "not_null": true,
+        "default": "'{}'::jsonb",
+        "identity": "",
+        "generated": ""
+      },
+      {
+        "column": "curriculum",
+        "type": "jsonb",
+        "not_null": true,
+        "default": "'{}'::jsonb",
+        "identity": "",
+        "generated": ""
       }
     ],
     "pk": [
@@ -2037,6 +2077,47 @@
         "target": "-",
         "columns": [
           "difficulty"
+        ],
+        "target_columns": []
+      },
+      {
+        "name": "courses_curriculum_object",
+        "type": "c",
+        "definition": "CHECK (jsonb_typeof(curriculum) = 'object'::text)",
+        "target": "-",
+        "columns": [
+          "curriculum"
+        ],
+        "target_columns": []
+      },
+      {
+        "name": "courses_duration_kind_valid",
+        "type": "c",
+        "definition": "CHECK ((duration_seconds IS NULL AND duration_kind IS NULL OR duration_seconds IS NOT NULL AND (duration_kind = ANY (ARRAY['video'::text, 'learning'::text]))) IS TRUE)",
+        "target": "-",
+        "columns": [
+          "duration_seconds",
+          "duration_kind"
+        ],
+        "target_columns": []
+      },
+      {
+        "name": "courses_duration_provenance_object",
+        "type": "c",
+        "definition": "CHECK (jsonb_typeof(duration_provenance) = 'object'::text)",
+        "target": "-",
+        "columns": [
+          "duration_provenance"
+        ],
+        "target_columns": []
+      },
+      {
+        "name": "courses_duration_seconds_positive",
+        "type": "c",
+        "definition": "CHECK (duration_seconds IS NULL OR duration_seconds > 0)",
+        "target": "-",
+        "columns": [
+          "duration_seconds"
         ],
         "target_columns": []
       },
@@ -2070,6 +2151,16 @@
           "enrollment_period_type",
           "enrollment_start",
           "enrollment_end"
+        ],
+        "target_columns": []
+      },
+      {
+        "name": "courses_estimated_duration_seconds_positive",
+        "type": "c",
+        "definition": "CHECK (estimated_duration_seconds IS NULL OR estimated_duration_seconds > 0)",
+        "target": "-",
+        "columns": [
+          "estimated_duration_seconds"
         ],
         "target_columns": []
       },

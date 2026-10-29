@@ -12,6 +12,10 @@ TABLES={'courses':('course_id','course_skills'),'books':('isbn','book_skills'),
 def finalize_catalog(conn, *, embed=True, embedding_client=None):
     """Run inside the ingestion transaction: normalize, exclude, embed, assert invariants."""
     matcher=SkillMatcher(conn.execute('SELECT skill_id,name,category FROM public.skill_tags ORDER BY skill_id').fetchall())
+    from src.database.course_duration import backfill
+    backfill(conn, apply=True)
+    from src.database.course_curriculum import backfill as backfill_curriculum
+    backfill_curriculum(conn, apply=True)
     copied=0;excluded=0
     for kind,(pk,_) in TABLES.items():
         if kind=='courses':continue

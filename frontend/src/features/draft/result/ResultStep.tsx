@@ -1,6 +1,7 @@
 /* 4. 점검 결과(API-25) · 4-1. 점검 결과 수정(API-26) (5차 scr['new-result'] · scr['new-result-edit'])
    진단 에이전트가 정리한 로드맵 미리보기 + 학습 선호(보기 전용 · 고치려면 '수정'). 수준 진단도 가데이터로 대신하지 않는다.
    실패는 서버(diagFail)에 남고 '다시 시도하기'를 눌러야만 다시 진단한다 */
+import { resourceSource } from '@/shared/lib/resourceSource';
 import { useEffect, useState } from 'react';
 import { draftsApi } from '@/api/endpoints/drafts';
 import type { EditDoc } from '@/api/types/draft';
@@ -106,7 +107,7 @@ function Preview() {
                     <span>
                       <b>{r.title}</b>{' '}
                       <span className="small muted">
-                        {r.kind} · {r.provider}
+                        {r.kind} · {resourceSource(r)}
                         {r.real ? '' : ' · 가상'}
                       </span>
                     </span>

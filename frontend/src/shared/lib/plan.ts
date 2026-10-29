@@ -7,6 +7,7 @@ import { D } from '@/shared/constants/data';
 import { resOf } from '@/shared/state/catalog';
 import { hrs, won } from './format';
 import { prefText } from './prefs';
+import { resourceSource } from './resourceSource';
 
 export const stageName = (n: number): string => D.stages.find((s) => s.n === n)?.name || '';
 
@@ -26,6 +27,8 @@ export function buildPlan(def: OptionDef, prm: Partial<PlanParams>, goal: string
         hours: a.res ? (r && r.hours != null ? r.hours : a.hours || 2) : a.hours || 0,
         wFrom: 0,
         wTo: 0,
+        hoursEstimated: r ? (r.estimated || []).includes('hours') : undefined,
+        hoursBasis: r?.timeNote || undefined,
       };
       // 과제가 다루는 스킬(에이전트가 고른 팀 DB 스킬 이름 · 10/23 · 스킬 지도에서 씀). 자료 활동은 자료에 붙은 스킬을 쓴다
       if (!a.res && a.skills && a.skills.length) x.skills = a.skills.slice();
@@ -125,5 +128,5 @@ export function actMeta(a: Pick<Activity, 'task' | 'res'>): string {
   if (a.task) return '직접 수행 과제';
   const r = resOf(a.res);
   if (!r) return '등록 자료 (정보를 불러오지 못했어요)';
-  return `${r.kind} · ${r.provider}${r.real ? '' : ' · 가상'} · ${costText(r)}`;
+  return `${r.kind} · ${resourceSource(r)}${r.real ? '' : ' · 가상'} · ${costText(r)}`;
 }

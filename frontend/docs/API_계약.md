@@ -62,6 +62,12 @@
 
 ### 학습 자료·자격증·규정·스킬 지도 — `catalog.ts`
 
+`GET /resources`·`POST /resources/lookup`·작업 공간의 자료 첨부는 요약(`detailsLoaded=false`)이다. `content`는 최대 400자, `curriculum`에는 개수(`item_count`)·확보 상태(`coverage`)만 보내고 `items`는 제외한다. `GET /resources/{id}`는 상세(`detailsLoaded=true`)로 전체 소개와 순서 있는 `curriculum.items`(`title`, `section`, `description`)를 제공한다. 목차 유무·자료 유형과 관계없이 요약에 ‘전체 소개·상세 보기’ 링크를 제공한다. 상세 화면은 전체 상세 캐시가 있어도 재진입마다 단건 상세를 조회하며 이후 요약 수신으로 전체 목차를 지우지 않는다.
+
+`curriculum.coverage`는 `public_outline`·`partial_outline`·`sample`·`description_only`이며 목차를 확보하지 못한 것을 빈 강좌로 해석하지 않는다. 원문 강의 전체나 자막을 저장했다는 뜻은 아니다.
+
+`hours`는 일정 계산용 정밀 값이고 `timeStatus`는 `confirmed`·`estimated`·`manual`이다. `durationKind`로 영상/학습 시간을 구분하고 `timeNote`에 출처·추정 근거를 제공한다. 자료·단계·선택지·간트·실행 기록·수정 화면은 공통 함수를 통해 10분 단위로 반올림한다(예: `5.83333` → ‘5시간 50분’). 새 `roadmap_steps.estimated_duration` 문구도 같은 규칙이며 숫자와 일정 계산 정밀도는 유지한다. 관리자 입력에서 시간 숫자는 그대로 두고 시간 추정 표시만 해제해도 `manual`로 저장하고 자동 동기화에서 보존한다. 새 로드맵 활동은 `hoursEstimated`, `hoursBasis`를 함께 저장하며 기존 확정 활동의 시간을 일괄 변경하지 않는다. 과거 활동의 `hoursEstimated`가 없으면 ‘추정 여부 미기록’으로 표시한다. 현재 강좌 시간이 확인돼 있어도 과거 계획 시간을 확인 시간으로 재해석하지 않는다. 025·026 DB 적용과 적재 후 앱을 배포해야 한다.
+
 | 요청 | 쓰는 곳 |
 | --- | --- |
 | `GET /certifications` | 자격증 2단계 고르기 |

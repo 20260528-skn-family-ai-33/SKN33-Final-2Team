@@ -275,7 +275,13 @@ def apply(t: db.Tx, found: dict[str, list[Row]], cur: dict[str, dict], ctx: dict
             t.run("""UPDATE public.courses SET title = :ti, platform = :pl, org_name = :o, url = :u, image_url = :im, difficulty = :d, duration_weeks = :w, syllabus_summary = :s,
                      content_status = :st, last_batch_updated = now() WHERE course_id = :k""",
                   k=r.key[0], ti=v['title'], pl=v['platform'], o=v.get('org'), u=v.get('url'), im=_img(v), d=DIFF_IN.get(v.get('difficulty') or ''), w=v.get('weeks'), s=v.get('summary'), st=keep)
-        _upsert_meta(t, r.key[0], 'course', 'course_id', r.key[0], v, _est_of(r, old, v))
+        estimated = _est_of(r, old, v)
+        _upsert_meta(t, r.key[0], 'course', 'course_id', r.key[0], v, estimated)
+        # 시간 숫자를 유지하고 추정 표시만 해제해도 관리자가 확인한 값이다.
+        confirmed_hours = (v.get('hours') is not None and 'estimated' in r.present
+                           and 'hours' in (old or {}).get('_est', []) and 'hours' not in estimated)
+        if confirmed_hours or any(change.get('field') == 'hours' for change in r.changes) or (r.action == 'add' and v.get('hours') is not None):
+            t.run("UPDATE app_ext.resource_meta SET hours_origin='manual' WHERE resource_key=:k", k=r.key[0])
         if 'skills' in r.present:
             _set_skills(t, 'course_skills', 'course_id', r.key[0], v.get('skills') or [], sid)
         res['강좌'][r.action] += 1
