@@ -18,5 +18,8 @@
     "config.json": "b4580ab28b397440f1832a1e0759ba7e0c72bdec5ae2280a4520a21b0c19a104",
     "tokenizer.json": "7ce88996cbefc7d8313592c7fdabfb3572d4b3b35e49d45188a8d3b7ffc1987f",
     "tokenizer_config.json": "7c6aef8a32f96ddc41bc7abb6faeac689cb46c7f14003ddf0245c8398a4c0dd9"
-  }
+  },
+  "storage_location": "https://drive.google.com/drive/folders/1jOvkc5NADpHGZ8J-ax9ZzRFrHpFjk5Qs",
+  "model_size_bytes": 442613817,
+  "storage_verification": "user_provided; cloud_download_and_team_access_not_verified"
 }

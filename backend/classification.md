@@ -31,7 +31,24 @@
 
 모델은 항상 `backend/models/klue_roberta_full_model.pt`에 둬요. 코드의 `MODEL_DIR`은 `backend/models/`로 고정하며 환경변수로 경로를 받지 않아요. 아래 `models/` 경로는 이 문서가 있는 `backend/` 기준이에요.
 
-`models/`에는 사용자가 제공한 `klue_roberta_full_model.pt`, 학습 때 사용한 `config.json`·`tokenizer.json`·`tokenizer_config.json`, 해시·라벨·입력 길이를 기록한 `classifier-manifest.json`을 둬요. 토크나이저 출처와 파일 해시는 manifest에 있어요. `models/.gitattributes`는 Git 줄바꿈 변환을 끄고 JSON 원본 바이트와 해시를 보존해요. 가중치는 Git에서 제외하며 팀 공유 보관 위치는 미정이에요. 다른 PC에는 신뢰할 수 있는 경로로 같은 가중치를 별도 전달해야 해요.
+`models/`에는 사용자가 제공한 `klue_roberta_full_model.pt`, 학습 때 사용한 `config.json`·`tokenizer.json`·`tokenizer_config.json`, 해시·라벨·입력 길이를 기록한 `classifier-manifest.json`을 둬요. 토크나이저 출처와 파일 해시는 manifest에 있어요. `models/.gitattributes`는 Git 줄바꿈 변환을 끄고 JSON 원본 바이트와 해시를 보존해요. 가중치는 Git에서 제외하며 아래 팀 공유 폴더에서 별도로 받아요. 다른 PC에서도 manifest와 같은 가중치를 사용해야 해요.
+
+### 팀원 PC에 가중치 배치
+
+공유 위치: [RoBERTa 가중치 공유 폴더](https://drive.google.com/drive/folders/1jOvkc5NADpHGZ8J-ax9ZzRFrHpFjk5Qs) (사용자 제공, 2026-10-29).
+
+1. 팀 Google 계정으로 공유 폴더를 열고 `klue_roberta_full_model.pt`를 다운로드해요. 접근이 거부되면 폴더 소유자에게 팀 계정의 접근 권한을 요청해요.
+2. 파일을 `backend/models/klue_roberta_full_model.pt`에 둬요. 토크나이저·설정·manifest는 Git으로 받은 파일을 유지해요.
+3. 저장소 맨 위에서 아래 명령으로 크기와 SHA-256을 확인해요. 기대 크기는 **442,613,817바이트**, SHA-256은 **`d369b4aad6df873e42f988571dab43e9177ef34e5e0336dcc0fd49f69eb94cd6`**예요. 해시는 대소문자를 구분하지 않아요.
+
+```powershell
+(Get-Item .\backend\models\klue_roberta_full_model.pt).Length
+(Get-FileHash .\backend\models\klue_roberta_full_model.pt -Algorithm SHA256).Hash
+```
+
+4. 크기·해시가 다르면 모델을 실행하지 말고 공유 파일의 버전을 확인해요. manifest를 임의로 바꿔 통과시키지 않아요. 일치하면 아래 실행 절차로 진행해요. 팀 DB 백업·로그인·답변용 모델 설정은 저장소 README의 준비 절차를 따라요.
+
+이 링크는 사용자가 지정한 배포 위치예요. 에이전트의 웹 도구에서 폴더가 열리지 않아 클라우드 파일 자체의 다운로드·해시와 팀원 계정 접근 권한은 확인하지 못했어요. 기대 크기·해시는 기존에 연결한 로컬 모델 기준이며, 실제 다운로드 파일과 대조해야 해요. 이 문서 갱신으로 실제 모델 추론이나 4개 유형 챗봇 검증이 완료된 것은 아니에요.
 
 모델은 첫 실제 질문에서 한 번 로드하고 CPU에서 재사용해요. 학습과 같은 128토큰·패딩·라벨 순서를 사용하며, PyTorch `2.11.0+cpu`·Transformers `5.20.2`는 저장소 최상단 `requirements.txt`에 고정했어요. `backend/requirements.txt`는 기존 설치 명령 호환용으로 최상단 파일만 참조하며, 별도 분류기 requirements 파일은 두지 않아요. 전체 객체 `.pt`를 읽기 때문에 검증한 파일 해시가 맞을 때만 역직렬화해요. 토크나이저는 로컬 파일만 읽고 실행 중 다운로드하지 않아요. 모델·토크나이저 누락/변조·실행 실패는 `AI_CLASSIFIER`로 알리고 LLM 분류나 가데이터로 자동 대체하지 않아요. 실제 모델의 `config.id2label`도 학습 라벨 순서와 대조해요.
 
