@@ -8,6 +8,21 @@ export type AnswerKind = 'regulation' | 'general' | 'clarify' | 'out';
 /** regulation: ok·missing·unclear·none·scope · general: general · clarify · out */
 export type AnswerLevel = 'ok' | 'missing' | 'unclear' | 'none' | 'scope' | 'general' | 'clarify' | 'out';
 
+/** 회사 정보 답변이 실제로 인용한 DB 원문 출처. 규정 조항 basis와 구분한다. */
+export interface CompanyKnowledgeSource {
+  chunkId: string;
+  documentId: string;
+  documentTitle: string;
+  sourceUrl: string | null;
+  location: string | null;
+  asOf: string | null;
+  sourceLimits: string | null;
+  isVirtual: boolean;
+  textSha256: string;
+  sourceFileSha256: string | null;
+  textTruncated: boolean;
+}
+
 export interface AssistantAnswer {
   kind: AnswerKind;
   level: AnswerLevel;
@@ -29,6 +44,8 @@ export interface AssistantAnswer {
   links?: [string, string][];
   retrieved?: string[];
   dropped?: boolean;
+  /** 수자원공사 정보 답변의 실제 인용 출처(없는 옛 응답도 허용) */
+  knowledgeSources?: CompanyKnowledgeSource[];
 }
 
 export interface AssistantResult {

@@ -4,7 +4,7 @@
 import { create } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
 import { ApiError } from '@/api/client';
-import { aiApi, demoApi, type ModelState, type ProviderInfo } from '@/api/endpoints/account';
+import { aiApi, demoApi, type ModelState, type ProviderInfo, type ThinkLevels } from '@/api/endpoints/account';
 import type { FailSim, ServerProvider, UserSettings } from '@/api/types/account';
 import type { StoredCause } from '@/api/types/common';
 
@@ -42,7 +42,7 @@ interface AiState {
 
 export const useAi = create<AiState>(() => ({
   status: { checked: false, providers: {}, docLibs: {} },
-  settings: { aiProvider: 'ollama', demoMock: false, failSim: {} },
+  settings: { aiProvider: 'ollama', demoMock: false, failSim: {}, reasoning: {} },
   conn: { state: 'idle', provider: '', at: 0 },
 }));
 
@@ -68,8 +68,26 @@ export const ai = {
   },
   ollamaInfo: () => ({ model: prov('ollama').models?.default || '' }),
   openaiModel: (): string => prov('api').models?.default || '',
+  /** 고를 수 있는 추론 정도 단계. OpenAI 는 서버 설정(.env), RunPod-Ollama 는 연결 확인 때 진단·로드맵 모델이 알려 준 단계
+   *  (규정 에이전트 모델은 늘 꺼서 고르지 않음). null 이면 아직 모름(연결 확인 전·실패), 빈 목록이면 이 모델은 고를 단계가 없음 */
+  reasoningLevels: (p: UiProvider): string[] | null => (p === 'api' ? prov('api').reasoning?.levels || [] : (ollamaThink()?.levels ?? null)),
+  /** 고르지 않았을 때 쓰는 값: 서버 기본값(.env) → 모델 기본값(Ollama 는 연결 확인, OpenAI 는 서버가 아는 기본 모델 값). null 이면 모름 */
+  reasoningDefault: (p: UiProvider): string | null =>
+    prov(p).reasoning?.default ?? (p === 'ollama' ? ollamaThink()?.default : prov('api').reasoning?.modelDefault) ?? null,
+  /** 직원이 고른 단계. null 이면 기본값을 따름 */
+  reasoning: (p: UiProvider): string | null => g().settings.reasoning[toSrv(p)] ?? null,
   failSim: (): FailSim => ({ ...Object.fromEntries(SIM_KINDS.map((k) => [k, false])), ...(g().settings.failSim || {}) }),
 };
+
+/** RunPod-Ollama 진단·로드맵 모델의 추론 정도 단계(마지막 연결 확인 결과) */
+function ollamaThink(): ThinkLevels | null {
+  const c = g().conn;
+  return (c.provider === 'ollama' && c.models?.find((m) => m.role === 'default')?.think) || null;
+}
+
+const LEVEL_LABEL: Record<string, string> = { off: '끔', on: '켬', none: '없음', minimal: '최소', low: '낮음', medium: '보통', high: '높음', xhigh: '매우 높음', max: '최대' };
+/** 단계 이름 → 화면 글자. 모르는 이름(모델이 정한 이름)은 그대로 */
+export const levelLabel = (level: string): string => LEVEL_LABEL[level] || level;
 
 export const unavailableWhyText = (): string => ai.unavailableWhy(ai.choice());
 
@@ -94,13 +112,50 @@ export async function checkStatus(): Promise<void> {
 export function applySettings(s: Partial<UserSettings> | null | undefined): void {
   if (!s) return;
   useAi.setState((st) => ({
-    settings: { aiProvider: s.aiProvider || st.settings.aiProvider, demoMock: !!s.demoMock, failSim: s.failSim || {} },
+    settings: {
+      aiProvider: s.aiProvider || st.settings.aiProvider,
+      demoMock: !!s.demoMock,
+      failSim: s.failSim || {},
+      reasoning: s.reasoning !== undefined ? s.reasoning || {} : st.settings.reasoning,
+    },
   }));
 }
 
 export async function setChoice(p: UiProvider): Promise<void> {
   useAi.setState((s) => ({ settings: { ...s.settings, aiProvider: toSrv(p) } }));
   await aiApi.setProvider(toSrv(p));
+}
+
+/* 추론 정도 저장은 하나씩 차례로 보낸다: 빠르게 바꾸면 앞 요청의 늦은 응답·실패가 마지막 선택을 덮지 않게
+   (PR #40 리뷰). 화면은 마지막 선택만 서버 응답으로 맞추고, 그것이 실패하면 서버에 마지막으로 저장된 값으로 돌린다 */
+let reasoningQueue: Promise<unknown> = Promise.resolve();
+let reasoningLatest = 0;
+/** 저장이 진행 중일 때 서버에 마지막으로 저장된 값(진행 중이 아니면 null · 화면 값이 곧 서버 값) */
+let reasoningSaved: UserSettings['reasoning'] | null = null;
+
+/** 모드별 추론 정도 저장(null 이면 기본값으로) */
+export async function setReasoning(p: UiProvider, level: string | null): Promise<void> {
+  const seq = ++reasoningLatest;
+  const cur = g().settings.reasoning;
+  if (reasoningSaved === null) reasoningSaved = cur;
+  const next = { ...cur };
+  if (level) next[toSrv(p)] = level;
+  else delete next[toSrv(p)];
+  useAi.setState((s) => ({ settings: { ...s.settings, reasoning: next } }));
+  const req = reasoningQueue.then(() => aiApi.setReasoning(toSrv(p), level));
+  reasoningQueue = req.catch(() => undefined);
+  const show = (reasoning: UserSettings['reasoning']) => {
+    if (seq !== reasoningLatest) return;
+    useAi.setState((s) => ({ settings: { ...s.settings, reasoning } }));
+    reasoningSaved = null;
+  };
+  try {
+    reasoningSaved = (await req).reasoning || {};
+    show(reasoningSaved);
+  } catch (err) {
+    show(reasoningSaved || cur);
+    throw err;
+  }
 }
 
 export async function setDemoMock(on: boolean): Promise<void> {
