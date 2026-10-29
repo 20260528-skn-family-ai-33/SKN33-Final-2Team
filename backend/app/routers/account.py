@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 from .. import db, llm
 from ..agents import runtime as rt
 from ..auth import Account, end_session, login, require_account, require_employee, start_session
-from ..config import S
+from ..config import S, level_ok
 from ..errors import ApiError, provider_label, unavailable_reason
 from ..services import demo, goals, profile
 from . import job_response
@@ -16,8 +16,9 @@ r = APIRouter(prefix='/api/v1')
 
 
 def _settings(employee_id: int) -> dict:
-    s = db.one('SELECT ai_provider, demo_mock, fail_sim FROM app_ext.user_settings WHERE employee_id = :e', e=employee_id) or {}
-    return {'aiProvider': s.get('ai_provider') or 'ollama', 'demoMock': bool(s.get('demo_mock')), 'failSim': s.get('fail_sim') or {}}
+    s = db.one('SELECT ai_provider, demo_mock, fail_sim, reasoning FROM app_ext.user_settings WHERE employee_id = :e', e=employee_id) or {}
+    return {'aiProvider': s.get('ai_provider') or 'ollama', 'demoMock': bool(s.get('demo_mock')), 'failSim': s.get('fail_sim') or {},
+            'reasoning': s.get('reasoning') or {}}
 
 
 def _me(a: Account) -> dict:
@@ -119,9 +120,14 @@ def api_providers(a: Account = Depends(require_account)):
     return {'current': cur, 'providers': [
         {'id': 'ollama', 'label': 'RunPod-Ollama', 'available': llm.available('ollama'), 'reason': unavailable_reason('ollama'), 'target': S.ollama_target if S.ollama_url else '',
          'models': dict({r: llm.model_name('ollama', r) for r in ('default', 'roadmap', 'regulation', 'vision')}, embed=llm.embed_model()),
-         'timeout': S.ollama_timeout},
+         'timeout': S.ollama_timeout,
+         # 추론 정도(진단·로드맵 모델 · 규정 모델은 늘 끔): default 는 .env 기본값(비면 null = 모델 기본값).
+         # Ollama 단계는 모델마다 달라 연결 확인(/ai/status)의 진단·로드맵 모델 models[].think 로 준다
+         'reasoning': {'levels': None, 'default': S.ollama_think}},
         {'id': 'openai', 'label': 'OpenAI API', 'available': llm.available('openai'), 'reason': unavailable_reason('openai'),
-         'models': {'default': S.openai_model, 'roadmap': S.openai_model, 'regulation': S.openai_model, 'embed': S.openai_embed, 'vision': S.openai_vision}}],
+         'models': {'default': S.openai_model, 'roadmap': S.openai_model, 'regulation': S.openai_model, 'embed': S.openai_embed, 'vision': S.openai_vision},
+         # modelDefault: 보내지 않을 때 모델이 쓰는 값(기본 모델 gpt-6-luna 만 코드에 있음 · 화면 '기본값 · 보통' 표시용)
+         'reasoning': {'levels': list(S.openai_reasoning_levels), 'default': S.openai_reasoning, 'modelDefault': S.openai_model_reasoning}}],
         'docLibs': {'pdf': _has('pypdf'), 'hwp': _has('olefile')}}
 
 
@@ -142,6 +148,28 @@ def api_set_provider(body: dict, a: Account = Depends(require_employee)):
         t.run("""INSERT INTO app_ext.user_settings(employee_id, ai_provider) VALUES(:e, :p)
                  ON CONFLICT (employee_id) DO UPDATE SET ai_provider = EXCLUDED.ai_provider, updated_at = now()""", e=a.id, p=p)
     return {'provider': p}
+
+
+@r.put('/me/reasoning')
+def api_set_reasoning(body: dict, a: Account = Depends(require_employee)):
+    """모드별 추론 정도. level 이 null 이면 .env 기본값을 따른다. RunPod-Ollama 는 진단·로드맵 모델에만 쓰고
+    규정 에이전트 모델은 늘 끈다(생각을 끄고 학습 · 고를 수 없음). OpenAI 는 .env 의 OPENAI_REASONING_LEVELS 안에서만 받는다.
+    RunPod-Ollama 단계는 모델마다 달라 이름 모양만 본다(모델이 모르는 이름이면 Ollama 가 모델 기본값을 쓴다)"""
+    p, level = body.get('provider'), body.get('level')
+    if p not in ('ollama', 'openai'):
+        raise ApiError(400, 'BAD_PROVIDER', 'RunPod-Ollama 또는 OpenAI API 중에서 골라 주세요')
+    if 'level' not in body or not (level is None or (isinstance(level, str) and level_ok(level))):
+        raise ApiError(422, 'BAD_REASONING', '추론 정도는 단계 이름 또는 null(서버 기본값)로 보내 주세요')
+    if p == 'openai' and level is not None and level not in S.openai_reasoning_levels:
+        raise ApiError(422, 'BAD_REASONING', 'OpenAI 모델이 받는 추론 정도가 아니에요', '.env 의 OPENAI_REASONING_LEVELS 에 있는 단계만 고를 수 있어요')
+    # 그 모드의 키만 한 문장으로 바꾼다: 읽고 고쳐 통째로 쓰면 두 모드를 동시에 저장할 때 한쪽이 사라진다(PR #40 리뷰)
+    mine = {} if level is None else {p: level}
+    with db.tx() as t:
+        row = t.one("""INSERT INTO app_ext.user_settings(employee_id, reasoning) VALUES(:e, :m)
+                       ON CONFLICT (employee_id) DO UPDATE
+                         SET reasoning = (app_ext.user_settings.reasoning - CAST(:p AS text)) || EXCLUDED.reasoning, updated_at = now()
+                       RETURNING reasoning""", e=a.id, p=p, m=db.J(mine))
+    return {'reasoning': row['reasoning'] or {}}
 
 
 @r.get('/ai/status')

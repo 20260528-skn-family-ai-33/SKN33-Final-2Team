@@ -29,6 +29,7 @@
 | `app/config.py`, `app/llm.py`, `app/errors.py` | RunPod-Ollama 기본 모델을 팀 모델로 둠(`app/config.py`의 `OLLAMA_TEAM_*`): 진단·로드맵 `growpath-27b`, 규정 에이전트 `growpath-regulation-4b`, 비전 없음. `.env`의 `OLLAMA_MODEL`·`OLLAMA_MODEL_REGULATION`·`OLLAMA_VISION_MODEL`은 비워 두면 기본값이고 원본 Qwen과 비교할 때만 적음. `OLLAMA_MODEL_ROADMAP`은 없앰(로드맵은 `OLLAMA_MODEL`과 같은 모델). `OLLAMA_BASE_URL`만 있으면 RunPod-Ollama 모드를 쓸 수 있음 | 팀 결정(2026-10-29 · #33): RunPod-Ollama는 팀이 파인튜닝한 두 모델을 기본으로 씀(이름은 Pod에서 만드는 별칭 · [RunPod_Ollama_연결_절차.md](RunPod_Ollama_연결_절차.md) 2-4). 원본(5차)은 `OLLAMA_MODEL` 기본 `qwen3.5:9b`, 그전(2026-10-26)에는 기본값 없이 `.env`로만 정했음 |
 | `app/config.py`, `app/llm.py` | Ollama 생각(thinking) 모드를 `.env`의 `OLLAMA_THINK`(on/off)로 정함. 비우면 원본처럼 `think`를 보내지 않음 | 생각 모드가 기본으로 켜진 모델(qwen3.8:27b)은 답 앞에 생각을 길게 써서 느림 · 끌 수 있게 (2026-10-26) |
 | `app/llm.py`, `app/agents/regulation.py`, `app/routers/account.py`, `tools/mock_ollama.py`·`mock_ollama.env` | 규정 에이전트(사내 생활 도우미 답변·안별 지원 조건 확인)가 `regulation` 역할로 규정 모델(기본 `growpath-regulation-4b`)을 부름. 연결 확인(`GET /ai/status`)이 그 모델의 설치·GPU 적재 여부도 보고, `GET /ai/providers`의 `models`에 `regulation`을 더함. 모의 Ollama 모델 이름을 팀 모델 이름으로 바꾸고 `no-regulation-model` 시나리오를 추가(`no-roadmap-model`은 로드맵이 진단과 같은 모델이 돼 없앰) | 팀 논의(2026-10-29 · #33): 진단·로드맵은 팀원이 파인튜닝한 27b, 규정 에이전트는 팀원이 파인튜닝한 4b를 한 Pod에 함께 올려 씀. 원본은 로드맵만 모델을 따로 정할 수 있었음 |
+| `db/02_app_ext.sql`, `app/config.py`, `app/routers/account.py`, `app/agents/runtime.py`, `app/llm.py`, `app/services/goals.py`, `app/errors.py`, `tools/mock_ollama.py` | 직원이 좌측 'AI 모델'에서 모드별 **추론 정도**를 고름(#28): `app_ext.user_settings.reasoning`(jsonb `{ollama, openai}` · 없는 모드는 `.env` 기본값)·`PUT /me/reasoning` 추가, `GET /me`에 `reasoning`. RunPod-Ollama는 진단·로드맵 모델에만 쓰고, 연결 확인(`/ai/status`) 때 그 모델의 `/api/show` `thinking.values`로 고를 단계를 알아내 `models[].think`로 줌 · `think`(on/off는 true/false, 나머지는 단계 이름)로 보냄. **규정 에이전트 모델은 직원 값·`.env`와 관계없이 늘 `think: false`**(`config.OLLAMA_REGULATION_THINK`). OpenAI는 받는 단계 안에서 골라 `reasoning_effort`로 보냄: 기본 모델 gpt-6-luna는 코드의 확인한 단계(none~xhigh)·모델 기본값(medium · 화면 '기본값 · 보통'), 다른 모델은 `.env`의 `OPENAI_REASONING_LEVELS`(기본값 `OPENAI_REASONING_EFFORT` · `GET /ai/providers`의 `reasoning`의 `levels`·`default`·`modelDefault` · `OPENAI_MODEL`이 아닌 비전 모델에는 보내지 않음). 고른 값이 지금 모델이 받는 단계가 아니면(모델을 바꾼 뒤 남은 옛 선택) `.env` 기본값을 보냄(모델별 단계는 `/api/show` 결과를 기억해 둠). 저장은 그 모드의 키만 한 SQL 문으로 바꿈(동시 저장에도 다른 모드 값 유지). 이미지 읽기 모델에는 직원 값을 쓰지 않음. `OLLAMA_THINK`는 진단·로드맵 모델 기본값이 되고 단계 이름도 받음(true·false 같은 값은 예전처럼 시작할 때 멈춤). 관리자가 모델을 골라 목표 후보를 다시 만들 때는 `.env` 값을 씀. 생각 모드·`reasoning_effort`를 받지 않는다는 오류에 원인 문구를 붙임. 모의 Ollama에 모델별 `/api/show`(`--think` · 기본은 실제 Pod 값)·`--host` 추가 | 모델마다 받는 단계가 다르고(팀 27b: 끔·low·medium·xhigh — RunPod 연결 절차의 실제 Pod 기록 · gpt-6-luna Chat Completions: none~xhigh, 모델 문서의 max는 400) `.env`를 고치고 서버를 다시 켜지 않아도 화면에서 바꿔 보게. 규정 에이전트 모델(4b)은 생각을 끄고 학습해 추론 없이가 기본이고 사용자가 바꾸면 안 됨 (2026-10-28·29 사용자 요청·결정) |
 | `app/regfiles.py`(새 파일), `app/routers/admin.py`, `app/admin_io/`(`regulations.py` 지움), `app/regstore.py`(설명), `app/config.py`, `db/02_app_ext.sql`, `docker-compose.yml` | 관리자의 규정 관리를 **원문 PDF 올리기·내려받기**로 바꿈. 규정·조항 엑셀/CSV·한 건 고치기(`/admin/datasets/regulations/*`)와 규정 색인 만들기(`POST /admin/regulations/index`)를 없애고, 지금 규정 목록(`GET /admin/regulations`)·원문 PDF 내려받기(`GET /admin/regulations/{id}/pdf`)·새 규정 PDF 올리기(`POST /admin/regulations/uploads`, 파일+메모)·올린 PDF 목록/내려받기·잘못 올린 PDF 삭제(`DELETE /admin/regulations/uploads/{id}` · 파일과 기록을 함께 지움)를 추가. 지금 규정 원문은 팀 규정 묶음의 `source/`(`GP5_REGULATION_FILES_DIR` · compose 는 `team_db/regulations` 를 읽기 전용으로 붙임), 올린 PDF는 `var/uploads/regulations/` 와 `app_ext.regulation_uploads`(처리 상태 없음). 개요 응답의 `regulations` 를 PDF 개수로 바꾸고 `providers` 를 맨 위로 옮김. 옛 화면(`web/`)의 규정 데이터 메뉴는 이제 동작하지 않음 | 사용자 결정(2026-10-26): 규정은 벡터 DB를 거친 RAG에 쓰여 관리자가 고치지 않고, 시스템 관리자(서비스 운영팀)가 올라온 PDF를 내려받아 임베딩·벡터 DB를 갱신(MVP 방식). 조항 표는 원문과 맞춰 보기 어려워 원문 PDF로 보게 함 |
 
 나머지는 5차 원본의 `app`·`tools`·`db`·`web`과 같아요(2026-10-26 비교).
@@ -117,3 +118,19 @@ python tools/preload_goals.py --employee-id $preloadEmployeeId --provider ollama
 ## 고칠 것이 보이면
 
 추가 변경은 GitHub 이슈로 백엔드 담당과 조율해요. 화면이 기대하는 모양은 [API 계약](../frontend/docs/API_계약.md)에 있어요.
+
+## Track 프롬프트 DB 연결 (#38)
+
+Free Track(A1→agent_certified), Fast Track(A2→agent_fasttrack), Challenge Track(A3→agent_practical)은 `public.prompt_versions`의 활성 버전을 매 요청 읽습니다. 기존 agent_id는 유지하며, 이름 변경 전 버전도 보존합니다. 각 본문은 `### GENERATION`과 `### REVISION` 구역으로 나뉩니다. 활성 버전 누락·중복·형식 오류는 명시적으로 실패하며 코드 기본값으로 대체하지 않습니다.
+
+새 환경에서는 기존 DB 백업을 보관한 후 아래 순서로 적용합니다. 모델 호출은 발생하지 않습니다.
+
+```bash
+docker compose up -d --no-deps --build backend
+docker compose exec -e PYTHONPATH=/srv/growpath backend python tools/install_track_prompts.py
+docker compose exec -e PYTHONPATH=/srv/growpath backend python tools/test_track_prompts.py
+```
+
+등록 도구는 이전 활성 버전을 비활성화하고 부모 버전에 연결한 새 버전을 트랜잭션으로 활성화합니다. 같은 내용으로 재실행하면 새 버전을 만들지 않습니다. Free Track에는 비용이 0으로 확인된 자료만 전달하고, 유료·비용 미확인 자료를 반환하면 서버에서도 거부합니다. 실제 AI 생성 품질 검증은 별도입니다.
+
+프롬프트를 되돌릴 때는 `prompt_versions`에서 이번 변경의 활성 버전·`parent_version_id`를 확인하고, 해당 agent_id의 현재 버전을 비활성화한 뒤 부모 버전을 활성화합니다. 이전 프롬프트는 새 구역 형식이 아니므로 **백엔드 코드도 DB 연결 도입 전 버전으로 함께 되돌려야 합니다.** 백엔드와 DB 버전을 각각만 되돌리면 호환되지 않습니다. 개인 로드맵 제목 데이터는 이 등록 도구가 변경하지 않습니다.

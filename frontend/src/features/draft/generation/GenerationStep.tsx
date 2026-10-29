@@ -9,19 +9,17 @@ import { paths } from '@/app/paths';
 import { D } from '@/shared/constants/data';
 import { useGo } from '@/shared/hooks/useGo';
 import { won } from '@/shared/lib/format';
-import { regGroups } from '@/shared/lib/reg';
 import { ai, cause, userText, userTodo } from '@/shared/state/ai';
 import { useCatalog } from '@/shared/state/catalog';
-import { me } from '@/shared/state/session';
 import { onDataReset } from '@/shared/state/events';
 import { updateWs, useWs, ws } from '@/shared/state/workspace';
 import { Icon } from '@/shared/ui/Icon';
-import { AgentRow, FailPage, OpsBox, Page, runSub, via } from '@/shared/ui/parts';
+import { AgentRow, FailPage, OpsBox, Page, via } from '@/shared/ui/parts';
 import { draftCall, takeDraft } from '../draftSync';
 import { startEdit, genStart } from '../result/ResultStep';
 import { Stepper } from '../Stepper';
 import { useDraftWatch } from '../useDraftWatch';
-import { SUP_LV, supRetry, syncGenCur } from '../options/support';
+import { supRetry, syncGenCur } from '../options/support';
 
 let hoOpen = false;
 export function HandoffView({ h }: { h: Handoff }) {
@@ -123,7 +121,7 @@ export function useKickSupport(): void {
   }, [info]);
 }
 
-const rowName = (id: string) => `${id} ${D.perspectives[id].name}`;
+const rowName = (id: string) => `${D.perspectives[id].name}`;
 
 async function genRetry(id: string): Promise<void> {
   const r = curGen(ws().draft);
@@ -132,15 +130,15 @@ async function genRetry(id: string): Promise<void> {
     const rr = curGen(s.draft);
     if (rr) rr.rows[id].st = 'run';
   });
-  await draftCall(`${id} 안을 다시 쓰지 못했어요`, (did) => draftsApi.optionRetry(did, id));
+  await draftCall(`${D.perspectives[id].name}을 다시 쓰지 못했어요`, (did) => draftsApi.optionRetry(did, id));
 }
 
 function GenRowView({ d, id }: { d: DraftDoc; id: string }) {
   const r = curGen(d);
   const row = r ? r.rows[id] : { st: 'run', tries: 1 };
   const name = rowName(id);
-  if (!row || row.st === 'run') return <AgentRow st="run" name={name} sub={runSub('roadmap', (row?.tries || 1) > 1 ? '다시 시도하는 중이에요' : '진단 에이전트가 넘긴 내용으로 작성 중이에요')} />;
-  if (row.st === 'ok') return <AgentRow st="ok" name={name} sub={row.out?.tagline} tag="작성 완료" tagCls="acc" />;
+  if (!row || row.st === 'run') return <AgentRow st="run" name={name} sub="진단 결과를 토대로 계획 생성 중" />;
+  if (row.st === 'ok') return <AgentRow st="ok" name={name} sub="준비가 완료되었습니다." tag="작성 완료" tagCls="acc" />;
   const c = cause(row.err || {});
   return (
     <AgentRow
@@ -158,48 +156,40 @@ function GenRowView({ d, id }: { d: DraftDoc; id: string }) {
 
 /** 규정 에이전트 줄: 3안이 정해지기 전에는 기다림, 확인 중, 안별 결과, 실패(다시 시도는 눌러야만) */
 function SupRow({ d }: { d: DraftDoc }) {
-  const name = '규정 에이전트 · 안별 지원 조건 확인';
   const g = curOut(d);
-  if (!g) return <AgentRow st="wait" name={name} sub="세 안이 정해지면 안마다 교육비 지원·근무시간 학습 인정을 확인해요" />;
-  const os = D.optionOrder.map((pid) => g.options[pid]).filter(Boolean);
-  const fails = os.filter((o) => o.supportFail);
-  if (fails.length) {
-    const c = cause(fails[0].supportFail?.cause);
-    return (
-      <AgentRow
-        st="fail"
-        name={name}
-        sub={ai.live() ? via('regulation') : ''}
-        failLabel="확인 실패"
-        tag="오류 발생"
-        tagCls="fail"
-        onRetry={() => void supRetry('all')}
-        detail={`${c.user || userText(c.kind)} · 지원 조건은 ‘확인 필요’로 두고 넘어갈 수 있어요`}
-      />
-    );
-  }
-  if (os.some((o) => !o.support)) return <AgentRow st="run" name={name} sub={runSub('regulation', '안마다 유료 자료·학습 형태로 등록된 규정을 확인하고 있어요')} />;
-  if (os.every((o) => o.support?.level === 'scope'))
-    return (
-      <AgentRow
-        st="ok"
-        warn
-        name={name}
-        sub={`등록된 규정은 ${regGroups().join('·')} 대상이라 ${me()?.empGroup || ''} 직원은 확인하지 않았어요`}
-        tag="적용 대상 아님"
-        tagCls="warn"
-      />
-    );
-  const allOk = os.every((o) => o.support?.level === 'ok');
+  const options = g
+    ? D.optionOrder.map((id) => g.options[id]).filter(Boolean)
+    : [];
+
+  const failed = options.some((option) => option.supportFail);
+  const done =
+    options.length > 0 &&
+    options.every((option) => !!option.support);
+
+  const state = failed ? 'failed' : !g ? 'waiting' : done ? 'done' : 'running';
+
+  const text = {
+    waiting: '규정 확인 대기',
+    running: '규정 확인 중',
+    done: '규정 확인 완료',
+    failed: '규정 확인 실패',
+  }[state];
+
   return (
-    <AgentRow
-      st="ok"
-      warn={!allOk}
-      name={name}
-      sub={os.map((o) => `${o.id} ${(SUP_LV[o.support?.level || ''] || SUP_LV.missing)[0]}`).join(' · ')}
-      tag={allOk ? '근거 확인' : '확인 필요'}
-      tagCls={allOk ? 'acc' : 'warn'}
-    />
+    <div className="reg-check" role="status" aria-live="polite">
+      <span className={`reg-check-icon ${state}`} aria-hidden="true" />
+      <span>{text}</span>
+
+      {failed ? (
+        <button
+          type="button"
+          className="link quiet"
+          onClick={() => void supRetry('all')}
+        >
+          다시 확인
+        </button>
+      ) : null}
+    </div>
   );
 }
 
@@ -236,7 +226,7 @@ export function GenerationStep() {
   );
   if (g.fail && r) {
     const failed = D.optionOrder.filter((id) => r.rows[id]?.st === 'fail');
-    const names = failed.map((id) => `${id} ${D.perspectives[id].name}`).join(', ');
+    const names = failed.map((id) => `${D.perspectives[id].name}`).join(', ');
     const errs = failed.map((id) => cause(r.rows[id].err || {}));
     return (
       <>
@@ -248,7 +238,7 @@ export function GenerationStep() {
               ? `${names}을 쓰지 못했어요. 작성된 안만 가지고 다음 단계로 넘어가거나, 실패한 안만 다시 시도할 수 있어요.`
               : '관점별 하위 에이전트가 로드맵 안을 쓰지 못했어요. 실패한 안을 다시 시도하거나, 조건을 고쳐 다시 만들어 주세요.'
           }
-          cause={`${failed.map((id, i) => `${id} ${D.perspectives[id].name} — ${errs[i].user || userText(errs[i].kind)}`).join(' · ')}. ${todoOf(errs)}`}
+          cause={`${failed.map((id, i) => `${D.perspectives[id].name} — ${errs[i].user || userText(errs[i].kind)}`).join(' · ')}. ${todoOf(errs)}`}
           body={
             <>
               <HandoffView h={h} />
@@ -293,7 +283,7 @@ export function GenerationStep() {
         title={done ? '로드맵 3안을 다 썼어요' : '로드맵 계획 에이전트가 3안을 쓰고 있어요'}
         lead={
           done
-            ? '‘3안 보러 가기’를 눌러 비교해 보세요. 지원 조건 확인이 끝나지 않았어도 넘어갈 수 있어요(비교표에서 이어서 보여 줘요).'
+            ? '‘로드맵 계획 미리보기’를 눌러 비교해 보세요. 지원 조건 확인이 끝나지 않았어도 넘어갈 수 있어요(비교표에서 이어서 보여 줘요).'
             : ai.mode() === 'ollama'
               ? '관점별 하위 에이전트 셋이 진단 에이전트가 넘긴 같은 내용으로 동시에 요청해요. AI 서버 사정에 따라 차례대로 처리돼 시간이 더 걸릴 수 있어요. 화면을 떠나도 서버가 이어서 써요.'
               : '관점별 하위 에이전트 셋이 진단 에이전트가 넘긴 같은 내용으로 동시에 작성해요. 화면을 떠나도 서버가 이어서 써요.'
@@ -305,7 +295,7 @@ export function GenerationStep() {
               이전
             </button>
             <button className="btn pri" disabled={!done} onClick={() => go(paths.newOptions)}>
-              3안 보러 가기
+              로드맵 계획 미리보기
             </button>
           </>
         }

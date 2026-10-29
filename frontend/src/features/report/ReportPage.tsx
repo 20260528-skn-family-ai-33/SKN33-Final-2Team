@@ -1,3 +1,4 @@
+import { trackName } from '@/shared/constants/data';
 /* 결과 보고서 (5차 scr.report · report-ok) — '확인했어요'를 누르면 이 로드맵을 마친 것으로 기록한다 */
 import { useParams } from 'react-router';
 import { plansApi } from '@/api/endpoints/plans';
@@ -32,7 +33,7 @@ export function ReportPage() {
   return (
     <Page
       back={paths.checks}
-      eyebrow={`결과 보고서 · ${r.opt} v${r.version} · ${r.createdAt}`}
+      eyebrow={`결과 보고서 · ${trackName(r.opt)} v${r.version} · ${r.createdAt}`}
       title="학습 결과 보고서"
       lead={r.goal}
       foot={

@@ -61,6 +61,8 @@ CAUSES = [
     (r'Ollama 시간 초과', 'timeout', '응답 시간이 초과됐어요 (Ollama)'),
     (r'out of memory|more system memory|CUDA error', 'memory', 'GPU 메모리가 부족해 모델을 실행하지 못했어요'),
     (r'Ollama 404|not found, try pulling', 'model', 'Ollama에 지정한 모델이 없어요'),
+    (r'does not support thinking', 'other', '이 모델은 생각(thinking) 모드를 지원하지 않아요 · 좌측 AI 모델의 추론 정도를 기본값이나 끔으로 바꿔 주세요'),
+    (r'reasoning_effort', 'other', '이 모델이 고른 추론 정도(reasoning_effort)를 받지 않아요 · 원문의 Supported values 에 맞춰 .env 의 OPENAI_REASONING_LEVELS 를 고쳐 주세요'),
     (r'Ollama 5\d\d', 'other', 'Ollama 서버에서 오류가 났어요'),
     (r'Ollama 4\d\d', 'other', 'Ollama가 요청을 처리하지 못했어요'),
     (r'OpenAI 40[13]', 'auth', 'API 키가 올바르지 않거나 권한이 없어요'),

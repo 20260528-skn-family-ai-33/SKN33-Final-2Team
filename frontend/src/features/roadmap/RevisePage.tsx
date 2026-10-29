@@ -1,3 +1,4 @@
+import { trackName } from '@/shared/constants/data';
 /* 수정 요청 (10/14 · 5차 scr.revise · P.revForm·revCtl·revRow·goalRow·diffView)
    여러 항목을 함께 골라도 된다. 고른 항목과 요청 내용을 관점 에이전트가 함께 보고 수정안을 먼저 보여 준다. 확정하기 전까지 지금 로드맵은 그대로 */
 import { useEffect } from 'react';
@@ -72,7 +73,7 @@ export function DiffView({ pd }: { pd: PendingRevision }) {
       <p className="note">
         <Icon name="info" />
         <span>
-          목표는 그대로예요.{same ? ` 관점(${pd.from.opt} ${pd.from.name})도 그대로예요.` : ''} 같은 활동의 진행 기록(완료·메모)은 이어져요.
+          목표는 그대로예요.{same ? ` 관점(${trackName(pd.from.opt, pd.from.name)})도 그대로예요.` : ''} 같은 활동의 진행 기록(완료·메모)은 이어져요.
           {pd.request ? ` 요청 내용: “${pd.request}”` : ''}
         </span>
       </p>
@@ -86,7 +87,7 @@ const curText = (k: string, pl: PlanContent): string => {
   if (k === 'cert') return certNameOf(p) || '계획 없음';
   if (['weeks', 'budget', 'format', 'etc'].includes(k)) return prefText(k as 'weeks', p);
   if (k === 'start') return `${pl.start}단계 ${stageName(pl.start)}`;
-  if (k === 'pid') return `${pl.opt} ${pl.name}`;
+  if (k === 'pid') return `${trackName(pl.opt, pl.name)}`;
   return `활동 ${pl.acts.length}개`;
 };
 
@@ -176,7 +177,7 @@ function RevCtl({ k, R }: { k: string; R: PlanRecord }) {
           {D.optionOrder.map((id) => (
             <label className="chip" key={id}>
               <input type="radio" name="rv-pid" value={id} checked={r.v.pid === id} onChange={() => setAt(`${base}.pid`, id)} />
-              {id} {D.perspectives[id].name}
+              {D.perspectives[id].name}
               {id === pl.opt ? ' (지금)' : ''}
             </label>
           ))}
@@ -343,7 +344,7 @@ function Revise({ R }: { R: PlanRecord }) {
   const pd = R.pending;
   const busy = !!r.running;
   const pid = r.on.pid && r.v.pid !== base.opt ? r.v.pid : base.opt;
-  const agent = `${pid} ${D.perspectives[pid].name}`;
+  const agent = `${D.perspectives[pid].name}`;
   const cm = r.fromComment ? (R.comments || []).find((c) => c.id === r.fromComment) : undefined;
   /* 요청 내용을 채운 뒤 부서장이 코멘트를 고쳤으면(10/23 코멘트 수정) 알리고, 고친 내용으로 다시 채울 수 있게 한다 */
   const stale = !!(cm && r.cmStamp && cm.stamp !== r.cmStamp);

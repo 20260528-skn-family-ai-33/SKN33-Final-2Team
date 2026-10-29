@@ -34,7 +34,7 @@ const FAILS: [string, string][] = [
   ['doc', '기획서 읽기(이미지·요약)'],
   ['quiz', '사전 점검 문항 생성'],
   ['diag', '점검 결과(수준 진단)'],
-  ['gen', '로드맵 3안 (A2·A3)'],
+  ['gen', '로드맵 3안 (Fast Track·Challenge Track)'],
   ['sup', '지원 조건 확인'],
   ['report', '결과 보고서'],
   ['reg', '사내 생활 도우미 답변'],

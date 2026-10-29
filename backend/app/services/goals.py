@@ -105,7 +105,8 @@ def _request(employee_id: int, trigger: str, avoid: list[str] | None, mode: str 
         if mode == 'mock':
             ctx.demo, ctx.fail_sim = True, {}
         elif mode in ('ollama', 'openai'):
-            ctx.provider, ctx.demo, ctx.fail_sim = mode, False, {}
+            # 관리자가 고른 모델에는 직원이 고른 추론 정도 대신 .env 기본값(OLLAMA_THINK · OPENAI_REASONING_EFFORT)을 쓴다
+            ctx.provider, ctx.demo, ctx.fail_sim, ctx.reasoning = mode, False, {}, {}
         sim = rt.sim_once(ctx, 'goal', ph + '|' + '|'.join(avoid or []))
         try:
             out = G.run(ctx, dict(inp, avoid=avoid or []), sim=sim)

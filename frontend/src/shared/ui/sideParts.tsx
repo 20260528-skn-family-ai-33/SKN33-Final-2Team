@@ -3,6 +3,8 @@ import type { ReactNode } from 'react';
 import { useGo } from '@/shared/hooks/useGo';
 import { setTheme, THEMES, useTheme } from '@/shared/state/theme';
 import { Icon } from './Icon';
+import { paths } from '@/app/paths';
+
 
 export function NavLink({ to, active, icon, label, dot }: { to: string; active: boolean; icon: string; label: ReactNode; dot?: boolean }) {
   const go = useGo();
@@ -22,14 +24,27 @@ export function NavLink({ to, active, icon, label, dot }: { to: string; active: 
   );
 }
 
-export const Brand = () => (
-  <div className="brand">
-    <span className="logo">
-      <Icon name="logo" />
-    </span>
-    GrowPath
-  </div>
-);
+export function Brand() {
+  const go = useGo();
+
+  return (
+    <a
+      className="brand"
+      href={paths.home}
+      aria-label="GrowPath 홈으로 이동"
+      style={{ color: 'inherit', textDecoration: 'none' }}
+      onClick={(e) => {
+        e.preventDefault();
+        go(paths.home);
+      }}
+    >
+      <span className="logo">
+        <Icon name="logo" />
+      </span>
+      GrowPath
+    </a>
+  );
+}
 
 export function ThemePicker() {
   const theme = useTheme((s) => s.theme);

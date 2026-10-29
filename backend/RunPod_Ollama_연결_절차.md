@@ -127,7 +127,7 @@ ollama show hf.co/golddragon0926/qwen35-4b-diagnosis-agent
 - ✅ 두 번 모두 진행 막대가 끝나고 `success`가 나와요.
 - ✅ `ollama list`에 `hf.co/Ssum-mer/qwen3.8-27b-growpath-Q4:latest`(약 16 GB)와 `hf.co/golddragon0926/qwen35-4b-diagnosis-agent:latest`(약 8 GB)가 보여요. 태그 없이 받아서 `:latest`가 붙어요. 이름이 다르게 보이면 보이는 이름을 그대로 3-2에 써요.
 - ✅ 두 모델 모두 `ollama show`의 Capabilities에 `completion`이 있어요. 두 모델 다 vision projector가 없어서 `vision`은 없어요(그래서 RunPod-Ollama 모드는 기획서 이미지 읽기를 건너뛰어요). 이때 `template source`는 `gguf_chat_template`이에요.
-- 두 모델의 채팅 템플릿은 생각 모드 켜고 끄기를 지원하고, 4b는 생각을 끄고 학습했어요(모델 카드). 3-2에서 `OLLAMA_THINK=off`로 둬요.
+- 두 모델의 채팅 템플릿은 생각 모드 켜고 끄기를 지원하고, 4b는 생각을 끄고 학습했어요(모델 카드). 생각을 켜면 4b는 생각이 길게 반복될 수 있어서, 앱은 4b를 `OLLAMA_THINK`·화면 설정과 관계없이 늘 생각을 끄고 불러요(#28). 27b는 3-2에서 `OLLAMA_THINK=off`로 두고, 2-5도 두 모델 모두 생각을 끄고 불러요.
 - ❌ `connection refused`가 나오면 2-3의 `export`를 하지 않은 창이에요. `export` 줄부터 다시 실행해요.
 - ❌ `The specified tag is not available in the repository`가 나오면 명령 끝에 `:Q4_K_M` 같은 태그가 붙어 있는지 봐요. 위 명령 그대로(태그 없이) 받아요.
 
@@ -226,16 +226,17 @@ cat ~/.ollama/id_ed25519.pub
 
 ### 2-5. 모델 미리 올리기 (선택 · 앱의 첫 호출이 덜 느려짐)
 
-두 모델을 차례로 한 번씩 불러 GPU에 올리고, 둘이 함께 들어가 있는지 봐요.
+두 모델을 차례로 한 번씩 불러 GPU에 올리고, 둘이 함께 들어가 있는지 봐요. 앱(`OLLAMA_THINK=off`)과 같게 생각 모드를 끄고 불러요(`--think=false`).
 
 ```bash
-ollama run growpath-27b "한 문장으로 인사해 줘"
-ollama run growpath-regulation-4b "한 문장으로 인사해 줘"
+ollama run growpath-27b --think=false "한 문장으로 인사해 줘"
+ollama run growpath-regulation-4b --think=false "한 문장으로 인사해 줘"
 ollama ps
 grep "template selection" /workspace/ollama.log | tail -n 2
 ```
 
-- ✅ 두 모델 모두 한국어 답이 나와요. 앞에 `Thinking...`이 먼저 보일 수 있어요.
+- ✅ 두 모델 모두 `Thinking...` 없이 한국어로 답해요.
+- ❌ 4b가 `Thinking...` 뒤에 같은 말을 길게 되풀이하다 답하면 `--think=false`가 빠진 거예요. `ollama run`은 `--think`를 주지 않으면 모델 기본값대로 생각 모드를 켜는데, 4b는 생각을 끄고 학습한 모델이에요(2-4). 팀 4b에는 Ollama 라이브러리 `qwen3.5:4b`에 있는 반복 억제 설정(`presence_penalty 1.5`)도 없어서 생각이 길게 반복될 수 있어요. 앱은 `think: false`를 보내서 이 문제가 없어요.
 - ✅ 마지막 줄(Ollama 기록)에 두 모델의 `selected=renderer_parser`가 보여요. `selected=none`이면 채팅 형식 없이 돌고 있는 거라 2-4 '채팅 형식 붙이기'를 다시 해요.
 - ✅ `ollama ps`에 **두 줄**이 보이고, 두 줄 모두 PROCESSOR가 `100% GPU`, CONTEXT가 `16384`예요.
 - ❌ 한 줄만 보이면(먼저 올린 27b가 사라짐) 두 모델이 GPU 하나에 같이 들어가지 않는 거예요. 이대로 쓰면 진단·로드맵과 도우미를 오갈 때마다 모델을 다시 불러와서 호출이 1분 넘게 걸릴 수 있어요. 더 큰 GPU로 다시 배포해요. `OLLAMA_NUM_PARALLEL`을 줄이면 문맥용 메모리가 줄지만 로드맵 3안을 차례로 처리해서 느려져요.
@@ -345,7 +346,7 @@ OLLAMA_THINK=off
   - RunPod-Ollama 모드만 쓰더라도 `.env`에 `OPENAI_API_KEY`가 있어야 도우미가 규정을 찾아요. 없으면 규정 질문이 '규정 검색 임베딩(text-embedding-3-small)에 쓰는 OpenAI 키가 .env에 없어요'로 실패해요(키워드 검색으로 몰래 바꾸지 않음).
   - 도우미에 한 질문 문장은 임베딩하려고 OpenAI로 가요. 답변은 RunPod-Ollama 모델이 써요.
   - 팀 DB 벡터를 그대로 쓰기 때문에 Pod에 임베딩 모델을 받을 필요가 없어요.
-- `OLLAMA_THINK=off`는 생각 모드를 꺼서 생각 없이 바로 답하게 해요(빨라짐). `on`은 켜고, 비우면 모델 기본값(qwen3.8은 켜짐)을 따라요. `on`·`off`가 아닌 값을 적으면 백엔드가 켜지지 않고 멈춰요(`docker compose logs backend`에 이유가 나와요). OpenAI 쪽 추론에는 영향이 없어요. 이 값은 두 모델에 같이 적용돼요(모델마다 따로 정하는 것은 #28). 2-4 B로 받은 두 모델 중 하나라도 Capabilities에 `thinking`이 없으면 `on`으로 두지 않아요. 생각 모드가 없는 모델에 켜라고 보내면 그 모델 호출이 오류가 날 수 있어요.
+- `OLLAMA_THINK=off`는 생각 모드를 꺼서 생각 없이 바로 답하게 해요(빨라짐). `on`은 켜고, 비우면 모델 기본값(qwen3.8은 켜짐)을 따라요. `low` 같은 27b의 단계 이름도 적을 수 있어요. `true`·`false`처럼 적거나 단계 이름 모양이 아니면 백엔드가 켜지지 않고 멈춰요(`docker compose logs backend`에 이유가 나와요). OpenAI 쪽 추론에는 영향이 없어요. 이 값은 **진단·로드맵 모델(27b)의 기본값**이고, 직원이 화면 좌측 'AI 모델'의 '추론 정도'에서 고르면 그 값이 앞서요(#28 · 고를 수 있는 단계는 연결 확인 때 27b의 `ollama show` 값). 규정 모델(4b)은 생각을 끄고 학습해 이 값·화면과 관계없이 늘 `think: false`로 불러요(켜면 답이 길게 반복되며 늦어질 수 있어요 · 2-5). 2-4 B로 받은 두 모델 중 하나라도 Capabilities에 `thinking`이 없으면 `on`으로 두지 않아요. 생각 모드가 없는 모델에 켜라고 보내면 그 모델 호출이 오류가 날 수 있어요.
 
 ### 3-3. 백엔드 다시 만들기
 
@@ -417,7 +418,7 @@ rm /workspace/ollama_key.txt
 
 - **HTTP 프록시 대신 TCP를 쓰는 이유:** RunPod HTTP 프록시(`https://<POD_ID>-11434.proxy.runpod.net`)는 100초 안에 응답이 시작되지 않으면 524로 끊어요. 이 앱 백엔드는 답을 끝까지 기다렸다 한 번에 받고(`stream: false`), `qwen3.8:27b`는 생각 모드가 기본으로 켜져 있어서 로드맵 3안처럼 긴 작업은 100초를 넘기기 쉬워요.
 - **모델 두 개:** Ollama는 이름이 다른 모델을 따로 GPU에 올려요. 진단과 로드맵은 같은 27b라 한 번만 올라가고, 규정 에이전트의 4b가 하나 더 올라가요. 앱은 호출마다 `keep_alive`(`.env`의 `OLLAMA_KEEP_ALIVE`)를 보내서, 두 모델 모두 마지막 호출 뒤 그 시간 동안 GPU에 남아요.
-- **생각 모드:** `.env`의 `OLLAMA_THINK`로 정해요(3-2). 두 모델에 같이 적용돼요. `off`면 Ollama 요청에 `think: false`를 보내고, 비우면 보내지 않아 모델 기본값(qwen3.8은 켜짐)을 따라요. OpenAI `gpt-6-luna`는 `reasoning_effort`를 보내지 않아 기본값(medium)으로 추론이 켜진 채예요. 두 모드의 결과를 비교할 때는 이 차이를 함께 적어요. 팀원 백엔드에는 아직 이 설정이 없어요.
+- **생각 모드:** 진단·로드맵 모델의 기본값은 `.env`의 `OLLAMA_THINK`로 정해요(3-2). `off`면 Ollama 요청에 `think: false`를 보내고, 비우면 보내지 않아 모델 기본값(qwen3.8은 켜짐)을 따라요. 직원이 화면에서 고른 값이 있으면 그 값을 보내요(#28). 규정 모델은 늘 `think: false`예요. OpenAI `gpt-6-luna`는 화면에서 고르지 않았고 `OPENAI_REASONING_EFFORT`도 비어 있으면 `reasoning_effort`를 보내지 않아 기본값(medium)으로 추론이 켜진 채예요. 두 모드의 결과를 비교할 때는 이 차이를 함께 적어요. 팀원 백엔드에는 아직 이 설정이 없어요.
 - **도우미가 '확인 불가'라고 할 때:** 먼저 검색이 조항을 찾았는지 봐요. 2026-10-26 전에는 RunPod-Ollama 모드가 키워드 검색을 해서, "근로 시작일은 한 달 기준 며칠 부터야?" 같은 질문은 조항을 0개 찾았어요(OpenAI 모드는 벡터 검색으로 「연봉규정」 제4조를 찾음). 지금은 두 모드가 같은 벡터 검색을 해요. 또 같은 날 지시문(`REG_SYS`)을 고쳐서, 뜻이 여러 가지로 읽히는 규정 질문은 '확인 필요'로 되묻고 선택지 버튼을 보여 줘요. 고르면 그 뜻으로 조항을 찾아 답해요. 고치기 전에는 qwen3.8이 같은 질문에 한 번은 '확인 불가', 한 번은 되묻기로 답했어요.
 - **CPU 100%:** 모델이 GPU에 다 올라가 있어도 토큰마다 다음 토큰 고르기와 JSON 형식 검사(`format: json`)는 CPU가 해요. 요청 여러 개를 동시에 처리하면 RunPod 화면의 CPU가 100%까지 차는데, 고장은 아니에요. GPU를 바꿔도 CPU 표시는 비슷하고, 빨라지는 건 답 만드는 속도예요.
 
@@ -455,6 +456,11 @@ rm /workspace/ollama_key.txt
   - 모델 줄을 비운 기본값으로 다시 돌린 앱 호출(같은 날): 진단 에이전트 목표 후보 제안(27b) 14.3초, 3안(27b) A1 63초·A3 115초·A2 167초, 지원 조건 확인(4b) 6.7초, 도우미(4b · 3안과 동시) 17.3초로 모두 성공했고, 두 모델이 끝까지 함께 올라가 있었어요(GPU 약 26GB).
   - **품질은 평가하지 않았어요.** 눈에 띈 것: 도우미가 "RAG가 뭐예요?"에 설명 대신 "일반 업무 지식 질문입니다"라고만 답했고, A1 비용 우선안의 장단점이 비어 있었어요.
   - **아직 안 한 것:** 진단 에이전트의 나머지 호출(기획서 요약·사전 점검·수준 진단·보고서)을 27b로 돌리기(목표 후보 제안만 확인), 화면 흐름 전체를 처음부터 끝까지 재기.
+- **2-5 생각 모드 끄기(2026-10-29 추가):** 담당자가 새 Pod에서 고치기 전 2-5(`--think` 없음)를 실행했을 때, 27b는 바로 한 문장으로 답했고 4b는 같은 말을 길게 되풀이하는 생각 끝에 답했어요. 근거는 아래와 같고, 그래서 2-5 명령에 `--think=false`를 붙였어요.
+  - 4b 모델 카드: "학습 당시처럼 thinking을 끄려면 `enable_thinking=false`를 적용"
+  - Ollama 0.40.12 `cmd/cmd.go`: `--think`를 주지 않으면 생각 여부를 보내지 않아 모델 기본값을 따름
+  - 샘플링 설정: 라이브러리 `qwen3.5:4b`는 `presence_penalty 1.5`·`temperature 1`·`top_k 20`·`top_p 0.95`, 팀 4b·27b 허깅페이스 저장소에는 설정(params)이 없음
+  - **바꾼 명령(`--think=false`)의 결과는 아직 Pod에서 확인하지 않았어요.** 4b Modelfile에 라이브러리 같은 샘플링 설정을 넣을지는 앱 답에도 영향이 있어 파인튜닝 담당과 정할 일이에요.
 - 설치 완료 문구 같은 출력 예시는 버전에 따라 조금 다를 수 있어요.
 
 참고: [RunPod – Run Ollama on a Pod](https://docs.runpod.io/tutorials/pods/run-ollama) · [RunPod – Expose ports](https://docs.runpod.io/pods/configuration/expose-ports) · [RunPod 프록시 안내](https://www.runpod.io/blog/runpod-proxy-guide) · [Ollama – qwen3.8:27b](https://ollama.com/library/qwen3.8:27b) · [Ollama FAQ – 여러 모델 함께 올리기](https://docs.ollama.com/faq) · [Hugging Face – Use Ollama with any GGUF Model](https://huggingface.co/docs/hub/en/ollama)

@@ -190,6 +190,34 @@ export function openPreAnswers(pid: string): void {
     ),
   });
 }
+export function openPostAnswers(pid: string): void {
+  const R = ws().plans[pid];
+  if (!R) return;
+
+  const questions = R.plan.assess?.questions || [];
+  const answers = R.post.answers || {};
+
+  openSheet({
+    title: '사후 점검 응답',
+    sub: R.plan.displayTitle || R.plan.goal,
+    wide: true,
+    body: () => (
+      <div className="list">
+        {questions.map((q) => (
+          <div className="li" key={q.id}>
+            <div className="tx">
+              <small>{q.area}</small>
+              <b style={{ fontWeight: 500 }}>{q.text}</b>
+            </div>
+            <span className="end">
+              {answers[q.id] ? ansLabel(answers[q.id]) : '미응답'}
+            </span>
+          </div>
+        ))}
+      </div>
+    ),
+  });
+}
 
 /** 사후 점검 시작 (홈·내 로드맵·점검·보고서 모두 같은 규칙 · 10/14): 언제든 시작할 수 있고,
     '진행 중'인 활동이 남아 있으면 한 번 확인한다(이미 답하기 시작했으면 묻지 않음) */

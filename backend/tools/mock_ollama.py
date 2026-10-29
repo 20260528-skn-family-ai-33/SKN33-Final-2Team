@@ -4,7 +4,8 @@ RunPod-Ollama 를 띄우지 않고 목업의 연결 상태·실패 화면을 확
 응답 내용은 정해진 문구('(모의 Ollama)' 표시)이며, 실제 모델 추론·품질 확인으로 쓰면 안 된다.
 
   GET  /api/version · /api/tags · /api/ps      버전, 설치된 모델, GPU에 올라간 모델
-  POST /api/chat · /api/embed                   대화(JSON 응답), 임베딩(해시로 만든 가짜 벡터)
+  POST /api/chat · /api/embed                   대화(JSON 응답), 임베딩(해시로 만든 가짜 벡터) · 받은 think 값을 로그에 남김
+  POST /api/show                                모델 정보(thinking.values = --think · 기본은 RunPod 연결 절차에 적은 실제 Pod 값) (#28)
   GET/POST /_scenario                           시나리오 보기·바꾸기 {"name": "...", "reset": true}
 
 시나리오
@@ -23,6 +24,7 @@ RunPod-Ollama 를 띄우지 않고 목업의 연결 상태·실패 화면을 확
   rev-retitle      수정안에서 남기는 직접 수행 과제의 제목을 완전히 바꿔 돌려줌(key 는 그대로) → 제목이 바뀌어도 진행 기록이 key 로 이어지는지 확인할 때 (10/23)
 
 실행: python tools/mock_ollama.py [--port 11436] [--models growpath-27b,growpath-regulation-4b] [--scenario ok]
+      [--think '모델=단계,단계;모델=단계,단계' | '단계,단계'(모든 모델) | ''(생각 모드 없음)] [--host 127.0.0.1(컨테이너에서 부를 때 0.0.0.0)]
 모델 이름은 앱의 기본 모델 이름(app/config.py 의 OLLAMA_TEAM_*)과 같아야 한다.
 """
 from __future__ import annotations
@@ -35,7 +37,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
-STATE = {'scenario': 'ok', 'models': [], 'loaded': set()}
+STATE = {'scenario': 'ok', 'models': [], 'loaded': set(), 'think': {}}
 LOCK = threading.Lock()
 SCENARIOS = ('ok', 'no-model', 'no-regulation-model', 'oom', 'slow', 'bad-json', 'proxy-502', 'roadmap-partial', 'slow-ok', 'rev-retitle')
 
@@ -251,6 +253,14 @@ class Handler(BaseHTTPRequestHandler):
         if self.proxy_down():
             return
         model = data.get('model', '')
+        if path == '/api/show':
+            if model not in installed():
+                return self.send(404, {'error': f'model "{model}" not found, try pulling it first'})
+            values = STATE['think'].get(model) or []
+            info = {'capabilities': ['completion'] + (['thinking'] if values else [])}
+            if values:
+                info['thinking'] = {'values': values}
+            return self.send(200, info)
         if path == '/api/embed':
             if model not in installed():
                 return self.send(404, {'error': f'model "{model}" not found, try pulling it first'})
@@ -270,6 +280,7 @@ class Handler(BaseHTTPRequestHandler):
         if isinstance(user, dict):
             user['_history'] = users[:-1]
         s = STATE['scenario']
+        print(f"  [mock-ollama] chat model={model} think={json.dumps(data.get('think')) if 'think' in data else '(없음)'}")
         if model not in installed():
             return self.send(404, {'error': f'model "{model}" not found, try pulling it first'})
         if s == 'oom' or (s == 'roadmap-partial' and '시간 우선안' in system):
@@ -294,16 +305,32 @@ class Handler(BaseHTTPRequestHandler):
                                'done': True, 'total_duration': ns(time.perf_counter() - t0), 'load_duration': ns(load), 'prompt_eval_count': 512, 'eval_count': 256})
 
 
+def think_spec(spec: str, models: list[str]) -> dict[str, list]:
+    """'모델=단계,단계;모델=단계,단계'(모델마다) 또는 '단계,단계'(모든 모델) → {모델: thinking.values}"""
+    level = lambda v: {'on': True, 'off': False}.get(v, v)  # noqa: E731
+    out: dict[str, list] = {}
+    for part in (x for x in spec.split(';') if x.strip()):
+        name, _, values = part.rpartition('=')
+        for m in ([name.strip()] if name.strip() else models):
+            out[m] = [level(v.strip()) for v in values.split(',') if v.strip()]
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--port', type=int, default=11436)
     ap.add_argument('--models', default='growpath-27b,growpath-regulation-4b')
     ap.add_argument('--scenario', default='ok', choices=SCENARIOS)
+    # 모델이 고를 수 있는 추론 정도(/api/show 의 thinking.values). on/off 는 true/false 로 돌려준다.
+    # 기본값은 실제 Pod 에서 본 값(backend/RunPod_Ollama_연결_절차.md · 2026-10-29): 27b false·low·medium·xhigh, 4b false·true
+    ap.add_argument('--think', default='growpath-27b=off,low,medium,xhigh;growpath-regulation-4b=off,on')
+    ap.add_argument('--host', default='127.0.0.1')
     a = ap.parse_args()
     STATE['models'] = [m.strip() for m in a.models.split(',') if m.strip()]
     STATE['scenario'] = a.scenario
-    srv = ThreadingHTTPServer(('127.0.0.1', a.port), Handler)
-    print(f'모의 Ollama (시험용) · http://127.0.0.1:{a.port}/ · 모델 {", ".join(STATE["models"])} · 시나리오 {a.scenario}')
+    STATE['think'] = think_spec(a.think, STATE['models'])
+    srv = ThreadingHTTPServer((a.host, a.port), Handler)
+    print(f'모의 Ollama (시험용) · http://{a.host}:{a.port}/ · 모델 {", ".join(STATE["models"])} · 시나리오 {a.scenario} · 추론 정도 {a.think or "없음"}')
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

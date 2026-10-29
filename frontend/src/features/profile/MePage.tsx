@@ -1,3 +1,4 @@
+import { ThemePicker } from '@/shared/ui/sideParts';
 /* 내 정보 (API-04~08 · 5차 gp-me.js)
    인사 정보·권한(부서·부서장)은 읽기 전용(관리자 화면의 인적 데이터 엑셀로 바뀜), 본인 입력 프로필과 평정의 목표 추천 활용 동의는 직접 고친다.
    고친 값은 서버에 저장하고, 저장하면 서버가 목표 후보를 새 값으로 다시 만든다(FR-05) */
@@ -458,6 +459,12 @@ export function MePage() {
         <EvalCard e={e} />
         <PermCard e={e} />
         <UseCard e={e} />
+        <section className="card" aria-labelledby="profile-theme-title">
+          <div className="sec-h">
+            <h2 className="st" id="profile-theme-title">테마 설정</h2>
+          </div>
+          <ThemePicker />
+        </section>
       </div>
     </Page>
   );
