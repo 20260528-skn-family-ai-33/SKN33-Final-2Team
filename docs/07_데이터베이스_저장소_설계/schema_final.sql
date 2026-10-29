@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 3tkaCs03LOEj7jFQz4ObFINgTYcVGV6czuGjz43SRDJZxfZGsAclBOIowU34wS7
+\restrict 6I5M8zeEqEzHPHkdlmzU3DmeaMnrhoBGMZbPxVxmmBTfqb0KankP9Dqo3hVWPFn
 
 -- Dumped from database version 17.11
 -- Dumped by pg_dump version 17.11
@@ -93,11 +93,9 @@ COMMENT ON EXTENSION vector IS 'vector data type and ivfflat and hnsw access met
 -- Name: employee_can_read_employee(integer, integer); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.employee_can_read_employee(actor integer, target integer)
- RETURNS boolean
- LANGUAGE sql
- STABLE
-AS $function$
+CREATE FUNCTION public.employee_can_read_employee(actor integer, target integer) RETURNS boolean
+    LANGUAGE sql STABLE
+    AS $$
  SELECT EXISTS (
   SELECT 1
   FROM public.employees viewer
@@ -109,28 +107,36 @@ AS $function$
     AND viewer.department_id=owner.department_id)
   )
  )
-$function$;
+$$;
 
-COMMENT ON FUNCTION public.employee_can_read_employee(integer, integer) IS '본인 또는 같은 기관·같은 부서의 부서장만 조회 허용. 부서 상하 관계는 조회 권한에 사용하지 않음.';
+
+--
+-- Name: FUNCTION employee_can_read_employee(actor integer, target integer); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.employee_can_read_employee(actor integer, target integer) IS '본인 또는 같은 기관·같은 부서의 부서장만 조회 허용. 부서 상하 관계는 조회 권한에 사용하지 않음.';
 
 
 --
 -- Name: employee_can_read_project(integer, uuid); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.employee_can_read_project(actor integer, target uuid)
- RETURNS boolean
- LANGUAGE sql
- STABLE
-AS $function$
+CREATE FUNCTION public.employee_can_read_project(actor integer, target uuid) RETURNS boolean
+    LANGUAGE sql STABLE
+    AS $$
  SELECT EXISTS (
   SELECT 1 FROM public.projects project
   WHERE project.project_id=target
     AND public.employee_can_read_employee(actor,project.employee_id)
  )
-$function$;
+$$;
 
-COMMENT ON FUNCTION public.employee_can_read_project(integer, uuid) IS '프로젝트 소유자 본인 또는 소유자와 같은 기관·같은 부서의 부서장만 조회 허용.';
+
+--
+-- Name: FUNCTION employee_can_read_project(actor integer, target uuid); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.employee_can_read_project(actor integer, target uuid) IS '프로젝트 소유자 본인 또는 소유자와 같은 기관·같은 부서의 부서장만 조회 허용.';
 
 
 --
@@ -1126,10 +1132,20 @@ CREATE TABLE public.courses (
     enrollment_end timestamp with time zone,
     enrollment_period_type text DEFAULT 'unknown'::text NOT NULL,
     ai_mention text,
+    duration_seconds integer,
+    duration_kind text,
+    estimated_duration_seconds integer,
+    duration_provenance jsonb DEFAULT '{}'::jsonb NOT NULL,
+    curriculum jsonb DEFAULT '{}'::jsonb NOT NULL,
     CONSTRAINT chk_courses_difficulty CHECK (((difficulty)::text = ANY (ARRAY[('BEGINNER'::character varying)::text, ('INTERMEDIATE'::character varying)::text, ('ADVANCED'::character varying)::text]))),
+    CONSTRAINT courses_curriculum_object CHECK ((jsonb_typeof(curriculum) = 'object'::text)),
+    CONSTRAINT courses_duration_kind_valid CHECK (((((duration_seconds IS NULL) AND (duration_kind IS NULL)) OR ((duration_seconds IS NOT NULL) AND (duration_kind = ANY (ARRAY['video'::text, 'learning'::text])))) IS TRUE)),
+    CONSTRAINT courses_duration_provenance_object CHECK ((jsonb_typeof(duration_provenance) = 'object'::text)),
+    CONSTRAINT courses_duration_seconds_positive CHECK (((duration_seconds IS NULL) OR (duration_seconds > 0))),
     CONSTRAINT courses_enrollment_order_check CHECK (((enrollment_start IS NULL) OR (enrollment_end IS NULL) OR (enrollment_start <= enrollment_end))),
     CONSTRAINT courses_enrollment_type_check CHECK ((enrollment_period_type = ANY (ARRAY['scheduled'::text, 'unrestricted'::text, 'unknown'::text]))),
-    CONSTRAINT courses_enrollment_values_check CHECK ((((enrollment_period_type = 'scheduled'::text) AND (enrollment_start IS NOT NULL) AND (enrollment_end IS NOT NULL)) OR ((enrollment_period_type = 'unrestricted'::text) AND (enrollment_start IS NULL) AND (enrollment_end IS NULL)) OR (enrollment_period_type = 'unknown'::text)))
+    CONSTRAINT courses_enrollment_values_check CHECK ((((enrollment_period_type = 'scheduled'::text) AND (enrollment_start IS NOT NULL) AND (enrollment_end IS NOT NULL)) OR ((enrollment_period_type = 'unrestricted'::text) AND (enrollment_start IS NULL) AND (enrollment_end IS NULL)) OR (enrollment_period_type = 'unknown'::text))),
+    CONSTRAINT courses_estimated_duration_seconds_positive CHECK (((estimated_duration_seconds IS NULL) OR (estimated_duration_seconds > 0)))
 );
 
 
@@ -1159,6 +1175,41 @@ COMMENT ON COLUMN public.courses.enrollment_period_type IS 'scheduled=기간 지
 --
 
 COMMENT ON COLUMN public.courses.ai_mention IS '향후 AI 생성 강좌 요약. 현재 미생성 NULL';
+
+
+--
+-- Name: COLUMN courses.duration_seconds; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.courses.duration_seconds IS '제공처에서 확인한 영상 또는 학습 총시간(초). 미확인은 NULL이며 계획 추정과 구분.';
+
+
+--
+-- Name: COLUMN courses.duration_kind; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.courses.duration_kind IS 'video=영상 재생시간, learning=제공처 학습/학습인정시간.';
+
+
+--
+-- Name: COLUMN courses.estimated_duration_seconds; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.courses.estimated_duration_seconds IS '총시간 미확보 시 공개 영상 차시 수 × 기준시간으로 계산한 로드맵 계획 추정(초).';
+
+
+--
+-- Name: COLUMN courses.duration_provenance; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.courses.duration_provenance IS '출처 URL/필드/원본 해시/수집 시각, 영상 누락 여부와 계획 추정 산식. 실제 이수시간이 아님.';
+
+
+--
+-- Name: COLUMN courses.curriculum; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.courses.curriculum IS 'Public course description and ordered outline, with source hashes and coverage; not full lesson transcripts.';
 
 
 --
@@ -4355,4 +4406,4 @@ ALTER TABLE regulations.regulations ENABLE ROW LEVEL SECURITY;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 3tkaCs03LOEj7jFQz4ObFINgTYcVGV6czuGjz43SRDJZxfZGsAclBOIowU34wS7
+\unrestrict 6I5M8zeEqEzHPHkdlmzU3DmeaMnrhoBGMZbPxVxmmBTfqb0KankP9Dqo3hVWPFn

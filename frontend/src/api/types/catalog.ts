@@ -1,6 +1,13 @@
 /* 학습 자료·자격증·규정·스킬 지도 (API-22, 53, 54 + 설계서 밖 /skills/map) */
 
 /** 학습 자료 하나(catalog._public). 팀 DB 에 없는 값은 규칙으로 채우고 estimated 에 그 칸 이름을 적는다 */
+export interface ResourceCurriculum {
+  coverage?: 'public_outline' | 'partial_outline' | 'sample' | 'description_only';
+  item_count?: number;
+  items?: { title: string; section?: string; description?: string; suspended?: boolean }[];
+  source_url?: string;
+}
+
 export interface Resource {
   id: string;
   title: string;
@@ -8,6 +15,10 @@ export interface Resource {
   kind: string; // 강좌 · 도서 · 자격 · 공식 문서
   format?: string;
   hours?: number | null;
+  timeStatus?: 'confirmed' | 'estimated' | 'manual' | null;
+  durationKind?: 'video' | 'learning' | 'manual' | null;
+  durationSeconds?: number | null;
+  timeNote?: string | null;
   cost?: number | null;
   stage?: number | null;
   real?: boolean;
@@ -15,6 +26,8 @@ export interface Resource {
   audience?: string;
   prereq?: string;
   content?: string;
+  detailsLoaded?: boolean;
+  curriculum?: ResourceCurriculum | null;
   note?: string;
   url?: string;
   image?: string;

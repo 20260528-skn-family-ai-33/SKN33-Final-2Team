@@ -1,14 +1,15 @@
 /* 학습 자료 (API-53·54 · 팀 DB 강좌·도서·자격증, 검색·쪽 나누기 · 5차 scr.resources · scr.res) */
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 import { catalogApi } from '@/api/endpoints/catalog';
 import type { Resource } from '@/api/types/catalog';
 import { paths } from '@/app/paths';
-import { hrs } from '@/shared/lib/format';
+import { resourceTime } from '@/shared/lib/resourceTime';
+import { resourceSource } from '@/shared/lib/resourceSource';
 import { costText, stageName } from '@/shared/lib/plan';
 import { cause } from '@/shared/state/ai';
-import { mergeRes, useRes } from '@/shared/state/catalog';
+import { mergeRes, resourceDetailQuery, useRes } from '@/shared/state/catalog';
 import { Icon } from '@/shared/ui/Icon';
 import { Est, Loading, Note, Page, Thumb } from '@/shared/ui/parts';
 
@@ -28,7 +29,38 @@ export function ResKv({ r }: { r: Resource }) {
         </>
       ) : null}
       <dt>내용</dt>
-      <dd>{r.content || '내용 소개가 없어요'}</dd>
+      <dd style={{ whiteSpace: 'pre-line', maxHeight: 240, overflowY: 'auto' }}>{r.content || '내용 소개가 없어요'}</dd>
+      {!r.detailsLoaded ? (
+        <>
+          <dt>상세</dt>
+          <dd><Link className="link" to={paths.resource(r.id)}>전체 소개·상세 보기</Link></dd>
+        </>
+      ) : null}
+      {r.type === 'course' ? (
+        <>
+          <dt>커리큘럼</dt>
+          <dd>
+            {r.curriculum?.items?.length ? (
+              <details>
+                <summary className="link">
+                  {r.curriculum.coverage === 'sample' ? '확인용 샘플' : r.curriculum.coverage === 'partial_outline' ? '일부 공개 목차' : '공개 목차'} {r.curriculum.items.length}개 보기
+                </summary>
+                <ol style={{ maxHeight: 360, overflowY: 'auto', paddingLeft: 24, marginTop: 8 }}>
+                  {r.curriculum.items.map((item, index) => (
+                    <li key={index} style={{ marginBottom: 8 }}>
+                      {item.section ? <span className="small muted">{item.section} · </span> : null}
+                      {item.title}{item.suspended ? ' (제공 중단 표기)' : ''}
+                      {item.description ? <small className="muted" style={{ display: 'block' }}>{item.description}</small> : null}
+                    </li>
+                  ))}
+                </ol>
+              </details>
+            ) : r.curriculum?.item_count ? (
+              <span className="small muted">공개 목차 {r.curriculum.item_count}개 · 전체 소개·상세 보기에서 확인할 수 있어요.</span>
+            ) : <span className="small muted">별도 목차 미확보 · 소개와 학습 목표를 참고해 주세요.</span>}
+          </dd>
+        </>
+      ) : null}
       <dt>단계·형식</dt>
       <dd>
         {r.stage ? `${r.stage}단계 ${stageName(r.stage)}` : '-'}
@@ -37,8 +69,8 @@ export function ResKv({ r }: { r: Resource }) {
       </dd>
       <dt>시간·비용</dt>
       <dd>
-        {r.hours != null ? hrs(r.hours) : '-'}
-        <Est r={r} k="hours" /> · {costText(r)}
+        <span title={r.timeNote || undefined}>{resourceTime(r)}</span> · {costText(r)}
+        {r.timeNote ? <><br /><span className="small muted">{r.timeNote}</span></> : null}
         {r.note ? (
           <>
             <br />
@@ -53,6 +85,8 @@ export function ResKv({ r }: { r: Resource }) {
         </>
       ) : null}
       <dt>출처</dt>
+      <dd>{resourceSource(r)}</dd>
+      <dt>확인 정보</dt>
       <dd>
         {r.source}
         {r.checked ? ` · 확인일 ${r.checked}` : ''}
@@ -111,7 +145,7 @@ export function ResourcesPage() {
     <Page
       eyebrow="부록"
       title="학습 자료"
-      lead="로드맵에 쓰는 등록 자료예요. 팀 DB의 강좌(MS Learn·K-MOOC)·도서·자격증에서 추천에 쓸 수 있는 것만 보여요. 직접 수행하는 실습 과제는 여기 없어요."
+      lead="로드맵에 쓰는 등록 강좌·도서·자격증 중 추천 가능한 자료예요. 강좌별 출처·학습 시간·공개 목차를 확인할 수 있어요. 직접 수행하는 실습 과제는 여기 없어요."
     >
       <div className="chips" style={{ marginBottom: 12 }}>
         {['전체', '강좌', '도서', '자격'].map((k) => (
@@ -153,8 +187,7 @@ export function ResourcesPage() {
                 <span className="grow">
                   <b>{r.title}</b>
                   <small className="muted" style={{ display: 'block', fontWeight: 400, fontSize: 13 }}>
-                    {r.kind} · {r.provider} · {r.hours != null ? hrs(r.hours) : '-'}
-                    {(r.estimated || []).includes('hours') ? '(추정)' : ''} · {costText(r)}
+                    {r.kind} · {resourceSource(r)} · <span title={r.timeNote || undefined}>{resourceTime(r)}</span> · {costText(r)}
                   </small>
                 </span>
                 {r.real ? <span className="tag line">실제 자료</span> : <span className="tag dash">가상</span>}
@@ -176,7 +209,7 @@ export function ResourcesPage() {
         <p className="small muted">{total}건</p>
       ) : null}
       <Note>
-        시간·단계·형식에 ‘추정’이 붙은 값은 팀 DB에 없어 규칙으로 정한 계획값이에요. 관리자 화면의 교육 데이터 엑셀로 고칠 수 있어요. 도서 가격·응시료·K-MOOC 수강료는 확인이
+        강좌는 제공처의 영상·학습 시간을 사용해요. 총시간을 확보하지 못한 강좌는 공개 커리큘럼 기준의 ‘계획 예상’ 시간을 일정에 사용하며 상세 화면에 근거를 표시해요. 관리자 화면에서 조정할 수 있어요. 도서 가격·응시료·K-MOOC 수강료는 확인이
         필요해요.
       </Note>
     </Page>
@@ -186,19 +219,11 @@ export function ResourcesPage() {
 export function ResourcePage() {
   const { id = '' } = useParams();
   const r = useRes(id);
-  /* 목록을 거치지 않고 들어오면(새로 고침 등) 그 자료만 받아 온다. 못 받으면 5차처럼 '불러오는 중'에 머문다 */
-  useQuery({
-    queryKey: ['resource', id],
-    queryFn: async () => {
-      const m = await catalogApi.lookup([id]);
-      mergeRes(m);
-      return m[id] || null;
-    },
-    enabled: !r,
-  });
-  if (!r) return <Page back={paths.resources} title="자료를 불러오는 중이에요" />;
+  /* 저장된 상세가 있어도 재진입 때 최신 내용을 받는다. */
+  useQuery(resourceDetailQuery(id));
+  if (!r?.detailsLoaded) return <Page back={paths.resources} title="자료를 불러오는 중이에요" />;
   return (
-    <Page back={paths.resources} eyebrow={`${r.kind} · ${r.real ? '실제 자료' : '가상 자료'}`} title={r.title} lead={r.provider}>
+    <Page back={paths.resources} eyebrow={`${r.kind} · ${r.real ? '실제 자료' : '가상 자료'}`} title={r.title} lead={resourceSource(r)}>
       <div className={`card res-card ${r.type || ''}`}>
         <Thumb r={r} size="lg" />
         <ResKv r={r} />

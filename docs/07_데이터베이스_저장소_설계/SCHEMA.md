@@ -1,6 +1,6 @@
 # DB 테이블과 관계
 
-2026-10-27 최종 ERD·스키마·외부 백업 manifest 기준. 전체 53테이블(운영45·관리2·보관6), 22,298행·87개 FK다. [구현·검증](README.md)과 함께 확인한다.
+2026-10-28 시간 반영 ERD·스키마·외부 백업 manifest 기준. 전체 53테이블(운영45·관리2·보관6), 22,300행·87개 FK다. [구현·검증](README.md)과 함께 확인한다.
 
 ## `growpath_legacy.agent_generations` · 71행
 
@@ -125,7 +125,7 @@
 | `mapping_evidence` | jsonb | 아니오 |
 | `fetched_at` | timestamp with time zone | 아니오 |
 
-## `growpath_meta.schema_migrations` · 24행
+## `growpath_meta.schema_migrations` · 26행
 
 기본키: version
 
@@ -320,6 +320,11 @@
 | `enrollment_end` | timestamp with time zone | 예 |
 | `enrollment_period_type` | text | 아니오 |
 | `ai_mention` | text | 예 |
+| `duration_seconds` | integer | 예 |
+| `duration_kind` | text | 예 |
+| `estimated_duration_seconds` | integer | 예 |
+| `duration_provenance` | jsonb | 아니오 |
+| `curriculum` | jsonb | 아니오 |
 
 ## `public.departments` · 14행
 

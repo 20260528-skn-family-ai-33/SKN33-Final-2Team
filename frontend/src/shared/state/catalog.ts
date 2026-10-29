@@ -17,7 +17,30 @@ export const useCatalog = create<CatalogState>(() => ({ res: {}, certGroups: [],
 
 export function mergeRes(res: ResourceMap | null | undefined): void {
   if (!res || !Object.keys(res).length) return;
-  useCatalog.setState((s) => ({ res: { ...s.res, ...res } }));
+  useCatalog.setState((s) => {
+    const next = { ...s.res };
+    Object.entries(res).forEach(([id, incoming]) => {
+      const previous = next[id];
+      next[id] = previous?.detailsLoaded && !incoming.detailsLoaded
+        ? { ...incoming, content: previous.content, curriculum: previous.curriculum, detailsLoaded: true }
+        : incoming;
+    });
+    return { res: next };
+  });
+}
+
+/** 상세는 재진입 때 확인하고, 목록 캐시는 가볍게 유지한다. */
+export function resourceDetailQuery(id: string) {
+  return {
+    queryKey: ['resource', id] as const,
+    queryFn: async () => {
+      const detail = await catalogApi.resource(id);
+      mergeRes({ [id]: detail });
+      return detail;
+    },
+    enabled: Boolean(id),
+    refetchOnMount: 'always' as const,
+  };
 }
 
 export function mergeReg(b: RegBundle | null | undefined): void {

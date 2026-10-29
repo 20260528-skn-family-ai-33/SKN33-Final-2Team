@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { catalogApi } from '@/api/endpoints/catalog';
 import type { Resource } from '@/api/types/catalog';
-import { hrs } from '@/shared/lib/format';
+import { resourceTime } from '@/shared/lib/resourceTime';
+import { resourceSource } from '@/shared/lib/resourceSource';
 import { costText } from '@/shared/lib/plan';
 import { cause } from '@/shared/state/ai';
 import { useAt } from '@/shared/state/bind';
@@ -44,7 +45,7 @@ export function ResPicker({ path, stage, exclude }: { path: string; stage?: numb
                 <Thumb r={x} />
                 <span className="tx">
                   {x ? x.title : id}
-                  <small>{x ? `${x.stage || '-'}단계 · ${x.kind} · ${x.provider} · ${hrs(x.hours || 0)} · ${costText(x)}` : ''}</small>
+                  <small>{x ? `${x.stage || '-'}단계 · ${x.kind} · ${resourceSource(x)} · ${resourceTime(x)} · ${costText(x)}` : ''}</small>
                 </span>
                 <span className="ck">
                   <Icon name="check" />
@@ -92,8 +93,7 @@ export function ResPicker({ path, stage, exclude }: { path: string; stage?: numb
                     {x.title}
                     <small>
                       {x.stage || '-'}단계
-                      <Est r={x} k="stage" /> · {x.kind} · {x.provider} · {hrs(x.hours || 0)}
-                      <Est r={x} k="hours" /> · {costText(x)}
+                      <Est r={x} k="stage" /> · {x.kind} · {resourceSource(x)} · {resourceTime(x)} · {costText(x)}
                     </small>
                   </span>
                   <span className="ck">

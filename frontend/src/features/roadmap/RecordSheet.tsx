@@ -1,6 +1,7 @@
 /* 실행 기록 창 (5차 rec-open·rec-save · P.recBody·recRes)
    진행 상태는 이 창에서만 바꾼다(홈·내 로드맵 활동 줄은 보여 주기만 · 10/23). 저장하기를 눌러야 반영된다.
    자료 상자(10/23 사용자 결정): 그림을 크게, 버튼 두 개 — '원본 열기'(새 탭) + '자료 정보'(앱 안 자료 상세) */
+import { resourceSource } from '@/shared/lib/resourceSource';
 import { plansApi } from '@/api/endpoints/plans';
 import type { Activity } from '@/api/types/plan';
 import type { Resource } from '@/api/types/catalog';
@@ -36,7 +37,7 @@ function RecRes({ a, r }: { a: Activity; r: Resource | null }) {
           <b>{r ? r.title : a.title}</b>
           {r ? (
             <small>
-              {r.kind} · {r.provider}
+              {r.kind} · {resourceSource(r)}
               {r.real ? '' : ' · 가상 자료'}
             </small>
           ) : null}

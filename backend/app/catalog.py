@@ -10,7 +10,7 @@ import re
 import threading
 import time
 
-from . import db
+from . import db, course_time, catalog_evidence
 
 KIND = {'course': '강좌', 'book': '도서', 'cert': '자격', 'doc': '공식 문서'}
 _lock = threading.Lock()
@@ -32,7 +32,8 @@ def _load() -> dict:
         links.setdefault((r['t'], r['k']), []).append(skills.get(r['skill_id'], ''))
     meta = {r['resource_key']: r for r in db.all_('SELECT * FROM app_ext.resource_meta')}
     rows = db.all_("""SELECT m.resource_key, m.resource_type, c.course_id, c.title AS c_title, c.org_name, c.platform, c.url AS c_url, c.cost AS c_cost,
-            c.duration_weeks, c.difficulty, c.syllabus_summary, c.content_status AS c_status, c.source_url AS c_src, c.source_verified_at AS c_ver, c.last_batch_updated AS c_upd,
+            c.duration_weeks, c.duration_seconds,c.duration_kind,c.estimated_duration_seconds,c.duration_provenance,
+            c.difficulty, c.syllabus_summary, c.curriculum, c.content_status AS c_status, c.source_url AS c_src, c.source_verified_at AS c_ver, c.last_batch_updated AS c_upd,
             c.image_url AS c_img,
             b.isbn, b.title AS b_title, b.author, b.publisher, b.description AS b_desc, b.content_status AS b_status, b.source_url AS b_src, b.loan_count,
             b.source_verified_at AS b_ver, b.last_batch_updated AS b_upd, b.image_url AS b_img,
@@ -53,7 +54,8 @@ def _load() -> dict:
             source = f"{r['platform']} 공개 강좌" if r['platform'] else '강좌'
             checked = _date(r['c_ver'] or r['c_upd'])
             sk = links.get(('course', r['course_id']), [])
-            extra = {'platform': r['platform'], 'difficulty': r['difficulty'], 'weeks': r['duration_weeks']}
+            extra = {'platform': r['platform'], 'difficulty': r['difficulty'], 'weeks': r['duration_weeks'],
+                     'curriculum': {key: (r['curriculum'] or {}).get(key) for key in ('coverage', 'items', 'item_count', 'source_url')}}
         elif t == 'book':
             title, provider, url, status = r['b_title'], r['publisher'], r['b_src'], r['b_status']
             content = r['b_desc'] or (f"저자 {r['author']}" if r['author'] else '')
@@ -75,17 +77,19 @@ def _load() -> dict:
             continue  # 원본 행이 지워졌으면 목록에서 뺀다
         image = _image(r.get({'course': 'c_img', 'book': 'b_img', 'cert': 'x_img'}.get(t, '')))
         est = list(m['estimated_fields'] or [])
+        timing = course_time.effective(r, m) if t == 'course' else {}
+        if timing:est = timing['estimated']
         items[r['resource_key']] = dict({
             'id': r['resource_key'], 'type': t, 'title': title, 'provider': provider or '', 'kind': KIND[t],
             'format': m['format'] or '', 'hours': float(m['hours']) if m['hours'] is not None else None,
             'cost': m['cost_won'], 'stage': m['stage'], 'real': bool(m['is_real']), 'skills': [s for s in sk if s],
-            'audience': m['audience'] or '', 'prereq': m['prereq'] or '', 'content': (m['content'] or content or '')[:600],
-            'note': m['note'] or ('시간·단계·형식은 규칙으로 정한 추정값이에요' if {'hours', 'stage'} & set(est) else ''),
+            'audience': m['audience'] or '', 'prereq': m['prereq'] or '', 'content': catalog_evidence.content_text(m['content'] or content),
+            'note': m['note'] or ('단계·형식 등은 규칙으로 정한 계획값이에요' if {'format', 'stage'} & set(est) else ''),
             'url': url or '', 'image': image, 'source': m['source_label'] or source, 'checked': _date(m['checked_on']) or checked,
             'estimated': est, 'status': status or '', 'usable': _usable(t, status, sk),
             'certCode': m['cert_code'], 'certGroup': m['cert_group'], 'certShort': m['cert_short'], 'certSub': m['cert_sub'],
             'certVendor': m['cert_vendor'], 'order': m['display_order'],
-        }, **extra)
+        }, **extra, **timing)
     return {'items': items, 'skills': skills}
 
 
@@ -128,15 +132,22 @@ def get(key: str | None) -> dict | None:
     return items().get(key or '') if key else None
 
 
-def resources_for(keys) -> dict[str, dict]:
+def resources_for(keys, *, detail: bool = False) -> dict[str, dict]:
     """화면에 보낼 자료(쓰인 키만)"""
     all_ = items()
-    return {k: _public(all_[k]) for k in set(k for k in keys if k) if k in all_}
+    return {k: _public(all_[k], detail=detail) for k in set(k for k in keys if k) if k in all_}
 
 
-def _public(r: dict) -> dict:
-    return {k: r.get(k) for k in ('id', 'title', 'provider', 'kind', 'format', 'hours', 'cost', 'stage', 'real', 'skills', 'audience', 'prereq',
-                                  'content', 'note', 'url', 'image', 'type', 'source', 'checked', 'estimated', 'certCode', 'platform', 'difficulty', 'weeks', 'author')}
+def _public(r: dict, *, detail: bool = False) -> dict:
+    out = {k: r.get(k) for k in ('id', 'title', 'provider', 'kind', 'format', 'hours', 'cost', 'stage', 'real', 'skills', 'audience', 'prereq',
+                                  'content', 'note', 'url', 'image', 'type', 'source', 'checked', 'estimated', 'certCode', 'platform', 'difficulty', 'weeks', 'author',
+                                  'timeStatus','durationKind','durationSeconds','timeNote','curriculum')}
+    out['detailsLoaded'] = detail
+    if not detail:
+        out['content'] = str(r.get('content') or '')[:400]
+        if r.get('curriculum'):
+            out['curriculum'] = {k: r['curriculum'].get(k) for k in ('coverage', 'item_count')}
+    return out
 
 
 def _word_re(w: str) -> re.Pattern:
@@ -215,6 +226,8 @@ def for_agent(texts: list[str], cert_key: str | None = None, limit: int = 28, st
         s = len(set(r['skills']) & set(want)) * 2
         title = r['title'].lower()
         s += sum(1 for w in words if w.lower() in title)
+        outline = ' '.join(f"{row.get('section', '')} {row.get('title', '')} {row.get('description', '')}" for row in (r.get('curriculum') or {}).get('items') or []).lower()
+        s += min(3, sum(0.5 for w in words if w.lower() in outline))
         s -= 0.5 * max(0, (r['stage'] or 2) - 3)
         if r['type'] == 'book':
             s -= 1  # 도서는 강좌보다 뒤에(시간 추정이 거칠어서)
@@ -235,10 +248,14 @@ def for_agent(texts: list[str], cert_key: str | None = None, limit: int = 28, st
     return picked
 
 
-def agent_view(r: dict, skill_names: bool = True) -> dict:
-    """에이전트 입력용 짧은 형태(4차 AI.catalog 와 같은 키)"""
-    return {'id': r['id'], 'title': r['title'], 'kind': r['kind'], 'format': r['format'], 'hours': r['hours'], 'cost': r['cost'],
-            'stage': r['stage'], 'real': r['real'], 'skills': r['skills'][:4] if skill_names else []}
+def agent_view(r: dict, skill_names: bool = True, texts: list[str] | None = None) -> dict:
+    """Keep original keys and add bounded, goal-relevant source evidence."""
+    return {**catalog_evidence.entry(r, skill_names=skill_names),
+            **catalog_evidence.evidence(r, texts)}
+
+
+def agent_views(records: list[dict], texts: list[str] | None = None) -> list[dict]:
+    return catalog_evidence.pack(records, texts)
 
 
 def cert_groups() -> list[dict]:

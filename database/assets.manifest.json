@@ -29,6 +29,26 @@
       "manifest_location": "https://drive.google.com/file/d/1iUVAugkFpXHNeO3IlWhFkol-6oID691C/view?usp=drivesdk"
     },
     {
+      "id": "course_duration_snapshot_20261028",
+      "filename": "growpath_duration_20261028.dump",
+      "bytes": 36573846,
+      "sha256": "1b8af0d26974ee22605332fde260a08642369482daf575b4b5d564e8085e64a7",
+      "location": null,
+      "location_status": "verified_local_export_not_uploaded",
+      "manifest": "data/exports/growpath_duration_20261028.manifest.json",
+      "version": "2026-10-28-course-duration-v2"
+    },
+    {
+      "id": "course_curriculum_snapshot_20261028",
+      "filename": "growpath_curriculum_20261028.dump",
+      "bytes": 38232789,
+      "sha256": "c401c1f60e0b7d2e513dce031225cc2dad0d879ec22674900608b55c31d2c48c",
+      "location": null,
+      "location_status": "verified_local_export_not_uploaded",
+      "manifest": "data/exports/growpath_curriculum_20261028.manifest.json",
+      "version": "2026-10-28-course-curriculum-v2"
+    },
+    {
       "id": "synthetic_profiles_20261028",
       "filename": "synthetic_profiles.v1.json",
       "sha256": "bfc173ec4b28eb18d250aa09510006636e2724ba20373129caa42db4ac58f8c4",

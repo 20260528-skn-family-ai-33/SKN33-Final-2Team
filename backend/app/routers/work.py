@@ -356,7 +356,7 @@ def api_resources_lookup(body: dict, a: Account = Depends(require_account)):
 
 @r.get('/resources/{resource_id}')
 def api_resource(resource_id: str, a: Account = Depends(require_account)):
-    x = catalog.resources_for([resource_id]).get(resource_id)
+    x = catalog.resources_for([resource_id], detail=True).get(resource_id)
     if not x:
         raise not_found('학습 자료')
     return x

@@ -46,10 +46,10 @@
       "source_sha256": "15e8559b61d8db92a1a322ba0a1be86852fb1f4555ecf80b89be366d9b289fcf",
       "source_bytes": 11326,
       "source_kind": "team_existing_file",
-      "sha256": "0bee51bb46030754819d36ba02e703cda0d0c3314757d019b66b53f53a42d9ad",
-      "bytes": 16917,
+      "sha256": "14ce21426101a3c5240320f3c00a2c93ef960a5f01eacdf513cd6e0d84dcc706",
+      "bytes": 17031,
       "handling": "adjusted",
-      "change_note": "Issue #15: reconcile latest main, implementation/contracts, regression coverage and verification metadata (2026-10-28)."
+      "change_note": "Issue #26 course-first publication: preserve latest #14/#15 main; time, outlines, UI and snapshot only."
     },
     {
       "path": "database/.env.example",
@@ -83,10 +83,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "1fc403e9caa8a5556086bccc7a9a05848d89b013dc1bac407ca36c12b4d9047f",
-      "bytes": 28189,
+      "sha256": "c016bae49963b65bbabf76381e6df5039b553a4e7b5ebd1cc364b48d777ee123",
+      "bytes": 40011,
       "handling": "adjusted",
-      "change_note": "Issue #27: reproduce and fix inherited work description being copied by a self save; 15 authenticated HTTP checks.",
+      "change_note": "Issue #27: employee delivery reconciled and verified on merged course main 44ef011 (2026-10-29).",
       "local_update_source": {
         "path": "README.md",
         "sha256": "e872d64ea58c53311d098dc1c769f5bc3232ad947d690054b75a0a0a20c6d8c6"
@@ -109,10 +109,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "a018b44795674ecb89d4fec89890d1bac6bb018b855cf0a32ac5cf173095c085",
-      "bytes": 23824,
+      "sha256": "ddda60569d0f53d7d34b4725adec52bd2f3e2d1280772932a7fdaca5b02792e5",
+      "bytes": 24722,
       "handling": "adjusted",
-      "change_note": "Issue #27: fictional profiles, protected real employees, work description fallback and regression evidence."
+      "change_note": "Issue #27: reconcile employee changes with merged course main 44ef011; preserve course contracts (2026-10-29)."
     },
     {
       "source_path": "database/config/paths.yaml",
@@ -297,10 +297,10 @@
       "source_sha256": "82327b5737f40c891484955c2eb2ce490a53b0de46990408d4b6f9708441991d",
       "source_bytes": 4420,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "de0c24eb1629991659114a7b43329ad44136bf0afe75f686696c2cace2a6116c",
-      "bytes": 5380,
+      "sha256": "ea4cc68a585e13c9e27f1407847f70d9942c71600d07ac610a6184be31aad37a",
+      "bytes": 5478,
       "handling": "adjusted",
-      "change_note": "Issue #27: fictional profiles, protected real employees, work description fallback and regression evidence.",
+      "change_note": "Issue #27: reconcile employee changes with merged course main 44ef011; preserve course contracts (2026-10-29).",
       "local_update_source": {
         "path": "scripts/check_workspace.py",
         "sha256": "82327b5737f40c891484955c2eb2ce490a53b0de46990408d4b6f9708441991d"
@@ -488,10 +488,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "91d4c6e9ca504ce7ec65d8ffc371c5f975f8d3d2f3e36a03d0e6699264aee1be",
-      "bytes": 15892,
+      "sha256": "2458afb17203d0b8c44c979ac46caeb42f4dcd01eb593db8e598ac529f25e293",
+      "bytes": 30533,
       "handling": "adjusted",
-      "change_note": "Issue #27: reproduce and fix inherited work description being copied by a self save; 15 authenticated HTTP checks."
+      "change_note": "Issue #27: employee delivery reconciled and verified on merged course main 44ef011 (2026-10-29)."
     },
     {
       "source_path": "database/src/__init__.py",
@@ -534,10 +534,10 @@
       "source_sha256": "60099e9c5f394bb8cda0bd4dd89aabc85cc28c4ba02047495eea8b6bcd269a3b",
       "source_bytes": 191247,
       "source_kind": "source_commit_file",
-      "sha256": "c1309a15de25ff5e5447c5d1b2440ab17c374fc67f0c34c76e28aaab7c7576f9",
-      "bytes": 208289,
-      "handling": "copied",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "sha256": "909bb6fb477eebb1837cf800010105100a7c82ae3dd4f4e97834d5066adec964",
+      "bytes": 210890,
+      "handling": "adjusted",
+      "change_note": "Issue #26 course-first publication: preserve latest #14/#15 main; time, outlines, UI and snapshot only.",
       "local_update_source": {
         "path": "src/database/catalog.current.json",
         "sha256": "c1309a15de25ff5e5447c5d1b2440ab17c374fc67f0c34c76e28aaab7c7576f9"
@@ -714,10 +714,10 @@
       "source_sha256": "e568b5447a02f5a1d944397d03cf044d0a4a1f53c8a22131a82868035d3c299f",
       "source_bytes": 4885,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "91fc7c07987c9008344d5c68c6931d1216a9494022e1d0d04f645e30e72bbc02",
-      "bytes": 5217,
-      "handling": "copied",
-      "change_note": "PR #22: preserve employee catalog identities and saved roadmap resources; accept millisecond dates; skip empty historical URLs; add free regressions and verification record.",
+      "sha256": "5205cfe0c821908ed6371e1cff59fed2b8e417a84d76a496ffd75aa4b62c128f",
+      "bytes": 5427,
+      "handling": "adjusted",
+      "change_note": "Issue #26 course-first publication: preserve latest #14/#15 main; time, outlines, UI and snapshot only.",
       "local_update_source": {
         "path": "src/database/ingestion/catalog_finalization.py",
         "sha256": "e568b5447a02f5a1d944397d03cf044d0a4a1f53c8a22131a82868035d3c299f"
@@ -1149,10 +1149,10 @@
       "source_sha256": "fcf62e38edceec7298965eb8ec1ea7031b25dcb862798f3a40bf6a372934cd14",
       "source_bytes": 7583,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "fcf62e38edceec7298965eb8ec1ea7031b25dcb862798f3a40bf6a372934cd14",
-      "bytes": 7583,
-      "handling": "copied",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "sha256": "1c28e57fedbd938b99aea930b13d2dd64cc18cf62e94cdcd1bdab37b59758b59",
+      "bytes": 7901,
+      "handling": "adjusted",
+      "change_note": "Issue #26 course-first publication: preserve latest #14/#15 main; time, outlines, UI and snapshot only.",
       "local_update_source": {
         "path": "src/shared/catalog_scope.py",
         "sha256": "fcf62e38edceec7298965eb8ec1ea7031b25dcb862798f3a40bf6a372934cd14"
@@ -1446,10 +1446,10 @@
       "source_sha256": "f5260d82fdb90d1b6f3309f4cb3f6062034be533133406f25cf5060a27b90b2b",
       "source_bytes": 166111,
       "source_kind": "user_delivered_external_erd",
-      "sha256": "f999187c852e87af639a61be6383c82de82d8825e332c70a1500fd18f1a47ad1",
-      "bytes": 180371,
+      "sha256": "83aaff2391221f2601b6673efd4f3e7af882e31a8f65ff476a428fc9b1cfbd64",
+      "bytes": 182151,
       "handling": "adjusted",
-      "change_note": "2026-10-27 #15 same-department-only permissions, regression tests and snapshot metadata; HR rows remain external.",
+      "change_note": "Issue #26 course-first publication: preserve latest #14/#15 main; time, outlines, UI and snapshot only.",
       "local_update_source": {
         "path": "docs/ERD_최종.html",
         "sha256": "68cd694ae64009304fa7f663861a80e9f93d3a8f67ef84e479971e4f709c66f2"
@@ -1461,10 +1461,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "66539dc8e6da8ec17f2e8e6868d5c83c9ef88400ce12adc8f71f6d1406739e07",
-      "bytes": 9278,
+      "sha256": "1622023fba331146e6a5c17d26621734dd04f914d632227fa7c3ed9b1c6d110b",
+      "bytes": 9442,
       "handling": "adjusted",
-      "change_note": "2026-10-27 #15 same-department-only permissions, regression tests and snapshot metadata; HR rows remain external."
+      "change_note": "Issue #26 course-first publication: preserve latest #14/#15 main; time, outlines, UI and snapshot only."
     },
     {
       "path": "docs/07_데이터베이스_저장소_설계/SCHEMA.md",
@@ -1472,10 +1472,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "9d8002fe1174936992c3090819a093caf463b4f2cffbedbb42a7e001fd39c091",
-      "bytes": 33247,
+      "sha256": "64ce4c2a6a3a2e86a78783afcdf417a56a090f493b82cb05d35211e4a8472e6a",
+      "bytes": 33458,
       "handling": "adjusted",
-      "change_note": "2026-10-27 #15 same-department-only permissions, regression tests and snapshot metadata; HR rows remain external."
+      "change_note": "Issue #26 course-first publication: preserve latest #14/#15 main; time, outlines, UI and snapshot only."
     },
     {
       "path": "docs/07_데이터베이스_저장소_설계/schema_final.sql",
@@ -1483,10 +1483,10 @@
       "source_sha256": "92f6b5a8e16e0391d15ca0f30940f56ef6b74109855ff463d7620ec5e71aad76",
       "source_bytes": 133911,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "1461a6d22cd297b70b40fa7d749dffa74d34b1d1451ed5be531c19fedd75d18e",
-      "bytes": 134442,
+      "sha256": "85edf9b795851754be4dfb0975432c39ef6500805dffb8526365c07b4da386e3",
+      "bytes": 136855,
       "handling": "adjusted",
-      "change_note": "Issue #15 review carried with #27: two schema SQL terminators, actual isolated psql verification; applied migrations unchanged.",
+      "change_note": "Issue #26 course-first publication: preserve latest #14/#15 main; time, outlines, UI and snapshot only.",
       "local_update_source": {
         "path": "docs/schema_final.sql",
         "sha256": "92f6b5a8e16e0391d15ca0f30940f56ef6b74109855ff463d7620ec5e71aad76"
@@ -1606,9 +1606,9 @@
       "source_bytes": null,
       "source_kind": "team_followup_implementation",
       "handling": "adjusted",
-      "sha256": "2afe785821f0063e36c8c384ddd31f93d3219fcdf4e259fdf3171b05318dc8d2",
-      "bytes": 29139,
-      "change_note": "Issue #27: reproduce and fix inherited work description being copied by a self save; 15 authenticated HTTP checks."
+      "sha256": "563f7f1f1335dcedba5283952b332451fcee459edf48220b949408bd7ecb70b2",
+      "bytes": 32726,
+      "change_note": "Issue #27: reconcile employee changes with merged course main 44ef011; preserve course contracts (2026-10-29)."
     },
     {
       "path": "backend/app/routers/account.py",
@@ -1630,7 +1630,7 @@
       "handling": "adjusted",
       "sha256": "3706b0ece944af5e55ec53c597d34627bfee78a72b209a77b6fc3468ca777cd2",
       "bytes": 18624,
-      "change_note": "Issue #27: reproduce and fix inherited work description being copied by a self save; 15 authenticated HTTP checks."
+      "change_note": "Issue #27: reconcile employee changes with merged course main 44ef011; preserve course contracts (2026-10-29)."
     },
     {
       "path": "frontend/docs/API_계약.md",
@@ -1639,9 +1639,9 @@
       "source_bytes": null,
       "source_kind": "team_followup_implementation",
       "handling": "adjusted",
-      "sha256": "8ea9f916f4f9ddef2b7a31fea5a653647503df5577a18e9787d2bfcd2b5760a7",
-      "bytes": 13685,
-      "change_note": "Issue #27: reproduce and fix inherited work description being copied by a self save; 15 authenticated HTTP checks."
+      "sha256": "9d5fe9996edb2c06469fb0854c5fae5a21faa891b656d473674930f142331044",
+      "bytes": 15678,
+      "change_note": "Issue #27: reconcile employee changes with merged course main 44ef011; preserve course contracts (2026-10-29)."
     },
     {
       "path": "database/tests/test_resource_refresh.py",
@@ -1664,6 +1664,424 @@
       "sha256": "ce1c780c1ef73a768e9895cf72129a9145a1cb03a5590dab309b9acdc046eed0",
       "bytes": 5339,
       "change_note": "Issue #14: reconcile latest main, implementation/contracts, regression coverage and verification metadata (2026-10-28)."
+    },
+    {
+      "path": "backend/app/admin_io/education.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "cc6a9b5ef63a91ad4a3760ba175cdb500355d81cf8926bb5329c81fde804d4dc",
+      "bytes": 25054,
+      "change_note": "PR #32 selected fixes: admin confirmation, detail refresh/access, ten-minute labels (2026-10-29)."
+    },
+    {
+      "path": "backend/app/agents/roadmap.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "93cb2c696dd59892b93bf947e2f87175540cd1e974c682ffbab17297fb2508f7",
+      "bytes": 41299,
+      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
+    },
+    {
+      "path": "backend/app/catalog.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "3aedc6b42cb63083934f63a0d793ab0e42e826bb59d8eb53af38036e28b25665",
+      "bytes": 16187,
+      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
+    },
+    {
+      "path": "backend/app/course_time.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "736f6df8976a1727a2c21afc5f0aacc2ca2083d641193ae0cf0f7cc04ec52884",
+      "bytes": 4225,
+      "change_note": "PR #32 selected fixes: admin confirmation, detail refresh/access, ten-minute labels (2026-10-29)."
+    },
+    {
+      "path": "backend/db/02_app_ext.sql",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "ea72ffee387fd93eabd598bd3df4cd9f98bd203af9c93adc96123b11d750e175",
+      "bytes": 15691,
+      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
+    },
+    {
+      "path": "backend/tools/setup_db.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "70e74f3b683ce2448db1b786e25450442f16c9a65b7df82d15d656f083378b66",
+      "bytes": 14489,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "database/data/exports/growpath_duration_20261028.manifest.json",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "9bf8f604cdf21674a95eaf5370a34ce923b0cc1ea661d0cd37814a76a53b65df",
+      "bytes": 59214,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "database/scripts/backfill_course_duration.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "5be6e4a83fd0bb7d45e9e30c3f810f920fdb50c58b1ffddfe5e3457474e226d8",
+      "bytes": 747,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "database/src/database/course_duration.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "49c50eafb8ae0e6668b82434f94851938bdc9b2e4efa0488f55ea681b09a3259",
+      "bytes": 8987,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "database/src/database/migrations/025_course_duration.sql",
+      "source_path": null,
+      "source_sha256": "ce5403a706a6f533f6d696e6af8b574c7251027a31ddf950b86bb2b271cf2fe8",
+      "source_bytes": 1660,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "ce5403a706a6f533f6d696e6af8b574c7251027a31ddf950b86bb2b271cf2fe8",
+      "bytes": 1660,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "database/tests/test_course_duration.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "263e03e9b58a83c7fb325873b5523c70e4b21217b25d7f086fbaa9a37d162b83",
+      "bytes": 6501,
+      "change_note": "PR #32 selected fixes: admin confirmation, detail refresh/access, ten-minute labels (2026-10-29)."
+    },
+    {
+      "path": "database/tests/test_course_duration_database.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "8e8a7e765354a64a86eab03e284310f235e58582841226dc906315c6cafa51ca",
+      "bytes": 6502,
+      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
+    },
+    {
+      "path": "frontend/src/api/types/catalog.ts",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "c4817e7a0e23d8afc381bec48caa1d2043495d637d06b05c1c723699ddc44119",
+      "bytes": 2897,
+      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
+    },
+    {
+      "path": "frontend/src/api/types/plan.ts",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "85e5685abf150007e13df9cfc69fed34c9ed10ce84085bffdcdb6172ccc6c738",
+      "bytes": 5430,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "frontend/src/features/draft/result/ResultStep.tsx",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "8adb6f1d0ed27f598279933be09834029b982c2df513dd7351f3e279684b022b",
+      "bytes": 19173,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "frontend/src/features/resources/ResourcePages.tsx",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "eba8d60be0e573f7f2a70f21a1a8b0d3f9d1d651e6785722bb213a0f7a636675",
+      "bytes": 9555,
+      "change_note": "PR #32 selected fixes: admin confirmation, detail refresh/access, ten-minute labels (2026-10-29)."
+    },
+    {
+      "path": "frontend/src/features/roadmap/RecordSheet.tsx",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "cbdf620bc0a9a5f7e4db67302bf2e0f2d089a53454b86993dfc30e219db0ef8f",
+      "bytes": 5904,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "frontend/src/shared/lib/plan.ts",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "52d4d641f049c23bb09e7110b75d4b5a38ba07654224847b56edbef79ac0ae58",
+      "bytes": 5981,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "frontend/src/shared/lib/resourceSource.test.ts",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "da4400a7b490a43cf9b6e9d21032111ec796c684530328c0e531169ac4d46127",
+      "bytes": 676,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "frontend/src/shared/lib/resourceSource.ts",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "cf6847576b9591a48c1248a089c0d915944ff884816f541c9e371d04db8923fb",
+      "bytes": 764,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "frontend/src/shared/lib/resourceTime.test.ts",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "8f92bb6bed5f4e1d2a8f75838a28099a511d4575e3d3f025a240434a1fb45457",
+      "bytes": 1769,
+      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
+    },
+    {
+      "path": "frontend/src/shared/lib/resourceTime.ts",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "d9dc64f64f8931671dd9622f2b7669821f76c575c1103f94980659e46f0e4607",
+      "bytes": 1611,
+      "change_note": "PR #32 selected fixes: admin confirmation, detail refresh/access, ten-minute labels (2026-10-29)."
+    },
+    {
+      "path": "frontend/src/shared/ui/ResPicker.tsx",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "ed00ca1b827a81f0ff2159c45c2d6523319fb5b4440fd4a8796512407e4889aa",
+      "bytes": 4424,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "frontend/src/shared/ui/StagesView.tsx",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "91b48cdff85864bd472f8b30ce6d973d73f99ed3df974b1a94f94153145f5013",
+      "bytes": 2139,
+      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
+    },
+    {
+      "path": "backend/app/agents/diag.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "f3ab5968cee1fc0e5376302b4cda1f3b943cb7afdce24b97ed668f374a5024ea",
+      "bytes": 27716,
+      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
+    },
+    {
+      "path": "backend/app/catalog_evidence.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "575f759f84ebaadbb70c77541b5e78c539a9cde3c5c6bed2f02fbc313a052440",
+      "bytes": 5671,
+      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
+    },
+    {
+      "path": "database/data/exports/growpath_curriculum_20261028.manifest.json",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "e81fd36cb9bd98524ffc10a79683f0dd29f31431094e450f71ddc89b0f79b3bd",
+      "bytes": 59418,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "database/scripts/backfill_course_curriculum.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "87a1a02a72f30d692aad3121eb795a9025a9f0818b8605d7afebc1bc4e150fd2",
+      "bytes": 1035,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "database/src/database/course_curriculum.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "75f3dc00783d8811eb38aee77a404a44dd7bdcd562577451f8986c540408f7dc",
+      "bytes": 11444,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "database/src/database/migrations/026_course_curriculum.sql",
+      "source_path": null,
+      "source_sha256": "71141de5ddb08a60563c5e7e685d509b7d9ea0e157752fe7d3dd0985c83983b0",
+      "source_bytes": 454,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "71141de5ddb08a60563c5e7e685d509b7d9ea0e157752fe7d3dd0985c83983b0",
+      "bytes": 454,
+      "change_note": "Issue #26: provider duration, curriculum planning estimates, source labels, display rounding and verified local snapshot."
+    },
+    {
+      "path": "database/tests/test_course_curriculum.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_duration_implementation",
+      "handling": "adjusted",
+      "sha256": "9f4d9de479b54dba607978f37a0e4cff4f188d17e998a4c034b4ac0417486f81",
+      "bytes": 8930,
+      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
+    },
+    {
+      "path": "backend/app/routers/work.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_review_fix",
+      "handling": "adjusted",
+      "sha256": "a064ec890565458418fe378af57a98464ce3fef3e4b02c92d0cb5804b2a32165",
+      "bytes": 16898,
+      "change_note": "PR #32 review: global AI evidence budget, summary/detail API, existing DB check and historical time labels."
+    },
+    {
+      "path": "frontend/src/shared/state/catalog.test.ts",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_review_fix",
+      "handling": "adjusted",
+      "sha256": "3a717e24b1c1c05eed52e04a2cd376b7d5d016f5d5d6b2c57550600d5e51639e",
+      "bytes": 2440,
+      "change_note": "PR #32 selected fixes: admin confirmation, detail refresh/access, ten-minute labels (2026-10-29)."
+    },
+    {
+      "path": "frontend/src/shared/state/catalog.ts",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_review_fix",
+      "handling": "adjusted",
+      "sha256": "8c877761828dc872a362518a11d7d59562527cbd6f628742d19e64bd51ffd1b8",
+      "bytes": 3198,
+      "change_note": "PR #32 selected fixes: admin confirmation, detail refresh/access, ten-minute labels (2026-10-29)."
+    },
+    {
+      "path": "backend/app/services/plans.py",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_review_fix",
+      "sha256": "7733940cf34b06ab6c0cb096e19ec4f1cb7afd981a9c40cbbfb4375107762545",
+      "bytes": 51132,
+      "handling": "adjusted",
+      "change_note": "PR #32 selected fixes: admin confirmation, detail refresh/access, ten-minute labels (2026-10-29)."
+    },
+    {
+      "path": "frontend/src/features/resources/ResourcePages.test.ts",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_review_fix",
+      "sha256": "c4c62e09331642d2776504a2cc94c6daaee559d7ad26a1e8a079aad3bbbb6705",
+      "bytes": 1333,
+      "handling": "adjusted",
+      "change_note": "PR #32 selected fixes: admin confirmation, detail refresh/access, ten-minute labels (2026-10-29)."
+    },
+    {
+      "path": "frontend/src/shared/lib/format.ts",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_review_fix",
+      "sha256": "b8cc95e2db882978be60e9c131317d3666002f0ebc04e01b463921e7421f9327",
+      "bytes": 1586,
+      "handling": "adjusted",
+      "change_note": "PR #32 selected fixes: admin confirmation, detail refresh/access, ten-minute labels (2026-10-29)."
+    },
+    {
+      "path": "frontend/src/shared/lib/format.test.ts",
+      "source_path": null,
+      "source_sha256": null,
+      "source_bytes": null,
+      "source_kind": "team_course_review_fix",
+      "sha256": "151eaf0cd179dbc96d8fd2ae3b1b7bbde65cd3624b4649120173976bab493e95",
+      "bytes": 703,
+      "handling": "adjusted",
+      "change_note": "PR #32 selected fixes: admin confirmation, detail refresh/access, ten-minute labels (2026-10-29)."
     },
     {
       "path": "database/data/exports/synthetic_profiles_20261028.manifest.json",
@@ -1950,8 +2368,8 @@
     "layout_and_controls_preserved": true
   },
   "updated_on": "2026-10-28",
-  "team_update_base_commit": "438b011a0c496fb0cfc6a443c4b7c3f733241a24",
-  "current_snapshot_manifest": "database/data/exports/growpath_latest.manifest.json",
+  "team_update_base_commit": "f8b37ed9ae3b0fb6c6b43aa9a0b7ae29686848d1",
+  "current_snapshot_manifest": "database/data/exports/growpath_curriculum_20261028.manifest.json",
   "update_scope": "Final DB source, employee form compatibility, category-scoped hybrid knowledge search, course source/skill filtering, schema/ERD and execution metadata. External source/HR/vector/runtime data are excluded.",
   "historical_validation": {
     "python": "3.12",
@@ -2041,5 +2459,38 @@
     "ignored_ineligible_vectors": 44,
     "mock_embedding_response": true,
     "actual_database_vector_writes": false
-  }
+  },
+  "course_curriculum_verification": {
+    "confirmed": 1730,
+    "estimated": 330,
+    "all_courses_have_planning_time": true,
+    "migration": "026_course_curriculum.sql",
+    "unit_passed": 213,
+    "unit_skipped": 5,
+    "postgres_duration_tests_passed": 3,
+    "full_outlines": 2051,
+    "partial_outlines": 3,
+    "description_only": 6,
+    "public_pages_supplemented": 111,
+    "visual_transcription_courses": 6,
+    "captured_model_payloads": 2,
+    "actual_model_inference": false,
+    "frontend_tests_passed": 41,
+    "frontend_typecheck": "PASS",
+    "frontend_lint": "PASS with 37 existing warnings",
+    "frontend_build": "PASS",
+    "original_course_fields_preserved": true,
+    "other_tables_and_vectors_preserved": true,
+    "all_53_restore_fingerprints_match": true,
+    "display_rounding_minutes": 10,
+    "platform_labels_verified": true,
+    "paid_api_calls": 0,
+    "human_review": "pending",
+    "drive_upload": "not_performed",
+    "browser": "local preview with a synthetic actor on the owned test clone; no model inference"
+  },
+  "course_publication_order": "course #26 before employee #27",
+  "course_review_verification": "database/snapshot-audit.json#course_review_20261029",
+  "course_selected_review_verification": "database/snapshot-audit.json#course_selected_review_fixes_20261029",
+  "employee_main_sync_verification": "database/snapshot-audit.json#employee_main_sync_20261029"
 }

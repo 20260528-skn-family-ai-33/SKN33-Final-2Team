@@ -109,12 +109,14 @@ def resources() -> None:
         n = 0
         for c in t.all('SELECT course_id, platform, cost, duration_weeks, difficulty FROM public.courses'):
             kmooc = (c['platform'] or '') == 'K-MOOC'
-            hours = (c['duration_weeks'] * 2 if c['duration_weeks'] else 10) if kmooc else 1
+            hours = None  # Populated below from source duration or explicit curriculum planning estimate.
             est = ['format', 'hours', 'stage'] + ([] if c['cost'] is not None else [])
             n += t.run("""INSERT INTO app_ext.resource_meta(resource_key, resource_type, course_id, format, hours, stage, cost_won, estimated_fields, is_real)
                           VALUES(:k, 'course', :cid, :f, :h, :s, :c, :e, true) ON CONFLICT (resource_key) DO NOTHING""",
                        k=c['course_id'], cid=c['course_id'], f='영상' if kmooc else '문서', h=hours, s=DIFF_STAGE.get(c['difficulty'] or '', 2),
                        c=int(c['cost']) if c['cost'] is not None else None, e=db.J(est))
+        from app.course_time import sync
+        sync(t)
         for b in t.all('SELECT isbn FROM public.books'):
             n += t.run("""INSERT INTO app_ext.resource_meta(resource_key, resource_type, isbn, format, hours, stage, estimated_fields, is_real)
                           VALUES(:k, 'book', :i, '문서', 10, 2, :e, true) ON CONFLICT (resource_key) DO NOTHING""", k=f"book_{b['isbn']}", i=b['isbn'], e=db.J(['format', 'hours', 'stage']))

@@ -22,7 +22,7 @@
 | [데이터 전처리 결과서](docs/08_데이터_전처리_결과서/README.md) | 수집·정제·품질 확인·스킬 매핑 코드와 연결 |
 | [벡터DB 구축 결과서](docs/09_벡터DB_구축_결과서/README.md) | 자료/규정 임베딩·해시·벡터 검색 코드와 연결 |
 
-2026-10-27 현재 DB 코드는 53테이블·22,298행·87 FK 기준이다. 최신 백업·실행·미검증 항목은 [DB 안내](database/README.md)를 따른다. 회사 정보/생활안내 442조각, 강좌·모듈 2,060개와 스킬 연결 보정을 반영했다.
+2026-10-28 시간·목차 반영 DB 코드는 53테이블·22,300행·87 FK 기준이다. 최신 백업·실행·미검증 항목은 [DB 안내](database/README.md)를 따른다. 회사 정보/생활안내 442조각, 강좌·모듈 2,060개와 스킬 연결 보정을 반영했다.
 
 아래는 10/21 이관 당시 기록이다. 전달 백업은 50개 테이블·29,903행이다. 자료 벡터는 4,792개 중 도서 25건이 갱신 필요하고, 규정 벡터 1,410개 중 현재 검색 대상은 1,406청크다. Word 원본 3종은 10/21 Drive 팀 폴더의 현재 파일과 SHA-256까지 동일하다. 관리 시트의 DB 설계·전처리 링크는 별도 이전 문서이며, 원본의 과거 수치와 현재 백업 기준 수치를 대응표에서 구분한다. ERD는 사용자 지정 외부 HTML의 레이아웃에 현재 구조·건수를 반영했다.
 
@@ -225,7 +225,7 @@ DB(PostgreSQL 17 + pgvector) → 팀 DB 백업 복원 → 보충 자료 → 백�
 | 화면 고치기 | Node.js 20.19 이상(24 권장)·npm | `npm ci --prefix frontend` (버전은 `frontend/package-lock.json`에 고정) |
 | 파이썬으로 직접 실행·DB 작업 | Python 3.12 | `pip install -r requirements.txt` (`backend/requirements.txt` + `database/requirements.txt`) |
 
-1. `.env.example`을 복사해 `.env`로 두고 `GP5_DB_PASSWORD`·`GP5_DEMO_PASSWORD`를 정합니다(값은 저장소에 적지 않습니다). RunPod-Ollama를 쓰려면 `OLLAMA_BASE_URL`·`OLLAMA_API_KEY`를 넣습니다. 예시 기본값은 모델 `qwen3.8:27b`, 생각(thinking) 모드 끔, 응답 제한 시간 300초입니다.
+1. `.env.example`을 복사해 `.env`로 두고 `GP5_DB_PASSWORD`·`GP5_DEMO_PASSWORD`를 정합니다(값은 저장소에 적지 않습니다). RunPod-Ollama를 쓰려면 `OLLAMA_BASE_URL`·`OLLAMA_API_KEY`를 넣습니다(Pod 준비와 키 잠금은 [RunPod-Ollama 연결 절차](backend/RunPod_Ollama_연결_절차.md)). 예시 기본값은 모델 `qwen3.8:27b`, 생각(thinking) 모드 끔, 응답 제한 시간 300초입니다.
 2. 팀 DB 최신 백업 `growpath_latest.dump`(#22 · 직원·부서·스킬·자격 포함)를 `team_db/`에, 규정 원문 PDF를 `team_db/regulations/`에 넣습니다([team_db/README.md](team_db/README.md) 참고).
 3. `docker compose up -d --build`로 실행합니다. 화면은 <http://localhost:8816>, 백엔드 API 문서는 <http://localhost:8815/api/docs>입니다.
 4. `docker compose down`으로 끕니다(데이터는 볼륨에 남습니다).
