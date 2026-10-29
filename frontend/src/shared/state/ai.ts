@@ -11,6 +11,8 @@ import type { StoredCause } from '@/api/types/common';
 /** 화면은 4차처럼 'api' 를 OpenAI 로 쓰고, 서버에는 'openai' 로 보낸다 */
 export type UiProvider = 'ollama' | 'api';
 export type Mode = UiProvider | 'mock' | 'off';
+/** 에이전트가 모델을 부르는 역할: 진단(default)·로드맵·규정·이미지 읽기 */
+export type ModelRole = 'default' | 'roadmap' | 'regulation' | 'vision';
 
 export const PROV: Record<string, string> = { ollama: 'RunPod-Ollama', api: 'OpenAI API', openai: 'OpenAI API', mock: '가데이터' };
 export const toUi = (p: string): UiProvider => (p === 'openai' ? 'api' : (p as UiProvider));
@@ -59,14 +61,17 @@ export const ai = {
   mode: (): Mode => modeOf(g()),
   live: (): boolean => ai.mode() === 'ollama' || ai.mode() === 'api',
   off: (): boolean => ai.mode() === 'off',
-  modelName: (role: 'default' | 'roadmap' | 'vision' = 'default'): string => {
+  modelName: (role: ModelRole = 'default'): string => {
     const m = prov(ai.mode()).models;
     if (!m) return '';
-    return role === 'vision' ? m.vision || '' : role === 'roadmap' ? m.roadmap || m.default || '' : m.default || '';
+    return role === 'vision' ? m.vision || '' : role === 'default' ? m.default || '' : m[role] || m.default || '';
   },
+  /** others: 진단 모델과 이름이 다른 모델 수(로드맵·규정) · 같은 이름이면 Pod에 한 번만 올라가므로 세지 않는다 */
   ollamaInfo: () => {
-    const ol = prov('ollama');
-    return { model: ol.models?.default || '', roadmapModel: ol.models?.roadmap || '' };
+    const m = prov('ollama').models;
+    const model = m?.default || '';
+    const others = new Set([m?.roadmap, m?.regulation].filter((n): n is string => !!n && n !== model));
+    return { model, others: others.size };
   },
   openaiModel: (): string => prov('api').models?.default || '',
   failSim: (): FailSim => ({ ...Object.fromEntries(SIM_KINDS.map((k) => [k, false])), ...(g().settings.failSim || {}) }),

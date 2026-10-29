@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react';
 import type { Resource } from '@/api/types/catalog';
 import type { Activity, PlanContent } from '@/api/types/plan';
-import { ai, connFor, PROV, type Cause } from '@/shared/state/ai';
+import { ai, connFor, PROV, type Cause, type ModelRole } from '@/shared/state/ai';
 import { resOf } from '@/shared/state/catalog';
 import { useGo } from '@/shared/hooks/useGo';
 import { Icon } from './Icon';
@@ -125,10 +125,10 @@ export function AgentRow(o: {
 }
 
 /** 모드·모델 이름 */
-export const via = (role: 'default' | 'roadmap' | 'vision' = 'default'): string => `${PROV[ai.mode()]} · ${ai.modelName(role)}`;
+export const via = (role: ModelRole = 'default'): string => `${PROV[ai.mode()]} · ${ai.modelName(role)}`;
 
 /** 생성 중 줄의 설명: 실제 모델이면 모드·모델 이름을, Ollama 모델이 아직 GPU에 없으면 첫 호출이 느리다는 안내를 붙인다 */
-export const runSub = (role: 'default' | 'roadmap' | 'vision', t: string): string =>
+export const runSub = (role: ModelRole, t: string): string =>
   !ai.live() ? `${t}…` : connFor(role).state === 'cold' ? `AI 모델을 준비하는 중이에요. 첫 생성은 1~2분 걸릴 수 있어요 · ${via(role)}` : `${t} · ${via(role)}`;
 
 /** 생성 실패 안내: 빨간 안내 → 오류 원인(쉬운 말과 할 일) → 에이전트별 상태 → 자세히 보기(운영자용) → 버튼 */

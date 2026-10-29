@@ -62,6 +62,7 @@ class Settings:
     ollama_url: str
     ollama_model: str
     ollama_model_roadmap: str
+    ollama_model_regulation: str
     ollama_vision: str
     ollama_key: str
     ollama_timeout: int
@@ -107,6 +108,8 @@ def load() -> Settings:
         ollama_url=env('OLLAMA_BASE_URL').rstrip('/'),
         ollama_model=model,
         ollama_model_roadmap=env('OLLAMA_MODEL_ROADMAP') or model,
+        # 규정 에이전트(사내 생활 도우미·안별 지원 조건): 진단·로드맵과 다른 작은 모델을 같은 Pod에 올려 쓴다(팀 논의 2026-10-29 · #33)
+        ollama_model_regulation=env('OLLAMA_MODEL_REGULATION') or model,
         ollama_vision=env('OLLAMA_VISION_MODEL'),
         ollama_key=env('OLLAMA_API_KEY'),
         ollama_timeout=int(env('OLLAMA_TIMEOUT', '180') or 180),

@@ -44,7 +44,7 @@ function AiBox() {
   return (
     <div className="aim" role="radiogroup" aria-label="AI 모델">
       <span className="lbl">AI 모델</span>
-      {opt('ollama', 'RunPod-Ollama', `로컬 LLM·sLLM · ${ol.model}${ol.roadmapModel && ol.roadmapModel !== ol.model ? ' 외 1' : ''}`)}
+      {opt('ollama', 'RunPod-Ollama', `로컬 LLM·sLLM · ${ol.model}${ol.others ? ` 외 ${ol.others}` : ''}`)}
       {opt('api', 'OpenAI API', ai.openaiModel())}
       <div className="aim-st" id="aimSt" aria-live="polite">
         <AimStatus />

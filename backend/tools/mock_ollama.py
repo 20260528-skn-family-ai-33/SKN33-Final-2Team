@@ -11,6 +11,7 @@ RunPod-Ollama 를 띄우지 않고 목업의 연결 상태·실패 화면을 확
   ok               정상. 모델이 GPU에 없으면 첫 호출에 2초 걸리고 load_duration 을 돌려준다(첫 호출 지연)
   no-model         설치된 모델이 없음 → 404 "model ... not found, try pulling it first"
   no-roadmap-model 로드맵 모델만 없음
+  no-regulation-model 규정 모델만 없음 → 도우미 답변·안별 지원 조건 확인만 404, 진단·로드맵은 정상 (#33)
   oom              500 "CUDA error: out of memory"
   slow             응답이 60초 걸림 → server.py 의 OLLAMA_TIMEOUT 을 짧게 두면 시간 초과
   bad-json         JSON 이 아닌 응답
@@ -21,7 +22,7 @@ RunPod-Ollama 를 띄우지 않고 목업의 연결 상태·실패 화면을 확
                    서버의 고치기 호출을 부르게 한다. 고치기·사후 심화 질문·서술형 판단(진단·보고서)도 흉내 낸다.
   rev-retitle      수정안에서 남기는 직접 수행 과제의 제목을 완전히 바꿔 돌려줌(key 는 그대로) → 제목이 바뀌어도 진행 기록이 key 로 이어지는지 확인할 때 (10/23)
 
-실행: python tools/mock_ollama.py [--port 11436] [--models qwen3.5:9b,growpath-roadmap:27b,bge-m3,qwen2.5vl:7b] [--scenario ok]
+실행: python tools/mock_ollama.py [--port 11436] [--models qwen3.5:9b,growpath-roadmap:27b,growpath-regulation:4b,bge-m3,qwen2.5vl:7b] [--scenario ok]
 """
 from __future__ import annotations
 
@@ -35,7 +36,7 @@ from urllib.parse import urlparse
 
 STATE = {'scenario': 'ok', 'models': [], 'loaded': set()}
 LOCK = threading.Lock()
-SCENARIOS = ('ok', 'no-model', 'no-roadmap-model', 'oom', 'slow', 'bad-json', 'proxy-502', 'roadmap-partial', 'slow-ok', 'rev-retitle')
+SCENARIOS = ('ok', 'no-model', 'no-roadmap-model', 'no-regulation-model', 'oom', 'slow', 'bad-json', 'proxy-502', 'roadmap-partial', 'slow-ok', 'rev-retitle')
 
 
 def installed() -> list[str]:
@@ -44,6 +45,8 @@ def installed() -> list[str]:
         return [m for m in ms if 'embed' in m or m.startswith('bge') or m.startswith('nomic')]
     if s == 'no-roadmap-model':
         return [m for m in ms if 'roadmap' not in m]
+    if s == 'no-regulation-model':
+        return [m for m in ms if 'regulation' not in m]
     return list(ms)
 
 
@@ -295,7 +298,7 @@ class Handler(BaseHTTPRequestHandler):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--port', type=int, default=11436)
-    ap.add_argument('--models', default='qwen3.5:9b,growpath-roadmap:27b,bge-m3,qwen2.5vl:7b')
+    ap.add_argument('--models', default='qwen3.5:9b,growpath-roadmap:27b,growpath-regulation:4b,bge-m3,qwen2.5vl:7b')
     ap.add_argument('--scenario', default='ok', choices=SCENARIOS)
     a = ap.parse_args()
     STATE['models'] = [m.strip() for m in a.models.split(',') if m.strip()]

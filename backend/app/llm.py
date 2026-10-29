@@ -89,7 +89,7 @@ def ollama(path: str, payload: dict | None, timeout: int | None = None) -> dict:
 
 def model_name(provider: str, role: str = 'default') -> str:
     if provider == 'ollama':
-        return S.ollama_vision if role == 'vision' else S.ollama_model_roadmap if role == 'roadmap' else S.ollama_model
+        return {'vision': S.ollama_vision, 'roadmap': S.ollama_model_roadmap, 'regulation': S.ollama_model_regulation}.get(role, S.ollama_model)
     if provider == 'openai':
         return S.openai_vision if role == 'vision' else S.openai_model
     return ''
@@ -171,9 +171,9 @@ def ping(provider: str) -> dict:
     names = lambda ms: {n for m in ms for n in (m.get('name'), m.get('model')) if n}  # noqa: E731
     have, loaded = names(tags), names(ps)
     hit = lambda n, pool: n in pool or (':' not in n and f'{n}:latest' in pool)  # noqa: E731
+    # 진단 모델과 이름이 다른 역할만 더한다: 같은 이름이면 Ollama 에 한 번만 올라가므로 따로 확인할 필요가 없다
     roles = [('default', S.ollama_model)]
-    if S.ollama_model_roadmap != S.ollama_model:
-        roles.append(('roadmap', S.ollama_model_roadmap))
+    roles += [(r, n) for r, n in (('roadmap', S.ollama_model_roadmap), ('regulation', S.ollama_model_regulation)) if n != S.ollama_model]
     return {'ok': True, 'provider': 'ollama', 'target': S.ollama_target, 'version': version,
             'models': [{'role': r, 'name': n, 'installed': hit(n, have), 'loaded': hit(n, loaded)} for r, n in roles],
             'ms': round((time.perf_counter() - t0) * 1000)}

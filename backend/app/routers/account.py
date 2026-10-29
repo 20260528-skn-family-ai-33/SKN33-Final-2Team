@@ -108,9 +108,10 @@ def api_providers(a: Account = Depends(require_account)):
     cur = _settings(a.id)['aiProvider'] if a.type == 'employee' else 'ollama'
     return {'current': cur, 'providers': [
         {'id': 'ollama', 'label': 'RunPod-Ollama', 'available': llm.available('ollama'), 'reason': unavailable_reason('ollama'), 'target': S.ollama_target if S.ollama_url else '',
-         'models': {'default': S.ollama_model, 'roadmap': S.ollama_model_roadmap, 'embed': llm.embed_model(), 'vision': S.ollama_vision}, 'timeout': S.ollama_timeout},
+         'models': {'default': S.ollama_model, 'roadmap': S.ollama_model_roadmap, 'regulation': S.ollama_model_regulation, 'embed': llm.embed_model(),
+                    'vision': S.ollama_vision}, 'timeout': S.ollama_timeout},
         {'id': 'openai', 'label': 'OpenAI API', 'available': llm.available('openai'), 'reason': unavailable_reason('openai'),
-         'models': {'default': S.openai_model, 'roadmap': S.openai_model, 'embed': S.openai_embed, 'vision': S.openai_vision}}],
+         'models': {'default': S.openai_model, 'roadmap': S.openai_model, 'regulation': S.openai_model, 'embed': S.openai_embed, 'vision': S.openai_vision}}],
         'docLibs': {'pdf': _has('pypdf'), 'hwp': _has('olefile')}}
 
 
