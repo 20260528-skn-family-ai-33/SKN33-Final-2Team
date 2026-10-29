@@ -169,7 +169,7 @@ export function connFor(role: string, c: Conn = g().conn): Conn {
       kind: 'model',
       error: `‘${miss.name}’ 모델이 Ollama에 없어요`,
       raw: `설치된 모델 목록(api/tags)에 ${miss.name}이 없음`,
-      hint: 'Pod에서 모델을 받은 뒤(ollama pull) 다시 시도하거나, .env의 모델 이름을 확인해 주세요',
+      hint: 'Pod에서 팀 모델을 받아 growpath-27b·growpath-regulation-4b 이름으로 만든 뒤(RunPod 연결 절차 2-4) 다시 시도해 주세요. .env에 원본 모델 이름을 넣었다면 Pod의 ollama list 이름과 같은지 확인해 주세요',
     };
   const wait = pick.filter((m) => m.role !== 'embed' && !m.loaded).map((m) => m.name);
   if (wait.length) return { ...c, state: 'cold', waiting: wait };

@@ -60,9 +60,8 @@ class Settings:
     openai_vision: str
     # RunPod-Ollama
     ollama_url: str
-    ollama_model: str
-    ollama_model_roadmap: str
-    ollama_model_regulation: str
+    ollama_model: str  # 진단·로드맵
+    ollama_model_regulation: str  # 규정 에이전트(사내 생활 도우미·안별 지원 조건)
     ollama_vision: str
     ollama_key: str
     ollama_timeout: int
@@ -76,6 +75,12 @@ class Settings:
         return 'runpod' if host.endswith('runpod.net') else 'local' if host in ('127.0.0.1', 'localhost', '::1') else 'remote'
 
 
+# RunPod-Ollama 기본 모델: 팀이 파인튜닝한 두 모델(팀 결정 2026-10-29 · #33). Pod 에서 허깅페이스 모델을 받아
+# 채팅 형식(renderer·parser)을 붙여 만든 이름이다(backend/RunPod_Ollama_연결_절차.md 2-4). .env 의 모델 줄은 원본 Qwen 과 비교할 때만 적는다
+OLLAMA_TEAM_MODEL = 'growpath-27b'  # 진단·로드맵 · hf.co/Ssum-mer/qwen3.8-27b-growpath-Q4
+OLLAMA_TEAM_REGULATION_MODEL = 'growpath-regulation-4b'  # 규정 에이전트 · hf.co/golddragon0926/qwen35-4b-diagnosis-agent
+
+
 def _on_off(key: str) -> bool | None:
     """on/off 설정: 비우면 None. 오타를 기본값으로 넘기지 않게 다른 값이면 시작할 때 멈춘다"""
     v = env(key).lower()
@@ -85,8 +90,6 @@ def _on_off(key: str) -> bool | None:
 
 
 def load() -> Settings:
-    # 모델 이름은 코드에 기본값을 두지 않는다: Pod에 받아 둔 모델만 쓸 수 있으므로 비우면 RunPod-Ollama 모드를 쓸 수 없게 한다
-    model = env('OLLAMA_MODEL')
     return Settings(
         database_url=env('DATABASE_URL') or _local_db_url(),
         db_timezone=env('GP5_DB_TIMEZONE', 'Asia/Seoul'),
@@ -106,10 +109,9 @@ def load() -> Settings:
         openai_json=env('OPENAI_JSON_MODE', 'on').lower() != 'off',
         openai_vision=env('OPENAI_VISION_MODEL'),
         ollama_url=env('OLLAMA_BASE_URL').rstrip('/'),
-        ollama_model=model,
-        ollama_model_roadmap=env('OLLAMA_MODEL_ROADMAP') or model,
-        # 규정 에이전트(사내 생활 도우미·안별 지원 조건): 진단·로드맵과 다른 작은 모델을 같은 Pod에 올려 쓴다(팀 논의 2026-10-29 · #33)
-        ollama_model_regulation=env('OLLAMA_MODEL_REGULATION') or model,
+        ollama_model=env('OLLAMA_MODEL', OLLAMA_TEAM_MODEL),
+        ollama_model_regulation=env('OLLAMA_MODEL_REGULATION', OLLAMA_TEAM_REGULATION_MODEL),
+        # 팀 모델은 이미지 입력이 없어 비워 두면 RunPod-Ollama 모드는 기획서 이미지 읽기를 건너뛴다
         ollama_vision=env('OLLAMA_VISION_MODEL'),
         ollama_key=env('OLLAMA_API_KEY'),
         ollama_timeout=int(env('OLLAMA_TIMEOUT', '180') or 180),

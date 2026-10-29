@@ -4,13 +4,14 @@ RunPod Pod를 Terminate한 상태에서 다시 배포하고, nginx로 키를 확
 
 한 Pod에 모델 두 개를 함께 올려 써요(팀 논의 2026-10-29 · #33).
 
-| 에이전트 | 모델 | `.env` |
+| 에이전트 | 모델 | 앱이 부르는 이름(기본값) |
 | --- | --- | --- |
-| 진단(목표 후보·기획서 요약·사전 점검·수준 진단·보고서) · 로드맵(3안·수정안) | 팀원이 파인튜닝한 qwen3.8:27b · [Ssum-mer/qwen3.8-27b-growpath-Q4](https://huggingface.co/Ssum-mer/qwen3.8-27b-growpath-Q4) (Q4_K_M · 16.55GB) | `OLLAMA_MODEL` (`OLLAMA_MODEL_ROADMAP`은 비움) |
-| 규정(사내 생활 도우미 답변·안별 지원 조건 확인) | 팀원이 파인튜닝한 qwen3.5:4b · [golddragon0926/qwen35-4b-diagnosis-agent](https://huggingface.co/golddragon0926/qwen35-4b-diagnosis-agent) (BF16 · 8.42GB) | `OLLAMA_MODEL_REGULATION` |
+| 진단(목표 후보·기획서 요약·사전 점검·수준 진단·보고서) · 로드맵(3안·수정안) | 팀원이 파인튜닝한 qwen3.8:27b · [Ssum-mer/qwen3.8-27b-growpath-Q4](https://huggingface.co/Ssum-mer/qwen3.8-27b-growpath-Q4) (Q4_K_M · 16.55GB) | `growpath-27b` |
+| 규정(사내 생활 도우미 답변·안별 지원 조건 확인) | 팀원이 파인튜닝한 qwen3.5:4b · [golddragon0926/qwen35-4b-diagnosis-agent](https://huggingface.co/golddragon0926/qwen35-4b-diagnosis-agent) (BF16 · 8.42GB) | `growpath-regulation-4b` |
 
+- 앱은 기본으로 이 두 이름을 불러요(코드 기본값 · `backend/app/config.py` · 팀 결정 2026-10-29). `.env`의 모델 줄은 비워 두고, 원본 Qwen과 비교할 때만 적어요(3-2). Pod에서 2-4로 정확히 이 두 이름을 만들어 둬야 해요.
 - 4b 저장소 이름은 `diagnosis-agent`(진단)이지만 규정 에이전트(사내 생활 도우미)용이에요(2026-10-29 사용자 확인).
-- 두 모델 모두 이미지 입력용 vision projector가 없어요(모델 카드). 그래서 기획서 이미지 읽기는 쓰지 않아요(3-2의 `OLLAMA_VISION_MODEL` 비움).
+- 두 모델 모두 이미지 입력용 vision projector가 없어요(모델 카드). 그래서 RunPod-Ollama 모드에서는 기획서 이미지 읽기를 건너뛰어요.
 
 > 작성 2026-10-26 · 두 모델 구성 반영 2026-10-29 · 확인 범위는 맨 아래에 있어요.
 
@@ -19,7 +20,7 @@ GrowPath 백엔드 ──(Bearer 키)──> 공개IP:외부포트 ──> Pod 1
 ```
 
 - `<공개IP>`, `<외부포트>`, `<키>`는 실제 값으로 바꿔 넣어요. 공개 저장소라서 실제 값은 이 문서와 저장소에 적지 않아요.
-- 이 문서의 모델 이름(`growpath-27b`, `growpath-regulation-4b`)은 위 표의 팀 모델을 받아 2-4에서 붙인 이름이에요. 다른 모델을 쓰면 `ollama list`에 보이는 이름으로 바꿔 넣어요. 앱 코드는 고치지 않아도 돼요(이름은 `.env`에서만 읽어요).
+- 이 문서의 모델 이름(`growpath-27b`, `growpath-regulation-4b`)은 위 표의 팀 모델을 받아 2-4에서 붙인 이름이에요. 앱은 이 두 이름을 그대로 불러서, 한 글자라도 다르면 '모델이 Ollama에 없어요'로 나와요.
 - Pod 명령은 RunPod 웹 터미널에서, PC 명령은 저장소 맨 위 폴더에서 실행해요.
 - 블록 하나를 통째로 붙여넣고, ✅ 출력을 확인한 뒤 다음 블록으로 넘어가요.
 - 웹 터미널에서 Ctrl+V가 안 되면 Ctrl+Shift+V나 마우스 오른쪽 클릭으로 붙여넣어요. 마지막 줄이 실행되지 않고 멈춰 있으면 Enter를 한 번 더 눌러요.
@@ -109,7 +110,7 @@ grep -m1 "inference compute" /workspace/ollama.log
 
 ### 2-4. 모델 받기
 
-모델 두 개(27b·4b)를 받아요. 팀 모델은 아래 '팀 모델 받기'를 그대로 실행해요. 다른 모델을 받을 때는 A(Ollama 라이브러리)나 B(허깅페이스 주소)를 봐요.
+모델 두 개(27b·4b)를 받아요. 아래 '팀 모델 받기'와 '채팅 형식 붙이기'를 그대로 실행해요. A(Ollama 라이브러리)는 원본 Qwen과 비교할 때(3-2), B(허깅페이스 주소)는 다른 모델을 Pod에서 따로 시험할 때의 참고예요.
 
 #### 팀 모델 받기
 
@@ -125,7 +126,7 @@ ollama show hf.co/golddragon0926/qwen35-4b-diagnosis-agent
 - 4b 저장소에는 학습용 `.safetensors`와 체크포인트도 있지만, Ollama는 GGUF(`qwen35-4b-diagnosis-agent-checkpoint-300-BF16.gguf`)만 받아요.
 - ✅ 두 번 모두 진행 막대가 끝나고 `success`가 나와요.
 - ✅ `ollama list`에 `hf.co/Ssum-mer/qwen3.8-27b-growpath-Q4:latest`(약 16 GB)와 `hf.co/golddragon0926/qwen35-4b-diagnosis-agent:latest`(약 8 GB)가 보여요. 태그 없이 받아서 `:latest`가 붙어요. 이름이 다르게 보이면 보이는 이름을 그대로 3-2에 써요.
-- ✅ 두 모델 모두 `ollama show`의 Capabilities에 `completion`이 있어요. 두 모델 다 vision projector가 없어서 `vision`은 없어요(3-2에서 `OLLAMA_VISION_MODEL`을 비워요). 이때 `template source`는 `gguf_chat_template`이에요.
+- ✅ 두 모델 모두 `ollama show`의 Capabilities에 `completion`이 있어요. 두 모델 다 vision projector가 없어서 `vision`은 없어요(그래서 RunPod-Ollama 모드는 기획서 이미지 읽기를 건너뛰어요). 이때 `template source`는 `gguf_chat_template`이에요.
 - 두 모델의 채팅 템플릿은 생각 모드 켜고 끄기를 지원하고, 4b는 생각을 끄고 학습했어요(모델 카드). 3-2에서 `OLLAMA_THINK=off`로 둬요.
 - ❌ `connection refused`가 나오면 2-3의 `export`를 하지 않은 창이에요. `export` 줄부터 다시 실행해요.
 - ❌ `The specified tag is not available in the repository`가 나오면 명령 끝에 `:Q4_K_M` 같은 태그가 붙어 있는지 봐요. 위 명령 그대로(태그 없이) 받아요.
@@ -202,8 +203,8 @@ ollama show hf.co/<사용자>/<저장소>:<양자화>
 
 - `:<양자화>`를 빼면 저장소에 `Q4_K_M`이 있을 때는 그것을, 없으면 저장소 안의 다른 양자화 하나를 골라 받아요. 무엇을 받았는지 분명하게 하려면 적어 줘요.
 - ✅ 진행 막대가 끝나고 `success`가 나와요.
-- ✅ `ollama list`에 `hf.co/`로 시작하는 이름이 보여요. **이 이름을 그대로 복사해 둬요.** 뒤 단계에서 팀 모델 이름 대신 이 이름을 써요(2-5의 `ollama run`, 3-1의 결과 확인, 3-2의 `OLLAMA_MODEL`·`OLLAMA_MODEL_REGULATION`).
-- ✅ `ollama show`의 Capabilities에 `completion`이 있어요. 기획서 이미지 읽기에도 쓰려면 `vision`이 있어야 하고, 생각 모드를 켜려면(`OLLAMA_THINK=on`) `thinking`이 있어야 해요.
+- ✅ `ollama list`에 `hf.co/`로 시작하는 이름이 보여요. 이 이름은 채팅 형식(renderer·parser)이 붙지 않은 상태라 앱 `.env`에는 넣지 않고, Pod 안에서 `ollama run <이름>`으로 시험해요. 앱에 붙이려면 팀 모델처럼 '채팅 형식 붙이기'로 새 이름을 만들어 그 이름을 적어요.
+- ✅ `ollama show`의 Capabilities에 `completion`이 있어요. 생각 모드를 켜려면(`OLLAMA_THINK=on`) `thinking`이 있어야 해요.
 - ❌ `The specified tag is not available in the repository`가 나오면 양자화 이름이 저장소의 파일과 맞지 않는 거예요. Files and versions의 파일 이름을 보고 고쳐요.
 - ❌ GGUF가 아니라는 오류가 나오거나 여러 조각으로 나뉜 GGUF(`…-00001-of-0000N.gguf`)를 지원하지 않는다는 오류가 나오면, 이 저장소는 이 방법으로 받을 수 없어요. 다른 GGUF 저장소를 찾아요.
 
@@ -316,15 +317,14 @@ curl.exe -H "Authorization: Bearer <키>" http://<공개IP>:<외부포트>/api/t
 
 ### 3-2. `.env` 고치기
 
-저장소 맨 위 `.env`의 Ollama 줄을 이렇게 맞춰요. `.env`가 없으면 [`.env.example`](../.env.example)을 복사해 만들고, 예시에 없는 줄은 더해요(`.env`는 Git에 넣지 않음). 같은 파일의 `OPENAI_API_KEY`도 있어야 해요(규정 검색 임베딩 · 아래 설명).
+저장소 맨 위 `.env`의 Ollama 줄을 이렇게 맞춰요. `.env`가 없으면 [`.env.example`](../.env.example)을 복사해 만들고 주소(`OLLAMA_BASE_URL`)와 키(`OLLAMA_API_KEY`)만 채우면 돼요. 모델 줄은 비워 두면 팀 모델을 불러요. 예전 `.env`의 모델 줄에 값이 남아 있으면(예: `OLLAMA_MODEL=qwen3.8:27b`) 그 모델로 도니 비워 둬요. `OLLAMA_MODEL_ROADMAP`은 없어졌어요(로드맵은 `OLLAMA_MODEL`과 같은 모델 · `.env`는 Git에 넣지 않음). 같은 파일의 `OPENAI_API_KEY`도 있어야 해요(규정 검색 임베딩 · 아래 설명).
 
 ```text
 OLLAMA_BASE_URL=http://<공개IP>:<외부포트>
-OLLAMA_MODEL=growpath-27b
-OLLAMA_MODEL_ROADMAP=
-OLLAMA_MODEL_REGULATION=growpath-regulation-4b
-OLLAMA_VISION_MODEL=
 OLLAMA_API_KEY=<키>
+OLLAMA_MODEL=
+OLLAMA_MODEL_REGULATION=
+OLLAMA_VISION_MODEL=
 OLLAMA_TIMEOUT=300
 OLLAMA_NUM_CTX=16384
 OLLAMA_KEEP_ALIVE=30m
@@ -334,12 +334,13 @@ OLLAMA_THINK=off
 - ✅ 주소가 `https`가 아니라 `http://`로 시작해요(TCP로 직접 붙으면 HTTPS가 없어요).
 - ✅ `=` 앞뒤에 공백과 따옴표가 없어요.
 - ✅ 같은 이름의 줄이 두 번 들어가 있지 않아요.
-- `OLLAMA_MODEL`은 꼭 적어요. 진단 에이전트(목표 후보·기획서 요약·사전 점검·수준 진단·보고서)가 이 모델을 써요. 코드에 기본 모델이 없어서, 비우면 RunPod-Ollama가 '지금 쓸 수 없어요 · .env에 OLLAMA_MODEL이 없어요'로 나와요.
-- 백엔드는 `.env`의 이름이 `ollama list`의 이름과 똑같은지로 모델이 있는지 봐요. 태그(`:` 뒤)를 빼고 적으면 `:latest`로 봐요. 그래서 위 예시처럼 `:latest` 없이 적어도 돼요. 2-4 B로 다른 모델을 받았다면 복사해 둔 `hf.co/…` 이름을 그대로 넣어요.
-- 모델을 바꿀 때는 이 `.env` 줄만 고치고 3-3을 해요. 앱 코드는 고치지 않아요.
-- `OLLAMA_MODEL_ROADMAP`을 비우면 로드맵도 `OLLAMA_MODEL`과 같은 모델(27b)을 써요.
-- `OLLAMA_MODEL_REGULATION`은 규정 에이전트(사내 생활 도우미 답변·안별 지원 조건 확인)가 써요. 비우면 `OLLAMA_MODEL`과 같은 모델을 써서, 4b를 받기 전에도 27b 하나로 돌아가요.
-- `OLLAMA_VISION_MODEL`은 기획서 이미지 읽기용이에요(선택). 팀 모델은 둘 다 vision이 없어서 비워 둬요. 비우면 이미지 읽기만 안 돼요. 다른 모델을 넣을 때는 `ollama show`의 Capabilities에 `vision`이 있는 모델만 넣어요.
+- 모델 줄을 비우면 앱이 부르는 모델: 진단 에이전트(목표 후보·기획서 요약·사전 점검·수준 진단·보고서)와 로드맵 에이전트(3안·수정안)는 `growpath-27b`, 규정 에이전트(사내 생활 도우미 답변·안별 지원 조건 확인)는 `growpath-regulation-4b`예요. 백엔드는 이 이름이 `ollama list`에 있는지로(태그가 없으니 `:latest`로) 모델이 있는지 봐요.
+- 기획서 이미지 읽기는 팀 모델로는 건너뛰어요(vision 없음). 이미지까지 읽으려면 OpenAI API 모드에서 `.env`의 `OPENAI_VISION_MODEL`을 써요.
+- **원본 Qwen과 비교할 때만** 모델 줄을 적어요.
+  1. Pod에서 원본을 받아요(2-4 A · 예: `ollama pull qwen3.8:27b`, `ollama pull qwen3.5:4b`). 라이브러리 모델은 채팅 형식이 이미 붙어 있어 '채팅 형식 붙이기'가 필요 없어요.
+  2. `.env`에 `ollama list` 이름을 적어요(예: `OLLAMA_MODEL=qwen3.8:27b`, `OLLAMA_MODEL_REGULATION=qwen3.5:4b`). 하나만 적으면 그 역할만 바뀌어요. 원본 27b는 이미지 입력이 있어 `OLLAMA_VISION_MODEL=qwen3.8:27b`로 이미지 읽기도 볼 수 있어요.
+  3. 3-3을 하고, 좌측 'AI 모델'과 '에이전트 동작 보기'에서 바뀐 이름을 확인해요. 끝나면 모델 줄을 다시 비우고 3-3을 해요.
+  - 허깅페이스 이름(`hf.co/…`)은 적지 않아요(채팅 형식이 붙지 않은 상태). 원본까지 함께 올리면 VRAM이 더 필요해요(원본 27b 약 18GB · 팀 모델 둘과 함께면 A40에서는 빠듯함).
 - **규정 검색 임베딩은 두 모드 모두 OpenAI `text-embedding-3-small`이에요**(팀 합의 2026-10-26 · 팀 DB 벡터가 이 모델로 만들어짐). 그래서 Ollama용 임베딩 설정(`OLLAMA_EMBED_MODEL`)은 없어요.
   - RunPod-Ollama 모드만 쓰더라도 `.env`에 `OPENAI_API_KEY`가 있어야 도우미가 규정을 찾아요. 없으면 규정 질문이 '규정 검색 임베딩(text-embedding-3-small)에 쓰는 OpenAI 키가 .env에 없어요'로 실패해요(키워드 검색으로 몰래 바꾸지 않음).
   - 도우미에 한 질문 문장은 임베딩하려고 OpenAI로 가요. 답변은 RunPod-Ollama 모델이 써요.
@@ -361,7 +362,7 @@ docker compose up -d --no-deps --force-recreate backend
 docker compose exec -T backend printenv OLLAMA_BASE_URL OLLAMA_MODEL OLLAMA_MODEL_REGULATION
 ```
 
-- ✅ 방금 넣은 주소와 두 모델 이름이 나와요. 키는 출력하지 않는 명령이에요.
+- ✅ 방금 넣은 주소가 나와요. 모델 줄을 비웠다면 그 아래는 빈 줄이에요(팀 모델 사용). 키는 출력하지 않는 명령이에요.
 
 ### 3-4. 화면에서 확인
 
@@ -379,7 +380,7 @@ docker compose exec -T backend printenv OLLAMA_BASE_URL OLLAMA_MODEL OLLAMA_MODE
 | `Ollama 401: unauthorized - check OLLAMA_API_KEY` (원인 칸: 'Ollama 키(OLLAMA_API_KEY)가 없거나 Pod의 키와 달라요') | `.env`에 키가 없거나 틀림, 또는 3-3을 안 함 | 키를 다시 복사해 넣고 3-3 |
 | `Ollama 연결 실패` | IP·포트가 틀림, Pod 꺼짐, nginx 꺼짐 | 3-1부터 확인, 필요하면 Pod에서 2-6 |
 | `RunPod 프록시 HTTP 502: Ollama 응답이 아니에요…` | nginx는 켜져 있는데 Ollama가 꺼짐 | Pod에서 2-3 |
-| `‘<모델 이름>’ 모델이 Ollama에 없어요` | 모델을 안 받았거나 이름 오타. 2-4 B로 받았다면 `.env`의 이름이 `ollama list`와 한 글자라도 다름. 4b만 없으면 규정 에이전트(도우미 답변·지원 조건 확인)만 실패하고 진단·로드맵은 돼요 | 2-4, 3-2 |
+| `‘<모델 이름>’ 모델이 Ollama에 없어요` | 모델을 안 받았거나 2-4 '채팅 형식 붙이기'를 안 해서 `growpath-27b`·`growpath-regulation-4b` 이름이 Pod에 없음. `.env` 모델 줄에 원본 이름을 넣었다면 그 이름이 `ollama list`와 다름. 4b만 없으면 규정 에이전트(도우미 답변·지원 조건 확인)만 실패하고 진단·로드맵은 돼요 | 2-4, 3-2 |
 | `Ollama 시간 초과: 300초…` | 동시 요청이 몰렸거나 긴 작업이라 오래 걸림(생각 모드를 켰다면 더 길어짐) | `OLLAMA_TIMEOUT=600`으로 바꾸고 3-3 |
 | `규정 검색 임베딩에 필요한 OpenAI 키가 없어요` (도우미 규정 질문) | `.env`에 `OPENAI_API_KEY`가 없음 | 키를 넣고 3-3 |
 
@@ -408,7 +409,7 @@ rm /workspace/ollama_key.txt
 
 ## 부록 C. 팀원과 같이 쓸 때
 
-- 주소와 키는 개인 메시지로 보내요. 팀원은 각자 `.env`의 `OLLAMA_BASE_URL`, `OLLAMA_API_KEY`, `OLLAMA_MODEL`, `OLLAMA_MODEL_REGULATION` 네 줄을 넣어요. 도우미 규정 검색에는 각자의 `OPENAI_API_KEY`도 필요해요. 생각 모드를 끄려면 `OLLAMA_THINK=off`도 넣어요. `OLLAMA_MODEL_REGULATION`과 `OLLAMA_THINK`는 참고용 백엔드 `backend/`에만 있는 설정이에요.
+- 주소와 키는 개인 메시지로 보내요. 팀원은 각자 `.env`의 `OLLAMA_BASE_URL`, `OLLAMA_API_KEY` 두 줄을 넣어요(모델 줄은 비워 두면 팀 모델). 도우미 규정 검색에는 각자의 `OPENAI_API_KEY`도 필요해요. 생각 모드를 끄려면 `OLLAMA_THINK=off`도 넣어요. 팀 모델 기본값, `OLLAMA_MODEL_REGULATION`, `OLLAMA_THINK`는 참고용 백엔드 `backend/`에만 있어요.
 - TCP로 직접 붙으면 키가 암호화 없이 전송돼요. 공용 와이파이에서는 조심하고, 실제 개인 정보는 넣지 마세요. 더 안전하게 하려면 Tailscale이나 SSH 터널을 써야 하는데, 팀원마다 설치·설정이 늘어요.
 - 누가 두드리는지는 `tail -n 20 /workspace/ollama-nginx-access.log`로 봐요. `401`이 계속 찍히면 누군가 키 없이 접속을 시도하고 있다는 뜻이에요.
 
@@ -440,18 +441,20 @@ rm /workspace/ollama_key.txt
   - 생각을 끈 짧은 호출이 1.9초 걸렸고, 2-5로 미리 올린 모델을 다시 불러오지 않았어요(불러오기 2ms · `OLLAMA_CONTEXT_LENGTH`와 `OLLAMA_NUM_CTX`가 같아서).
 - **아직 안 한 것:** 키 잠금 구성에서 앱 흐름 전체(사전 점검 → 3안)를 돌려 걸린 시간을 재지는 않았어요.
 - **허깅페이스 주소로 받기(2-4 B · 2026-10-28 추가):** 실제 Pod에서는 해 보지 않았어요. 받는 명령, 기본 양자화, 비공개 저장소 키 등록은 허깅페이스 공식 안내를 따랐어요. `.env` 이름 맞추기는 백엔드 연결 확인 코드(`backend/app/llm.py`)를 보고 썼어요. 나뉜 GGUF 오류는 공식 안내가 아니라 사용자 이슈 보고를 근거로 했어요.
-- **두 모델 구성 · 코드(#33 · 2026-10-29 추가):** 격리 Docker 스택과 모의 Ollama(`backend/tools/mock_ollama.py` · 진단 모델 대신 `qwen3.5:9b`, 규정 모델 대신 `growpath-regulation:4b`)로 확인했어요. OpenAI 키는 비워 유료 호출을 하지 않았어요.
-  - 규정 에이전트(도우미 답변·안별 지원 조건 확인)는 규정 모델로, 진단·로드맵(3안)은 `OLLAMA_MODEL`로 호출되고 '에이전트 동작 보기' 기록에도 그 이름이 남아요.
-  - 연결 확인이 두 모델을 함께 봐요. 규정 모델만 GPU에 없으면 '연결됨 · 모델 준비 중', 규정 모델만 없으면 '연결 안 됨 · ‘<모델 이름>’ 모델이 Ollama에 없어요'이고, 그때도 진단·로드맵 호출은 돼요.
-  - `OLLAMA_MODEL_REGULATION`을 비우면 규정 에이전트도 `OLLAMA_MODEL`을 써요.
+- **두 모델 구성 · 코드(#33 · 2026-10-29 추가):** 격리 Docker 스택과 모의 Ollama(`backend/tools/mock_ollama.py`)로 확인했어요.
+  - 규정 에이전트(도우미 답변·안별 지원 조건 확인)는 규정 모델로, 진단·로드맵(3안)은 진단 모델로 호출되고 '에이전트 동작 보기' 기록에도 그 이름이 남아요.
+  - 연결 확인이 두 모델을 함께 봐요. 규정 모델만 GPU에 없으면 '연결됨 · 모델 준비 중', 규정 모델만 없으면 '연결 안 됨 · ‘growpath-regulation-4b’ 모델이 Ollama에 없어요'이고, 그때도 진단·로드맵 호출은 돼요.
+  - 팀 모델 기본값과 덮어쓰기(팀 결정 뒤 · 모의 Ollama): 모델 줄을 비우면 `growpath-27b`·`growpath-regulation-4b`, `OLLAMA_MODEL=qwen3.8:27b`·`OLLAMA_MODEL_REGULATION=qwen3.5:4b`를 넣으면 그 이름으로 호출되고 연결 확인도 그 이름을 봐요. 한 줄만 넣으면 그 역할만 바뀌어요. 비전 역할은 비워 두면 'RunPod-Ollama 팀 모델은 이미지를 읽지 않아요' 안내로 끝나요.
+  - **원본 Qwen으로 덮어쓴 호출은 실제 Pod에서 해 보지 않았어요**(원본을 받지 않음 · 담당자가 나중에 확인).
 - **팀 모델 저장소(2026-10-29):** 허깅페이스 API와 모델 카드에서 공개 여부, GGUF 파일 수·이름·정밀도·크기, vision projector 미포함을 확인했어요. Ollama가 받는 주소(`https://hf.co/v2/<저장소>/manifests/<태그>`)는 태그 없이(`latest`) 두 모델 모두 200, 27b의 `:Q4_K_M`은 400이었어요. 두 모델에는 template·renderer·parser 설정이 없고, Ollama 라이브러리 `qwen3.8:27b`는 `renderer qwen3.8`·`parser qwen3.5`, `qwen3.5:4b`는 `renderer qwen3.5`·`parser qwen3.5`예요(2-4 '채팅 형식 붙이기'의 근거).
 - **실제 Pod에서 두 모델 (2026-10-29):** 확인용 A40(46GB) Pod · 볼륨 47G · Ollama 0.40.12에서 이 절차를 그대로(웹 터미널 대신 SSH로) 실행하고, 이 저장소의 #33 코드로 띄운 격리 스택(`OLLAMA_THINK=off`, OpenAI 키 있음)에 붙였어요.
   - 2-4: 받는 데 27b 321초, 4b 175초. `ollama list` 이름은 `hf.co/…:latest`(16 GB · 8.4 GB)이고, 받은 그대로는 `template source gguf_chat_template`였어요. '채팅 형식 붙이기' 뒤에는 두 모델 모두 `template source renderer_parser`, 디스크는 24G 그대로였어요. 생각 모드 단계는 27b `false, low, medium, xhigh`, 4b `false, true`예요.
   - 2-5: `ollama ps`에 두 줄 모두 `100% GPU` · `16384`, GPU 메모리 약 26GB/46GB. Ollama 기록은 두 모델 모두 `selected=renderer_parser`. 첫 `ollama run`(생각 켬)은 27b 83초, 4b 93초 걸렸어요.
   - 2-6·2-7·3-1: 키 없으면 401, 키 있으면 통과(Pod 안·PC 모두). 화면 좌측 'AI 모델'은 `growpath-27b 외 1 · 연결됨`.
   - 앱 호출: 로드맵 3안(27b · 세 안 동시 요청)은 A2 35초, A1 97초, A3 168초로 모두 JSON 형식에 맞게 성공했어요. 안별 지원 조건 확인(4b)은 17.8초에 성공했고 세 안 모두 '확인 필요'였어요. 도우미(4b)는 규정 질문 9.9초(근거 조항 1개와 답), 일반 질문 5.5초에 답했어요. 시험하는 동안 두 모델이 번갈아 내려가지 않았어요.
+  - 모델 줄을 비운 기본값으로 다시 돌린 앱 호출(같은 날): 진단 에이전트 목표 후보 제안(27b) 14.3초, 3안(27b) A1 63초·A3 115초·A2 167초, 지원 조건 확인(4b) 6.7초, 도우미(4b · 3안과 동시) 17.3초로 모두 성공했고, 두 모델이 끝까지 함께 올라가 있었어요(GPU 약 26GB).
   - **품질은 평가하지 않았어요.** 눈에 띈 것: 도우미가 "RAG가 뭐예요?"에 설명 대신 "일반 업무 지식 질문입니다"라고만 답했고, A1 비용 우선안의 장단점이 비어 있었어요.
-  - **아직 안 한 것:** 진단 에이전트 호출(목표 후보·사전 점검·수준 진단·보고서)을 27b로 돌리기, 화면 흐름 전체를 처음부터 끝까지 재기.
+  - **아직 안 한 것:** 진단 에이전트의 나머지 호출(기획서 요약·사전 점검·수준 진단·보고서)을 27b로 돌리기(목표 후보 제안만 확인), 화면 흐름 전체를 처음부터 끝까지 재기.
 - 설치 완료 문구 같은 출력 예시는 버전에 따라 조금 다를 수 있어요.
 
 참고: [RunPod – Run Ollama on a Pod](https://docs.runpod.io/tutorials/pods/run-ollama) · [RunPod – Expose ports](https://docs.runpod.io/pods/configuration/expose-ports) · [RunPod 프록시 안내](https://www.runpod.io/blog/runpod-proxy-guide) · [Ollama – qwen3.8:27b](https://ollama.com/library/qwen3.8:27b) · [Ollama FAQ – 여러 모델 함께 올리기](https://docs.ollama.com/faq) · [Hugging Face – Use Ollama with any GGUF Model](https://huggingface.co/docs/hub/en/ollama)
