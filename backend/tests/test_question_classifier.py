@@ -108,11 +108,11 @@ class ClassifierRoutingTest(unittest.TestCase):
                 reg._api(self.ctx, self.inp)
         llm.assert_not_called()
 
-    def run_route(self, label, response):
+    def run_route(self, label, response=None, responses=None):
         self.classify.return_value = {'label': label}
         with patch.object(reg.regstore, 'search', return_value=[]) as search, \
              patch.object(reg.regstore, 'explicit_ref', return_value=None), \
-             patch.object(rt, 'llm_json', return_value=response) as llm:
+             patch.object(rt, 'llm_json', return_value=response, side_effect=responses) as llm:
             result = reg._api(self.ctx, self.inp)
         return result, search, llm
 
@@ -181,13 +181,154 @@ class ClassifierRoutingTest(unittest.TestCase):
         self.assertEqual(result['knowledgeSources'], [])
         self.assertIn('충분한 근거', result['summary'])
 
-    def test_llm_cannot_override_regulation_route(self):
-        with self.assertRaisesRegex(LlmError, '답변 유형'):
-            self.run_route('사내 규정', {'kind': 'general', 'summary': '답'})
+    def confirmation(self):
+        return {'kind': 'clarify', 'question': '부산의 일반 날씨인가요, 업무 중 기상 대응 규정인가요?',
+                'options': ['부산의 일반 날씨를 알려 주세요.', '업무 중 기상 대응 규정을 알려 주세요.']}
 
-    def test_llm_cannot_override_general_route(self):
-        with self.assertRaisesRegex(LlmError, '답변 유형'):
-            self.run_route('사내 생활안내', {'kind': 'regulation'})
+    def after_confirmation(self, reply):
+        self.inp.update(question=reply, history=[{'q': '부산 날씨 알려줘', 'a': self.confirmation()}])
+
+    def test_conflicting_interpretations_ask_without_exposing_answer(self):
+        for label, kind in [('사내 규정', 'general'), ('사내 규정', 'out_of_scope'),
+                            ('사내 생활안내', 'regulation'), ('사내 생활안내', 'out')]:
+            with self.subTest(label=label, kind=kind):
+                result, _, model = self.run_route(label, responses=[
+                    {'kind': kind, 'summary': '검증되지 않은 사실 답변', 'basis': ['unknown']}, self.confirmation()])
+                self.assertEqual(result['kind'], 'clarify')
+                self.assertIn('일반 날씨', result['question'])
+                self.assertEqual(result['summary'], '')
+                self.assertEqual(result['basis'], [])
+                self.assertEqual(result['retrieved'], [])
+                self.assertEqual(model.call_count, 2)
+                self.assertEqual(model.call_args.kwargs['role'], 'regulation')
+                self.assertNotIn('검증되지 않은 사실 답변', str(model.call_args))
+
+    def test_unknown_or_malformed_response_is_not_semantic_conflict(self):
+        for response in ({}, [], None, {'kind': 'unknown'}, {'kind': ['regulation']}):
+            with self.subTest(response=response):
+                with self.assertRaisesRegex(LlmError, '답변 유형'):
+                    self.run_route('사내 규정', response)
+
+    def test_bad_json_is_not_converted_to_clarification(self):
+        with patch.object(rt.llm, 'chat', return_value={'content': 'invalid json'}), \
+             patch.object(reg.regstore, 'search', return_value=[]), \
+             patch.object(reg.regstore, 'explicit_ref', return_value=None):
+            with self.assertRaisesRegex(LlmError, 'JSON'):
+                reg._api(self.ctx, self.inp)
+
+    def test_invalid_confirmation_remains_system_error(self):
+        for response in ({'kind': 'out'}, {'kind': 'clarify', 'question': [], 'options': []},
+                         {'kind': 'clarify', 'question': '어떤 뜻인가요?', 'options': '질문'},
+                         {'kind': 'clarify', 'question': '어떤 뜻인가요?', 'options': [{}]}):
+            with self.subTest(response=response):
+                with self.assertRaisesRegex(LlmError, '의도 확인'):
+                    self.run_route('사내 규정', responses=[{'kind': 'out'}, response])
+
+    def test_direct_option_reclassifies_only_selected_question(self):
+        selected = self.confirmation()['options'][1]
+        self.after_confirmation(selected)
+        result, search, model = self.run_route('사내 규정', {'kind': 'regulation', 'level': 'none'})
+        self.classify.assert_called_once_with(selected)
+        self.assertTrue(self.inp['_classification']['usedHistory'])
+        search.assert_called_once_with(selected, 4, '일반직', self.ctx.mode)
+        self.assertEqual(model.call_count, 1)
+        self.assertEqual(model.call_args.args[2]['confirmedIntent']['reply'], selected)
+        self.assertEqual(result['kind'], 'regulation')
+
+    def test_outside_option_does_not_search_or_generate(self):
+        selected = self.confirmation()['options'][0]
+        self.after_confirmation(selected)
+        result, search, model = self.run_route('범위 밖')
+        self.classify.assert_called_once_with(selected)
+        self.assertEqual(result['kind'], 'out')
+        search.assert_not_called()
+        self.company_search.assert_not_called()
+        model.assert_not_called()
+
+    def test_numbered_option_resolves_to_full_question(self):
+        for reply in ('2', '2번', '2번째', '2번요'):
+            with self.subTest(reply=reply):
+                self.classify.reset_mock()
+                self.after_confirmation(reply)
+                result, _, _ = self.run_route('사내 규정', {'kind': 'regulation', 'level': 'none'})
+                self.classify.assert_called_once_with(self.confirmation()['options'][1])
+                self.assertEqual(result['kind'], 'regulation')
+
+    def test_yes_no_or_invalid_choice_does_not_choose_an_intent(self):
+        for reply in ('네', '아니요', '3번'):
+            with self.subTest(reply=reply):
+                self.after_confirmation(reply)
+                result, search, model = self.run_route('사내 규정')
+                self.assertEqual(result['kind'], 'clarify')
+                self.assertEqual(result['options'], self.confirmation()['options'])
+                self.classify.assert_not_called()
+                search.assert_not_called()
+                model.assert_not_called()
+
+    def test_free_reply_uses_confirmation_and_reclassifies_resolved_intent(self):
+        self.after_confirmation('규정 쪽이요')
+        resolved = '업무 중 기상 대응 규정을 알려 주세요.'
+        result, search, model = self.run_route('사내 규정', responses=[
+            {'kind': 'resolved', 'resolvedQuestion': resolved}, {'kind': 'regulation', 'level': 'none'}])
+        resolution = model.call_args_list[0]
+        self.assertEqual(resolution.args[2]['reply'], '규정 쪽이요')
+        self.assertEqual(resolution.args[2]['confirmationQuestion'], self.confirmation()['question'])
+        self.assertEqual(resolution.args[2]['originalQuestion'], '부산 날씨 알려줘')
+        self.classify.assert_called_once_with(resolved)
+        search.assert_called_once_with(resolved, 4, '일반직', self.ctx.mode)
+        self.assertEqual(result['kind'], 'regulation')
+
+    def test_unresolved_free_reply_still_asks_without_classifier_or_search(self):
+        self.after_confirmation('그건 아니고요')
+        result, search, model = self.run_route('사내 규정', self.confirmation())
+        self.assertEqual(result['kind'], 'clarify')
+        self.classify.assert_not_called()
+        search.assert_not_called()
+        self.assertEqual(model.call_count, 1)
+
+    def test_new_topic_after_confirmation_is_classified_by_itself(self):
+        self.after_confirmation('구내식당 식단은 어디서 확인하나요?')
+        menu_id = reg.D['intranet'][0]['id']
+        result, search, model = self.run_route('사내 생활안내', responses=[
+            {'kind': 'resolved', 'resolvedQuestion': self.inp['question']}, {'kind': 'general', 'intranet': [menu_id]}])
+        self.classify.assert_called_once_with(self.inp['question'])
+        search.assert_not_called()
+        self.assertEqual(result['source'], 'intranet')
+        self.assertEqual(model.call_count, 2)
+
+    def test_malformed_resolved_intent_is_not_classified(self):
+        self.after_confirmation('규정 쪽이요')
+        for response in ({}, {'kind': 'resolved', 'resolvedQuestion': ''}, {'kind': 'resolved', 'resolvedQuestion': []}):
+            with self.subTest(response=response):
+                with self.assertRaisesRegex(LlmError, '확인된 질문'):
+                    self.run_route('사내 규정', response)
+                self.classify.assert_not_called()
+
+    def test_confirmation_cannot_skip_classifier_failure(self):
+        self.after_confirmation('2번')
+        self.classify.side_effect = LlmError('질문 분류 모델 추론 실패')
+        with self.assertRaisesRegex(LlmError, '분류 모델'):
+            self.run_route('사내 규정')
+
+    def test_confirmation_filters_unsupported_numbers_and_explanations(self):
+        result, _, _ = self.run_route('사내 규정', {
+            'kind': 'clarify', 'question': '휴가가 999일이라는 뜻인가요?',
+            'options': ['휴가가 999일인가요?', '휴가 신청은 어디서 하나요? (999일 사용 가능)', '교육 신청은 어디서 하나요? 답은 999일이에요.']})
+        self.assertNotIn('999', json.dumps(result, ensure_ascii=False))
+        self.assertEqual(len(result['options']), 2)
+
+    def test_confirmed_intent_keeps_regulation_number_guard(self):
+        self.after_confirmation('2번')
+        article = {'id': 'r1', 'title': '기상 대응', 'text': '업무 중 기상 대응 기준을 정한다.',
+                   'reg': 'reg1', 'no': '제1조', 'chapter': ''}
+        with patch.object(reg.regstore, 'article', return_value=article), \
+             patch.object(reg.regstore, 'reg_public', return_value={'name': '기상 규정'}), \
+             patch.object(reg.regstore, 'search', return_value=[{'id': 'r1'}]), \
+             patch.object(reg.regstore, 'explicit_ref', return_value=None), \
+             patch.object(rt, 'llm_json', return_value={'kind': 'regulation', 'level': 'ok', 'summary': '999일 휴가예요.', 'basis': ['r1']}):
+            result = reg._api(self.ctx, self.inp)
+        self.assertEqual(result['level'], 'unclear')
+        self.assertTrue(result['dropped'])
 
     def test_ambiguous_question_can_still_clarify(self):
         result, _, _ = self.run_route('사내 규정', {'kind': 'clarify', 'question': '어떤 기준인가요?', 'options': ['입사일인가요?', '월별 계산 시작일인가요?']})
