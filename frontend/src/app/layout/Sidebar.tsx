@@ -2,7 +2,7 @@
 import { newIdToPath, paths } from '@/app/paths';
 import { DemoTools } from '@/features/demo/DemoTools';
 import { useGo } from '@/shared/hooks/useGo';
-import { ai, ping, PROV, resetConn, setChoice, useAi, useAiMode, type UiProvider } from '@/shared/state/ai';
+import { ai, levelLabel, ping, PROV, resetConn, setChoice, setReasoning, useAi, useAiMode, type UiProvider } from '@/shared/state/ai';
 import { logoutAndReset } from '@/features/auth/actions';
 import { isSup, meLine, useMe } from '@/shared/state/session';
 import { toast } from '@/shared/state/ui';
@@ -14,8 +14,9 @@ import { Brand, NavLink } from '@/shared/ui/sideParts';
 
 export function AiBox() {
   const { choice } = useAiMode();
-  // 모델 상태(사용 가능 여부)는 ai.* 로 읽으므로, 바뀌면 다시 그리도록 구독만 한다
+  // 모델 상태(사용 가능 여부)·추론 정도는 ai.* 로 읽으므로, 바뀌면 다시 그리도록 구독만 한다(연결 확인 결과는 useAiMode 의 conn)
   useAi((s) => s.status);
+  useAi((s) => s.settings.reasoning);
   const pick = (p: UiProvider) => {
     setChoice(p)
       .then(() => {
@@ -31,6 +32,39 @@ export function AiBox() {
       })
       .catch((err) => failToast(err));
   };
+  const pickLevel = (p: UiProvider, level: string | null) => {
+    setReasoning(p, level)
+      .then(() => toast(`${PROV[p]} 추론 정도: ${level ? levelLabel(level) : '기본값'} · 다음 호출부터 적용돼요`))
+      .catch((err) => failToast(err));
+  };
+  /** 고른 모드 바로 아래의 추론 정도. 단계는 모델마다 달라 그 모델이 받는 것만 보여 준다.
+   *  RunPod-Ollama 는 진단·로드맵 모델에만 쓰고, 규정 에이전트는 생각을 끄고 학습한 모델이라 늘 끈다(고를 수 없음) */
+  const effort = (p: UiProvider) => {
+    if (choice !== p || !ai.available(p)) return null;
+    const levels = ai.reasoningLevels(p);
+    if (levels && !levels.length) return null;
+    const def = ai.reasoningDefault(p);
+    const mine = ai.reasoning(p);
+    const id = `aim-effort-${p}`;
+    return (
+      <div className="aim-effort">
+        <label htmlFor={id}>추론 정도</label>
+        {levels ? (
+          <select id={id} value={mine && levels.includes(mine) ? mine : ''} onChange={(e) => pickLevel(p, e.target.value || null)}>
+            <option value="">기본값 · {def ? levelLabel(def) : '모델 기본'}</option>
+            {levels.map((l) => (
+              <option key={l} value={l}>
+                {levelLabel(l)}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <small>연결을 확인하면 고를 수 있어요</small>
+        )}
+        {p === 'ollama' ? <small className="aim-effort-n">진단·로드맵에 적용 · 규정 에이전트는 늘 추론 없이 답해요</small> : null}
+      </div>
+    );
+  };
   const opt = (p: UiProvider, l: string, sub: string) => (
     <label className="aim-o">
       <input type="radio" name="gp-prov" value={p} checked={choice === p} onChange={() => pick(p)} />
@@ -44,7 +78,9 @@ export function AiBox() {
     <div className="aim" role="radiogroup" aria-label="AI 모델">
       <span className="lbl">AI 모델</span>
       {opt('ollama', 'RunPod-Ollama', '로컬 LLM·sLLM')}
+      {effort('ollama')}
       {opt('api', 'OpenAI API', ai.openaiModel())}
+      {effort('api')}
       <div className="aim-st" id="aimSt" aria-live="polite">
         <AimStatus />
       </div>

@@ -41,6 +41,8 @@ def bad(message: str, code: str = 'BAD_REQUEST') -> ApiError:
 # ── 에이전트(모델) 오류 → 원인·종류·할 일 (4차 gp-ai.js 의 AI.cause 를 서버로 옮김) ──
 # 앞머리 문구(Ollama 연결 실패 / RunPod 프록시 / OpenAI 401 …)는 llm.py 가 만드는 오류 문구와 맞춘다
 CAUSES = [
+    (r'^회사 정보 검색 임베딩', 'config', '회사 정보 검색의 임베딩 모델·키·저장 벡터 설정을 확인해 주세요'),
+    (r'^질문 분류 모델', 'classifier', '로컬 질문 분류 모델을 읽거나 실행하지 못했어요'),
     (r'^모드 사용 불가', 'off', '고른 AI 모델 모드가 설정되지 않아 쓸 수 없어요'),
     (r'작업을 찾을 수 없어요|서버가 다시 시작', 'lost', '서버를 다시 켜서 진행 중이던 작업이 없어졌어요'),
     (r'기획서 형식', 'docfmt', '읽을 수 없는 파일 형식이에요'),
@@ -59,6 +61,8 @@ CAUSES = [
     (r'Ollama 시간 초과', 'timeout', '응답 시간이 초과됐어요 (Ollama)'),
     (r'out of memory|more system memory|CUDA error', 'memory', 'GPU 메모리가 부족해 모델을 실행하지 못했어요'),
     (r'Ollama 404|not found, try pulling', 'model', 'Ollama에 지정한 모델이 없어요'),
+    (r'does not support thinking', 'other', '이 모델은 생각(thinking) 모드를 지원하지 않아요 · 좌측 AI 모델의 추론 정도를 기본값이나 끔으로 바꿔 주세요'),
+    (r'reasoning_effort', 'other', '이 모델이 고른 추론 정도(reasoning_effort)를 받지 않아요 · 원문의 Supported values 에 맞춰 .env 의 OPENAI_REASONING_LEVELS 를 고쳐 주세요'),
     (r'Ollama 5\d\d', 'other', 'Ollama 서버에서 오류가 났어요'),
     (r'Ollama 4\d\d', 'other', 'Ollama가 요청을 처리하지 못했어요'),
     (r'OpenAI 40[13]', 'auth', 'API 키가 올바르지 않거나 권한이 없어요'),
@@ -75,7 +79,9 @@ CODE_OF = {'off': 'AI_UNAVAILABLE', 'lost': 'JOB_LOST', 'conn': 'AI_UNREACHABLE'
            'memory': 'AI_OUT_OF_MEMORY', 'format': 'AI_BAD_OUTPUT', 'auth': 'AI_AUTH', 'limit': 'AI_RATE_LIMIT', 'visioncfg': 'VISION_NOT_SET',
            'docfmt': 'DOC_FORMAT', 'doclib': 'DOC_LIB', 'docread': 'DOC_READ', 'docbig': 'DOC_TOO_BIG', 'config': 'AI_CONFIG', 'server': 'SERVER',
            'other': 'AI_ERROR'}
+CODE_OF['classifier'] = 'AI_CLASSIFIER'
 HINT = {
+    'classifier': {'any': 'backend/models의 모델·토크나이저·classifier-manifest.json과 백엔드 로그를 확인해 주세요. 모델 교체 시 검증한 manifest도 갱신해야 해요'},
     'off': {'ollama': '.env에 OLLAMA_BASE_URL을 넣고 서버를 다시 실행해 주세요. 가데이터로 보려면 시연 도구에서 직접 켜야 해요(자동 대체 없음)',
             'any': '.env에 OPENAI_API_KEY를 넣고 서버를 다시 실행해 주세요. 가데이터로 보려면 시연 도구에서 직접 켜야 해요(자동 대체 없음)'},
     'lost': {'any': '다시 시도하면 새 작업으로 만들어요'},
@@ -100,6 +106,7 @@ HINT = {
     'other': {'any': '잠시 뒤 다시 시도해 주세요'},
 }
 USER_TEXT = {
+    'classifier': '질문 유형을 확인하지 못했어요',
     'off': '고른 AI 모델을 지금 쓸 수 없어요', 'lost': '진행 중이던 작업을 찾지 못했어요',
     'server': 'AI 서버에 연결하지 못했어요', 'config': 'AI 모델 설정이 아직 준비되지 않았어요', 'conn': 'AI 모델이 지금 응답하지 않아요',
     'model': 'AI 모델을 아직 쓸 수 없어요', 'auth': 'AI 모델을 쓸 권한을 확인하지 못했어요', 'timeout': 'AI 모델의 응답이 너무 오래 걸려 멈췄어요',

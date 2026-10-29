@@ -127,7 +127,7 @@ ollama show hf.co/golddragon0926/qwen35-4b-diagnosis-agent
 - ✅ 두 번 모두 진행 막대가 끝나고 `success`가 나와요.
 - ✅ `ollama list`에 `hf.co/Ssum-mer/qwen3.8-27b-growpath-Q4:latest`(약 16 GB)와 `hf.co/golddragon0926/qwen35-4b-diagnosis-agent:latest`(약 8 GB)가 보여요. 태그 없이 받아서 `:latest`가 붙어요. 이름이 다르게 보이면 보이는 이름을 그대로 3-2에 써요.
 - ✅ 두 모델 모두 `ollama show`의 Capabilities에 `completion`이 있어요. 두 모델 다 vision projector가 없어서 `vision`은 없어요(그래서 RunPod-Ollama 모드는 기획서 이미지 읽기를 건너뛰어요). 이때 `template source`는 `gguf_chat_template`이에요.
-- 두 모델의 채팅 템플릿은 생각 모드 켜고 끄기를 지원하고, 4b는 생각을 끄고 학습했어요(모델 카드). 3-2에서 `OLLAMA_THINK=off`로 둬요.
+- 두 모델의 채팅 템플릿은 생각 모드 켜고 끄기를 지원하고, 4b는 생각을 끄고 학습했어요(모델 카드). 그래서 앱은 4b를 `OLLAMA_THINK`·화면 설정과 관계없이 늘 생각을 끄고 불러요(#28). 27b는 3-2에서 `OLLAMA_THINK=off`로 둬요.
 - ❌ `connection refused`가 나오면 2-3의 `export`를 하지 않은 창이에요. `export` 줄부터 다시 실행해요.
 - ❌ `The specified tag is not available in the repository`가 나오면 명령 끝에 `:Q4_K_M` 같은 태그가 붙어 있는지 봐요. 위 명령 그대로(태그 없이) 받아요.
 
@@ -345,7 +345,7 @@ OLLAMA_THINK=off
   - RunPod-Ollama 모드만 쓰더라도 `.env`에 `OPENAI_API_KEY`가 있어야 도우미가 규정을 찾아요. 없으면 규정 질문이 '규정 검색 임베딩(text-embedding-3-small)에 쓰는 OpenAI 키가 .env에 없어요'로 실패해요(키워드 검색으로 몰래 바꾸지 않음).
   - 도우미에 한 질문 문장은 임베딩하려고 OpenAI로 가요. 답변은 RunPod-Ollama 모델이 써요.
   - 팀 DB 벡터를 그대로 쓰기 때문에 Pod에 임베딩 모델을 받을 필요가 없어요.
-- `OLLAMA_THINK=off`는 생각 모드를 꺼서 생각 없이 바로 답하게 해요(빨라짐). `on`은 켜고, 비우면 모델 기본값(qwen3.8은 켜짐)을 따라요. `on`·`off`가 아닌 값을 적으면 백엔드가 켜지지 않고 멈춰요(`docker compose logs backend`에 이유가 나와요). OpenAI 쪽 추론에는 영향이 없어요. 이 값은 두 모델에 같이 적용돼요(모델마다 따로 정하는 것은 #28). 2-4 B로 받은 두 모델 중 하나라도 Capabilities에 `thinking`이 없으면 `on`으로 두지 않아요. 생각 모드가 없는 모델에 켜라고 보내면 그 모델 호출이 오류가 날 수 있어요.
+- `OLLAMA_THINK=off`는 생각 모드를 꺼서 생각 없이 바로 답하게 해요(빨라짐). `on`은 켜고, 비우면 모델 기본값(qwen3.8은 켜짐)을 따라요. `low` 같은 27b의 단계 이름도 적을 수 있어요. `true`·`false`처럼 적거나 단계 이름 모양이 아니면 백엔드가 켜지지 않고 멈춰요(`docker compose logs backend`에 이유가 나와요). OpenAI 쪽 추론에는 영향이 없어요. 이 값은 **진단·로드맵 모델(27b)의 기본값**이고, 직원이 화면 좌측 'AI 모델'의 '추론 정도'에서 고르면 그 값이 앞서요(#28 · 고를 수 있는 단계는 연결 확인 때 27b의 `ollama show` 값). 규정 모델(4b)은 생각을 끄고 학습해 이 값·화면과 관계없이 늘 `think: false`로 불러요. 2-4 B로 받은 두 모델 중 하나라도 Capabilities에 `thinking`이 없으면 `on`으로 두지 않아요. 생각 모드가 없는 모델에 켜라고 보내면 그 모델 호출이 오류가 날 수 있어요.
 
 ### 3-3. 백엔드 다시 만들기
 
@@ -417,7 +417,7 @@ rm /workspace/ollama_key.txt
 
 - **HTTP 프록시 대신 TCP를 쓰는 이유:** RunPod HTTP 프록시(`https://<POD_ID>-11434.proxy.runpod.net`)는 100초 안에 응답이 시작되지 않으면 524로 끊어요. 이 앱 백엔드는 답을 끝까지 기다렸다 한 번에 받고(`stream: false`), `qwen3.8:27b`는 생각 모드가 기본으로 켜져 있어서 로드맵 3안처럼 긴 작업은 100초를 넘기기 쉬워요.
 - **모델 두 개:** Ollama는 이름이 다른 모델을 따로 GPU에 올려요. 진단과 로드맵은 같은 27b라 한 번만 올라가고, 규정 에이전트의 4b가 하나 더 올라가요. 앱은 호출마다 `keep_alive`(`.env`의 `OLLAMA_KEEP_ALIVE`)를 보내서, 두 모델 모두 마지막 호출 뒤 그 시간 동안 GPU에 남아요.
-- **생각 모드:** `.env`의 `OLLAMA_THINK`로 정해요(3-2). 두 모델에 같이 적용돼요. `off`면 Ollama 요청에 `think: false`를 보내고, 비우면 보내지 않아 모델 기본값(qwen3.8은 켜짐)을 따라요. OpenAI `gpt-6-luna`는 `reasoning_effort`를 보내지 않아 기본값(medium)으로 추론이 켜진 채예요. 두 모드의 결과를 비교할 때는 이 차이를 함께 적어요. 팀원 백엔드에는 아직 이 설정이 없어요.
+- **생각 모드:** 진단·로드맵 모델의 기본값은 `.env`의 `OLLAMA_THINK`로 정해요(3-2). `off`면 Ollama 요청에 `think: false`를 보내고, 비우면 보내지 않아 모델 기본값(qwen3.8은 켜짐)을 따라요. 직원이 화면에서 고른 값이 있으면 그 값을 보내요(#28). 규정 모델은 늘 `think: false`예요. OpenAI `gpt-6-luna`는 화면에서 고르지 않았고 `OPENAI_REASONING_EFFORT`도 비어 있으면 `reasoning_effort`를 보내지 않아 기본값(medium)으로 추론이 켜진 채예요. 두 모드의 결과를 비교할 때는 이 차이를 함께 적어요. 팀원 백엔드에는 아직 이 설정이 없어요.
 - **도우미가 '확인 불가'라고 할 때:** 먼저 검색이 조항을 찾았는지 봐요. 2026-10-26 전에는 RunPod-Ollama 모드가 키워드 검색을 해서, "근로 시작일은 한 달 기준 며칠 부터야?" 같은 질문은 조항을 0개 찾았어요(OpenAI 모드는 벡터 검색으로 「연봉규정」 제4조를 찾음). 지금은 두 모드가 같은 벡터 검색을 해요. 또 같은 날 지시문(`REG_SYS`)을 고쳐서, 뜻이 여러 가지로 읽히는 규정 질문은 '확인 필요'로 되묻고 선택지 버튼을 보여 줘요. 고르면 그 뜻으로 조항을 찾아 답해요. 고치기 전에는 qwen3.8이 같은 질문에 한 번은 '확인 불가', 한 번은 되묻기로 답했어요.
 - **CPU 100%:** 모델이 GPU에 다 올라가 있어도 토큰마다 다음 토큰 고르기와 JSON 형식 검사(`format: json`)는 CPU가 해요. 요청 여러 개를 동시에 처리하면 RunPod 화면의 CPU가 100%까지 차는데, 고장은 아니에요. GPU를 바꿔도 CPU 표시는 비슷하고, 빨라지는 건 답 만드는 속도예요.
 

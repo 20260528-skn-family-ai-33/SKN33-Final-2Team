@@ -68,7 +68,12 @@ export interface UserSettings {
   aiProvider: ServerProvider;
   demoMock: boolean;
   failSim: FailSim;
+  reasoning: ReasoningPicks;
 }
+
+/** 모드별로 고른 추론 정도(단계 이름). 없으면 서버 기본값(.env OLLAMA_THINK · OPENAI_REASONING_EFFORT).
+ *  RunPod-Ollama 는 진단·로드맵 모델에만 쓰고, 규정 에이전트 모델은 생각을 끄고 학습해 늘 끈다(고를 수 없음) */
+export type ReasoningPicks = Partial<Record<ServerProvider, string>>;
 
 export type Account =
   | ({ accountType: 'employee'; user: User } & UserSettings)

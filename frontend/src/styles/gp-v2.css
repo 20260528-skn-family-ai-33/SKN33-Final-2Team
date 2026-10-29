@@ -197,6 +197,12 @@ details.handoff + .agents { margin-top: 14px; }
 .aim-o small { display: block; font-size: 11.5px; line-height: 1.35; color: var(--ink-3); overflow-wrap: anywhere; }
 .aim-o:has(input:checked) { background: var(--accent-soft); }
 .aim-o:has(input:checked) b { color: var(--accent-ink); }
+/* 고른 모드 바로 아래의 추론 정도 · 위 라디오의 글자 줄에 맞춘다. 아래 안내(aim-effort-n)는 한 줄 전체 */
+.aim-effort { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 4px 8px; margin: 2px 0 4px 32px; padding-right: 10px; }
+.aim-effort label { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.aim-effort select { min-width: 0; height: 28px; padding: 0 4px; border: 1px solid var(--line-2); border-radius: 8px; background: #fff; font-size: 12px; }
+.aim-effort small { font-size: 11.5px; line-height: 1.35; color: var(--ink-3); }
+.aim-effort .aim-effort-n { grid-column: 1 / -1; font-size: 11px; color: var(--ink-4); }
 .aim-st { display: flex; gap: 8px; margin: 4px 0 0; padding: 0 10px; font-size: 12.5px; line-height: 1.4; color: var(--ink-2); }
 .aim-st small { display: block; font-size: 11.5px; color: var(--ink-3); overflow-wrap: anywhere; }
 .aim-st .d { width: 8px; height: 8px; margin-top: 5px; flex: none; border-radius: 50%; background: var(--ink-4); }
@@ -239,6 +245,8 @@ details.handoff + .agents { margin-top: 14px; }
   .aim .lbl { padding: 0 4px 0 0; }
   .aim-o { padding: 4px 8px; }
   .aim-o small { display: none; }
+  .aim-effort { margin: 0; padding: 0; }
+  .aim-effort .aim-effort-n { display: none; }
   .aim-st { flex: 1 1 100%; padding: 0 2px; }
   .ef { grid-template-columns: 1fr; gap: 8px; }
   .ef-l { padding-top: 0; }

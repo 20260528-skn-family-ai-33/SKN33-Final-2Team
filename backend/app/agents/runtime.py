@@ -48,6 +48,7 @@ class Ctx:
     me: dict = field(default_factory=dict)  # 화면 모양의 내 프로필(직원 구분·직급·부서 등)
     meta: dict = field(default_factory=dict)  # 마지막 호출의 모드·모델·시간
     by: str = ''  # 호출을 시작한 쪽: 비면 직원 본인, '관리자'면 관리자 화면에서 시작(에이전트 동작 보기 표시용)
+    reasoning: dict = field(default_factory=dict)  # 직원이 고른 모드별 추론 정도 {ollama|openai: 단계}. 없는 모드는 .env 기본값
 
     @property
     def mode(self) -> str:
@@ -59,11 +60,11 @@ class Ctx:
 
 
 def context(employee_id: int, me: dict | None = None) -> Ctx:
-    s = db.one('SELECT ai_provider, demo_mock, fail_sim FROM app_ext.user_settings WHERE employee_id = :e', e=employee_id) or {}
+    s = db.one('SELECT ai_provider, demo_mock, fail_sim, reasoning FROM app_ext.user_settings WHERE employee_id = :e', e=employee_id) or {}
     if me is None:
         from ..services import profile
         me = profile.view(employee_id)
-    return Ctx(employee_id, s.get('ai_provider') or 'ollama', bool(s.get('demo_mock')), s.get('fail_sim') or {}, me or {})
+    return Ctx(employee_id, s.get('ai_provider') or 'ollama', bool(s.get('demo_mock')), s.get('fail_sim') or {}, me or {}, reasoning=s.get('reasoning') or {})
 
 
 def reset_tries(employee_id: int) -> None:
@@ -172,7 +173,7 @@ def llm_json(ctx: Ctx, system: str, inp, role: str = 'default', images: list | N
     if images:
         user['images'] = images
     messages = [{'role': 'system', 'content': system}] + list(history or []) + [user]
-    res = llm.chat(ctx.mode, messages, role=role, json_mode=True)
+    res = llm.chat(ctx.mode, messages, role=role, json_mode=True, reasoning=ctx.reasoning.get(ctx.mode))
     ctx.meta = {'loadMs': res.get('loadMs', 0)}
     return parse_json(res['content'])
 
