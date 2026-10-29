@@ -89,6 +89,9 @@ class ClassifierRoutingTest(unittest.TestCase):
         self.available = patch('app.llm.available', return_value=True)
         self.available.start()
         self.addCleanup(self.available.stop)
+        self.knowledge = patch.object(reg.knowledge, 'search_company', return_value=[])
+        self.company_search = self.knowledge.start()
+        self.addCleanup(self.knowledge.stop)
 
     def test_out_of_scope_never_searches_or_calls_llm(self):
         self.classify.return_value = {'label': '범위 밖'}
@@ -128,12 +131,55 @@ class ClassifierRoutingTest(unittest.TestCase):
         self.assertEqual(result['intranet'], [menu_id])
         self.assertEqual(llm.call_args.args[2]['classification']['label'], '사내 생활안내')
 
-    def test_company_question_keeps_existing_general_answer_contract(self):
-        result, search, llm = self.run_route('수자원공사 정보', {'kind': 'general', 'summary': '등록된 자료로 확인할 수 없어요.'})
+    def test_company_without_hits_does_not_call_llm(self):
+        result, search, llm = self.run_route('수자원공사 정보', {})
         self.assertEqual(result['kind'], 'general')
         self.assertEqual(result['source'], 'work')
+        self.assertEqual(result['knowledgeSources'], [])
+        self.company_search.assert_called_once()
         search.assert_not_called()
-        self.assertIn('자료에 없으면 확인할 수 없다고', llm.call_args.args[1])
+        llm.assert_not_called()
+
+    def company_hit(self, **changes):
+        hit = {'chunk_id': 'company-1', 'document_id': 'company', 'document_title': '회사 소개',
+               'category': '수자원공사 정보', 'is_virtual': False,
+               'chunk_text': '수돗물 공급과 수자원 관리 업무를 수행한다.',
+               'chunk_text_sha256': 'a' * 64,
+               'metadata': {'location': 'PDF 3쪽', 'as_of': '2025 보고서 기준', 'source_url': 'https://example.invalid/source'}}
+        hit.update(changes)
+        return hit
+
+    def test_company_passes_database_text_and_returns_valid_source(self):
+        self.company_search.return_value = [self.company_hit()]
+        result, search, llm = self.run_route('수자원공사 정보', {
+            'answerable': True, 'summary': '수돗물 공급과 수자원 관리를 수행해요.', 'sourceIds': ['company-1']})
+        search.assert_not_called()
+        self.assertIn('수돗물 공급', llm.call_args.args[2]['sources'][0]['text'])
+        self.assertEqual(llm.call_args.kwargs['role'], 'regulation')
+        self.assertEqual(result['knowledgeSources'][0]['chunkId'], 'company-1')
+        self.assertFalse(result['knowledgeSources'][0]['isVirtual'])
+        self.assertIn('출처: 회사 소개', result['summary'])
+
+    def test_company_rejects_unknown_citation(self):
+        self.company_search.return_value = [self.company_hit()]
+        with self.assertRaisesRegex(LlmError, '출처'):
+            self.run_route('수자원공사 정보', {'answerable': True, 'summary': '답변', 'sourceIds': ['unknown']})
+
+    def test_company_rejects_virtual_workplace_material(self):
+        self.company_search.return_value = [self.company_hit(is_virtual=True)]
+        with self.assertRaisesRegex(LlmError, '범주'):
+            self.run_route('수자원공사 정보', {})
+
+    def test_company_rejects_unsupported_number(self):
+        self.company_search.return_value = [self.company_hit()]
+        with self.assertRaisesRegex(LlmError, '숫자'):
+            self.run_route('수자원공사 정보', {'answerable': True, 'summary': '직원은 999명입니다.', 'sourceIds': ['company-1']})
+
+    def test_company_can_decline_when_retrieved_text_does_not_answer(self):
+        self.company_search.return_value = [self.company_hit()]
+        result, _, _ = self.run_route('수자원공사 정보', {'answerable': False, 'summary': '', 'sourceIds': []})
+        self.assertEqual(result['knowledgeSources'], [])
+        self.assertIn('충분한 근거', result['summary'])
 
     def test_llm_cannot_override_regulation_route(self):
         with self.assertRaisesRegex(LlmError, '답변 유형'):
