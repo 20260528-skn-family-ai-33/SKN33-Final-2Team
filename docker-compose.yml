@@ -74,6 +74,7 @@ services:
       # 관리자가 올린 규정 PDF 는 var/uploads/regulations/ 에 남는다(시스템 관리자가 docker compose cp 로 꺼냄)
       - uploads:/srv/growpath/var
       - ./team_db/regulations:/srv/growpath/regulation_files:ro
+      - ./backend/models:/srv/growpath/models:ro
 
   # 화면: React 빌드 결과를 nginx 가 제공하고 /api 는 backend 로 넘긴다(같은 주소라 로그인 쿠키가 그대로 동작)
   frontend:

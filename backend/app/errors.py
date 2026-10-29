@@ -41,6 +41,7 @@ def bad(message: str, code: str = 'BAD_REQUEST') -> ApiError:
 # ── 에이전트(모델) 오류 → 원인·종류·할 일 (4차 gp-ai.js 의 AI.cause 를 서버로 옮김) ──
 # 앞머리 문구(Ollama 연결 실패 / RunPod 프록시 / OpenAI 401 …)는 llm.py 가 만드는 오류 문구와 맞춘다
 CAUSES = [
+    (r'^질문 분류 모델', 'classifier', '로컬 질문 분류 모델을 읽거나 실행하지 못했어요'),
     (r'^모드 사용 불가', 'off', '고른 AI 모델 모드가 설정되지 않아 쓸 수 없어요'),
     (r'작업을 찾을 수 없어요|서버가 다시 시작', 'lost', '서버를 다시 켜서 진행 중이던 작업이 없어졌어요'),
     (r'기획서 형식', 'docfmt', '읽을 수 없는 파일 형식이에요'),
@@ -75,7 +76,9 @@ CODE_OF = {'off': 'AI_UNAVAILABLE', 'lost': 'JOB_LOST', 'conn': 'AI_UNREACHABLE'
            'memory': 'AI_OUT_OF_MEMORY', 'format': 'AI_BAD_OUTPUT', 'auth': 'AI_AUTH', 'limit': 'AI_RATE_LIMIT', 'visioncfg': 'VISION_NOT_SET',
            'docfmt': 'DOC_FORMAT', 'doclib': 'DOC_LIB', 'docread': 'DOC_READ', 'docbig': 'DOC_TOO_BIG', 'config': 'AI_CONFIG', 'server': 'SERVER',
            'other': 'AI_ERROR'}
+CODE_OF['classifier'] = 'AI_CLASSIFIER'
 HINT = {
+    'classifier': {'any': 'backend/models의 모델·토크나이저·classifier-manifest.json과 백엔드 로그를 확인해 주세요. 모델 교체 시 검증한 manifest도 갱신해야 해요'},
     'off': {'ollama': '.env에 OLLAMA_BASE_URL을 넣고 서버를 다시 실행해 주세요. 가데이터로 보려면 시연 도구에서 직접 켜야 해요(자동 대체 없음)',
             'any': '.env에 OPENAI_API_KEY를 넣고 서버를 다시 실행해 주세요. 가데이터로 보려면 시연 도구에서 직접 켜야 해요(자동 대체 없음)'},
     'lost': {'any': '다시 시도하면 새 작업으로 만들어요'},
@@ -100,6 +103,7 @@ HINT = {
     'other': {'any': '잠시 뒤 다시 시도해 주세요'},
 }
 USER_TEXT = {
+    'classifier': '질문 유형을 확인하지 못했어요',
     'off': '고른 AI 모델을 지금 쓸 수 없어요', 'lost': '진행 중이던 작업을 찾지 못했어요',
     'server': 'AI 서버에 연결하지 못했어요', 'config': 'AI 모델 설정이 아직 준비되지 않았어요', 'conn': 'AI 모델이 지금 응답하지 않아요',
     'model': 'AI 모델을 아직 쓸 수 없어요', 'auth': 'AI 모델을 쓸 권한을 확인하지 못했어요', 'timeout': 'AI 모델의 응답이 너무 오래 걸려 멈췄어요',

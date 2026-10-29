@@ -8,3 +8,4 @@ python-multipart==0.0.32  # 관리자 엑셀·CSV, 기획서 파일 업로드(mu
 openpyxl==3.1.5           # 엑셀 읽기·쓰기 (관리자 업로드·다운로드, 초기 자료 이전)
 pypdf==6.21.1             # 기획서 PDF 글자 꺼내기 (없으면 PDF만 안내)
 olefile==0.47             # 기획서 HWP(옛 형식) 글자 꺼내기 (없으면 HWP만 안내)
+-r requirements-classifier.txt  # 챗봇 질문 4분류(CPU)

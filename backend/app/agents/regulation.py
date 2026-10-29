@@ -1,6 +1,7 @@
 """규정 에이전트 · 사내 생활 도우미(API-09) / 안별 지원 조건 확인 (4차 gp-ai.js · 4차 묶음 5·7).
 
-분류 모델 없이 LLM 지시문으로 질문을 분류하고(NFR-01 · 사용자 결정), 유형에 맞게만 답한다(호출 한 번).
+실제 모드는 로컬 RoBERTa로 먼저 질문을 4분류하고, 규정 검색·LLM 답변으로 연결한다.
+가데이터 모드는 기존 키워드·고정 답을 유지하며 실제 분류 모델을 호출하지 않는다.
   regulation  규정·인사 제도 — 내 직원 구분의 등록 규정에 명시된 경우에만 근거와 함께. 없으면 답하지 않고 담당 부서 안내
   general     업무·사내 생활 — 사내 생활은 가상 사내 홈페이지 메뉴 안내 안에서만(값을 지어내지 않음), 업무·학습은 일반 답변
   out         범위 밖(주식·날씨·스포츠) — 답하지 않음      clarify  애매하면 되묻기(유형이 애매하거나, 규정 질문의 뜻이 갈리고 조항이 일부 뜻에만 답할 때 · 10/26)
@@ -13,7 +14,7 @@ import copy
 import json
 import re
 
-from .. import llm, regstore
+from .. import llm, question_classifier, regstore
 from . import runtime as rt
 from .demo import D
 
@@ -344,11 +345,24 @@ def _hist_msgs(h: list) -> list:
 
 
 def _api(ctx: rt.Ctx, inp: dict) -> dict:
+    q, hist = inp['question'], inp.get('history') or []
+    # 짧은 이어 묻기는 독립 질문으로 학습된 분류기에 최소한의 앞 질문을 함께 준다.
+    follow = bool(hist) and not OUT_HINT.search(q) and _is_follow(q, hist[-1], inp['me'])
+    text = f"{hist[-1]['q'][:120]} {q}" if follow else q
+    classification = question_classifier.classify(text)
+    inp['_classification'] = dict(classification, usedHistory=follow)
+    if classification['label'] == '범위 밖':
+        return ans(kind='out', level='out')
+    return _api_answer(ctx, inp, classification['label'])
+
+
+def _api_answer(ctx: rt.Ctx, inp: dict, label: str) -> dict:
     q, me, hist = inp['question'], inp['me'], inp.get('history') or []
     group, prev = me.get('empGroup'), (hist[-1] if hist else None)
+    is_regulation = label == '사내 규정'
     # 이어 묻기는 질문만으로 검색이 안 되므로 앞 질문을 붙인 검색도 하고, 앞 답변의 근거도 함께 넣는다
-    alone = regstore.search(q, 4, group, ctx.mode)
-    joined = regstore.search(f"{prev['q']} {q}", 4, group, ctx.mode) if prev else []
+    alone = regstore.search(q, 4, group, ctx.mode) if is_regulation else []
+    joined = regstore.search(f"{prev['q']} {q}", 4, group, ctx.mode) if prev and is_regulation else []
     mix = []
     for i in range(max(len(alone), len(joined))):
         if i < len(joined):
@@ -356,25 +370,33 @@ def _api(ctx: rt.Ctx, inp: dict) -> dict:
         if i < len(alone):
             mix.append(alone[i]['id'])
     # 규정 이름과 조(항·호)를 직접 물으면 그 조항을 검색 결과보다 앞에 넣는다(검색은 번호를 뜻으로 찾지 못함 · 10/21)
-    ref = regstore.explicit_ref(q, group, _prev_reg(prev))
+    ref = regstore.explicit_ref(q, group, _prev_reg(prev)) if is_regulation else None
     ref_ids = (ref or {}).get('ids') or []
-    ids = [i for i in rt.uniq(ref_ids + list((prev or {}).get('a', {}).get('basis') or []) + mix) if regstore.article(i)][:max(7, len(ref_ids))]
+    previous_ids = list((prev or {}).get('a', {}).get('basis') or []) if is_regulation else []
+    ids = [i for i in rt.uniq(ref_ids + previous_ids + mix) if regstore.article(i)][:max(7, len(ref_ids))]
     payload = {'question': q, 'user': inp['context'], 'articles': [_art_in(regstore.article(i)) for i in ids],
+               'classification': {'label': label},
                'intranet': [{'id': x['id'], 'title': x['title'], 'menu': x['menu'], 'covers': x['covers']} for x in D['intranet']]}
     if ref:
         payload['requested'] = {'regulation': ref['reg']['name'], 'where': ref['where'], 'found': bool(ref_ids), 'articleIds': ref_ids,
                                 'focus': ref['focus'] or '', 'note': ref['note']}
-    r = rt.llm_json(ctx, REG_SYS, payload, role='regulation', history=_hist_msgs(hist))
+    route = ('사내 규정이면 kind=regulation 또는 뜻이 애매할 때 clarify만 사용한다. '
+             '사내 생활안내이면 kind=general, source=intranet으로 메뉴를 안내하거나 뜻이 애매할 때 clarify를 사용한다. '
+             '수자원공사 정보이면 kind=general, source=work 또는 clarify를 사용한다. '
+             '기관의 사실 정보는 입력 자료에 명시된 것만 답하고, 자료에 없으면 확인할 수 없다고 알려 준다. '
+             '입력의 classification.label은 별도 RoBERTa 분류기가 결정했다. 이 유형을 다른 유형으로 다시 분류하지 않는다.')
+    r = rt.llm_json(ctx, REG_SYS + '\n' + route, payload, role='regulation', history=_hist_msgs(hist))
     lst = lambda v, n=3: [str(x).strip() for x in (v if isinstance(v, list) else []) if str(x).strip()][:n]  # noqa: E731
     kind = str(r.get('kind') or '').replace('out_of_scope', 'out')
-    if kind == 'out':
-        return ans(kind='out', level='out', retrieved=ids)
+    allowed = ('regulation', 'clarify') if is_regulation else ('general', 'clarify')
+    if kind not in allowed:
+        raise llm.LlmError('답변 형식 오류: 질문 분류 결과와 답변 유형이 맞지 않아요')
     if kind == 'clarify':
         allow = ctx_nums(inp['context']) | set(re.findall(r'\d+(?:\.\d+)?', q))
         opts = rt.uniq(o for o in (clean_option(x, allow) for x in lst(r.get('options'))) if o)
         return ans(kind='clarify', level='clarify', question=str(r.get('question') or '').strip() or '어떤 내용을 물어보신 건지 조금 더 알려 주세요.', options=opts, retrieved=ids)
     if kind == 'general':
-        src = r.get('source') if r.get('source') in ('intranet', 'work', 'app') else 'work'
+        src = 'intranet' if label == '사내 생활안내' else 'work'
         if src == 'intranet':
             return ans(source=src, intranet=[i for i in lst(r.get('intranet'), 2) if any(x['id'] == i for x in D['intranet'])], retrieved=ids)
         if not str(r.get('summary') or '').strip():
@@ -411,6 +433,8 @@ def answer(ctx: rt.Ctx, question: str, history: list, context: dict, sim: str | 
     task = f"사내 생활 질문 분류·답변{f' (앞 대화 {len(history)}턴 포함)' if history else ''}"
     a = rt.run(ctx, '규정 에이전트', task, inp, _mock, lambda i: _api(ctx, i), role='regulation', sim=sim, mock_delay=0.38,
                log_input={'question': question, 'context': context, 'history': history or []})
+    if inp.get('_classification'):
+        ctx.meta['classification'] = inp['_classification']
     return scope_answer(a, me) if a['kind'] == 'regulation' and not regstore.set_for(me.get('empGroup')) else a
 
 
