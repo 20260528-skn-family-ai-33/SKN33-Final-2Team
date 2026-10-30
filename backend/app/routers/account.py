@@ -67,7 +67,7 @@ def api_profile(a: Account = Depends(require_employee)):
 @r.put('/me/profile/self')
 def api_self(body: dict, a: Account = Depends(require_employee)):
     profile.save_self(a.id, body)
-    goals.request(a.id, 'self-input')   # 목표 후보를 새 값으로 다시 만든다(API-06)
+    goals.request(a.id, 'self-input', only_if_stale=True)
     v = profile.view(a.id)
     return dict(profile.spec(v), view=v)
 
@@ -75,7 +75,7 @@ def api_self(body: dict, a: Account = Depends(require_employee)):
 @r.delete('/me/profile/self')
 def api_self_revert(a: Account = Depends(require_employee)):
     profile.revert_self(a.id)
-    goals.request(a.id, 'self-input-revert')
+    goals.request(a.id, 'self-input-revert', only_if_stale=True)
     v = profile.view(a.id)
     return dict(profile.spec(v), view=v)
 
@@ -86,7 +86,7 @@ def api_consent(period: str, body: dict, a: Account = Depends(require_employee))
     if type(consent) is not bool:
         raise ApiError(422, 'CONSENT_REQUIRED', '평정 활용 동의 여부를 true 또는 false로 보내 주세요')
     profile.set_consent(a.id, period, consent)
-    goals.request(a.id, 'consent')
+    goals.request(a.id, 'consent', only_if_stale=True)
     return {'period': period, 'consent': consent}
 
 
@@ -101,6 +101,16 @@ def api_goals_regen(request: Request, a: Account = Depends(require_employee)):
     if not jid:
         return goals.get(a.id)
     return JSONResponse({'jobId': jid, 'status': 'running'}, status_code=202)
+
+
+@r.post('/me/goal-suggestions/ensure')
+def api_goals_ensure(a: Account = Depends(require_employee)):
+    state = goals.get(a.id)
+    # 정보 변경은 저장 성공 뒤 갱신한다. 목표 화면은 신규/미준비 계정만 보완한다.
+    if state['status'] == 'none':
+        goals.request(a.id, 'goal-missing', only_if_stale=True)
+        return goals.get(a.id)
+    return state
 
 
 # ── AI 모델 (API-10~12) ──

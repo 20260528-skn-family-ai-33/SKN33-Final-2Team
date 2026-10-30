@@ -48,6 +48,16 @@ class CourseDurationDatabaseTests(unittest.TestCase):
                     self.c.execute('UPDATE public.courses SET '+assignment+' WHERE course_id=%s',(self.id,))
             self.assertEqual(self.c.execute('SELECT duration_seconds FROM public.courses WHERE course_id=%s',(self.id,)).fetchone()['duration_seconds'],4260)
 
+    def test_timezone_changes_preserve_evidence_but_new_fetch_time_is_detected(self):
+        backfill(self.c, apply=True)
+        before = self.c.execute('SELECT duration_provenance FROM public.courses WHERE course_id=%s', (self.id,)).fetchone()
+        for zone in ('Asia/Seoul', 'UTC'):
+            self.c.execute("SELECT set_config('TimeZone',%s,true)", (zone,))
+            self.assertEqual(backfill(self.c, apply=True)['changed_count'], 0)
+            self.assertEqual(self.c.execute('SELECT duration_provenance FROM public.courses WHERE course_id=%s', (self.id,)).fetchone(), before)
+        self.c.execute("UPDATE growpath_meta.catalog_api_sources SET fetched_at=fetched_at+interval '1 second' WHERE resource_type='courses' AND entity_key=%s", (self.id,))
+        self.assertEqual(backfill(self.c)['changed_count'], 1)
+
     def test_fresh_and_legacy_app_schema_share_the_same_hours_origin_check(self):
         self.c.execute(self.app_schema())
         self.c.execute('ALTER TABLE app_ext.resource_meta DROP CONSTRAINT resource_meta_hours_origin_check')

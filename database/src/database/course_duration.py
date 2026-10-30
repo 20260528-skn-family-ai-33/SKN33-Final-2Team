@@ -1,5 +1,6 @@
 """Normalize stored provider durations without changing vector inputs or source text."""
 from collections import Counter
+from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 import hashlib
 import json
@@ -43,10 +44,22 @@ def positive_seconds(value, multiplier=1):
         return None
 
 
+def normalized_timestamp(value):
+    """동일한 수집 시각을 DB 시간대·ISO 구분자와 무관하게 비교한다."""
+    if not value:
+        return None
+    text = str(value)
+    try:
+        parsed = datetime.fromisoformat(text.replace('Z', '+00:00'))
+    except ValueError:
+        return text
+    return parsed.astimezone(timezone.utc).isoformat() if parsed.tzinfo else text
+
+
 def normalize(source, payload, *, url=None, fetched_at=None, curriculum=None):
     payload = payload or {}
     proof = {'version': VERSION, 'source': source, 'url': url or payload.get('url'),
-             'fetched_at': str(fetched_at) if fetched_at else None,
+             'fetched_at': normalized_timestamp(fetched_at),
              'payload_sha256': hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str).encode()).hexdigest()}
     seconds = kind = estimate = None
     lessons = payload.get('lessons') or []
@@ -144,6 +157,10 @@ def backfill(conn, *, apply=False, source_root=None):
             continue
         curriculum=full_curriculum(row['payload'],row['duration_provenance'] or {},source_root or Path(__file__).resolve().parents[2]) if row['source']=='WEB_OPENTUTORIALS' else None
         values = normalize(row['source'], row['payload'], url=row['url'], fetched_at=row['fetched_at'],curriculum=curriculum)
+        prior_time = (row['duration_provenance'] or {}).get('fetched_at')
+        if normalized_timestamp(prior_time) == values['duration_provenance']['fetched_at']:
+            # 기존 증거 문자열은 보존한다. 실제 수집 시각이 바뀌면 아래 비교에서 갱신된다.
+            values['duration_provenance']['fetched_at'] = prior_time
         counts['confirmed' if values['duration_seconds'] else 'estimated'] += 1
         counts[str(row['source'])] += 1
         if any(row[key] != value for key, value in values.items()):

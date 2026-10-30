@@ -20,13 +20,15 @@
     {
       "id": "full_database_current",
       "filename": "growpath_latest.dump",
-      "bytes": 36345626,
-      "sha256": "be3648e42907cd566d9716354437665260ccb3c26041a0dcdcb20e13db643189",
+      "bytes": 38402877,
+      "sha256": "e27fb83895f4080cbf8838765de577c360007d6b95cc8c2cc0c92b9979dd3ea7",
       "location": "https://drive.google.com/file/d/1YBhxTVQjNfm53FbcLJnO7SKi-hsycxz4/view?usp=drivesdk",
       "location_status": "uploaded_existing_drive_file",
       "manifest": "data/exports/growpath_latest.manifest.json",
-      "version": "2026-10-27-real-user-and-same-department-scope",
-      "manifest_location": "https://drive.google.com/file/d/1iUVAugkFpXHNeO3IlWhFkol-6oID691C/view?usp=drivesdk"
+      "version": "2026-10-29-final-quality-track-prompts-goals315",
+      "manifest_location": "https://drive.google.com/file/d/1iUVAugkFpXHNeO3IlWhFkol-6oID691C/view?usp=drivesdk",
+      "verified_all_tables": 78,
+      "verified_all_rows": 23567
     },
     {
       "id": "course_duration_snapshot_20261028",
@@ -47,6 +49,50 @@
       "location_status": "verified_local_export_not_uploaded",
       "manifest": "data/exports/growpath_curriculum_20261028.manifest.json",
       "version": "2026-10-28-course-curriculum-v2"
+    },
+    {
+      "id": "synthetic_profiles_20261028",
+      "filename": "synthetic_profiles.v1.json",
+      "sha256": "bfc173ec4b28eb18d250aa09510006636e2724ba20373129caa42db4ac58f8c4",
+      "location": null,
+      "location_status": "local_only_not_uploaded",
+      "manifest": "data/exports/synthetic_profiles_20261028.manifest.json"
+    },
+    {
+      "id": "real_user_demo_context_20261029",
+      "filename": "growpath_real_context_20261029.dump",
+      "sha256": "ed9f3a507da9768b2480b933a988380df7cff6f396ab01c872495a138539c77b",
+      "bytes": 38245535,
+      "location": null,
+      "location_status": "verified_local_export_not_uploaded",
+      "manifest": "data/exports/real_user_demo_contexts_20261029.manifest.json"
+    },
+    {
+      "id": "actual_goal_preload_20261029",
+      "filename": "growpath_profiles_goals_20261029.dump",
+      "sha256": "beb9ac646a746434979f889f6fd564608534477b4e85c2f2e78dd95008285373",
+      "bytes": 38297980,
+      "location": null,
+      "location_status": "historical_local_checkpoint_included_in_latest",
+      "manifest": "data/exports/actual_goal_preload_20261029.manifest.json"
+    },
+    {
+      "id": "employee100_goal_preload_20261029",
+      "filename": "growpath_all_profiles_goals_20261029.dump",
+      "sha256": "cb55423c93f78487ae527ae8d815b3655dfa8314d08fa3be264bed9579d42687",
+      "bytes": 38352349,
+      "location": null,
+      "location_status": "historical_local_checkpoint_superseded_by_natural105",
+      "manifest": "data/exports/employee100_goal_preload_20261029.manifest.json"
+    },
+    {
+      "id": "natural105_goals_20261029",
+      "filename": "growpath_natural_profiles_goals_20261029.dump",
+      "sha256": "4e3a792cbb34635497cedd6b1b83f6e8390a13326edd4a23f6faf58c55dc496d",
+      "bytes": 38375509,
+      "location": "https://drive.google.com/file/d/1YBhxTVQjNfm53FbcLJnO7SKi-hsycxz4/view?usp=drivesdk",
+      "location_status": "included_in_verified_latest_drive_backup",
+      "manifest": "data/exports/natural105_goals_20261029.manifest.json"
     }
   ],
   "regulation_originals": [

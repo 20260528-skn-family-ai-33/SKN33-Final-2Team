@@ -7,6 +7,13 @@ from src.database.course_skill_corrections import validate_plan
 
 
 class InstructionalContentTests(unittest.TestCase):
+    def test_ci_and_cd_curriculum_is_recognized_but_biography_is_excluded(self):
+        matcher = SkillMatcher([{'skill_id': 21, 'name': 'CI/CD 배포 자동화 파이프라인'}])
+        for text in ('강좌 운영 계획\nCI & CD 시스템 구축', '강좌 운영 계획\nCI\n& CD 프로세스'):
+            self.assertIn(21, scoped_matches(matcher, {'syllabus_summary': text}))
+        for text in ('강사 소개\nCI & CD 엔지니어 경력', 'ASCII & CDF 파일 형식'):
+            self.assertNotIn(21, scoped_matches(matcher, {'syllabus_summary': text}))
+
     def setUp(self):
         self.matcher = SkillMatcher([
             {'skill_id': 5, 'name': 'ETL & 데이터 파이프라인'},

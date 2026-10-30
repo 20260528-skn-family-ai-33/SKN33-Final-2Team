@@ -1,0 +1,37 @@
+{
+  "format": 1,
+  "version": "synthetic-work-profile/v1",
+  "as_of": "2026-10-28",
+  "synthetic": true,
+  "plan_filename": "synthetic_profiles.v1.json",
+  "plan_sha256": "bfc173ec4b28eb18d250aa09510006636e2724ba20373129caa42db4ac58f8c4",
+  "location_status": "local_only_not_uploaded",
+  "location": null,
+  "employees": 100,
+  "protected_real_user_accounts": 5,
+  "roles": {
+    "ai": 10,
+    "data": 25,
+    "gis": 10,
+    "system": 25,
+    "security": 15,
+    "cloud": 15
+  },
+  "levels": {
+    "기초 실무": 35,
+    "독립 수행": 35,
+    "운영 개선": 30
+  },
+  "source": "Codex authored fictional scenarios; not human-submitted histories or verified credentials",
+  "backup": {
+    "bytes": 38244988,
+    "sha256": "9901802d42787958115899af5d2555d0169666173e0b11142fb54cb9cf7fc2e7",
+    "rows": 22404
+  },
+  "backup_filename": "growpath_profiles_20261028.dump",
+  "backup_includes_pending_issue26_migrations": [
+    "025_course_duration.sql",
+    "026_course_curriculum.sql"
+  ],
+  "schema_change_required_for_this_data_update": false
+}

@@ -114,7 +114,7 @@ function GoalSuggestions() {
         {items}
         {g.status === 'default' ? (
           <Note>
-            프로필에 본인 입력 정보(업무 설명·경험 요약·기술 스택)가 없어 판단 근거가 부족해요. AI 활용 업무 기본 후보를 보여 드려요. 프로필을 채우면 맞춤 후보를 다시
+            프로필에 본인 입력 정보(업무 설명·경험 요약·기술 스택·프로젝트)가 없어 판단 근거가 부족해요. AI 활용 업무 기본 후보를 보여 드려요. 프로필을 채우면 맞춤 후보를 다시
             만들어요.{' '}
             <button className="link" onClick={() => go(paths.me)}>
               <Icon name="user" />내 정보에서 채우기
@@ -137,7 +137,7 @@ function GoalSuggestions() {
           <Icon name="spark" />
           목표 후보
         </b>
-        <span className="small muted">{g && g.status === 'default' ? 'AI 활용 업무 기본 후보' : '내 정보가 바뀔 때 미리 만들어 둬요'}</span>
+        <span className="small muted">{g && g.status === 'default' ? 'AI 활용 업무 기본 후보' : '내 정보·인사 정보 변경 때 미리 준비해요'}</span>
         {tag}
       </div>
       {body}

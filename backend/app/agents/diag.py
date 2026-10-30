@@ -46,6 +46,7 @@ Q_SYS = """너는 GrowPath의 '진단 에이전트'다. 사용자의 목표, 업
 - 그래서 각 문항은 구체적인 라이브러리·도구·개념을 짚어 "~할 수 있다.", "~를 알고 있다."로 끝나는 서술문으로 쓴다. "~나요?" 같은 질문형으로 쓰지 않는다.
 - skill에는 그 문항이 확인하는 역량을 짧은 한국어 명사구로 쓴다.
 - projectSummary가 있으면 그 프로젝트를 하는 데 필요한 역량을 확인하는 문항을 목표 분야 영역에 넣는다.
+- profile의 업무 설명·projectExperience는 주제와 사례를 고르는 참고다. 프로젝트 경험을 현재 기획서로 대체하거나 이미 숙련한 것으로 단정하지 않는다.
 - domain에는 목표가 속한 분야를 짧은 한국어 명사구로 쓴다(예: "RAG·문서 검색", "운영 데이터 분석"). 로드맵 계획 에이전트에게 함께 넘긴다.
 
 [심화 질문 · 사용자가 고를 때만 푼다]
@@ -100,7 +101,8 @@ def _mock_questions(inp: dict) -> dict:
 def questions(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
     """자가 진단 문항 + 심화 질문(문항별 객관식·영역별 서술형). 심화 질문이 비면 deep None(자가 진단만 · 실패로 보지 않음)"""
     def api(_):
-        r = rt.llm_json(ctx, Q_SYS, {'goal': inp['goal'], 'projectFile': inp.get('project'), 'projectSummary': inp.get('projectSummary'), 'certPlan': inp.get('certPlan')})
+        r = rt.llm_json(ctx, Q_SYS, {'goal': inp['goal'], 'projectFile': inp.get('project'), 'projectSummary': inp.get('projectSummary'),
+                                   'certPlan': inp.get('certPlan'), 'profile': work_profile(ctx.me) or None})
         raw = [q for q in (r.get('questions') or []) if isinstance(q, dict) and q.get('text')][:16]
         qs = [{'id': f'q{k + 1}', 'area': str(q.get('area') or '기타')[:20], 'text': str(q['text'])[:140], 'skill': str(q.get('skill') or q['text'])[:40]}
               for k, q in enumerate(raw)]
@@ -146,7 +148,7 @@ A_SYS = """너는 GrowPath의 '진단 에이전트'다. 사전 점검 응답과 
 [입력]
 - answers: 문항(statement), 그 문항이 확인하는 역량(skill), 응답. 응답은 5점 척도(1 전혀 아님, 2 아님, 3 보통이다, 4 그렇다, 5 매우 그렇다)의 자기보고다.
 - details: 학습 선호와 기타 고려 사항. projectSummary: 업무 프로젝트 기획서 요약(있을 때). catalog: 등록 학습 자료.
-- profile: 직무, 담당 업무, 업무 설명, 기술 스택(있을 때). 목표에 맞는 업무 맥락(쓰는 기술, 맡은 시스템 종류)으로만 쓴다. 업무 설명에 목표와 다른 계획이 있으면 끌어오지 않는다. 업무 설명에만 나온 시스템·도구는 적용 대상으로 쓰지 않는다.
+- profile: 직무, 담당 업무, 업무 설명, 기술 스택, projectExperience(본인 입력의 프로젝트 경험, 있을 때). 목표에 맞는 업무 맥락과 사례로만 참고하며 프로젝트 경험을 현재 기획서나 숙련도 증빙으로 간주하지 않는다. 업무 설명에 목표와 다른 계획이 있으면 끌어오지 않는다. 업무 설명에만 나온 시스템·도구는 적용 대상으로 쓰지 않는다.
 - deepCheck(사용자가 심화 질문을 골랐을 때): items는 문항별 자기평가(self)와 같은 개념 객관식의 결과(question, chosen, result: 맞음/틀림/모름/답 안 함), essays는 영역별 서술형(id, area, question, points: 채점 핵심 요소, answer: 사용자 답)이다.
 
 [응답 해석]
@@ -181,7 +183,10 @@ def work_profile(me: dict | None) -> dict:
     if not me:
         return {}
     p = goal_input(me)['profile']
-    return {k: p[k] for k in PROFILE_KEYS if p.get(k)}
+    out = {k: p[k] for k in PROFILE_KEYS if p.get(k)}
+    if p.get('projects'):
+        out['projectExperience'] = [str(x)[:300] for x in p['projects'][:5]]
+    return out
 
 
 def _blank(v) -> bool:

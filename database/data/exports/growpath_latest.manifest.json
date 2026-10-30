@@ -1,11 +1,11 @@
 {
   "format": 1,
-  "created_at": "2026-10-27T06:02:45.800471+00:00",
+  "created_at": "2026-10-29T13:55:51.301423+00:00",
   "database": "growpath",
-  "server_version": "17.11",
+  "server_version": "17.10 (Debian 17.10-1.pgdg12+1)",
   "archive": "growpath_latest.dump",
-  "sha256": "be3648e42907cd566d9716354437665260ccb3c26041a0dcdcb20e13db643189",
-  "bytes": 36345626,
+  "sha256": "e27fb83895f4080cbf8838765de577c360007d6b95cc8c2cc0c92b9979dd3ea7",
+  "bytes": 38402877,
   "inventory": {
     "tables": {
       "growpath_legacy.agent_generations": 71,
@@ -15,7 +15,7 @@
       "growpath_legacy.roadmap_requests": 25,
       "growpath_legacy.test_mock_profiles": 39,
       "growpath_meta.catalog_api_sources": 2433,
-      "growpath_meta.schema_migrations": 24,
+      "growpath_meta.schema_migrations": 26,
       "knowledge.chunks": 442,
       "knowledge.documents": 4,
       "public.assessment_questions": 25,
@@ -28,11 +28,11 @@
       "public.courses": 2060,
       "public.departments": 14,
       "public.diagnostic_rounds": 2,
-      "public.employee_certifications": 96,
+      "public.employee_certifications": 10,
       "public.employee_education_records": 105,
-      "public.employee_input_profiles": 1,
-      "public.employee_recommended_prompts": 0,
-      "public.employee_skills": 299,
+      "public.employee_input_profiles": 103,
+      "public.employee_recommended_prompts": 315,
+      "public.employee_skills": 389,
       "public.employees": 105,
       "public.growth_reports": 1,
       "public.institutions": 1,
@@ -43,7 +43,7 @@
       "public.major_skills": 14,
       "public.majors": 7,
       "public.projects": 2,
-      "public.prompt_versions": 6,
+      "public.prompt_versions": 12,
       "public.roadmap_comments": 0,
       "public.roadmap_step_resources": 1,
       "public.roadmap_steps": 3,
@@ -444,6 +444,30 @@
       {
         "schema": "public",
         "table_name": "courses",
+        "conname": "courses_curriculum_object",
+        "definition": "CHECK ((jsonb_typeof(curriculum) = 'object'::text))"
+      },
+      {
+        "schema": "public",
+        "table_name": "courses",
+        "conname": "courses_duration_kind_valid",
+        "definition": "CHECK (((((duration_seconds IS NULL) AND (duration_kind IS NULL)) OR ((duration_seconds IS NOT NULL) AND (duration_kind = ANY (ARRAY['video'::text, 'learning'::text])))) IS TRUE))"
+      },
+      {
+        "schema": "public",
+        "table_name": "courses",
+        "conname": "courses_duration_provenance_object",
+        "definition": "CHECK ((jsonb_typeof(duration_provenance) = 'object'::text))"
+      },
+      {
+        "schema": "public",
+        "table_name": "courses",
+        "conname": "courses_duration_seconds_positive",
+        "definition": "CHECK (((duration_seconds IS NULL) OR (duration_seconds > 0)))"
+      },
+      {
+        "schema": "public",
+        "table_name": "courses",
         "conname": "courses_enrollment_order_check",
         "definition": "CHECK (((enrollment_start IS NULL) OR (enrollment_end IS NULL) OR (enrollment_start <= enrollment_end)))"
       },
@@ -458,6 +482,12 @@
         "table_name": "courses",
         "conname": "courses_enrollment_values_check",
         "definition": "CHECK ((((enrollment_period_type = 'scheduled'::text) AND (enrollment_start IS NOT NULL) AND (enrollment_end IS NOT NULL)) OR ((enrollment_period_type = 'unrestricted'::text) AND (enrollment_start IS NULL) AND (enrollment_end IS NULL)) OR (enrollment_period_type = 'unknown'::text)))"
+      },
+      {
+        "schema": "public",
+        "table_name": "courses",
+        "conname": "courses_estimated_duration_seconds_positive",
+        "definition": "CHECK (((estimated_duration_seconds IS NULL) OR (estimated_duration_seconds > 0)))"
       },
       {
         "schema": "public",
@@ -1487,5 +1517,657 @@
       }
     ]
   },
-  "scope": "All schemas, table data, vectors, functions, views and sequences in this database; cluster roles/passwords and external PDF/storage files are separate."
+  "scope": "All schemas and data, including app_ext. Server roles, external files and secrets are separate.",
+  "all_schema_table_fingerprints": {
+    "app_ext.activity_progress": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.admin_accounts": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.admin_uploads": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.agent_calls": {
+      "rows": 210,
+      "digest": "5f312933d7f4208b52fb9696181a4182"
+    },
+    "app_ext.cert_groups": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.comment_meta": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.employee_evaluations": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.employee_hr": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.employee_self_inputs": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.employee_transfers": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.goal_suggestion_meta": {
+      "rows": 315,
+      "digest": "7ba5f99e1e5d1acf5ef8220d0ee9a6a9"
+    },
+    "app_ext.goal_suggestion_runs": {
+      "rows": 105,
+      "digest": "23c28ab8df13c21499335255e955baf2"
+    },
+    "app_ext.jobs": {
+      "rows": 210,
+      "digest": "41a4bbb06de704cefd114b5cb293f0ea"
+    },
+    "app_ext.learning_docs": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.post_checks": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.rag_chunk_vectors": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.regulation_meta": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.regulation_uploads": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.report_meta": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.resource_meta": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.roadmap_meta": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.roadmap_revisions": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.roadmap_versions": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.sessions": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "app_ext.user_settings": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "growpath_legacy.agent_generations": {
+      "rows": 71,
+      "digest": "73d7885ad6d02cca4ae04149ce2860c1"
+    },
+    "growpath_legacy.agent_selections": {
+      "rows": 20,
+      "digest": "759e9e796b6468670a0857ba46accbf0"
+    },
+    "growpath_legacy.finetuning_datasets": {
+      "rows": 2,
+      "digest": "52a51f591c3278e8db4019546b227a2f"
+    },
+    "growpath_legacy.preference_pairs": {
+      "rows": 4,
+      "digest": "ca03706c8aa7108e7eb18a46398a08e2"
+    },
+    "growpath_legacy.roadmap_requests": {
+      "rows": 25,
+      "digest": "bc2382f90bb4eb0913344535a0e5b5db"
+    },
+    "growpath_legacy.test_mock_profiles": {
+      "rows": 39,
+      "digest": "6c2e47ef65e79198e513e89959d1f21c"
+    },
+    "growpath_meta.catalog_api_sources": {
+      "rows": 2433,
+      "digest": "2bd4d48c6120408f8b780acff643a37f"
+    },
+    "growpath_meta.schema_migrations": {
+      "rows": 26,
+      "digest": "e35f08e40d0b181609659eb835966ad3"
+    },
+    "knowledge.chunks": {
+      "rows": 442,
+      "digest": "2e92529d2e71386c55763cc14be82344"
+    },
+    "knowledge.documents": {
+      "rows": 4,
+      "digest": "addd8f25c94fb5a22e9edc547197777d"
+    },
+    "public.assessment_questions": {
+      "rows": 25,
+      "digest": "36abfc7d178f53000c63973e6d4f5201"
+    },
+    "public.assessment_responses": {
+      "rows": 25,
+      "digest": "6e90df4bc13a26089fe40e2c9780a5ed"
+    },
+    "public.book_skills": {
+      "rows": 506,
+      "digest": "91342628962126aeeb6490a870735551"
+    },
+    "public.books": {
+      "rows": 334,
+      "digest": "1b7fb323906485ec75a45007e73a3d7b"
+    },
+    "public.certification_skills": {
+      "rows": 43,
+      "digest": "e217c2bd0a1e979735d606f234991f11"
+    },
+    "public.certifications": {
+      "rows": 26,
+      "digest": "52008314919a0431a0599f86a4a0037b"
+    },
+    "public.course_skills": {
+      "rows": 3658,
+      "digest": "8485a83fcc72eafb5b215e4dbd448fe0"
+    },
+    "public.courses": {
+      "rows": 2060,
+      "digest": "b070441ff553117f2d21756fcda15225"
+    },
+    "public.departments": {
+      "rows": 14,
+      "digest": "b97a7e91d0efc49670d7e9267dad3a00"
+    },
+    "public.diagnostic_rounds": {
+      "rows": 2,
+      "digest": "f28aa65545c96e07dd86d8dbb5b7b7b4"
+    },
+    "public.employee_certifications": {
+      "rows": 10,
+      "digest": "8e5c5aff89f79f6a16d457d31051cd37"
+    },
+    "public.employee_education_records": {
+      "rows": 105,
+      "digest": "8aa2b9727bc1f30a52ccb096170e9e69"
+    },
+    "public.employee_input_profiles": {
+      "rows": 103,
+      "digest": "059eab6bcae832d6c082a928774eb903"
+    },
+    "public.employee_recommended_prompts": {
+      "rows": 315,
+      "digest": "995653d4590c8de5a66131916a1039f8"
+    },
+    "public.employee_skills": {
+      "rows": 389,
+      "digest": "34d32dc67bad1eb8c51aae3492098764"
+    },
+    "public.employees": {
+      "rows": 105,
+      "digest": "84dc4ad4106bc8d7e1d6ef2fee976fe5"
+    },
+    "public.growth_reports": {
+      "rows": 1,
+      "digest": "794db6711837a5ec3140512550173158"
+    },
+    "public.institutions": {
+      "rows": 1,
+      "digest": "a16dc924a6f61198b8dc16b342115a0f"
+    },
+    "public.job_grades": {
+      "rows": 5,
+      "digest": "463fd6c06d18bef1d94d85fa5840eb78"
+    },
+    "public.job_skills": {
+      "rows": 8,
+      "digest": "186ed4c1000d1098159c29fb0fd72500"
+    },
+    "public.jobs": {
+      "rows": 6,
+      "digest": "c8218eb7b08b53f2b5aae2f46296bda4"
+    },
+    "public.learning_resource_embeddings": {
+      "rows": 2469,
+      "digest": "98b763e1e297bbde84c5ebfc06b206fc"
+    },
+    "public.major_skills": {
+      "rows": 14,
+      "digest": "a3c38ff38889043afbe3d2f84f9053fc"
+    },
+    "public.majors": {
+      "rows": 7,
+      "digest": "723071e66051a534b296210cc73e2e19"
+    },
+    "public.projects": {
+      "rows": 2,
+      "digest": "025b70ceaa26c79a7a53a5b0b55fc790"
+    },
+    "public.prompt_versions": {
+      "rows": 12,
+      "digest": "8dceadbd06244a27366347bee0b613bf"
+    },
+    "public.roadmap_comments": {
+      "rows": 0,
+      "digest": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "public.roadmap_step_resources": {
+      "rows": 1,
+      "digest": "3951987c4707d17b3f575f4814a18f6e"
+    },
+    "public.roadmap_steps": {
+      "rows": 3,
+      "digest": "6cb67e3c0eb2b96eab2cee7083f7b745"
+    },
+    "public.roadmaps": {
+      "rows": 1,
+      "digest": "36d2b35209afbe2d0ecd05bb63e76cd7"
+    },
+    "public.skill_tags": {
+      "rows": 36,
+      "digest": "3538047c2cb517bc2d0d57991d069f3f"
+    },
+    "regulations.evaluation_item_definitions": {
+      "rows": 70,
+      "digest": "77a0470b31541240f9031f5effd00fa9"
+    },
+    "regulations.evaluation_result_schemas": {
+      "rows": 11,
+      "digest": "00eac58762d6ae56548de29d3299a01b"
+    },
+    "regulations.evaluation_schema_sources": {
+      "rows": 172,
+      "digest": "99936ce644205cfde0360530088ab404"
+    },
+    "regulations.rag_chunk_embeddings": {
+      "rows": 1410,
+      "digest": "43101f71b39289ecdf2025a45e83ac65"
+    },
+    "regulations.rag_chunk_sources": {
+      "rows": 1774,
+      "digest": "3432e3a4ba2bac7f8252094f72bb48d7"
+    },
+    "regulations.rag_chunks": {
+      "rows": 1552,
+      "digest": "0b2e8be88347c333844f818dcf1ca133"
+    },
+    "regulations.regulation_files": {
+      "rows": 28,
+      "digest": "d1ce48a85fbc610b60318add132f875c"
+    },
+    "regulations.regulation_nodes": {
+      "rows": 3451,
+      "digest": "e8234fde21c534274284937f08e15293"
+    },
+    "regulations.regulation_references": {
+      "rows": 462,
+      "digest": "a3036d80cc851b4c5e6e932a1122d892"
+    },
+    "regulations.regulation_scopes": {
+      "rows": 389,
+      "digest": "7d9fe7395bcd2f8952a1cd88975dc1b5"
+    },
+    "regulations.regulation_versions": {
+      "rows": 28,
+      "digest": "680deafdf0bfb021572f2cf5869aaddb"
+    },
+    "regulations.regulations": {
+      "rows": 28,
+      "digest": "7d593aac2bfbc076a640306b05c5d4f2"
+    }
+  },
+  "all_schema_table_count": 78,
+  "all_schema_row_count": 23567,
+  "verification": {
+    "all_table_fingerprints_match": true,
+    "all_table_counts": 78,
+    "all_rows": 23567,
+    "canonical_inventory_matches": true,
+    "schema_hash_matches": true,
+    "sequences_match": true,
+    "vector_self_distance_checks": {
+      "public.learning_resource_embeddings": true,
+      "regulations.rag_chunk_embeddings": true,
+      "knowledge.chunks": true
+    },
+    "idempotent_curriculum_backfill": {
+      "courses": 2060,
+      "changed_count": 0,
+      "coverage": {
+        "public_outline": 2045,
+        "partial_outline": 9,
+        "description_only": 6
+      },
+      "applied": false,
+      "embedding_api_called": false,
+      "vector_inputs_changed": false
+    },
+    "vector_status": {
+      "embedding_model": "text-embedding-3-small",
+      "dimensions": 1536,
+      "vector_table_exists": true,
+      "resources": {
+        "skills": {
+          "source_count": 36,
+          "current_vectors": 36,
+          "missing_or_stale_vectors": 0
+        },
+        "courses": {
+          "source_count": 2046,
+          "current_vectors": 2046,
+          "missing_or_stale_vectors": 0
+        },
+        "certifications": {
+          "source_count": 23,
+          "current_vectors": 23,
+          "missing_or_stale_vectors": 0
+        },
+        "jobs": {
+          "source_count": 6,
+          "current_vectors": 6,
+          "missing_or_stale_vectors": 0
+        },
+        "majors": {
+          "source_count": 7,
+          "current_vectors": 7,
+          "missing_or_stale_vectors": 0
+        },
+        "books": {
+          "source_count": 308,
+          "current_vectors": 308,
+          "missing_or_stale_vectors": 0
+        }
+      },
+      "orphan_vectors_ignored": 43,
+      "database_changes": false,
+      "embedding_api_called": false
+    }
+  },
+  "source_release": {
+    "sha256": "bb98e1801b8cb67513d19415031bfd8fd38dbc5554b2c073b01fbc975b9e3750",
+    "bytes": 38384275,
+    "code_main": "8c8041cb11c79650d0aea33a32018e8cf3b542b9",
+    "pr29_head": "37b6e1c0368a9989bb5d178793990e89043946a3",
+    "additional_code_changes": "PR29 working tree; pending explicit commit/push approval"
+  },
+  "data_changes": {
+    "skill_correction": {
+      "status": "applied",
+      "courses_changed": 1,
+      "embedded_count": 1,
+      "changed_tables": [
+        "public.course_skills",
+        "public.learning_resource_embeddings"
+      ],
+      "source_records_unchanged": true,
+      "all_eligible_vectors_current": true,
+      "original_ai_verdicts_unchanged": true
+    },
+    "curriculum": {
+      "courses": 2060,
+      "changed_count": 55,
+      "coverage": {
+        "public_outline": 2045,
+        "partial_outline": 9,
+        "description_only": 6
+      },
+      "applied": true,
+      "embedding_api_called": false,
+      "vector_inputs_changed": false
+    },
+    "curriculum_repeat": {
+      "courses": 2060,
+      "changed_count": 0,
+      "coverage": {
+        "public_outline": 2045,
+        "partial_outline": 9,
+        "description_only": 6
+      },
+      "applied": false,
+      "embedding_api_called": false,
+      "vector_inputs_changed": false
+    },
+    "changed_tables": [
+      "public.course_skills",
+      "public.courses",
+      "public.learning_resource_embeddings"
+    ],
+    "all_78_table_counts_unchanged": true,
+    "employees_candidates_and_private_data_unchanged": true
+  },
+  "paid_embedding": {
+    "approved_scope": "KMOOC_7204 only; maximum one API call; zero retries",
+    "model": "text-embedding-3-small",
+    "input_utf8_bytes": 3520,
+    "input_sha256": "a31f7131ef3a70fb54d30e05cb49bf8841bc6cf50823e6f607d195ee41ee1adc",
+    "started_at": "2026-10-29T13:53:59.840111+00:00",
+    "calls": 1,
+    "automatic_retries": 0,
+    "status": "succeeded",
+    "usage": {
+      "prompt_tokens": 1567,
+      "total_tokens": 1567
+    },
+    "finished_at": "2026-10-29T13:54:03.285586+00:00"
+  },
+  "quality_review": {
+    "format": 1,
+    "checked_on": "2026-10-29",
+    "scope": "Final shared DB, PR29 + main PR41 integration; AI audit, human review pending",
+    "courses": {
+      "total": 2060,
+      "checked_fields": [
+        "source/title/provider/description",
+        "URL shape and duplicates",
+        "negative/unknown price and app cache consistency",
+        "enrollment date order",
+        "positive confirmed/estimated duration",
+        "skill links",
+        "embedding currentness",
+        "curriculum provenance and item preservation"
+      ],
+      "corrected_course_count": 55,
+      "corrected_outline_items": 1091,
+      "actual_titles_recovered": 1075,
+      "explicit_missing_titles_added": 16,
+      "new_partial_course_ids": [
+        "KMOOC_19727",
+        "KMOOC_19991",
+        "KMOOC_19993",
+        "KMOOC_20832",
+        "KMOOC_21083",
+        "KMOOC_21085"
+      ],
+      "coverage": {
+        "public_outline": 2045,
+        "partial_outline": 9,
+        "description_only": 6
+      },
+      "price_unknown_preserved": 83,
+      "confirmed_time_count": 1730,
+      "estimated_time_count": 330,
+      "original_fields_and_source_hashes_preserved": true,
+      "detail_response_courses_checked": 55,
+      "live_website_revalidation": false
+    },
+    "employees": {
+      "total": 105,
+      "synthetic": 100,
+      "real": 5,
+      "structural_checks": {
+        "total": 105,
+        "synthetic": 100,
+        "synthetic_missing_context": 0,
+        "invalid_development_years": 0,
+        "invalid_employment_dates": 0
+      },
+      "invalid_education_dates": 0,
+      "all_personal_data_and_candidates_unchanged": true
+    },
+    "goals": {
+      "employees": 105,
+      "candidates": 315,
+      "structural_issues": [],
+      "cross_employee_duplicates": 0,
+      "lengths": {
+        "min": 39,
+        "max": 93
+      },
+      "jobs": {
+        "시스템소프트웨어개발자": 26,
+        "해당 없음": 1,
+        "정보보호전문가": 16,
+        "인공지능 엔지니어": 11,
+        "클라우드 시스템 엔지니어": 16,
+        "데이터베이스관리자": 25,
+        "지리정보시스템기사": 10
+      },
+      "very_short_experience": [
+        2
+      ],
+      "semantic_review_accounts": 23,
+      "semantic_review_candidates": 69,
+      "selection": "6 synthetic job families: lowest/highest development years and middle account, plus all 5 real accounts",
+      "human_review": false,
+      "assessment": "표본에서 심각한 직무 불일치·고급 경험 날조를 찾지 못함. 가상 프로필은 직무별 공통 틀을 사용해 표현 다양성이 제한됨. 실제 직원 이력이나 운영 모델 품질 평가를 뜻하지 않음."
+    },
+    "cache": {
+      "employees": 105,
+      "candidates": 315,
+      "all_original_generation_inputs_equal": true,
+      "all_ready_and_not_stale": true,
+      "generation_jobs_requested": 0,
+      "model_api_calls": 0,
+      "track_prompt_reads": 6,
+      "all_78_tables_unchanged": true
+    },
+    "skill_correction_plan": {
+      "review_method": "Codex source/curriculum review; human semantic review pending",
+      "corrections": [
+        {
+          "course_id": "KMOOC_7204",
+          "title": "오픈소스를 이용한 DevOps 구축 및 활용",
+          "syllabus_sha256": "5faed7b9f3cd31fe9ea573f78735e8d585a6a623ae3fd5036f5a0e364bda928c",
+          "before_skill_ids": [
+            33
+          ],
+          "after_skill_ids": [
+            21
+          ],
+          "reason": "강사 경력의 시스템 보안 문구가 학습 주제로 잘못 연결됨. 실제 목차의 CI/CD 구축·활용으로 연결한다.",
+          "evidence": [
+            "WEEK 11: CI & CD / 프로세스·시스템",
+            "WEEK 12: CI & CD 시스템 구축·환경설정",
+            "WEEK 13: SW 버전 관리 / Jenkins 시스템 연동 설정",
+            "WEEK 14: Periodic Build 설정 / SW Package 관리"
+          ],
+          "source_url": "https://www.kmooc.kr/view/course/detail/7204"
+        }
+      ]
+    },
+    "embedding": {
+      "approved_scope": "KMOOC_7204 only; maximum one API call; zero retries",
+      "model": "text-embedding-3-small",
+      "input_utf8_bytes": 3520,
+      "input_sha256": "a31f7131ef3a70fb54d30e05cb49bf8841bc6cf50823e6f607d195ee41ee1adc",
+      "started_at": "2026-10-29T13:53:59.840111+00:00",
+      "calls": 1,
+      "automatic_retries": 0,
+      "status": "succeeded",
+      "usage": {
+        "prompt_tokens": 1567,
+        "total_tokens": 1567
+      },
+      "finished_at": "2026-10-29T13:54:03.285586+00:00"
+    },
+    "remaining": [
+      "가격 미확인 83건은 미확인으로 유지; 무료로 추정하지 않음.",
+      "목차는 6강좌 소개만 제공, 9강좌 일부 제목 미제공; 원문에 없는 제목을 생성하지 않음.",
+      "330강좌 계획 시간은 추정치; 실제 영상 길이로 간주하지 않음.",
+      "가상 직원 프로필은 공통 문장 틀의 한계가 있으며 사람 검토가 남음.",
+      "Free Track 유료/미확인 자격증 데모 실패와 확정 전 가격 재검사 문제는 기존 코드 후속 작업."
+    ],
+    "track_prompts": [
+      {
+        "agent_id": "agent_certified",
+        "version_num": 3,
+        "sha256": "23cd7012df7d7c258cdaf48869582a862e0f83817fd7c171ad0da202b69fb1e7"
+      },
+      {
+        "agent_id": "agent_fasttrack",
+        "version_num": 4,
+        "sha256": "1630d90d393f41df8a3562cc10bc59193b810909a8c051828a0e255cb8904252"
+      },
+      {
+        "agent_id": "agent_plan_draft",
+        "version_num": 1,
+        "sha256": "edf99a7af3333583fdaddb7ee60e38ea9211ada881038e6effc477d33790c0b7"
+      },
+      {
+        "agent_id": "agent_plan_refine",
+        "version_num": 1,
+        "sha256": "e4274e334703552f32793d2711e43f2973d7b10853c92a09a098502c8d90ee9c"
+      },
+      {
+        "agent_id": "agent_practical",
+        "version_num": 3,
+        "sha256": "34eb6cdd5d1aeb86b9b77c39660b6d3dd96224b707c6923062812775ae08d448"
+      }
+    ]
+  },
+  "application_verification": {
+    "backend_unit_passed": 33,
+    "data_change_targeted_unit_passed": 30,
+    "new_dump_actual_api_smoke_passed": 35,
+    "catalog_details_checked": 55,
+    "cached_employee_inputs_checked": 105,
+    "known_free_track_issues_reproduced": 2,
+    "external_generation_calls": 0,
+    "browser_ui_verified": false,
+    "human_review": "pending",
+    "code_sha256": {
+      "backend/app/services/profile.py": "c54ecc93136c030cc7321906c0f86cb9faf89fe4e97b7de5a7d24efc3a3417d2",
+      "database/src/database/course_curriculum.py": "00c8531feacf9e4a8094face7ac7a677635465bfa7762dad8b90e82c38aa5812",
+      "database/src/shared/skill_matching.py": "2148be6dd4294d210b611dc48150cff3e6db11f02130be12e7c1dbd8f2df96ec"
+    },
+    "database_unit": {
+      "collected": 242,
+      "started_including_skips": 231,
+      "executed": 226,
+      "passed": 226,
+      "skipped": 5,
+      "failures": 0,
+      "errors": 0,
+      "successful": true
+    },
+    "initial_setup_notes": [
+      "Backend test temporary directory was changed from sandbox temp to workspace after a PermissionError; final 33 tests passed.",
+      "Skill update stopped before API because CI & CD was not matched; after the code correction exactly one approved embedding request succeeded."
+    ]
+  },
+  "publication": {
+    "dump_url": "https://drive.google.com/file/d/1YBhxTVQjNfm53FbcLJnO7SKi-hsycxz4/view",
+    "manifest_url": "https://drive.google.com/file/d/1iUVAugkFpXHNeO3IlWhFkol-6oID691C/view",
+    "previous_backup_folder_url": "https://drive.google.com/drive/folders/1wW9sey0PHMX2iSfNkNqu4RrTr0g0HjiZ",
+    "previous_dump_id": "175wels3fnOs9VTV7mqRuL7cp7-7XBHYS",
+    "previous_manifest_id": "1kfCRwZwjH2cNlbZDIwhiAplO1QA-ErJ9",
+    "previous_download_hashes_verified": true,
+    "version": "2026-10-29-final-quality-track-prompts-goals315"
+  }
 }

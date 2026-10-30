@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import hashlib
 
 from .. import db
 from ..errors import ApiError
@@ -31,7 +32,8 @@ def _rows() -> list[dict]:
             coalesce(d.name, e.department) AS dept, pd.name AS parent_dept,
             coalesce(g.name, e.grade) AS grade, coalesce(j.title, e.job_title) AS job,
             {EMP_GROUP_SQL} AS employee_group, coalesce(e.hire_date, h.hire_date) AS hire_date, h.position, h.job_family, h.task,
-            h.employment_status, h.account_status, h.grade_since, coalesce(e.department_start_date, h.valid_from) AS valid_from, h.change_reason
+            h.employment_status, h.account_status, h.grade_since, coalesce(e.department_start_date, h.valid_from) AS valid_from, h.change_reason,
+            e.planned_project_description
         FROM public.employees e
         LEFT JOIN public.departments d ON d.department_id = e.department_id
         LEFT JOIN public.departments pd ON pd.department_id = d.parent_department_id
@@ -66,7 +68,7 @@ def member_ids(employee_id: int) -> set[int]:
 # ── 본인 입력 (2026-10-27 사용자 결정: 팀 최신 DB 기준) ──
 # 값은 팀 직원 입력 표에 둔다(팀 database/src/database/employee_form.py 와 같은 표·열): 경험 요약·개발 경력·기술·프로젝트·교육은
 # public.employee_input_profiles, 자격은 public.employee_certifications(팀 자격표에 있는 것) + employees.unlisted_certifications(없는 것).
-# 팀 표에 자리가 없는 업무 설명·'없음 확인' 표시와, 되돌리기용 처음 팀 표 값(baseline)만 app_ext.employee_self_inputs 에 둔다.
+# 업무 설명도 employees.planned_project_description에 둔다. app_ext에는 처음 값과 입력 상태·되돌리기용 변경 해시만 둔다.
 def _split(v: str | None) -> list[str]:
     return [x.strip() for x in (v or '').split('\n') if x.strip()]
 
@@ -81,22 +83,25 @@ def _team_state(t: db.Tx, employee_id: int) -> dict:
                  FROM public.employee_input_profiles WHERE employee_id = :e""", e=employee_id)
     if p and p['development_years'] is not None:
         p = dict(p, development_years=float(p['development_years']))
+    employee = t.one('SELECT unlisted_certifications, planned_project_description FROM public.employees WHERE employee_id = :e', e=employee_id) or {}
     return {'profile': dict(p) if p else None,
             'certIds': [r['certification_id'] for r in t.all('SELECT certification_id FROM public.employee_certifications WHERE employee_id = :e ORDER BY 1', e=employee_id)],
-            'unlisted': t.val('SELECT unlisted_certifications FROM public.employees WHERE employee_id = :e', e=employee_id)}
+            'unlisted': employee.get('unlisted_certifications'), 'workDesc': employee.get('planned_project_description')}
 
 
 def _team_values(t: db.Tx, employee_id: int, st: dict) -> dict:
     p = st['profile'] or {}
-    certs = [r['title'] for r in t.all("""SELECT c.title FROM public.employee_certifications ec JOIN public.certifications c ON c.cert_id = ec.certification_id
-                                         WHERE ec.employee_id = :e ORDER BY c.title""", e=employee_id)] + _split(st['unlisted'])
+    # DB 복원 환경의 collation이 달라도 추천 입력 해시가 같도록 마스터 목록은 Python에서 정렬한다.
+    # 직접 입력한 여러 줄의 순서는 그대로 보존한다.
+    certs = sorted(r['title'] for r in t.all("""SELECT title FROM public.certifications
+                                         WHERE cert_id = ANY(CAST(:ids AS integer[]))""", ids=st['certIds'])) + _split(st['unlisted'])
     if st['profile'] is None:
         # 본인 입력 전에는 사내 DB 의 보유 스킬을 사용 기술 처음 값으로 보여 준다
-        tech = [r['name'] for r in t.all("""SELECT s.name FROM public.employee_skills es JOIN public.skill_tags s USING (skill_id)
-                                            WHERE es.employee_id = :e ORDER BY s.name""", e=employee_id)]
+        tech = sorted(r['name'] for r in t.all("""SELECT s.name FROM public.employee_skills es JOIN public.skill_tags s USING (skill_id)
+                                            WHERE es.employee_id = :e""", e=employee_id))
     else:
         tech = _split(p.get('technology_experience'))
-    return {'expSummary': p.get('experience_summary'), 'devYears': p.get('development_years'), 'tech': tech, 'certs': certs,
+    return {'workDesc': st.get('workDesc'), 'expSummary': p.get('experience_summary'), 'devYears': p.get('development_years'), 'tech': tech, 'certs': certs,
             'learning': _split(p.get('learning_history')), 'projects': _split(p.get('project_experience'))}
 
 
@@ -111,9 +116,15 @@ def _write_profile(t: db.Tx, employee_id: int, p: dict) -> None:
 
 
 def _write_team(t: db.Tx, employee_id: int, v: dict) -> None:
-    _write_profile(t, employee_id, {'experience_summary': v['expSummary'], 'development_years': None if v['devYears'] is None else round(v['devYears'], 2),
-                                    'technology_experience': _join(v['tech']), 'project_experience': _join(v['projects']),
-                                    'learning_history': _join(v['learning'])})
+    current = _team_values(t, employee_id, _team_state(t, employee_id))
+    # 업무 설명만 고칠 때 빈 프로필 행을 만들거나 스킬 기본 표시를 덮지 않는다.
+    if any(v[k] != current[k] for k in ('expSummary', 'devYears', 'tech', 'projects', 'learning')):
+        _write_profile(t, employee_id, {'experience_summary': v['expSummary'], 'development_years': None if v['devYears'] is None else round(v['devYears'], 2),
+                                        'technology_experience': _join(v['tech']), 'project_experience': _join(v['projects']),
+                                        'learning_history': _join(v['learning'])})
+    _write_work_desc(t, employee_id, v['workDesc'])
+    if v['certs'] == current['certs']:
+        return
     # 자격: 팀 자격표 이름과 같으면 연결하고, 없는 자격은 목록 밖 자격 글자로 둔다('SQLD (2023)'처럼 괄호 앞 이름으로 찾음)
     ids = {r['title'].casefold(): r['cert_id'] for r in t.all('SELECT cert_id, title FROM public.certifications')}
     linked: list[int] = []
@@ -125,6 +136,25 @@ def _write_team(t: db.Tx, employee_id: int, v: dict) -> None:
         elif not cid:
             unlisted.append(c)
     _write_certs(t, employee_id, linked, _join(unlisted))
+
+
+def _work_hash(value: str | None) -> str:
+    return hashlib.sha256((value or '').encode('utf-8')).hexdigest()
+
+
+def _write_work_desc(t: db.Tx, employee_id: int, value: str | None) -> None:
+    value = (value or '').strip() or None
+    t.run('''UPDATE public.employees SET planned_project_description = :w, updated_at = now()
+             WHERE employee_id = :e AND planned_project_description IS DISTINCT FROM :w''', w=value, e=employee_id)
+
+
+def _work_baseline(base: dict, edited: dict, current: dict) -> dict:
+    """본인이 고치지 않았거나 이후 DB에서 갱신한 설명은 되돌리기로 덮지 않는다."""
+    base = dict(base)
+    owned = edited.get('workDescHash')
+    if not owned or owned != _work_hash(current.get('workDesc')):
+        base['workDesc'] = current.get('workDesc')
+    return base
 
 
 def _write_certs(t: db.Tx, employee_id: int, cert_ids: list[int], unlisted: str | None) -> None:
@@ -141,6 +171,8 @@ def _restore_team(t: db.Tx, employee_id: int, st: dict) -> None:
     else:
         _write_profile(t, employee_id, p)
     _write_certs(t, employee_id, list(st.get('certIds') or []), st.get('unlisted'))
+    if 'workDesc' in st:
+        _write_work_desc(t, employee_id, st['workDesc'])
 
 
 def _self_of(employee_id: int) -> tuple[dict, bool, datetime | None]:
@@ -151,7 +183,9 @@ def _self_of(employee_id: int) -> tuple[dict, bool, datetime | None]:
     extra = x.get('edited') or {}
     status = {k: 'reported' if vals[k] else 'unprovided' for k in LISTS}
     status.update({k: v for k, v in (extra.get('inputStatus') or {}).items() if v == 'none_confirmed' and not vals.get(k)})
-    src = {**vals, 'workDesc': extra.get('workDesc'), 'expStatus': 'reported' if vals['expSummary'] else 'unprovided', 'inputStatus': status}
+    # 구판 입력은 명시적 저장/이관 전까지 읽어 손실을 막는다. 새 저장은 팀 열만 쓴다.
+    wd = extra['workDesc'] if 'workDesc' in extra else vals['workDesc']
+    src = {**vals, 'workDesc': wd, 'expStatus': 'reported' if vals['expSummary'] else 'unprovided', 'inputStatus': status}
     src['present'] = bool(src['workDesc'] or vals['expSummary'] or vals['devYears'] is not None or any(vals[k] for k in LISTS))
     return src, x.get('edited_at') is not None, x.get('edited_at')
 
@@ -221,7 +255,7 @@ def spec(v: dict) -> dict:
 
 
 def save_self(employee_id: int, body: dict) -> None:
-    """본인 입력 저장(API-06). 하나라도 적으면 업무 설명 필수(사내 DB 규칙). 사내 DB 값과 같으면 '직접 고침'으로 두지 않는다"""
+    """본인 입력을 팀 표에 저장한다. 업무 설명과 프로젝트는 각각 선택이며 처음 값은 보존한다."""
     wd, ex = str(body.get('workDesc') or '').strip(), str(body.get('expSummary') or '').strip()
     yrs = body.get('devYears')
     try:
@@ -232,33 +266,40 @@ def save_self(employee_id: int, body: dict) -> None:
         raise ApiError(422, 'DEV_YEARS_RANGE', '개발 경험은 0~50년 사이로 적거나 비워 주세요.')
     lists = {k: [str(x).strip() for x in body.get(k) or [] if str(x).strip()][:20] for k in LISTS}
     none = body.get('noneConfirmed') or {}
-    anything = wd or ex or yrs is not None or any(lists[k] or none.get(k) for k in LISTS)
-    if anything and not wd:
-        raise ApiError(422, 'WORK_DESC_REQUIRED', '업무 설명을 적어 주세요. 본인 입력 정보를 저장할 때 업무 설명은 꼭 있어야 해요.')
+    if len(wd) > 500:
+        raise ApiError(422, 'WORK_DESC_LENGTH', '업무 설명은 500자 이내로 적어 주세요.')
     st = lambda k: 'reported' if lists[k] else 'none_confirmed' if none.get(k) else 'unprovided'  # noqa: E731
-    new = {'expSummary': ex or None, 'devYears': yrs, **lists}
-    extra = {'workDesc': wd or None, 'inputStatus': {k: st(k) for k in LISTS}}
+    new = {'workDesc': wd or None, 'expSummary': ex or None, 'devYears': yrs, **lists}
+    extra = {'inputStatus': {k: st(k) for k in LISTS}}
     with db.tx() as t:
-        row = t.one('SELECT baseline FROM app_ext.employee_self_inputs WHERE employee_id = :e', e=employee_id)
+        t.val('SELECT employee_id FROM public.employees WHERE employee_id = :e FOR UPDATE', e=employee_id)
+        row = t.one('SELECT baseline, edited FROM app_ext.employee_self_inputs WHERE employee_id = :e', e=employee_id)
         # 처음 고칠 때의 팀 표 값을 되돌리기용으로 남긴다(사내 DB 값으로 되돌리기)
-        base = row['baseline'] if row and row['baseline'] else _team_state(t, employee_id)
-        _write_team(t, employee_id, new)
-        if _team_state(t, employee_id) == base and not wd and not any(none.get(k) for k in LISTS):
-            # 처음 값과 같아졌고 팀 표 밖 값도 없으면 '직접 고침'이 아니다
-            _restore_team(t, employee_id, base)
+        current = _team_state(t, employee_id)
+        base = _work_baseline(row['baseline'], row.get('edited') or {}, current) if row and row['baseline'] else current
+        if new == _team_values(t, employee_id, base) and not any(none.get(k) for k in LISTS):
+            if current != base:
+                _restore_team(t, employee_id, base)
             t.run('DELETE FROM app_ext.employee_self_inputs WHERE employee_id = :e', e=employee_id)
             return
+        if new != _team_values(t, employee_id, current):
+            _write_team(t, employee_id, new)
+        if new['workDesc'] != base.get('workDesc'):
+            # 값 사본 대신 해시로 본인 변경 여부만 기록한다. 관리자 후속 갱신은 보존한다.
+            extra['workDescHash'] = _work_hash(new['workDesc'])
         t.run("""INSERT INTO app_ext.employee_self_inputs(employee_id, baseline, edited, edited_at) VALUES(:e, :b, :v, now())
                  ON CONFLICT (employee_id) DO UPDATE SET baseline = EXCLUDED.baseline, edited = EXCLUDED.edited, edited_at = now()""",
               e=employee_id, b=db.J(base), v=db.J(extra))
 
 
 def revert_self(employee_id: int) -> None:
-    """사내 DB 값으로 되돌리기: 처음 고치기 전의 팀 표 값으로 되돌리고 팀 표 밖 값(업무 설명 등)도 지운다"""
+    """처음 본인 입력을 복원한다. 구판 사본과 이후 관리자 변경의 업무 설명은 보존한다."""
     with db.tx() as t:
-        row = t.one('SELECT baseline FROM app_ext.employee_self_inputs WHERE employee_id = :e', e=employee_id)
+        t.val('SELECT employee_id FROM public.employees WHERE employee_id = :e FOR UPDATE', e=employee_id)
+        row = t.one('SELECT baseline, edited FROM app_ext.employee_self_inputs WHERE employee_id = :e', e=employee_id)
         if row and row['baseline']:
-            _restore_team(t, employee_id, row['baseline'])
+            base = _work_baseline(row['baseline'], row.get('edited') or {}, _team_state(t, employee_id))
+            _restore_team(t, employee_id, base)
         t.run('DELETE FROM app_ext.employee_self_inputs WHERE employee_id = :e', e=employee_id)
 
 

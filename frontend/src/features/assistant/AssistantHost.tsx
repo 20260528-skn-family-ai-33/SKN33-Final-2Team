@@ -131,7 +131,7 @@ function RegCard({ a }: { a: AssistantAnswer }) {
           규정 에이전트 <span className="tag warn">등록된 규정에서 확인 불가</span>
         </div>
         <p className="sum">{summary || `등록된 ${setLabel()}에 이 내용이 명시돼 있지 않아 답하지 않아요.`}</p>
-        <p>인사 제도에 관한 내용은 인사 담당 부서(인재경영실 · 가상)에 문의해 주세요.</p>
+        <p>인사 제도에 관한 내용은 인사 담당 부서(인재경영실)에 문의해 주세요.</p>
         <p className="src">등록된 규정 원문에 있는 내용에만 답해요. 짐작이나 다른 기관 사례로 답하지 않아요.</p>
       </div>
     );
