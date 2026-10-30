@@ -157,6 +157,11 @@ def build_handoff(d: dict, profile: dict | None = None) -> dict:
     if deep_on(d) and a.get('deep'):
         # 심화 질문 결과 요약(10/23): 개념별 자기평가·객관식 결과, 영역별 서술형 판단, 자기평가와 다른 개념
         h['deepCheck'] = DC.handoff_summary(d['quiz']['questions'], d['answers'], d['quiz']['deep'], a['deep']['grade'], a['deep']['judge'], DG.ans, DG.skill_label)
+    from .. import track_policy
+    skills = catalog.roadmap_skills([h['goal'], h.get('projectSummary') or ''] + h['focus'] + h['gaps'])
+    if skills:
+        h['skillNames'] = skills
+    h['trackPolicyVersion'] = track_policy.VERSION
     h['key'] = hashlib.sha1(json.dumps(h, ensure_ascii=False, sort_keys=True).encode('utf-8')).hexdigest()[:16]
     return h
 

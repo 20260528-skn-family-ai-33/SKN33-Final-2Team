@@ -70,6 +70,7 @@ class Settings:
     openai_reasoning_levels: tuple[str, ...]  # 모델이 받는 reasoning_effort 단계(.env · 비면 기본 모델만 코드 값). 비면 화면에서 고르지 못한다
     openai_reasoning: str | None  # reasoning_effort 기본값. None 이면 보내지 않아 모델 기본값을 따른다
     openai_model_reasoning: str | None  # 보내지 않을 때 모델이 쓰는 기본값(화면 '기본값 · 보통' 표시용). 모르는 모델이면 None
+    openai_roadmap_timeout: int  # 로드맵 생성·재생성·수정의 HTTP 대기 제한(초)
     # RunPod-Ollama
     ollama_url: str
     ollama_model: str  # 진단·로드맵
@@ -128,6 +129,12 @@ def load() -> Settings:
     openai_reasoning = _level('OPENAI_REASONING_EFFORT')
     if openai_reasoning and openai_levels and openai_reasoning not in openai_levels:
         raise ValueError(f'OPENAI_REASONING_EFFORT({openai_reasoning})가 OPENAI_REASONING_LEVELS 목록에 없어요')
+    try:
+        roadmap_timeout = int(env('OPENAI_ROADMAP_TIMEOUT', '180'))
+    except ValueError as exc:
+        raise ValueError('OPENAI_ROADMAP_TIMEOUT은 1~600 사이의 정수(초)여야 해요') from exc
+    if not 1 <= roadmap_timeout <= 600:
+        raise ValueError('OPENAI_ROADMAP_TIMEOUT은 1~600 사이의 정수(초)여야 해요')
     return Settings(
         database_url=env('DATABASE_URL') or _local_db_url(),
         db_timezone=env('GP5_DB_TIMEZONE', 'Asia/Seoul'),
@@ -149,6 +156,7 @@ def load() -> Settings:
         openai_reasoning_levels=openai_levels,
         openai_reasoning=openai_reasoning,
         openai_model_reasoning=OPENAI_DEFAULT_MODEL_REASONING if known else None,
+        openai_roadmap_timeout=roadmap_timeout,
         ollama_url=env('OLLAMA_BASE_URL').rstrip('/'),
         ollama_model=env('OLLAMA_MODEL', OLLAMA_TEAM_MODEL),
         ollama_model_regulation=env('OLLAMA_MODEL_REGULATION', OLLAMA_TEAM_REGULATION_MODEL),

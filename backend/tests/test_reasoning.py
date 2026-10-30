@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import dataclasses
 import os
+import socket
 import unittest
+import urllib.error
 from unittest.mock import patch
 
 os.environ.setdefault('DATABASE_URL', 'postgresql+psycopg://test:test@127.0.0.1:1/test')
@@ -71,13 +73,16 @@ class OllamaThinkTest(unittest.TestCase):
 class OpenAiReasoningTest(unittest.TestCase):
     def setUp(self):
         self.sent = []
+        self.timeouts = []
 
         def fake(path, payload, timeout=90):
             self.sent.append(payload)
+            self.timeouts.append(timeout)
             return {'choices': [{'message': {'content': '{}'}}], 'model': payload['model']}
 
         settings = dataclasses.replace(llm.S, openai_key='x', openai_model='gpt-6-luna', openai_vision='gpt-4o', openai_json=True,
-                                       openai_reasoning_levels=config.OPENAI_DEFAULT_LEVELS, openai_reasoning=None)
+                                       openai_reasoning_levels=config.OPENAI_DEFAULT_LEVELS, openai_reasoning=None,
+                                       openai_roadmap_timeout=180)
         for p in (patch.object(llm, 'openai', fake), patch.object(llm, 'S', settings)):
             p.start()
             self.addCleanup(p.stop)
@@ -98,10 +103,39 @@ class OpenAiReasoningTest(unittest.TestCase):
     def test_other_vision_model_gets_nothing(self):
         self.assertEqual(self.effort('low', role='vision'), '(없음)')
 
+    def test_only_roadmap_uses_configurable_timeout_and_keeps_user_effort(self):
+        for role, timeout in [('roadmap', 180), ('default', 90), ('regulation', 90), ('vision', 90)]:
+            with self.subTest(role=role):
+                self.assertEqual(self.effort('low', role=role), '(없음)' if role == 'vision' else 'low')
+                self.assertEqual(self.timeouts[-1], timeout)
+        with patch.object(llm, 'S', dataclasses.replace(llm.S, openai_roadmap_timeout=90)):
+            self.assertEqual(self.effort('high', role='roadmap'), 'high')
+            self.assertEqual(self.timeouts[-1], 90)
+
+    def test_roadmap_does_not_silently_lower_default_or_selected_effort(self):
+        self.assertEqual(self.effort(role='roadmap'), '(없음)')
+        with patch.object(llm, 'S', dataclasses.replace(llm.S, openai_reasoning='medium')):
+            self.assertEqual(self.effort(role='roadmap'), 'medium')
+            self.assertEqual(self.effort('high', role='roadmap'), 'high')
+
+
+class OpenAiTimeoutTest(unittest.TestCase):
+    def test_timeout_is_reported_without_retry_for_each_role(self):
+        settings = dataclasses.replace(llm.S, openai_key='test-key', openai_roadmap_timeout=180)
+        for role, timeout in [('roadmap', 180), ('default', 90)]:
+            for error in (socket.timeout(), urllib.error.URLError(socket.timeout())):
+                with self.subTest(role=role, error=type(error).__name__), patch.object(llm, 'S', settings), \
+                        patch.object(llm, '_http', side_effect=error) as http:
+                    with self.assertRaisesRegex(llm.LlmError, f'시간 초과: {timeout}초'):
+                        llm.chat('openai', MSGS, role=role)
+                    http.assert_called_once()
+                    self.assertEqual(http.call_args.args[-1], timeout)
+
 
 class SettingsTest(unittest.TestCase):
     def load(self, **env):
-        base = {'OPENAI_MODEL': '', 'OPENAI_REASONING_LEVELS': '', 'OPENAI_REASONING_EFFORT': '', 'OLLAMA_THINK': 'off'}
+        base = {'OPENAI_MODEL': '', 'OPENAI_REASONING_LEVELS': '', 'OPENAI_REASONING_EFFORT': '',
+                'OPENAI_ROADMAP_TIMEOUT': '', 'OLLAMA_THINK': 'off'}
         with patch.dict(os.environ, dict(base, **env)), patch.dict(config._FILE, {}, clear=True):
             return config.load()
 
@@ -119,6 +153,15 @@ class SettingsTest(unittest.TestCase):
         for env in ({'OPENAI_REASONING_EFFORT': 'max'}, {'OLLAMA_THINK': 'false'}, {'OLLAMA_THINK': 'High Effort'}):
             with self.subTest(env=env), self.assertRaises(ValueError):
                 self.load(**env)
+
+    def test_roadmap_timeout_default_override_and_boundaries(self):
+        self.assertEqual(self.load().openai_roadmap_timeout, 180)
+        for value in ('1', '90', '180', '600'):
+            with self.subTest(value=value):
+                self.assertEqual(self.load(OPENAI_ROADMAP_TIMEOUT=value).openai_roadmap_timeout, int(value))
+        for value in ('0', '-1', '601', '1.5', 'invalid'):
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, 'OPENAI_ROADMAP_TIMEOUT'):
+                self.load(OPENAI_ROADMAP_TIMEOUT=value)
 
 
 if __name__ == '__main__':
