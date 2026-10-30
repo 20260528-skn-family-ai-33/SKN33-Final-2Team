@@ -1,146 +1,72 @@
-/* 3. 사전 점검 (5차 scr['new-quiz'] · ensureQuiz)
-   문항 생성(API-23): 서버 작업으로 만들고, 진행 상태(quizRun)·실패(quizFail)는 서버 작성 문서에 남는다.
-   실패는 가데이터로 대신하지 않고, '다시 시도하기'를 눌러야만 다시 만든다(10/14) */
-import { useEffect } from 'react';
-import { draftsApi } from '@/api/endpoints/drafts';
+import { useEffect, useState } from 'react';
 import { paths } from '@/app/paths';
-import { DeepToggle, QuizBody } from '@/features/assessment/quizParts';
 import { useGo } from '@/shared/hooks/useGo';
-import { ai, cause, errText } from '@/shared/state/ai';
-import { updateWs, useWs, ws } from '@/shared/state/workspace';
-import { Icon } from '@/shared/ui/Icon';
-import { AgentRow, FailPage, OpsBox, Page, runSub, via } from '@/shared/ui/parts';
-import { draftCall, pullDraft } from '../draftSync';
-import { deepOnOf, quizDone, quizKey } from '../model';
-import { StaleNote } from '../stale';
+import { useWs } from '@/shared/state/workspace';
+import { Page } from '@/shared/ui/parts';
+import { ensureDraft, pullDraft } from '../draftSync';
 import { Stepper } from '../Stepper';
-import { useDraftWatch } from '../useDraftWatch';
-import { toast } from '@/shared/state/ui';
+import { SurveyFlow } from './assessment/SurveyFlow';
+import type { Answers, Survey } from './assessment/flow';
 
-const QUIZ_AGENT = '진단 에이전트 · 사전 점검 문항 생성';
-let quizAsk = '';
-
-async function ensureQuiz(retry = false): Promise<void> {
-  const d = ws().draft;
-  const key = quizKey(d);
-  if ((d.quiz && d.quiz.key === key) || (d.quizRun && d.quizRun.key === key)) return;
-  if (quizAsk === key || (!retry && d.quizFail && d.quizFail.key === key)) return;
-  quizAsk = key;
-  const r = await draftCall('사전 점검 문항을 만들지 못했어요', (id) => draftsApi.assessment(id));
-  quizAsk = '';
-  if (!r) return;
-  await pullDraft();
+type Stored = Survey & { answers: Answers; completed: boolean };
+const flights = new Map<string, Promise<Stored>>();
+class SurveyRequestError extends Error {
+  constructor(message: string, readonly code: string) { super(message); }
 }
-
+async function request(path: string, init?: RequestInit): Promise<Stored | null> {
+  const response = await fetch(path, { ...init, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', ...init?.headers } });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) throw new SurveyRequestError(body?.error?.message ?? '문항 요청을 처리하지 못했어요.', body?.error?.code ?? 'REQUEST_FAILED');
+  return body.survey ?? null;
+}
+function load(owner: string): Promise<Stored> {
+  const pending = flights.get(owner);
+  if (pending) return pending;
+  const work = (async () => {
+    const id = await ensureDraft();
+    const path = `/api/v2/drafts/${id}/survey`;
+    const existing = await request(path);
+    const result = existing ?? await request(path, { method: 'POST' });
+    if (!result) throw new Error('생성된 문항이 없어요.');
+    return result;
+  })();
+  flights.set(owner, work);
+  void work.finally(() => { if (flights.get(owner) === work) flights.delete(owner); }).catch(() => {});
+  return work;
+}
 export function QuizStep() {
+  const owner = useWs(s => s.owner);
+  const id = useWs(s => s.draftId);
+  const inputKey = useWs(s => JSON.stringify([s.draft.goal, s.draft.prefs, s.draft.project, s.draft.doc?.summary, s.draft.doc?.status]));
   const go = useGo();
-  const d = useWs((s) => s.draft);
-  const key = quizKey(d);
-  const ready = !!(d.quiz && d.quiz.key === key);
-  const failKey = d.quizFail?.key;
-  const running = !!d.quizRun;
-  useDraftWatch();
+  const [loaded, setLoaded] = useState<{ key: string; survey: Stored | null; error: string } | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const requestKey = JSON.stringify([owner, id, inputKey, attempt]);
+  const survey = loaded && loaded.key === requestKey ? loaded.survey : null;
+  const error = loaded && loaded.key === requestKey ? loaded.error : '';
   useEffect(() => {
-    void ensureQuiz();
-  }, [key, ready, running, failKey]);
-
-  const err = !ready && !d.quizRun && d.quizFail && d.quizFail.key === key ? cause(d.quizFail.cause) : null;
-  if (err)
-    return (
-      <>
-        <Stepper cur="quiz" />
-        <FailPage
-          title="사전 점검 문항을 만드는 중 문제가 발생했어요"
-          desc="진단 에이전트가 목표와 세부 사항으로 점검 문항을 만들지 못했어요. 입력한 목표와 세부 사항은 그대로 남아 있어요."
-          cause={errText(err)}
-          body={
-            <div className="agents">
-              <AgentRow st="fail" name={QUIZ_AGENT} sub={ai.live() ? via('default') : ''} tag="오류 발생" tagCls="fail" />
-            </div>
+    let active = true;
+    void load(`${owner}:${inputKey}`).then(result => { if (active) setLoaded({ key: requestKey, survey: result, error: '' }); })
+      .catch(e => { if (active) setLoaded({ key: requestKey, survey: null, error: e instanceof Error ? e.message : '문항을 불러오지 못했어요.' }); });
+    return () => { active = false; };
+  }, [owner, inputKey, requestKey]);
+  return <><Stepper cur="quiz" /><Page title="사전 점검"
+    lead="프로젝트 요약과 키우고 싶은 역량, 개인 프로필을 참고해 선정 스킬의 역량을 확인해요. 설문을 모두 마치면 퀴즈로 이어집니다.">
+    {error ? <div className="card"><p role="alert">{error}</p><div className="actions">
+      <button className="btn line" onClick={() => go(paths.newDetailsCheck)}>입력 내용 확인</button>
+      <button className="btn pri" onClick={() => setAttempt(n => n + 1)}>다시 시도하기</button></div></div>
+      : survey ? <SurveyFlow key={survey.generationId} survey={survey} initialAnswers={survey.answers} initialCompleted={survey.completed} onContinue={() => go(paths.newResult)}
+        onSave={async (answers, complete) => {
+          if (!id) throw new Error('작성 중인 로드맵을 확인해 주세요.');
+          try {
+            await request(`/api/v2/drafts/${id}/survey/answers`, { method: 'PUT', body: JSON.stringify({ generationId: survey.generationId, answers, complete }) });
+            if (complete) await pullDraft();
+          } catch (e) {
+            if (e instanceof SurveyRequestError && e.code === 'SURVEY_INPUT_CHANGED') {
+              setAttempt(n => n + 1);
+            }
+            throw e;
           }
-          ops={<OpsBox items={[['', err]]} />}
-          foot={
-            <>
-              <button className="btn line" onClick={() => go(paths.newGoal)}>
-                <Icon name="left" />
-                목표·기획서 고치기
-              </button>
-              <button
-                className="btn pri"
-                onClick={() => {
-                  updateWs((s) => void (s.draft.quizFail = null));
-                  void ensureQuiz(true);
-                }}
-              >
-                <Icon name="retry" />
-                다시 시도하기
-              </button>
-            </>
-          }
-        />
-      </>
-    );
-
-  const quiz = d.quiz;
-  const deepKs = deepOnOf(d) && quiz?.deep ? Object.keys(quiz.deep.mcq) : [];
-  return (
-    <>
-      <Stepper cur="quiz" />
-      <Page
-        title={ready && quiz ? `사전 점검 · ${quiz.questions.length}문항` : '사전 점검'}
-        lead="목표와 세부 사항을 바탕으로 진단 에이전트가 만든 문항이에요. 문장마다 나에게 맞는 정도를 1~5점으로 골라 주세요. 진단 에이전트가 계산한 수준값은 보여드리지 않아요."
-        foot={
-          <>
-            <button className="btn line" onClick={() => go(paths.newDetailsCheck)}>
-              <Icon name="left" />
-              이전
-            </button>
-            <button
-              className="btn pri"
-              disabled={!ready}
-              onClick={() => {
-                if (!quizDone(d)) {
-                  toast('모든 문항 선택을 완료해 주세요.');
-                  return;
-                }
-
-                go(paths.newResult);
-              }}
-            >
-              다음: 점검 결과
-            </button>
-          </>
-        }
-      >
-        {ready && quiz ? (
-          <>
-            {quiz.deep ? (
-              <DeepToggle on={!!d.deepOn} nm={Object.keys(quiz.deep.mcq).length} ne={quiz.deep.essays.length} onToggle={() => updateWs((s) => void (s.draft.deepOn = !s.draft.deepOn))} />
-            ) : ai.live() ? (
-              <p className="small muted">이번 문항에는 심화 질문이 만들어지지 않았어요. 자가 진단만으로 진행해요.</p>
-            ) : null}
-            <p className="small muted" style={{ margin: `${quiz.deep ? '0' : '-14px'} 0 16px` }}>
-              답한 문항{' '}
-              <b id="qCount" className="num">
-                {quiz.questions.filter((q) => d.answers[q.id]).length} / {quiz.questions.length}
-              </b>
-              <span id="dqCount">{deepKs.length ? ` · 심화 객관식 ${deepKs.filter((k) => (d.deepMcq || {})[k]).length} / ${deepKs.length}` : ''}</span>
-            </p>
-            <div className="stack">
-              <QuizBody
-                questions={quiz.questions}
-                path="draft.answers"
-                dq={deepOnOf(d) && quiz.deep ? { quiz: quiz.deep, mcq: 'draft.deepMcq', essay: 'draft.deepEssay' } : null}
-              />
-            </div>
-            <StaleNote kind="diag" />
-          </>
-        ) : (
-          <div className="agents">
-            <AgentRow st="run" name={QUIZ_AGENT} sub={runSub('default', '목표와 세부 사항을 바탕으로 문항을 만들고 있어요')} />
-          </div>
-        )}
-      </Page>
-    </>
-  );
+        }} /> : <div className="loading" role="status" aria-live="polite"><span className="sp" aria-hidden="true" /><span>프로젝트와 희망 역량에 맞춰 스킬·문항을 준비하고 있어요.</span></div>}
+  </Page></>;
 }

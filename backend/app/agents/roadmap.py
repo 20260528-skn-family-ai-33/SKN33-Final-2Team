@@ -13,6 +13,8 @@ skills 를 받지 않는다. 목록에 없는 이름은 finish_option 이 버리
 """
 from __future__ import annotations
 
+import copy
+
 import json
 import math
 import re
@@ -390,6 +392,17 @@ def _track_catalog(pid: str, handoff: dict, extra_ids: list | None = None) -> li
 def option(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
     """inp: pid, handoff, variant?, request?, previousDef?, previous?"""
     pid = inp['pid']
+    if pid == 'A2' and inp['handoff'].get('assessmentGenerationId'):
+        inp = dict(inp, handoff=copy.deepcopy(inp['handoff']))
+        handoff = inp['handoff']
+        previous_focus = list(handoff['focus'])
+        handoff['focus'] = handoff['focus'][:3]
+        handoff['excludedSkills'] = list(handoff.get('excludedSkills') or []) + previous_focus[3:]
+        handoff['skillDetails'] = [row for row in handoff.get('skillDetails', []) if row['name'] in handoff['focus']]
+        if handoff.get('skillMaterials'):
+            handoff['resourceHints'] = list(dict.fromkeys(rid for name in handoff['focus'] for rid in [handoff['skillMaterials'][name]['course']] + handoff['skillMaterials'][name]['books'] if rid))
+        handoff['skillOrder'] = handoff.get('skillOrder', handoff['focus'])[:3]
+        handoff['agentNotes'] = list(handoff.get('agentNotes') or []) + ['Crash Course는 우선순위 상위 3개 역량만 다룬다. 다른 역량을 추가하지 않는다.']
 
     def api(_):
         extra = ('\n- 사용자가 요청(request)과 함께 이 관점의 안을 다시 만들어 달라고 했다. previous(지금 안)를 바탕으로 request를 반영해 고친다.\n'

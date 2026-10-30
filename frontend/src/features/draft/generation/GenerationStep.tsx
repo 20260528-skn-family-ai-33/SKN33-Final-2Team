@@ -204,17 +204,23 @@ export function GenerationStep() {
   useDraftWatch();
   useKickSupport();
   useEffect(() => {
-    const cur = ws().draft;
-    if (!curGen(cur) && curOut(cur)) {
-      go(paths.newOptions, { force: true, replace: true });
-      return;
-    }
-    if (!curGen(cur) && !curOut(cur)) void genStart(go);
-    syncGenCur();
-    // 화면에 들어올 때 한 번
+    const timer = window.setTimeout(() => {
+      const cur = ws().draft;
+      if (cur.v2Assessment) {
+        void genStart(go);
+        return;
+      }
+      if (!curGen(cur) && curOut(cur)) {
+        go(paths.newOptions, { force: true, replace: true });
+        return;
+      }
+      if (!curGen(cur) && !curOut(cur)) void genStart(go);
+      syncGenCur();
+    }, 0);
+    return () => window.clearTimeout(timer);
+    // 생성 화면 진입 뒤 시작하며, StrictMode 재실행은 중복 요청하지 않는다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  if (!h) return null;
   const g = r ? genState(r.rows) : { running: true, ok: 0, fail: 0 };
   const rows = (
     <div className="agents">
@@ -241,7 +247,7 @@ export function GenerationStep() {
           cause={`${failed.map((id, i) => `${D.perspectives[id].name} — ${errs[i].user || userText(errs[i].kind)}`).join(' · ')}. ${todoOf(errs)}`}
           body={
             <>
-              <HandoffView h={h} />
+              {h && <HandoffView h={h} />}
               {rows}
             </>
           }
@@ -300,7 +306,7 @@ export function GenerationStep() {
           </>
         }
       >
-        <HandoffView h={h} />
+        {h && <HandoffView h={h} />}
         {rows}
       </Page>
     </>

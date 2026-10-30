@@ -6,14 +6,15 @@ import { sameJ } from '@/shared/lib/format';
 import { certOf } from '@/shared/lib/prefs';
 import type { WsState } from '@/shared/state/workspace';
 
-export type StepKey = 'goal' | 'details' | 'quiz' | 'result' | 'options' | 'review';
+export type StepKey = 'goal' | 'details' | 'quiz' | 'result' | 'options' | 'materials' | 'review';
 
 export const STEPS: [StepKey, string, string][] = [
   ['goal', '목표·기획서', paths.newGoal],
   ['details', '세부 사항', paths.newDetails],
   ['quiz', '사전 점검', paths.newQuiz],
   ['result', '점검 결과', paths.newResult],
-  ['options', '로드맵 3안', paths.newOptions],
+  ['options', '로드맵 선택', paths.newOptions],
+  ['materials', '자료·활동 선택', paths.newMaterials],
   ['review', '검토·확정', paths.newReview],
 ];
 
@@ -26,13 +27,13 @@ export const goalOk = (d: DraftDoc): boolean => (d.goal || '').trim().length >= 
 /** 심화 질문(10/23): 고른 사람은 객관식에 모두 답해야 넘어간다('잘 모르겠어요' 포함 · 서술형은 비워도 됨) */
 export const mcqDone = (mcq: Record<string, unknown>, ans: Record<string, string> | undefined): boolean => Object.keys(mcq).every((k) => (ans || {})[k]);
 export const quizDone = (d: DraftDoc): boolean =>
-  !!d.quiz && d.quiz.questions.every((q) => d.answers[q.id]) && (!(d.deepOn && d.quiz.deep) || mcqDone(d.quiz.deep.mcq, d.deepMcq));
+  d.v2Assessment ? d.v2Assessment.completed : !!d.quiz && d.quiz.questions.every((q) => d.answers[q.id]) && (!(d.deepOn && d.quiz.deep) || mcqDone(d.quiz.deep.mcq, d.deepMcq));
 export const docIdle = (d: DraftDoc): boolean => !d.doc || d.doc.status !== 'reading';
 
 export function stepDone(s: Pick<WsState, 'draft' | 'draftPlan'>, k: StepKey): boolean {
   const d = s.draft;
   /* 세부 사항은 모두 선택 사항이라, 확인 화면에서 '다음'을 눌렀거나 사전 점검 문항이 있으면 지난 것으로 본다 */
-  return { goal: goalOk(d), details: !!(d.detailsOk || d.quiz), quiz: quizDone(d), result: !!(d.handoff || d.gen), options: !!s.draftPlan, review: false }[k];
+  return { goal: goalOk(d), details: !!(d.detailsOk || d.quiz), quiz: quizDone(d), result: !!(d.handoff || d.gen || d.v2Assessment?.completed), options: !!s.draftPlan, materials: !!d.v2Assessment?.activitiesReady, review: false }[k];
 }
 
 /** 이 단계 앞에 마치지 않은 단계가 있으면 그 단계 주소 */
@@ -86,6 +87,8 @@ export const DOWN: Record<Stale['kind'], string[]> = {
 
 /** 지금 입력이 뒤 단계 결과를 만들 때와 다르면 그 단계: quiz(목표·기획서·자격증 계획) > diag(사전 점검 응답) > gen(그 밖의 세부 사항) */
 export function staleOf(d: DraftDoc): Stale | null {
+  // V_2의 문항·응답 유효성은 입력 스냅샷을 확인하는 API가 판정한다.
+  if (d.v2Assessment) return null;
   if (d.quiz && d.quiz.key !== quizKey(d)) {
     const rest = String(d.quiz.key).split('|cert:')[0] !== quizRest(d);
     const cert = keyCert(d.quiz.key) !== certKey(d.prefs);

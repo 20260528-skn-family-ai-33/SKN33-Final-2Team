@@ -13,6 +13,7 @@ export const paths = {
   newResultEdit: '/new/result/edit',
   newGen: '/new/generating',
   newOptions: '/new/options',
+  newMaterials: '/new/materials',
   newReview: '/new/review',
   // 내 로드맵
   roadmaps: '/roadmaps',
@@ -51,6 +52,7 @@ export const NEW_ORDER = [
   paths.newResultEdit,
   paths.newGen,
   paths.newOptions,
+  paths.newMaterials,
   paths.newReview,
 ] as string[];
 
@@ -64,6 +66,7 @@ const NEW_ID_TO_PATH: Record<string, string> = {
   'new-result-edit': paths.newResultEdit,
   'new-gen': paths.newGen,
   'new-options': paths.newOptions,
+  'new-materials': paths.newMaterials,
   'new-review': paths.newReview,
 };
 export const newIdToPath = (id: string | null | undefined): string => (id && NEW_ID_TO_PATH[id]) || paths.newGoal;

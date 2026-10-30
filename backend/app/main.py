@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from . import jobs
 from .config import ROOT
 from .errors import ApiError, api_error_handler
-from .routers import account, team, work
+from .routers import account, team, work, preassessment
 
 WEB = ROOT / 'web'
 
@@ -32,6 +32,9 @@ app.add_exception_handler(ApiError, api_error_handler)
 app.include_router(account.r)
 app.include_router(work.r)
 app.include_router(team.r)
+app.include_router(preassessment.r)
+for error_type in (preassessment.StoreError, preassessment.SelectionError, preassessment.SurveyError, preassessment.RecommendationError):
+    app.add_exception_handler(error_type, preassessment.validation_error)
 try:
     from .routers import admin
     app.include_router(admin.r)

@@ -1,7 +1,7 @@
 import { trackName } from '@/shared/constants/data';
 /* 5. 3안 비교표 (10/14 · 5차 scr['new-options']): 열 순서는 A1·A2·A3 고정.
    마음에 들지 않는 안은 요청을 적어 그 안만 다시 만들고(API-32 · 버전으로 쌓임), ‹ › 로 버전을 넘겨 본다 */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { draftsApi } from '@/api/endpoints/drafts';
 import type { DraftDoc, OptionDef, RegenRequest } from '@/api/types/draft';
 import type { PlanContent } from '@/api/types/plan';
@@ -9,8 +9,8 @@ import { paths } from '@/app/paths';
 import { D } from '@/shared/constants/data';
 import { useGo } from '@/shared/hooks/useGo';
 import { hrs, won } from '@/shared/lib/format';
-import { buildPlan, stageActs } from '@/shared/lib/plan';
-import { cause, PROV } from '@/shared/state/ai';
+import { buildPlan } from '@/shared/lib/plan';
+import { cause } from '@/shared/state/ai';
 import { setAt } from '@/shared/state/bind';
 import { resOf, useCatalog } from '@/shared/state/catalog';
 import { failToast } from '@/shared/lib/fail';
@@ -41,7 +41,7 @@ export async function choose(go: ReturnType<typeof useGo>, id: string): Promise<
   try {
     await flush();
     takeDraft(await draftsApi.select(ws().draftId as string, id));
-    go(paths.newReview);
+    go(paths.newMaterials);
   } catch (err) {
     if (!(err instanceof DraftSaveError)) failToast(err, '안을 고르지 못했어요');
   }
@@ -197,7 +197,13 @@ function useRegenToast(): void {
   }, [counts]);
 }
 
+function brief(text: string | undefined, limit: number): string {
+  const first = (text || '').trim().split(/(?<=[.!?。])\s+/)[0] || '';
+  return first.length > limit ? `${first.slice(0, limit).trimEnd()}…` : first;
+}
+
 export function OptionsStep() {
+  const [supportOpen, setSupportOpen] = useState(false);
   const go = useGo();
   const d = useWs((s) => s.draft);
   useCatalog((s) => s.res);
@@ -212,14 +218,13 @@ export function OptionsStep() {
   const ps = optsOf(d);
   const cur = d.chosen;
   const colCls = (p: PlanContent) => (regenBusy(d, p.opt) ? 'busy' : undefined);
-  const src = (o: OptionDef) => (o.source && o.source !== 'mock' ? <span className="tag acc">{PROV[o.source] || 'API'} 작성</span> : <span className="tag">가데이터</span>);
   const off = ps.some((p) => p.def.offDomain);
   const missing = g.missing || [];
   const row = (k: string, f: (p: PlanContent, x: OptionDef) => React.ReactNode) => (
     <tr>
       <td className="k">{k}</td>
       {ps.map((p) => (
-        <td key={p.opt} data-col={p.opt} className={colCls(p)}>
+        <td key={p.opt} data-col={p.opt} className={colCls(p)} onClick={event => { if (!(event.target as HTMLElement).closest('button,a,input,summary')) setAt('draft.chosen', p.opt); }} style={{ cursor: 'pointer' }}>
           {f(p, p.def)}
         </td>
       ))}
@@ -259,8 +264,8 @@ export function OptionsStep() {
     const busy = regenBusy(d, p.opt);
     const err = regenErr(d, p.opt);
     return (
-      <th key={p.opt} data-col={p.opt} className={colCls(p)}>
-        <label>
+      <th key={p.opt} data-col={p.opt} className={colCls(p)} onClick={event => { if (!(event.target as HTMLElement).closest('button,a,input,label')) setAt('draft.chosen', p.opt); }} style={{ cursor: 'pointer' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}><label style={{ flex: 1, minWidth: 0 }}>
           <input type="radio" name="pick" value={p.opt} checked={cur === p.opt} onChange={() => setAt('draft.chosen', p.opt)} />
           <span>
             <b>
@@ -269,24 +274,21 @@ export function OptionsStep() {
             <small>{p.tagline}</small>
           </span>
         </label>
+        {err && <button type="button" className="link" disabled={busy} style={{ color: 'var(--danger, #dc3545)', fontSize: 12, whiteSpace: 'nowrap', flexShrink: 0 }} onClick={() => void draftCall('안을 새로고침하지 못했어요', id => draftsApi.regenerate(id, p.opt, null), { soft: true })}>
+          {busy ? <span className="sp" aria-hidden="true" /> : <Icon name="retry" />} 새로고침
+        </button>}</div>
+        <div className="small" style={{ textAlign: 'left', fontWeight: 400, marginTop: 8 }}>
+          <span className="muted" style={{ fontSize: 10, fontWeight: 400 }}>추천 이유</span>
+          <p title={p.def.reason} style={{ margin: '3px 0 8px' }}>{brief(p.def.reason, 48)}</p>
+          <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 7 }}><span className="muted" style={{ fontSize: 10, fontWeight: 400 }}>장점</span>
+          <ul style={{ margin: '3px 0 0', paddingLeft: 18 }}>{p.def.pros.slice(0, 2).map((text, index) => <li key={index} title={text}>{brief(text, 32)}</li>)}</ul></div>
+        </div>
         <Ver p={p} />
-        <button className="regen" disabled={busy} onClick={() => openRegenSheet(p.opt)}>
-          {busy ? (
-            <>
-              <span className="sp" />
-              다시 쓰는 중…
-            </>
-          ) : (
-            <>
-              <Icon name="history" />이 안만 다시 만들기
-            </>
-          )}
-        </button>
         {err && !busy ? (
           <>
             <span className="small rev fail-t">
               <Icon name="x" />
-              <span>다시 만들지 못했어요 · {err.user}. 이전 안을 그대로 뒀어요. 다시 해 보려면 ‘이 안만 다시 만들기’를 눌러 주세요.</span>
+              <span>다시 만들지 못했어요 · {err.user}. 이전 안을 그대로 뒀어요. 다시 시도하려면 제목 옆 ‘새로고침’을 눌러 주세요.</span>
             </span>
             <OpsBox items={[['', err]]} cls="sm" />
           </>
@@ -298,8 +300,8 @@ export function OptionsStep() {
     <>
       <Stepper cur="options" />
       <Page
-        title={ps.length === 3 ? '로드맵 3안을 비교하고 골라 주세요' : ps.length === 1 ? '작성된 로드맵을 확인해 주세요' : `작성된 로드맵 ${ps.length}안을 비교하고 골라 주세요`}
-        lead="같은 목표와 학습 여건으로 방법만 달라요. 마음에 들지 않는 안은 바라는 점을 적어 그 안만 다시 만들 수 있고, 다시 만든 안은 버전으로 넘겨 볼 수 있어요."
+        title={ps.length === 3 ? '로드맵 제안' : ps.length === 1 ? '작성된 로드맵을 확인해 주세요' : `작성된 로드맵 ${ps.length}안을 비교하고 골라 주세요`}
+        lead="같은 목표와 학습 여건으로 방법만 달라요."
         foot={
           <>
             <button className="btn line" onClick={() => go(paths.newResult)}>
@@ -323,8 +325,9 @@ export function OptionsStep() {
           </>
         }
       >
+        <style>{`.v2-course-boundaries [data-col]{border-left:3px solid #f2f2f2}.v2-course-boundaries [data-col]:last-child{border-right:3px solid #f2f2f2}`}</style>
         <div className="tblwrap">
-          <table className="cmp">
+          <table className="cmp v2-course-boundaries">
             <thead>
               <tr>
                 <th />
@@ -332,10 +335,9 @@ export function OptionsStep() {
               </tr>
             </thead>
             <tbody>
-              {row('기간 · 주당', (p) => (
+              {row('예상 기간(주당)', (p) => (
                 <>
                   <span className="numv">{p.weeks}주</span> · 주 {p.hours}시간
-                  {d.handoff?.prefs.hoursAuto ? <small className="muted"> (에이전트가 정함)</small> : null}
                 </>
               ))}
               {row('예상 비용', (p) => (
@@ -344,52 +346,10 @@ export function OptionsStep() {
                   {p.costUnknown ? ' + 확인 필요' : ''}
                 </span>
               ))}
-              {row('활동', (p) => (
-                <details className="more" open>
-                  <summary>
-                    <Icon name="right" />
-                    {p.acts.length}개 보기
-                  </summary>
-                  <ul className="cmp-acts">
-                    {p.acts.map((a) => (
-                      <li key={a.id}>
-                        <ActThumb a={a} size="xs" />
-                        <span>
-                          {a.title}{' '}
-                          <span className="muted small">
-                            {a.task ? '직접 수행' : ''} {hrs(a.hours)}
-                          </span>
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              ))}
-              {row('지원 조건', (_p, x) => (
-                <SupCell o={x} />
-              ))}
-              {row('단계', (p) =>
-                D.stages
-                  .filter((s) => s.n >= p.start && stageActs(p, s.n).length)
-                  .map((s) => s.name)
-                  .join(' › '),
-              )}
-              {row('추천 이유', (_p, x) => x.reason)}
-              {row('좋은 점', (_p, x) => (
-                <ul>
-                  {x.pros.map((t, i) => (
-                    <li key={i}>{t}</li>
-                  ))}
-                </ul>
-              ))}
-              {row('아쉬운 점', (_p, x) => (
-                <ul>
-                  {x.cons.map((t, i) => (
-                    <li key={i}>{t}</li>
-                  ))}
-                </ul>
-              ))}
-              {row('작성', (_p, x) => src(x))}
+              {row('예상 성장 역량', p => <div className="chips">{(p.opt === 'A2' ? (d.handoff?.focus || []).slice(0, 3) : (d.handoff?.focus || [])).map(name => <span className="chip" key={name}>{name}</span>)}</div>)}
+              <tr><td className="k"><button className="link" aria-expanded={supportOpen} onClick={() => setSupportOpen(open => !open)}>지원 조건 {supportOpen ? '접기' : '보기'}</button></td>
+                {ps.map(p => <td key={p.opt} data-col={p.opt} className={colCls(p)}>{supportOpen && <SupCell o={p.def} />}</td>)}
+              </tr>
             </tbody>
           </table>
         </div>

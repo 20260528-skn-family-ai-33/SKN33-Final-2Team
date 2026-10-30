@@ -12,6 +12,8 @@ import { toast } from '@/shared/state/ui';
 import { updateWs, useWs, ws } from '@/shared/state/workspace';
 import type { DocState } from '@/api/types/draft';
 import { BText } from '@/shared/ui/bound';
+import { me } from '@/shared/state/session';
+import { resolveGoalInput } from './goalInput';
 import { Icon } from '@/shared/ui/Icon';
 import { AgentRow, Note, OpsBox, Page, runSub } from '@/shared/ui/parts';
 import { DraftSaveError, draftCall, ensureDraft, pullDraft, takeDraft } from '../draftSync';
@@ -395,7 +397,19 @@ function ProjectField() {
 
 export function GoalStep() {
   const go = useGo();
-  const ok = useWs((s) => goalOk(s.draft) && docIdle(s.draft));
+  const d = useWs((s) => s.draft);
+  const firstGoal = useGoalStore((s) => s.gs && s.gs.owner && s.gs.owner === me()?.id ? s.gs.candidates[0]?.goal?.trim() ?? '' : '');
+  const effectiveGoal = resolveGoalInput(d.goal, firstGoal);
+  const ok = goalOk({ ...d, goal: effectiveGoal }) && docIdle(d);
+  const proceed = () => {
+    const current = ws().draft;
+    const state = useGoalStore.getState().gs;
+    const first = state && state.owner && state.owner === me()?.id ? state.candidates[0]?.goal : '';
+    const goal = resolveGoalInput(current.goal, first);
+    if (!goalOk({ ...current, goal }) || !docIdle(current)) return;
+    if (!current.goal.trim()) setAt('draft.goal', goal);
+    go(paths.newDetails);
+  };
   useDraftWatch();
   useEffect(() => {
     loadGoalsIfOld();
@@ -407,7 +421,7 @@ export function GoalStep() {
         title="어떤 역량을 키우고 싶나요?"
         lead="목표와, 적용할 프로젝트 기획서가 있으면 함께 알려 주세요. 기획서는 진단 에이전트가 읽고 요약해요. 학습 여건은 다음 단계에서 적어 주세요(모두 선택)."
         foot={
-          <button className="btn pri" disabled={!ok} onClick={() => go(paths.newDetails)}>
+          <button className="btn pri" disabled={!ok} onClick={proceed}>
             다음: 세부 사항
           </button>
         }
@@ -415,7 +429,8 @@ export function GoalStep() {
         <div className="card">
           <div className="field">
             <label>키우고 싶은 역량</label>
-            <BText path="draft.goal" id="goalText" maxLength={300} ariaLabel="키우고 싶은 역량" placeholder="예: 사내 규정 문서로 질의응답 시제품을 만들고 싶어요." />
+            <BText path="draft.goal" id="goalText" maxLength={300} ariaLabel="키우고 싶은 역량" placeholder={firstGoal || '목표 후보를 불러오거나 직접 작성해 주세요.'} />
+            <p className="small muted">입력하지 않으면 첫 번째 목표 후보로 진행해요. 직접 작성하면 입력한 내용을 사용해요.</p>
             <GoalSuggestions />
           </div>
           <hr className="hr" />

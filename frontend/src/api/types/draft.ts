@@ -237,6 +237,7 @@ export interface RegenRequest {
 }
 
 export interface DraftDoc {
+  v2Assessment?: { generationId: string; completed: boolean; activitiesReady?: boolean };
   goal: string;
   project: { name: string; size?: number } | null;
   prefs: Prefs;

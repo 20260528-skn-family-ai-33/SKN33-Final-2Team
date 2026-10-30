@@ -28,7 +28,7 @@ from ..free_track import validate_free_plan
 from . import plans as PL
 from . import profile as PF
 
-STEP_ROUTES = ['new-goal', 'new-details', 'new-details-check', 'new-quiz', 'new-result', 'new-result-edit', 'new-gen', 'new-options', 'new-review']
+STEP_ROUTES = ['new-goal', 'new-details', 'new-details-check', 'new-quiz', 'new-result', 'new-result-edit', 'new-gen', 'new-options', 'new-materials', 'new-review']
 # deepOn·deepMcq·deepEssay: 심화 질문을 풀지(체크)와 객관식·서술형 답(10/23)
 CLIENT_KEYS = ('goal', 'project', 'prefs', 'detailsOk', 'answers', 'deepOn', 'deepMcq', 'deepEssay', 'chosen', 'edit', 'lastNew')
 _images: dict[str, list] = {}   # 기획서 이미지(base64)는 DB에 넣지 않고 서버 메모리에만 잠깐 둔다
@@ -239,6 +239,12 @@ def present(w: dict | None, draft_id: str | None) -> dict:
     if not w:
         return {'draftId': None, 'draft': None, 'draftPlan': None, 'lastNew': None, 'res': {}, 'reg': {'articles': {}, 'regs': {}}}
     d = w['draft']
+    assessment = w.get('v2Survey')
+    if isinstance(assessment, dict):
+        from app.services.activity_selection import current_record
+        from app.services.course_recommendations import scope_view
+        proposal = current_record(scope_view(assessment, d.get('chosen')), d)
+        d = dict(d, v2Assessment={'generationId': assessment['generationId'], 'completed': bool(assessment.get('completed')), 'activitiesReady': bool(proposal and proposal.get('selectedIds'))})
     q = d.get('quiz')
     if q and q.get('deep'):
         # 심화 질문 정답·해설·모범 답안은 점검 결과가 나온 뒤에만 보낸다(10/23 · 화면에서는 접어 둠)
@@ -671,9 +677,18 @@ def options_start(employee_id: int, draft_id: str) -> dict:
 
     def fn(t, w):
         d = w['draft']
-        if not d.get('diag') or d['diag']['key'] != diag_key(d):
-            raise ApiError(409, 'DIAG_REQUIRED', '점검 결과를 먼저 정리해 주세요')
-        h = build_handoff(d, work_info)
+        if w.get('v2Survey'):
+            from app.routers.preassessment import recommendation_context
+            from app.services.planning_handoff import build_handoff as build_v2_handoff
+            saved = recommendation_context(t, employee_id, draft_id)
+            try:
+                h = build_v2_handoff(saved, handoff_prefs(d['prefs']), work_info)
+            except ValueError as error:
+                raise ApiError(422, 'PLAN_INPUT_INVALID', str(error)) from error
+        else:
+            if not d.get('diag') or d['diag']['key'] != diag_key(d):
+                raise ApiError(409, 'DIAG_REQUIRED', '점검 결과를 먼저 정리해 주세요')
+            h = build_handoff(d, work_info)
         if not d.get('gen') or d['gen'].get('key') != h['key'] or (d['gen'].get('missing') or []):
             d.update(gen=None, chosen=None, genRun=None)
             w['draftPlan'] = None
@@ -934,7 +949,7 @@ def select(employee_id: int, draft_id: str, pid: str) -> dict:
         d['chosen'] = pid
         o = g['options'][pid]
         w['draftPlan'] = RM.build_plan(o, RM.params_of(d['handoff'], o), d['goal'])
-        w['lastNew'] = 'new-review'
+        w['lastNew'] = 'new-materials'
     return present(_mutate(employee_id, draft_id, fn), draft_id)
 
 
@@ -952,11 +967,27 @@ def confirm(employee_id: int, draft_id: str) -> dict:
             raise ApiError(409, 'NOT_SELECTED', '확정할 안을 먼저 골라 주세요')
         g = d['gen']
         _sync(g)
-        o = g['options'][d['chosen']]
+        assessment = w.get('v2Survey')
+        if assessment:
+            from app.services.activity_selection import context as activity_context, current_record, selection_option
+            assessment, _ = activity_context(t, employee_id, draft_id)
+            proposal = current_record(assessment, d)
+            o = selection_option(assessment, d, (proposal or {}).get('selectedIds') or [])
+        else:
+            o = g['options'][d['chosen']]
         plan = RM.build_plan(o, RM.params_of(d['handoff'], o), d['goal'])
         validate_free_plan(t, plan)
-        assess = {'questions': d['quiz']['questions'], 'answers': dict(d['answers']), 'domain': d['quiz']['domain']}
-        if deep_on(d) and (d.get('diag') or {}).get('deep'):
+        if assessment:
+            questions = [dict(q, skill=group['skill'], area=group['skill']) for group in assessment['survey']['groups'] for q in group['surveys']]
+            answers = {q['id']: str(assessment['answers'][q['id']]) for q in questions}
+            capture = dict(d, quiz={'questions': questions, 'domain': ' · '.join(d['handoff']['focus'])}, answers=answers)
+            _save_questions(t, draft_id, capture)
+            _save_answers(t, draft_id, capture)
+            assess = {'questions': questions, 'answers': answers, 'domain': capture['quiz']['domain'],
+                'v2': {'survey': copy.deepcopy(assessment['survey']), 'answers': copy.deepcopy(assessment['answers'])}}
+        else:
+            assess = {'questions': d['quiz']['questions'], 'answers': dict(d['answers']), 'domain': d['quiz']['domain']}
+        if not assessment and deep_on(d) and (d.get('diag') or {}).get('deep'):
             # 심화 질문(사전): 사후 점검 비교와 결과 보고서용. 부서장 화면에는 보내지 않는다(plans.record for_mgr 가 assess 를 비움)
             assess['deep'] = {'on': True, 'quiz': d['quiz']['deep'], 'mcq': dict(d.get('deepMcq') or {}), 'essay': dict(d.get('deepEssay') or {}),
                               'grade': d['diag']['deep']['grade'], 'judge': d['diag']['deep']['judge']}

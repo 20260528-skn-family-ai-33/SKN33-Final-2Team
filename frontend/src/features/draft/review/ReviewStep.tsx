@@ -13,7 +13,6 @@ import { Note, Page, Stats } from '@/shared/ui/parts';
 import { StagesView } from '@/shared/ui/StagesView';
 import { DraftSaveError, flush, reloadWorkspace } from '../draftSync';
 import { useKickSupport } from '../generation/GenerationStep';
-import { openRegenSheet } from '../options/OptionsStep';
 import { SupCell, SupNote } from '../options/support';
 import { Stepper } from '../Stepper';
 import { useDraftWatch } from '../useDraftWatch';
@@ -49,9 +48,9 @@ export function ReviewStep() {
         title="이 로드맵으로 확정할까요?"
         foot={
           <>
-            <button className="btn line" onClick={() => go(paths.newOptions)}>
+            <button className="btn line" onClick={() => go(paths.newMaterials)}>
               <Icon name="left" />
-              재선택
+              이전: 자료·활동 선택
             </button>
             <button className="btn pri" onClick={() => void confirmDraft(go)}>
               확정하기
@@ -69,20 +68,7 @@ export function ReviewStep() {
         <div className="sec">
           <StagesView pl={pl} />
         </div>
-        <p className="small muted rv-fix">
-          고치고 싶은 활동이 있으면{' '}
-          <button
-            className="link"
-            onClick={() => {
-              const id = ws().draftPlan?.opt;
-              go(paths.newOptions);
-              if (id) openRegenSheet(id);
-            }}
-          >
-            <Icon name="history" />
-            3안 비교에서 이 안 다시 만들기
-          </button>
-        </p>
+        <p className="small muted">활동을 바꾸려면 <button className="link" onClick={() => go(paths.newMaterials)}>자료·활동 선택으로 돌아가기</button></p>
         <div className="sec">
           <div className="card flat">
             <dl className="kv">
