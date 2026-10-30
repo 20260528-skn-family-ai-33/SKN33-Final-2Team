@@ -45,7 +45,7 @@ def propose(saved, draft, generate, source):
     for rid in ids:
         resource=resources.get(rid)
         if not resource: raise ApiError(409,'MATERIAL_CHANGED','선택한 자료를 다시 확인해 주세요.')
-        if draft['chosen']=='A1' and resource.get('cost')!=0:
+        if draft['chosen']=='A1' and resource.get('type')!='book' and resource.get('cost')!=0:
             raise ApiError(409,'FREE_TRACK_PRICE_CHANGED','Free Course는 0원으로 확인된 자료만 선택할 수 있어요.')
         materials.append({key:deepcopy(resource.get(key)) for key in ('id','title','hours','cost','skills','content')})
     raw=generate(SYSTEM,{'project':saved['project'],'skillOrder':active,'choices':{name:choices[name] for name in active},'materials':materials,'course':draft['gen']['options'][draft['chosen']]})

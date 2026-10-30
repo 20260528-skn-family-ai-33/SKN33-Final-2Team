@@ -189,7 +189,7 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(response.json()['error']['code'],'ASSESSMENT_REQUIRED')
 
     def test_existing_recommendations_are_read_without_model_calls(self):
-        self.auth(); t=Mock(); saved=dict(self.saved,completed=True,recommendations={'id':'rec','skills':[],'retrieval':{'version':'resource-pgvector-rag/v2'}},resourceChoices={})
+        self.auth(); t=Mock(); saved=dict(self.saved,completed=True,recommendations={'id':'rec','skills':[],'retrieval':{'version':'resource-pgvector-rag/v3'}},resourceChoices={})
         with patch.object(api.db,'tx',side_effect=lambda:transaction(t)),patch.object(api,'recommendation_context',return_value=saved),patch.object(api,'recommend_from_catalog') as generate:
             response=self.client.get(f'/api/v2/drafts/{self.pid}/recommendations')
         self.assertEqual(response.status_code,200)

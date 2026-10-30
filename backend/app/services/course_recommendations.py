@@ -28,5 +28,10 @@ def merge_scope(base,scoped):
 
 def free_cache_valid(recommendations,items):
     if not recommendations:return False
-    return all(resource.get('cost')==0 and resource['id'] in items and items[resource['id']].get('cost')==0 and items[resource['id']].get('usable')
-        for skill in recommendations['skills'] for kind in ('courses','books') for resource in skill[kind])
+    for skill in recommendations['skills']:
+        for kind in ('courses','books'):
+            for resource in skill[kind]:
+                latest=items.get(resource['id'])
+                if not latest or not latest.get('usable'):return False
+                if kind=='courses' and (resource.get('cost')!=0 or latest.get('cost')!=0):return False
+    return True

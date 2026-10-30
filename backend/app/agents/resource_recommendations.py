@@ -39,7 +39,7 @@ def candidate_pools(project: dict, selection: dict, items: dict[str, dict], limi
         by_kind = {}
         for kind, key in (('course', 'courses'), ('book', 'books')):
             # 스킬·종류·사용 가능 여부를 후보 개수 제한보다 먼저 적용한다.
-            available = [row for row in items.values() if row.get('usable') and row.get('type') == kind and skill['name'] in (row.get('skills') or []) and (not free_only or (row.get('cost') == 0 and not isinstance(row.get('cost'), bool)))]
+            available = [row for row in items.values() if row.get('usable') and row.get('type') == kind and skill['name'] in (row.get('skills') or []) and (not free_only or kind == 'book' or (row.get('cost') == 0 and not isinstance(row.get('cost'), bool)))]
             available.sort(key=lambda row: (-score(row), str(row.get('title') or ''), row['id']))
             by_kind[key] = [deepcopy({field: row.get(field) for field in
                 ('id', 'title', 'provider', 'cost', 'hours', 'estimated', 'image', 'url', 'skills', 'content', 'curriculum')})
@@ -73,7 +73,7 @@ def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
     payload = {'project': {key: project.get(key) for key in ('goal', 'projectSummary', 'desiredCompetencies')}, 'skills': evidence_pools}
     payload['course'] = deepcopy(course)
     payload['project']['details'] = deepcopy(project.get('details') or {})
-    rules = '\n선택한 course의 방향과 범위를 따라 추천한다. A1 Free Course는 예산과 무관하게 비용 0원만, A2 Crash Course는 단기간에 필요한 내용을 익힐 자료, A3 Challenge Course는 프로젝트에 직접 적용하는 실습 중심 자료를 우선한다. 없는 자료를 채우지 않는다.'
+    rules = '\n선택한 course의 방향과 범위를 따라 추천한다. A1 Free Course는 강좌만 예산과 무관하게 비용 0원으로 제한하고 도서는 유료·가격 미확인도 허용하며 가격과 예산으로 제외하지 않는다, A2 Crash Course는 단기간에 필요한 내용을 익힐 자료, A3 Challenge Course는 프로젝트에 직접 적용하는 실습 중심 자료를 우선한다. 없는 자료를 채우지 않는다.'
     raw = generate(SYSTEM + rules, payload)
     rows = raw.get('skills') if isinstance(raw, dict) else None
     if not isinstance(rows, list) or len(rows) != len(pools):

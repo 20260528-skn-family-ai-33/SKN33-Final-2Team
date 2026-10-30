@@ -9,10 +9,10 @@ class CourseRecommendationTests(unittest.TestCase):
  def test_free_filter_precedes_candidate_limit_and_ignores_budget(self):
   result=candidate_pools({'goal':'S','details':{'budget':999999}},{'skills':[{'name':'S'}]},self.items(),limit=2,free_only=True)
   self.assertEqual({r['id'] for r in result[0]['courses']},{'20','21'})
- def test_free_excludes_unknown_cost_for_courses_and_books(self):
-  items=self.items();items['20']['cost']=None;items['21']['type']='book'
+ def test_free_excludes_unknown_course_but_allows_books(self):
+  items=self.items();items['20']['cost']=None;items['21']['type']='book';items['21']['cost']=15000
   result=candidate_pools({}, {'skills':[{'name':'S'}]},items,free_only=True)[0]
-  self.assertEqual(result['courses'],[]);self.assertEqual(result['books'][0]['id'],'21')
+  self.assertEqual(result['courses'],[]);self.assertEqual(result['books'][0]['id'],'21');self.assertEqual(result['books'][0]['cost'],15000)
  def test_paid_courses_still_available_for_other_courses(self):
   result=candidate_pools({}, {'skills':[{'name':'S'}]},self.items())[0]
   self.assertTrue(any(r['cost']>0 for r in result['courses']))

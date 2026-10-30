@@ -11,7 +11,7 @@ from app.agents.resource_recommendations import RecommendationError, candidate_p
 
 MODEL = 'text-embedding-3-small'
 DIMENSIONS = 1536
-VERSION = 'resource-pgvector-rag/v2'
+VERSION = 'resource-pgvector-rag/v3'
 PER_KIND = 6
 FIELDS = ('id','title','provider','cost','hours','estimated','image','url','skills','content','curriculum')
 
@@ -77,13 +77,13 @@ def retrieve(project, selection, items, course=None, *, embed=None, search=None)
     for index,vector in zip(active,vectors):
         for key,kind,prefix in [('courses','courses',''),('books','books','book_')]:
             allowed={row['id'][len(prefix):] if prefix and row['id'].startswith(prefix) else row['id']: row for row in all_pools[index][key]}
-            rows=search(kind,list(allowed),vector,PER_KIND,free_only) if allowed else []
+            rows=search(kind,list(allowed),vector,PER_KIND,free_only and key == 'courses') if allowed else []
             seen=set()
             for match in rows[:PER_KIND]:
                 rid=str(match['resource_id'])
                 if rid not in allowed or rid in seen:raise RecommendationError('벡터 검색 결과가 허용된 자료와 일치하지 않아요.')
                 row=deepcopy(allowed[rid]);row['cost']=match.get('current_cost',row.get('cost'))
-                if free_only and row.get('cost')!=0:raise RecommendationError('Free Course 검색에 유료 자료가 포함됐어요.')
+                if free_only and key == 'courses' and row.get('cost')!=0:raise RecommendationError('Free Course 검색에 유료 자료가 포함됐어요.')
                 score=match.get('similarity')
                 if score is None or not math.isfinite(float(score)):raise RecommendationError('자료 검색 유사도가 올바르지 않아요.')
                 seen.add(rid)

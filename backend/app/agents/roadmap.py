@@ -60,8 +60,8 @@ def finish_option(pid: str, raw: dict, source: str, off_domain: bool = False, ke
         r = _res(rid)
         if rid and not r:
             continue
-        if pid == 'A1' and r and r.get('cost') != 0:
-            raise llm.LlmError('Free Track은 비용이 0으로 확인된 무료 자료만 허용합니다.')
+        if pid == 'A1' and r and r.get('type') != 'book' and r.get('cost') != 0:
+            raise llm.LlmError('Free Course의 강좌는 비용이 0으로 확인된 자료만 허용합니다. 도서는 가격을 제한하지 않습니다.')
         try:
             stage = min(4, max(1, round(float(a.get('stage') or 2))))
         except (TypeError, ValueError):
@@ -169,7 +169,7 @@ def _alt_same(rid: str, used: set, fmt: str | None, *, free_only: bool = False) 
         return None
     for k, x in sorted(_cat().items(), key=lambda kv: kv[1]['title']):
         if k != rid and k not in used and x['usable'] and x['kind'] != '자격' and x['stage'] == r['stage'] and (not fmt or x['format'] == fmt) \
-                and set(x['skills']) & set(r['skills']) and (not free_only or x.get('cost') == 0):
+                and set(x['skills']) & set(r['skills']) and (not free_only or x.get('type') == 'book' or x.get('cost') == 0):
             return k
     return None
 
@@ -185,13 +185,13 @@ def _filter_free_mock_acts(pid: str, acts: list[dict]) -> tuple[list[dict], list
             kept.append(act)
             continue
         resource = _res(rid)
-        if resource and resource.get('cost') == 0:
+        if resource and (resource.get('type') == 'book' or resource.get('cost') == 0):
             kept.append(act)
         else:
             excluded.append((resource or {}).get('title') or act.get('title') or rid)
     notes = []
     if excluded:
-        notes.append('Free Track은 무료 자료만 사용하므로 유료·비용 미확인 또는 조회되지 않는 자료를 제외했어요: ' + ', '.join(dict.fromkeys(excluded)))
+        notes.append('Free Course의 유료·비용 미확인 강좌 또는 조회되지 않는 자료를 제외했어요: ' + ', '.join(dict.fromkeys(excluded)))
     return kept, notes
 
 
@@ -307,7 +307,7 @@ def agent_catalog(handoff: dict, extra_ids: list | None = None, *, free_only: bo
     have = {r['id'] for r in cat}
     for rid in list(handoff.get('resourceHints') or []) + list(extra_ids or []):
         r = _res(rid)
-        if r and rid not in have and (not free_only or r.get('cost') == 0):
+        if r and rid not in have and (not free_only or r.get('type') == 'book' or r.get('cost') == 0):
             cat.append(r)
             have.add(rid)
     # Existing plan resources must survive the catalog budget before new choices.
@@ -382,6 +382,8 @@ def _sys(pid: str, tpl: str) -> str:
     text = sections[1] if tpl is REV_SYS else sections[0][len('### GENERATION\n'):]
     if not text.strip():
         raise llm.LlmError('DB Track 프롬프트가 비어 있습니다.')
+    if pid == 'A1':
+        text += '\n[최신 Free Course 정책] 강좌는 0원만 허용한다. 도서는 가격·예산과 무관하게 유료·가격 미확인도 추천할 수 있다. 도서 비용은 표시하되 무료 강좌 제한에 포함하지 않는다.'
     return text.strip()
 
 

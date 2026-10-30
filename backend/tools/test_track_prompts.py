@@ -9,8 +9,10 @@ class TrackPromptTests(unittest.TestCase):
     def test_db_generation_and_revision_are_selected(self):
         prompt = '### GENERATION\nDB generation\n### REVISION\nDB revision'
         with patch.object(rm.db, 'all_', return_value=[{'system_prompt': prompt}]) as query:
-            self.assertEqual(rm._sys('A1', rm.R_SYS), 'DB generation')
-            self.assertEqual(rm._sys('A1', rm.REV_SYS), 'DB revision')
+            generation = rm._sys('A1', rm.R_SYS)
+            self.assertTrue(generation.startswith('DB generation'))
+            self.assertIn('도서는 가격·예산과 무관', generation)
+            self.assertTrue(rm._sys('A1', rm.REV_SYS).startswith('DB revision'))
             self.assertEqual(query.call_count, 2)
             self.assertEqual(query.call_args.kwargs['agent'], 'agent_certified')
 

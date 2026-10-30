@@ -218,7 +218,7 @@ def skills_for(texts: list[str]) -> list[str]:
 def for_agent(texts: list[str], cert_key: str | None = None, limit: int = 28, start_stage: int = 1, *, free_only: bool = False) -> list[dict]:
     """관련 스킬 자료를 단계·종류가 고르게 섞이도록 고른다. 자격은 사용자가 고른 것만"""
     want = skills_for(texts)
-    pool = [r for r in items().values() if r['usable'] and r['type'] != 'cert' and set(r['skills']) & set(want) and (not free_only or r.get('cost') == 0)]
+    pool = [r for r in items().values() if r['usable'] and r['type'] != 'cert' and set(r['skills']) & set(want) and (not free_only or r.get('type') == 'book' or r.get('cost') == 0)]
     hay = ' '.join(t for t in texts if t).lower()
     words = {w for w in re.findall(r'[A-Za-z]{3,}|[가-힣]{2,}', hay)}
 

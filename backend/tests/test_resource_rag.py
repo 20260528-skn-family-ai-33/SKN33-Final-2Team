@@ -51,3 +51,9 @@ class ResourceRagTests(unittest.TestCase):
    sql=query.call_args.args[0].upper();self.assertTrue(sql.strip().startswith('SELECT'))
    self.assertNotIn('INSERT',sql);self.assertNotIn('UPDATE ',sql);self.assertLess(sql.index('M.COST_WON=0'),sql.index('LIMIT'))
    self.assertEqual(query.call_args.kwargs['model'],MODEL)
+
+ def test_free_books_do_not_use_price_filter(self):
+  items={'book_b':{'id':'book_b','type':'book','usable':True,'skills':['S'],'cost':23000}}
+  search=Mock(return_value=[{'resource_id':'b','similarity':.5,'current_cost':23000}])
+  pools,_=retrieve(self.project,self.selection,items,{'id':'A1'},embed=self.embed,search=search)
+  self.assertFalse(search.call_args.args[4]);self.assertEqual(pools[0]['books'][0]['cost'],23000)
