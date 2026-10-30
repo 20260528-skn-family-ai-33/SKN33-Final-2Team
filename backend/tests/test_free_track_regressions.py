@@ -3,7 +3,7 @@ import copy
 import unittest
 from contextlib import ExitStack, contextmanager
 from unittest.mock import Mock, patch
-from app import catalog, llm
+from app import catalog, catalog_budget, llm
 from app.agents import roadmap as rm
 from app.errors import ApiError
 from app.free_track import validate_free_plan
@@ -17,7 +17,8 @@ class FreeTrackRegressions(unittest.TestCase):
     def resources(self, cert_cost=0):
         def item(key,cost,kind='강좌'):
             return {'id':key,'title':key,'cost':cost,'hours':1,'format':'영상','kind':kind,
-                    'type':'cert' if kind=='자격' else 'course','stage':2,'skills':['s'],'usable':True}
+                    'type':'cert' if kind=='자격' else 'course','stage':2,'skills':['s'],'usable':True,
+                    'content':'RAG 검색과 근거 답변을 학습한다.'}
         return {'free':item('free',0),'paid':item('paid',100),'unknown':item('unknown',None),
                 'cert':item('cert',cert_cost,'자격')}
 
@@ -102,29 +103,24 @@ class FreeTrackRegressions(unittest.TestCase):
                             self.assertEqual([a['res'] for a in result['acts'] if a.get('res')], [expected])
                             self.assertEqual(len(result['acts']), len(acts))
 
-    def test_filter_precedes_top_28_and_evidence_budget(self):
+    def test_filter_precedes_per_skill_limit_and_evidence_budget(self):
         pool={str(i):dict(self.resources()['paid'],id=str(i),title=f'AAA{i:02}') for i in range(28)}
         pool['free']=dict(self.resources()['free'],title='ZZZ')
-        def pack(rows,texts):
-            seen.append([r['id'] for r in rows])
-            return rows
-        with patch.object(catalog,'items',return_value=pool), patch.object(catalog,'skills_for',return_value=['s']), patch.object(catalog,'agent_views',side_effect=pack):
+        with patch.object(catalog,'items',return_value=pool), patch.object(catalog,'skills_for',return_value=['s']), patch.object(catalog_budget,'tokens',return_value=1):
             for pid in ('A1','A2','A3'):
-                seen=[]
                 h=self.handoff(); h['prefs']['certRes']=None
                 out=rm._track_catalog(pid,h)
                 if pid=='A1':
                     self.assertEqual([r['id'] for r in out],['free'])
-                    self.assertEqual(seen,[['free']])
                 else:
-                    self.assertEqual(len(out),28)
+                    self.assertEqual(len(out),20)
                     self.assertNotIn('free',[r['id'] for r in out])
 
     def test_hints_and_existing_resources_filtered_before_pack(self):
         resources=self.resources()
-        h=self.handoff(); h['resourceHints']=['paid','unknown','free']
+        h=self.handoff(); h['resourceHints']=['paid','unknown','free']; h['skillNames']=['s']
         for pid in ('A1','A2','A3'):
-            with self.subTest(pid=pid), patch.object(catalog,'for_agent',return_value=[]), patch.object(rm,'_cat',return_value=resources), patch.object(catalog,'agent_views',side_effect=lambda rows,texts:rows):
+            with self.subTest(pid=pid), patch.object(catalog,'items',return_value=resources), patch.object(catalog_budget,'tokens',return_value=1):
                 out=rm._track_catalog(pid,h,['cert'])
                 self.assertEqual({r['id'] for r in out},{'free','cert'} if pid=='A1' else set(resources))
 
