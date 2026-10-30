@@ -1,9 +1,12 @@
 """Authenticated HTTP + real PostgreSQL contracts; isolated clone, no model calls."""
 import copy
 from concurrent.futures import ThreadPoolExecutor
+from threading import Event
+from types import SimpleNamespace
 import os
 from pathlib import Path
 import secrets
+import subprocess
 import sys
 import unittest
 from unittest.mock import patch
@@ -36,7 +39,8 @@ class AppContractTests(unittest.TestCase):
         from app.services import goals, plans, profile
         if (db.engine.url.host, db.engine.url.database, db.engine.url.port) != (p['host'], p['dbname'], int(p.get('port', 5432))):
             raise ValueError('The cached app engine does not point at the owned test clone')
-        cls.db, cls.plans, cls.profile = db, plans, profile
+        cls.db, cls.plans, cls.profile, cls.goals = db, plans, profile, goals
+        cls.actual_goal_request = staticmethod(goals.request)
         cls.addClassCleanup(db.engine.dispose)
         cls.enterClassContext(patch.object(llm, '_http', side_effect=AssertionError('External model calls forbidden in DB contracts')))
         cls.enterClassContext(patch.object(goals, 'request', return_value=None))  # Generation is evaluated separately.
@@ -91,6 +95,54 @@ class AppContractTests(unittest.TestCase):
         self.addCleanup(remove)
         catalog.invalidate()
         return rid
+
+    def test_supplemented_course_detail_returns_confirmed_hour_and_full_outline(self):
+        from datetime import datetime, timezone
+        from psycopg.rows import dict_row
+        from app import catalog
+        from src.database.ingestion.course_supplement import insert_approved
+        from src.database.vectors import resource_vectors
+        from tests.test_course_supplement import external_course
+        row = external_course()
+        key = str(uuid4().int % 10**12 + 10**12)
+        slug = 'fastapi-' + key
+        url = f'https://www.inflearn.com/course/{slug}?cid={key}'
+        rid = 'INFLEARN_' + key
+        now = datetime.now(timezone.utc)
+        row.update(external_key=key, fetched_at=now, matches={30: ['FastAPI']})
+        row['fields'].update(course_id=rid, platform='Inflearn', url=url, source_url=url, source_verified_at=now)
+        row['raw'].update(source_id=key, url=url)
+        row['raw']['course_info'].update(id=int(key), slug=slug)
+        for index, lesson in enumerate(row['raw']['lessons'], 1):
+            lesson.update(id=index, runtime=1800)
+        fake = [1.0] + [0.0] * (resource_vectors.DIMENSIONS - 1)
+        with psycopg.connect(os.environ['EMPLOYEE_FORM_TEST_DB_URL'], row_factory=dict_row) as c:
+            skills = c.execute('SELECT skill_id,name,category FROM public.skill_tags ORDER BY skill_id').fetchall()
+            with patch.object(resource_vectors, 'embed_texts', return_value=[fake]) as api:
+                insert_approved(c, [row], skills)
+                api.assert_called_once()
+        def remove():
+            with self.db.tx() as t:
+                t.run("DELETE FROM growpath_meta.catalog_api_sources WHERE resource_type='courses' AND entity_key=:k", k=rid)
+                t.run('DELETE FROM public.courses WHERE course_id=:k', k=rid)
+            catalog.invalidate()
+        self.addCleanup(remove)
+        with self.db.tx() as t:
+            # 구판의 임시 2시간 설정이 있어도 실제 제공처 1시간이 우선해야 한다.
+            t.run("""INSERT INTO app_ext.resource_meta(resource_key,resource_type,course_id,hours,hours_origin,estimated_fields,stage)
+                     VALUES(:k,'course',:c,2,'catalog',:e,1)""", k=rid, c=rid, e=self.db.J(['hours','stage']))
+        catalog.invalidate()
+        client = self.client('member')
+        response = client.get('/api/v1/resources/' + rid)
+        self.assertEqual(response.status_code, 200, response.text)
+        detail = response.json()
+        self.assertEqual((detail['hours'], detail['timeStatus'], detail['durationSeconds']), (1, 'confirmed', 3600))
+        self.assertNotIn('hours', detail['estimated'])
+        self.assertEqual(detail['curriculum']['coverage'], 'public_outline')
+        self.assertEqual([x['title'] for x in detail['curriculum']['items']], ['요청 처리', '응답 처리'])
+        summary = client.post('/api/v1/resources/lookup', json={'ids': [rid]}).json()[rid]
+        self.assertEqual(summary['hours'], 1)
+        self.assertEqual(summary['curriculum'], {'coverage': 'public_outline', 'item_count': 2})
 
     def test_admin_can_confirm_time_without_changing_the_number_and_sync_preserves_it(self):
         from app import catalog,course_time
@@ -212,7 +264,7 @@ class AppContractTests(unittest.TestCase):
         self.assertEqual(float(stored['development_years']), 3.25)
         self.assertEqual(stored['technology_experience'], 'SQL fixture')
         self.assertEqual(self.db.val('SELECT unlisted_certifications FROM public.employees WHERE employee_id=:e', e=self.ids['member']), 'Unlisted fixture')
-        for invalid in ({'expSummary': 'No work description'}, {'workDesc': 'Fixture', 'devYears': 51},
+        for invalid in ({'workDesc': '가'*501}, {'workDesc': 'Fixture', 'devYears': 51},
                         {'workDesc': 'Fixture', 'devYears': 'invalid'}, {'workDesc': 'Fixture', 'devYears': []}):
             self.assertEqual(c.put('/api/v1/me/profile/self', json=invalid).status_code, 422)
             self.assertEqual(self.db.one('SELECT * FROM public.employee_input_profiles WHERE employee_id=:e', e=self.ids['member']), stored)
@@ -239,6 +291,443 @@ class AppContractTests(unittest.TestCase):
         self.assertIsNone(row['consent'])  # Inherit false default, not an erased evaluation.
         self.assertIsNotNone(row['consent_changed_at'])
         self.assertEqual(self.client('peer').put(path, json={'consent': True}).status_code, 404)
+
+    def test_database_work_description_reaches_model_self_override_and_revert(self):
+        from app.agents.goals import goal_input
+        from app.agents.diag import work_profile
+        eid = self.ids['member']
+        with self.db.tx() as t:
+            t.run('UPDATE public.employees SET planned_project_description=:w WHERE employee_id=:e',
+                  w='DB supplied work description', e=eid)
+        c = self.client('member')
+        v = c.get('/api/v1/me/profile').json()['view']
+        self.assertEqual(v['profile']['workDesc'], 'DB supplied work description')
+        self.assertFalse(v['edited'])
+        self.assertEqual(goal_input(v)['profile']['workDescription'], 'DB supplied work description')
+        self.assertEqual(work_profile(v)['workDescription'], 'DB supplied work description')
+        response = c.put('/api/v1/me/profile/self', json={'workDesc': 'Personal override', 'devYears': 0})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()['view']['profile']['workDesc'], 'Personal override')
+        with self.db.tx() as t:
+            t.run('UPDATE public.employees SET planned_project_description=:w WHERE employee_id=:e',
+                  w='Updated DB work description', e=eid)
+        # 새 계약은 팀 열 하나가 현재 값이다. 관리자 후속 변경이 즉시 표시된다.
+        self.assertEqual(c.get('/api/v1/me/profile').json()['view']['profile']['workDesc'], 'Updated DB work description')
+        self.assertEqual(c.delete('/api/v1/me/profile/self').status_code, 200)
+        v = c.get('/api/v1/me/profile').json()['view']
+        self.assertEqual(v['profile']['workDesc'], 'Updated DB work description')
+        self.assertFalse(v['edited'])
+        self.assertNotIn('profile', self.profile.team_view(self.profile.view(eid)))
+
+    def test_explicit_empty_work_override_and_legacy_missing_description(self):
+        eid = self.ids['member']
+        self.assertIsNone(self.profile.view(eid)['profile'])
+        with self.db.tx() as t:
+            t.run('UPDATE public.employees SET planned_project_description=:w WHERE employee_id=:e', w='DB default', e=eid)
+            t.run('INSERT INTO app_ext.employee_self_inputs(employee_id,edited) VALUES(:e,:v)', e=eid, v=self.db.J({'workDesc': None}))
+        self.assertIsNone(self.profile.view(eid)['profile'])
+        with self.db.tx() as t:
+            t.run('UPDATE app_ext.employee_self_inputs SET edited=:v WHERE employee_id=:e', e=eid, v=self.db.J({'inputStatus': {}}))
+        self.assertEqual(self.profile.view(eid)['profile']['workDesc'], 'DB default')
+
+    @staticmethod
+    def self_body(view):
+        """Use the same prefilled values as MePage's full personal-input save."""
+        p = view.get('profile') or {}
+        return {'workDesc': p.get('workDesc') or '', 'expSummary': p.get('expSummary') or '',
+                'devYears': p.get('devYears'),
+                **{k: list(view[k]) for k in ('tech', 'certs', 'learning', 'projects')},
+                'noneConfirmed': {k: p.get('inputStatus', {}).get(k) == 'none_confirmed'
+                                  for k in ('tech', 'certs', 'learning', 'projects')}}
+
+    def test_unchanged_prefilled_self_save_preserves_original_rows(self):
+        for role, with_profile in (('member', False), ('peer', True)):
+            with self.subTest(with_profile=with_profile):
+                eid = self.ids[role]
+                with self.db.tx() as t:
+                    t.run('UPDATE public.employees SET planned_project_description=:w WHERE employee_id=:e', w='DB work', e=eid)
+                    t.run('INSERT INTO public.employee_skills(employee_id,skill_id) SELECT :e,skill_id FROM public.skill_tags ORDER BY skill_id LIMIT 1', e=eid)
+                    if with_profile:
+                        self.profile._write_profile(t, eid, {'experience_summary': 'Saved experience', 'development_years': 0,
+                            'technology_experience': 'Saved technology', 'project_experience': 'Saved project', 'learning_history': 'Saved training'})
+                before = self.db.one('SELECT * FROM public.employee_input_profiles WHERE employee_id=:e', e=eid)
+                stamp = self.db.val('SELECT updated_at FROM public.employees WHERE employee_id=:e', e=eid)
+                c = self.client(role)
+                body = self.self_body(c.get('/api/v1/me/profile').json()['view'])
+                for _ in range(2):
+                    r = c.put('/api/v1/me/profile/self', json=body)
+                    self.assertEqual(r.status_code, 200, r.text)
+                    self.assertFalse(r.json()['self']['edited'])
+                self.assertIsNone(self.db.one('SELECT * FROM app_ext.employee_self_inputs WHERE employee_id=:e', e=eid))
+                self.assertEqual(self.db.one('SELECT * FROM public.employee_input_profiles WHERE employee_id=:e', e=eid), before)
+                self.assertEqual(self.db.val('SELECT updated_at FROM public.employees WHERE employee_id=:e', e=eid), stamp)
+                with self.db.tx() as t:
+                    t.run('UPDATE public.employees SET planned_project_description=:w WHERE employee_id=:e', w='New DB work', e=eid)
+                self.assertEqual(c.get('/api/v1/me/profile').json()['view']['profile']['workDesc'], 'New DB work')
+
+    def test_technology_only_save_keeps_work_description_inherited_and_can_restore(self):
+        eid = self.ids['member']
+        with self.db.tx() as t:
+            t.run('UPDATE public.employees SET planned_project_description=:w WHERE employee_id=:e', w='DB work', e=eid)
+            t.run('INSERT INTO public.employee_skills(employee_id,skill_id) SELECT :e,skill_id FROM public.skill_tags ORDER BY skill_id LIMIT 1', e=eid)
+        c = self.client('member')
+        original = self.self_body(c.get('/api/v1/me/profile').json()['view'])
+        body = dict(original, tech=original['tech'] + ['Added technology'])
+        for _ in range(2):
+            r = c.put('/api/v1/me/profile/self', json=body)
+            self.assertEqual(r.status_code, 200, r.text)
+            self.assertTrue(r.json()['self']['edited'])
+            self.assertNotIn('workDesc', self.db.val('SELECT edited FROM app_ext.employee_self_inputs WHERE employee_id=:e', e=eid))
+        with self.db.tx() as t:
+            t.run('UPDATE public.employees SET planned_project_description=:w WHERE employee_id=:e', w='New DB work', e=eid)
+        v = c.get('/api/v1/me/profile').json()['view']
+        self.assertEqual(v['profile']['workDesc'], 'New DB work')
+        self.assertIn('Added technology', v['tech'])
+        body = self.self_body(v)
+        body['tech'] = original['tech']
+        r = c.put('/api/v1/me/profile/self', json=body)
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertFalse(r.json()['self']['edited'])
+        self.assertIsNone(self.db.one('SELECT * FROM public.employee_input_profiles WHERE employee_id=:e', e=eid))
+
+    def test_description_only_override_and_equal_db_value_do_not_copy_team_fields(self):
+        eid = self.ids['member']
+        with self.db.tx() as t:
+            t.run('UPDATE public.employees SET planned_project_description=:w WHERE employee_id=:e', w='DB work', e=eid)
+        c = self.client('member')
+        body = self.self_body(c.get('/api/v1/me/profile').json()['view'])
+        body['workDesc'] = 'Personal work'
+        r = c.put('/api/v1/me/profile/self', json=body)
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertTrue(r.json()['self']['edited'])
+        self.assertIsNone(self.db.one('SELECT * FROM public.employee_input_profiles WHERE employee_id=:e', e=eid))
+        self.assertEqual(self.db.val('SELECT planned_project_description FROM public.employees WHERE employee_id=:e', e=eid),'Personal work')
+        extra=self.db.val('SELECT edited FROM app_ext.employee_self_inputs WHERE employee_id=:e', e=eid)
+        self.assertNotIn('workDesc',extra)
+        self.assertIn('workDescHash',extra)
+        body['workDesc']='DB work'
+        r = c.put('/api/v1/me/profile/self', json=body)
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertFalse(r.json()['self']['edited'])
+        with self.db.tx() as t:
+            t.run('UPDATE public.employees SET planned_project_description=:w WHERE employee_id=:e', w='Later DB work', e=eid)
+        self.assertEqual(c.get('/api/v1/me/profile').json()['view']['profile']['workDesc'], 'Later DB work')
+
+    def test_work_description_restores_initial_team_value_and_empty_is_null(self):
+        eid=self.ids['member']
+        with self.db.tx() as t:
+            t.run('UPDATE public.employees SET planned_project_description=:w WHERE employee_id=:e',w='처음 업무',e=eid)
+        c=self.client('member')
+        self.assertEqual(c.put('/api/v1/me/profile/self',json={'workDesc':'수정한 업무'}).status_code,200)
+        self.assertEqual(self.db.val('SELECT baseline FROM app_ext.employee_self_inputs WHERE employee_id=:e',e=eid)['workDesc'],'처음 업무')
+        self.assertEqual(c.delete('/api/v1/me/profile/self').status_code,200)
+        self.assertEqual(self.db.val('SELECT planned_project_description FROM public.employees WHERE employee_id=:e',e=eid),'처음 업무')
+        self.assertEqual(c.put('/api/v1/me/profile/self',json={'workDesc':''}).status_code,200)
+        self.assertIsNone(self.db.val('SELECT planned_project_description FROM public.employees WHERE employee_id=:e',e=eid))
+        self.assertEqual(c.put('/api/v1/me/profile/self',json={'workDesc':'가'*501}).status_code,422)
+
+    def test_real_user_project_only_save_reaches_diagnosis_and_roadmap_handoff(self):
+        from app.agents import diag,goals
+        from app.services import drafts
+        eid=self.ids['member']
+        with self.db.tx() as t:
+            t.run("UPDATE public.employees SET source_type='REAL_USER' WHERE employee_id=:e",e=eid)
+        c=self.client('member')
+        r=c.put('/api/v1/me/profile/self',json={'projects':['데모 가정: 로그 누락 검사 프로젝트'],'workDesc':''})
+        self.assertEqual(r.status_code,200,r.text)
+        v=r.json()['view']
+        self.assertTrue(goals.profile_enough(v))
+        self.assertIsNone(v['profile']['workDesc'])
+        self.assertEqual(self.db.val('SELECT project_experience FROM public.employee_input_profiles WHERE employee_id=:e',e=eid),v['projects'][0])
+        context=diag.work_profile(v)
+        self.assertEqual(context['projectExperience'],v['projects'])
+        self.assertNotIn('name',context)
+        self.assertNotIn('code',context)
+        draft={'goal':'로그 누락 검사','diag':{'startStage':1,'startReason':'응답 근거','known':[],
+            'gaps':[],'competencies':[],'resourceIds':[],'outcome':''},'prefs':{'format':'','hours':'','weeks':'','budget':'','cert':'','etc':''}}
+        handoff=drafts.build_handoff(draft,context)
+        self.assertEqual(handoff['profile']['projectExperience'],v['projects'])
+        self.assertIsNone(handoff['projectSummary'])
+
+    def test_project_context_is_bounded_without_employee_identity(self):
+        from app.agents import diag,goals
+        me={'name':'private name','code':'private number','dept':'private department',
+            'projects':['경험 '+str(n)+'가'*500 for n in range(8)]}
+        self.assertTrue(goals.profile_enough(me))
+        context=diag.work_profile(me)
+        self.assertEqual(len(context['projectExperience']),5)
+        self.assertTrue(all(len(x)<=300 for x in context['projectExperience']))
+        self.assertNotIn('name',context)
+        self.assertNotIn('department',context)
+        self.assertNotIn('projectSummary',context)
+
+    def test_question_model_receives_personal_projects_separately_from_proposal(self):
+        from app.agents import diag
+        ctx=SimpleNamespace(me={'profile':{'workDesc':'현재 업무'},'projects':['과거 프로젝트']})
+        result={'questions':[{'text':f'검증 문항 {n}','area':'업무','skill':'SQL'} for n in range(5)]}
+        def invoke(ctx,name,task,inp,mock,api,**kwargs):return api(inp)
+        with patch.object(diag.rt,'run',side_effect=invoke),patch.object(diag.rt,'llm_json',return_value=result) as model, \
+             patch.object(diag.DC,'build',return_value={'issues':[]}),patch.object(diag.DC,'finish',return_value=None):
+            diag.questions(ctx,{'goal':'학습 목표','projectSummary':'새 기획서'})
+        payload=model.call_args.args[2]
+        self.assertEqual(payload['profile']['workDescription'],'현재 업무')
+        self.assertEqual(payload['profile']['projectExperience'],['과거 프로젝트'])
+        self.assertEqual(payload['projectSummary'],'새 기획서')
+
+    def test_legacy_work_migration_preserves_data_and_rejects_conflicts_atomically(self):
+        from sqlalchemy.exc import DBAPIError
+        script=(Path(__file__).resolve().parents[2]/'backend/db/migrate_self_work_descriptions.sql').read_text(encoding='utf-8')
+        # The file controls its transaction when run with psql; use this test's tx instead.
+        body=script.replace('BEGIN;\nLOCK TABLE','LOCK TABLE',1).rsplit('COMMIT;',1)[0]
+        first,second=self.ids['member'],self.ids['peer']
+        with self.db.tx() as t:
+            t.run('INSERT INTO app_ext.employee_self_inputs(employee_id,edited) VALUES(:e,:v)',e=first,v=self.db.J({'workDesc':'구판 설명'}))
+            t.run('UPDATE public.employees SET planned_project_description=:w WHERE employee_id=:e',e=second,w='팀 설명')
+            t.run('INSERT INTO app_ext.employee_self_inputs(employee_id,edited) VALUES(:e,:v)',e=second,v=self.db.J({'workDesc':'서로 다른 설명'}))
+        with self.assertRaises(DBAPIError):
+            with self.db.tx() as t:t.run(body)
+        self.assertIsNone(self.db.val('SELECT planned_project_description FROM public.employees WHERE employee_id=:e',e=first))
+        with self.db.tx() as t:t.run('DELETE FROM app_ext.employee_self_inputs WHERE employee_id=:e',e=second)
+        for _ in range(2):
+            with self.db.tx() as t:t.run(body)
+        self.assertEqual(self.db.val('SELECT planned_project_description FROM public.employees WHERE employee_id=:e',e=first),'구판 설명')
+        self.assertNotIn('workDesc',self.db.val('SELECT edited FROM app_ext.employee_self_inputs WHERE employee_id=:e',e=first))
+        self.assertEqual(self.client('member').delete('/api/v1/me/profile/self').status_code,200)
+        self.assertEqual(self.db.val('SELECT planned_project_description FROM public.employees WHERE employee_id=:e',e=first),'구판 설명')
+
+    def _goal_setup(self):
+        eid=self.ids['member']
+        with self.db.tx() as t:t.run('UPDATE public.employees SET planned_project_description=:w WHERE employee_id=:e',e=eid,w='로그 분석 업무')
+        return eid,{'candidates':[{'goal':f'{x} 오류를 점검하고 싶어요.','why':'업무 설명 근거','basis':['업무 설명']} for x in ('로그','적재','조회')],'note':''}
+
+    def _wait_goal(self,eid):
+        from app import jobs
+        state=self.goals.get(eid)
+        if state['jobId']:jobs.wait_result(state['jobId'],eid,timeout=5)
+        return self.goals.get(eid)
+
+    def test_goal_preload_runs_after_website_save_not_login_session_or_sql_edit(self):
+        eid,out=self._goal_setup()
+        with patch.object(self.goals,'request',self.actual_goal_request),patch.object(self.goals.G,'run',return_value=out) as generate:
+            c=self.client('member')
+            self.assertEqual(c.get('/api/v1/me').status_code,200)
+            self.assertEqual(generate.call_count,0)
+            self.assertIsNone(self.db.one('SELECT status FROM app_ext.goal_suggestion_runs WHERE employee_id=:e',e=eid))
+            self.assertEqual(c.post('/api/v1/me/goal-suggestions/ensure').status_code,200)
+            self.assertEqual(self._wait_goal(eid)['status'],'ready')
+            self.assertEqual(generate.call_count,1)
+            for _ in range(2):
+                self.assertEqual(c.post('/api/v1/auth/login',json={'employeeNo':self.numbers['member'],'password':self.password}).status_code,200)
+                self.assertEqual(c.get('/api/v1/me').status_code,200)
+                self.assertEqual(c.post('/api/v1/me/goal-suggestions/ensure').status_code,200)
+            self.assertEqual(generate.call_count,1)
+            with self.db.tx() as t:t.run('UPDATE public.employees SET planned_project_description=:w WHERE employee_id=:e',e=eid,w='변경된 데이터 점검 업무')
+            self.assertEqual(c.get('/api/v1/me').status_code,200)
+            stale=c.post('/api/v1/me/goal-suggestions/ensure')
+            self.assertTrue(stale.json()['stale'])
+            self.assertEqual(generate.call_count,1)
+            body=self.self_body(c.get('/api/v1/me/profile').json()['view'])
+            body['workDesc']='홈페이지에서 바꾼 로그 분석 업무'
+            self.assertEqual(c.put('/api/v1/me/profile/self',json=body).status_code,200)
+            self.assertEqual(self._wait_goal(eid)['status'],'ready')
+            self.assertEqual(generate.call_count,2)
+            self.assertEqual(c.put('/api/v1/me/profile/self',json=body).status_code,200)
+            self.assertEqual(c.get('/api/v1/me').status_code,200)
+            self.assertEqual(generate.call_count,2)
+            self.assertEqual(c.put('/api/v1/me/profile/self',json=dict(body,devYears=51)).status_code,422)
+            self.assertEqual(generate.call_count,2)
+            self.assertEqual(c.delete('/api/v1/me/profile/self').status_code,200)
+            self.assertEqual(self._wait_goal(eid)['status'],'ready')
+            self.assertEqual(generate.call_count,3)
+
+    def test_goal_preload_follows_website_evaluation_consent_changes(self):
+        eid,out=self._goal_setup()
+        with self.db.tx() as t:
+            t.run("INSERT INTO app_ext.employee_evaluations(employee_id,period,grade,consent_default) VALUES(:e,'2026','A',false)",e=eid)
+        with patch.object(self.goals,'request',self.actual_goal_request),patch.object(self.goals.G,'run',return_value=out) as generate:
+            c=self.client('member')
+            self.assertEqual(c.post('/api/v1/me/goal-suggestions/ensure').status_code,200)
+            self.assertEqual(self._wait_goal(eid)['status'],'ready')
+            self.assertEqual(c.put('/api/v1/me/evaluations/2026/consent',json={'consent':False}).status_code,200)
+            self.assertEqual(generate.call_count,1)
+            self.assertEqual(c.put('/api/v1/me/evaluations/2026/consent',json={'consent':True}).status_code,200)
+            self.assertEqual(self._wait_goal(eid)['status'],'ready')
+            self.assertEqual(generate.call_count,2)
+            self.assertEqual(c.put('/api/v1/me/evaluations/2026/consent',json={'consent':True}).status_code,200)
+            self.assertEqual(generate.call_count,2)
+
+    def test_department_rename_preloads_affected_members_after_admin_save(self):
+        from app.admin_io import base,hr
+        eid,out=self._goal_setup()
+        code=self.db.val('SELECT department_code FROM public.departments WHERE department_id=:d',d=self.dept)
+        row=base.Row('부서',2,{'code':code,'name':'웹에서 변경한 상위 부서'},{'code','name'},key=(code,))
+        row.action='update'
+        with patch.object(self.goals,'request',self.actual_goal_request),patch.object(self.goals.G,'run',return_value=out) as generate:
+            self.client('member').post('/api/v1/me/goal-suggestions/ensure')
+            self.assertEqual(self._wait_goal(eid)['status'],'ready')
+            with patch.object(hr,'_inst',return_value=self.inst):
+                cur={sheet:hr.current(sheet) for sheet in ('부서','직원','평정')}
+                with self.db.tx() as t:result=hr.apply(t,{'부서':[row]},cur,{})
+            self.assertEqual(set(result['goal_ids']),{self.ids[key] for key in ('head','member','peer','child_head','child_member')})
+            self.assertEqual(generate.call_count,1)
+            hr.after(result,{})
+            for affected in result['goal_ids']:
+                self.assertEqual(self._wait_goal(affected)['status'],'ready')
+            self.assertEqual(generate.call_count,6)
+            self.assertEqual(self.profile.view(eid)['dept'],'웹에서 변경한 상위 부서')
+
+    def test_org_only_goal_uses_same_llm_contract_for_app_entry_and_preload(self):
+        from app import llm,jobs
+        from app.agents import runtime
+        first,second=self.ids['member'],self.ids['peer']
+        with self.db.tx() as t:
+            for eid in (first,second):
+                t.run("INSERT INTO app_ext.user_settings(employee_id,ai_provider,demo_mock) VALUES(:e,'openai',false)",e=eid)
+        result={'candidates':[{'goal':f'{topic}의 기초를 학습하고 싶어요.','why':'소속 부서를 참고한 기초 목표예요.','basis':['직급·부서']}
+                              for topic in ('문서 검색','데이터 분석','서비스 운영')],'note':'담당 업무 입력이 없어 기초 방향으로 제안했어요.'}
+        with patch.object(self.goals,'request',self.actual_goal_request),patch.object(llm,'available',return_value=True), \
+             patch.object(runtime,'llm_json',return_value=result) as model:
+            c=self.client('member')
+            self.assertEqual(c.post('/api/v1/me/goal-suggestions/ensure').status_code,200)
+            self.assertEqual(self._wait_goal(first)['source'],'openai')
+            jid=self.actual_goal_request(second,'admin-preload',mode='openai',only_if_stale=True)
+            jobs.wait_result(jid,second,timeout=5)
+            self.assertEqual(self._wait_goal(second)['source'],'openai')
+            self.assertEqual(model.call_count,2)
+            self.assertEqual(model.call_args_list[0].args[1:],model.call_args_list[1].args[1:])
+            self.assertEqual(len(self.goals.get(first)['candidates']),3)
+
+    def test_owned_certificate_rename_preloads_only_linked_employees(self):
+        from app.admin_io import base,education
+        from app import catalog
+        eid,out=self._goal_setup()
+        with self.db.tx() as t:
+            cid=t.val("INSERT INTO public.certifications(title,provider,content_status) VALUES(:n,'fixture','ready') RETURNING cert_id",n='웹 변경 자격 '+uuid4().hex)
+            t.run('INSERT INTO public.employee_certifications(employee_id,certification_id) VALUES(:e,:c)',e=eid,c=cid)
+            t.run("INSERT INTO app_ext.resource_meta(resource_key,resource_type,cert_id,hours,stage,estimated_fields) VALUES(:k,'cert',:c,30,1,'[]'::jsonb)",k=f'cert_{cid}',c=cid)
+        def cleanup():
+            with self.db.tx() as t:
+                t.run('DELETE FROM public.employee_certifications WHERE certification_id=:c',c=cid)
+                t.run('DELETE FROM app_ext.resource_meta WHERE cert_id=:c',c=cid)
+                t.run('DELETE FROM public.certifications WHERE cert_id=:c',c=cid)
+            catalog.invalidate()
+        self.addCleanup(cleanup)
+        cur={'강좌':{},'도서':{},'자격증':{(cid,):education.current('자격증')[(cid,)]}}
+        row=base.Row('자격증',2,{'key':cid,'title':'홈페이지에서 바꾼 자격 명칭'},{'key','title'},key=(cid,))
+        row.action='update'
+        with patch.object(self.goals,'request',self.actual_goal_request),patch.object(self.goals.G,'run',return_value=out) as generate:
+            self.client('member').post('/api/v1/me/goal-suggestions/ensure')
+            self.assertEqual(self._wait_goal(eid)['status'],'ready')
+            with self.db.tx() as t:result=education.apply(t,{'자격증':[row]},cur,{})
+            self.assertEqual(result['goal_ids'],[eid])
+            self.assertEqual(generate.call_count,1)
+            education.after(result,{})
+            self.assertEqual(self._wait_goal(eid)['status'],'ready')
+            self.assertEqual(generate.call_count,2)
+
+    def test_goal_concurrent_preloads_share_one_job_and_running_state_precedes_worker(self):
+        eid,out=self._goal_setup()
+        entered,release=Event(),Event()
+        def generate(ctx,inp,**kwargs):
+            self.assertEqual(self.goals.get(eid)['status'],'running')
+            entered.set()
+            if not release.wait(5):raise AssertionError('Test worker gate timed out')
+            return out
+        with patch.object(self.goals.G,'run',side_effect=generate) as model:
+            try:
+                with ThreadPoolExecutor(max_workers=2) as pool:
+                    ids=list(pool.map(lambda _:self.actual_goal_request(eid,'login',only_if_stale=True),range(2)))
+                self.assertTrue(entered.wait(2))
+                self.assertEqual(ids[0],ids[1])
+                self.assertEqual(model.call_count,1)
+            finally:release.set()
+            self.assertEqual(self._wait_goal(eid)['status'],'ready')
+
+    def test_goal_failed_preload_keeps_candidates_and_only_manual_retries_same_input(self):
+        from app.errors import AgentError
+        eid,out=self._goal_setup()
+        with self.db.tx() as t:self.goals._save(t,eid,out['candidates'])
+        with patch.object(self.goals.G,'run',side_effect=AgentError('검증용 모델 연결 실패')) as generate:
+            self.actual_goal_request(eid,'login',only_if_stale=True)
+            self.assertEqual(self._wait_goal(eid)['status'],'failed')
+            for _ in range(2):self.actual_goal_request(eid,'login',only_if_stale=True)
+            self.assertEqual(generate.call_count,1)
+            self.assertEqual(len(self.goals.get(eid)['candidates']),3)
+        with patch.object(self.goals,'request',self.actual_goal_request),patch.object(self.goals.G,'run',return_value=out) as generate:
+            self.goals.regenerate(eid)
+            self.assertEqual(self._wait_goal(eid)['status'],'ready')
+            self.assertEqual(generate.call_count,1)
+
+    def test_preload_cli_defaults_to_readonly_without_model_or_job_calls(self):
+        eid,_=self._goal_setup()
+        before=self.db.val('SELECT count(*) FROM app_ext.jobs')
+        env={**os.environ,'DATABASE_URL':self.db.engine.url.render_as_string(hide_password=False)}
+        done=subprocess.run([sys.executable,'-X','utf8',str(Path(__file__).resolve().parents[2]/'backend/tools/preload_goals.py'),
+                             '--employee-id',str(eid)],env=env,capture_output=True,text=True,timeout=10)
+        self.assertEqual(done.returncode,0,done.stderr)
+        import json
+        result=json.loads(done.stdout)
+        self.assertEqual((result['mode'],result['database_writes'],result['paid_api_calls']),('preview',0,0))
+        self.assertEqual(self.db.val('SELECT count(*) FROM app_ext.jobs'),before)
+
+    def test_profile_change_during_preload_discards_old_result_and_prepares_latest_once(self):
+        from app import jobs
+        eid,out=self._goal_setup()
+        entered,release=Event(),Event()
+        inputs=[];modes=[]
+        def generate(ctx,inp,**kwargs):
+            value=inp['profile']['workDescription'];inputs.append(value);modes.append(ctx.mode)
+            if len(inputs)==1:
+                entered.set()
+                if not release.wait(5):raise AssertionError('Test worker gate timed out')
+            return dict(out,candidates=[dict(c,goal=value+' '+c['goal']) for c in out['candidates']])
+        with patch.object(self.goals,'request',self.actual_goal_request),patch.object(self.goals.G,'run',side_effect=generate):
+            try:
+                jid=self.actual_goal_request(eid,'admin-preload',mode='mock',only_if_stale=True)
+                self.assertTrue(entered.wait(2))
+                with self.db.tx() as t:t.run('UPDATE public.employees SET planned_project_description=:w WHERE employee_id=:e',e=eid,w='바뀐 프로젝트 점검 업무')
+                self.assertEqual(self.actual_goal_request(eid,'self-input',only_if_stale=True),jid)
+            finally:release.set()
+            jobs.wait_result(jid,eid,timeout=5)
+            state=self._wait_goal(eid)
+            self.assertEqual(state['status'],'ready')
+            self.assertEqual(inputs,['로그 분석 업무','바뀐 프로젝트 점검 업무'])
+            self.assertEqual(modes,['mock','mock'])
+            self.assertTrue(all(c['goal'].startswith('바뀐 프로젝트 점검 업무') for c in state['candidates']))
+
+    def test_certificate_only_retry_preserves_edited_links_and_can_restore(self):
+        eid = self.ids['member']
+        certs = self.db.all_('SELECT cert_id,title FROM public.certifications ORDER BY cert_id LIMIT 2')
+        self.assertEqual(len(certs), 2)
+        with self.db.tx() as t:
+            t.run('UPDATE public.employees SET planned_project_description=:w WHERE employee_id=:e', w='DB work', e=eid)
+            t.run('INSERT INTO public.employee_certifications(employee_id,certification_id) VALUES(:e,:c)', e=eid, c=certs[0]['cert_id'])
+        c = self.client('member')
+        original = self.self_body(c.get('/api/v1/me/profile').json()['view'])
+        body = dict(original, certs=[x['title'] for x in certs])
+        for _ in range(2):
+            r = c.put('/api/v1/me/profile/self', json=body)
+            self.assertEqual(r.status_code, 200, r.text)
+            self.assertTrue(r.json()['self']['edited'])
+            self.assertEqual(set(r.json()['self']['certs']), {x['title'] for x in certs})
+            self.assertNotIn('workDesc', self.db.val('SELECT edited FROM app_ext.employee_self_inputs WHERE employee_id=:e', e=eid))
+        r = c.put('/api/v1/me/profile/self', json=original)
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertFalse(r.json()['self']['edited'])
+        self.assertEqual(r.json()['self']['certs'], [certs[0]['title']])
+
+    def test_none_confirmed_is_preserved_without_work_description_override(self):
+        eid = self.ids['member']
+        with self.db.tx() as t:
+            t.run('UPDATE public.employees SET planned_project_description=:w WHERE employee_id=:e', w='DB work', e=eid)
+        c = self.client('member')
+        body = self.self_body(c.get('/api/v1/me/profile').json()['view'])
+        body['noneConfirmed']['learning'] = True
+        r = c.put('/api/v1/me/profile/self', json=body)
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertTrue(r.json()['self']['edited'])
+        self.assertEqual(r.json()['self']['profile']['inputStatus']['learning'], 'none_confirmed')
+        self.assertNotIn('workDesc', self.db.val('SELECT edited FROM app_ext.employee_self_inputs WHERE employee_id=:e', e=eid))
 
     def test_progress_retry_owner_only_and_manager_redaction(self):
         path = '/api/v1/plans/' + self.roadmap + '/activities/fixture-activity/progress'

@@ -5,12 +5,48 @@ import sys
 import tempfile
 import unittest
 
-from src.database.course_curriculum import VERSION, normalize, plain
+from src.database.course_curriculum import VERSION, normalize, plain, repair_numbered_titles
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'backend'))
 from app.catalog_evidence import CATALOG_BYTES, content_text, evidence, pack, packed_bytes
 
 
 class CourseCurriculumTests(unittest.TestCase):
+    def test_week_and_lesson_numbers_use_the_same_source_row_title(self):
+        payload = {'summary': '<table><tr><th>주차</th><th>주제</th><th>차시</th><th>내용</th></tr>'
+                   '<tr><td>WEEK 1</td><td>SW 배포체계</td><td>1-1</td><td>배포 위험</td></tr>'
+                   '<tr><td>1-2</td><td>통합 배포 체계</td></tr></table>'}
+        value = normalize('API_KMOOC', payload)
+        self.assertEqual([r['title'] for r in value['items']], ['SW 배포체계', '통합 배포 체계'])
+        self.assertEqual(value['items'][0]['section'], 'WEEK 1')
+        self.assertEqual(value['items'][0]['description'], '1-1 / 배포 위험')
+        self.assertEqual(value['items'][0]['original_title'], 'WEEK 1')
+        self.assertEqual(value['items'][0]['original_description'], 'SW 배포체계 / 1-1 / 배포 위험')
+
+    def test_restored_outline_repairs_without_original_cache_and_is_idempotent(self):
+        import copy
+        value = {'source': 'API_KMOOC', 'payload_sha256': 'preserved', 'item_count': 2,
+                 'items': [{'title': '1 주차', 'section': '', 'description': 'SQL / SELECT'},
+                           {'title': '트랜잭션', 'section': '', 'description': '격리 수준'}]}
+        before = copy.deepcopy(value)
+        fixed = repair_numbered_titles(value)
+        self.assertEqual(value, before)
+        self.assertEqual(fixed['payload_sha256'], value['payload_sha256'])
+        self.assertEqual(fixed['item_count'], 2)
+        self.assertEqual(fixed['items'][1], value['items'][1])
+        self.assertEqual(fixed, repair_numbered_titles(fixed))
+
+    def test_kocw_video_metadata_is_preserved_and_no_missing_title_is_invented(self):
+        value = normalize('WEB_KOCW', {'lessons': [
+            {'title': '1-2', 'chapter': '1.', 'description': '파이썬 기본 이론', 'video_listed': True},
+            {'title': '2-1', 'description': ''}]})
+        self.assertEqual(value['items'][0]['title'], '파이썬 기본 이론')
+        self.assertEqual(value['items'][0]['section'], '1. / 1-2')
+        self.assertTrue(value['items'][0]['video'])
+        self.assertEqual(value['items'][1]['title'], '제목 미제공')
+        self.assertEqual(value['items'][1]['original_title'], '2-1')
+        self.assertTrue(value['items'][1]['title_missing'])
+        self.assertEqual(value['coverage'], 'partial_outline')
+
     def test_entire_ai_catalog_budget_and_four_skill_limit(self):
         records=[{'id':str(i),'title':'SQL 강좌 '+str(i),'kind':'강좌','type':'course','format':'영상',
                   'skills':['SQL']*12,'hours':1,'timeStatus':'estimated','content':'한글 소개 '*1000,
@@ -66,6 +102,61 @@ class CourseCurriculumTests(unittest.TestCase):
         value=normalize('WEB_OPENTUTORIALS',{'lessons':[{'title':'sample'}]})
         self.assertEqual(value['coverage'],'sample')
         self.assertEqual(normalize('API_MS_LEARN',{'units':['uid']})['coverage'],'description_only')
+
+    def test_sample_upgrades_when_the_same_source_cache_becomes_available(self):
+        with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parent) as folder:
+            root = Path(folder)
+            raw = b'<a class="depth_0" href="/course/1/11">First</a><a class="depth_1" href="/course/1/12">Second</a>'
+            payload = {'source_id': 1, 'html_path': 'course.html',
+                       'html_sha256': hashlib.sha256(raw).hexdigest(), 'lessons': [{'title': 'Sample'}]}
+            sample = normalize('WEB_OPENTUTORIALS', payload, source_root=root)
+            self.assertEqual(sample['coverage'], 'sample')
+            (root / 'course.html').write_bytes(raw)
+            full = normalize('WEB_OPENTUTORIALS', payload, previous=sample, source_root=root)
+            self.assertEqual(full['coverage'], 'public_outline')
+            self.assertEqual([row['title'] for row in full['items']], ['First', 'Second'])
+            self.assertEqual(full['payload_sha256'], sample['payload_sha256'])
+            self.assertEqual(normalize('WEB_OPENTUTORIALS', payload, previous=full, source_root=root), full)
+            (root / 'course.html').unlink()
+            self.assertEqual(normalize('WEB_OPENTUTORIALS', payload, previous=full, source_root=root), full)
+
+    def test_missing_outline_upgrades_from_verified_supplement_and_rejects_bad_hash(self):
+        with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parent) as folder:
+            root = Path(folder)
+            raw = b'<a class="unit-title" href="1">First</a><a class="unit-title" href="2">Second</a>'
+            payload = {'units': ['first', 'second']}
+            supplement = {'html_path': 'ms.html', 'html_sha256': hashlib.sha256(raw).hexdigest()}
+            missing = normalize('API_MS_LEARN', payload, source_root=root, supplement=supplement)
+            self.assertEqual(missing['coverage'], 'description_only')
+            (root / 'ms.html').write_bytes(b'wrong source')
+            with self.assertRaisesRegex(ValueError, 'checksum'):
+                normalize('API_MS_LEARN', payload, previous=missing, source_root=root, supplement=supplement)
+            (root / 'ms.html').write_bytes(raw)
+            full = normalize('API_MS_LEARN', payload, previous=missing, source_root=root, supplement=supplement)
+            self.assertEqual(full['coverage'], 'public_outline')
+            self.assertEqual(full['item_count'], 2)
+            self.assertEqual(full['supplement_input_sha256'], missing['supplement_input_sha256'])
+
+    def test_available_cache_does_not_replace_a_richer_partial_outline(self):
+        with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parent) as folder:
+            root = Path(folder)
+            raw = b'<a class="unit-title" href="1">First</a>'
+            payload = {'units': ['one', 'two', 'three'], 'html_path': 'ms.html',
+                       'html_sha256': hashlib.sha256(raw).hexdigest()}
+            description = '공개 단원\nFirst\nSecond'
+            partial = normalize('API_MS_LEARN', payload, description, source_root=root)
+            self.assertEqual(partial['item_count'], 2)
+            (root / 'ms.html').write_bytes(raw)
+            self.assertEqual(normalize('API_MS_LEARN', payload, description, previous=partial, source_root=root), partial)
+
+    def test_changed_source_or_normalizer_version_rebuilds_the_cached_outline(self):
+        payload = {'lessons': [{'title': 'Old', 'hasVideo': True}]}
+        original = normalize('WEB_INFLEARN', payload)
+        changed = normalize('WEB_INFLEARN', {'lessons': [{'title': 'New', 'hasVideo': True}]}, previous=original)
+        self.assertEqual(changed['items'][0]['title'], 'New')
+        stale_version = dict(original, version='old', items=[{'title': 'Stale'}])
+        rebuilt = normalize('WEB_INFLEARN', payload, previous=stale_version)
+        self.assertEqual(rebuilt['items'][0]['title'], 'Old')
 
     def test_ms_supplement_uses_public_titles_not_invented_uid_labels(self):
         with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parent) as folder:

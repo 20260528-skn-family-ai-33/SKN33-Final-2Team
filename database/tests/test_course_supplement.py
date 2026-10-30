@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 from src.shared.catalog_eligibility import exclusion_reason
 from src.shared.catalog_scope import scope_reason, scoped_matches
 from src.shared.skill_matching import SkillMatcher
-from src.database.ingestion.course_supplement import validate_rows, insert_approved
+from src.database.ingestion.course_supplement import validate_rows, insert_approved, insert_catalog_approved
 
 NOW = datetime(2026, 10, 26, tzinfo=timezone.utc)
 SKILLS = [{'skill_id': 1, 'name': 'SQL 기본 문법 & 조인', 'category': '데이터베이스'},
@@ -160,6 +160,48 @@ def external_course(source='WEB_INFLEARN'):
 class ExternalCourseTests(unittest.TestCase):
     def reason(self, row):
         return exclusion_reason('courses', row['fields'], row['source'], row['raw'], row['fetched_at'], now=NOW)
+
+    def inserted_fields(self, row, insert):
+        conn = MagicMock()
+        conn.execute.return_value.fetchall.side_effect = [NEW_SKILLS, []]
+        row['matches'] = {30: ['FastAPI']}
+        before = deepcopy(row)
+        key = ('courses', row['fields']['course_id'])
+        module = 'src.database.ingestion.course_supplement.'
+        with patch(module + 'resource_vectors.stored', return_value={}), \
+             patch(module + 'resource_vectors.sources', return_value={key: {}}), \
+             patch(module + 'resource_vectors.embed', return_value={'embedded_count': 1}), \
+             patch(module + 'eligible_keys', return_value=({key}, {})):
+            insert(conn, [row], NEW_SKILLS)
+        call = next(c for c in conn.execute.call_args_list if c.args[0].startswith('INSERT INTO public.courses'))
+        columns = call.args[0].split('(', 1)[1].split(')', 1)[0].split(',')
+        self.assertEqual(row, before)
+        return dict(zip(columns, call.args[1]))
+
+    def test_both_supplement_paths_store_confirmed_hour_and_outline_without_backfill(self):
+        for insert in (insert_approved, insert_catalog_approved):
+            with self.subTest(path=insert.__name__):
+                row = external_course()
+                for index, lesson in enumerate(row['raw']['lessons']):
+                    lesson.update(id=index + 1, runtime=1800)
+                fields = self.inserted_fields(row, insert)
+                self.assertEqual(fields.get('duration_seconds'), 3600)
+                self.assertEqual(fields['duration_kind'], 'video')
+                self.assertIsNone(fields['estimated_duration_seconds'])
+                self.assertEqual(fields['duration_provenance'].obj['status'], 'confirmed')
+                self.assertEqual(fields['curriculum'].obj['item_count'], 2)
+                self.assertEqual(fields['curriculum'].obj['items'][0]['title'], '요청 처리')
+
+    def test_unknown_runtime_stays_an_explicit_estimate_with_source_evidence(self):
+        row = external_course()
+        for index, lesson in enumerate(row['raw']['lessons']):
+            lesson['id'] = index + 1
+        fields = self.inserted_fields(row, insert_approved)
+        self.assertIn('duration_seconds', fields)
+        self.assertIsNone(fields['duration_seconds'])
+        self.assertEqual(fields['estimated_duration_seconds'], 2400)
+        self.assertEqual(fields['duration_provenance'].obj['status'], 'estimated')
+        self.assertEqual(fields['curriculum'].obj['coverage'], 'public_outline')
 
     def test_published_paid_and_free_public_courses_validate(self):
         rows = [external_course(), external_course('WEB_OPENTUTORIALS')]

@@ -1,6 +1,7 @@
 """Validate and add only reviewed new courses; never reset/finalize other catalogs."""
 from datetime import datetime, timezone
 import hashlib
+from pathlib import Path
 from urllib.parse import urlsplit, parse_qs, urlencode
 
 from psycopg.types.json import Jsonb
@@ -11,6 +12,7 @@ from src.shared.skill_matching import SkillMatcher
 from src.database.ingestion.ai_catalog_filter import AICatalogFilter
 from src.shared.course_sources import step_identity, kmooc_identity
 from src.database.vectors import resource_vectors
+from src.database import course_curriculum, course_duration
 
 FIELDS = {'course_id', 'title', 'org_name', 'platform', 'url', 'source_url', 'content_status',
           'record_source', 'source_verified_at', 'syllabus_summary', 'cost', 'difficulty',
@@ -96,7 +98,22 @@ def validate_catalog(rows: list, skills: list, existing: list, *, max_courses=50
     return checked
 
 
-def _insert_approved(conn, rows: list, skills: list, validator, *, embedding_client=None) -> dict:
+def _normalized_fields(row: dict, source_root=None) -> dict:
+    """원문은 보존하고 신규 행의 앱용 시간·목차를 같은 공통 규칙으로 만든다."""
+    root = source_root or Path(__file__).resolve().parents[3]
+    fields = dict(row['fields'])
+    source, payload = row['source'], row['raw']
+    outline = course_curriculum.normalize(source, payload, fields.get('syllabus_summary', ''),
+                                           url=fields['url'], source_root=root)
+    full = course_duration.full_curriculum(payload, {}, root) if source == 'WEB_OPENTUTORIALS' else None
+    duration = course_duration.normalize(source, payload, url=fields['url'],
+                                         fetched_at=row['fetched_at'], curriculum=full)
+    fields.update(duration, curriculum=Jsonb(outline))
+    fields['duration_provenance'] = Jsonb(duration['duration_provenance'])
+    return fields
+
+
+def _insert_approved(conn, rows: list, skills: list, validator, *, embedding_client=None, source_root=None) -> dict:
     """Caller provides an outer transaction; any failure rolls back the entire catalog."""
     conn.execute('SELECT pg_advisory_xact_lock(763250131)')
     conn.execute('LOCK TABLE public.courses IN SHARE ROW EXCLUSIVE MODE')
@@ -107,6 +124,7 @@ def _insert_approved(conn, rows: list, skills: list, validator, *, embedding_cli
     checked = validator(rows, skills, existing)
     ids = {r['fields']['course_id'] for r in checked}
     original_rows = {r['fields']['course_id']: r for r in rows}
+    prepared = []
     for row in checked:
         if not row.get('matches') or not set(row['matches']) <= set(row['reviewed_skill_ids']):
             raise ValueError('심사 결과의 스킬 범위가 올바르지 않습니다.')
@@ -115,9 +133,13 @@ def _insert_approved(conn, rows: list, skills: list, validator, *, embedding_cli
         approved = original['matches']
         if not approved or not set(approved) <= set(row['matches']):
             raise ValueError('심사 결과의 스킬이 본문에 입증되지 않습니다.')
-        fields = {**row['fields'], 'last_batch_updated': datetime.now(timezone.utc)}
+        # 배치 전체의 원문/캐시를 검증한 뒤 쓰기와 임베딩을 시작한다.
+        fields = _normalized_fields(row, source_root)
+        fields['last_batch_updated'] = datetime.now(timezone.utc)
         fields.setdefault('duration_weeks', None)
         fields.setdefault('enrollment_period_type', 'unrestricted')
+        prepared.append((row, approved, fields))
+    for row, approved, fields in prepared:
         columns = list(fields)
         conn.execute('INSERT INTO public.courses (' + ','.join(columns) + ') VALUES (' + ','.join(['%s'] * len(columns)) + ')',
                      [fields[k] for k in columns])
@@ -140,20 +162,22 @@ def _insert_approved(conn, rows: list, skills: list, validator, *, embedding_cli
     return {'inserted_courses': len(ids), 'course_ids': sorted(ids), 'vectors': vectors}
 
 
-def insert_approved(conn, rows: list, skills: list, *, embedding_client=None) -> dict:
-    return _insert_approved(conn, rows, skills, validate_rows, embedding_client=embedding_client)
+def insert_approved(conn, rows: list, skills: list, *, embedding_client=None, source_root=None) -> dict:
+    return _insert_approved(conn, rows, skills, validate_rows, embedding_client=embedding_client, source_root=source_root)
 
 
-def insert_catalog_approved(conn, rows: list, skills: list, *, max_courses=50, embedding_client=None) -> dict:
+def insert_catalog_approved(conn, rows: list, skills: list, *, max_courses=50, embedding_client=None, source_root=None) -> dict:
     def validator(items, current_skills, existing):
         return validate_catalog(items, current_skills, existing, max_courses=max_courses)
-    return _insert_approved(conn, rows, skills, validator, embedding_client=embedding_client)
+    return _insert_approved(conn, rows, skills, validator, embedding_client=embedding_client, source_root=source_root)
 
 
-def prepare(conn, rows: list, *, max_courses=50) -> tuple:
+def prepare(conn, rows: list, *, max_courses=50, source_root=None) -> tuple:
     skills = conn.execute('SELECT skill_id,name,category FROM public.skill_tags ORDER BY skill_id').fetchall()
     existing = conn.execute('SELECT course_id,title,url FROM public.courses').fetchall()
     checked = validate_catalog(rows, skills, existing, max_courses=max_courses)
+    for row in checked:
+        _normalized_fields(row, source_root)
     return skills, checked
 
 

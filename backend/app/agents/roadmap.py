@@ -340,7 +340,7 @@ R_SYS = """너는 GrowPath '로드맵 계획 에이전트'의 관점별 하위 �
 - resourceHints: 진단 에이전트가 고른 자료 id. 먼저 검토하되 관점에 맞지 않으면 쓰지 않아도 된다.
 - agentNotes, userNotes: 반영한다. userNotes는 사용자가 적은 일정·환경 제약이다.
 - deepCheck(있을 때): 사용자가 푼 심화 질문 결과다. concepts[].check가 틀림·모름인 개념은 자기평가(self)가 높아도 2단계에서 작은 예제로 다루고, 맞음인 개념은 짧게 하거나 뺀다. essays[].level이 부족·답 없음인 영역은 그 영역 과제의 완료 기준에 why에서 빠졌다고 한 점을 확인하는 내용을 넣는다. 점수·개수는 쓰지 않는다.
-- projectSummary(업무 프로젝트 기획서 요약)가 있으면 3단계 과제를 그 프로젝트의 데이터·시스템으로 한다. profile은 목표에 맞는 업무 맥락(쓰는 기술, 맡은 시스템 종류)으로만 쓰고, 업무 설명에 목표와 다른 계획이 있으면 끌어오지 않는다. 업무 설명에만 나온 시스템·도구는 적용 대상으로 쓰지 않고, 기획서가 없으면 목표 문장에 나온 대상이나 공개 샘플에 적용한다. 입력에 없는 사내 시스템·데이터 이름은 지어내지 않고 "내 업무 문서", "공개 샘플 데이터"처럼 쓴다.
+- projectSummary(업무 프로젝트 기획서 요약)가 있으면 3단계 과제를 그 프로젝트의 데이터·시스템으로 한다. profile은 목표에 맞는 업무 맥락(쓰는 기술, 맡은 시스템 종류)으로만 쓰고, 업무 설명에 목표와 다른 계획이 있으면 끌어오지 않는다. projectExperience는 본인 입력의 프로젝트 경험이므로 새 기획서나 숙련도 증빙으로 간주하지 않는다. 업무 설명에만 나온 시스템·도구는 적용 대상으로 쓰지 않고, 기획서가 없으면 목표 문장에 나온 대상이나 공개 샘플에 적용한다. 입력에 없는 사내 시스템·데이터 이름은 지어내지 않고 "내 업무 문서", "공개 샘플 데이터"처럼 쓴다.
 - prefs의 주당 시간(weeklyHours), 기간(deadlineWeeks), 예산(budgetWon)을 넘지 않는다. weeklyHours가 null이면 사용자가 '알아서'로 둔 것이니 관점과 기간에 맞게 정해 weeklyHours에 쓴다. 값이 있으면 그대로 쓴다.
 - prefs.format(학습 방식)에 맞는 자료를 먼저 고른다. 영상 강의면 catalog의 format이 "영상"인 자료, 문서·도서 읽기면 "문서"인 자료를 먼저 쓰고, 직접 구현하며 학습이면 실습 과제 비중을 높인다. '알아서'면 관점에 맞게 고른다.
 - prefs.certRes가 있으면 그 자격 자료를 4단계에 넣는다.
@@ -439,7 +439,7 @@ def _mock_revise(inp: dict) -> dict:
             continue
         hint = c.get('replaceHint') or ''
         fmt = '영상' if '영상' in hint else '문서' if re.search(r'(문서|도서|읽)', hint) else None
-        alt = (_alt_same(a['res'], used(), fmt) or _alt_same(a['res'], used(), None, free_only=pid == 'A1')) if a.get('res') else None
+        alt = (_alt_same(a['res'], used(), fmt, free_only=pid == 'A1') or _alt_same(a['res'], used(), None, free_only=pid == 'A1')) if a.get('res') else None
         if alt:
             a['res'], a['title'] = alt, f"{_res(alt)['title']} 학습"
         elif not a.get('res'):
@@ -529,7 +529,7 @@ REV_SYS = """너는 GrowPath '로드맵 계획 에이전트'의 관점별 하위
 - changes.perspective가 있으면 너의 관점으로 로드맵을 새로 쓴다. current는 참고만 하고, 계속 쓸 자료와 완료한 활동은 그대로 둔다.
 - removeActs의 활동은 뺀다. replaceActs의 활동은 catalog의 다른 자료나 다른 실습 과제로 바꾼다(replaceHint 참고). addResources는 catalog id를 그대로 res로 넣고, addTasks는 실습 과제(res null)로 넣는다.
 - handoff.prefs의 주당 시간(weeklyHours)·기간(deadlineWeeks)·예산(budgetWon)·학습 방식(format)·자격(certRes)을 지킨다. weeklyHours가 null이면 관점과 기간에 맞게 정해 weeklyHours에 쓴다. certRes가 있으면 그 자격 자료를 4단계에 넣고, 없으면 자격 준비 활동은 뺀다.
-- handoff.projectSummary(업무 프로젝트 기획서 요약)가 있으면 바꾸는 과제도 그 프로젝트에 맞춘다. profile은 목표에 맞는 업무 맥락(쓰는 기술, 맡은 시스템 종류)으로만 쓰고, 업무 설명에만 나온 시스템·도구는 적용 대상으로 쓰지 않는다. 기획서가 없으면 목표 문장에 나온 대상이나 공개 샘플에 적용하고, 입력에 없는 사내 시스템·데이터 이름은 지어내지 않는다.
+- handoff.projectSummary(업무 프로젝트 기획서 요약)가 있으면 바꾸는 과제도 그 프로젝트에 맞춘다. profile은 목표에 맞는 업무 맥락(쓰는 기술, 맡은 시스템 종류)으로만 쓰고, projectExperience는 과거 프로젝트 참고이며 현재 기획서나 숙련도 증빙으로 간주하지 않는다. 업무 설명에만 나온 시스템·도구는 적용 대상으로 쓰지 않는다. 기획서가 없으면 목표 문장에 나온 대상이나 공개 샘플에 적용하고, 입력에 없는 사내 시스템·데이터 이름은 지어내지 않는다.
 - handoff.deepCheck(심화 질문 결과)가 있으면 새로 넣거나 바꾸는 활동에 반영한다: 틀림·모름인 개념은 작은 예제로 다루고, 서술형이 부족한 영역은 빠진 점을 완료 기준에 넣는다.
 
 [새로 넣거나 바꾸는 활동 쓰는 법]

@@ -39,7 +39,7 @@ def _d(v) -> str | None:
 
 # ── 확정 (drafts.confirm 이 부름) ──
 def _write_steps(t: db.Tx, roadmap_id: str, plan: dict) -> None:
-    items = catalog.items()
+    items = catalog.items(refresh=plan.get('opt') == 'A1')
     done = {r['activity_id'] for r in t.all("SELECT activity_id FROM app_ext.activity_progress WHERE roadmap_id = CAST(:r AS uuid) AND status = 'done'", r=roadmap_id)}
     t.run('DELETE FROM public.roadmap_steps WHERE roadmap_id = CAST(:r AS uuid)', r=roadmap_id)
     for i, a in enumerate(plan['acts'], 1):
@@ -47,7 +47,7 @@ def _write_steps(t: db.Tx, roadmap_id: str, plan: dict) -> None:
         sid = t.val("""INSERT INTO public.roadmap_steps(roadmap_id, step_order, title, activity, estimated_duration, estimated_cost, is_completed, details)
                        VALUES(CAST(:r AS uuid), :o, :t, :a, :du, :c, :done, :d) RETURNING step_id""",
                     r=roadmap_id, o=i, t=a['title'], a=a.get('how') or (res['title'] if res else None), du=f"{course_time.display_hours(a['hours'])} · {a['wFrom']}~{a['wTo']}주차",
-                    c=res['cost'] if res and res['cost'] is not None else None, done=a['id'] in done,
+                    c=0 if plan.get('opt') == 'A1' and a.get('res') else res['cost'] if res and res['cost'] is not None else None, done=a['id'] in done,
                     d=db.J({k: a.get(k) for k in ('id', 'stage', 'res', 'task', 'hours', 'wFrom', 'wTo', 'skills')}))  # skills: 과제가 다루는 스킬 이름(10/23)
         if res and res['type'] in ('course', 'book', 'cert'):
             col = {'course': 'course_id', 'book': 'isbn', 'cert': 'certification_id'}[res['type']]

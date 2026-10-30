@@ -6,6 +6,7 @@ ALIASES = {'SQL 기본 문법 & 조인': 'SQL 기본 문법 & 조인', 'SQL 쿼�
 
 # Literal domain terms supplement existing YAML patterns; never attach a default skill.
 TERMS = {
+ 'CI/CD 배포 자동화 파이프라인': [r'(?<![A-Za-z0-9_])CI\s*&\s*CD(?![A-Za-z0-9_])'],
  'SQL 기본 문법 & 조인': [r'\bsql\b', r'postgresql', r'mysql'],
  'ETL & 데이터 파이프라인': [r'아파치\s*스파크', r'스파크\s*(?:SQL|애플리케이션|프로그램|데이터)',
                         r'\b(?:flume|sqoop)\b'],

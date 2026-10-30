@@ -1,5 +1,6 @@
 """Provider units, incomplete curricula and explicit timetable estimates."""
 from pathlib import Path
+from datetime import datetime
 import hashlib
 import sys
 import tempfile
@@ -11,6 +12,14 @@ from app.course_time import display_hours, effective
 
 
 class CourseDurationTests(unittest.TestCase):
+    def test_equivalent_source_timestamps_normalize_but_different_times_do_not(self):
+        stamps = ('2026-10-30T09:00:00+09:00', '2026-10-30 00:00:00+00:00',
+                  '2026-10-30T00:00:00Z', datetime.fromisoformat('2026-10-30T09:00:00+09:00'))
+        values = [normalize('API_MS_LEARN', {'duration_in_minutes': 60}, fetched_at=t) for t in stamps]
+        self.assertTrue(all(value == values[0] for value in values))
+        self.assertNotEqual(values[0], normalize('API_MS_LEARN', {'duration_in_minutes': 60},
+                                               fetched_at='2026-10-30T00:00:01Z'))
+
     def test_display_rounding_boundaries(self):
         for hours,label in [(35/6,'5시간 50분'),(65/60,'1시간 10분'),(25/60,'30분'),
                             (5/60,'10분'),(1/60,'10분 미만'),(0,'0시간'),(None,'시간 미확인'),

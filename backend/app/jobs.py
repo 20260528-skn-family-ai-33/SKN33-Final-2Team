@@ -31,7 +31,8 @@ class JobCtx:
         return db.val('SELECT status FROM app_ext.jobs WHERE job_id = :j', j=self.job_id) == 'cancelled'
 
 
-def start(kind: str, employee_id: int | None, ref: str, fn: Callable[[JobCtx], Any], progress: dict | None = None) -> str:
+def start(kind: str, employee_id: int | None, ref: str, fn: Callable[[JobCtx], Any], progress: dict | None = None,
+          *, before_start: Callable[[str], None] | None = None) -> str:
     with db.tx() as t:
         jid = str(t.val("INSERT INTO app_ext.jobs(employee_id, kind, ref, status, progress) VALUES(:e, :k, :r, 'running', :p) RETURNING job_id",
                         e=employee_id, k=kind, r=ref, p=db.J(progress or {})))
@@ -52,6 +53,12 @@ def start(kind: str, employee_id: int | None, ref: str, fn: Callable[[JobCtx], A
             t.run("UPDATE app_ext.jobs SET status = :s, result = :r, error = :e, updated_at = now() WHERE job_id = :j AND status = 'running'",
                   s=status, r=db.J(result), e=db.J(error), j=jid)
 
+    if before_start:
+        try:
+            before_start(jid)
+        except Exception:
+            cancel(jid, employee_id)
+            raise
     POOL.submit(work)
     return jid
 

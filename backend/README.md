@@ -40,7 +40,7 @@
 | --- | --- | --- |
 | `tools/setup_db.py`, `Dockerfile` | 직원 가데이터 엑셀(2.9.0) 단계와 `data/seed/` 폴더를 없앰. 기본 백업을 `team_db/growpath_latest.dump`로 | 최신 백업에 시험 직원 100명·부서장 5명·스킬·자격·학력이 들어 있고, 예전 가데이터 16명은 부서장 중복(`employees_one_department_head`)으로 들어가지 않음 |
 | `tools/setup_db.py` | 시험 비밀번호(로컬 사본만)를 사번이 있는 계정에만 넣음 | 사번 없는 `REAL_USER` 행은 로그인할 수 없고, 새 사번 필수 제약(`employees_number_required` · NOT VALID)이 그 행의 어떤 수정도 막음 |
-| `app/services/profile.py` | 내 정보의 본인 입력을 팀 표에서 읽고 씀: 경험 요약·개발 경력·사용 기술·프로젝트·교육은 `employee_input_profiles`, 자격은 `employee_certifications`(팀 자격표에 있는 이름) + `employees.unlisted_certifications`(없는 이름). 본인 입력 전에는 보유 스킬(`employee_skills`)을 사용 기술 처음 값으로 보여 줌. 팀 표에 자리가 없는 업무 설명·없음 확인과 되돌리기용 처음 값만 `app_ext.employee_self_inputs`에. 학력 단계 코드는 한글로 | 팀 직원 입력 양식(`database/src/database/employee_form.py`)과 같은 표·열에 저장 · API 모양(API-06)은 그대로 |
+| `app/services/profile.py` | 업무 설명은 `employees.planned_project_description`, 경험·개발 경력·기술·프로젝트·교육은 `employee_input_profiles`, 자격은 `employee_certifications` + `employees.unlisted_certifications`. 업무·프로젝트는 각각 선택. `app_ext.employee_self_inputs`에는 처음 값·입력 상태·설명 변경 해시만 저장. 구판 설명은 읽기 호환 유지 | 팀 직원 입력 양식과 같은 표·열에 저장. 새 표/열 없음. 선택 이관 SQL은 `db/migrate_self_work_descriptions.sql` |
 | `app/services/profile.py`, `app/admin_io/hr.py` | 입사일·현재 근무 시작일을 `employees.hire_date`·`department_start_date`에서 읽고 관리자 인적 데이터 반영도 그 열에 씀. 직원 구분이 비면 직급 이름('일반직 4급')의 앞부분 | 최신 DB 에 생긴 열 · 직원 구분은 규정 묶음 선택에 씀 |
 
 ### PR #23 리뷰로 고친 곳 (2026-10-27)
@@ -86,6 +86,35 @@ PowerShell에서는 `$env:GP5_ENV_FILE = '../.env'`를 먼저 실행한 뒤 `pyt
 
 분류 모델 연결 흐름·파일별 역할·실행 방법·검증 기록은 [챗봇 질문 분류 안내](classification.md)를 참고하세요.
 
+## 목표 후보 사전 준비
+
+로그인과 세션 조회에서는 목표 생성 요청을 하지 않아요. 홈페이지에서 본인 입력 저장·되돌리기·평정 동의 또는 관리자 수정/업로드가 성공한 뒤, 추천 입력이 바뀐 직원만 백그라운드로 갱신해요. 부서명·상위 부서 변경과 보유 자격명 변경도 영향을 받는 직원을 포함해요. 목표 화면은 후보가 없는 계정만 처음 준비하고 기존 후보는 그대로 읽어요. 동시 요청은 한 작업을 공유하며 실패하면 이전 후보를 보존하고 사용자가 다시 시도해요. SQL로 직접 수정한 경우에는 명시적으로 후보를 다시 만들어요.
+
+목표 후보의 생성 기준은 `app/agents/goals.py`의 `G_SYS`와 `_api`예요. 앱과 사전 생성 도구 모두 같은 서비스를 사용해요. 모델에는 이름·이메일·사번을 보내지 않고, 소속·직급·직무와 입력된 업무 설명·경험·기술·자격·교육·프로젝트를 전달해요. 평정은 본인이 활용에 동의한 정보만 포함해요. 본인 입력이 없어도 사내 기본 정보가 있으면 실제 모델로 기초 학습 방향을 제안하고, 근거가 전혀 없을 때만 기본 후보를 사용해요.
+
+모델에는 실제로 채워진 항목 이름을 `availableBasis`로 명시해요. 서로 다른 후보 3개, 각 8~160자이고 `싶어요.`로 끝나는 문장, 비어 있지 않은 추천 이유와 실제 제공된 항목의 근거를 검사해요. 입력 문장 안의 지시는 따르지 않으며, 없는 업무·경력·자격·프로젝트를 만들지 않도록 지시해요. 형식·근거 항목 검사는 사실 검증 전체를 대신하지 않으므로 결과도 프로필과 대조해야 해요. 검사 실패를 고정 후보의 성공으로 바꾸지 않고 이전 후보를 보존해요. 실제 모델 호출과 무료 고정 응답 검증은 별도로 기록해요.
+
+DB 공유 전에 미리 생성할 수도 있어요. `backend/`에서 실제 앱 DB 설정과 `db/02_app_ext.sql`을 준비한 뒤 대상 ID를 지정해요. 아래 ID는 예시이므로 실제 확인한 `employee_id`로 바꿔요. 원문·비밀번호·키는 출력하지 않아요.
+
+```powershell
+$preloadEmployeeId = 123  # 예시 ID
+python tools/preload_goals.py --employee-id $preloadEmployeeId
+# API/GPU 사용 범위를 승인받은 뒤에만 실행. 여러 명은 --employee-id를 반복해요(기본 최대 4명).
+python tools/preload_goals.py --employee-id $preloadEmployeeId --provider ollama --apply
+```
+
+기본 실행은 조회만 하며 추론/DB 쓰기가 없어요. `--apply`는 생성이 필요한 대상만 처리하고 `--provider openai`는 유료 API를 사용해요. `mock`은 가데이터로 표시되며 실제 추론으로 계산하지 않아요. 실패한 같은 입력은 자동 재시도하지 않으므로 화면의 다시 만들기를 사용해요. 기존 유효 후보는 모델을 지정해도 재사용해요.
+
+완료 후 `public.employee_recommended_prompts`와 `app_ext.goal_suggestion_meta`·`goal_suggestion_runs`를 포함한 **전체 DB 백업**을 공유해요. 후보뿐 아니라 이유·입력 해시·상태도 있어야 수신 PC 로그인에서 같은 후보를 재사용할 수 있어요. 업무 설명의 구판 값이 남아 있으면 새 앱이 읽기 호환을 유지하며, 선택 이관 SQL은 백업/충돌 확인 후 명시적으로 실행해요.
+
+2026-10-29 앞선 4명 실제 검증: 사용자 지정 `gpt-6-luna`로 4명×3개 후보를 4회 호출해 사전 저장했어요. 직원 설정의 AI 모드는 바꾸지 않았어요. 같은 입력의 재로그인은 생성 모델이 아닌 저장된 후보를 재사용해요. 전체 백업에는 기존 `app_ext` 25개 표도 포함했고 복원 후에도 추가 호출 없이 표시됨을 확인했어요. 실제 생성 기록은 `database/data/exports/actual_goal_preload_20261029.manifest.json`을 봐 주세요.
+
+2026-10-29 추가 검증: 가상 직원 100명에게 `gpt-6-luna`를 1회씩, 총 100회 호출해 300개를 더 저장했어요. 해당 시점 후보는 기존 12개와 합쳐 312개였어요. 로그인/세션은 생성 요청을 하지 않고 홈페이지의 정보 저장 성공 뒤 갱신해요. SQL 직접 수정은 자동 갱신하지 않으므로 명시적 다시 만들기를 사용해요. 전체 백업과 저장 후 갱신 코드는 각각 배포해야 해요.
+
+2026-10-29 목표 생성 checkpoint: 직원 표시 정리 후 105명에 실제 후보 315개를 저장했어요. 초기 105회 중 1건의 근거 검사가 실패했고 별도 승인 1회로 보완했어요(총 106회, 자동 재시도 0회). 앱과 사전 생성은 같은 서비스·에이전트 경로를 사용하며 추천 근거 목록과 후보 문장 형식 검사를 보완했어요. 생성/복원본 각각 105명 로그인·목표 조회에서 추가 모델 호출 0회를 확인했어요. 최신 기록은 `database/data/exports/natural105_goals_20261029.manifest.json`을 봐 주세요.
+
+2026-10-29 복원 환경 호환 검사: 사내 스킬·등록 자격 목록은 DB 언어별 정렬 차이와 무관하게 같은 순서를 사용해요. Windows 백업을 Linux에 복원해도 105명 모두 기존 추천 입력과 일치하며, 사용자 입력 순서는 보존해요. 직원 보정(#27)과 강좌·최종 공유 DB 배포 기록(#35)은 PR #29에서 함께 전달해요. 현재 공유본은 [복원 안내](../database/RESTORE.md)를 따르세요. 기존 `natural105` manifest는 생성 시점의 기록으로 보존해요.
+
 ## 고칠 것이 보이면
 
 추가 변경은 GitHub 이슈로 백엔드 담당과 조율해요. 화면이 기대하는 모양은 [API 계약](../frontend/docs/API_계약.md)에 있어요.
@@ -114,3 +143,7 @@ Free Track만 후보 순위·개수 제한·본문 용량 배분 전에 비용 0
 최초 확정과 수정안 적용은 저장 트랜잭션에서 `app_ext.resource_meta.cost_won`을 직접 조회하고 가격 행을 잠급니다. 유료·NULL·삭제된 자료가 섞이면 `409 FREE_TRACK_PRICE_CHANGED`로 저장을 거부하며 계획을 조용히 바꾸지 않습니다. Fast/Challenge Track의 후보 선정과 가격 처리는 유지합니다. DB 스키마·프롬프트 재설치는 필요하지 않습니다.
 
 회귀 검사는 백엔드 디렉터리에서 `PYTHONPATH=. python -m unittest discover -s tests -p test_free_track_regressions.py -v`로 실행합니다. 실제 모델 호출이나 DB 쓰기를 하지 않고 생성·재생성·수정·확정·수정안 적용과 다른 Track 무영향을 확인합니다.
+
+삭제된 자료는 실제 행 삭제와 content_status=deleted 표시를 모두 확인합니다. Free 활동 저장 시 카탈로그를 갱신하고 검증된 0원을 활동별 비용에도 반영합니다.
+
+예전 Free 계획에 완료한 유료 활동이 남아 있어도 무료 전용 정책의 예외는 없습니다. 수정안 적용은 409로 거부하며 무료 자료로 다시 생성하거나 다른 Track을 선택하라는 메시지를 화면에 전달합니다. 기존 기록이나 활동을 자동 삭제하지 않습니다.

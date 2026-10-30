@@ -78,6 +78,30 @@ class FreeTrackRegressions(unittest.TestCase):
             self.assertEqual(rm._alt_same('unknown',set(),None,free_only=True),'free')
             self.assertEqual(rm._alt_same('unknown',set(),None),'paid')
 
+    def test_revision_format_replacement_keeps_free_activity(self):
+        for pid in ('A1', 'A2', 'A3'):
+            for hint, original_format, target_format in (
+                ('영상으로', '문서', '영상'),
+                ('문서로', '영상', '문서'),
+            ):
+                for paid_cost in (100, None):
+                    for with_other_activity in (False, True):
+                        resources = self.resources()
+                        original = dict(resources['free'], id='original', title='원본', format=original_format)
+                        paid = dict(resources['paid'], id='paid-target', title='AAA 유료 후보', format=target_format, cost=paid_cost)
+                        free = dict(resources['free'], id='free-target', title='ZZZ 무료 후보', format=target_format)
+                        data = {r['id']: r for r in (original, paid, free)}
+                        acts = [{'id': 'original-act', 'stage': 2, 'title': '원본', 'res': 'original', 'hours': 1, 'how': '기존 활동'}]
+                        if with_other_activity:
+                            acts.append({'id': 'task', 'stage': 3, 'title': '유지할 실습', 'res': None, 'hours': 1, 'how': '직접 실습'})
+                        plan = {'opt': pid, 'name': pid, 'short': pid, 'tagline': 'test', 'start': 1, 'hours': 4, 'acts': acts}
+                        changes = {'replaceActs': [{'key': 'original-act', 'title': '원본'}], 'replaceHint': hint}
+                        with self.subTest(pid=pid, hint=hint, paid_cost=paid_cost, multi=with_other_activity), patch.object(rm, '_cat', return_value=data):
+                            result = rm._mock_revise({'pid': pid, 'plan': plan, 'handoff': self.handoff(), 'changes': changes})
+                            expected = 'free-target' if pid == 'A1' else 'paid-target'
+                            self.assertEqual([a['res'] for a in result['acts'] if a.get('res')], [expected])
+                            self.assertEqual(len(result['acts']), len(acts))
+
     def test_filter_precedes_top_28_and_evidence_budget(self):
         pool={str(i):dict(self.resources()['paid'],id=str(i),title=f'AAA{i:02}') for i in range(28)}
         pool['free']=dict(self.resources()['free'],title='ZZZ')
@@ -119,6 +143,40 @@ class FreeTrackRegressions(unittest.TestCase):
                         validate_free_plan(t,plan)
                         t.all.assert_not_called()
                         self.assertEqual(plan['cost'],99)
+
+    def test_completed_legacy_paid_activity_is_rejected_with_guidance(self):
+        t = Mock()
+        t.all.return_value = [{'resource_key': 'old-paid', 'cost_won': 100}]
+        plan = {'opt': 'A1', 'acts': [{'res': 'old-paid', 'done': True}], 'cost': 100}
+        original = copy.deepcopy(plan)
+        with self.assertRaises(ApiError) as error:
+            validate_free_plan(t, plan)
+        self.assertEqual(error.exception.code, 'FREE_TRACK_PRICE_CHANGED')
+        self.assertIn('다시 생성', error.exception.message)
+        self.assertIn('다른 Track', error.exception.message)
+        self.assertEqual(plan, original)
+    def test_soft_deleted_free_resource_is_rejected_without_plan_change(self):
+        t = Mock()
+        t.all.return_value = [{'resource_key': 'deleted-free', 'cost_won': 0, 'deleted': True}]
+        plan = {'opt': 'A1', 'acts': [{'res': 'deleted-free'}], 'cost': 0}
+        original = copy.deepcopy(plan)
+        with self.assertRaises(ApiError) as error:
+            validate_free_plan(t, plan)
+        self.assertEqual(error.exception.code, 'FREE_TRACK_PRICE_CHANGED')
+        self.assertEqual(plan, original)
+
+    def test_activity_storage_uses_validated_free_cost_and_refreshes_catalog(self):
+        for pid in ('A1', 'A2', 'A3'):
+            plan = {'opt': pid, 'acts': [{'id': 'act', 'title': '자료', 'res': 'resource', 'stage': 2, 'hours': 1, 'wFrom': 1, 'wTo': 1}]}
+            # 캐시가 잘못된 값을 반환해도 검증한 Free 활동 가격은 0으로 저장한다.
+            resource = {'type': 'course', 'title': '자료', 'cost': 100}
+            t = Mock()
+            t.all.return_value = []
+            t.val.return_value = 'step'
+            with self.subTest(pid=pid), patch.object(catalog, 'items', return_value={'resource': resource}) as items:
+                plans._write_steps(t, 'roadmap', plan)
+                items.assert_called_once_with(refresh=pid == 'A1')
+                self.assertEqual(t.val.call_args.kwargs['c'], 0 if pid == 'A1' else 100)
 
     def test_valid_free_uses_current_zero_and_keeps_activities(self):
         t=Mock(); t.all.return_value=[{'resource_key':'free','cost_won':0}]

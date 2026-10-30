@@ -73,7 +73,7 @@ export function LoginPage() {
       const k = x instanceof ApiError ? x.payload : {};
       return setErr(
         k.code === 'ACCOUNT_INACTIVE'
-          ? '지금은 쓸 수 없는 계정이에요. 인사 담당 부서(인재경영실 · 가상)에 문의해 주세요.'
+          ? '지금은 쓸 수 없는 계정이에요. 인사 담당 부서(인재경영실)에 문의해 주세요.'
           : x instanceof ApiError && x.status === 401
             ? '사번 또는 비밀번호가 맞지 않아요.'
             : cause(x).user,

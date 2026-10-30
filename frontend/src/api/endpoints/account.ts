@@ -15,6 +15,7 @@ export const accountApi = {
   revertSelf: () => http.del<ProfileView>('/me/profile/self'),
   consent: (period: string, consent: boolean) => http.put<{ period: string; consent: boolean }>(`/me/evaluations/${enc(period)}/consent`, { consent }),
   goals: () => http.get<GoalSuggestions>('/me/goal-suggestions'),
+  goalsEnsure: () => http.post<GoalSuggestions>('/me/goal-suggestions/ensure'),
   goalsRegenerate: () => http.post<Partial<JobStarted> & Partial<GoalSuggestions>>('/me/goal-suggestions/regenerate'),
   workspace: () => http.get<Workspace>('/me/workspace'),
 };

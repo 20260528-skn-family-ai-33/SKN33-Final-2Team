@@ -35,7 +35,7 @@ const lines = (t: unknown) =>
     .map((x) => x.trim())
     .filter(Boolean)
     .slice(0, 20);
-const profileEnough = (e: User | null) => !!(e && ((e.profile && (e.profile.workDesc || e.profile.expSummary)) || (e.tech || []).length));
+const profileEnough = (e: User | null) => !!(e && ((e.profile && (e.profile.workDesc || e.profile.expSummary)) || (e.tech || []).length || (e.projects || []).length));
 
 function HrCard({ e }: { e: User }) {
   return (
@@ -99,7 +99,7 @@ function HrCard({ e }: { e: User }) {
         <dt>현재 근무</dt>
         <dd>{e.validFrom ? `${e.validFrom}부터${e.changeReason ? ` · ${e.changeReason}` : ''}` : <None />}</dd>
       </dl>
-      <p className="small muted me-foot">인사 정보는 직접 고칠 수 없어요. 다르면 인사 담당 부서(인재경영실 · 가상)에 정정을 요청해 주세요. 담당자가 관리자 화면의 인적 데이터로 고쳐요.</p>
+      <p className="small muted me-foot">인사 정보는 직접 고칠 수 없어요. 다르면 인사 담당 부서(인재경영실)에 정정을 요청해 주세요. 담당자가 관리자 화면의 인적 데이터로 고쳐요.</p>
     </div>
   );
 }
@@ -185,7 +185,7 @@ function SelfView({ e }: { e: User }) {
   const p = e.profile || {};
   return (
     <>
-      {e.profile ? null : <Note>본인 입력 프로필이 아직 없어요. ‘수정’을 눌러 업무 설명부터 채우면 목표 후보를 내 업무에 맞춰 받을 수 있어요.</Note>}
+      {e.profile ? null : <Note>본인 입력 프로필이 아직 없어요. ‘수정’을 눌러 업무 설명이나 프로젝트 경험을 채우면 내 업무에 맞는 목표 후보를 받을 수 있어요.</Note>}
       <dl className="kv me-kv">
         <dt>업무 설명</dt>
         <dd>
@@ -216,7 +216,7 @@ function SelfForm({ err }: { err: string }) {
     <div className="me-form">
       <div className="field">
         <label>
-          업무 설명 <span className="muted small">지금 하는 일과 AI로 줄이고 싶은 일</span>
+          업무 설명 <span className="muted small">선택 · 지금 하는 일과 AI로 줄이고 싶은 일</span>
         </label>
         <BText
           path="meEdit.workDesc"
@@ -319,8 +319,7 @@ function UseCard({ e }: { e: User }) {
         <div className="row top">
           <Icon name="spark" />
           <span>
-            <b>목표 후보 제안</b> · 진단 에이전트가 직급·부서·직무·담당 업무와 본인 입력 정보, 목표 추천 활용에 동의한 평정만 보고 목표 후보 3개를 미리 만들어 둬요. 여기서 저장하면
-            서버가 새 정보로 다시 만들어요.{' '}
+            <b>목표 후보 제안</b> · 업무·프로젝트 등 추천에 쓰는 정보를 저장하면 후보 3개를 미리 준비해요. 로그인할 때는 저장된 후보를 사용하고, 후보가 없으면 목표 설정 화면에서 처음 준비해요.{' '}
             <button className="link" onClick={() => go(newIdToPath(lastNew))}>
               새 로드맵 작성 <Icon name="right" />
             </button>
@@ -367,9 +366,6 @@ export function MePage() {
     const yrs = ed.devYears === '' || ed.devYears == null ? null : Number(ed.devYears);
     if (yrs != null && !(yrs >= 0 && yrs <= 50)) return setErr('개발 경험은 0~50년 사이로 적거나 비워 주세요.');
     const ls = Object.fromEntries(LISTS.map(([k]) => [k, lines(ed[k])]));
-    const any = wd || ex || yrs != null || LISTS.some(([k]) => ls[k].length || ed[k + 'None']);
-    /* 사내 DB 규칙: 본인 입력 프로필이 있으면 업무 설명은 필수(서버도 같은 규칙으로 막는다) */
-    if (any && !wd) return setErr('업무 설명을 적어 주세요. 본인 입력 정보를 저장할 때 업무 설명은 꼭 있어야 해요.');
     try {
       const r = await accountApi.saveSelf({
         workDesc: wd,
@@ -384,7 +380,7 @@ export function MePage() {
       return setErr(cause(x).user);
     }
     updateWs((s) => void (s.meEdit = null));
-    toast(profileEnough(meNow()) ? '본인 입력 정보를 저장했어요 · 목표 후보를 새 정보로 다시 만들고 있어요' : '본인 입력 정보를 저장했어요');
+    toast(profileEnough(meNow()) ? '본인 입력 정보를 저장했어요 · 추천 정보가 바뀌면 목표 후보를 새로 준비해요' : '본인 입력 정보를 저장했어요');
   };
   const revert = () =>
     openSheet({

@@ -60,6 +60,12 @@ export function HandoffView({ h }: { h: Handoff }) {
             <dd className="pre">{h.projectSummary}</dd>
           </>
         ) : null}
+        {typeof h.profile?.workDescription === 'string' && h.profile.workDescription ? (
+          <><dt>본인 업무 설명</dt><dd className="pre">{h.profile.workDescription}</dd></>
+        ) : null}
+        {Array.isArray(h.profile?.projectExperience) && h.profile.projectExperience.length ? (
+          <><dt>본인 프로젝트 경험</dt><dd className="pre">{h.profile.projectExperience.map(String).join('\n')}</dd></>
+        ) : null}
         <dt>메모</dt>
         <dd>{h.userNotes.concat(h.agentNotes).join(' / ') || '없음'}</dd>
         <dt>자료 후보</dt>
