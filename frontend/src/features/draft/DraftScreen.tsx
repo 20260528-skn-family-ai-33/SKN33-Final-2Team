@@ -29,5 +29,5 @@ export function DraftScreen({ step, extra, remember = true, children }: { step?:
 
 /* 하위 화면의 진입 조건 (5차 guard 그대로) */
 export const editGate = (s: WsState) => (s.draft.diag && s.draft.diag.key === diagKey(s.draft) ? null : paths.newResult);
-export const genGate = (s: WsState) => (s.draft.handoff ? null : blockedTo(s, 'options') || paths.newResult);
+export const genGate = (s: WsState) => (s.draft.handoff || s.draft.v2Assessment?.completed ? null : blockedTo(s, 'options') || paths.newResult);
 export const optionsGate = (s: WsState) => (s.draft.gen ? null : s.draft.handoff ? paths.newGen : blockedTo(s, 'options') || paths.newResult);

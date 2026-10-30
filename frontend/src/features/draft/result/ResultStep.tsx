@@ -8,6 +8,7 @@ import { useGo } from '@/shared/hooks/useGo';
 import { useWs } from '@/shared/state/workspace';
 import { Page } from '@/shared/ui/parts';
 import { Stepper } from '../Stepper';
+import { genStart, startEdit, ResultEdit } from './legacyResult';
 import { displayOrder, moveSkill, currentWeeks, totalWeeks, type Choices, type DurationEstimate } from './skillOrder';
 
 type Resource = { id: string; title: string; provider?: string; image?: string; url?: string; cost: number | null; why: string; knowledge: string; aiRecommended: boolean };
@@ -196,7 +197,7 @@ function ResultSelection({ resourcesOnly = false, editorRef, onChoicesChanged, l
   if (resourcesOnly) return content;
   return <><Stepper cur="result" /><Page title="이런 로드맵이 만들어질 예정이에요" lead="학습할 스킬의 순서와 포함 여부를 정해 주세요. 도서·강좌는 검토·확정에서 선택합니다."
     foot={<><button className="btn line" disabled={busy} onClick={() => go(paths.newQuiz)}>이전: 사전 점검</button>
-      <button className="btn pri" disabled={busy || saving || !result?.recommendations} onClick={() => void (async () => { if (await save()) go(paths.newGen); })()}>로드맵 계획하기</button></>}>{content}</Page></>;
+      <button className="btn pri" disabled={busy || saving || !result?.recommendations} onClick={() => void (async () => { if (await save()) await genStart(go); })()}>로드맵 계획하기</button></>}>{content}</Page></>;
 }
 // 로드맵 3안 생성 연결은 다음 단계에서 기존 호출 계약과 함께 교체한다.
-export { genStart, startEdit, ResultEdit } from './legacyResult';
+export { genStart, startEdit, ResultEdit };
