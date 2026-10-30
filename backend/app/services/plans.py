@@ -22,6 +22,7 @@ from ..agents import roadmap as RM
 from ..agents import runtime as rt
 from ..agents.demo import D
 from ..errors import AgentError, ApiError, forbidden, not_found
+from ..free_track import validate_free_plan
 from . import profile
 
 STATUS = {'IN_PROGRESS': 'active', 'COMPLETED': 'done', 'ARCHIVED': 'archived'}
@@ -474,6 +475,7 @@ def accept_revision(employee_id: int, roadmap_id: str, revision_id: str) -> dict
         from .drafts import selection_of
         plan = dict(pd['to'], version=cur['version'] + 1, confirmedAt=today(), why=pd['label'], assess=cur.get('assess'), prefs=pd['prefsTo'], handoff=pd['handoff'],
                     selection=selection_of(pd['to']['def']) if changed else cur.get('selection'))
+        validate_free_plan(t, plan)
         # 로드맵 내용이 바뀌면 팀 DB 트리거가 코멘트에 '수정 완료' 시각만 적는다. 그 갱신은 작성자 검사 트리거(본문·작성자·로드맵 열)를 거치지 않는다
         t.run('UPDATE public.roadmaps SET content = :c, strategy_type = :st, strategy_title = :tt, summary = :s, updated_at = now() WHERE roadmap_id = :r',
               c=db.J(plan), st=plan['opt'], tt=plan['name'], s=plan['tagline'], r=row['roadmap_id'])

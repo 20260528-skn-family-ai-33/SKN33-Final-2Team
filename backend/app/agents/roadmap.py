@@ -161,18 +161,38 @@ def keep_ids(d: dict, base: dict, ver: int) -> dict:
     return d
 
 
-def _alt_same(rid: str, used: set, fmt: str | None) -> str | None:
+def _alt_same(rid: str, used: set, fmt: str | None, *, free_only: bool = False) -> str | None:
     r = _res(rid)
     if not r:
         return None
     for k, x in sorted(_cat().items(), key=lambda kv: kv[1]['title']):
         if k != rid and k not in used and x['usable'] and x['kind'] != '자격' and x['stage'] == r['stage'] and (not fmt or x['format'] == fmt) \
-                and set(x['skills']) & set(r['skills']):
+                and set(x['skills']) & set(r['skills']) and (not free_only or x.get('cost') == 0):
             return k
     return None
 
 
 # ── 가데이터 ──
+def _filter_free_mock_acts(pid: str, acts: list[dict]) -> tuple[list[dict], list[str]]:
+    if pid != 'A1':
+        return acts, []
+    kept, excluded = [], []
+    for act in acts:
+        rid = act.get('res')
+        if not rid:
+            kept.append(act)
+            continue
+        resource = _res(rid)
+        if resource and resource.get('cost') == 0:
+            kept.append(act)
+        else:
+            excluded.append((resource or {}).get('title') or act.get('title') or rid)
+    notes = []
+    if excluded:
+        notes.append('Free Track은 무료 자료만 사용하므로 유료·비용 미확인 또는 조회되지 않는 자료를 제외했어요: ' + ', '.join(dict.fromkeys(excluded)))
+    return kept, notes
+
+
 def _mock_option(inp: dict) -> dict:
     if inp.get('request') and inp.get('previousDef'):
         return _mock_regen(inp)
@@ -185,13 +205,16 @@ def _mock_option(inp: dict) -> dict:
             have = {x.get('res') for x in acts if x.get('res')}
             r = _res(a.get('res'))
             if r and r['format'] != '영상':
-                v = _alt_same(a['res'], have, '영상')
+                v = _alt_same(a['res'], have, '영상', free_only=pid == 'A1')
                 if v:
                     a['res'], a['title'] = v, _res(v)['title'] + ' 수강'
     cert = pr.get('certRes')
     if cert and _res(cert):
         acts.append({'stage': 4, 'title': f"{_res(cert)['title']} 준비", 'res': cert})
     reason = t['reason']
+    acts, notices = _filter_free_mock_acts(pid, acts)
+    if notices:
+        reason += ' ' + ' '.join(notices)
     hours_of = lambda a: (_res(a['res']) or {}).get('hours') or 2 if a.get('res') else a.get('hours') or 2  # noqa: E731
     total = lambda: sum(hours_of(a) for a in acts if a['stage'] >= h['startStage'])  # noqa: E731
     pick = lambda: min(12, max(2, math.ceil(total() / pr['deadlineWeeks']))) if pr.get('deadlineWeeks') else AUTO_HOURS  # noqa: E731
@@ -222,7 +245,7 @@ def _mock_regen(inp: dict) -> dict:
         a = next((y for y in acts if y['key'] == x['key']), None)
         if not a:
             continue
-        alt = _alt_same(a['res'], used(), None) if a.get('res') else None
+        alt = _alt_same(a['res'], used(), None, free_only=pid == 'A1') if a.get('res') else None
         if alt:
             a['res'], a['title'] = alt, f"{_res(alt)['title']} 학습"
         elif not a.get('res'):
@@ -247,7 +270,7 @@ def _mock_regen(inp: dict) -> dict:
         for a in acts:
             rr = _res(a.get('res'))
             if rr and rr['kind'] != '자격' and rr['format'] != f:
-                alt = _alt_same(a['res'], used(), f)
+                alt = _alt_same(a['res'], used(), f, free_only=pid == 'A1')
                 if alt:
                     a['res'], a['title'] = alt, f"{_res(alt)['title']} 학습"
                     n += 1
@@ -268,19 +291,21 @@ def _mock_regen(inp: dict) -> dict:
             done.append('가장 긴 과제 시간 줄이기')
     if r.get('wish'):
         notes.append('가데이터 모드라 바라는 점 문장은 읽지 않았어요. 고른 칩과 활동만 정해진 규칙으로 반영했어요. 실제 모델 모드에서는 문장도 반영해요.')
+    acts, notices = _filter_free_mock_acts(pid, acts)
+    notes.extend(notices)
     o = finish_option(pid, {'tagline': prev['tagline'], 'reason': prev.get('reason'), 'pros': prev.get('pros'), 'cons': prev.get('cons'), 'acts': acts,
                             'weeklyHours': prev.get('weeklyHours') or h['prefs'].get('weeklyHours')}, 'mock', prev.get('offDomain'))
     o.update(summary=' · '.join(done) or '요청을 살펴봤지만 바꿀 내용이 없었어요', notes=rt.uniq(notes))
     return o
 
 
-def agent_catalog(handoff: dict, extra_ids: list | None = None) -> list[dict]:
+def agent_catalog(handoff: dict, extra_ids: list | None = None, *, free_only: bool = False) -> list[dict]:
     texts = [handoff.get('goal') or '', handoff.get('projectSummary') or ''] + list(handoff.get('focus') or []) + list(handoff.get('gaps') or [])
-    cat = catalog.for_agent(texts, handoff['prefs'].get('certRes'))
+    cat = catalog.for_agent(texts, handoff['prefs'].get('certRes'), free_only=free_only)
     have = {r['id'] for r in cat}
     for rid in list(handoff.get('resourceHints') or []) + list(extra_ids or []):
         r = _res(rid)
-        if r and rid not in have:
+        if r and rid not in have and (not free_only or r.get('cost') == 0):
             cat.append(r)
             have.add(rid)
     # Existing plan resources must survive the catalog budget before new choices.
@@ -359,8 +384,7 @@ def _sys(pid: str, tpl: str) -> str:
 
 
 def _track_catalog(pid: str, handoff: dict, extra_ids: list | None = None) -> list[dict]:
-    rows = agent_catalog(handoff, extra_ids)
-    return [r for r in rows if r.get('cost') == 0] if pid == 'A1' else rows
+    return agent_catalog(handoff, extra_ids, free_only=pid == 'A1')
 
 
 def option(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
@@ -415,7 +439,7 @@ def _mock_revise(inp: dict) -> dict:
             continue
         hint = c.get('replaceHint') or ''
         fmt = '영상' if '영상' in hint else '문서' if re.search(r'(문서|도서|읽)', hint) else None
-        alt = (_alt_same(a['res'], used(), fmt) or _alt_same(a['res'], used(), None)) if a.get('res') else None
+        alt = (_alt_same(a['res'], used(), fmt) or _alt_same(a['res'], used(), None, free_only=pid == 'A1')) if a.get('res') else None
         if alt:
             a['res'], a['title'] = alt, f"{_res(alt)['title']} 학습"
         elif not a.get('res'):
@@ -441,7 +465,7 @@ def _mock_revise(inp: dict) -> dict:
             for a in acts:
                 rr = _res(a.get('res'))
                 if not a.get('done') and rr and rr['kind'] != '자격' and rr['format'] != f:
-                    alt = _alt_same(a['res'], used(), f)
+                    alt = _alt_same(a['res'], used(), f, free_only=pid == 'A1')
                     if alt:
                         a['res'], a['title'] = alt, f"{_res(alt)['title']} 학습"
                         n += 1
@@ -476,6 +500,8 @@ def _mock_revise(inp: dict) -> dict:
             done.append('3단계 과제 시간 늘리기(예시)')
     if c.get('constraints') or inp.get('request'):
         notes.append('가데이터 모드라 요청 문장(요청 내용·일정·환경 제약)은 읽지 않았어요. 고른 항목만 정해진 규칙으로 반영한 예시 수정안이에요. 실제 모델 모드에서는 문장도 반영해요.')
+    acts, notices = _filter_free_mock_acts(pid, acts)
+    notes.extend(notices)
     hours_of = lambda a: ((_res(a['res']) or {}).get('hours') or 2) if a.get('res') else a.get('hours') or 0  # noqa: E731
     total = sum(hours_of(a) for a in acts if a['stage'] >= start)
     fit = min(12, max(2, math.ceil(total / h['prefs']['deadlineWeeks']))) if h['prefs'].get('deadlineWeeks') else AUTO_HOURS
