@@ -174,14 +174,19 @@ function RegCard({ a }: { a: AssistantAnswer }) {
   if (a.kind === 'general') {
     /* 일반 답변 카드: 규정 근거 없이 요약 → 설명 → 더 볼 것 → 바로 가기(서버가 5차 화면 ID 로 줌) */
     const links = a.links || [];
+    const isCompany = a.source === 'work' && Array.isArray(a.knowledgeSources);
+    const sources = [...new Set((a.knowledgeSources || []).map((s) => [s.documentTitle, s.location, s.asOf].filter(Boolean).join(' · ')))];
+    // 서버가 summary 끝에 붙인 출처는 별도 영역에 표시하고 본문에서는 중복을 없앤다.
+    const sourceStart = isCompany && sources.length ? summary.lastIndexOf('\n\n출처:') : -1;
+    const answerSummary = sourceStart >= 0 ? summary.slice(0, sourceStart).trimEnd() : summary;
     return (
       <div className="ans">
         <div className="who">
           <Icon name="chat" />
-          사내 생활 도우미 <span className="tag">{a.source === 'app' ? '사용법 안내' : '일반 답변'}</span>
+          사내 생활 도우미 <span className="tag">{isCompany ? '수자원공사 정보' : a.source === 'app' ? '사용법 안내' : '일반 답변'}</span>
         </div>
         <h4>답변 요약</h4>
-        <p className="sum">{summary}</p>
+        <p className="sum">{answerSummary}</p>
         {apply ? <p>{apply}</p> : null}
         <List h="더 알아볼 것" arr={more} />
         {links.length ? (
@@ -193,7 +198,11 @@ function RegCard({ a }: { a: AssistantAnswer }) {
             ))}
           </p>
         ) : null}
-        <p className="src">규정 근거가 아닌 일반 답변이에요. 기관 기준이 필요한 내용은 담당 부서에 확인해 주세요.</p>
+        {isCompany ? (
+          sources.length ? <p className="company-sources">출처: {sources.join(' / ')}</p> : null
+        ) : (
+          <p className="src">규정 근거가 아닌 일반 답변이에요. 기관 기준이 필요한 내용은 담당 부서에 확인해 주세요.</p>
+        )}
       </div>
     );
   }
