@@ -199,7 +199,11 @@ function RegCard({ a }: { a: AssistantAnswer }) {
           </p>
         ) : null}
         {isCompany ? (
-          sources.length ? <p className="company-sources">출처: {sources.join(' / ')}</p> : null
+          sources.length ? (
+            <p className="company-sources">출처: {sources.join(' / ')}</p>
+          ) : (
+            <p className="src">등록된 회사 자료에서 답변 근거를 확인하지 못했어요. 정확한 내용은 담당 부서에 확인해 주세요.</p>
+          )
         ) : (
           <p className="src">규정 근거가 아닌 일반 답변이에요. 기관 기준이 필요한 내용은 담당 부서에 확인해 주세요.</p>
         )}
