@@ -26,11 +26,12 @@ export function savePost(pid: string, extra?: Record<string, unknown> | null): P
     const body = { answers: cur.post.answers, goalSelf: cur.post.goalSelf, ...(deepOpen(dp) ? { deepMcq: dp!.mcq || {}, deepEssay: dp!.essay || {} } : {}), ...(extra || {}) };
     try {
       const res = await plansApi.savePost(pid, body);
-      /* 보내는 사이 서술형을 더 썼으면 서버 응답이 덮지 않게 화면의 심화 답을 그대로 둔다 */
+      /* 보내는 사이 서술형을 더 썼으면 서버 응답이 덮지 않게 화면의 심화 답을 그대로 둔다
+         immer 는 draft 를 고치면서 값도 돌려주면 예외를 던지므로 Object.assign 의 결과를 돌려주지 않는다(#48) */
       const mine = ws().plans[pid]?.post;
       const keep = mine && deepOpen(mine.deep) ? { mcq: mine.deep!.mcq, essay: mine.deep!.essay } : null;
       takePlan(res);
-      if (keep && deepOpen(ws().plans[pid]?.post.deep)) updateWs((s) => Object.assign(s.plans[pid].post.deep as PostDeep, keep));
+      if (keep && deepOpen(ws().plans[pid]?.post.deep)) updateWs((s) => void Object.assign(s.plans[pid].post.deep as PostDeep, keep));
       return true;
     } catch (err) {
       failToast(err, '사후 점검 응답을 저장하지 못했어요');
