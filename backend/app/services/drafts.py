@@ -24,6 +24,7 @@ from ..agents import roadmap as RM
 from ..agents import runtime as rt
 from ..agents.demo import D
 from ..errors import AgentError, ApiError, not_found
+from ..free_track import validate_free_plan
 from . import plans as PL
 from . import profile as PF
 
@@ -953,6 +954,7 @@ def confirm(employee_id: int, draft_id: str) -> dict:
         _sync(g)
         o = g['options'][d['chosen']]
         plan = RM.build_plan(o, RM.params_of(d['handoff'], o), d['goal'])
+        validate_free_plan(t, plan)
         assess = {'questions': d['quiz']['questions'], 'answers': dict(d['answers']), 'domain': d['quiz']['domain']}
         if deep_on(d) and (d.get('diag') or {}).get('deep'):
             # 심화 질문(사전): 사후 점검 비교와 결과 보고서용. 부서장 화면에는 보내지 않는다(plans.record for_mgr 가 assess 를 비움)

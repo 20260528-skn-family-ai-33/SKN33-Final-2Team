@@ -21,12 +21,11 @@ class TrackPromptTests(unittest.TestCase):
                 with self.assertRaises(llm.LlmError):
                     rm._sys('A1', rm.R_SYS)
 
-    def test_catalog_excludes_paid_and_unknown_only_for_free(self):
-        rows = [{'id': 'free', 'cost': 0}, {'id': 'paid', 'cost': 100}, {'id': 'unknown', 'cost': None}]
-        with patch.object(rm, 'agent_catalog', return_value=rows):
-            self.assertEqual(rm._track_catalog('A1', {}), [rows[0]])
-            self.assertEqual(rm._track_catalog('A2', {}), rows)
-            self.assertEqual(rm._track_catalog('A3', {}), rows)
+    def test_catalog_filter_is_requested_only_for_free(self):
+        for pid in ('A1', 'A2', 'A3'):
+            with self.subTest(pid=pid), patch.object(rm, 'agent_catalog', return_value=[]) as get_catalog:
+                self.assertEqual(rm._track_catalog(pid, {}), [])
+                get_catalog.assert_called_once_with({}, None, free_only=pid == 'A1')
 
     def test_free_output_rejects_paid_and_unknown(self):
         for cost in (100, None):

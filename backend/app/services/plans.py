@@ -22,6 +22,7 @@ from ..agents import roadmap as RM
 from ..agents import runtime as rt
 from ..agents.demo import D
 from ..errors import AgentError, ApiError, forbidden, not_found
+from ..free_track import validate_free_plan
 from . import profile
 
 STATUS = {'IN_PROGRESS': 'active', 'COMPLETED': 'done', 'ARCHIVED': 'archived'}
@@ -38,7 +39,7 @@ def _d(v) -> str | None:
 
 # ── 확정 (drafts.confirm 이 부름) ──
 def _write_steps(t: db.Tx, roadmap_id: str, plan: dict) -> None:
-    items = catalog.items()
+    items = catalog.items(refresh=plan.get('opt') == 'A1')
     done = {r['activity_id'] for r in t.all("SELECT activity_id FROM app_ext.activity_progress WHERE roadmap_id = CAST(:r AS uuid) AND status = 'done'", r=roadmap_id)}
     t.run('DELETE FROM public.roadmap_steps WHERE roadmap_id = CAST(:r AS uuid)', r=roadmap_id)
     for i, a in enumerate(plan['acts'], 1):
@@ -46,7 +47,7 @@ def _write_steps(t: db.Tx, roadmap_id: str, plan: dict) -> None:
         sid = t.val("""INSERT INTO public.roadmap_steps(roadmap_id, step_order, title, activity, estimated_duration, estimated_cost, is_completed, details)
                        VALUES(CAST(:r AS uuid), :o, :t, :a, :du, :c, :done, :d) RETURNING step_id""",
                     r=roadmap_id, o=i, t=a['title'], a=a.get('how') or (res['title'] if res else None), du=f"{course_time.display_hours(a['hours'])} · {a['wFrom']}~{a['wTo']}주차",
-                    c=res['cost'] if res and res['cost'] is not None else None, done=a['id'] in done,
+                    c=0 if plan.get('opt') == 'A1' and a.get('res') else res['cost'] if res and res['cost'] is not None else None, done=a['id'] in done,
                     d=db.J({k: a.get(k) for k in ('id', 'stage', 'res', 'task', 'hours', 'wFrom', 'wTo', 'skills')}))  # skills: 과제가 다루는 스킬 이름(10/23)
         if res and res['type'] in ('course', 'book', 'cert'):
             col = {'course': 'course_id', 'book': 'isbn', 'cert': 'certification_id'}[res['type']]
@@ -474,6 +475,7 @@ def accept_revision(employee_id: int, roadmap_id: str, revision_id: str) -> dict
         from .drafts import selection_of
         plan = dict(pd['to'], version=cur['version'] + 1, confirmedAt=today(), why=pd['label'], assess=cur.get('assess'), prefs=pd['prefsTo'], handoff=pd['handoff'],
                     selection=selection_of(pd['to']['def']) if changed else cur.get('selection'))
+        validate_free_plan(t, plan)
         # 로드맵 내용이 바뀌면 팀 DB 트리거가 코멘트에 '수정 완료' 시각만 적는다. 그 갱신은 작성자 검사 트리거(본문·작성자·로드맵 열)를 거치지 않는다
         t.run('UPDATE public.roadmaps SET content = :c, strategy_type = :st, strategy_title = :tt, summary = :s, updated_at = now() WHERE roadmap_id = :r',
               c=db.J(plan), st=plan['opt'], tt=plan['name'], s=plan['tagline'], r=row['roadmap_id'])
