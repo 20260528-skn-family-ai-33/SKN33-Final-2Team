@@ -283,6 +283,8 @@
   .fab { box-shadow: 0 10px 30px rgba(245, 158, 11, .3); }
   .fab:hover { background: #FBBF24; }
   .msg.bot .plain { background: var(--sunk); }
+  /* 도우미 답변의 출처 상자(gp.css)는 --ink-2 바탕에 흰 글자라 어두운 테마에서는 바탕이 밝아져 글자가 묻힌다 */
+  .ans .company-sources { background: var(--sunk); color: var(--ink-2); }
   .adm-panel { top: calc(var(--rib-h) + var(--nav-h) + 12px); border-radius: 16px; background: var(--surface); }
   @media (max-width: 1100px) { .adm-panel { top: calc(var(--rib-h) + var(--nav-h)); border-radius: 0; } }
   .adm-tbl th { background: #1F1F1F; }
