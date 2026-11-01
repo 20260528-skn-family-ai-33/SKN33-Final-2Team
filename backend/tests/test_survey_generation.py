@@ -26,6 +26,31 @@ class SurveyTests(unittest.TestCase):
     def run_result(self, result, n=2):
         return generate_survey(self.project, self.selection(n), self.profile, lambda *_: result)
 
+    def test_new_generation_requires_measurement_and_preserves_it_after_shuffle(self):
+        raw = self.result(2)
+        model = Mock(return_value=raw)
+        with self.assertRaises(SurveyError):
+            generate_survey(self.project, self.selection(2), self.profile, model, require_measurement=True)
+        for group in raw['groups']:
+            for i, row in enumerate(group['quizzes']):
+                row.update(concept=f'개념{i}', questionType='오류 원인 판단', difficulty='적용')
+        result = generate_survey(self.project, self.selection(2), self.profile, model, require_measurement=True)
+        question = result['groups'][0]['quizzes'][0]
+        self.assertEqual((question['concept'], question['questionType'], question['difficulty']),
+                         ('개념0', '오류 원인 판단', '적용'))
+        raw['groups'][0]['quizzes'][0]['difficulty'] = '임의 난이도'
+        with self.assertRaises(SurveyError):
+            generate_survey(self.project, self.selection(2), self.profile, model, require_measurement=True)
+
+    def test_known_technology_and_certifications_reach_measurement_input(self):
+        self.profile['self'] = {'tech': ['Python'], 'certs': ['SQLD']}
+        model = Mock(return_value=self.result(2))
+        generate_survey(self.project, self.selection(2), self.profile, model)
+        payload = model.call_args.args[1]
+        self.assertEqual(payload['learnerKnowledge']['technologies'], ['Python'])
+        self.assertEqual(payload['learnerKnowledge']['certifications'], ['SQLD'])
+        self.assertEqual(payload['hrContext']['department'], '운영부')
+
     def test_exact_counts_for_every_allowed_skill_count(self):
         for n in range(1, 6):
             with self.subTest(n=n):

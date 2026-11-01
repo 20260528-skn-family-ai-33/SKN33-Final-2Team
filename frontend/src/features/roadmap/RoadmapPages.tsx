@@ -1,19 +1,23 @@
+import { ReviewSkillBlocks, type ReviewMaterials } from '@/features/draft/review/ReviewSkillBlocks';
+import { openRecord } from './RecordSheet';
 import { trackName } from '@/shared/constants/data';
 /* 내 로드맵: 목록(진행 중 · 지난 로드맵) → 로드맵 하나 · 확정 완료 화면 (5차 scr.roadmap · scr.confirmed) */
 import { Navigate, useParams } from 'react-router';
 import type { PlanRecord } from '@/api/types/plan';
 import { paths } from '@/app/paths';
 import { SkillMap } from '@/features/skillmap/SkillMap';
-import { D } from '@/shared/constants/data';
+import { RoadmapResources, RoadmapActivityList } from './RoadmapLearning';
 import { useGo } from '@/shared/hooks/useGo';
-import { count, range, st, stageActs } from '@/shared/lib/plan';
+import { count, st } from '@/shared/lib/plan';
+import { weekNow } from '@/features/home/ganttCalc';
+import { groupLearningActivities } from './roadmapLearningData';
+import { useCatalog } from '@/shared/state/catalog';
 import { useMe } from '@/shared/state/session';
 import { closeSheet, openSheet } from '@/shared/state/ui';
 import { newComments, planReports, recs, useWs } from '@/shared/state/workspace';
 import { Icon } from '@/shared/ui/Icon';
 import { Note, Page, Stats } from '@/shared/ui/parts';
-import { StagesView } from '@/shared/ui/StagesView';
-import { ActRow, Alerts, NoPlan, openPreAnswers, openVersions, PlanGate, postStart } from './parts';
+import { Alerts, NoPlan, openPreAnswers, openVersions, PlanGate, postStart } from './parts';
 import { archivePlan, resumePlan, startRevise } from './planActions';
 import { useState } from 'react';
 import { won } from '@/shared/lib/format';
@@ -187,7 +191,7 @@ function openArchive(go: ReturnType<typeof useGo>, R: PlanRecord): void {
             void archivePlan(go, R.id);
           }}
         >
-          보관하기
+          중지 후 보관하기
         </button>
       </>
     ),
@@ -196,6 +200,7 @@ function openArchive(go: ReturnType<typeof useGo>, R: PlanRecord): void {
 
 /** 진행 중이면 기록할 수 있고, 마쳤거나 보관한 로드맵은 읽기 전용(활동·완료·메모·버전·보고서·받은 코멘트) */
 function RoadView({ R }: { R: PlanRecord }) {
+  const resources = useCatalog(state => state.res);
   const go = useGo();
   const reports = useWs((s) => s.reports);
   const reps = planReports({ reports }, R);
@@ -222,7 +227,7 @@ function RoadView({ R }: { R: PlanRecord }) {
       </button>
       {cmBtn}
       <button className="btn ghost sm rm-arch" onClick={() => openArchive(go, R)}>
-        보관하기
+        중지 후 보관하기
       </button>
     </>
   ) : (
@@ -257,36 +262,15 @@ function RoadView({ R }: { R: PlanRecord }) {
           {R.status === 'done' ? '마친 로드맵이에요. 기록은 읽기만 할 수 있어요.' : '보관한 로드맵이에요. 기록은 읽기만 할 수 있고, ‘다시 진행하기’를 누르면 이어서 기록할 수 있어요.'}
         </Note>
       )}
-      <Stats pl={pl} />
-      <SkillMap pl={pl} />
-      <div className="sec">
-        {live ? (
-          D.stages
-            .filter((s) => s.n >= pl.start)
-            .map((s) => {
-              const acts = stageActs(pl, s.n);
-              if (!acts.length) return null;
-              return (
-                <div className="stage" key={s.n}>
-                  <div className="stage-h">
-                    <span className="no">{s.n}</span>
-                    <b>{s.name}</b>
-                    <span className="end">
-                      {range(acts)} · {acts.filter((a) => st(R.progress, a.id) === 'done').length}/{acts.length} 완료
-                    </span>
-                  </div>
-                  <ul className="acts" style={{ gap: 12, marginTop: 14 }}>
-                    {acts.map((a) => (
-                      <ActRow key={a.id} a={a} R={R} />
-                    ))}
-                  </ul>
-                </div>
-              );
-            })
-        ) : (
-          <StagesView pl={pl} progress={R.progress} status memo />
-        )}
-      </div>
+      <Stats pl={pl} periodLabel={pl.def.learningReport ? '자료 학습 예상 기간' : '기간'} />
+      <RoadmapResources R={R} />
+      {pl.def.learningReport ? <ReviewSkillBlocks confirmed materials={pl.def.learningReport as ReviewMaterials}
+        acts={pl.acts.filter((act): act is typeof act & { skill: string; how: string; hours: number } => !!act.skill).map(act => ({ ...act, how: act.how || '' }))}
+        selectedIds={pl.acts.map(act => act.id)} busy={!live}
+        currentSkillNames={live ? groupLearningActivities(pl, resources).filter(group => group.activities.some(a => a.wFrom <= weekNow(R) && weekNow(R) <= a.wTo) && group.activities.some(a => st(R.progress, a.id) !== 'done')).map(group => group.name) : []}
+        onOpenResource={(skill, resourceId) => { const activity = pl.acts.find(act => act.skill === skill && act.res === resourceId) || pl.acts.find(act => act.res === resourceId); if (activity) openRecord(R.id, activity.id); }}
+        onSubmit={name => { const task = pl.acts.find(act => act.skill === name && !act.res); if (task) openRecord(R.id, task.id); }} /> : <SkillMap pl={pl} /> }
+      <div className="sec"><RoadmapActivityList R={R} /></div>
       {reps.length ? (
         <div className="sec">
           <div className="sec-h">

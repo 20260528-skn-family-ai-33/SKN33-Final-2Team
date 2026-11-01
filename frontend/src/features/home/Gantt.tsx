@@ -7,12 +7,16 @@ import { createPortal } from 'react-dom';
 import type { PlanRecord } from '@/api/types/plan';
 import { paths } from '@/app/paths';
 import { openRecord } from '@/features/roadmap/RecordSheet';
-import { D } from '@/shared/constants/data';
+import { ActRow } from '@/features/roadmap/parts';
+import { openSheet } from '@/shared/state/ui';
+import { useCatalog } from '@/shared/state/catalog';
 import { useGo } from '@/shared/hooks/useGo';
 import { hrs } from '@/shared/lib/format';
-import { count, st, stageActs } from '@/shared/lib/plan';
+import { count, st } from '@/shared/lib/plan';
 import { Icon } from '@/shared/ui/Icon';
-import { addDays, axisAll, colsOne, confirmDay, dayGap, gtPos, md, planStart, planWeeks, weekNow, type GtCol } from './ganttCalc';
+import { addDays, axisAll, colsOne, dailyCols, confirmDay, dayGap, gtPos, md, planStart, planWeeks, weekNow, type GtCol } from './ganttCalc';
+
+import './ganttInteraction.css';
 
 const gtFold = new Set<string>();
 
@@ -92,21 +96,35 @@ function Row({ lv, ins, label, bar, tip }: { lv: number; ins: string[]; label: R
   );
 }
 
-/** 로드맵 하나의 단계·활동 줄. off = 축 첫날부터 이 로드맵 1주차 첫날까지 일 수, T = 축 전체 일 수, up = 위 줄(로드맵)의 접기 열쇠 */
+/** 로드맵 하나의 스킬·활동 줄. off = 축 첫날부터 이 로드맵 1주차 첫날까지 일 수, T = 축 전체 일 수, up = 위 줄(로드맵)의 접기 열쇠 */
 function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: number; up: string[]; onToggle: (k: string) => void }) {
   const pl = R.plan;
   const base = planStart(R);
+  const resources = useCatalog(state => state.res);
+  const skillOrder = pl.def.learningSkills?.map(skill => skill.name) || [];
+  const groups = new Map<string, typeof pl.acts>();
+  for (const activity of pl.acts) {
+    const resource = activity.res ? resources[activity.res] : undefined;
+    const name = activity.skill || activity.skills?.[0] || resource?.skills?.find(skill => skillOrder.includes(skill)) || resource?.skills?.[0] || '기타 활동';
+    groups.set(name, [...(groups.get(name) || []), activity]);
+  }
+  const names = [...skillOrder.filter(name => groups.has(name)), ...[...groups.keys()].filter(name => !skillOrder.includes(name))];
   const when = (f: number, t: number) => `${f === t ? f : `${f}~${t}`}주차 · ${md(addDays(base, 7 * (f - 1)))}~${md(addDays(base, 7 * t - 1))}`;
   return (
     <>
-      {D.stages
-        .filter((s) => s.n >= pl.start && stageActs(pl, s.n).length)
-        .map((s) => {
-          const as = stageActs(pl, s.n);
+      {names.map((name, index) => {
+          const as = groups.get(name)!;
+          const number = index + 1;
+          const materials = as.filter(activity => activity.res);
+          const courses = materials.filter(activity => { const resource = resources[activity.res!]; return resource?.type === 'course' || resource?.kind === '강좌'; }).length;
+          const books = materials.filter(activity => { const resource = resources[activity.res!]; return resource?.type === 'book' || resource?.kind === '도서'; }).length;
+          const materialLabel = [courses ? `강좌 ${courses}개` : '', books ? `도서 ${books}권` : '', materials.length > courses + books ? `기타 ${materials.length - courses - books}개` : ''].filter(Boolean).join(' · ');
+          const showMaterials = () => openSheet({ title: `${name} · 학습 자료`, sub: materialLabel, body: () => <ul className="acts">{materials.map(activity => <ActRow key={activity.id} a={activity} R={R} />)}</ul> });
           const dn = as.filter((a) => st(R.progress, a.id) === 'done').length;
-          const key = `${R.id}:${s.n}`;
+          const key = `${R.id}:skill:${name}`;
           const f = Math.min(...as.map((a) => a.wFrom));
           const t = Math.max(...as.map((a) => a.wTo));
+          const rangeEnd = Math.min(T, off + 7 * t + (as.some(activity => !activity.res) ? 3.5 : 0));
           return (
             <Fragment key={key}>
               <Row
@@ -114,25 +132,29 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
                 ins={up}
                 label={
                   <>
-                    <Tg k={key} name={`${s.n}단계 ${s.name}`} onToggle={() => onToggle(key)} />
-                    <span className="gt-no">{s.n}</span>
-                    <span className="gt-name">{s.name}</span>
+                    <Tg k={key} name={name} onToggle={() => onToggle(key)} />
+                    <span className="gt-no">{number}</span>
+                    <span className="gt-name">{name}</span>
                     <span className="gt-sub">
                       {dn}/{as.length}
                     </span>
                   </>
                 }
                 bar={
-                  <span className="gt-bar sum" style={gtPos(off + 7 * (f - 1), off + 7 * t, T)}>
+                  <span className="gt-bar sum" style={gtPos(off + 7 * (f - 1), rangeEnd, T)}>
                     <i style={{ width: `${(dn / as.length) * 100}%` }} />
                   </span>
                 }
-                tip={{ v: when(f, t), t: `${s.n}단계 ${s.name}`, m: `활동 ${as.length}개 중 ${dn}개 완료` }}
+                tip={{ v: when(f, t), t: name, m: `활동 ${as.length}개 중 ${dn}개 완료` }}
               />
-              {as.map((a, i) => {
+              {materials.length > 0 && <Row lv={2} ins={up.concat(key)} label={<button className="gt-a" aria-label={`${name} 자료 학습 · ${materialLabel} · 자료 목록 열기`} onClick={showMaterials}><span className="gt-no">{number}.1</span><span className="gt-name">자료 학습 <small>{materialLabel}</small></span></button>} bar={<button type="button" className="gt-bar act gt-materials-open" aria-label={`${name} 학습 자료 열기`} onClick={showMaterials} style={gtPos(off + 7 * (Math.min(...materials.map(activity => activity.wFrom)) - 1), off + 7 * Math.max(...materials.map(activity => activity.wTo)), T)} />} tip={{ v: when(Math.min(...materials.map(activity => activity.wFrom)), Math.max(...materials.map(activity => activity.wTo))), t: `${name} 자료 학습`, m: `${materialLabel} · 클릭하면 개별 자료와 기록을 볼 수 있어요.` }} />}
+              {as.filter(activity => !activity.res).map((a, i) => {
+                const task = !a.res;
+                const activityFrom = task ? t : a.wFrom;
+                const activityTo = task ? t : a.wTo;
                 const done = st(R.progress, a.id) === 'done';
-                const no = `${s.n}.${i + 1}`;
-                const w = when(a.wFrom, a.wTo);
+                const no = `${number}.${i + (materials.length ? 2 : 1)}`;
+                const w = when(activityFrom, activityTo);
                 const m = `${hrs(a.hours)} · ${done ? '완료' : '진행 중'}`;
                 return (
                   <Row
@@ -140,16 +162,14 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
                     lv={2}
                     ins={up.concat(key)}
                     label={
-                      <button className="gt-a" aria-label={`${no} ${a.title}, ${w}, ${m}, 실행 기록 열기`} onClick={() => openRecord(R.id, a.id)}>
+                      <button className="gt-a" aria-label={`${no} ${a.title}, ${w}, ${m}, ${task ? '과제물 제출 열기' : '실행 기록 열기'}`} onClick={() => openRecord(R.id, a.id)}>
                         <span className="gt-no">{no}</span>
                         <span className="gt-name">{a.title}</span>
                         {done ? <Icon name="check" cls="gt-ok" /> : null}
                       </button>
                     }
                     bar={
-                      <span className={`gt-bar act${done ? ' done' : ''}`} style={gtPos(off + 7 * (a.wFrom - 1), off + 7 * a.wTo, T)}>
-                        {done ? <Icon name="check" /> : null}
-                      </span>
+                      task ? <button type="button" className={`gt-bar act gt-task-submit${done ? ' done' : ''}`} aria-label={`${a.title} 과제물 제출`} onClick={() => openRecord(R.id, a.id)} style={gtPos(Math.max(0, off + 7 * t - 3.5), Math.min(T, off + 7 * t + 3.5), T)}>{done ? <Icon name="check" /> : null}</button> : <span className={`gt-bar act${done ? ' done' : ''}`} style={gtPos(off + 7 * (activityFrom - 1), off + 7 * activityTo, T)}>{done ? <Icon name="check" /> : null}</span>
                     }
                     tip={{ v: w, t: a.title, m }}
                   />
@@ -163,9 +183,48 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
 }
 
 /** 머리 줄(칸 이름 두 줄) + 세로 칸 선·이번 주 칸 + 줄들 + 범례 */
-function Card({ title, link, heads, cols, rows, note, cls }: { title: ReactNode; link: ReactNode; heads: [string, string]; cols: GtCol[]; rows: ReactNode; note: string; cls?: string }) {
+function Card({ title, link, heads, cols, days, rows, note, cls }: { title: ReactNode; link: ReactNode; heads: [string, string]; cols: GtCol[]; days?: GtCol[]; rows: ReactNode; note: string; cls?: string }) {
   const tip = useTip();
   const scroll = useRef<HTMLDivElement>(null);
+  const [zoom, setZoom] = useState(1);
+  const daily = !!days && Math.round(zoom * 100) >= 150;
+  const visibleCols = daily ? days! : cols;
+  const [timelineSize, setTimelineSize] = useState({ available: 0, base: cols.length * 34 });
+  useEffect(() => {
+    const element = scroll.current;
+    if (!element) return;
+    const measure = () => {
+      const label = element.querySelector<HTMLElement>('.gt-h .gt-l');
+      const available = Math.max(0, element.clientWidth - (label?.offsetWidth || 236));
+      setTimelineSize({ available, base: Math.max(available, cols.length * 34) });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [cols.length]);
+  const [dragging, setDragging] = useState(false);
+  const drag = useRef<{ pointer: number; x: number; left: number; moved: boolean } | null>(null);
+  const suppressClick = useRef(false);
+  const changeZoom = (value: number) => { tip.hide(); setZoom(Math.max(.45, Math.min(1.5, value))); };
+  useEffect(() => {
+    const element = scroll.current;
+    if (!element) return;
+    const onWheel = (event: WheelEvent) => {
+      if (!event.ctrlKey) return;
+      event.preventDefault();
+      tip.hide();
+      setZoom(value => Math.max(.45, Math.min(1.5, value + (event.deltaY < 0 ? .1 : -.1))));
+    };
+    element.addEventListener('wheel', onWheel, { passive: false });
+    return () => element.removeEventListener('wheel', onWheel);
+  }, [tip.hide]);
+  const fit = () => {
+    const element = scroll.current;
+    if (!element) return;
+    changeZoom(Math.min(1, timelineSize.available / timelineSize.base));
+    element.scrollLeft = 0;
+  };
   /* 일정이 칸보다 넓어 옆으로 밀리면 이번 주 칸이 이름 칸 바로 옆(한 칸 띄움)에 오게 맞춘다 */
   useEffect(() => {
     const sc = scroll.current;
@@ -178,18 +237,45 @@ function Card({ title, link, heads, cols, rows, note, cls }: { title: ReactNode;
     <div className="card gt-card">
       <div className="sec-h">
         <h2 className="st">{title}</h2>
-        {link}
+        <div className="gt-view-controls" aria-label="일정표 보기 조절">
+          <button type="button" onClick={() => changeZoom(zoom - .1)} disabled={zoom <= .45} aria-label="일정표 축소">−</button>
+          <span aria-live="polite">{Math.round(zoom * 100)}%</span>
+          <button type="button" onClick={() => changeZoom(zoom + .1)} disabled={zoom >= 1.5} aria-label="일정표 확대">+</button>
+          <button type="button" onClick={fit}>전체 맞춤</button>
+          <button type="button" onClick={() => changeZoom(1)} disabled={zoom === 1}>원래 크기</button>
+          {link}
+        </div>
       </div>
-      <div className="gt-scroll" ref={scroll} onPointerOver={tip.show} onFocus={tip.show}>
-        <div className={`gt${cls ? ` ${cls}` : ''}`} style={{ ['--n' as string]: cols.length }}>
+      <div className={`gt-scroll gt-pan${dragging ? ' is-dragging' : ''}`} ref={scroll} onScroll={event => event.currentTarget.style.setProperty('--gt-scroll-left', `${Math.max(0, event.currentTarget.scrollLeft)}px`)} tabIndex={0} aria-label="일정표 · 좌우 드래그로 이동, Ctrl과 마우스 휠로 확대·축소"
+        onPointerOver={event => { if (!drag.current?.moved) tip.show(event); }} onFocus={tip.show}
+        onPointerDown={event => {
+          if (event.pointerType !== 'mouse' || event.button !== 0) return;
+          suppressClick.current = false;
+          drag.current = { pointer: event.pointerId, x: event.clientX, left: event.currentTarget.scrollLeft, moved: false };
+        }}
+        onPointerMove={event => {
+          const start = drag.current;
+          if (!start || start.pointer !== event.pointerId) return;
+          const dx = event.clientX - start.x;
+          if (!start.moved && Math.abs(dx) < 5) return;
+          if (!start.moved) { start.moved = true; suppressClick.current = true; setDragging(true); tip.hide(); event.currentTarget.setPointerCapture(event.pointerId); }
+          event.preventDefault();
+          event.currentTarget.scrollLeft = start.left - dx;
+        }}
+        onPointerUp={event => { drag.current = null; setDragging(false); if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); }}
+        onPointerCancel={() => { drag.current = null; suppressClick.current = false; setDragging(false); }}
+        onLostPointerCapture={() => { drag.current = null; setDragging(false); }}
+        onClickCapture={event => { if (suppressClick.current) { event.preventDefault(); event.stopPropagation(); suppressClick.current = false; } }}>
+
+        <div className={`gt${cls ? ` ${cls}` : ''}`} style={{ ['--n' as string]: visibleCols.length, minWidth: `calc(var(--gl) + ${daily ? Math.max(timelineSize.base * zoom, visibleCols.length * 26) : timelineSize.base * zoom}px)` }}>
           <div className="gt-h">
             <div className="gt-l">
-              <span>{heads[0]}</span>
-              <span>{heads[1]}</span>
+              <span>{daily ? '일 단위' : heads[0]}</span>
+              <span>{daily ? '날짜' : heads[1]}</span>
             </div>
             <div className="gt-tl">
-              {cols.map((c, i) => (
-                <div key={i} className={c.on ? 'on' : ''} aria-current={c.on ? 'date' : undefined}>
+              {visibleCols.map((c, i) => (
+                <div key={i} className={[c.on ? 'on' : '', c.weekStart ? 'gt-week-start' : ''].filter(Boolean).join(' ')} aria-current={c.on ? 'date' : undefined}>
                   <b>{c.top}</b>
                   <span>{c.sub}</span>
                 </div>
@@ -198,10 +284,11 @@ function Card({ title, link, heads, cols, rows, note, cls }: { title: ReactNode;
           </div>
           <div className="gt-body">
             <div className="gt-grid" aria-hidden="true">
-              {cols.map((c, i) => (
-                <i key={i} className={c.on ? 'on' : ''} />
+              {visibleCols.map((c, i) => (
+                <i key={i} className={[c.on ? 'on' : '', c.weekStart ? 'gt-week-start' : ''].filter(Boolean).join(' ')} />
               ))}
             </div>
+            {daily && <div className="gt-week-boundaries" aria-hidden="true">{visibleCols.map((column, index) => <i key={index} className={column.weekStart ? 'week-start' : ''} />)}</div>}
             {rows}
           </div>
         </div>
@@ -217,7 +304,7 @@ function Card({ title, link, heads, cols, rows, note, cls }: { title: ReactNode;
         </span>
         <span>
           <i className="k-now" />
-          이번 주
+          {daily ? '오늘' : '이번 주'}
         </span>
         <span className="gt-note">{note}</span>
       </div>
@@ -250,10 +337,11 @@ export function GanttOne({ R }: { R: PlanRecord }) {
           로드맵 전체 <Icon name="right" />
         </button>
       }
-      heads={['주차', '시작일(월)']}
+      heads={['주차', '시작일']}
       cols={colsOne(R)}
+      days={dailyCols(base, 7 * n)}
       rows={<Stages R={R} off={0} T={7 * n} up={[]} onToggle={toggle} />}
-      note={`한 칸은 월~일 1주예요. 1주차는 처음 확정한 날(${md(confirmDay(R))})이 든 주(${md(base)}~${md(addDays(base, 6))})예요.`}
+      note={`1주차는 시작일(${md(confirmDay(R))})부터 ${md(addDays(base, 6))}까지예요. 150% 이상 확대하면 하루 단위로 보여요.`}
     />
   );
 }
@@ -297,6 +385,6 @@ export function GanttAll({ list }: { list: PlanRecord[] }) {
     );
   });
   return (
-    <Card title="전체 일정" link={null} heads={['', '주 시작일(월)']} cols={cols} rows={rows} note="한 칸은 월~일 1주예요. 로드맵마다 처음 확정한 날이 든 주를 1주차로 세요." cls="all" />
+    <Card title="전체 일정" link={null} heads={['', '주 시작일']} cols={cols} days={dailyCols(axis, T)} rows={rows} note="로드맵 시작일부터 7일을 1주로 세요. 150% 이상 확대하면 하루 단위로 보여요." cls="all" />
   );
 }

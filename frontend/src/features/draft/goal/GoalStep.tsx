@@ -77,7 +77,7 @@ function GoalSuggestions() {
     body = (
       <>
         <div className="agents">
-          <AgentRow st="run" name="진단 에이전트 · 목표 후보 만들기" sub={runSub('default', '내 프로필(직급·직무·담당 업무·본인 입력)만 보고 지금과 다른 후보를 만들고 있어요')} />
+          <AgentRow st="run" name="새 목표 후보 생성 중" sub={runSub('default', '인사 정보와 업무 설명·프로젝트를 참고하고 있어요. 완성되면 새 후보 3개로 교체해요.')} />
         </div>
         {list.length ? items : null}
       </>

@@ -11,17 +11,20 @@ from app.agents.resource_recommendations import RecommendationError, candidate_p
 
 MODEL = 'text-embedding-3-small'
 DIMENSIONS = 1536
-VERSION = 'resource-pgvector-rag/v3'
+VERSION = 'resource-pgvector-rag/v4-learner-knowledge'
 PER_KIND = 6
 FIELDS = ('id','title','provider','cost','hours','estimated','image','url','skills','content','curriculum')
 
 
 def query_text(project: dict, skill: dict, course: dict | None) -> str:
     return json.dumps({
+        'learnerKnowledge':project.get('learnerKnowledge') or {},
+        'learningDirection':'이미 사용하는 기술의 입문 반복보다 프로젝트에 필요한 새 개념·심화·적용 중심',
         'projectGoal': str(project.get('goal') or '')[:500],
         'projectSummary': str(project.get('projectSummary') or '')[:2500],
         'desiredCompetencies': str(project.get('desiredCompetencies') or '')[:500],
         'skill': skill['name'], 'application': str(skill.get('application') or '')[:600],
+        **({'targetOutcome':str(skill.get('targetOutcome') or '')[:500],'completionCriteria':skill.get('completionCriteria') or []} if course and course.get('id')=='A3' else {}),
         'course': {key: str((course or {}).get(key) or '')[:500] for key in ('id','name','reason','scope')},
     }, ensure_ascii=False, sort_keys=True)
 

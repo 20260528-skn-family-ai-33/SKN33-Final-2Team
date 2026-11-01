@@ -1,0 +1,10 @@
+.task-description{display:block;min-width:0;font-size:12px;line-height:1.4;margin-top:2px}
+.task-description-text{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;line-clamp:3;overflow:hidden;white-space:pre-line;line-height:1.4}
+.task-description-text.is-expanded{display:block;-webkit-line-clamp:unset;line-clamp:unset;overflow:visible}
+.task-description .task-description-toggle{display:inline-block;min-height:0;padding:0;margin:3px 0 0;font-size:11px;line-height:1.4}
+.task-description-intro{display:block;margin-bottom:8px}
+.task-description-section{display:grid;grid-template-columns:64px minmax(0,1fr);gap:10px;padding:8px 0;border-bottom:1px solid var(--line,#e4e4df);white-space:normal}
+.task-description-section:last-child{border-bottom:0;padding-bottom:2px}
+.task-description-section .task-description-heading{font-size:11px;line-height:1.6;font-weight:650;color:var(--ink,#25332d)}
+.task-description-body{display:block;white-space:pre-line;line-height:1.65;overflow-wrap:anywhere}
+@media(max-width:600px){.task-description-section{grid-template-columns:1fr;gap:3px;padding:7px 0}}

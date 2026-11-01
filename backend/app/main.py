@@ -6,6 +6,10 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from contextlib import suppress
+import asyncio
+import os
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
@@ -24,7 +28,21 @@ async def lifespan(_: FastAPI):
     n = jobs.mark_lost()
     if n:
         print(f'  서버가 다시 시작돼 끊긴 작업 {n}개를 실패로 남겼어요(다시 시도는 사용자가 누를 때만)')
-    yield
+    prompt_task = None
+    if os.environ.get('PROMPT_IMPROVEMENT_ENABLED', '0') == '1':
+        from .services.prompt_evaluation_replay import load_cases
+        from .services.prompt_improvement_worker import serve
+        cases_path = os.environ.get('PROMPT_IMPROVEMENT_CASES', '')
+        load_cases(cases_path)  # 설정이 없거나 잘못됐으면 활성화에 성공한 것처럼 시작하지 않는다.
+        state_dir = Path(os.environ.get('PROMPT_IMPROVEMENT_STATE_DIR', str(ROOT / 'var' / 'prompt_improvement')))
+        prompt_task = asyncio.create_task(serve(cases_path, state_dir, apply=os.environ.get('PROMPT_IMPROVEMENT_AUTO_APPLY', '1') == '1'))
+    try:
+        yield
+    finally:
+        if prompt_task:
+            prompt_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await prompt_task
 
 
 app = FastAPI(title='GrowPath 5차 목업 API', version='5.0', lifespan=lifespan, docs_url='/api/docs', openapi_url='/api/openapi.json')

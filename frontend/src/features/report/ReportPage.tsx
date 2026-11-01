@@ -45,7 +45,7 @@ export function ReportPage() {
           ) : undefined
         ) : (
           <button className="btn pri" onClick={() => void ok()}>
-            확인했어요
+            {r.executionSnapshot?.early ? '확인하고 조기 종료' : '확인했어요'}
           </button>
         )
       }
@@ -55,8 +55,8 @@ export function ReportPage() {
       {sup ? <Note>이 보고서는 내 계획을 보는 부서장 {sup.name} 님도 볼 수 있어요.</Note> : null}
       {r.confirmed ? null : (
         <Note>
-          ‘확인했어요’를 누르면 이 로드맵을 마친 것으로 기록하고 내 로드맵의 ‘지난 로드맵’으로 옮겨요. 확인하기 전에는 사후 점검을 다시 작성해 새 보고서를 만들 수 있고, 확인한
-          뒤에는 읽기 전용이라 다시 점검하려면 새 로드맵에서 시작해요.
+          보고서 확인 버튼을 누르면 이 로드맵을 최종 종료하고 내 로드맵의 ‘지난 로드맵’으로 옮겨요. 확인하기 전에는 사후 점검을 다시 작성해 새 보고서를 만들 수 있고, 확인한
+          뒤에는 읽기 전용이며 재개할 수 없어요. 보관한 로드맵만 다시 진행할 수 있어요.
           {R && R.status === 'active' ? (
             <>
               {' '}

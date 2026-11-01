@@ -26,6 +26,6 @@ export const draftsApi = {
   regenerate: (id: string, pid: string, request: RegenRequest | null) => http.post<DraftResponse>(`/drafts/${enc(id)}/options/${enc(pid)}/regenerate`, { request }),
   /** perspective 가 null 이면 세 안 모두 다시 확인 */
   supportRetry: (id: string, perspective: string | null) => http.post<DraftResponse>(`/drafts/${enc(id)}/options/support/retry`, { perspective }),
-  select: (id: string, perspective: string) => http.post<DraftResponse>(`/drafts/${enc(id)}/selection`, { perspective }),
+  select: (id: string, perspective: string, displayed?: { course: string; optionId: string; promptVersionId: string }[]) => http.post<DraftResponse>(`/drafts/${enc(id)}/selection`, { perspective, displayed }),
   confirm: (id: string) => http.post<{ planId: string }>(`/drafts/${enc(id)}/confirm`),
 };

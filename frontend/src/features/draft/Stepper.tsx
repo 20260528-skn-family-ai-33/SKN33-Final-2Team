@@ -4,7 +4,7 @@ import { useWs } from '@/shared/state/workspace';
 import { Icon } from '@/shared/ui/Icon';
 import { blockedTo, STEPS, stepDone, type StepKey } from './model';
 
-export function Stepper({ cur }: { cur: StepKey }) {
+export function Stepper({ cur, busy = false }: { cur: StepKey; busy?: boolean }) {
   const go = useGo();
   const s = useWs();
   return (
@@ -14,7 +14,7 @@ export function Stepper({ cur }: { cur: StepKey }) {
           const st = k === cur ? 'cur' : stepDone(s, k) ? 'done' : !blockedTo(s, k) ? 'open' : 'lock';
           return (
             <li className={st} key={k}>
-              <button disabled={st === 'lock'} aria-current={k === cur ? 'step' : undefined} onClick={() => go(r)}>
+              <button disabled={busy || st === 'lock'} aria-current={k === cur ? 'step' : undefined} onClick={() => go(r)}>
                 <span className="sn">{st === 'done' ? <Icon name="check" /> : i + 1}</span>
                 <span className="sl">{l}</span>
               </button>

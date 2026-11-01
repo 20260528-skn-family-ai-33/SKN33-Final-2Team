@@ -1,0 +1,1 @@
+.dform.dform-conditions{grid-template-columns:repeat(3,minmax(0,1fr))}.dform-conditions>.field.wide{grid-column:1 / -1}@media(max-width:600px){.dform.dform-conditions{grid-template-columns:1fr}}

@@ -15,6 +15,20 @@ import { updateWs, ws } from '@/shared/state/workspace';
 
 /** 사후 심화 답은 문항이 준비되고 보고서를 만들기 전까지만 보낸다(보고서를 만든 뒤에는 서버가 고정) */
 export const deepOpen = (dp: PostDeep | null | undefined) => !!(dp && dp.status === 'ready' && !dp.judge);
+const quizFlights = new Map<string, Promise<void>>();
+export function ensurePostQuiz(pid: string): Promise<void> {
+  if (ws().plans[pid]?.post.quizSurvey) return Promise.resolve();
+  const pending = quizFlights.get(pid); if (pending) return pending;
+  const work = plansApi.postQuiz(pid).then(result => {
+    const mine = ws().plans[pid]?.post;
+    const keep = mine ? { answers: { ...mine.answers }, quizAnswers: { ...mine.quizAnswers }, goalSelf: mine.goalSelf } : null;
+    takePlan(result);
+    if (keep && ws().plans[pid]) updateWs(s => { Object.assign(s.plans[pid].post, keep); });
+  });
+  quizFlights.set(pid, work);
+  void work.finally(() => quizFlights.delete(pid)).catch(() => {});
+  return work;
+}
 let postQ: Promise<boolean> = Promise.resolve(true);
 
 /** 사후 점검 응답 저장. 성공하면 true, 실패하면 알림을 띄우고 false(화면 입력은 그대로 두어 다시 시도할 수 있다) */
@@ -23,14 +37,16 @@ export function savePost(pid: string, extra?: Record<string, unknown> | null): P
     const cur = ws().plans[pid];
     if (!cur) return false;
     const dp = cur.post.deep;
-    const body = { answers: cur.post.answers, goalSelf: cur.post.goalSelf, ...(deepOpen(dp) ? { deepMcq: dp!.mcq || {}, deepEssay: dp!.essay || {} } : {}), ...(extra || {}) };
+    const body = { ...(cur.post.quizSurvey ? { quizAnswers: cur.post.quizAnswers || {} } : {}), answers: cur.post.answers, goalSelf: cur.post.goalSelf, ...(deepOpen(dp) ? { deepMcq: dp!.mcq || {}, deepEssay: dp!.essay || {} } : {}), ...(extra || {}) };
     try {
       const res = await plansApi.savePost(pid, body);
       /* 보내는 사이 서술형을 더 썼으면 서버 응답이 덮지 않게 화면의 심화 답을 그대로 둔다
          immer 는 draft 를 고치면서 값도 돌려주면 예외를 던지므로 Object.assign 의 결과를 돌려주지 않는다(#48) */
       const mine = ws().plans[pid]?.post;
       const keep = mine && deepOpen(mine.deep) ? { mcq: mine.deep!.mcq, essay: mine.deep!.essay } : null;
+      const keepAnswers = mine ? { answers: { ...mine.answers }, quizAnswers: { ...mine.quizAnswers }, goalSelf: mine.goalSelf } : null;
       takePlan(res);
+      if (keepAnswers && ws().plans[pid]) updateWs(s => { Object.assign(s.plans[pid].post, keepAnswers); });
       if (keep && deepOpen(ws().plans[pid]?.post.deep)) updateWs((s) => void Object.assign(s.plans[pid].post.deep as PostDeep, keep));
       return true;
     } catch (err) {

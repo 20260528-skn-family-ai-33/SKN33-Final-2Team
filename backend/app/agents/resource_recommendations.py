@@ -34,12 +34,14 @@ def candidate_pools(project: dict, selection: dict, items: dict[str, dict], limi
     def score(item):
         evidence = (str(item.get('title') or '') + ' ' + str(item.get('content') or '')).lower()
         return sum(term in evidence for term in terms)
+    from app.learner_knowledge import exclusion
+    knowledge=project.get('learnerKnowledge') or {}
     pools = []
     for skill in rows:
         by_kind = {}
         for kind, key in (('course', 'courses'), ('book', 'books')):
             # 스킬·종류·사용 가능 여부를 후보 개수 제한보다 먼저 적용한다.
-            available = [row for row in items.values() if row.get('usable') and row.get('type') == kind and skill['name'] in (row.get('skills') or []) and (not free_only or kind == 'book' or (row.get('cost') == 0 and not isinstance(row.get('cost'), bool)))]
+            available = [row for row in items.values() if row.get('usable') and row.get('type') == kind and not exclusion(row,knowledge,str(project.get('goal') or '')) and skill['name'] in (row.get('skills') or []) and (not free_only or kind == 'book' or (row.get('cost') == 0 and not isinstance(row.get('cost'), bool)))]
             available.sort(key=lambda row: (-score(row), str(row.get('title') or ''), row['id']))
             by_kind[key] = [deepcopy({field: row.get(field) for field in
                 ('id', 'title', 'provider', 'cost', 'hours', 'estimated', 'image', 'url', 'skills', 'content', 'curriculum')})
@@ -71,10 +73,14 @@ def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
                 row.pop('image', None)
                 row.pop('url', None)
     payload = {'project': {key: project.get(key) for key in ('goal', 'projectSummary', 'desiredCompetencies')}, 'skills': evidence_pools}
+    payload['learnerKnowledge']=deepcopy(project.get('learnerKnowledge') or {})
+    payload['hrContext']=deepcopy(project.get('hrContext') or {})
     payload['course'] = deepcopy(course)
     payload['project']['details'] = deepcopy(project.get('details') or {})
     rules = '\n선택한 course의 방향과 범위를 따라 추천한다. A1 Free Course는 강좌만 예산과 무관하게 비용 0원으로 제한하고 도서는 유료·가격 미확인도 허용하며 가격과 예산으로 제외하지 않는다, A2 Crash Course는 단기간에 필요한 내용을 익힐 자료, A3 Challenge Course는 프로젝트에 직접 적용하는 실습 중심 자료를 우선한다. 없는 자료를 채우지 않는다.'
-    raw = generate(SYSTEM + rules, payload)
+    from app.track_policy import challenge_guidance
+    from app.learner_knowledge import POLICY
+    raw = generate(SYSTEM + rules + POLICY + challenge_guidance(course, 'resources'), payload)
     rows = raw.get('skills') if isinstance(raw, dict) else None
     if not isinstance(rows, list) or len(rows) != len(pools):
         raise RecommendationError('스킬별 추천 결과 수가 일치하지 않습니다.')
@@ -143,8 +149,10 @@ def recommend_from_catalog(ctx: Any, pre: dict, course: dict | None = None) -> d
         raise RecommendationError('AI 추천에는 사용 가능한 실제 모델이 필요합니다.')
     from app.services.resource_rag import retrieve
     items = catalog.items()
-    pools, retrieval = retrieve(pre['project'], pre['selection'], items, course)
-    result = recommend_resources(pre['project'], pre['selection'], items,
+    from app.learner_knowledge import from_profile,hr_context
+    project=dict(pre['project'],learnerKnowledge=from_profile(pre.get('profile')),hrContext=hr_context(pre.get('profile')))
+    pools, retrieval = retrieve(project, pre['selection'], items, course)
+    result = recommend_resources(project, pre['selection'], items,
         lambda system, payload: runtime.llm_json(ctx, system, payload), course=course, retrieved_pools=pools)
     result['retrieval'] = retrieval
     return result

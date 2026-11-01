@@ -64,6 +64,7 @@ export interface RegenReq {
 }
 
 export interface WsState {
+  pendingFlow?: 'inputs' | 'answers' | 'options' | 'materials';
   owner: string | null;
   draft: DraftDoc;
   draftId: string | null;

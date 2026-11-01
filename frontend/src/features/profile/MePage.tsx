@@ -1,4 +1,3 @@
-import { ThemePicker } from '@/shared/ui/sideParts';
 /* 내 정보 (API-04~08 · 5차 gp-me.js)
    인사 정보·권한(부서·부서장)은 읽기 전용(관리자 화면의 인적 데이터 엑셀로 바뀜), 본인 입력 프로필과 평정의 목표 추천 활용 동의는 직접 고친다.
    고친 값은 서버에 저장하고, 저장하면 서버가 목표 후보를 새 값으로 다시 만든다(FR-05) */
@@ -183,40 +182,39 @@ function ListView({ e, k }: { e: User; k: (typeof LISTS)[number][0] }) {
 
 function SelfView({ e }: { e: User }) {
   const p = e.profile || {};
-  return (
-    <>
-      {e.profile ? null : <Note>본인 입력 프로필이 아직 없어요. ‘수정’을 눌러 업무 설명이나 프로젝트 경험을 채우면 내 업무에 맞는 목표 후보를 받을 수 있어요.</Note>}
-      <dl className="kv me-kv">
-        <dt>업무 설명</dt>
-        <dd>
-          <Val v={p.workDesc} />
-        </dd>
-        <dt>경험 요약</dt>
-        <dd>
-          <Val v={p.expSummary} />
-        </dd>
-        <dt>개발 경험</dt>
-        <dd>{p.devYears == null ? <None /> : `${p.devYears}년`}</dd>
-        {LISTS.map(([k, l]) => (
-          <Fragment key={k}>
-            <dt>{l}</dt>
-            <dd>
-              <ListView e={e} k={k} />
-            </dd>
-          </Fragment>
-        ))}
-      </dl>
-    </>
-  );
+  return <>
+    {e.profile ? null : <Note>본인 입력 프로필이 아직 없어요. ‘수정’을 눌러 업무 설명이나 프로젝트 경험을 채우면 내 업무에 맞는 목표 후보를 받을 수 있어요.</Note>}
+    <h3 style={{ fontSize: 14, margin: '0 0 8px' }}>권장</h3>
+    <p className="small muted">업무와 프로젝트를 적으면 목표·학습 추천에 도움이 돼요.</p>
+    <dl className="kv me-kv"><dt>업무 설명</dt><dd><Val v={p.workDesc} /></dd><dt>프로젝트</dt><dd><ListView e={e} k="projects" /></dd></dl>
+    <h3 style={{ fontSize: 14, margin: '20px 0 8px' }}>선택 사항</h3>
+    <dl className="kv me-kv"><dt>경험 요약</dt><dd><Val v={p.expSummary} /></dd><dt>개발 경험</dt><dd>{p.devYears == null ? <None /> : `${p.devYears}년`}</dd>
+      {LISTS.filter(([key]) => key !== 'projects').map(([k, label]) => <Fragment key={k}><dt>{label}</dt><dd><ListView e={e} k={k} /></dd></Fragment>)}
+    </dl>
+  </>;
 }
 
 function SelfForm({ err }: { err: string }) {
   const ed = useAt<Record<string, unknown>>('meEdit') || {};
+  const renderListField = ([k, l, ph]: (typeof LISTS)[number]) => (
+<div className="field" key={k}>
+          <label>
+            {l} <span className="muted small">{k === 'projects' ? '권장' : '선택'} · 한 줄에 하나씩</span>
+          </label>
+          <BText path={`meEdit.${k}`} className="textarea sm" maxLength={800} rows={3} ariaLabel={l} placeholder={ph} />
+          <label className="check sm">
+            <input type="checkbox" checked={!!ed[k + 'None']} onChange={(e) => setAt(`meEdit.${k}None`, e.target.checked)} />
+            없어요 (없음을 확인함)
+          </label>
+        </div>
+  );
   return (
     <div className="me-form">
+      <h3 style={{ fontSize: 14, margin: '0 0 8px' }}>권장</h3>
+      <p className="small muted">업무와 프로젝트를 적으면 목표·학습 추천에 도움이 돼요.</p>
       <div className="field">
         <label>
-          업무 설명 <span className="muted small">선택 · 지금 하는 일과 AI로 줄이고 싶은 일</span>
+          업무 설명 <span className="muted small">권장 · 지금 하는 일과 AI로 줄이고 싶은 일</span>
         </label>
         <BText
           path="meEdit.workDesc"
@@ -227,6 +225,8 @@ function SelfForm({ err }: { err: string }) {
           placeholder="예: 사내 업무 시스템의 조회 기능을 유지보수해요. 규정 문서에서 근거를 찾는 데 시간이 오래 걸려요."
         />
       </div>
+      {renderListField(LISTS.find(([key]) => key === 'projects')!)}
+      <h3 style={{ fontSize: 14, margin: '20px 0 8px' }}>선택 사항</h3>
       <div className="field">
         <label>
           경험 요약 <span className="muted small">선택</span>
@@ -242,18 +242,7 @@ function SelfForm({ err }: { err: string }) {
           <span>년</span>
         </div>
       </div>
-      {LISTS.map(([k, l, ph]) => (
-        <div className="field" key={k}>
-          <label>
-            {l} <span className="muted small">선택 · 한 줄에 하나씩</span>
-          </label>
-          <BText path={`meEdit.${k}`} className="textarea sm" maxLength={800} rows={3} ariaLabel={l} placeholder={ph} />
-          <label className="check sm">
-            <input type="checkbox" checked={!!ed[k + 'None']} onChange={(e) => setAt(`meEdit.${k}None`, e.target.checked)} />
-            없어요 (없음을 확인함)
-          </label>
-        </div>
-      ))}
+      {LISTS.filter(([key]) => key !== 'projects').map(renderListField)}
       <p className="err" id="meErr" role="alert" hidden={!err}>
         {err}
       </p>
@@ -444,27 +433,15 @@ export function MePage() {
               </button>
             </div>
           ) : null}
-          <p className="small muted me-foot">
-            고친 내용은 팀 DB의 직원 입력 정보에 저장되고, 처음 들어온 값은 되돌릴 수 있게 따로 남아요.
-            {e.edited && !ed ? (
-              <>
-                {' '}
-                <button className="link quiet" onClick={revert}>
-                  처음 값으로 되돌리기
-                </button>
-              </>
-            ) : null}
-          </p>
+          {e.edited && !ed ? (
+            <p className="small">
+              <button type="button" className="link quiet" onClick={revert}>처음 값으로 되돌리기</button>
+            </p>
+          ) : null}
         </div>
         <EvalCard e={e} />
         <PermCard e={e} />
         <UseCard e={e} />
-        <section className="card" aria-labelledby="profile-theme-title">
-          <div className="sec-h">
-            <h2 className="st" id="profile-theme-title">테마 설정</h2>
-          </div>
-          <ThemePicker />
-        </section>
       </div>
     </Page>
   );

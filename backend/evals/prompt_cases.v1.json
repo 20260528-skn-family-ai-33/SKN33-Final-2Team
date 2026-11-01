@@ -1,0 +1,78 @@
+{
+  "caseSetId": "growpath-synthetic-projects-v1",
+  "description": "비식별 합성 프로젝트 평가 사례. 운영 활성화 전 검토 대상이며 실제 직원 정보가 아니다.",
+  "cases": [
+    {
+      "caseId": "sql-join-validation",
+      "rubric": ["이미 사용하는 SQL의 설치·입문 반복보다 조인·집계 결과 검증에 집중", "중복 키·결측값·집계 합계의 확인 방법과 제출할 쿼리/실행 결과 명시", "운영 DB 접속·배포·새 자격 취득을 요구하지 않음"],
+      "handoff": {
+        "goal": "공개 샘플 주문 데이터의 조인·집계 결과를 검증하는 조회 쿼리를 만들고 싶어요.",
+        "projectSummary": "합성 고객·주문 CSV로 중복 키와 결측값이 집계에 미치는 영향을 확인한다. 운영 DB 접속·서비스 배포는 제외한다.",
+        "desiredCompetencies": "조인과 집계 결과의 정합성 검증",
+        "startStage": 1,
+        "courseSkillSelection": true,
+        "focus": ["SQL 기본 문법 & 조인"],
+        "skillNames": ["SQL 기본 문법 & 조인"],
+        "skillDetails": [{"name": "SQL 기본 문법 & 조인", "application": "조인·집계 결과의 정합성 검증"}],
+        "known": ["SQL"], "gaps": [], "resourceHints": [],
+        "learnerKnowledge": {"version": "learner-knowledge/v1", "technologies": ["SQL"], "certifications": ["SQLD"], "learning": []},
+        "prefs": {"weeklyHours": 6, "deadlineWeeks": 6, "formatKey": "mixed", "budgetLimit": 100000}
+      },
+      "revision": {"changes": {}, "request": "학습 범위와 선택 자료는 유지하고 중복 키·결측값·집계 합계를 확인할 과제 완료 기준을 구체화해 주세요."}
+    },
+    {
+      "caseId": "eda-reproducibility",
+      "rubric": ["Python 문법 반복이나 보유 자격 재취득 준비를 추가하지 않음", "합성 데이터의 결측·이상값 처리 근거와 처리 전후 비교를 제시", "표·시각화·재실행 가능한 노트북을 실제 자료 근거와 연결"],
+      "handoff": {
+        "goal": "합성 설문 데이터의 결측값과 이상값을 분석하고 처리 근거를 재현 가능한 노트북으로 남기고 싶어요.",
+        "projectSummary": "개인정보가 없는 합성 응답 데이터의 분포와 처리 전후 통계를 비교한다. 통계 자격시험 준비·예측 모델 학습·운영 배포는 제외한다.",
+        "desiredCompetencies": "데이터 분포 진단과 전처리 근거 설명",
+        "startStage": 1,
+        "courseSkillSelection": true,
+        "focus": ["탐색적 데이터 분석(EDA) & 전처리"],
+        "skillNames": ["탐색적 데이터 분석(EDA) & 전처리"],
+        "skillDetails": [{"name": "탐색적 데이터 분석(EDA) & 전처리", "application": "결측·이상값 진단 및 전처리 전후 비교"}],
+        "known": ["Python"], "gaps": [], "resourceHints": [],
+        "learnerKnowledge": {"version": "learner-knowledge/v1", "technologies": ["Python"], "certifications": ["사회조사분석사 2급"], "learning": []},
+        "prefs": {"weeklyHours": 6, "deadlineWeeks": 6, "formatKey": "mixed", "budgetLimit": 100000}
+      },
+      "revision": {"changes": {}, "request": "학습 범위를 유지하고 합성 데이터 처리 전후 비교와 노트북 재실행으로 확인할 제출물·완료 기준을 보완해 주세요."}
+    },
+    {
+      "caseId": "python-async-failure-handling",
+      "rubric": ["Python 기초 문법 대신 비동기 I/O·동시성 제한·실패 처리 학습으로 연결", "모의 응답으로 순차/동시 처리 결과와 예외 처리를 비교", "유료 외부 API·실제 인증키·운영 배포를 필수로 요구하지 않음"],
+      "handoff": {
+        "goal": "모의 API 응답을 비동기로 수집하고 시간 초과와 실패를 처리하는 Python 코드를 만들고 싶어요.",
+        "projectSummary": "로컬 모의 응답만 사용해 순차·동시 처리의 결과와 동시성 제한·시간 초과 동작을 비교한다. 실제 외부 API 결제·인증키 입력·클라우드 배포는 제외한다.",
+        "desiredCompetencies": "비동기 I/O의 동시성 제어와 예외 처리 검증",
+        "startStage": 1,
+        "courseSkillSelection": true,
+        "focus": ["Python 프로그래밍 & 비동기 I/O"],
+        "skillNames": ["Python 프로그래밍 & 비동기 I/O"],
+        "skillDetails": [{"name": "Python 프로그래밍 & 비동기 I/O", "application": "모의 API 수집의 동시성 제어와 실패 처리 검증"}],
+        "known": ["Python"], "gaps": [], "resourceHints": [],
+        "learnerKnowledge": {"version": "learner-knowledge/v1", "technologies": ["Python"], "certifications": [], "learning": []},
+        "prefs": {"weeklyHours": 6, "deadlineWeeks": 6, "formatKey": "mixed", "budgetLimit": 100000}
+      },
+      "revision": {"changes": {}, "request": "선택 자료와 범위를 유지하고 모의 응답의 시간 초과·실패 처리와 순차/동시 결과 비교를 확인할 완료 기준을 구체화해 주세요."}
+    },
+    {
+      "caseId": "nlp-grounded-answer-validation",
+      "rubric": ["프로젝트 범위 안에서 텍스트 분할·검색·근거 확인 학습을 연결", "공개 짧은 문서와 고정 질문으로 검색 결과·인용 근거를 확인", "모델 파인튜닝·대규모 수집·개인 문서 업로드·외부 서비스 결제를 강요하지 않음"],
+      "handoff": {
+        "goal": "공개 짧은 문서에서 질문의 근거를 찾고 생성형 AI 답변의 인용 근거를 검토하고 싶어요.",
+        "projectSummary": "공개 짧은 문서와 고정 질문으로 텍스트 분할·검색 결과·답변 근거를 비교한다. 모델 파인튜닝·대규모 수집·개인 문서 업로드·유료 API 결제는 제외한다.",
+        "desiredCompetencies": "텍스트 검색 결과와 생성 답변의 근거 검토",
+        "startStage": 1,
+        "courseSkillSelection": true,
+        "focus": ["자연어 처리(NLP) & LLM 기초"],
+        "skillNames": ["자연어 처리(NLP) & LLM 기초"],
+        "skillDetails": [{"name": "자연어 처리(NLP) & LLM 기초", "application": "공개 문서의 텍스트 분할·검색·인용 근거 검증"}],
+        "known": ["Python"], "gaps": [], "resourceHints": [],
+        "learnerKnowledge": {"version": "learner-knowledge/v1", "technologies": ["Python"], "certifications": [], "learning": []},
+        "prefs": {"weeklyHours": 6, "deadlineWeeks": 6, "formatKey": "mixed", "budgetLimit": 100000}
+      },
+      "revision": {"changes": {}, "request": "학습 범위와 선택 자료는 유지하고 고정 질문·문서 근거로 검색과 답변의 적절성을 확인할 제출물·완료 기준을 보완해 주세요."}
+    }
+  ]
+}

@@ -181,7 +181,9 @@ def chat(provider: str, messages: list, role: str = 'default', json_mode: bool =
     level = (mine if mine in S.openai_reasoning_levels else S.openai_reasoning) if model == S.openai_model else None
     if level:
         payload['reasoning_effort'] = level
-    res = openai('chat/completions', payload)
+    # 상세 계획을 쓰는 로드맵만 더 기다린다. 사용자 추론 선택과 다른 기능의 제한은 유지한다.
+    timeout = S.openai_roadmap_timeout if role == 'roadmap' else 90
+    res = openai('chat/completions', payload, timeout=timeout)
     return {'content': res['choices'][0]['message'].get('content') or '', 'model': res.get('model', model), 'provider': 'openai', 'loadMs': 0, 'totalMs': 0}
 
 

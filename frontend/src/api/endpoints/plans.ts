@@ -20,6 +20,7 @@ export const plansApi = {
   savePost: (id: string, body: Record<string, unknown>) => http.put<PlanResponse>(`/plans/${enc(id)}/post-assessment`, body),
   makeReport: (id: string) => http.post<JobStarted>(`/plans/${enc(id)}/reports`, {}, a),
   /** 설계서 밖 추가(10/23) · 사후 심화 질문 만들기 */
+  postQuiz: (id: string) => http.post<PlanResponse>(`/plans/${enc(id)}/post-quiz`),
   postDeep: (id: string) => http.post<JobStarted>(`/plans/${enc(id)}/post-assessment/deep`, {}, a),
   reports: (planId?: string) => http.get<Report[]>(`/reports${planId ? `?planId=${enc(planId)}` : ''}`),
   confirmReport: (rid: string) => http.post<{ planStatus: string; planId: string }>(`/reports/${enc(rid)}/confirm`),

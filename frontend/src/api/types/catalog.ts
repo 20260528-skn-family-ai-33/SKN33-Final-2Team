@@ -50,6 +50,7 @@ export interface ResourceSearch {
 }
 
 export interface Cert {
+  skills?: string[];
   id: string;
   res: string;
   short: string;

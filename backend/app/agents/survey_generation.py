@@ -7,6 +7,7 @@ import hashlib
 import json
 import random
 from typing import Any
+from app.learner_knowledge import from_profile, hr_context
 
 SYSTEM = """선정한 각 스킬의 핵심 지식과 수행 역량을 확인하는 설문과 퀴즈를 만든다.
 projectSummary는 기획서 요약, desiredCompetencies는 키우고 싶은 역량,
@@ -14,6 +15,12 @@ profile은 소속·학력·전공·본인 입력 정보다. 기획서가 없으�
 측정 기준은 skills다. 프로젝트는 업무 상황과 예시에만 사용한다. 수도 공정 같은 도메인
 지식을 알아야만 풀 수 있는 문제나 기획서 제외 범위의 작업을 출제하지 않는다.
 희망 역량은 스킬 내 세부 주제를 조정한다. 학력·소속·경험만으로 현재 역량을 단정하지 않는다.
+skills의 application을 해당 프로젝트에서 측정할 수행 범위로 삼는다. 넓은 스킬의 일반 입문 문제로 채우지 않는다.
+learnerKnowledge의 보유 기술·자격에 해당하는 단순 문법·용어 암기 문항은 줄이고 새로운 적용·판단·검증에 집중한다.
+보유 기술만으로 모든 세부 역량을 숙련했다고 단정하거나 선정 스킬의 진단 문항을 생략하지 않는다.
+설문은 조건과 행동이 드러나는 구체적인 수행 가능성으로 작성한다. 퀴즈는 업무 상황에서 방법·오류 원인·검증 절차를 판단하게 한다.
+각 퀴즈에 concept(측정할 구체적 개념), questionType(예: 오류 원인 판단), difficulty(기초/적용/심화)를 기록한다.
+이 세 기준은 사후 평행 문항에도 유지한다. 같은 스킬 안에서는 서로 다른 세부 개념을 측정한다.
 스킬마다 surveysPerSkill개의 5점 자기평가 서술문과 quizzesPerSkill개의 객관식 퀴즈를
 각각 만든다. 설문은 '~할 수 있다', '~을 알고 있다' 형식이다. 심화 구분·서술형은 없다.
 각 그룹의 title은 부드럽고 이해하기 쉬운 제목이며 DB 스킬 태그 자체를 제목으로 쓰지 않는다.
@@ -26,7 +33,7 @@ profile은 소속·학력·전공·본인 입력 정보다. 기획서가 없으�
 정답에만 질문의 낱말을 반복하지 않는다. 답 위치는 서버가 선택지를 섞어 편향을 줄인다.
 JSON: {"groups":[{"skill":"입력 스킬 이름","title":"업무 데이터를 다뤄볼까요",
 "surveys":[{"text":"공통 키로 테이블을 결합할 수 있다."}],
-"quizzes":[{"q":"질문","options":["보기1","보기2","보기3","보기4","보기5"],"answer":0,"explain":"근거"}]}]}
+"quizzes":[{"concept":"일대다 조인의 행 증가","questionType":"오류 원인 판단","difficulty":"적용","q":"질문","options":["보기1","보기2","보기3","보기4","보기5"],"answer":0,"explain":"근거"}]}]}
 """
 
 
@@ -38,6 +45,7 @@ def profile_input(me: dict[str, Any]) -> dict[str, Any]:
     """profile.view 결과. education 문자열에는 학교·전공·학위가 함께 들어 있다."""
     return deepcopy({
         'department': me.get('dept'), 'parentDepartment': me.get('parentDept'),
+        'grade':me.get('grade'),'position':me.get('position'),'jobFamily':me.get('jobFamily'),
         'job': me.get('job'), 'task': me.get('task'), 'education': me.get('education') or [],
         'self': {'profile': me.get('profile'),
                  **{key: me.get(key) or [] for key in ('tech', 'certs', 'learning', 'projects')}},
@@ -51,7 +59,8 @@ def _text(value: Any, label: str) -> str:
 
 
 def generate_survey(project: dict[str, Any], selection: dict[str, Any], profile: dict[str, Any],
-                    generate: Callable[[str, dict[str, Any]], dict[str, Any]]) -> dict[str, Any]:
+                    generate: Callable[[str, dict[str, Any]], dict[str, Any]], *,
+                    require_measurement: bool = False) -> dict[str, Any]:
     if not isinstance(project, dict) or not isinstance(selection, dict) or not isinstance(profile, dict):
         raise SurveyError('프로젝트·스킬·프로필 입력 형식을 확인해 주세요.')
     goal = _text(project.get('goal'), '목표')
@@ -70,7 +79,8 @@ def generate_survey(project: dict[str, Any], selection: dict[str, Any], profile:
     # 원문 파일·원문 텍스트 같은 추가 필드는 모델에 전달하지 않는다.
     payload = deepcopy({'goal': goal, 'projectSummary': summary, 'desiredCompetencies': desired,
                         'skills': skills, 'profile': profile, 'surveysPerSkill': per_skill,
-                        'quizzesPerSkill': per_skill})
+                        'quizzesPerSkill': per_skill, 'learnerKnowledge': from_profile(profile),
+                        'hrContext': hr_context(profile)})
     raw = generate(SYSTEM, payload)
     groups = raw.get('groups') if isinstance(raw, dict) else None
     if not isinstance(groups, list) or len(groups) != len(names):
@@ -111,11 +121,17 @@ def generate_survey(project: dict[str, Any], selection: dict[str, Any], profile:
                 if type(answer) is not int or not 0 <= answer < 5:
                     raise SurveyError('퀴즈 정답은 0~4 정수여야 합니다.')
                 explain = _text(row.get('explain'), '정답 해설')
+                measurement = {}
+                if require_measurement or any(key in row for key in ('concept', 'questionType', 'difficulty')):
+                    measurement = {key: _text(row.get(key), label) for key, label in (
+                        ('concept', '측정 개념'), ('questionType', '문항 유형'), ('difficulty', '문항 난이도'))}
+                    if measurement['difficulty'] not in ('기초', '적용', '심화'):
+                        raise SurveyError('문항 난이도는 기초·적용·심화 중 하나여야 합니다.')
                 seed = hashlib.sha256(json.dumps([goal, summary, skill, text, sorted(options)], ensure_ascii=False).encode()).hexdigest()
                 indices = sorted(range(5), key=lambda k: options[k])
                 random.Random(seed).shuffle(indices)
                 cleaned[kind].append({'q': text, 'options': [options[k] for k in indices],
-                                      'answer': indices.index(answer), 'explain': explain})
+                                      'answer': indices.index(answer), 'explain': explain, **measurement})
         by_skill[skill] = cleaned
     ordered = [by_skill[name] for name in names]
     for i, group in enumerate(ordered, 1):
@@ -136,4 +152,5 @@ def generate_from_profile(ctx: Any, project: dict[str, Any], selection: dict[str
     if me is None:
         raise SurveyError('개인 DB 프로필을 찾을 수 없습니다.')
     return generate_survey(project, selection, profile_input(me),
-                           lambda system, payload: runtime.llm_json(ctx, system, payload))
+                           lambda system, payload: runtime.llm_json(ctx, system, payload),
+                           require_measurement=True)

@@ -39,3 +39,31 @@ class RecommendationStoreTests(unittest.TestCase):
         self.assertEqual(updated['skillOrder'],['분석'])
         self.assertFalse(updated['resourceChoices']['분석']['enabled'])
         self.assertEqual(updated['resourceChoices']['분석']['books'],['b'])
+
+    def test_course_selection_marks_materials_ready_without_generating_activities(self):
+        from app.services.activity_selection import materials_ready
+        saved=store.save_recommendations(self.tx,1,'project','pre',self.result,course='A1')
+        from app.services.course_recommendations import merge_scope,scope_view
+        base=merge_scope(self.pre,saved)
+        self.tx.one.return_value={'draft_choices':{store.KEY:base}}
+        self.assertFalse(materials_ready(scope_view(base,'A1')))
+        choices={'분석':{'course':'c','books':['b'],'enabled':True}}
+        updated=store.save_resource_choices(self.tx,1,'project','pre',saved['recommendations']['id'],choices,course='A1')
+        self.assertTrue(materials_ready(updated))
+        self.assertFalse(updated.get('activityProposal'))
+        changed=copy.deepcopy(updated);changed['resourceChoices']['분석']['books']=[]
+        self.assertFalse(materials_ready(changed))
+        combined=merge_scope(base,updated)
+        self.assertTrue(materials_ready(scope_view(combined,'A1')))
+        self.assertFalse(materials_ready(scope_view(combined,'A3')))
+
+    def test_new_recommendations_require_material_selection_again(self):
+        from app.services.activity_selection import materials_ready
+        saved=store.save_recommendations(self.tx,1,'project','pre',self.result,course='A1')
+        from app.services.course_recommendations import merge_scope
+        base=merge_scope(self.pre,saved)
+        self.tx.one.return_value={'draft_choices':{store.KEY:base}}
+        updated=store.save_resource_choices(self.tx,1,'project','pre',saved['recommendations']['id'],saved['resourceChoices'],course='A1')
+        self.tx.one.return_value={'draft_choices':{store.KEY:merge_scope(base,updated)}}
+        replaced=store.save_recommendations(self.tx,1,'project','pre',self.result,course='A1',replace=True)
+        self.assertFalse(materials_ready(replaced))

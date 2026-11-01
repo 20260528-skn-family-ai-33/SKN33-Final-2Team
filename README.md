@@ -231,3 +231,5 @@ DB(PostgreSQL 17 + pgvector) → 팀 DB 백업 복원 → 보충 자료 → 백�
 4. `docker compose down`으로 끕니다(데이터는 볼륨에 남습니다).
 
 화면만 고칠 때는 `docker compose up -d backend`로 DB·백엔드만 켜고, `frontend/`에서 `npm ci` → `npm run dev`(<http://localhost:5185>)로 개발합니다. 검사는 `npm run typecheck`·`npm run lint`·`npm test`·`npm run build`이며, `frontend/`를 바꾸는 PR마다 GitHub Actions가 같은 순서로 실행합니다. 자세한 내용은 [frontend/README.md](frontend/README.md)와 [backend/README.md](backend/README.md)를 따릅니다.
+
+> 월간 프롬프트 개선 에이전트의 자동 실행은 현재 꺼져 있습니다.

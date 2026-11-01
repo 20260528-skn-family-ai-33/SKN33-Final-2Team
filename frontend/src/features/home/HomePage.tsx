@@ -10,11 +10,15 @@ import { Stepper } from '@/features/draft/Stepper';
 import { ActRow, Alerts, postStart } from '@/features/roadmap/parts';
 import { useGo } from '@/shared/hooks/useGo';
 import { failToast } from '@/shared/lib/fail';
-import { count, curStage, range, stageActs, stageName } from '@/shared/lib/plan';
+import { count } from '@/shared/lib/plan';
+import { useState } from 'react';
+import { weekNow } from './ganttCalc';
 import { useMe } from '@/shared/state/session';
 import { toast } from '@/shared/state/ui';
 import { draftActive, recs, updateWs, useWs, ws } from '@/shared/state/workspace';
 import { Icon } from '@/shared/ui/Icon';
+import { useCatalog } from '@/shared/state/catalog';
+import './homeSkills.css';
 import { GanttAll } from './Gantt';
 
 function DraftBox() {
@@ -62,34 +66,50 @@ function DraftBox() {
 function PostCta({ R }: { R: PlanRecord }) {
   const go = useGo();
   const c = count(R.plan, R.progress);
-  return c.done === c.t ? (
+  return (
     <div className="actions">
-      <button className="btn pri" onClick={() => postStart(go, R.id)}>
-        사후 점검 시작
+      <button className="btn line home-show-all" onClick={() => postStart(go, R.id)}>
+        {c.done === c.t ? '사후 점검 시작' : '사후 점검·조기 종료'}
       </button>
     </div>
-  ) : null;
+  );
 }
 
-function StageCard({ R, multi }: { R: PlanRecord; multi?: boolean }) {
+function StageCard({ R }: { R: PlanRecord }) {
   const pl = R.plan;
-  const cur = curStage(pl, R.progress);
-  const acts = stageActs(pl, cur);
+  const [expanded, setExpanded] = useState(false);
+  const week = weekNow(R);
+  const currentActs = pl.acts.filter(activity => activity.wFrom <= week && week <= activity.wTo);
+  const acts = expanded ? pl.acts : currentActs;
+  const resources = useCatalog(s => s.res);
+  const skillNames = pl.def.learningSkills?.map(skill => skill.name) || [];
+  const groups = new Map<string, Map<string, typeof acts>>();
+  for (const activity of acts) {
+    const resource = activity.res ? resources[activity.res] : undefined;
+    const skill = activity.skill || activity.skills?.[0] || resource?.skills?.find(name => skillNames.includes(name)) || resource?.skills?.[0] || '기타 활동';
+    const kind = !activity.res ? '과제' : resource?.type === 'book' || resource?.kind === '도서' ? '도서' : resource?.type === 'course' || resource?.kind === '강좌' ? '강좌' : '기타 자료';
+    if (!groups.has(skill)) groups.set(skill, new Map());
+    const categories = groups.get(skill)!;
+    categories.set(kind, [...(categories.get(kind) || []), activity]);
+  }
   return (
     <div className="card">
       <div className="sec-h">
         <h2 className="st">
-          이번 단계 활동{multi ? ` · ${cur}단계 ${stageName(cur)}` : ''}
+          {expanded ? '전체 활동' : '이번 주차 활동'} · {week}주차
         </h2>
         <span className="small muted" style={{ marginLeft: 'auto' }}>
-          {range(acts)}
+          {pl.acts.length > currentActs.length && <button type="button" className="btn line home-show-all" aria-expanded={expanded} onClick={() => setExpanded(value => !value)}>{expanded ? '접기' : '모두 보기'}</button>}
         </span>
       </div>
-      <ul className="acts" style={{ gap: 14 }}>
-        {acts.map((a) => (
-          <ActRow key={a.id} a={a} R={R} />
-        ))}
-      </ul>
+      {!acts.length && <p className="small muted">이번 주차에 예정된 활동이 없어요. 모두 보기에서 전체 활동을 확인할 수 있어요.</p>}
+      <div className="home-skill-groups">{[...groups].map(([skill, categories]) => <section className="home-skill-group" key={skill}>
+        <h3>{skill}</h3>
+        {['도서', '강좌', '과제', '기타 자료'].filter(kind => categories.has(kind)).map(kind => <div className="home-material-group" data-kind={kind} key={kind}>
+          <h4>{kind}<span>{categories.get(kind)!.length}개</span></h4>
+          <ul className="acts">{categories.get(kind)!.map(a => <ActRow key={a.id} a={a} R={R} />)}</ul>
+        </div>)}
+      </section>)}</div>
     </div>
   );
 }
@@ -159,7 +179,7 @@ export function HomePage() {
     <>
       <p className="eyebrow">안녕하세요, {hello} 님</p>
       <h1 className="t">진행 중인 로드맵 {act.length}개</h1>
-      <p className="lead">전체 일정을 먼저 보여 드리고, 로드맵마다 이번 단계 활동을 보여 드려요.</p>
+      <p className="lead">전체 일정을 먼저 보여 드리고, 로드맵마다 이번 주차 활동을 보여 드려요.</p>
       <GanttAll list={act} />
       {act.map((R) => (
         <section className="hp" key={R.id}>
@@ -175,7 +195,7 @@ export function HomePage() {
             </button>
           </div>
           <Alerts R={R} />
-          <StageCard R={R} multi />
+          <StageCard R={R} />
           <PostCta R={R} />
         </section>
       ))}

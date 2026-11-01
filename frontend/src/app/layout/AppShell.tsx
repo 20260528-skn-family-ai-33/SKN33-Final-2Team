@@ -11,6 +11,8 @@ import { updateWs } from '@/shared/state/workspace';
 import { SheetHost, ToastHost } from '@/shared/ui/SheetHost';
 import { Loading } from '@/shared/ui/parts';
 import { AiBox, Sidebar } from './Sidebar';
+import { ThemePicker } from '@/shared/ui/sideParts';
+import './themeControl.css';
 
 export interface ScreenHandle {
   nav?: string;
@@ -139,6 +141,7 @@ export function AppShell() {
   return (
     <>
       <header className="ribbon">
+        <ThemePicker compact />
         <ModeChip />
       </header>
       <div className="app">

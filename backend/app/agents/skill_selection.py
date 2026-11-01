@@ -48,7 +48,10 @@ def select_skills(
         raise SelectionError('세부사항은 문자열 또는 객체여야 합니다.')
     payload = {'goal': project['goal'].strip(), 'projectSummary': summary,
                'details': details, 'desiredCompetencies': desired, 'availableSkills': tags, 'maxSkills': MAX_SKILLS}
-    raw = generate(SYSTEM, payload)
+    from app.learner_knowledge import POLICY
+    payload['learnerKnowledge']=project.get('learnerKnowledge') or {}
+    payload['hrContext']=project.get('hrContext') or {}
+    raw = generate(SYSTEM+POLICY, payload)
     rows = raw.get('skills') if isinstance(raw, dict) else None
     if not isinstance(rows, list):
         raise SelectionError('스킬 목록 형식이 올바르지 않습니다.')

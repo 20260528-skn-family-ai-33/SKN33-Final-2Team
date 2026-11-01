@@ -71,9 +71,11 @@ def generate_for(employee_id: int, project_id: str) -> dict:
         if not ctx.live:
             raise ApiError(503, 'MODEL_REQUIRED', '사용 가능한 실제 모델을 선택해 주세요.')
         # 네트워크 호출은 DB 트랜잭션·행 잠금 밖에서 한다.
-        selection = select_from_catalog(ctx, project)
+        from app.learner_knowledge import from_profile,hr_context
+        selection = select_from_catalog(ctx, dict(project,learnerKnowledge=from_profile(personal),hrContext=hr_context(personal)))
         survey = generate_survey(project, selection, personal,
-                                 lambda system, payload: runtime.llm_json(ctx, system, payload))
+                                 lambda system, payload: runtime.llm_json(ctx, system, payload),
+                                 require_measurement=True)
         if profile_input(profile.view(employee_id) or {}) != personal:
             raise ApiError(409, 'PROFILE_CHANGED', '생성 중 개인 정보가 변경됐어요. 다시 생성해 주세요.')
         with db.tx() as t:
@@ -167,7 +169,7 @@ def course_context(t, employee_id: int, project_id: str, course: str | None = No
     draft = draft_service._row(t, employee_id, project_id, lock=False)['draft_choices']['draft']
     if course not in ('A1','A2','A3') or draft.get('chosen') != course or course not in (draft.get('gen') or {}).get('options', {}):
         raise ApiError(409,'COURSE_CHANGED','선택한 코스를 다시 확인해 주세요.')
-    scoped=scope_view(saved,course)
+    scoped=scope_view(saved,course,draft['gen']['options'][course])
     expected_names = {row['name'] for row in scoped['selection']['skills']}
     cached_names = {row['name'] for row in (scoped.get('recommendations') or {}).get('skills', [])}
     if expected_names != cached_names or (scoped.get('recommendations') or {}).get('retrieval', {}).get('version') != VERSION or (course=='A1' and scoped.get('recommendations') and not free_cache_valid(scoped['recommendations'],catalog.items())):
@@ -182,7 +184,9 @@ def course_input(t, employee_id, project_id, course):
     from app.services import drafts as draft_service
     draft=draft_service._row(t,employee_id,project_id,lock=False)['draft_choices']['draft']
     option=draft['gen']['options'][course]
-    return {'id':course,**{key:deepcopy(option.get(key)) for key in ('name','reason','scope','weeklyHours')}}
+    from app.services.course_skills import selected
+    targets=selected(option) or []
+    return {'id':course,**{key:deepcopy(option.get(key)) for key in ('name','reason','scope','weeklyHours')},'learningSkills':[{k:v for k,v in row.items() if k!='enabled'} for row in targets if row['enabled']]}
 
 
 def recommendation_view(saved: dict) -> dict:
@@ -211,9 +215,11 @@ def generate_recommendations(project_id: UUID, a: Account = Depends(require_empl
         ctx = runtime.context(a.id)
         result = recommend_from_catalog(ctx, pre, selected_course)
         with db.tx() as t:
+            t.one("SELECT project_id FROM public.projects WHERE project_id=CAST(:p AS uuid) AND employee_id=:e AND status='DRAFTING' FOR UPDATE",p=str(project_id),e=a.id)
             current = course_context(t, a.id, str(project_id), course)
-            if current['generationId'] != pre['generationId']:
-                raise ApiError(409, 'SURVEY_INPUT_CHANGED', '점검 문항이 변경됐어요. 다시 확인해 주세요.')
+            from app.services.course_recommendations import dependency_key
+            if dependency_key(current) != dependency_key(pre):
+                raise ApiError(409, 'RECOMMENDATIONS_CHANGED', '생성 중 역량·순서 또는 선택한 계획이 변경됐어요. 최신 조건으로 다시 추천받아 주세요.')
             saved = save_recommendations(t, a.id, str(project_id), pre['generationId'], result, course=course, replace=True)
         return recommendation_view(saved)
     finally:
@@ -251,8 +257,8 @@ def generate_durations(project_id: UUID, body: ChoicesBody, a: Account = Depends
         weekly=(selected_course or {}).get('weeklyHours') or AUTO_HOURS
         proposals=calculate_durations(pre['project'],recommendations,body.choices,
             body.skillOrder if body.skillOrder is not None else pre.get('skillOrder',[row['name'] for row in recommendations['skills']]),weekly)
-        saved=save_duration_proposals(t,a.id,str(project_id),str(body.generationId),str(body.recommendationId),proposals,course=course)
-        return recommendation_view(saved)
+        preview=dict(pre,durationEstimates={**(pre.get('durationEstimates') or {}),**proposals})
+        return recommendation_view(preview)
 
 
 @r.get('/api/v2/drafts/{project_id}/activities')
@@ -260,36 +266,92 @@ def get_activities(project_id: UUID,a: Account=Depends(require_employee)):
     from app.services import activity_selection as activities
     with db.tx() as t:
         saved,d=activities.context(t,a.id,str(project_id))
-        return {'proposal':activities.current_record(saved,d)}
+        return activities.view(saved,d)
 
 @r.post('/api/v2/drafts/{project_id}/activities')
-def propose_activities(project_id: UUID,a: Account=Depends(require_employee)):
+def propose_activities(project_id: UUID,a: Account=Depends(require_employee),regenerate: bool=False,skill: str | None=None):
     from app.services import activity_selection as activities
     if not _generation_lock.acquire(timeout=120): raise ApiError(409,'GENERATION_BUSY','생성 대기가 길어지고 있어요. 잠시 후 다시 확인해 주세요.')
     try:
         with db.tx() as t:saved,d=activities.context(t,a.id,str(project_id))
         existing=activities.current_record(saved,d)
-        if existing:return {'proposal':existing}
+        if existing and not regenerate and not skill:return activities.view(saved,d)
         ctx=runtime.context(a.id)
         if not ctx.live:raise ApiError(503,'MODEL_REQUIRED','실제 모델 연결이 필요해요.')
-        proposal=activities.propose(saved,d,lambda system,payload:runtime.llm_json(ctx,system,payload,role='roadmap'),ctx.mode)
+        model=lambda system,payload:runtime.llm_json(ctx,system,payload,role='roadmap')
+        proposal=activities.repropose_skill(saved,d,skill,model,ctx.mode) if skill else activities.propose(saved,d,model,ctx.mode,previous=activities.versions(saved,d) if regenerate else None)
         def save(t,w):
             current,draft=activities.context(t,a.id,str(project_id))
             if activities.fingerprint(current,draft)!=proposal['key']:raise ApiError(409,'ACTIVITIES_CHANGED','자료가 변경됐어요. 다시 제안받아 주세요.')
-            current['activityProposal']=proposal
+            active=activities.current_record(current,draft)
+            if (activities.proposal_id(active) if active else None)!=(activities.proposal_id(existing) if existing else None):
+                raise ApiError(409,'ACTIVITIES_CHANGED','선택한 제안이 변경됐어요. 다시 확인해 주세요.')
+            activities.append_proposal(current,draft,proposal)
             from app.services.course_recommendations import merge_scope
             w['v2Survey']=merge_scope(w['v2Survey'],current)
         from app.services import drafts as draft_service
-        draft_service._mutate(a.id,str(project_id),save)
-        return {'proposal':proposal}
+        current_result=draft_service._mutate(a.id,str(project_id),save)
+        from app.services.course_recommendations import scope_view
+        return activities.view(scope_view(current_result['v2Survey'],d['chosen'],((d.get('gen') or {}).get('options') or {}).get(d['chosen'])),d)
     finally:_generation_lock.release()
 
 class ActivitySelectionBody(BaseModel):
     model_config=ConfigDict(extra='forbid')
     key:str
     selectedIds:list[str]
+    proposalId:str | None=None
+    skillProposalIds:dict[str,str] | None=None
 
 @r.put('/api/v2/drafts/{project_id}/activities/selection')
 def select_activities(project_id:UUID,body:ActivitySelectionBody,a:Account=Depends(require_employee)):
     from app.services.activity_selection import save_selection
-    return save_selection(a.id,str(project_id),body.key,body.selectedIds)
+    return save_selection(a.id,str(project_id),body.key,body.selectedIds,body.proposalId,**({'skill_picks':body.skillProposalIds} if body.skillProposalIds is not None else {}))
+
+
+class SkillSelectionBody(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    key: str
+    selection: list[dict]
+
+
+@r.put('/api/v2/drafts/{project_id}/options/{course}/skills')
+def select_course_skills(project_id:UUID,course:str,body:SkillSelectionBody,a:Account=Depends(require_employee)):
+    from app.services.course_skills import save
+    return save(a.id,str(project_id),course,body.key,body.selection)
+
+
+@r.post('/api/v2/drafts/{project_id}/options/{course}/skills')
+def initialize_course_skills(project_id:UUID,course:str,a:Account=Depends(require_employee)):
+    from app.services.course_skills import initialize
+    return initialize(a.id,str(project_id),course)
+
+
+@r.get('/api/v2/drafts/{project_id}/learning-outcomes')
+def get_learning_outcomes(project_id:UUID,a:Account=Depends(require_employee)):
+    from app.services import activity_selection,learning_outcomes
+    with db.tx() as t:
+        saved,draft=activity_selection.context(t,a.id,str(project_id))
+        return {'summaries':learning_outcomes.current(saved,draft)}
+
+
+@r.post('/api/v2/drafts/{project_id}/learning-outcomes')
+def generate_learning_outcomes(project_id:UUID,a:Account=Depends(require_employee)):
+    from app.services import activity_selection,learning_outcomes,drafts
+    from app.services.course_recommendations import merge_scope
+    if not _generation_lock.acquire(timeout=120):raise ApiError(409,'GENERATION_BUSY','생성 대기가 길어지고 있어요. 잠시 후 다시 시도해 주세요.')
+    try:
+        with db.tx() as t:
+            saved,draft=activity_selection.context(t,a.id,str(project_id))
+            existing=learning_outcomes.current(saved,draft)
+            if existing is not None:return {'summaries':existing}
+        ctx=runtime.context(a.id)
+        if not ctx.live:raise ApiError(503,'MODEL_REQUIRED','실제 모델 연결이 필요해요.')
+        result=learning_outcomes.generate(saved,draft,lambda system,payload:runtime.llm_json(ctx,system,payload,role='roadmap'))
+        def save(t,w):
+            latest,d=activity_selection.context(t,a.id,str(project_id))
+            if activity_selection.fingerprint(latest,d)!=result['key']:raise ApiError(409,'MATERIALS_CHANGED','선택한 자료가 변경됐어요. 다시 확인해 주세요.')
+            latest['learningOutcomes']=result
+            w['v2Survey']=merge_scope(w['v2Survey'],latest)
+        drafts._mutate(a.id,str(project_id),save)
+        return {'summaries':result['summaries']}
+    finally:_generation_lock.release()

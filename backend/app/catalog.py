@@ -10,7 +10,7 @@ import re
 import threading
 import time
 
-from . import db, course_time, catalog_evidence
+from . import db, course_time, catalog_evidence, catalog_candidates
 
 KIND = {'course': '강좌', 'book': '도서', 'cert': '자격', 'doc': '공식 문서'}
 _lock = threading.Lock()
@@ -55,6 +55,7 @@ def _load() -> dict:
             checked = _date(r['c_ver'] or r['c_upd'])
             sk = links.get(('course', r['course_id']), [])
             extra = {'platform': r['platform'], 'difficulty': r['difficulty'], 'weeks': r['duration_weeks'],
+                     '_learning_description': m['content'] or (r['curriculum'] or {}).get('description') or r['syllabus_summary'] or '',
                      'curriculum': {key: (r['curriculum'] or {}).get(key) for key in ('coverage', 'items', 'item_count', 'source_url')}}
         elif t == 'book':
             title, provider, url, status = r['b_title'], r['publisher'], r['b_src'], r['b_status']
@@ -259,6 +260,27 @@ def agent_views(records: list[dict], texts: list[str] | None = None) -> list[dic
     return catalog_evidence.pack(records, texts)
 
 
+def roadmap_skills(texts: list[str], skill_names: list[str] | None = None) -> list[str]:
+    records = items()
+    known = {s for r in records.values() for s in r.get('skills') or []}
+    if skill_names is not None:
+        if not isinstance(skill_names, list) or not skill_names or any(not isinstance(s, str) or s not in known for s in skill_names):
+            raise ValueError('선정 스킬은 DB에 등록된 스킬 이름이어야 합니다.')
+        if len(set(skill_names)) > catalog_candidates.MAX_SKILLS:
+            raise ValueError('선정 스킬은 최대 5개입니다.')
+        want = skill_names
+    else:
+        # 구판 handoff 호환. 정확한 스킬명이 전달되면 키워드 추정보다 우선한다.
+        exact = [s for text in texts for s in sorted(known) if s in text]
+        want = list(dict.fromkeys(s for s in exact + skills_for(texts) if s in known))[:catalog_candidates.MAX_SKILLS]
+    return list(dict.fromkeys(want))
+
+
+def roadmap_selection(texts: list[str], track: str, *, skill_names: list[str] | None = None,
+                      required: list[str] | None = None, hints: list[str] | None = None) -> catalog_candidates.Selection:
+    return catalog_candidates.select(items(), roadmap_skills(texts, skill_names), texts, track, required, hints)
+
+
 def cert_groups() -> list[dict]:
     """세부 사항의 자격증 고르기(API-22): 분야 → 자격. 폐지·폐지 예정·상태 미확인은 뺀다(사용자 결정)"""
     groups = db.all_('SELECT group_key, label, issuer, url FROM app_ext.cert_groups ORDER BY display_order, label')
@@ -270,7 +292,7 @@ def cert_groups() -> list[dict]:
             out.append({'key': g['group_key'], 'label': g['label'], 'issuer': g['issuer'], 'url': g['url'],
                         'certs': [{'id': c['certCode'], 'res': c['id'], 'short': c['certShort'] or c['title'], 'sub': c['certSub'] or '',
                                    'name': c['title'], 'issuer': c['provider'], 'vendor': c['certVendor'], 'hours': c['hours'], 'url': c['url'],
-                                   'image': c['image']} for c in list_]})
+                                   'image': c['image'], 'skills': list(c.get('skills') or [])} for c in list_]})
     return out
 
 

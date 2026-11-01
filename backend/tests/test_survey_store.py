@@ -8,6 +8,16 @@ import test_survey_generation as fixtures
 
 
 class StoreTests(unittest.TestCase):
+    def test_measurement_is_stored_but_not_exposed_as_an_answer_hint(self):
+        raw = self.fixture.result(2)
+        metadata = {'concept': '일대다 조인', 'questionType': '원인 판단', 'difficulty': '적용'}
+        raw['groups'][0]['quizzes'][0].update(metadata)
+        stored = store.save_generated(self.tx, 1, 'project', self.fixture.project,
+                                      self.fixture.selection(2), self.fixture.profile, raw)
+        self.assertEqual(stored['survey']['groups'][0]['quizzes'][0]['concept'], '일대다 조인')
+        public = store.public_view(stored)['groups'][0]['quizzes'][0]
+        self.assertTrue(set(metadata).isdisjoint(public))
+
     def setUp(self):
         self.fixture = fixtures.SurveyTests()
         self.fixture.setUp()

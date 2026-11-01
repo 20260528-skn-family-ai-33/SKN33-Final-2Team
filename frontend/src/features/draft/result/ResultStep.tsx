@@ -1,4 +1,7 @@
+import { CourseCostSummary } from '../materials/CourseCostSummary';
+import { flush } from '../draftSync';
 import { Fragment } from 'react';
+import { ResourceImage } from '@/shared/ui/ResourceImage';
 import type { Prefs } from '@/api/types/draft';
 import { D } from '@/shared/constants/data';
 import { prefText } from '@/shared/lib/prefs';
@@ -8,6 +11,7 @@ import { useGo } from '@/shared/hooks/useGo';
 import { useWs } from '@/shared/state/workspace';
 import { Page } from '@/shared/ui/parts';
 import { Stepper } from '../Stepper';
+import { DetailsView } from '../details/DetailsStep';
 import { genStart, startEdit, ResultEdit } from './legacyResult';
 import { displayOrder, moveSkill, currentWeeks, totalWeeks, type Choices, type DurationEstimate } from './skillOrder';
 
@@ -35,7 +39,7 @@ function ResourceCard({ resource, kind, checked, disabled, onChange }: { resourc
   return <article className={`v2-resource ${checked ? 'v2-resource-selected' : ''}`} role={kind === 'course' ? 'radio' : 'checkbox'} aria-checked={checked} aria-disabled={disabled} aria-label={resource.title} tabIndex={disabled ? -1 : 0}
     onClick={event => { if (!disabled && !(event.target as HTMLElement).closest('a,input,label')) onChange(); }}
     onKeyDown={event => { if (event.target === event.currentTarget && !disabled && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onChange(); } }}>
-    {resource.image && <img className="v2-resource-image" src={resource.image} alt="" loading="lazy" draggable={false} onError={event => { event.currentTarget.hidden = true; }} />}
+    <ResourceImage className="v2-resource-image" image={resource.image} type={kind} />
     <div className="v2-resource-info"><label className="v2-resource-choice">
       <input type={kind === 'course' ? 'radio' : 'checkbox'} checked={checked} disabled={disabled} onChange={onChange} />
       <span><b>{resource.title}</b>{resource.aiRecommended && <span className="tag acc">AI 추천</span>}</span>
@@ -47,7 +51,26 @@ function ResourceCard({ resource, kind, checked, disabled, onChange }: { resourc
 
 }
 export type ResourceSelectionHandle = { save: () => Promise<boolean> };
-export function ResultStep() { return <ResultSelection />; }
+export function ResultStep() {
+  const d = useWs(s => s.draft);
+  const go = useGo();
+  const [busy, setBusy] = useState(false);
+  return <><Stepper cur="result" busy={busy} /><Page title="학습 조건을 확인하고 로드맵을 제안받아요"
+    lead="각 로드맵이 관점에 맞는 지식·역량을 따로 추천해요. 다음 화면에서 로드맵별로 포함 여부와 학습 순서를 정할 수 있어요."
+    foot={<><button className="btn line" disabled={busy} onClick={() => go(paths.newQuiz)}>이전: 사전 점검</button>
+      <button className="btn pri" disabled={busy} onClick={() => { setBusy(true); void genStart(go).finally(() => setBusy(false)); }}>{busy ? '로드맵 준비 중…' : '로드맵 제안받기'}</button></>}>
+      <div className="card"><h2>학습 목표</h2><p>{d.goal}</p></div>
+      <section className="card" aria-label="프로젝트 설명"><h2>프로젝트 설명</h2>
+        {d.project ? <>
+          <p className="small muted">첨부 파일 · {d.project.name}</p>
+          {d.doc?.status === 'ok' && d.doc.summary?.trim()
+            ? <p className="small" style={{ whiteSpace: 'pre-wrap' }}>{d.doc.summary}</p>
+            : <p className="small muted">{d.doc?.status === 'reading' ? '첨부한 프로젝트 파일의 설명을 정리하고 있어요.' : '프로젝트 파일이 첨부되어 있지만 요약을 확인하지 못했어요.'}</p>}
+        </> : <p className="small muted">프로젝트 파일이 첨부되지 않았습니다.</p>}
+      </section>
+      <DetailsView p={d.prefs} />
+    </Page></>;
+}
 export function ResourceSelection({ ref, onChoicesChanged, locked }: { ref?: Ref<ResourceSelectionHandle>; onChoicesChanged?: () => void; locked?: boolean }) { return <ResultSelection resourcesOnly editorRef={ref} onChoicesChanged={onChoicesChanged} locked={locked} />; }
 function ResultSelection({ resourcesOnly = false, editorRef, onChoicesChanged, locked = false }: { resourcesOnly?: boolean; editorRef?: Ref<ResourceSelectionHandle>; onChoicesChanged?: () => void; locked?: boolean }) {
   const id = useWs(s => s.draftId);
@@ -88,6 +111,7 @@ function ResultSelection({ resourcesOnly = false, editorRef, onChoicesChanged, l
     if (!id || !result?.recommendations || busy || saving) return false;
     setSaving(true); setError('');
     try {
+      await flush();
       await request(recommendationUrl(id, course, '/choices'), { method: 'PUT', body: JSON.stringify({ generationId: result.generationId, recommendationId: result.recommendations.id, choices, skillOrder: order }) });
       return true;
     } catch (e) { setError(e instanceof Error ? e.message : '선택을 저장하지 못했어요.'); return false; }
@@ -194,7 +218,7 @@ function ResultSelection({ resourcesOnly = false, editorRef, onChoicesChanged, l
       @media(max-width:650px){.v2-resource{gap:10px}.v2-resource-meta{width:100%;justify-content:flex-start}.v2-skills-board>.v2-skill{padding:14px}}
     `}</style>
   </>;
-  if (resourcesOnly) return content;
+  if (resourcesOnly) return <div className="materials-with-cost"><div>{content}</div><CourseCostSummary skills={result?.recommendations?.skills || []} choices={choices} order={order} /></div>;
   return <><Stepper cur="result" /><Page title="이런 로드맵이 만들어질 예정이에요" lead="학습할 스킬의 순서와 포함 여부를 정해 주세요. 도서·강좌는 검토·확정에서 선택합니다."
     foot={<><button className="btn line" disabled={busy} onClick={() => go(paths.newQuiz)}>이전: 사전 점검</button>
       <button className="btn pri" disabled={busy || saving || !result?.recommendations} onClick={() => void (async () => { if (await save()) await genStart(go); })()}>로드맵 계획하기</button></>}>{content}</Page></>;

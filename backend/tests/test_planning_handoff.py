@@ -17,3 +17,13 @@ class PlanningHandoffTests(unittest.TestCase):
   s=self.saved()
   for c in s['resourceChoices'].values():c['enabled']=False
   with self.assertRaises(ValueError):build_handoff(s,{},{})
+
+ def test_selected_order_and_policy_are_passed_to_main_candidate_contract(self):
+  from unittest.mock import patch
+  from app import track_policy
+  saved=self.saved();saved['resourceChoices']['A']['enabled']=False
+  h=build_handoff(saved,{},{})
+  self.assertEqual(h['skillNames'],['B'])
+  self.assertEqual(h['trackPolicyVersion'],track_policy.VERSION)
+  with patch.object(track_policy,'VERSION','changed'):
+   self.assertNotEqual(h['key'],build_handoff(saved,{},{})['key'])

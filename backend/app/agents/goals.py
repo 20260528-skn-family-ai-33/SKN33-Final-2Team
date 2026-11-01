@@ -50,7 +50,7 @@ def goal_input(e: dict) -> dict:
     p = e.get('profile') or {}
     evals = [{'period': x['period'], 'result': ', '.join(v for v in (x.get('grade'), x.get('score')) if v)} for x in e.get('evals', []) if x.get('consent')]
     profile = {'grade': e.get('grade'), 'department': e.get('dept'), 'parentDepartment': e.get('parentDept'), 'job': e.get('job'), 'task': e.get('task'),
-               'position': e.get('position'), 'workDescription': p.get('workDesc'), 'experience': p.get('expSummary'), 'developmentYears': p.get('devYears'),
+               'position': e.get('position'), 'jobFamily':e.get('jobFamily'), 'education':e.get('education') or [], 'workDescription': p.get('workDesc'), 'experience': p.get('expSummary'), 'developmentYears': p.get('devYears'),
                'techStack': e.get('tech') or [], 'certifications': e.get('certs') or [], 'learning': e.get('learning') or [], 'projects': e.get('projects') or [],
                'evaluations': evals}
     used = [G_LABEL[k] for k in G_LABEL if (len(profile[k]) if isinstance(profile[k], list) else bool(profile[k]))]
@@ -74,7 +74,8 @@ def clean(lst, avoid) -> list[dict]:
 
 def _api(ctx: rt.Ctx, inp: dict) -> dict:
     available = _available_basis(inp['profile'])
-    r = rt.llm_json(ctx, G_SYS, {'profile': inp['profile'], 'areas': inp['areas'], 'avoid': inp.get('avoid') or [],
+    from app.learner_knowledge import POLICY,from_profile,hr_context
+    r = rt.llm_json(ctx, G_SYS+POLICY, {'learnerKnowledge':from_profile(inp['profile']), 'hrContext':hr_context(inp['profile']), 'profile': inp['profile'], 'areas': inp['areas'], 'avoid': inp.get('avoid') or [],
                               'availableBasis': [label for label in G_BASIS if label in available]})
     cands = clean(r.get('candidates'), inp.get('avoid'))
     if len(cands) != 3:

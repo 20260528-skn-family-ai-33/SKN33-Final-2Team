@@ -1,3 +1,4 @@
+from app.services.resource_rag import VERSION as RESOURCE_RAG_VERSION
 import copy
 from contextlib import contextmanager
 import unittest
@@ -122,6 +123,7 @@ class ApiTests(unittest.TestCase):
         select.assert_called_once()
         self.assertEqual(generate.call_args.args[0], self.project)
         self.assertEqual(generate.call_args.args[1], selection)
+        self.assertTrue(generate.call_args.kwargs['require_measurement'])
         self.assertEqual(generate.call_args.args[2]['self']['projects'], self.me['projects'])
         self.assertEqual(generate.call_args.args[2]['education'], self.me['education'])
         save.assert_called_once()
@@ -189,7 +191,7 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(response.json()['error']['code'],'ASSESSMENT_REQUIRED')
 
     def test_existing_recommendations_are_read_without_model_calls(self):
-        self.auth(); t=Mock(); saved=dict(self.saved,completed=True,recommendations={'id':'rec','skills':[],'retrieval':{'version':'resource-pgvector-rag/v3'}},resourceChoices={})
+        self.auth(); t=Mock(); saved=dict(self.saved,completed=True,recommendations={'id':'rec','skills':[],'retrieval':{'version':RESOURCE_RAG_VERSION}},resourceChoices={})
         with patch.object(api.db,'tx',side_effect=lambda:transaction(t)),patch.object(api,'recommendation_context',return_value=saved),patch.object(api,'recommend_from_catalog') as generate:
             response=self.client.get(f'/api/v2/drafts/{self.pid}/recommendations')
         self.assertEqual(response.status_code,200)
@@ -219,3 +221,53 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(response.status_code,200)
         self.assertEqual(response.json()['durationEstimates']['S']['weeks'],3)
         context.assert_not_called();generate.assert_not_called();lock.acquire.assert_not_called()
+
+
+class ActivityVersionApiTests(unittest.TestCase):
+    def setUp(self):
+        from app.services import activity_selection as activities
+        self.activities=activities
+        self.pid=str(uuid4())
+        self.saved={'generationId':'g','recommendations':{'id':'r'},'resourceChoices':{},'skillOrder':[],'_course':'A2'}
+        self.draft={'chosen':'A2','handoff':{'key':'h'}}
+        self.old={'id':'first','key':activities.fingerprint(self.saved,self.draft),'option':{'acts':[]},'selectedIds':['a']}
+        activities.append_proposal(self.saved,self.draft,self.old)
+        self.client=TestClient(api_app)
+        api_app.dependency_overrides[require_employee]=lambda:Account('employee',7,'시험')
+
+    def tearDown(self):
+        api_app.dependency_overrides.clear()
+
+    def test_normal_post_returns_history_without_calling_model(self):
+        with patch.object(api.db,'tx',side_effect=lambda:transaction(Mock())),patch.object(self.activities,'context',return_value=(self.saved,self.draft)),patch.object(api.runtime,'context') as model:
+            response=self.client.post(f'/api/v2/drafts/{self.pid}/activities')
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(len(response.json()['versions']),1)
+        model.assert_not_called()
+
+    def test_failed_reproposal_preserves_current_and_history(self):
+        before=copy.deepcopy(self.saved)
+        with patch.object(api.db,'tx',side_effect=lambda:transaction(Mock())),patch.object(self.activities,'context',return_value=(self.saved,self.draft)),patch.object(api.runtime,'context',return_value=Mock(live=True,mode='test')),patch.object(self.activities,'propose',side_effect=api.ApiError(422,'FAIL','생성 실패')):
+            response=self.client.post(f'/api/v2/drafts/{self.pid}/activities?regenerate=true')
+        self.assertEqual(response.status_code,422)
+        self.assertEqual(self.saved,before)
+        self.assertFalse(api._generation_lock.locked())
+
+    def test_reproposal_appends_without_losing_previous(self):
+        from app.services import drafts
+        new={**self.old,'id':'second'}
+        w={'v2Survey':copy.deepcopy(self.saved)}
+        def mutate(employee,project,fn):
+            fn(Mock(),w)
+            return w
+        with patch.object(api.db,'tx',side_effect=lambda:transaction(Mock())),patch.object(self.activities,'context',return_value=(copy.deepcopy(self.saved),self.draft)),patch.object(api.runtime,'context',return_value=Mock(live=True,mode='test')),patch.object(self.activities,'propose',return_value=new),patch.object(drafts,'_mutate',side_effect=mutate):
+            response=self.client.post(f'/api/v2/drafts/{self.pid}/activities?regenerate=true')
+        self.assertEqual(response.status_code,200)
+        self.assertEqual([p['id'] for p in response.json()['versions']],['first','second'])
+        self.assertEqual(response.json()['proposal']['id'],'second')
+
+    def test_selection_endpoint_passes_chosen_version(self):
+        with patch.object(self.activities,'save_selection',return_value={}) as save:
+            response=self.client.put(f'/api/v2/drafts/{self.pid}/activities/selection',json={'key':self.old['key'],'proposalId':'first','selectedIds':['a']})
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(save.call_args.args[-1],'first')

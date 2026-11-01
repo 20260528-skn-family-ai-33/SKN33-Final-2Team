@@ -16,10 +16,11 @@ from ..agents import goals as G
 from ..agents import runtime as rt
 from ..errors import cause
 from . import profile
+from app.learner_knowledge import VERSION as KNOWLEDGE_VERSION
 
 
 def _hash(inp: dict) -> str:
-    return hashlib.sha256(json.dumps(inp['profile'], ensure_ascii=False, sort_keys=True).encode('utf-8')).hexdigest()[:16]
+    return hashlib.sha256(json.dumps([KNOWLEDGE_VERSION,inp['profile']], ensure_ascii=False, sort_keys=True).encode('utf-8')).hexdigest()[:16]
 
 
 def get(employee_id: int) -> dict:
@@ -43,6 +44,10 @@ def get(employee_id: int) -> dict:
 
 
 def _save(t: db.Tx, employee_id: int, cands: list[dict]) -> None:
+    # 기존 후보를 지우기 전에 완성된 3개인지 확인한다. 실패하면 이전 후보가 남는다.
+    texts = [str(c.get('goal') or '').replace('\n', ' ').strip() for c in cands]
+    if len(texts) != 3 or any(not text for text in texts) or len({''.join(text.split()) for text in texts}) != 3:
+        raise ValueError('서로 다른 목표 후보 3개가 필요해요')
     t.run('DELETE FROM public.employee_recommended_prompts WHERE employee_id = :e', e=employee_id)
     t.run('DELETE FROM app_ext.goal_suggestion_meta WHERE employee_id = :e', e=employee_id)
     for i, c in enumerate(cands[:3], 1):
@@ -78,7 +83,7 @@ def request(employee_id: int, trigger: str, avoid: list[str] | None = None, mode
             same = run.get('profile_hash') == _hash(G.goal_input(me))
             count = t.val('SELECT count(*) FROM public.employee_recommended_prompts WHERE employee_id=:e', e=employee_id)
             seeded_mock = run.get('trigger') == 'setup' and run.get('source') == 'mock'
-            if same and (run.get('status') == 'failed' or (run.get('status') in ('ready', 'default') and count and not seeded_mock)):
+            if same and (run.get('status') == 'failed' or (run.get('status') in ('ready', 'default') and count == 3 and not seeded_mock)):
                 return None
         return _request(employee_id, trigger, avoid, mode)
 

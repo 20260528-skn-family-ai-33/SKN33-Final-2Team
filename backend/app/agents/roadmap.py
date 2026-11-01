@@ -1,4 +1,4 @@
-"""로드맵 계획 에이전트 · 관점별 하위 에이전트 A1 비용·A2 시간·A3 업무 적용 (4차 gp-ai.js · gp-parts.js 의 계산).
+"""로드맵 계획 에이전트 · DB 활성 프롬프트와 목표별 자료 후보를 사용한다.
 
 - option(): 3안 작성·다시 만들기(요청 반영), revise(): 확정한 로드맵의 수정안
 - build_plan(): 안(def) + 조건 → 주차·기간·비용을 계산한 계획 (4차 P.buildPlan). 기간·예산 한도 검사는 하지 않는다(지시문으로만 전달 · 10/08 결정)
@@ -14,12 +14,13 @@ skills 를 받지 않는다. 목록에 없는 이름은 finish_option 이 버리
 from __future__ import annotations
 
 import copy
-
 import json
 import math
 import re
+import hashlib
+from uuid import uuid4
 
-from .. import catalog, db, llm
+from .. import catalog, catalog_budget, db, llm, track_policy
 from . import runtime as rt
 from .demo import D, TEMPLATES, TEMPLATES_ALT, domain_of
 
@@ -94,12 +95,18 @@ def build_plan(d: dict, prm: dict, goal: str) -> dict:
     p = dict({'start': 1, 'hours': 4, 'format': 'mixed', 'patch': {}}, **(prm or {}))
     hrs = p['hours'] or AUTO_HOURS
     acts, cum = [], 0.0
+    schedule=d.get('materialSchedule')
+    slots={}; study_weeks=0
+    if schedule:
+        for row in schedule:
+            weeks=row['weeks'];slots[row['skill']]=(study_weeks+1,max(study_weeks+1,study_weeks+weeks));study_weeks+=weeks
     for a in d['acts']:
         if a['stage'] < p['start']:
             continue
         r = _res(a.get('res'))
         x = {'id': a['id'], 'stage': a['stage'], 'title': a['title'], 'res': a.get('res') or None, 'task': not a.get('res'), 'how': a.get('how') or '',
              'hours': (r['hours'] if r and r['hours'] is not None else a.get('hours') or 2) if a.get('res') else a.get('hours') or 2}
+        if a.get('skill'):x['skill']=a['skill']
         if not a.get('res') and a.get('skills'):
             x['skills'] = list(a['skills'])
         if r:
@@ -109,8 +116,9 @@ def build_plan(d: dict, prm: dict, goal: str) -> dict:
         x['wFrom'] = math.floor(cum / hrs) + 1
         cum += x['hours']
         x['wTo'] = max(x['wFrom'], math.ceil(cum / hrs))
+        if schedule and a.get('skill') in slots:x['wFrom'],x['wTo']=slots[a['skill']]
         acts.append(x)
-    weeks = max(1, math.ceil(cum / hrs))
+    weeks = study_weeks if schedule else max(1, math.ceil(cum / hrs))
     res_ids = list(dict.fromkeys(a['res'] for a in acts if a['res']))
     costs = [(_res(r) or {}).get('cost') for r in res_ids]
     return {'displayTitle': d.get('displayTitle') or '', 'opt': d['id'], 'name': d['name'], 'short': d['short'], 'tagline': d['tagline'], 'goal': goal, 'def': d, 'params': p, 'start': p['start'],
@@ -301,19 +309,59 @@ def _mock_regen(inp: dict) -> dict:
     return o
 
 
-def agent_catalog(handoff: dict, extra_ids: list | None = None, *, free_only: bool = False) -> list[dict]:
+def _catalog_payload(pid: str, payload: dict, system: str = '', extra_ids: list | None = None,
+                     context_limit: int = 16384) -> dict:
+    payload = copy.deepcopy(payload)
+    handoff = payload['handoff']
     texts = [handoff.get('goal') or '', handoff.get('projectSummary') or ''] + list(handoff.get('focus') or []) + list(handoff.get('gaps') or [])
-    cat = catalog.for_agent(texts, handoff['prefs'].get('certRes'), free_only=free_only)
-    have = {r['id'] for r in cat}
-    for rid in list(handoff.get('resourceHints') or []) + list(extra_ids or []):
-        r = _res(rid)
-        if r and rid not in have and (not free_only or r.get('type') == 'book' or r.get('cost') == 0):
-            cat.append(r)
-            have.add(rid)
-    # Existing plan resources must survive the catalog budget before new choices.
-    priority = set(extra_ids or [])
-    cat.sort(key=lambda r: r['id'] not in priority)
-    return catalog.agent_views(cat, texts=texts)
+    # 같은 DB 태그라도 실제 적용 범위에 맞는 단원을 찾는다. 제외/비핵심 스킬은 검색에 섞지 않는다.
+    active = set(handoff.get('skillNames') or handoff.get('focus') or []) - set(handoff.get('excludedSkills') or [])
+    applications = [str(row.get('application') or '').strip()[:600] for row in handoff.get('skillDetails') or []
+                    if row.get('name') in active and row.get('application')]
+    texts += list(dict.fromkeys(applications))
+    required = list(extra_ids or []) + list(handoff.get('selectedResourceIds') or [])
+    cert = (handoff.get('prefs') or {}).get('certRes')
+    if cert:
+        required.append(cert)
+    try:
+        selection = catalog.roadmap_selection(texts, pid, skill_names=handoff.get('skillNames'),
+                                             required=required, hints=handoff.get('resourceHints'))
+        from app.learner_knowledge import exclusion,from_profile
+        knowledge=handoff.get('learnerKnowledge') or from_profile(handoff.get('profile'))
+        if knowledge.get('technologies') or knowledge.get('certifications'):
+            selection=copy.copy(selection)
+            rejected={row['id']:exclusion(row,knowledge,handoff.get('goal') or '') for row in selection.records}
+            rejected={key:value for key,value in rejected.items() if value}
+            selection.records=[row for row in selection.records if row['id'] not in rejected]
+            selection.required=[key for key in selection.required if key not in rejected]
+            payload['learnerKnowledge']=knowledge
+            payload['learnerExclusions']=[{'id':key,'reason':value} for key,value in rejected.items()]
+        if pid in track_policy.CANDIDATE_PREFERENCE:
+            payload['trackGuidance'] = {'policyVersion': track_policy.VERSION,
+                                        'candidatePreference': track_policy.CANDIDATE_PREFERENCE[pid],
+                                        'selectionNote': '후보 순위는 목표 관련성과 커리큘럼의 관점 적합도를 함께 평가한 검토 순서다. 최종 선택과 편성은 DB 시스템 프롬프트와 사용자 조건을 따른다.'}
+        if pid == 'A2':
+            handoff['prefs'] = dict(handoff.get('prefs') or {})
+            handoff['prefs']['deadlineWeeks'] = track_policy.fast_weeks(handoff['prefs'])
+            handoff['skillNames'] = list(selection.skills)
+            # 학습 범위와 과제 분류를 분리해 Docker 과제를 다른 핵심 스킬로 오표기하지 않게 한다.
+            payload['trackGuidance'].update({'maxWeeks': track_policy.fast_weeks(handoff.get('prefs') or {}),
+                                        'maxCoreSkills': track_policy.FAST_SKILLS,
+                                        'coreSkills': list(selection.skills),
+                                        'taskSkillNote': 'coreSkills는 집중 학습할 핵심 스킬이다. 과제 skills는 핵심 스킬에 억지로 맞추지 말고 skillTags 중 실제 수행 내용에 맞는 이름을 1~3개 고른다. 보조 태그를 쓴다고 별도 학습 스킬이나 과제를 추가하지 않는다.',
+                                        'planningNote': '최대 6주·핵심 스킬 3개 안에서 편성한다. 최종 강좌 선택은 목표와 목차·소개를 보고 판단한다. 후보별 시간 상한은 아니다.'})
+        return catalog_budget.pack(selection, system, payload, context_limit)
+    except ValueError as error:
+        raise llm.LlmError(str(error)) from error
+
+
+def agent_catalog(handoff: dict, extra_ids: list | None = None, *, free_only: bool = False,
+                  track: str = 'A2') -> list[dict]:
+    """기존 검사 도구용 목록. 실제 생성·수정은 전체 입력을 검사하는 _catalog_payload를 사용한다."""
+    payload = _catalog_payload('A1' if free_only else track, {'handoff': handoff}, extra_ids=extra_ids)
+    return [{**payload['catalogDefaults'], **row, 'skills': [payload['catalogSkillMap'][s] for s in row['skills']],
+             'curriculum': [{'index': i, 'title': text} for i, text in row['curriculum']]}
+            for row in payload['catalog']]
 
 
 PROMPT_VERSION = 'v2.5'  # Public curriculum evidence and confirmed/estimated course time.
@@ -371,9 +419,10 @@ JSON 형식(형식만 보여 주는 예): {{"tagline":"...","reason":"...","pros
 TRACK_PROMPT_AGENTS = {'A1': 'agent_certified', 'A2': 'agent_fasttrack', 'A3': 'agent_practical'}
 
 
-def _sys(pid: str, tpl: str) -> str:
+def _sys(pid: str, tpl: str, provenance: dict | None = None, evaluation_prompt: str | None = None) -> str:
     """DB 활성 버전 사용. 누락 또는 중복 시 코드 프롬프트로 대체하지 않는다."""
-    rows = db.all_('SELECT system_prompt FROM public.prompt_versions WHERE agent_id = :agent AND is_active', agent=TRACK_PROMPT_AGENTS[pid])
+    # 내부 비교 평가에서만 임시 전문을 사용한다. 운영 프롬프트를 DB에 쓰지 않고 재생한다.
+    rows = [{'system_prompt': evaluation_prompt}] if evaluation_prompt is not None else db.all_('SELECT prompt_version_id,system_prompt FROM public.prompt_versions WHERE agent_id = :agent AND is_active', agent=TRACK_PROMPT_AGENTS[pid])
     if len(rows) != 1:
         raise llm.LlmError('Track의 DB 활성 프롬프트가 정확히 하나 필요합니다.')
     sections = rows[0]['system_prompt'].split('\n### REVISION\n', 1)
@@ -382,18 +431,33 @@ def _sys(pid: str, tpl: str) -> str:
     text = sections[1] if tpl is REV_SYS else sections[0][len('### GENERATION\n'):]
     if not text.strip():
         raise llm.LlmError('DB Track 프롬프트가 비어 있습니다.')
+    if provenance is not None and rows[0].get('prompt_version_id'):
+        provenance.update(promptVersionId=str(rows[0]['prompt_version_id']), agentId=TRACK_PROMPT_AGENTS[pid],
+                          storedPromptHash=hashlib.sha256(rows[0]['system_prompt'].encode('utf-8')).hexdigest())
     if pid == 'A1':
         text += '\n[최신 Free Course 정책] 강좌는 0원만 허용한다. 도서는 가격·예산과 무관하게 유료·가격 미확인도 추천할 수 있다. 도서 비용은 표시하되 무료 강좌 제한에 포함하지 않는다.'
     return text.strip()
 
 
 def _track_catalog(pid: str, handoff: dict, extra_ids: list | None = None) -> list[dict]:
-    return agent_catalog(handoff, extra_ids, free_only=pid == 'A1')
+    return agent_catalog(handoff, extra_ids, free_only=pid == 'A1', track=pid)
+
+
+def _validate_learning_acts(raw,handoff):
+    from app.learner_knowledge import exclusion,from_profile
+    knowledge=handoff.get('learnerKnowledge') or from_profile(handoff.get('profile'))
+    for act in raw.get('acts') or []:
+        resource=_res(act.get('res')) if isinstance(act,dict) and act.get('res') else None
+        reason=exclusion(resource,knowledge,handoff.get('goal') or '') if resource else None
+        if reason:raise llm.LlmError(f'기존 지식 반영 필요: {reason}')
 
 
 def option(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
     """inp: pid, handoff, variant?, request?, previousDef?, previous?"""
     pid = inp['pid']
+    if inp['handoff'].get('assessmentGenerationId'):
+        inp = dict(inp, handoff=copy.deepcopy(inp['handoff']))
+        inp['handoff']['courseSkillSelection']=True
     if pid == 'A2' and inp['handoff'].get('assessmentGenerationId'):
         inp = dict(inp, handoff=copy.deepcopy(inp['handoff']))
         handoff = inp['handoff']
@@ -413,15 +477,35 @@ def option(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
                  '  · summary에 바꾼 점을 한 문장으로 쓰고, 반영하지 못한 요청은 notes에 쓴다. JSON에 "summary":"...","notes":[] 를 더한다.') if inp.get('request') else \
             ('\n- 사용자가 이 관점의 안을 다시 요청했다. previous와 활동 구성이 분명히 다르게 쓴다. 관점과 한도는 그대로 지킨다.' if inp.get('previous') else '')
         prev_ids = [a.get('res') for a in ((inp.get('previous') or {}).get('acts') or [])]
-        r = rt.llm_json(ctx, _sys(pid, R_SYS) + extra, {'handoff': inp['handoff'], 'catalog': _track_catalog(pid, inp['handoff'], prev_ids), 'skillTags': catalog.skill_names(),
-                                                         'previous': inp.get('previous'), 'request': inp.get('request')}, role='roadmap')
+        from app.learner_knowledge import POLICY
+        provenance = {}
+        system = _sys(pid, R_SYS, provenance, inp.get('_evaluationPrompt')) + extra + POLICY + track_policy.challenge_guidance(pid, 'plan')
+        if inp['handoff'].get('courseSkillSelection'):
+            from app.services.course_skills import CONTRACT
+            system += CONTRACT
+        payload = _catalog_payload(pid, {'handoff': inp['handoff'], 'skillTags': catalog.skill_names(),
+                                        'previous': inp.get('previous'), 'previousLearningSkills': (inp.get('previousDef') or {}).get('learningSkills'), 'request': inp.get('request')}, system, prev_ids,
+                                   rt.S.ollama_num_ctx if ctx.mode == 'ollama' else 16384)
+        r = rt.llm_json(ctx, system, payload, role='roadmap')
+        _validate_learning_acts(r,inp['handoff'])
         o = finish_option(pid, r, ctx.mode)
+        if provenance:
+            o['optionId'] = str(uuid4())
+            o['promptProvenance'] = dict(provenance, source=ctx.mode,
+                                        effectivePromptHash=hashlib.sha256(system.encode('utf-8')).hexdigest())
+        if inp['handoff'].get('courseSkillSelection'):
+            from app.services.course_skills import validate_recommendations, recommendation_key
+            allowed={row['name'] for row in payload['handoff'].get('skillDetails',[])}
+            try:o['learningSkills']=validate_recommendations(r.get('learningSkills'),allowed,pid,require_depth=True)
+            except ValueError as error:raise llm.LlmError(str(error)) from error
+            o['learningSkillsVersion']=str(uuid4())
+            o['learningSkillsKey']=recommendation_key(o)
         if inp.get('request'):
             o.update(summary=str(r.get('summary') or '').strip()[:80], notes=rt.arr(r.get('notes'), 3))
         return o
     task = f"{D['perspectives'][pid]['name']} {'요청 반영해 다시 작성' if inp.get('request') else '다시 작성' if inp.get('variant') else '작성'}"
     return rt.run(ctx, f'로드맵 계획 · {pid}', task, inp, _mock_option, api, role='roadmap', sim=sim, mock_delay=0.7 + D['optionOrder'].index(pid) * 0.26,
-                  log_input={k: v for k, v in inp.items() if k != 'previousDef'})
+                  log_input={k: v for k, v in inp.items() if k not in ('previousDef', '_evaluationPrompt')})
 
 
 # ── 수정안 (확정한 로드맵) ──
@@ -578,9 +662,22 @@ def revise(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
         current = {'perspective': f"{pl['opt']} {pl['name']}", 'weeklyHours': pl['hours'], 'startStage': pl['start'],
                    'acts': [dict({'key': a['id'], 'stage': a['stage'], 'title': a['title'], 'res': a.get('res'), 'hours': a.get('hours'), 'how': a.get('how') or '', 'done': a.get('done')},
                                  **({} if a.get('res') else {'skills': a.get('skills') or []})) for a in pl['acts']]}
-        extra_ids = [a.get('res') for a in pl['acts']] + list(inp['changes'].get('addResources') or [])
-        r = rt.llm_json(ctx, _sys(pid, REV_SYS), {'current': current, 'handoff': inp['handoff'], 'changes': inp['changes'], 'request': inp.get('request'),
-                                                  'catalog': _track_catalog(pid, inp['handoff'], extra_ids), 'skillTags': catalog.skill_names()}, role='roadmap')
+        removed = {a.get('key') for a in (inp['changes'].get('removeActs') or []) + (inp['changes'].get('replaceActs') or [])}
+        extra_ids = [a.get('res') for a in pl['acts'] if a['id'] not in removed] + list(inp['changes'].get('addResources') or [])
+        # 이전 자료 선택 스냅샷이 제외·교체 요청을 다시 필수 후보로 되살리지 않게 한다.
+        handoff = copy.deepcopy(inp['handoff'])
+        gone_resources = {a.get('res') for a in pl['acts'] if a['id'] in removed and a.get('res')} - set(extra_ids)
+        handoff['selectedResourceIds'] = [rid for rid in handoff.get('selectedResourceIds') or [] if rid not in gone_resources]
+        if (handoff.get('prefs') or {}).get('certRes') in gone_resources:
+            handoff['prefs'] = dict(handoff['prefs'], certRes=None)
+        from app.learner_knowledge import POLICY
+        system = _sys(pid, REV_SYS, evaluation_prompt=inp.get('_evaluationPrompt')) + POLICY + track_policy.challenge_guidance(pid, 'tasks')
+        current['learningSkills'] = (pl.get('def') or {}).get('learningSkills') or []
+        payload = _catalog_payload(pid, {'current': current, 'skillTargets': current['learningSkills'], 'handoff': handoff, 'changes': inp['changes'],
+                                        'request': inp.get('request'), 'skillTags': catalog.skill_names()}, system, extra_ids,
+                                   rt.S.ollama_num_ctx if ctx.mode == 'ollama' else 16384)
+        r = rt.llm_json(ctx, system, payload, role='roadmap')
+        _validate_learning_acts(r,inp['handoff'])
         o = finish_option(pid, r, ctx.mode, keep_key=True)
         o.update(summary=str(r.get('summary') or '').strip()[:80], notes=rt.arr(r.get('notes'), 4))
         return o

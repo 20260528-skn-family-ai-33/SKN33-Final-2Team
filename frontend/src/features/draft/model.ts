@@ -14,7 +14,7 @@ export const STEPS: [StepKey, string, string][] = [
   ['quiz', '사전 점검', paths.newQuiz],
   ['result', '점검 결과', paths.newResult],
   ['options', '로드맵 선택', paths.newOptions],
-  ['materials', '자료·활동 선택', paths.newMaterials],
+  ['materials', '자료 선택', paths.newMaterials],
   ['review', '검토·확정', paths.newReview],
 ];
 
@@ -33,7 +33,7 @@ export const docIdle = (d: DraftDoc): boolean => !d.doc || d.doc.status !== 'rea
 export function stepDone(s: Pick<WsState, 'draft' | 'draftPlan'>, k: StepKey): boolean {
   const d = s.draft;
   /* 세부 사항은 모두 선택 사항이라, 확인 화면에서 '다음'을 눌렀거나 사전 점검 문항이 있으면 지난 것으로 본다 */
-  return { goal: goalOk(d), details: !!(d.detailsOk || d.quiz), quiz: quizDone(d), result: !!(d.handoff || d.gen || d.v2Assessment?.completed), options: !!s.draftPlan, materials: !!d.v2Assessment?.activitiesReady, review: false }[k];
+  return { goal: goalOk(d), details: !!(d.detailsOk || d.quiz), quiz: quizDone(d), result: !!(d.handoff || d.gen || d.v2Assessment?.completed), options: d.v2Assessment ? !!(d.chosen && d.gen?.options[d.chosen] && !d.gen.regenRun?.[d.chosen]) : !!s.draftPlan, materials: !!(d.v2Assessment?.materialsReady || d.v2Assessment?.activitiesReady), review: false }[k];
 }
 
 /** 이 단계 앞에 마치지 않은 단계가 있으면 그 단계 주소 */

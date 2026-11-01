@@ -9,6 +9,8 @@ import { resOf, useCatalog } from '@/shared/state/catalog';
 import { Icon } from '@/shared/ui/Icon';
 import { Note } from '@/shared/ui/parts';
 import { ApiError } from '@/api/client';
+import { matchingCertificates } from '@/features/roadmap/roadmapLearningData';
+import { useMe } from '@/shared/state/session';
 import { actWeek, canvasMeasure, coverOf, place, relOf, weeksOf, type Cover, type Layout } from './layout';
 
 let layoutCache: { d: SkillMapData; m: Layout } | null = null;
@@ -24,10 +26,13 @@ function layoutOf(d: SkillMapData): Layout {
 }
 
 function Info({ data, picked, cov, onClose }: { data: SkillMapData; picked: number | null; cov: Cover; onClose: () => void }) {
+  const certificates = useCatalog(state => state.certById);
+  const me = useMe();
   if (picked == null || !data.skills.some((s) => s.id === picked))
     return <p className="small muted">스킬 점을 누르면 이 로드맵에서 몇 주차에 어떤 활동이 다루는지와 선수 관계를 보여 줘요.</p>;
   const s = data.skills.find((x) => x.id === picked)!;
-  const { parents, kids } = relOf(data);
+  const { parents } = relOf(data);
+  const certs = matchingCertificates(Object.values(certificates), [s.name], me?.certs);
   const names = (ids?: number[]) =>
     ids && ids.length ? ids.map((id) => data.skills.find((x) => x.id === id)?.name || '').join(', ') : <span className="muted">없어요</span>;
   const c = cov.get(picked);
@@ -52,14 +57,12 @@ function Info({ data, picked, cov, onClose }: { data: SkillMapData; picked: numb
         </button>
       </div>
       <dl className="kv sm-kv">
+        <dt>배우게 될 스킬</dt>
+        <dd>{names([...(parents[picked] || []), picked])}</dd>
+        <dt>추천 자격증</dt>
+        <dd>{certs.length ? certs.map(cert => cert.name).join(', ') : '일치하는 자격증이 없어요.'}</dd>
         <dt>이 로드맵</dt>
         <dd>{here}</dd>
-        <dt>팀 DB 자료</dt>
-        <dd>{s.resources}건에 이 스킬이 붙어 있어요</dd>
-        <dt>먼저 배울 스킬</dt>
-        <dd>{names(parents[picked])}</dd>
-        <dt>다음 스킬</dt>
-        <dd>{names(kids[picked])}</dd>
       </dl>
     </>
   );
@@ -270,7 +273,7 @@ export function SkillMap({ pl }: { pl: PlanContent }) {
           </span>
           <span>
             <i className="k-e" />
-            먼저 배울 스킬 → 다음 스킬{draft ? '(가정)' : ''}
+            배우게 될 스킬 · 학습 연결{draft ? '(가정)' : ''}
           </span>
           <span>
             <i className="k-n" />점 크기 = 팀 DB 자료 수
