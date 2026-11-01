@@ -85,9 +85,6 @@ svg.i { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor;
 .seg { display: grid; grid-template-columns: 1fr 1fr; padding: 3px; border-radius: 10px; background: #ECECE7; }
 .seg button { height: 30px; border: 0; border-radius: 8px; background: transparent; font-size: 12.5px; color: var(--ink-3); }
 .seg button.on { background: #fff; color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, .1); }
-.theme { display: flex; align-items: center; gap: 7px; }
-.theme button { width: 20px; height: 20px; padding: 0; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--line-2); }
-.theme button.on { box-shadow: 0 0 0 2px var(--ink); }
 .demo { font-size: 12px; color: var(--ink-3); }
 .demo summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 4px; }
 .demo summary::-webkit-details-marker { display: none; }

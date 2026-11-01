@@ -1,7 +1,6 @@
 /* 좌측 메뉴 조각 — 직원 메뉴(app/layout/Sidebar)와 관리자 메뉴(features/admin/AdminSide)가 함께 쓴다 */
 import type { ReactNode } from 'react';
 import { useGo } from '@/shared/hooks/useGo';
-import { setTheme, THEMES, useTheme } from '@/shared/state/theme';
 import { Icon } from './Icon';
 import { paths } from '@/app/paths';
 
@@ -43,19 +42,5 @@ export function Brand() {
       </span>
       GrowPath
     </a>
-  );
-}
-
-export function ThemePicker({ compact = false }: { compact?: boolean }) {
-  const theme = useTheme((s) => s.theme);
-  return (
-    <div className={compact ? 'theme-compact' : undefined}>
-      <div className="foot-lbl">{compact ? '테마' : '테마 색상'}</div>
-      <div className="theme" role="group" aria-label="테마 색상">
-        {THEMES.map(([k, n, c]) => (
-          <button type="button" key={k} style={{ background: c }} className={theme === k ? 'on' : ''} title={n} aria-label={n} aria-pressed={theme === k} onClick={() => setTheme(k)} />
-        ))}
-      </div>
-    </div>
   );
 }

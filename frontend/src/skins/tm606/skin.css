@@ -89,7 +89,6 @@
   .sm-e { stroke: #3A3A3A; }
   .sm-n .dot { fill: #1A1A1A; stroke: #5A5A5A; }
   .sm-n text { stroke: rgba(13, 13, 13, .92); }
-  .theme button { border-color: var(--bg); }
 
   /* 강조색 바탕 위 글자는 검게(호박색 위 흰 글자는 읽기 어렵다) */
   .btn.pri, .chip:has(input:checked), .chip.on, .scale label:has(input:checked), .li .idx.on, .stepper li.cur .sn, .stt.done,
@@ -154,8 +153,6 @@
 
       .side .side-foot { order: 4; margin: 0; padding: 0; display: flex; align-items: center; gap: 6px; }
       .side .side-foot .foot-lbl { display: none; }
-      .side .theme { gap: 5px; }
-      .side .theme button { width: 18px; height: 18px; }
       .side .logout { height: 34px; padding: 0 10px; border-radius: 8px; color: var(--ink-3); }
       .side .logout:hover { background: var(--sunk); color: var(--accent); }
       .side .logout .lbl { display: none; }

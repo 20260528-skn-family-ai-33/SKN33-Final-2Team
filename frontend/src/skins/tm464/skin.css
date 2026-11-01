@@ -10,7 +10,7 @@
    - 첫 화면 배경 사진(책상) · 소개 사진 */
 
 :root[data-skin="tm464"] {
-  /* 테마 색은 이 테마가 정한다(관리자 '테마 색상' 고르기보다 우선) */
+  /* 테마 색은 이 테마가 정한다 */
   --accent: #EB5424 !important;
   --tm-dark: #202020;
   --tm-wrap: 1240px;
@@ -42,7 +42,7 @@
   }
 
   /* ── 모서리: 템플릿처럼 2px (동그라미여야 하는 점·스피너·체크 표시는 그대로) ── */
-  .brand .logo, .me, .nav a, .seg, .seg button, .theme button, .demo select, .btn, .btn.sm, .link, .back,
+  .brand .logo, .me, .nav a, .seg, .seg button, .demo select, .btn, .btn.sm, .link, .back,
   .bar, .bar i, .choice, .choice .n, .choice .badge, .scale label, .chip, .input, .textarea, .drop, .drop .ico, .file-on,
   .stats, .tag, .callout, .flow span, .list, .li .idx, .bars .track, .bars .track i, .bars .track.dual::before, .bars .track.dual::after,
   .stage, .stage-h .no, .opt, .tblwrap, .diff .d, .agent, .hero, .next, .alert, .mini-seg, .mini-seg label,
@@ -112,8 +112,6 @@
 
       .side .side-foot { order: 4; margin: 0; padding: 0; display: flex; align-items: center; gap: 6px; }
       .side .side-foot .foot-lbl { display: none; }
-      .side .theme { gap: 5px; }
-      .side .theme button { width: 18px; height: 18px; }
       .side .logout { height: 34px; padding: 0 10px; color: var(--ink-3); }
       .side .logout:hover { background: transparent; color: var(--accent); }
       .side .logout .lbl { display: none; }
