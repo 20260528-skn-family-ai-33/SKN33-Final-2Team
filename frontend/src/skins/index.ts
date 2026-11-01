@@ -1,7 +1,8 @@
 /* 화면 테마(스킨) 비교 — 템플릿 후보를 같은 화면·같은 데이터에서 바꿔 보며 비교하는 비교 브랜치 전용 장치
    규칙
    - 테마 하나 = 폴더 하나(skins/<id>/): index.ts(이름·묶음·출처·글꼴) + skin.css + 사진. 테마 때문에 다른 곳의 화면 코드는 고치지 않는다.
-   - 묶음(group): templatemo 에서 education 태그가 붙은 템플릿은 'education', 나머지는 'other'. 고르기 상자의 첫 칸이 이 묶음이다.
+   - 묶음(group): templatemo 에서 education 태그가 붙은 템플릿은 'education', 나머지(자매 사이트 Tooplate 템플릿 포함)는 'other'.
+     고르기 상자의 첫 칸이 이 묶음이다. 폴더 이름은 templatemo 는 tm<번호>, Tooplate 는 tp<번호>.
    - skin.css 는 전부 :root[data-skin="<id>"] { … } 안에 적는다 → 고르지 않은 테마는 화면에 영향이 없다.
    - 테마마다 메뉴 위치가 다른 두 버전: 상단 메뉴(기본) · 좌측 메뉴(<html data-nav="side">, 원래 화면과 같은 배치).
      skin.css 에서 상단 메뉴 규칙은 &:not([data-nav="side"]) { … }, 좌측 메뉴 규칙은 &[data-nav="side"] { … } 안에 둔다.
@@ -21,7 +22,7 @@ export const GROUPS: { id: SkinGroup; name: string }[] = [
 
 export interface SkinMeta {
   name: string;
-  /** templatemo 의 education 태그가 붙은 템플릿이면 'education', 아니면 'other' */
+  /** templatemo 의 education 태그가 붙은 템플릿이면 'education', 아니면(Tooplate 포함) 'other' */
   group: SkinGroup;
   /** 원본 템플릿 주소 */
   source: string;

@@ -1,0 +1,236 @@
+/* 화면 테마 tm503 · templatemo 503 Newline
+   원본: https://templatemo.com/tm-503-newline — 무료 · 상업/비상업 사용 허용. 사진도 템플릿에 들어 있던 것(크기만 줄이거나 흐리게).
+   전부 :root[data-skin="tm503"] 안에 적어 이 테마를 고른 때만 적용된다. 메뉴 위치가 다른 두 버전:
+   상단 메뉴(&:not([data-nav="side"])) · 좌측 메뉴(&[data-nav="side"]).
+
+   템플릿에서 가져온 것: 흐린 사진 위 짙은 바탕 · 노란(#ffbb05) 동그라미 아이콘 메뉴 · 노란 윗줄 흰 상자 · Montserrat 대문자, 사진은 템플릿의 작품 사진 */
+
+:root[data-skin="tm503"] {
+  --accent: #FFBB05 !important;
+  /* 노란 글자는 흰 바탕에서 흐려 글자용은 짙게(대비 약 5.5:1) */
+  --accent-ink: #8A6100;
+  --tm-dark: #121212;
+  --tm-on-accent: #121212;
+  --tm-wrap: 1240px;
+  --nav-h: 92px;
+  --bg: #1B1B1B; --surface: #FFFFFF; --surface-2: #FAFAFA; --sunk: #F4F4F4; --line: #E6E6E6; --line-2: #CDCDCD;
+  --ink: #121212; --ink-2: #4A4A4A; --ink-3: #8A8A8A; --ink-4: #AAAAAA;
+  --side-w: 0px; --r-lg: 0px; --r-md: 0px;
+  --shadow-pop: 0 18px 45px rgba(0, 0, 0, .35), 0 2px 8px rgba(0, 0, 0, .1);
+
+  body { background: var(--bg); color: var(--ink-2); font-family: 'Montserrat', 'Pretendard Variable', Pretendard, -apple-system, 'Malgun Gothic', sans-serif; }
+
+  /* ── 공통 모서리 ── */
+  .list, .stage, .opt, .tblwrap, .roadmap-preview, .check-plan-group, .connbox, .cm-item, .gsug, .docbox, .cause,
+  .sheet, .regp, .login-card, .login-side, .loading, .stats, .agent, .diff .d, .alert, .callout, .ck-list, .rec-res, .pstrip div,
+  .api-picker-panel, .cp-pop, .feat, .ls-card { border-radius: 0; }
+  .btn, .btn.sm, .back, .fab, .toast { border-radius: 0; }
+  .input, .textarea, .cp-btn { border-radius: 0; }
+  .tag, .ls-no, .ribbon .mode, .api-picker-button, .login-side .pill { border-radius: 0; }
+  .v2-survey section, .v2-survey fieldset { border-radius: 0; }
+  .v2-survey button { border-radius: 0; }
+
+  /* ── 상단 띠(AI 모델 고르기) ── */
+  .ribbon { padding: 0 max(20px, calc((100% - var(--tm-wrap)) / 2)); background: #0B0B0B; color: rgba(255, 255, 255, .6); border-bottom: 1px solid rgba(255, 255, 255, .06); }
+  .api-picker-button { padding: 5px 12px; font-size: 12px; }
+  body.auth .ribbon { display: none; }
+
+  /* 상단 메뉴가 있으면 관리자 고치기 창은 그 아래에서 시작(좌측 메뉴 버전은 --nav-h: 0) */
+  .adm-panel { top: calc(var(--rib-h) + var(--nav-h) + 12px); border-radius: 0; }
+  @media (max-width: 1100px) { .adm-panel { top: calc(var(--rib-h) + var(--nav-h)); border-radius: 0; } }
+
+  /* ── 로그인 ── */
+  body.auth .app { min-height: 100vh; }
+  body.auth .main { min-height: 100vh; display: flex; align-items: center; background: linear-gradient(rgba(18, 18, 18, .72), rgba(18, 18, 18, .82)), url('./page-bg.jpg') center / cover fixed; }
+  body.auth .main::before { display: none; }
+  body.auth .view { width: 100%; }
+  .login-side::after { display: none; }
+
+  /* ── 홈 '나의 학습 공간' 카드 그림: 템플릿 사진을 카드 폭 가득 ── */
+  .ls-card .ls-art { height: 170px; margin: 22px -26px 20px; background-size: cover; mix-blend-mode: normal; }
+  .ls-card:nth-child(1) .ls-art { background-image: url('./photo-1.jpg'); }
+  .ls-card:nth-child(2) .ls-art { background-image: url('./photo-3.jpg'); }
+  .ls-card:nth-child(3) .ls-art { background-image: url('./photo-5.jpg'); }
+
+  /* ── 상단 메뉴 버전(기본): 좌측 메뉴 버전(data-nav="side")을 고르지 않은 때만 ── */
+  &:not([data-nav="side"]) {
+    @media (min-width: 901px) {
+      & { scroll-padding-top: calc(var(--rib-h) + var(--nav-h) + 12px); }
+      .app { display: block; }
+      .side {
+        position: sticky; top: var(--rib-h); z-index: 39;
+        height: auto; min-height: var(--nav-h); overflow: visible;
+        flex-direction: row; flex-wrap: wrap; align-items: center; gap: 0 12px;
+        padding: 0 max(20px, calc((100% - var(--tm-wrap)) / 2));
+        border: 0; background: rgba(18, 18, 18, .94); box-shadow: 0 2px 14px rgba(0, 0, 0, .4); color: #fff;
+      }
+      .side:empty { display: none; }
+      .side .brand { order: 0; margin-right: auto; padding: 0; font-size: 22px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
+      .side .brand .logo { width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: var(--tm-on-accent); }
+      .side .nav { order: 1; flex-direction: row; align-items: center; gap: 0; }
+      .side .nav a { position: relative; height: var(--nav-h); padding: 0 12px; background: transparent; white-space: nowrap; flex-direction: column; justify-content: center; gap: 6px; border-radius: 0; color: #fff; font-size: 10.5px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; }
+      .side .nav a svg { display: none; }
+      .side .nav a:hover { color: var(--accent); }
+      .side .nav a.on { background: transparent; color: var(--accent); }
+
+      .side .nav a .dot { margin: 0 0 12px 3px; }
+      .side .nav-appx { order: 2; display: flex; align-items: center; margin: 0; padding: 0; border: 0; }
+      .side .nav-appx::before { content: ''; width: 1px; height: 18px; margin: 0 4px; background: rgba(255, 255, 255, .2); }
+      .side .nav-appx .lbl { display: none; }
+      .side .me { order: 3; margin: 0 0 0 6px; padding: 4px 12px 4px 4px; gap: 8px; border: 1px solid rgba(255, 255, 255, .2); border-radius: 50px; background: rgba(255, 255, 255, .06); }
+      .side .me .avatar { width: 30px; height: 30px; font-size: 11px; border-radius: 50%; background: var(--accent); color: var(--tm-on-accent); }
+      .side .me small, .side .me .me-go { display: none; }
+      .side .me b { font-size: 13px; white-space: nowrap; }
+      .side a.me:hover, .side a.me.on { box-shadow: none; border-color: var(--accent); }
+      .side .side-foot { order: 4; margin: 0; padding: 0; display: flex; align-items: center; gap: 6px; }
+      .side .side-foot .foot-lbl { display: none; }
+      .side .logout { height: 34px; padding: 0 10px; color: inherit; }
+      .side .logout:hover { background: transparent; color: var(--accent); }
+      .side .logout .lbl { display: none; }
+      /* 시연 도구: 메뉴 줄에는 버튼만, 펼치면 메뉴 아래 오른쪽에 떠 있는 창(자리는 비워 두어 메뉴가 밀리지 않게) */
+      .side .demo { order: -1; color: inherit; }
+      .side .demo > summary {
+        width: 96px; height: 34px; justify-content: center; padding: 0 8px; border: 1px dashed currentColor; border-radius: 0;
+        font-size: 12px; font-weight: 600; white-space: nowrap; opacity: .85;
+      }
+      .side .side-foot:has(> .demo[open]) { padding-left: 102px; }
+      .side .demo[open] {
+        position: fixed; z-index: 45; top: calc(var(--rib-h) + var(--nav-h) + 10px);
+        right: max(20px, calc((100% - var(--tm-wrap)) / 2));
+        width: 300px; max-height: calc(100vh - var(--rib-h) - var(--nav-h) - 32px); overflow-y: auto;
+        padding: 0 16px 16px; border: 1px solid var(--line); border-radius: 0; background: var(--surface); color: var(--ink-3); box-shadow: var(--shadow-pop);
+      }
+      .side .demo[open] > summary {
+        width: auto; height: 46px; margin: 0 -16px 12px; padding: 0 16px; justify-content: flex-start;
+        border: 0; border-bottom: 1px solid var(--line); border-radius: 0; color: var(--ink); opacity: 1;
+      }
+      .side .demo[open] .foot-lbl { display: block; font-weight: 700; }
+    }
+    /* 좁은 데스크톱: 메뉴가 두 줄로 넘치지 않게 조금 줄인다 */
+    @media (min-width: 901px) and (max-width: 1240px) {
+      --nav-h: 84px;
+      .side .brand { font-size: 18px; }
+      .side .nav a { padding: 0 8px; font-size: 12.5px; letter-spacing: 0; }
+      .side .me { padding: 3px; }
+      .side .me .grow { display: none; }
+    }
+  }
+
+  /* ── 좌측 메뉴 버전(data-nav="side"): 원래 화면과 같은 좌측 메뉴 배치에 짙은 바탕 · 노란 동그라미 아이콘 · 흰 대문자 ── */
+  &[data-nav="side"] {
+    --nav-h: 0px;
+    @media (min-width: 901px) {
+      --side-w: 248px;
+      .side { background: #121212; border-right: 0; color: #fff; }
+      .side .brand { font-size: 19px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
+      .side .brand .logo { border-radius: 50%; background: var(--accent); color: var(--tm-on-accent); }
+      .side .me { border: 1px solid rgba(255, 255, 255, .15); border-radius: 0; background: rgba(255, 255, 255, .05); }
+      .side .me small, .side .me .me-go { color: rgba(255, 255, 255, .55); }
+      .side .me .avatar { border-radius: 50%; background: var(--accent); color: var(--tm-on-accent); }
+      .side a.me:hover, .side a.me.on { box-shadow: none; border-color: var(--accent); }
+      .side .nav a { border-radius: 0; color: #fff; font-size: 12.5px; font-weight: 600; letter-spacing: .4px; text-transform: uppercase; }
+      .side .nav a:hover { background: rgba(255, 255, 255, .05); color: var(--accent); }
+      .side .nav a.on { background: rgba(255, 187, 5, .1); color: var(--accent); }
+      .side .nav-appx { border-top-color: rgba(255, 255, 255, .12); }
+      .side .nav-appx .lbl, .side .foot-lbl { color: rgba(255, 255, 255, .55); }
+      .side .logout { color: inherit; }
+      .side .logout:hover { background: rgba(255, 255, 255, .05); color: var(--accent); }
+      .side .demo { color: rgba(255, 255, 255, .55); }
+      .side .demo[open] { padding: 10px 12px 12px; border: 1px solid var(--line); border-radius: 0; background: var(--surface); color: var(--ink-3); }
+      .side .demo[open] summary { color: var(--ink-2); }
+      .side .demo[open] .foot-lbl { color: var(--ink-4); }
+    }
+  }
+
+  /* ── 바탕: 템플릿 첫 화면(흐린 영상) 대신 작품 사진을 흐리게 깔고 어둡게 덮는다 ── */
+  body { background: linear-gradient(rgba(18, 18, 18, .78), rgba(18, 18, 18, .86)), url('./page-bg.jpg') center / cover fixed #121212; }
+
+  /* ── 본문: 템플릿처럼 바탕(사진·짙은 색) 위에 놓인 상자 안에 둔다(로그인 화면 제외) ── */
+  body:not(.auth) .view { padding: 36px 40px 44px; background: var(--surface); border-top: 5px solid var(--accent); box-shadow: 0 20px 50px rgba(0, 0, 0, .35); }
+  /* 관리자 데이터 화면의 오른쪽 고치기 창 자리(gp-admin.css)는 그대로 비운다 */
+  body:not(.auth) .view.adm-ds:has(.adm-split.has-panel) { padding-right: 416px; }
+  .adm-foot { background: var(--surface); }
+  @media (max-width: 1100px) { body:not(.auth) .view.adm-ds:has(.adm-split.has-panel) { padding-right: 40px; } }
+  @media (max-width: 900px) { body:not(.auth) .view { padding: 22px 16px 28px; } }
+
+  /* ── 메뉴 아이콘: 노란 동그라미(템플릿 tm-nav 아이콘) ── */
+  &:not([data-nav="side"]) {
+    @media (min-width: 901px) {
+      .side .nav a svg {
+        display: block; width: 40px; height: 40px; padding: 10px; border-radius: 50%; background: var(--accent); color: var(--tm-on-accent);
+        transition: transform .2s, box-shadow .2s;
+      }
+      .side .nav a:hover svg, .side .nav a.on svg { transform: translateY(-2px); box-shadow: 0 0 0 3px rgba(255, 187, 5, .3); }
+    }
+  }
+  &[data-nav="side"] {
+    @media (min-width: 901px) {
+      .side .nav a svg { width: 28px; height: 28px; padding: 6px; border-radius: 50%; background: var(--accent); color: var(--tm-on-accent); }
+    }
+  }
+
+  /* ── 글자·버튼: 굵은 대문자 · 노란 사각 버튼(템플릿 Discover More) ── */
+  .eyebrow { font-size: 12.5px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--accent-ink); }
+  .t { font-size: 32px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; color: var(--ink); }
+  .t.lg { font-size: 38px; }
+  .lead { font-size: 15px; line-height: 1.8; }
+  .st, .hp-t { font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--ink); }
+  .link { color: var(--accent-ink); }
+  .btn { font-size: 13px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+  .btn.pri { background: var(--accent); border-color: var(--accent); color: var(--tm-on-accent); }
+  .btn.pri:hover { background: #121212; border-color: #121212; color: var(--accent); }
+  .btn.pri:disabled, .btn.pri:disabled:hover { background: #DADADA; border-color: #DADADA; color: #8A8A8A; }
+  .btn.line { background: transparent; border-color: #121212; color: #121212; }
+  .btn.line:hover:not(:disabled) { background: #121212; color: var(--accent); }
+  .chip:has(input:checked), .chip.on { background: #121212; border-color: #121212; color: var(--accent); }
+  .choice:has(input:checked) { border-color: var(--accent); background: rgba(255, 187, 5, .1); box-shadow: inset 4px 0 0 var(--accent); }
+  .input:focus, .textarea:focus, .cpick.open .cp-btn { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(255, 187, 5, .25); }
+  .card.tap:hover, .opt:hover { border-color: var(--accent); }
+  .pstrip div { padding: 14px; border: 1px solid var(--line); border-top: 3px solid var(--accent); background: #fff; }
+  .pstrip div b { color: var(--ink); text-transform: uppercase; }
+  .hero, .next { border: 0; background: linear-gradient(rgba(18, 18, 18, .82), rgba(18, 18, 18, .82)), url('./page-bg.jpg') center / cover; color: #fff; }
+  .hero .t, .hero .lead { color: #fff; }
+  .hero .btn.line { border-color: #fff; color: #fff; }
+  .sheet-h, .adm-ph { background: #121212; border-bottom: 3px solid var(--accent); color: #fff; }
+  .sheet-h small, .adm-ph small { color: rgba(255, 255, 255, .7); }
+  .sheet-h .x, .adm-ph .x, .sheet-h .btn.line { background: transparent; color: #fff; border-color: rgba(255, 255, 255, .5); }
+  .toast { background: #121212; border-left: 4px solid var(--accent); }
+  .fab { background: var(--accent); color: var(--tm-on-accent); }
+  .fab:hover { background: #121212; color: var(--accent); }
+  .msg.me { background: #121212; }
+
+  /* ── 홈 카드: 노란 윗줄 흰 상자 · 작품 사진 두 장 ── */
+  .ls-t { font-weight: 800; text-transform: uppercase; }
+  .ls-card { border: 1px solid var(--line); border-top: 4px solid var(--accent); }
+  .ls-card:hover { box-shadow: 0 14px 30px rgba(0, 0, 0, .12); }
+  .ls-h h3 { font-weight: 700; text-transform: uppercase; }
+  .ls-card:nth-child(n) { --ls-c: #121212; }
+  .ls-no { color: var(--accent); }
+  .ls-go { font-size: 13px; text-transform: uppercase; }
+  .ls-card .ls-art { margin: 22px 0 20px; background-repeat: no-repeat; background-size: 48.5% auto; background-position: 0 50%, 100% 50%; }
+  .ls-card:nth-child(1) .ls-art { background-image: url('./photo-1.jpg'), url('./photo-2.jpg'); }
+  .ls-card:nth-child(2) .ls-art { background-image: url('./photo-3.jpg'), url('./photo-4.jpg'); }
+  .ls-card:nth-child(3) .ls-art { background-image: url('./photo-5.jpg'), url('./photo-6.jpg'); }
+
+  /* ── 로그인: 짙은 바탕 + 노란 윗줄 ── */
+  .login-card { border: 0; border-top: 5px solid var(--accent); box-shadow: 0 20px 50px rgba(0, 0, 0, .4); }
+  .login-side { background: rgba(18, 18, 18, .88); border: 1px solid rgba(255, 255, 255, .1); }
+  .login-side h2 { font-weight: 800; text-transform: uppercase; }
+  .login-side .pill { background: var(--accent); color: var(--tm-on-accent); }
+  .feat { background: rgba(255, 255, 255, .05); border-color: rgba(255, 255, 255, .12); }
+  .feat .ico { border-radius: 50%; background: var(--accent); color: var(--tm-on-accent); }
+
+  /* ── 좁은 화면(900px 이하): 두 버전 모두 원래의 한 줄 메뉴 배치에 색만 ── */
+  @media (max-width: 900px) {
+    .side { border-bottom: 0; background: #121212; color: #fff; }
+    .side .nav a { color: #fff; font-weight: 600; }
+    .side .nav a.on { background: transparent; color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); }
+    .side a.me { border-color: rgba(255, 255, 255, .2); background: rgba(255, 255, 255, .06); color: #fff; }
+    .side .logout { color: inherit; }
+    .main { padding: 32px 16px 140px; }
+    .t { font-size: 24px; }
+    .t.lg { font-size: 28px; }
+    body.auth .main { padding: 24px 16px; background-attachment: scroll; }
+    .adm-panel { top: var(--rib-h); }
+  }
+}
