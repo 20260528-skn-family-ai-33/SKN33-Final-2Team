@@ -4,6 +4,7 @@ import './skin.css';
 
 const meta: SkinMeta = {
   name: '467 Easy Profile',
+  group: 'education',
   source: 'https://templatemo.com/tm-467-easy-profile',
   fonts: ['https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700&display=swap'],
 };

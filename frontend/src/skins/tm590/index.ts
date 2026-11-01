@@ -4,6 +4,7 @@ import './skin.css';
 
 const meta: SkinMeta = {
   name: '590 Topic Listing',
+  group: 'education',
   source: 'https://templatemo.com/tm-590-topic-listing',
   fonts: ['https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&family=Open+Sans:wght@400;600&display=swap'],
 };

@@ -97,7 +97,8 @@ svg.i { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor;
 
 .main { min-width: 0; padding: 44px 40px 150px; }
 /* 본문 폭: 데스크톱에서 넓게 쓴다(2026-11 · 모바일 접속은 거의 없음). 5차 원래 값은 580(기본) · 760(wide) · 980px(xwide).
-   1240px 은 화면 테마의 상단 메뉴 폭과 같아, 테마에서는 본문 좌우 끝이 로고·오른쪽 메뉴 끝에 맞는다 */
+   1240px 은 화면 테마의 상단 메뉴 폭과 같아, 테마에서는 본문 좌우 끝이 로고·오른쪽 메뉴 끝에 맞는다.
+   비교 브랜치의 고르기 상자에서 '이전 본문 폭'을 고르면 원래 값으로 돌아간다(skins/width.css) */
 .view { max-width: var(--view-w, 1240px); margin: 0 auto; animation: rise .22s ease-out; }
 .view.wide, .view.xwide { max-width: var(--view-w, 1240px); }
 @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }

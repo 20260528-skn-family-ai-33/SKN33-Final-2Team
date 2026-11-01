@@ -1,19 +1,29 @@
 /* 화면 테마 고르기 상자(비교 브랜치 전용) — 어느 테마에서도 같은 모양이 되게 값을 직접 적는다.
-   원래 화면의 좌측 메뉴 아래(로그아웃 버튼)를 가리지 않게 메뉴 폭(--side-w)만큼 비켜 둔다 */
+   원래 화면의 좌측 메뉴 아래(로그아웃 버튼)를 가리지 않게 메뉴 폭(--side-w)만큼 비켜 둔다.
+   펼치면 제목 아래에 고르는 칸 4개가 2×2 로 놓인다(묶음 · 테마 / 메뉴 위치 · 본문 폭) */
 .skin-pick {
   position: fixed; z-index: 70; left: calc(var(--side-w, 0px) + 12px); bottom: 12px;
-  display: flex; align-items: center; gap: 6px; padding: 4px 4px 4px 10px;
+  display: flex; flex-direction: column; gap: 5px; padding: 4px;
   border: 1px solid rgba(0, 0, 0, .15); border-radius: 8px; background: rgba(255, 255, 255, .96);
   box-shadow: 0 4px 14px rgba(0, 0, 0, .12);
   font: 600 12px/1.2 system-ui, -apple-system, 'Malgun Gothic', sans-serif; color: #333; letter-spacing: 0;
 }
+.skin-pick-t {
+  display: flex; align-items: center; gap: 6px; padding: 3px 6px; border: 0; border-radius: 5px; background: none;
+  font: inherit; color: inherit; text-align: left; cursor: pointer;
+}
+.skin-pick-t:hover { background: rgba(0, 0, 0, .05); }
+.skin-pick-t::after { content: '▸'; font-size: 10px; color: #777; }
+.skin-pick.open .skin-pick-t::after { content: '▾'; }
+.skin-pick-g { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; width: min(400px, calc(100vw - 32px)); }
 .skin-pick select {
-  max-width: 52vw; height: 26px; padding: 0 4px; border: 1px solid #C8C8C8; border-radius: 6px; background: #fff;
+  width: 100%; height: 26px; padding: 0 4px; border: 1px solid #C8C8C8; border-radius: 6px; background: #fff;
   font: 400 12px system-ui, -apple-system, 'Malgun Gothic', sans-serif; color: #222;
 }
-/* 좁은 화면: 오른쪽 아래 '사내 생활 도우미' 버튼과 겹치지 않게 맨 위 띠의 왼쪽(비어 있는 자리)으로 */
+.skin-pick select:disabled { background: #F2F2F2; color: #888; }
+/* 좁은 화면: 오른쪽 아래 '사내 생활 도우미' 버튼과 겹치지 않게 맨 위 띠의 왼쪽(비어 있는 자리)으로.
+   접힌 채로 시작하고, 펼치면 칸들이 아래로 내려온다 */
 @media (max-width: 600px) {
   .skin-pick { top: 3px; bottom: auto; left: 8px; padding: 2px; }
-  .skin-pick > span { display: none; }
-  .skin-pick select { max-width: 44vw; }
+  .skin-pick-g { grid-template-columns: 1fr; width: min(260px, calc(100vw - 24px)); }
 }

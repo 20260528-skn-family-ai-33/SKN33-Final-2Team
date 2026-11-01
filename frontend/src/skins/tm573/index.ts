@@ -4,6 +4,7 @@ import './skin.css';
 
 const meta: SkinMeta = {
   name: '573 Eduwell',
+  group: 'education',
   source: 'https://templatemo.com/tm-573-eduwell',
   fonts: ['https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600;700;800&display=swap'],
 };

@@ -4,6 +4,7 @@ import './skin.css';
 
 const meta: SkinMeta = {
   name: '569 Edu Meeting',
+  group: 'education',
   source: 'https://templatemo.com/tm-569-edu-meeting',
   fonts: ['https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap'],
 };

@@ -4,6 +4,7 @@ import './skin.css';
 
 const meta: SkinMeta = {
   name: '498 Stimulus',
+  group: 'education',
   source: 'https://templatemo.com/tm-498-stimulus',
   fonts: ['https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;600;700&display=swap'],
 };

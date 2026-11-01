@@ -4,6 +4,7 @@ import './skin.css';
 
 const meta: SkinMeta = {
   name: '465 Alpha',
+  group: 'education',
   source: 'https://templatemo.com/tm-465-alpha',
   fonts: ['https://fonts.googleapis.com/css2?family=Dosis:wght@400;600;700&family=Open+Sans:wght@300;400;600;700&display=swap'],
 };
