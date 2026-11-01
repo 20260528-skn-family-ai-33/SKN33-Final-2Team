@@ -1,0 +1,292 @@
+/* 화면 테마 tm464 · templatemo 464 Ultra Profile
+   원본: https://templatemo.com/tm-464-ultra-profile — 무료 · 상업/비상업 사용 허용. 배경 사진(home-bg·about-bg)도 템플릿에 들어 있던 것.
+   전부 :root[data-skin="tm464"] 안에 적어 이 테마를 고른 때만 적용된다. gp.css · gp-v2.css · gp-admin.css 위에 색·글꼴·모서리·메뉴 배치만 덧씌운다.
+
+   템플릿에서 가져온 것
+   - 흰 상단 고정 메뉴 + 옅은 그림자, 굵은 대문자 메뉴 글자(13px · 자간 1px), 마우스·현재 메뉴는 강조색
+   - Raleway 글꼴(index.ts 에서 불러옴), 가는(300) 큰 제목 + 강조색 짧은 밑줄, 본문 #606060 · 제목 #303030
+   - 강조색 #EB5424, 모서리 2px, 테두리 카드에 마우스를 올리면 강조색 테두리
+   - 어두운 반전(#202020): 테두리 버튼에 마우스를 올릴 때
+   - 첫 화면 배경 사진(책상) · 소개 사진 */
+
+:root[data-skin="tm464"] {
+  /* 테마 색은 이 테마가 정한다(관리자 '테마 색상' 고르기보다 우선) */
+  --accent: #EB5424 !important;
+  --tm-dark: #202020;
+  --tm-wrap: 1240px;
+  --nav-h: 70px;
+
+  --bg: #F8F8F8;
+  --surface: #FFFFFF;
+  --surface-2: #FAFAFA;
+  --sunk: #F2F2F2;
+  --line: #E8E8E8;
+  --line-2: #D2D2D2;
+  --ink: #303030;
+  --ink-2: #606060;
+  --ink-3: #888888;
+  --ink-4: #ABABAB;
+
+  --side-w: 0px;
+  --r-lg: 2px;
+  --r-md: 2px;
+  --shadow-pop: 0 14px 40px rgba(32, 32, 32, .16), 0 2px 8px rgba(50, 50, 50, .08);
+
+  body {
+    background: var(--bg);
+    color: var(--ink-2);
+    font-family: 'Raleway', 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+    /* Raleway 기본 숫자는 높낮이가 다른 옛 숫자라 표·날짜가 들쭉날쭉해 보인다 → 고른 숫자로 */
+    font-variant-numeric: lining-nums;
+    letter-spacing: 0;
+  }
+
+  /* ── 모서리: 템플릿처럼 2px (동그라미여야 하는 점·스피너·체크 표시는 그대로) ── */
+  .brand .logo, .me, .nav a, .seg, .seg button, .theme button, .demo select, .btn, .btn.sm, .link, .back,
+  .bar, .bar i, .choice, .choice .n, .choice .badge, .scale label, .chip, .input, .textarea, .drop, .drop .ico, .file-on,
+  .stats, .tag, .callout, .flow span, .list, .li .idx, .bars .track, .bars .track i, .bars .track.dual::before, .bars .track.dual::after,
+  .stage, .stage-h .no, .opt, .tblwrap, .diff .d, .agent, .hero, .next, .alert, .mini-seg, .mini-seg label,
+  .chatbar, .chatbar .go, .sheet, .sheet-h .x, .msg.me, .msg.bot .plain, .ans, .basis .art, .toast,
+  .api-picker-button, .api-picker-panel, .gt-card:has(.gt.all) > .sec-h > h2, .roadmap-preview, .roadmap-info-badge,
+  .check-plan-group, .record-sort, .check-plan-open, .hp-h .hp-shortcut,
+  .ribbon .mode, .stepper button, .stepper .sn, .cp-pop, .cp-it, .cp-back, .cp-n, .connbox, .lik label, .loading,
+  .fail-card, .fail-card .ico, .cause, .agent .detail, .conn, .aim-o, .aim-effort select, .badge-ico, .fab, .regp,
+  .logi, .logi pre, .login-card, .pw .eye, .err, .demo-acc button, .login-side, .login-side .pill, .feat, .feat .ico,
+  .ops-b, .rv-sum, .docbox, .cmp th .vnav button, .cmp th .regen, .rg-act, .reg-long, .cm-item, .ck-list, .gsug, .gs-it, .gs-fail,
+  .ans ul.intra li, .me-sup, .lg-pick, .rthumb, .rthumb.xs, .rthumb.lg, .rthumb.md, .rec-res, .gt-h .gt-tl > div, .gt-tg,
+  .lv1 .gt-no, .gt-bar, .gt-tip, .gt-key i, .act-row, .acts li > .act-row, .deep-tg .box, .dq, .dq-tag, .dq-opt, .dr-tag, .ef-sub,
+  .avatar, .adm-tbl, .adm-row, .adm-pick, .adm-panel, .adm-ph .x, .adm-f .input, .adm-f .textarea, .adm-ro {
+    border-radius: 2px;
+  }
+  .gt.all .gt-roadmap-group { border-radius: 2px; clip-path: inset(0 round 2px); }
+
+  /* ── 상단 띠: 흰 바탕의 얇은 줄(AI 모델 고르기) ── */
+  .ribbon {
+    padding: 0 max(20px, calc((100% - var(--tm-wrap)) / 2));
+    background: #fff; color: var(--ink-3); border-bottom: 1px solid var(--sunk);
+    font-size: 12px; letter-spacing: 1px;
+  }
+  .ribbon .mode { background: var(--sunk); color: var(--ink-2); font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+  .ribbon .mode.api { background: var(--accent); color: #fff; }
+  .api-picker-button { padding: 5px 12px; font-size: 12px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+  .api-picker-panel { border-top: 3px solid var(--accent); }
+  body.auth .ribbon { display: none; }
+
+  /* ── 넓은 화면: 좌측 메뉴를 템플릿의 흰 상단 메뉴로 ── */
+  @media (min-width: 901px) {
+    & { scroll-padding-top: calc(var(--rib-h) + var(--nav-h) + 12px); }
+    .app { display: block; }
+    .side {
+      position: sticky; top: var(--rib-h); z-index: 39;
+      height: auto; min-height: var(--nav-h); overflow: visible;
+      flex-direction: row; flex-wrap: wrap; align-items: center; gap: 0 14px;
+      padding: 0 max(20px, calc((100% - var(--tm-wrap)) / 2));
+      background: #fff; border: 0; box-shadow: 0 2px 8px 0 rgba(50, 50, 50, .08);
+    }
+    .side:empty { display: none; }
+    .side .brand { order: 0; margin-right: auto; padding: 0; font-size: 24px; font-weight: 800; letter-spacing: 0; color: #212227; }
+    .side .brand .logo { width: 32px; height: 32px; }
+
+    .side .nav { order: 1; flex-direction: row; align-items: stretch; gap: 0; }
+    .side .nav a {
+      position: relative; height: var(--nav-h); padding: 0 13px; border-radius: 0; background: transparent;
+      color: var(--tm-dark); font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; white-space: nowrap;
+      transition: color .3s ease-in;
+    }
+    .side .nav a svg { display: none; }
+    .side .nav a:hover, .side .nav a.on { background: transparent; color: var(--accent); }
+    .side .nav a.on::after { content: ''; position: absolute; left: 13px; right: 13px; bottom: 0; height: 3px; background: var(--accent); }
+    .side .nav a .dot { margin: 0 0 12px 3px; }
+    .side .nav-appx { order: 2; display: flex; align-items: center; margin: 0; padding: 0; border: 0; }
+    .side .nav-appx::before { content: ''; width: 1px; height: 18px; margin: 0 4px; background: var(--line-2); }
+    .side .nav-appx .lbl { display: none; }
+    .side .nav-appx a { color: #707070; }
+
+    .side .me { order: 3; margin: 0 0 0 6px; padding: 4px 12px 4px 4px; gap: 8px; border: 1px solid var(--line); background: #fff; }
+    .side .me .avatar { width: 30px; height: 30px; background: var(--accent); color: #fff; font-size: 11px; }
+    .side .me small, .side .me .me-go { display: none; }
+    .side .me b { font-size: 13px; white-space: nowrap; }
+    .side a.me:hover, .side a.me.on { border-color: var(--accent); box-shadow: none; }
+
+    .side .side-foot { order: 4; margin: 0; padding: 0; display: flex; align-items: center; gap: 6px; }
+    .side .side-foot .foot-lbl { display: none; }
+    .side .theme { gap: 5px; }
+    .side .theme button { width: 18px; height: 18px; }
+    .side .logout { height: 34px; padding: 0 10px; color: var(--ink-3); }
+    .side .logout:hover { background: transparent; color: var(--accent); }
+    .side .logout .lbl { display: none; }
+
+    /* 시연 도구: 메뉴 줄에는 버튼만, 펼치면 메뉴 아래 오른쪽에 떠 있는 창으로(자리는 비워 두어 메뉴가 밀리지 않게) */
+    .side .demo { order: -1; }
+    .side .demo > summary {
+      width: 96px; height: 34px; justify-content: center; padding: 0 8px;
+      border: 1px dashed var(--line-2); border-radius: 2px;
+      font-size: 12px; font-weight: 700; letter-spacing: .5px; color: var(--ink-3); white-space: nowrap;
+    }
+    .side .demo > summary:hover { border-color: var(--accent); color: var(--accent); }
+    .side .side-foot:has(> .demo[open]) { padding-left: 102px; }
+    .side .demo[open] {
+      position: fixed; z-index: 45; top: calc(var(--rib-h) + var(--nav-h) + 8px);
+      right: max(20px, calc((100% - var(--tm-wrap)) / 2));
+      width: 300px; max-height: calc(100vh - var(--rib-h) - var(--nav-h) - 32px); overflow-y: auto;
+      padding: 0 16px 16px; border: 1px solid var(--line); border-top: 3px solid var(--accent); border-radius: 2px;
+      background: #fff; box-shadow: var(--shadow-pop);
+    }
+    .side .demo[open] > summary {
+      width: auto; height: 44px; margin: 0 -16px 12px; padding: 0 16px; justify-content: flex-start;
+      border: 0; border-bottom: 1px solid var(--line); border-radius: 0; color: var(--ink);
+    }
+    .side .demo[open] .foot-lbl { display: block; font-weight: 700; letter-spacing: 1px; }
+  }
+
+  /* 좁은 데스크톱: 메뉴가 두 줄로 넘치지 않게 조금 줄인다 */
+  @media (min-width: 901px) and (max-width: 1240px) {
+    --nav-h: 60px;
+    .side .brand { font-size: 20px; }
+    .side .brand .logo { width: 28px; height: 28px; }
+    .side .nav a { padding: 0 9px; font-size: 12.5px; letter-spacing: .5px; }
+    .side .nav a.on::after { left: 9px; right: 9px; }
+    .side .me { padding: 3px; }
+    .side .me .grow { display: none; }
+  }
+
+  /* ── 본문: 맨 위에 템플릿 첫 화면 사진을 옅게 깔고 아래로 흐려지게 ── */
+  .main { position: relative; padding: 56px 40px 150px; }
+  .main::before {
+    content: ''; position: absolute; z-index: -1; top: 0; left: 0; right: 0; height: 360px; pointer-events: none;
+    /* 사진 아래쪽(유리컵·연필)이 보이게 내려 잡는다 — 위쪽 모니터가 단계 표시 뒤에 오면 글자가 묻힌다 */
+    background: url('./home-bg.jpg') center 60% / cover no-repeat;
+    opacity: .8;
+    -webkit-mask-image: linear-gradient(to bottom, #000 45%, transparent);
+            mask-image: linear-gradient(to bottom, #000 45%, transparent);
+  }
+  /* 넓은 화면(xwide·관리자 표)은 본문이 사진 왼쪽 헤드폰까지 닿아 제목이 묻힌다 → 아주 옅게 */
+  .main:has(> .view.xwide)::before, .main:has(> .view.adm-ds)::before { opacity: .28; }
+
+  /* ── 글자 ── */
+  .eyebrow { font-size: 12.5px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); }
+  .t {
+    position: relative; margin: 0 0 22px; padding-bottom: 16px;
+    font-size: 32px; line-height: 1.35; font-weight: 300; letter-spacing: -.01em; color: var(--ink);
+  }
+  .t::after { content: ''; position: absolute; left: 0; bottom: 0; width: 60px; height: 2px; background: var(--accent); }
+  .t.lg { font-size: 38px; }
+  .lead { font-size: 16px; line-height: 1.75; color: var(--ink-2); }
+  .st { font-weight: 700; letter-spacing: .01em; color: var(--ink); }
+  .sec-h { padding-bottom: 10px; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
+  .big { font-weight: 300; color: var(--ink); }
+  .link { color: var(--accent-ink); font-weight: 700; }
+  .link:hover { color: var(--accent); }
+  .link.quiet { color: var(--ink-3); }
+
+  /* ── 버튼: 강조색 바탕 · 마우스를 올리면 흰 바탕 + 강조색 글자(템플릿 'Let's Begin'), 테두리 버튼은 어둡게 반전 ── */
+  .btn { font-weight: 700; letter-spacing: .5px; transition: background .3s ease-in, color .3s ease-in, border-color .3s ease-in; }
+  .btn.pri { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.pri:hover { background: #fff; border-color: var(--accent); color: var(--accent); }
+  .btn.pri:disabled, .btn.pri:disabled:hover { background: #D8D8D8; border-color: #D8D8D8; color: #fff; }
+  .btn.line { background: transparent; border-color: #8A8A8A; color: var(--tm-dark); }
+  .btn.line:hover:not(:disabled) { background: var(--tm-dark); border-color: var(--tm-dark); color: #fff; }
+  .btn.ghost:hover { background: transparent; color: var(--accent); }
+  .back { border-color: var(--line-2); }
+  .back:hover { border-color: var(--tm-dark); background: var(--tm-dark); color: #fff; }
+
+  /* ── 진행 표시 ── */
+  .bar { background: #EBEBEB; }
+  .stepper { padding: 8px 6px; border: 1px solid var(--line); background: rgba(255, 255, 255, .9); }
+  .stepper .sn { border-radius: 2px; }
+  .stepper li.cur .sn { box-shadow: 0 0 0 3px var(--accent-soft2); }
+  .stepper li.cur .sl { font-weight: 700; }
+
+  /* ── 선택지·칩·입력 ── */
+  .choice { transition: border-color .3s ease-in, background .2s; }
+  .choice:hover { border-color: #8A8A8A; }
+  .choice:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+  .scale label:hover, .lik label:hover { border-color: #8A8A8A; }
+  .chip { border-color: var(--line-2); transition: border-color .3s ease-in, background .3s ease-in, color .3s ease-in; }
+  .chip:hover { border-color: var(--accent); color: var(--accent-ink); }
+  .chip:has(input:checked), .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .tag { font-weight: 700; letter-spacing: .3px; }
+  .input, .textarea { border-color: #C8C8C8; transition: border-color .3s ease-in, box-shadow .3s ease-in; }
+  .input:hover, .textarea:hover { border-color: #8A8A8A; }
+  .input:focus, .textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .cpick.open .cp-btn { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .drop:hover { border-color: var(--accent); }
+
+  /* ── 카드: 테두리 상자 + 마우스를 올리면 강조색 테두리(템플릿 'My Work' 상자) ── */
+  .card.tap, .opt, .gs-it, .demo-acc button, .roadmap-preview, .check-plan-group { transition: border-color .4s ease-in, background .2s; }
+  .card.tap:hover, .opt:hover, .gs-it:hover, .demo-acc button:hover { border-color: var(--accent); }
+  .opt:hover { box-shadow: none; }
+  .opt h3 { font-weight: 700; }
+  .hero { border-top: 3px solid var(--accent); text-align: center; padding: 44px 32px; }
+  .hero .t::after { left: 50%; transform: translateX(-50%); }
+  .hero .actions { justify-content: center; }
+  .hero .actions .btn.pri { flex: 0 1 auto; }
+  .next {
+    background: linear-gradient(color-mix(in srgb, var(--accent) 88%, transparent), color-mix(in srgb, var(--accent) 88%, transparent)),
+      url('./home-bg.jpg') center / cover;
+  }
+  .next .btn:hover { background: var(--tm-dark); color: #fff; }
+  .pstrip div { padding: 14px; border: 1px solid var(--line); border-radius: 2px; background: #fff; transition: border-color .4s ease-in; }
+  .pstrip div:hover { border-color: var(--accent); }
+  .pstrip div b { color: var(--ink); }
+  .stats b { color: var(--ink); }
+  .alert { border-left: 3px solid var(--accent); }
+  .cmp thead th, .adm-tbl th { letter-spacing: .5px; }
+  .cmp thead th { background: var(--surface-2); }
+
+  /* ── 창·알림 ── */
+  .ov { background: rgba(32, 32, 32, .45); }
+  .sheet-h, .adm-ph { border-top: 3px solid var(--accent); }
+  .sheet-h b, .adm-ph b { font-weight: 700; }
+  .toast { background: var(--tm-dark); border-left: 3px solid var(--accent); }
+  .fab { font-weight: 700; letter-spacing: .5px; box-shadow: 0 6px 18px rgba(32, 32, 32, .2); transition: background .3s ease-in; }
+  .fab:hover { background: var(--tm-dark); }
+  .regp .sheet-h { border-top: 3px solid var(--accent); }
+  .gt-tip { background: var(--tm-dark); }
+
+  /* 상단 메뉴가 생겨 관리자 고치기 창은 그 아래에서 시작 */
+  .adm-panel { top: calc(var(--rib-h) + var(--nav-h) + 12px); }
+  @media (max-width: 1100px) {
+    .adm-panel { top: calc(var(--rib-h) + var(--nav-h)); }
+  }
+
+  /* 사전 점검 설문(features/draft/quiz/assessment/style.css) */
+  .v2-survey nav span, .v2-survey section, .v2-survey fieldset, .v2-survey label, .v2-survey button { border-radius: 2px; }
+  .v2-survey .primary { border-color: var(--accent); }
+
+  /* ── 로그인: 템플릿 첫 화면처럼 책상 사진을 화면 가득, 소개 쪽은 강조색을 덮은 소개 사진 ── */
+  body.auth .app { min-height: 100vh; }
+  body.auth .main {
+    min-height: 100vh; display: flex; align-items: center;
+    background: linear-gradient(rgba(255, 255, 255, .3), rgba(255, 255, 255, .3)), url('./home-bg.jpg') center / cover fixed;
+  }
+  body.auth .main::before { display: none; }
+  body.auth .view { width: 100%; }
+  .login-card { border: 0; box-shadow: 0 2px 8px rgba(50, 50, 50, .08), 0 18px 50px rgba(32, 32, 32, .10); }
+  .login-card .t.lg { font-size: 34px; }
+  .login-side {
+    background: linear-gradient(color-mix(in srgb, var(--accent) 86%, transparent), color-mix(in srgb, var(--accent) 86%, transparent)),
+      url('./about-bg.jpg') 30% center / cover;
+  }
+  .login-side::after { display: none; }
+  .login-side h2 { font-size: 34px; font-weight: 300; letter-spacing: -.01em; }
+  .login-side .pill { background: rgba(255, 255, 255, .18); letter-spacing: 1px; text-transform: uppercase; }
+  .feat { background: rgba(255, 255, 255, .12); border-color: rgba(255, 255, 255, .22); }
+
+  /* ── 좁은 화면(900px 이하): 원래의 한 줄 메뉴 배치를 쓰고 색·글자만 맞춘다 ── */
+  @media (max-width: 900px) {
+    .side { background: #fff; border-bottom: 0; box-shadow: 0 2px 8px 0 rgba(50, 50, 50, .08); }
+    .side .brand { font-weight: 800; }
+    .side .nav a { font-size: 13px; font-weight: 700; color: var(--tm-dark); }
+    .side .nav a.on { background: transparent; color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); }
+    .side a.me { border-radius: 2px; }
+    .main { padding: 32px 16px 140px; }
+    /* 좁은 폭에서는 사진 전체(모니터·키보드)가 다 들어와 제목 뒤가 어지럽다 → 가운데 빈 책상만 크게 */
+    .main::before { height: 220px; background-size: auto 520px; background-position: center 62%; }
+    .t { font-size: 24px; }
+    .t.lg { font-size: 27px; }
+    body.auth .main { padding: 24px 16px; background-attachment: scroll; }
+    .login-side h2 { font-size: 25px; }
+    .adm-panel { top: var(--rib-h); }
+  }
+}
