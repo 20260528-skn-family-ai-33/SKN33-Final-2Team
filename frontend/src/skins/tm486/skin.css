@@ -49,7 +49,8 @@
   .ls-card .ls-art { height: 170px; margin: 22px -26px 20px; background-size: cover; mix-blend-mode: normal; }
   .ls-card:nth-child(1) .ls-art { background-image: url('./card-roadmap.jpg'); }
   .ls-card:nth-child(2) .ls-art { background-image: url('./card-resources.jpg'); }
-  .ls-card:nth-child(3) .ls-art { background-image: url('./hero.jpg'); }
+  /* 세 번째는 첫 화면(hero)과 같은 사진이라 템플릿 문의 영역의 빈 책상 사진으로(책상이 보이게 아래쪽 중심) */
+  .ls-card:nth-child(3) .ls-art { background-image: url('./card-growth.jpg'); background-position: center 72%; }
 
   /* ── 상단 메뉴 버전(기본): 좌측 메뉴 버전(data-nav="side")을 고르지 않은 때만 ── */
   &:not([data-nav="side"]) {
