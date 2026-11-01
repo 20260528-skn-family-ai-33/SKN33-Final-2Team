@@ -154,14 +154,13 @@
   .main { position: relative; padding: 56px 40px 150px; }
   .main::before {
     content: ''; position: absolute; z-index: -1; top: 0; left: 0; right: 0; height: 360px; pointer-events: none;
-    /* 사진 아래쪽(유리컵·연필)이 보이게 내려 잡는다 — 위쪽 모니터가 단계 표시 뒤에 오면 글자가 묻힌다 */
-    background: url('./home-bg.jpg') center 60% / cover no-repeat;
+    /* 사진 아래쪽(유리컵)이 보이게 내려 잡고, 키워서 오른쪽으로 민다 — 본문이 넓어(1240px) 왼쪽 헤드폰·위쪽 모니터가
+       제목·단계 표시 뒤에 오면 글자가 묻힌다 */
+    background: url('./home-bg.jpg') 72% 60% / 140% auto no-repeat;
     opacity: .8;
     -webkit-mask-image: linear-gradient(to bottom, #000 45%, transparent);
             mask-image: linear-gradient(to bottom, #000 45%, transparent);
   }
-  /* 넓은 화면(xwide·관리자 표)은 본문이 사진 왼쪽 헤드폰까지 닿아 제목이 묻힌다 → 아주 옅게 */
-  .main:has(> .view.xwide)::before, .main:has(> .view.adm-ds)::before { opacity: .28; }
 
   /* ── 글자 ── */
   .eyebrow { font-size: 12.5px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); }
@@ -272,6 +271,23 @@
   .login-side h2 { font-size: 34px; font-weight: 300; letter-spacing: -.01em; }
   .login-side .pill { background: rgba(255, 255, 255, .18); letter-spacing: 1px; text-transform: uppercase; }
   .feat { background: rgba(255, 255, 255, .12); border-color: rgba(255, 255, 255, .22); }
+
+  /* ── 홈 '나의 학습 공간' 카드: 각진 테두리 상자 + 가는 제목, 마우스를 올리면 주황 테두리 ── */
+  .ls-t { font-weight: 300; font-size: 30px; }
+  .ls-card, .ls-no { border-radius: 2px; }
+  .ls-card:hover { border-color: var(--accent); box-shadow: none; transform: none; }
+  .ls-h h3 { font-weight: 700; }
+  .ls-card:nth-child(1) { --ls-c: #202020; }
+  .ls-card:nth-child(2) { --ls-c: var(--accent); }
+  .ls-card:nth-child(3) { --ls-c: #8A8A8A; }
+
+  /* 카드 그림: 템플릿 포트폴리오 사진을 카드 폭 가득, 마우스를 올리면 주황 덮개(portfolio-overlay) */
+  .ls-card .ls-art { height: 170px; margin: 22px -26px 20px; background-size: cover; mix-blend-mode: normal; }
+  .ls-card:nth-child(1) .ls-art { background-image: url('./card-roadmap.jpg'); }
+  .ls-card:nth-child(2) .ls-art { background-image: url('./card-resources.jpg'); }
+  .ls-card:nth-child(3) .ls-art { background-image: url('./card-growth.jpg'); }
+  .ls-art::after { content: ''; position: absolute; inset: 0; background: var(--accent); opacity: 0; transition: opacity .4s ease-in-out; }
+  .ls-card:hover .ls-art::after { opacity: .8; }
 
   /* ── 좁은 화면(900px 이하): 원래의 한 줄 메뉴 배치를 쓰고 색·글자만 맞춘다 ── */
   @media (max-width: 900px) {

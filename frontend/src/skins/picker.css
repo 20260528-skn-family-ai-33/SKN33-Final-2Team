@@ -8,6 +8,12 @@
   font: 600 12px/1.2 system-ui, -apple-system, 'Malgun Gothic', sans-serif; color: #333; letter-spacing: 0;
 }
 .skin-pick select {
-  height: 26px; padding: 0 4px; border: 1px solid #C8C8C8; border-radius: 6px; background: #fff;
+  max-width: 52vw; height: 26px; padding: 0 4px; border: 1px solid #C8C8C8; border-radius: 6px; background: #fff;
   font: 400 12px system-ui, -apple-system, 'Malgun Gothic', sans-serif; color: #222;
+}
+/* 좁은 화면: 오른쪽 아래 '사내 생활 도우미' 버튼과 겹치지 않게 맨 위 띠의 왼쪽(비어 있는 자리)으로 */
+@media (max-width: 600px) {
+  .skin-pick { top: 3px; bottom: auto; left: 8px; padding: 2px; }
+  .skin-pick > span { display: none; }
+  .skin-pick select { max-width: 44vw; }
 }

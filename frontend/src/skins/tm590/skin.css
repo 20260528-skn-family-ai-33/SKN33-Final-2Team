@@ -1,0 +1,238 @@
+/* 화면 테마 tm590 · templatemo 590 Topic Listing
+   원본: https://templatemo.com/tm-590-topic-listing — 무료 · 상업/비상업 사용 허용. 로그인 사진(office.jpg)도 템플릿에 들어 있던 것.
+   전부 :root[data-skin="tm590"] 안에 적어 이 테마를 고른 때만 적용된다.
+
+   템플릿에서 가져온 것
+   - 청록 그라데이션(15deg, #13547a → #80d0c7) 상단 메뉴, 흰 대문자 메뉴 글자, 알약 모양 메뉴·버튼(모서리 100px)
+   - Montserrat 제목 + Open Sans 본문, 옅은 하늘색(#f0f8ff) 바탕 위 흰 둥근 카드(모서리 20px) + 그림자, 마우스를 올리면 살짝 떠오름
+   - 민트(#80d0c7) 버튼 → 마우스를 올리면 진청(#13547a), 아래가 둥근 머리 띠(featured-section 모양) */
+
+:root[data-skin="tm590"] {
+  --accent: #13547A !important;
+  --tm-mint: #80D0C7;
+  --tm-grad: linear-gradient(15deg, #13547A 0%, #80D0C7 100%);
+  --tm-title: 'Montserrat', 'Pretendard Variable', Pretendard, -apple-system, 'Malgun Gothic', sans-serif;
+  --tm-wrap: 1240px;
+  --nav-h: 76px;
+
+  --bg: #F0F8FF;
+  --surface: #FFFFFF;
+  --surface-2: #F7FBFF;
+  --sunk: #E8F1F8;
+  --line: #DCE8F0;
+  --line-2: #C3D5E0;
+  --ink: #0B1F2A;
+  --ink-2: #5F6266;
+  --ink-3: #85888D;
+  --ink-4: #AEB2B7;
+
+  --side-w: 0px;
+  --r-lg: 20px;
+  --r-md: 10px;
+  --shadow-pop: 0 20px 50px rgba(19, 84, 122, .18), 0 2px 8px rgba(19, 84, 122, .06);
+  --tm-shadow: 0 10px 30px rgba(19, 84, 122, .07);
+
+  body {
+    background: var(--bg); color: var(--ink-2);
+    font-family: 'Open Sans', 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
+  }
+
+  /* ── 상단 띠·메뉴: 그라데이션 ── */
+  /* 띠와 메뉴 줄이 높이가 달라 각자 그라데이션을 그리면 이음매가 보인다 → 화면 기준(fixed)으로 하나처럼 */
+  .ribbon { padding: 0 max(20px, calc((100% - var(--tm-wrap)) / 2)); background: var(--tm-grad) fixed; color: rgba(255, 255, 255, .85); }
+  .ribbon .mode { border-radius: 100px; background: rgba(255, 255, 255, .2); color: #fff; }
+  .api-picker-button { border-radius: 100px; padding: 5px 12px; font-family: var(--tm-title); font-size: 12px; }
+  .api-picker-panel { border-radius: 20px; }
+  body.auth .ribbon { display: none; }
+
+  @media (min-width: 901px) {
+    & { scroll-padding-top: calc(var(--rib-h) + var(--nav-h) + 12px); }
+    .app { display: block; }
+    .side {
+      position: sticky; top: var(--rib-h); z-index: 39;
+      height: auto; min-height: var(--nav-h); overflow: visible;
+      flex-direction: row; flex-wrap: wrap; align-items: center; gap: 0 10px;
+      padding: 0 max(28px, calc((100% - var(--tm-wrap)) / 2));
+      background: var(--tm-grad) fixed; border: 0; border-radius: 0 0 36px 36px; box-shadow: 0 10px 30px rgba(19, 84, 122, .18);
+      color: #fff; /* 로고 글자는 color: inherit(인라인)라 메뉴 줄 글자색을 따른다 */
+    }
+    .side:empty { display: none; }
+    .side .brand { order: 0; margin-right: auto; padding: 0; font-family: var(--tm-title); font-size: 26px; font-weight: 700; color: #fff; }
+    .side .brand .logo { width: 40px; height: 40px; border-radius: 100px; background: #fff; color: var(--accent); }
+
+    .side .nav { order: 1; flex-direction: row; align-items: center; gap: 2px; }
+    .side .nav a {
+      height: 40px; padding: 0 14px; border-radius: 100px; background: transparent; color: #fff;
+      font-family: var(--tm-title); font-size: 13.5px; font-weight: 500; letter-spacing: .5px; text-transform: uppercase; white-space: nowrap;
+    }
+    .side .nav a svg { display: none; }
+    .side .nav a:hover { background: rgba(255, 255, 255, .18); color: #fff; }
+    .side .nav a.on { background: #fff; color: var(--accent); font-weight: 600; }
+    .side .nav a .dot { margin: 0 0 12px 3px; background: #fff; }
+    .side .nav a.on .dot { background: var(--tm-mint); }
+    .side .nav-appx { order: 2; display: flex; align-items: center; margin: 0; padding: 0; border: 0; }
+    .side .nav-appx::before { content: ''; width: 1px; height: 18px; margin: 0 4px; background: rgba(255, 255, 255, .45); }
+    .side .nav-appx .lbl { display: none; }
+    .side .nav-appx a { color: rgba(255, 255, 255, .88); }
+
+    .side .me { order: 3; margin: 0 0 0 6px; padding: 4px 14px 4px 4px; gap: 8px; border: 0; border-radius: 100px; background: rgba(255, 255, 255, .18); color: #fff; }
+    .side .me .avatar { width: 32px; height: 32px; border-radius: 100px; background: #fff; color: var(--accent); font-size: 11px; }
+    .side .me small, .side .me .me-go { display: none; }
+    .side .me b { font-size: 13px; white-space: nowrap; }
+    .side a.me:hover, .side a.me.on { background: rgba(255, 255, 255, .3); box-shadow: none; }
+
+    .side .side-foot { order: 4; margin: 0; padding: 0; display: flex; align-items: center; gap: 6px; }
+    .side .side-foot .foot-lbl { display: none; }
+    .side .theme { gap: 5px; }
+    .side .theme button { width: 18px; height: 18px; }
+    .side .logout { height: 36px; padding: 0 10px; border-radius: 100px; color: #fff; }
+    .side .logout:hover { background: rgba(255, 255, 255, .18); color: #fff; }
+    .side .logout .lbl { display: none; }
+
+    /* 시연 도구: 메뉴 줄에는 버튼만, 펼치면 메뉴 아래 오른쪽에 떠 있는 창 */
+    .side .demo { order: -1; color: #fff; }
+    .side .demo > summary {
+      width: 96px; height: 34px; justify-content: center; padding: 0 8px;
+      border: 1px dashed rgba(255, 255, 255, .7); border-radius: 100px;
+      font-family: var(--tm-title); font-size: 12px; font-weight: 600; color: #fff; white-space: nowrap;
+    }
+    .side .side-foot:has(> .demo[open]) { padding-left: 102px; }
+    .side .demo[open] {
+      position: fixed; z-index: 45; top: calc(var(--rib-h) + var(--nav-h) + 10px);
+      right: max(20px, calc((100% - var(--tm-wrap)) / 2));
+      width: 300px; max-height: calc(100vh - var(--rib-h) - var(--nav-h) - 32px); overflow-y: auto;
+      padding: 0 16px 16px; border-radius: 20px; background: #fff; color: var(--ink-3); box-shadow: var(--shadow-pop);
+    }
+    .side .demo[open] > summary {
+      width: auto; height: 46px; margin: 0 -16px 12px; padding: 0 16px; justify-content: flex-start;
+      border: 0; border-radius: 0; background: var(--tm-grad); color: #fff;
+    }
+    .side .demo[open] .foot-lbl { display: block; font-weight: 700; }
+  }
+  @media (min-width: 901px) and (max-width: 1240px) {
+    --nav-h: 66px;
+    .side .brand { font-size: 21px; }
+    .side .brand .logo { width: 34px; height: 34px; }
+    .side .nav a { padding: 0 9px; font-size: 12.5px; letter-spacing: 0; }
+    .side .me { padding: 3px; }
+    .side .me .grow { display: none; }
+  }
+
+  /* ── 글자 ── */
+  .main { padding: 56px 40px 150px; }
+  .eyebrow { font-family: var(--tm-title); font-size: 13px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; color: var(--accent); }
+  .t { font-family: var(--tm-title); font-size: 34px; font-weight: 700; letter-spacing: -.01em; color: var(--ink); }
+  .t.lg { font-size: 40px; }
+  .lead { font-size: 16.5px; line-height: 1.75; }
+  .st, .hp-t, .opt h3, .check-plan-title { font-family: var(--tm-title); font-weight: 600; color: var(--ink); }
+  .big, .stats b, .check-plan-percent { font-family: var(--tm-title); }
+  .link { color: var(--accent); }
+  .link:hover { color: #0E3F5C; }
+
+  /* ── 버튼: 알약 모양 · 민트 → 진청 ── */
+  .btn { border-radius: 100px; font-family: var(--tm-title); font-weight: 600; transition: all .3s; }
+  .btn.pri { background: var(--tm-mint); border-color: transparent; color: #fff; }
+  .btn.pri:hover { background: var(--accent); }
+  .btn.pri:disabled, .btn.pri:disabled:hover { background: #CFDCE3; }
+  .btn.line { background: transparent; border: 2px solid var(--tm-mint); color: var(--accent); }
+  .btn.line:hover:not(:disabled) { background: var(--tm-mint); border-color: transparent; color: #fff; }
+  .btn.ghost:hover { background: var(--accent-soft); color: var(--accent); }
+  .back { border-radius: 100px; }
+  .back:hover { border-color: var(--tm-mint); background: var(--tm-mint); color: #fff; }
+
+  /* ── 선택지·칩·입력 ── */
+  .chip:hover { border-color: var(--tm-mint); }
+  .chip:has(input:checked), .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .tag { border-radius: 5px; }
+  .choice:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+  .input { border-radius: 100px; padding-left: 20px; }
+  .textarea { border-radius: 20px; padding: 14px 18px; }
+  .input, .textarea { border-color: var(--line-2); }
+  .input:focus, .textarea:focus, .cpick.open .cp-btn { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(128, 208, 199, .4); }
+  .cp-pop, .api-picker-panel { border-radius: 20px; }
+
+  /* ── 카드: 흰 둥근 상자 + 그림자, 누를 수 있는 상자는 떠오름 ── */
+  .list, .stage, .opt, .tblwrap, .roadmap-preview, .check-plan-group, .connbox, .cm-item, .gsug, .docbox, .cause,
+  .sheet, .regp, .login-card, .login-side, .loading, .stats, .agent, .diff .d, .alert, .callout, .ck-list, .rec-res { border-radius: 20px; }
+  .card, .list, .stage, .opt, .tblwrap, .roadmap-preview, .check-plan-group, .connbox, .cm-item, .stats, .agent, .pstrip div {
+    border-color: transparent; box-shadow: var(--tm-shadow);
+  }
+  .card.tap, .opt, .gs-it { transition: transform .3s ease, box-shadow .3s ease, border-color .3s; }
+  .card.tap:hover, .opt:hover { border-color: transparent; transform: translateY(-3px); box-shadow: 0 16px 40px rgba(19, 84, 122, .13); }
+  .gs-it:hover { border-color: var(--tm-mint); }
+  .pstrip div { padding: 16px; border-radius: 20px; background: #fff; }
+  .pstrip div b { font-family: var(--tm-title); color: var(--accent); }
+  .hero { border: 0; background: var(--tm-grad); color: #fff; box-shadow: var(--tm-shadow); }
+  .hero .t, .hero .lead { color: #fff; }
+  .hero .btn.pri { background: #fff; color: var(--accent); }
+  .hero .btn.pri:hover { background: var(--accent); color: #fff; }
+  .hero .btn.line { border-color: #fff; color: #fff; }
+  .next { background: var(--tm-grad); }
+  .bar i, .bars .track i { background: var(--tm-grad); }
+  .stepper li.cur .sn { box-shadow: 0 0 0 4px rgba(128, 208, 199, .45); }
+  .stepper li.done .sn { background: var(--tm-mint); border-color: var(--tm-mint); color: #fff; }
+
+  /* ── 창·알림 ── */
+  .ov { background: rgba(11, 31, 42, .4); }
+  .sheet-h { background: var(--tm-grad); border-bottom: 0; color: #fff; }
+  .sheet-h small { color: rgba(255, 255, 255, .85); }
+  .sheet-h .x, .sheet-h .btn.line { color: #fff; border-color: rgba(255, 255, 255, .7); }
+  .sheet-h .x:hover { background: rgba(255, 255, 255, .2); }
+  .toast { border-radius: 100px; background: var(--accent); }
+  .fab { background: var(--tm-grad); font-family: var(--tm-title); box-shadow: 0 10px 30px rgba(19, 84, 122, .3); }
+  .fab:hover { background: var(--accent); }
+  .msg.me { background: var(--accent); }
+  .adm-panel { top: calc(var(--rib-h) + var(--nav-h) + 12px); border-radius: 20px; }
+  .adm-ph { background: var(--tm-grad); color: #fff; }
+  .adm-ph small, .adm-ph .x { color: rgba(255, 255, 255, .9); }
+  @media (max-width: 1100px) { .adm-panel { top: calc(var(--rib-h) + var(--nav-h)); border-radius: 0; } }
+  .v2-survey section, .v2-survey fieldset { border-radius: 20px; }
+  .v2-survey button { border-radius: 100px; }
+
+  /* ── 로그인: 그라데이션 화면 + 사진에 그라데이션을 덮은 소개(템플릿 overlay 블록) ── */
+  body.auth .app { min-height: 100vh; }
+  body.auth .main { min-height: 100vh; display: flex; align-items: center; background: var(--tm-grad); }
+  body.auth .view { width: 100%; }
+  .login-card { border: 0; box-shadow: 0 20px 50px rgba(11, 31, 42, .18); }
+  .login-side {
+    background: linear-gradient(15deg, rgba(19, 84, 122, .88) 0%, rgba(128, 208, 199, .82) 100%), url('./office.jpg') center / cover;
+    box-shadow: 0 20px 50px rgba(11, 31, 42, .18);
+  }
+  .login-side::after { display: none; }
+  .login-side h2 { font-family: var(--tm-title); font-weight: 700; }
+  .login-side .pill { font-family: var(--tm-title); }
+  .feat { border-radius: 20px; background: rgba(255, 255, 255, .14); }
+
+  /* ── 홈 '나의 학습 공간' 카드: 그림자 둥근 카드(템플릿 custom-block), 마우스를 올리면 떠오름 ── */
+  .ls-t, .ls-h h3, .ls-go { font-family: var(--tm-title); }
+  .ls-t { font-weight: 700; }
+  .ls-h h3 { font-weight: 600; }
+  .ls-card { border-color: transparent; border-radius: 20px; box-shadow: var(--tm-shadow); }
+  .ls-card:hover { border-color: var(--tm-mint); transform: translateY(-3px); box-shadow: 0 16px 40px rgba(19, 84, 122, .13); }
+  .ls-no { border-radius: 5px; }
+  .ls-card:nth-child(1) { --ls-c: var(--accent); }
+  .ls-card:nth-child(2) { --ls-c: #B9644A; }
+  .ls-card:nth-child(3) { --ls-c: #6C69A6; }
+
+  /* 카드 그림: 같은 패키지의 다른 undraw 일러스트(계획 보드 · 화상 강의 · 성장 차트) */
+  .ls-card:nth-child(1) .ls-art { background-image: url('./card-roadmap.png'); }
+  .ls-card:nth-child(2) .ls-art { background-image: url('./card-resources.png'); }
+  .ls-card:nth-child(3) .ls-art { background-image: url('./card-growth.png'); }
+
+  /* ── 좁은 화면(900px 이하): 원래의 한 줄 메뉴 배치에 색만 ── */
+  @media (max-width: 900px) {
+    .side { background: var(--tm-grad); border-bottom: 0; border-radius: 0 0 24px 24px; color: #fff; }
+    .side .brand { font-family: var(--tm-title); color: #fff; }
+    .side .brand .logo { border-radius: 100px; background: #fff; color: var(--accent); }
+    .side .nav a { border-radius: 100px; color: #fff; }
+    .side .nav a:hover { background: rgba(255, 255, 255, .18); }
+    .side .nav a.on { background: #fff; color: var(--accent); }
+    .side a.me { border: 0; background: rgba(255, 255, 255, .2); color: #fff; }
+    .side .logout { color: #fff; }
+    .main { padding: 32px 16px 140px; }
+    .t { font-size: 25px; }
+    .t.lg { font-size: 28px; }
+    body.auth .main { padding: 24px 16px; }
+    .adm-panel { top: var(--rib-h); }
+  }
+}
