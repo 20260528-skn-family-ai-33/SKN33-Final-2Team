@@ -239,8 +239,10 @@
   .ls-card .ls-art { height: 170px; margin: 22px -26px 20px; background-size: cover; mix-blend-mode: normal; }
   .ls-card:nth-child(1) .ls-art { background-image: url('./card-roadmap.jpg'); }
   .ls-card:nth-child(2) .ls-art { background-image: url('./card-resources.jpg'); }
-  .ls-card:nth-child(3) .ls-art { background-image: url('./card-growth.jpg'); }
+  .ls-card:nth-child(3) .ls-art { background-image: url('./apply-bg.jpg'); }
   .ls-art::after { content: ''; position: absolute; inset: 0; background: linear-gradient(transparent 50%, rgba(31, 39, 43, .5)); }
+  /* 둘째·셋째 카드 사진(facts-bg · apply-bg 1600px)은 템플릿에서 어둡게 칠한 배경이라 밝힌다 */
+  .ls-card:nth-child(2) .ls-art, .ls-card:nth-child(3) .ls-art { filter: brightness(1.55) saturate(1.1); }
 
   /* ── 좁은 화면(900px 이하): 원래의 한 줄 메뉴 배치에 색만 ── */
   @media (max-width: 900px) {

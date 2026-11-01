@@ -46,10 +46,11 @@
   .login-side::after { display: none; }
 
   /* ── 홈 '나의 학습 공간' 카드 그림: 템플릿 사진을 카드 폭 가득 ── */
-  .ls-card .ls-art { height: 170px; margin: 22px -26px 20px; background-size: cover; mix-blend-mode: normal; }
-  .ls-card:nth-child(1) .ls-art { background-image: url('./card-roadmap.jpg'); }
-  .ls-card:nth-child(2) .ls-art { background-image: url('./card-resources.jpg'); }
-  .ls-card:nth-child(3) .ls-art { background-image: url('./card-growth.jpg'); }
+  /* 템플릿의 다른 사진은 180~300px 썸네일이라 흐려서, 큰 사진(설문 배너 1200px) 한 장을 카드마다 왼쪽·가운데·오른쪽으로 잘라 쓴다.
+     150% 로 키워도 2배 화면에서 원본 화소를 거의 그대로 쓴다 */
+  .ls-card .ls-art { height: 170px; margin: 22px -26px 20px; background: url('./login-side.jpg') 0 55% / 150% auto no-repeat; mix-blend-mode: normal; }
+  .ls-card:nth-child(2) .ls-art { background-position: 50% 55%; }
+  .ls-card:nth-child(3) .ls-art { background-position: 100% 55%; }
 
   /* ── 상단 메뉴 버전(기본): 좌측 메뉴 버전(data-nav="side")을 고르지 않은 때만 ── */
   &:not([data-nav="side"]) {

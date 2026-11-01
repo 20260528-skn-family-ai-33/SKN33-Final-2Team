@@ -245,11 +245,12 @@
   .ls-no { border-radius: 5px; background: var(--tm-grad); }
   .ls-go { text-transform: uppercase; font-size: 13.5px; }
 
-  /* 카드 그림: 템플릿 서비스 아이콘(퍼즐 · 책장 · 전구)을 옅은 그라데이션 원 안에(Eduwell service-item) */
-  .ls-card .ls-art { width: 132px; height: 132px; margin: 24px auto 20px; border-radius: 50%; mix-blend-mode: normal; background-size: 86px auto, cover; background-position: center; }
-  .ls-card:nth-child(1) .ls-art { background-image: url('./card-roadmap.png'), linear-gradient(-145deg, rgba(219, 138, 222, .22), rgba(246, 191, 159, .22)); }
-  .ls-card:nth-child(2) .ls-art { background-image: url('./card-resources.png'), linear-gradient(-145deg, rgba(219, 138, 222, .22), rgba(246, 191, 159, .22)); }
-  .ls-card:nth-child(3) .ls-art { background-image: url('./card-growth.png'), linear-gradient(-145deg, rgba(219, 138, 222, .22), rgba(246, 191, 159, .22)); }
+  /* 카드 그림: 템플릿의 분홍 얼룩 배경 인물·팀 그림(첫 화면 · 소개 · 참여 안내 단락, 480~630px)을 잘리지 않게 담는다.
+     처음 쓴 서비스 아이콘은 74~94px 이라 커지면 흐렸다 */
+  .ls-card .ls-art { height: 170px; margin: 22px 0 20px; mix-blend-mode: normal; background-size: contain; background-position: center; }
+  .ls-card:nth-child(1) .ls-art { background-image: url('./card-roadmap.png'); }
+  .ls-card:nth-child(2) .ls-art { background-image: url('./card-resources.png'); }
+  .ls-card:nth-child(3) .ls-art { background-image: url('./card-growth.png'); }
 
   /* ── 좁은 화면(900px 이하): 원래의 한 줄 메뉴 배치에 색만 ── */
   @media (max-width: 900px) {
