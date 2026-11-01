@@ -6,6 +6,13 @@ from app.agents import roadmap as rm
 
 
 class TrackPromptTests(unittest.TestCase):
+    def test_all_tracks_use_db_system_text_without_code_policy_overwrite(self):
+        prompt = '### GENERATION\nDB active generation\n### REVISION\nDB active revision'
+        for pid in ('A1', 'A2', 'A3'):
+            with patch.object(rm.db, 'all_', return_value=[{'system_prompt': prompt}]):
+                self.assertEqual(rm._sys(pid, rm.R_SYS), 'DB active generation')
+                self.assertEqual(rm._sys(pid, rm.REV_SYS), 'DB active revision')
+
     def test_db_generation_and_revision_are_selected(self):
         prompt = '### GENERATION\nDB generation\n### REVISION\nDB revision'
         with patch.object(rm.db, 'all_', return_value=[{'system_prompt': prompt}]) as query:
@@ -25,7 +32,7 @@ class TrackPromptTests(unittest.TestCase):
         for pid in ('A1', 'A2', 'A3'):
             with self.subTest(pid=pid), patch.object(rm, 'agent_catalog', return_value=[]) as get_catalog:
                 self.assertEqual(rm._track_catalog(pid, {}), [])
-                get_catalog.assert_called_once_with({}, None, free_only=pid == 'A1')
+                get_catalog.assert_called_once_with({}, None, free_only=pid == 'A1', track=pid)
 
     def test_free_output_rejects_paid_and_unknown(self):
         for cost in (100, None):

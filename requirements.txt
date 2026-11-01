@@ -23,6 +23,7 @@ olefile==0.47             # 기획서 HWP(옛 형식) 글자 꺼내기 (없으�
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch==2.11.0+cpu
 transformers==5.20.2
+tokenizers==0.23.3       # 로드맵 후보/전체 입력량 검사. 공개 토크나이저만 사용하며 모델 가중치는 로드하지 않음.
 
 # DB 도구의 기존 의존성(원본 파일 유지)
 -r database/requirements.txt

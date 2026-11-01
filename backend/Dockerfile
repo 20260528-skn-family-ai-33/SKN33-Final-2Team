@@ -10,5 +10,6 @@ COPY backend/app ./app
 COPY backend/web ./web
 COPY backend/db ./db
 COPY backend/tools ./tools
+RUN python tools/install_catalog_tokenizer.py
 EXPOSE 8785
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8785"]
