@@ -235,14 +235,16 @@
   .ls-card:nth-child(3) { --ls-c: var(--tm-dark); }
   .ls-go { color: var(--accent); text-transform: uppercase; font-size: 13.5px; font-weight: 600; }
 
-  /* 카드 그림: 템플릿 강의 사진(플래너 · 책 더미 · 졸업)을 카드 폭 가득, 아래쪽은 남색으로 옅게 */
-  .ls-card .ls-art { height: 170px; margin: 22px -26px 20px; background-size: cover; mix-blend-mode: normal; }
-  .ls-card:nth-child(1) .ls-art { background-image: url('./card-roadmap.jpg'); }
-  .ls-card:nth-child(2) .ls-art { background-image: url('./card-resources.jpg'); }
-  .ls-card:nth-child(3) .ls-art { background-image: url('./apply-bg.jpg'); }
-  .ls-art::after { content: ''; position: absolute; inset: 0; background: linear-gradient(transparent 50%, rgba(31, 39, 43, .5)); }
-  /* 둘째·셋째 카드 사진(facts-bg · apply-bg 1600px)은 템플릿에서 어둡게 칠한 배경이라 밝힌다 */
-  .ls-card:nth-child(2) .ls-art, .ls-card:nth-child(3) .ls-art { filter: brightness(1.55) saturate(1.1); }
+  /* 카드 그림: 템플릿 강의 사진 2장을 나란히(플래너 · 세미나 필기 / 책 더미 · 회의 / 졸업 · 책 든 학생).
+     색을 덮지 않은 사진은 270~370px 썸네일뿐이라(큰 사진은 어두운 색이 미리 덮인 배경) 한 장을 카드 폭으로 늘리면 흐리고,
+     세미나 사진 한 장을 잘라 쓰면 세 카드가 거의 같아진다. 칸 폭의 48.5%(약 170px)로 담아 2배 화면에서도 원본 화소를 크게 넘지 않게 한다 */
+  .ls-card .ls-art {
+    height: 170px; margin: 22px 0 20px; background-repeat: no-repeat; background-size: 48.5% auto;
+    background-position: 0 50%, 100% 50%; mix-blend-mode: normal;
+  }
+  .ls-card:nth-child(1) .ls-art { background-image: url('./photo-1.jpg'), url('./photo-2.jpg'); }
+  .ls-card:nth-child(2) .ls-art { background-image: url('./photo-3.jpg'), url('./photo-4.jpg'); }
+  .ls-card:nth-child(3) .ls-art { background-image: url('./photo-6.jpg'), url('./photo-5.jpg'); }
 
   /* ── 좁은 화면(900px 이하): 원래의 한 줄 메뉴 배치에 색만 ── */
   @media (max-width: 900px) {

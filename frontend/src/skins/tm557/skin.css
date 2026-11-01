@@ -47,10 +47,12 @@
   .login-side::after { display: none; }
 
   /* ── 홈 '나의 학습 공간' 카드 그림: 템플릿 사진을 카드 폭 가득 ── */
-  .ls-card .ls-art { height: 170px; margin: 22px -26px 20px; background-size: cover; mix-blend-mode: normal; }
-  .ls-card:nth-child(1) .ls-art { background-image: url('./card-roadmap.jpg'); }
-  .ls-card:nth-child(2) .ls-art { background-image: url('./card-resources.jpg'); }
-  .ls-card:nth-child(3) .ls-art { background-image: url('./card-growth.jpg'); }
+  /* 템플릿 'Why choose us' 단락의 사진 묶음 그림(534x361 · 배경 투명)을 잘리지 않게 담는다.
+     큰 배경 사진(1600px)은 남색이 미리 짙게 덮여 있어(명암이 보통 사진의 1/5 이하) 밝혀도 뿌옇게 보여 쓰지 않는다 */
+  .ls-card .ls-art { height: 170px; margin: 22px 0 20px; background-size: contain; background-position: center; mix-blend-mode: normal; }
+  .ls-card:nth-child(1) .ls-art { background-image: url('./card-roadmap.png'); }
+  .ls-card:nth-child(2) .ls-art { background-image: url('./card-resources.png'); }
+  .ls-card:nth-child(3) .ls-art { background-image: url('./card-growth.png'); }
 
   /* ── 상단 메뉴 버전(기본): 좌측 메뉴 버전(data-nav="side")을 고르지 않은 때만 ── */
   &:not([data-nav="side"]) {
@@ -182,8 +184,6 @@
   .ls-d { color: rgba(255, 255, 255, .75); }
   .ls-go { font-size: 13px; text-transform: uppercase; color: var(--accent); }
   .ls-card:nth-child(n) { --ls-c: var(--accent); }
-  /* 카드 사진은 템플릿의 큰 배경 사진(1600px)이라 이미 남색으로 어둡게 칠해져 있다 → 남색 카드에서 보이게 밝힌다 */
-  .ls-card .ls-art { filter: brightness(1.8) saturate(1.15); }
 
   /* ── 로그인 소개: 남색 반투명 상자 ── */
   .login-card { border: 0; box-shadow: 0 20px 50px rgba(0, 0, 0, .35); }

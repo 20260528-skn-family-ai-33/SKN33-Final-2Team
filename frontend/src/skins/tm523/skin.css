@@ -45,12 +45,16 @@
   body.auth .view { width: 100%; }
   .login-side::after { display: none; }
 
-  /* ── 홈 '나의 학습 공간' 카드 그림: 템플릿 사진을 카드 폭 가득 ── */
-  /* 템플릿의 다른 사진은 180~300px 썸네일이라 흐려서, 큰 사진(설문 배너 1200px) 한 장을 카드마다 왼쪽·가운데·오른쪽으로 잘라 쓴다.
-     150% 로 키워도 2배 화면에서 원본 화소를 거의 그대로 쓴다 */
-  .ls-card .ls-art { height: 170px; margin: 22px -26px 20px; background: url('./login-side.jpg') 0 55% / 150% auto no-repeat; mix-blend-mode: normal; }
-  .ls-card:nth-child(2) .ls-art { background-position: 50% 55%; }
-  .ls-card:nth-child(3) .ls-art { background-position: 100% 55%; }
+  /* ── 홈 '나의 학습 공간' 카드 그림: 템플릿의 '그림 보기 고르기'처럼 설문 사진 3장을 나란히(가로 3:2 · 정사각 · 세로 2:3) ──
+     원본이 180~300px 이라 한 장을 카드 폭으로 늘리면 흐리고, 큰 사진(설문 배너) 한 장을 잘라 쓰면 세 카드가 거의 같아진다.
+     칸 폭의 31.5%(약 110px)로 담아 2배 화면에서도 원본 화소를 크게 넘지 않게 한다 */
+  .ls-card .ls-art {
+    height: 170px; margin: 22px 0 20px; background-repeat: no-repeat; background-size: 31.5% auto;
+    background-position: 0 50%, 50% 50%, 100% 50%; mix-blend-mode: normal;
+  }
+  .ls-card:nth-child(1) .ls-art { background-image: url('./choice-1.jpg'), url('./choice-2.jpg'), url('./choice-3.jpg'); }
+  .ls-card:nth-child(2) .ls-art { background-image: url('./choice-4.jpg'), url('./choice-5.jpg'), url('./choice-6.jpg'); }
+  .ls-card:nth-child(3) .ls-art { background-image: url('./choice-7.jpg'), url('./choice-8.jpg'), url('./choice-9.jpg'); }
 
   /* ── 상단 메뉴 버전(기본): 좌측 메뉴 버전(data-nav="side")을 고르지 않은 때만 ── */
   &:not([data-nav="side"]) {
