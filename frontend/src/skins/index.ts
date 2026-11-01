@@ -2,10 +2,12 @@
    규칙
    - 테마 하나 = 폴더 하나(skins/<id>/): index.ts(이름·출처·글꼴) + skin.css + 사진. 테마 때문에 다른 곳의 화면 코드는 고치지 않는다.
    - skin.css 는 전부 :root[data-skin="<id>"] { … } 안에 적는다 → 고르지 않은 테마는 화면에 영향이 없다.
+   - 테마마다 메뉴 위치가 다른 두 버전: 상단 메뉴(기본) · 좌측 메뉴(<html data-nav="side">, 원래 화면과 같은 배치).
+     skin.css 에서 상단 메뉴 규칙은 &:not([data-nav="side"]) { … }, 좌측 메뉴 규칙은 &[data-nav="side"] { … } 안에 둔다.
    - 테마 추가 = 폴더 추가, 빼기 = 폴더 삭제. 이 파일이 폴더를 알아서 찾는다.
-   - 고를 때: 왼쪽 아래 '화면 테마' 상자, 또는 주소 뒤 ?skin=<id> (?skin=base 는 원래 화면). 고른 값은 이 브라우저에 기억한다.
+   - 고를 때: 왼쪽 아래 '화면 테마' 상자, 또는 주소 뒤 ?skin=<id> · ?skin=<id>:side (?skin=base 는 원래 화면). 고른 값은 이 브라우저에 기억한다.
    - 최종 결정 뒤에는 최신 main 에서 새 브랜치를 만들고 고른 폴더만 가져가 정식으로 적용한다. 이 고르기 장치는 가져가지 않는다. */
-import { BASE, pickSkin } from './pick';
+import { BASE, pickSkin, SIDE, splitChoice } from './pick';
 
 export interface SkinMeta {
   name: string;
@@ -41,11 +43,14 @@ function save(id: string): void {
   }
 }
 
-function apply(id: string): void {
+function apply(choice: string): void {
+  const { skin: id, side } = splitChoice(choice);
   const skin = SKINS.find((s) => s.id === id);
   const root = document.documentElement;
   if (skin) root.dataset.skin = skin.id;
   else delete root.dataset.skin;
+  if (skin && side) root.dataset.nav = 'side';
+  else delete root.dataset.nav;
   document.querySelectorAll('link[data-skin-font]').forEach((el) => el.remove());
   for (const href of skin?.fonts || []) {
     const link = document.createElement('link');
@@ -56,7 +61,10 @@ function apply(id: string): void {
   }
 }
 
-export const currentSkin = (): string => document.documentElement.dataset.skin || BASE;
+export function currentSkin(): string {
+  const { skin, nav } = document.documentElement.dataset;
+  return skin ? skin + (nav === 'side' ? SIDE : '') : BASE;
+}
 
 /** 고르기 상자에서 바꿀 때: 바로 적용하고 기억한다. 주소에 ?skin= 이 남아 있으면 새로 고칠 때 되돌아가지 않게 지운다 */
 export function setSkin(id: string): void {

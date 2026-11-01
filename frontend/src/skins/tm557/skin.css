@@ -1,0 +1,207 @@
+/* 화면 테마 tm557 · templatemo 557 Grad School
+   원본: https://templatemo.com/tm-557-grad-school — 무료 · 상업/비상업 사용 허용. 사진도 템플릿에 들어 있던 것(크기만 줄임).
+   전부 :root[data-skin="tm557"] 안에 적어 이 테마를 고른 때만 적용된다. 메뉴 위치가 다른 두 버전:
+   상단 메뉴(&:not([data-nav="side"])) · 좌측 메뉴(&[data-nav="side"]).
+
+   템플릿에서 가져온 것: 짙은 남색(#172238) 머리 · 주황(#f5a425) 강조 · Montserrat 굵은 대문자 · 각진 상자, 홈 카드는 템플릿의 남색 기능 상자 */
+
+:root[data-skin="tm557"] {
+  --accent: #F5A425 !important;
+  /* 주황 글자는 흰 바탕에서 흐려 글자용은 짙게(대비 약 5:1) */
+  --accent-ink: #9A5E00;
+  --tm-navy: #172238;
+  --tm-navy-2: #0C1228;
+  --tm-wrap: 1240px;
+  --nav-h: 80px;
+  --bg: #F2F3F7; --surface: #FFFFFF; --surface-2: #F8F9FB; --sunk: #ECEEF3; --line: #E3E6EE; --line-2: #CDD2DE;
+  --ink: #172238; --ink-2: #4A5163; --ink-3: #7C8293; --ink-4: #A8ADBA;
+  --side-w: 0px; --r-lg: 0px; --r-md: 0px;
+  --shadow-pop: 0 18px 45px rgba(12, 18, 40, .25), 0 2px 8px rgba(12, 18, 40, .08);
+
+  body { background: var(--bg); color: var(--ink-2); font-family: 'Montserrat', 'Pretendard Variable', Pretendard, -apple-system, 'Malgun Gothic', sans-serif; }
+
+  /* ── 공통 모서리 ── */
+  .list, .stage, .opt, .tblwrap, .roadmap-preview, .check-plan-group, .connbox, .cm-item, .gsug, .docbox, .cause,
+  .sheet, .regp, .login-card, .login-side, .loading, .stats, .agent, .diff .d, .alert, .callout, .ck-list, .rec-res, .pstrip div,
+  .api-picker-panel, .cp-pop, .feat, .ls-card { border-radius: 0; }
+  .btn, .btn.sm, .back, .fab, .toast { border-radius: 0; }
+  .input, .textarea, .cp-btn { border-radius: 0; }
+  .tag, .ls-no, .ribbon .mode, .api-picker-button, .login-side .pill { border-radius: 0; }
+  .v2-survey section, .v2-survey fieldset { border-radius: 0; }
+  .v2-survey button { border-radius: 0; }
+
+  /* ── 상단 띠(AI 모델 고르기) ── */
+  .ribbon { padding: 0 max(20px, calc((100% - var(--tm-wrap)) / 2)); background: var(--tm-navy-2); color: rgba(255, 255, 255, .7); border-bottom: 1px solid rgba(250, 250, 250, .08); }
+  .api-picker-button { padding: 5px 12px; font-size: 12px; }
+  body.auth .ribbon { display: none; }
+
+  /* 상단 메뉴가 있으면 관리자 고치기 창은 그 아래에서 시작(좌측 메뉴 버전은 --nav-h: 0) */
+  .adm-panel { top: calc(var(--rib-h) + var(--nav-h) + 12px); border-radius: 0; }
+  @media (max-width: 1100px) { .adm-panel { top: calc(var(--rib-h) + var(--nav-h)); border-radius: 0; } }
+
+  /* ── 로그인 ── */
+  body.auth .app { min-height: 100vh; }
+  body.auth .main { min-height: 100vh; display: flex; align-items: center; background: linear-gradient(rgba(12, 18, 40, .55), rgba(12, 18, 40, .7)), url('./login-bg.jpg') center / cover fixed; }
+  body.auth .main::before { display: none; }
+  body.auth .view { width: 100%; }
+  .login-side::after { display: none; }
+
+  /* ── 홈 '나의 학습 공간' 카드 그림: 템플릿 사진을 카드 폭 가득 ── */
+  .ls-card .ls-art { height: 170px; margin: 22px -26px 20px; background-size: cover; mix-blend-mode: normal; }
+  .ls-card:nth-child(1) .ls-art { background-image: url('./card-roadmap.jpg'); }
+  .ls-card:nth-child(2) .ls-art { background-image: url('./card-resources.jpg'); }
+  .ls-card:nth-child(3) .ls-art { background-image: url('./card-growth.jpg'); }
+
+  /* ── 상단 메뉴 버전(기본): 좌측 메뉴 버전(data-nav="side")을 고르지 않은 때만 ── */
+  &:not([data-nav="side"]) {
+    @media (min-width: 901px) {
+      & { scroll-padding-top: calc(var(--rib-h) + var(--nav-h) + 12px); }
+      .app { display: block; }
+      .side {
+        position: sticky; top: var(--rib-h); z-index: 39;
+        height: auto; min-height: var(--nav-h); overflow: visible;
+        flex-direction: row; flex-wrap: wrap; align-items: center; gap: 0 12px;
+        padding: 0 max(20px, calc((100% - var(--tm-wrap)) / 2));
+        border: 0; background: rgba(22, 34, 57, .96); box-shadow: 0 2px 12px rgba(0, 0, 0, .25); color: #fff;
+      }
+      .side:empty { display: none; }
+      .side .brand { order: 0; margin-right: auto; padding: 0; font-size: 26px; font-weight: 800; letter-spacing: 0; text-transform: uppercase; }
+      .side .brand .logo { width: 32px; height: 32px; border-radius: 0; background: var(--accent); color: #fff; }
+      .side .nav { order: 1; flex-direction: row; align-items: center; gap: 0; }
+      .side .nav a { position: relative; height: var(--nav-h); padding: 0 12px; background: transparent; white-space: nowrap; border-radius: 0; color: #fff; font-size: 13px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+      .side .nav a svg { display: none; }
+      .side .nav a:hover { color: var(--accent); }
+      .side .nav a.on { background: transparent; color: var(--accent); }
+
+      .side .nav a .dot { margin: 0 0 12px 3px; }
+      .side .nav-appx { order: 2; display: flex; align-items: center; margin: 0; padding: 0; border: 0; }
+      .side .nav-appx::before { content: ''; width: 1px; height: 18px; margin: 0 4px; background: rgba(250, 250, 250, .25); }
+      .side .nav-appx .lbl { display: none; }
+      .side .me { order: 3; margin: 0 0 0 6px; padding: 4px 12px 4px 4px; gap: 8px; border: 1px solid rgba(250, 250, 250, .2); border-radius: 0; background: rgba(250, 250, 250, .1); }
+      .side .me .avatar { width: 30px; height: 30px; font-size: 11px; border-radius: 0; background: var(--accent); color: #fff; }
+      .side .me small, .side .me .me-go { display: none; }
+      .side .me b { font-size: 13px; white-space: nowrap; }
+      .side a.me:hover, .side a.me.on { box-shadow: none; border-color: var(--accent); }
+      .side .side-foot { order: 4; margin: 0; padding: 0; display: flex; align-items: center; gap: 6px; }
+      .side .side-foot .foot-lbl { display: none; }
+      .side .theme { gap: 5px; }
+      .side .theme button { width: 18px; height: 18px; }
+      .side .logout { height: 34px; padding: 0 10px; color: inherit; }
+      .side .logout:hover { background: transparent; color: var(--accent); }
+      .side .logout .lbl { display: none; }
+      /* 시연 도구: 메뉴 줄에는 버튼만, 펼치면 메뉴 아래 오른쪽에 떠 있는 창(자리는 비워 두어 메뉴가 밀리지 않게) */
+      .side .demo { order: -1; color: inherit; }
+      .side .demo > summary {
+        width: 96px; height: 34px; justify-content: center; padding: 0 8px; border: 1px dashed currentColor; border-radius: 0;
+        font-size: 12px; font-weight: 600; white-space: nowrap; opacity: .85;
+      }
+      .side .side-foot:has(> .demo[open]) { padding-left: 102px; }
+      .side .demo[open] {
+        position: fixed; z-index: 45; top: calc(var(--rib-h) + var(--nav-h) + 10px);
+        right: max(20px, calc((100% - var(--tm-wrap)) / 2));
+        width: 300px; max-height: calc(100vh - var(--rib-h) - var(--nav-h) - 32px); overflow-y: auto;
+        padding: 0 16px 16px; border: 1px solid var(--line); border-radius: 0; background: var(--surface); color: var(--ink-3); box-shadow: var(--shadow-pop);
+      }
+      .side .demo[open] > summary {
+        width: auto; height: 46px; margin: 0 -16px 12px; padding: 0 16px; justify-content: flex-start;
+        border: 0; border-bottom: 1px solid var(--line); border-radius: 0; color: var(--ink); opacity: 1;
+      }
+      .side .demo[open] .foot-lbl { display: block; font-weight: 700; }
+    }
+    /* 좁은 데스크톱: 메뉴가 두 줄로 넘치지 않게 조금 줄인다 */
+    @media (min-width: 901px) and (max-width: 1240px) {
+      --nav-h: 70px;
+      .side .brand { font-size: 21px; }
+      .side .nav a { padding: 0 8px; font-size: 12.5px; letter-spacing: 0; }
+      .side .me { padding: 3px; }
+      .side .me .grow { display: none; }
+    }
+  }
+
+  /* ── 좌측 메뉴 버전(data-nav="side"): 원래 화면과 같은 좌측 메뉴 배치에 남색 교실 사진 · 흰 굵은 대문자 · 주황 표시 ── */
+  &[data-nav="side"] {
+    --nav-h: 0px;
+    @media (min-width: 901px) {
+      --side-w: 248px;
+      .side { background: linear-gradient(rgba(22, 34, 57, .9), rgba(12, 18, 40, .96)), url('./nav-bg.jpg') center / cover; border-right: 0; color: #fff; }
+      .side .brand { font-size: 21px; font-weight: 800; text-transform: uppercase; }
+      .side .brand .logo { border-radius: 0; background: var(--accent); color: #fff; }
+      .side .me { border: 1px solid rgba(250, 250, 250, .18); border-radius: 0; background: rgba(250, 250, 250, .08); }
+      .side .me small, .side .me .me-go { color: rgba(255, 255, 255, .6); }
+      .side .me .avatar { border-radius: 0; background: var(--accent); color: #fff; }
+      .side a.me:hover, .side a.me.on { box-shadow: none; border-color: var(--accent); }
+      .side .nav a { border-radius: 0; color: #fff; font-size: 13px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+      .side .nav a:hover { background: rgba(250, 250, 250, .06); color: var(--accent); }
+      .side .nav a.on { background: rgba(250, 250, 250, .1); color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+      .side .nav-appx { border-top-color: rgba(250, 250, 250, .2); }
+      .side .nav-appx .lbl, .side .foot-lbl { color: rgba(255, 255, 255, .6); }
+      .side .logout { color: inherit; }
+      .side .logout:hover { background: rgba(250, 250, 250, .06); color: var(--accent); }
+      .side .demo { color: rgba(255, 255, 255, .6); }
+      .side .demo[open] { padding: 10px 12px 12px; border: 1px solid var(--line); border-radius: 0; background: var(--surface); color: var(--ink-3); }
+      .side .demo[open] summary { color: var(--ink-2); }
+      .side .demo[open] .foot-lbl { color: var(--ink-4); }
+    }
+  }
+
+  /* ── 글자·버튼: 굵은 대문자 · 주황 사각 버튼(템플릿 main-button) ── */
+  .eyebrow { font-size: 13px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--accent-ink); }
+  .t { font-size: 34px; font-weight: 800; letter-spacing: 0; text-transform: uppercase; color: var(--ink); }
+  .t.lg { font-size: 40px; }
+  .lead { font-size: 15.5px; line-height: 1.8; }
+  .st, .hp-t { font-weight: 700; letter-spacing: .3px; text-transform: uppercase; color: var(--ink); }
+  .link { color: var(--accent-ink); }
+  .btn { font-size: 13.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+  .btn.pri { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.pri:hover { background: #D98B14; border-color: #D98B14; }
+  .btn.pri:disabled, .btn.pri:disabled:hover { background: #C9CDD6; border-color: #C9CDD6; }
+  .btn.line { background: transparent; border-color: var(--tm-navy); color: var(--tm-navy); }
+  .btn.line:hover:not(:disabled) { background: var(--tm-navy); color: #fff; }
+  .chip:has(input:checked), .chip.on { background: var(--tm-navy); border-color: var(--tm-navy); color: #fff; }
+  .choice:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+  .input:focus, .textarea:focus, .cpick.open .cp-btn { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(245, 164, 37, .2); }
+  .card.tap:hover, .opt:hover { border-color: var(--accent); }
+  .pstrip div { padding: 14px; border: 1px solid var(--line); background: #fff; }
+  .pstrip div b { color: var(--ink); text-transform: uppercase; }
+  .hero, .next { border: 0; background: linear-gradient(rgba(22, 34, 57, .88), rgba(22, 34, 57, .88)), url('./nav-bg.jpg') center / cover; color: #fff; }
+  .hero .t, .hero .lead { color: #fff; }
+  .hero .btn.line { border-color: #fff; color: #fff; }
+  .sheet-h, .adm-ph { background: var(--tm-navy); border-bottom: 3px solid var(--accent); color: #fff; }
+  .sheet-h small, .adm-ph small { color: rgba(255, 255, 255, .7); }
+  .sheet-h .x, .adm-ph .x, .sheet-h .btn.line { background: transparent; color: #fff; border-color: rgba(255, 255, 255, .5); }
+  .toast { background: var(--tm-navy); border-left: 4px solid var(--accent); }
+  .fab { background: var(--accent); text-transform: uppercase; }
+  .fab:hover { background: var(--tm-navy); }
+  .msg.me { background: var(--tm-navy); }
+
+  /* ── 홈 카드: 템플릿의 남색 기능 상자 + 주황 번호 ── */
+  .ls-t { font-weight: 800; text-transform: uppercase; }
+  .ls-card { border: 0; background: var(--tm-navy); }
+  .ls-card:hover { box-shadow: 0 14px 30px rgba(12, 18, 40, .35); }
+  .ls-h h3 { font-weight: 700; text-transform: uppercase; color: #fff; }
+  .ls-d { color: rgba(255, 255, 255, .75); }
+  .ls-go { font-size: 13px; text-transform: uppercase; color: var(--accent); }
+  .ls-card:nth-child(n) { --ls-c: var(--accent); }
+
+  /* ── 로그인 소개: 남색 반투명 상자 ── */
+  .login-card { border: 0; box-shadow: 0 20px 50px rgba(0, 0, 0, .35); }
+  .login-side { background: rgba(22, 34, 57, .86); border: 1px solid rgba(250, 250, 250, .12); }
+  .login-side h2 { font-weight: 800; text-transform: uppercase; }
+  .login-side .pill { background: var(--accent); }
+  .feat { background: rgba(250, 250, 250, .06); }
+  .feat .ico { border-radius: 0; background: var(--accent); }
+
+  /* ── 좁은 화면(900px 이하): 두 버전 모두 원래의 한 줄 메뉴 배치에 색만 ── */
+  @media (max-width: 900px) {
+    .side { border-bottom: 0; background: rgba(22, 34, 57, .97); color: #fff; }
+    .side .nav a { color: #fff; font-weight: 700; }
+    .side .nav a.on { background: transparent; color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); }
+    .side a.me { border-color: rgba(250, 250, 250, .2); background: rgba(250, 250, 250, .1); color: #fff; }
+    .side .logout { color: inherit; }
+    .main { padding: 32px 16px 140px; }
+    .t { font-size: 24px; }
+    .t.lg { font-size: 28px; }
+    body.auth .main { padding: 24px 16px; background-attachment: scroll; }
+    .adm-panel { top: var(--rib-h); }
+  }
+}

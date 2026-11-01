@@ -73,81 +73,104 @@
   body.auth .ribbon { display: none; }
 
   /* ── 넓은 화면: 좌측 메뉴를 템플릿의 흰 상단 메뉴로 ── */
-  @media (min-width: 901px) {
-    & { scroll-padding-top: calc(var(--rib-h) + var(--nav-h) + 12px); }
-    .app { display: block; }
-    .side {
-      position: sticky; top: var(--rib-h); z-index: 39;
-      height: auto; min-height: var(--nav-h); overflow: visible;
-      flex-direction: row; flex-wrap: wrap; align-items: center; gap: 0 14px;
-      padding: 0 max(20px, calc((100% - var(--tm-wrap)) / 2));
-      background: #fff; border: 0; box-shadow: 0 2px 8px 0 rgba(50, 50, 50, .08);
-    }
-    .side:empty { display: none; }
-    .side .brand { order: 0; margin-right: auto; padding: 0; font-size: 24px; font-weight: 800; letter-spacing: 0; color: #212227; }
-    .side .brand .logo { width: 32px; height: 32px; }
+  /* 상단 메뉴 버전(기본): 좌측 메뉴 버전(data-nav="side")을 고르지 않은 때만 */
+  &:not([data-nav="side"]) {
+    @media (min-width: 901px) {
+      & { scroll-padding-top: calc(var(--rib-h) + var(--nav-h) + 12px); }
+      .app { display: block; }
+      .side {
+        position: sticky; top: var(--rib-h); z-index: 39;
+        height: auto; min-height: var(--nav-h); overflow: visible;
+        flex-direction: row; flex-wrap: wrap; align-items: center; gap: 0 14px;
+        padding: 0 max(20px, calc((100% - var(--tm-wrap)) / 2));
+        background: #fff; border: 0; box-shadow: 0 2px 8px 0 rgba(50, 50, 50, .08);
+      }
+      .side:empty { display: none; }
+      .side .brand { order: 0; margin-right: auto; padding: 0; font-size: 24px; font-weight: 800; letter-spacing: 0; color: #212227; }
+      .side .brand .logo { width: 32px; height: 32px; }
 
-    .side .nav { order: 1; flex-direction: row; align-items: stretch; gap: 0; }
-    .side .nav a {
-      position: relative; height: var(--nav-h); padding: 0 13px; border-radius: 0; background: transparent;
-      color: var(--tm-dark); font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; white-space: nowrap;
-      transition: color .3s ease-in;
-    }
-    .side .nav a svg { display: none; }
-    .side .nav a:hover, .side .nav a.on { background: transparent; color: var(--accent); }
-    .side .nav a.on::after { content: ''; position: absolute; left: 13px; right: 13px; bottom: 0; height: 3px; background: var(--accent); }
-    .side .nav a .dot { margin: 0 0 12px 3px; }
-    .side .nav-appx { order: 2; display: flex; align-items: center; margin: 0; padding: 0; border: 0; }
-    .side .nav-appx::before { content: ''; width: 1px; height: 18px; margin: 0 4px; background: var(--line-2); }
-    .side .nav-appx .lbl { display: none; }
-    .side .nav-appx a { color: #707070; }
+      .side .nav { order: 1; flex-direction: row; align-items: stretch; gap: 0; }
+      .side .nav a {
+        position: relative; height: var(--nav-h); padding: 0 13px; border-radius: 0; background: transparent;
+        color: var(--tm-dark); font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; white-space: nowrap;
+        transition: color .3s ease-in;
+      }
+      .side .nav a svg { display: none; }
+      .side .nav a:hover, .side .nav a.on { background: transparent; color: var(--accent); }
+      .side .nav a.on::after { content: ''; position: absolute; left: 13px; right: 13px; bottom: 0; height: 3px; background: var(--accent); }
+      .side .nav a .dot { margin: 0 0 12px 3px; }
+      .side .nav-appx { order: 2; display: flex; align-items: center; margin: 0; padding: 0; border: 0; }
+      .side .nav-appx::before { content: ''; width: 1px; height: 18px; margin: 0 4px; background: var(--line-2); }
+      .side .nav-appx .lbl { display: none; }
+      .side .nav-appx a { color: #707070; }
 
-    .side .me { order: 3; margin: 0 0 0 6px; padding: 4px 12px 4px 4px; gap: 8px; border: 1px solid var(--line); background: #fff; }
-    .side .me .avatar { width: 30px; height: 30px; background: var(--accent); color: #fff; font-size: 11px; }
-    .side .me small, .side .me .me-go { display: none; }
-    .side .me b { font-size: 13px; white-space: nowrap; }
-    .side a.me:hover, .side a.me.on { border-color: var(--accent); box-shadow: none; }
+      .side .me { order: 3; margin: 0 0 0 6px; padding: 4px 12px 4px 4px; gap: 8px; border: 1px solid var(--line); background: #fff; }
+      .side .me .avatar { width: 30px; height: 30px; background: var(--accent); color: #fff; font-size: 11px; }
+      .side .me small, .side .me .me-go { display: none; }
+      .side .me b { font-size: 13px; white-space: nowrap; }
+      .side a.me:hover, .side a.me.on { border-color: var(--accent); box-shadow: none; }
 
-    .side .side-foot { order: 4; margin: 0; padding: 0; display: flex; align-items: center; gap: 6px; }
-    .side .side-foot .foot-lbl { display: none; }
-    .side .theme { gap: 5px; }
-    .side .theme button { width: 18px; height: 18px; }
-    .side .logout { height: 34px; padding: 0 10px; color: var(--ink-3); }
-    .side .logout:hover { background: transparent; color: var(--accent); }
-    .side .logout .lbl { display: none; }
+      .side .side-foot { order: 4; margin: 0; padding: 0; display: flex; align-items: center; gap: 6px; }
+      .side .side-foot .foot-lbl { display: none; }
+      .side .theme { gap: 5px; }
+      .side .theme button { width: 18px; height: 18px; }
+      .side .logout { height: 34px; padding: 0 10px; color: var(--ink-3); }
+      .side .logout:hover { background: transparent; color: var(--accent); }
+      .side .logout .lbl { display: none; }
 
-    /* 시연 도구: 메뉴 줄에는 버튼만, 펼치면 메뉴 아래 오른쪽에 떠 있는 창으로(자리는 비워 두어 메뉴가 밀리지 않게) */
-    .side .demo { order: -1; }
-    .side .demo > summary {
-      width: 96px; height: 34px; justify-content: center; padding: 0 8px;
-      border: 1px dashed var(--line-2); border-radius: 2px;
-      font-size: 12px; font-weight: 700; letter-spacing: .5px; color: var(--ink-3); white-space: nowrap;
+      /* 시연 도구: 메뉴 줄에는 버튼만, 펼치면 메뉴 아래 오른쪽에 떠 있는 창으로(자리는 비워 두어 메뉴가 밀리지 않게) */
+      .side .demo { order: -1; }
+      .side .demo > summary {
+        width: 96px; height: 34px; justify-content: center; padding: 0 8px;
+        border: 1px dashed var(--line-2); border-radius: 2px;
+        font-size: 12px; font-weight: 700; letter-spacing: .5px; color: var(--ink-3); white-space: nowrap;
+      }
+      .side .demo > summary:hover { border-color: var(--accent); color: var(--accent); }
+      .side .side-foot:has(> .demo[open]) { padding-left: 102px; }
+      .side .demo[open] {
+        position: fixed; z-index: 45; top: calc(var(--rib-h) + var(--nav-h) + 8px);
+        right: max(20px, calc((100% - var(--tm-wrap)) / 2));
+        width: 300px; max-height: calc(100vh - var(--rib-h) - var(--nav-h) - 32px); overflow-y: auto;
+        padding: 0 16px 16px; border: 1px solid var(--line); border-top: 3px solid var(--accent); border-radius: 2px;
+        background: #fff; box-shadow: var(--shadow-pop);
+      }
+      .side .demo[open] > summary {
+        width: auto; height: 44px; margin: 0 -16px 12px; padding: 0 16px; justify-content: flex-start;
+        border: 0; border-bottom: 1px solid var(--line); border-radius: 0; color: var(--ink);
+      }
+      .side .demo[open] .foot-lbl { display: block; font-weight: 700; letter-spacing: 1px; }
     }
-    .side .demo > summary:hover { border-color: var(--accent); color: var(--accent); }
-    .side .side-foot:has(> .demo[open]) { padding-left: 102px; }
-    .side .demo[open] {
-      position: fixed; z-index: 45; top: calc(var(--rib-h) + var(--nav-h) + 8px);
-      right: max(20px, calc((100% - var(--tm-wrap)) / 2));
-      width: 300px; max-height: calc(100vh - var(--rib-h) - var(--nav-h) - 32px); overflow-y: auto;
-      padding: 0 16px 16px; border: 1px solid var(--line); border-top: 3px solid var(--accent); border-radius: 2px;
-      background: #fff; box-shadow: var(--shadow-pop);
+
+    /* 좁은 데스크톱: 메뉴가 두 줄로 넘치지 않게 조금 줄인다 */
+    @media (min-width: 901px) and (max-width: 1240px) {
+      --nav-h: 60px;
+      .side .brand { font-size: 20px; }
+      .side .brand .logo { width: 28px; height: 28px; }
+      .side .nav a { padding: 0 9px; font-size: 12.5px; letter-spacing: .5px; }
+      .side .nav a.on::after { left: 9px; right: 9px; }
+      .side .me { padding: 3px; }
+      .side .me .grow { display: none; }
     }
-    .side .demo[open] > summary {
-      width: auto; height: 44px; margin: 0 -16px 12px; padding: 0 16px; justify-content: flex-start;
-      border: 0; border-bottom: 1px solid var(--line); border-radius: 0; color: var(--ink);
-    }
-    .side .demo[open] .foot-lbl { display: block; font-weight: 700; letter-spacing: 1px; }
   }
 
-  /* 좁은 데스크톱: 메뉴가 두 줄로 넘치지 않게 조금 줄인다 */
-  @media (min-width: 901px) and (max-width: 1240px) {
-    --nav-h: 60px;
-    .side .brand { font-size: 20px; }
-    .side .brand .logo { width: 28px; height: 28px; }
-    .side .nav a { padding: 0 9px; font-size: 12.5px; letter-spacing: .5px; }
-    .side .nav a.on::after { left: 9px; right: 9px; }
-    .side .me { padding: 3px; }
-    .side .me .grow { display: none; }
+  /* ── 좌측 메뉴 버전(data-nav="side"): 원래 화면처럼 좌측 메뉴에 템플릿의 흰 메뉴 · 굵은 대문자 글자 · 주황 표시 ── */
+  &[data-nav="side"] {
+    --nav-h: 0px;
+    @media (min-width: 901px) {
+      --side-w: 248px;
+      .side { background: #fff; border-right: 0; box-shadow: 2px 0 8px rgba(50, 50, 50, .08); color: #212227; }
+      .side .brand { font-size: 23px; font-weight: 800; }
+      .side .nav a { border-radius: 0; color: var(--tm-dark); font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+      .side .nav a svg { color: #8A8A8A; }
+      .side .nav a:hover, .side .nav a:hover svg { background: transparent; color: var(--accent); }
+      .side .nav a.on { background: transparent; color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+      .side .nav a.on svg { color: var(--accent); }
+      .side .nav-appx { border-top: 1px solid var(--line); }
+      .side .nav-appx .lbl { font-weight: 700; letter-spacing: 1px; }
+      .side .me .avatar { background: var(--accent); color: #fff; }
+      .side a.me:hover, .side a.me.on { border-color: var(--accent); box-shadow: none; }
+      .side .logout:hover { background: transparent; color: var(--accent); }
+    }
   }
 
   /* ── 본문: 맨 위에 템플릿 첫 화면 사진을 옅게 깔고 아래로 흐려지게 ── */
