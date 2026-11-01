@@ -4,12 +4,14 @@
    - 묶음(group): templatemo 에서 education 태그가 붙은 템플릿은 'education', 나머지(자매 사이트 Tooplate 템플릿 포함)는 'other'.
      고르기 상자의 첫 칸이 이 묶음이다. 폴더 이름은 templatemo 는 tm<번호>, Tooplate 는 tp<번호>.
    - skin.css 는 전부 :root[data-skin="<id>"] { … } 안에 적는다 → 고르지 않은 테마는 화면에 영향이 없다.
-   - 테마마다 메뉴 위치가 다른 두 버전: 상단 메뉴(기본) · 좌측 메뉴(<html data-nav="side">, 원래 화면과 같은 배치).
+   - 기본 테마는 464 Ultra Profile · 상단 메뉴(pick.ts DEFAULT_SKIN). 테마를 덧씌우지 않은 '원래 화면'은 고르기에서 뺐지만,
+     원래 화면의 CSS(styles/gp*.css)는 모든 테마가 그 위에 얹히므로 그대로 둔다.
+   - 테마마다 메뉴 위치가 다른 두 버전: 상단 메뉴(기본) · 좌측 메뉴(<html data-nav="side">, 예전 원래 화면과 같은 배치).
      skin.css 에서 상단 메뉴 규칙은 &:not([data-nav="side"]) { … }, 좌측 메뉴 규칙은 &[data-nav="side"] { … } 안에 둔다.
    - 본문 폭도 두 가지: 넓은 본문 폭(기본 · gp.css) · 이전 본문 폭(<html data-width="narrow"> · width.css). 테마와 상관없이 고른다.
    - 테마 추가 = 폴더 추가, 빼기 = 폴더 삭제. 이 파일이 폴더를 알아서 찾는다.
    - 고를 때: 왼쪽 아래 '화면 테마' 상자(묶음 → 테마 → 메뉴 위치 → 본문 폭), 또는 주소 뒤 ?skin=<id>[:side][:narrow]
-     (?skin=base 는 원래 화면, 형식은 pick.ts). 고른 값은 이 브라우저에 기억한다.
+     (형식은 pick.ts). 고른 값은 이 브라우저에 기억한다.
    - 최종 결정 뒤에는 최신 main 에서 새 브랜치를 만들고 고른 폴더만 가져가 정식으로 적용한다. 이 고르기 장치(width.css 포함)는 가져가지 않는다. */
 import { type Choice, formatChoice, pickChoice } from './pick';
 import './width.css';

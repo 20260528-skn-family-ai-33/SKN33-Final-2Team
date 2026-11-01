@@ -3,22 +3,20 @@
    제목을 누르면 접고 편다. 좁은 화면(휴대폰)에서는 본문을 가리지 않게 접힌 채로 시작한다 */
 import { useState } from 'react';
 import { currentChoice, GROUPS, setChoice, type SkinGroup, SKINS } from '@/skins';
-import { BASE, type Choice } from './pick';
+import type { Choice } from './pick';
 import './picker.css';
 
 const groupOf = (id: string): SkinGroup => SKINS.find((s) => s.id === id)?.group ?? 'education';
 
 export function SkinPicker() {
   const [choice, setPicked] = useState(currentChoice);
-  // 원래 화면을 고른 동안에도 테마 목록이 그대로 보이게 묶음은 따로 기억한다
-  const [group, setGroup] = useState(() => groupOf(currentChoice().skin));
+  const group = groupOf(choice.skin);
   const [open, setOpen] = useState(() => !window.matchMedia?.('(max-width: 600px)').matches);
   const change = (next: Partial<Choice>) => {
     const c = { ...choice, ...next };
     setChoice(c);
     setPicked(c);
   };
-  const isBase = choice.skin === BASE;
 
   return (
     <div className={'skin-pick' + (open ? ' open' : '')}>
@@ -32,9 +30,8 @@ export function SkinPicker() {
             aria-label="템플릿 묶음"
             value={group}
             onChange={(e) => {
-              const g = e.target.value as SkinGroup;
-              setGroup(g);
-              change({ skin: SKINS.find((s) => s.group === g)?.id ?? BASE });
+              const first = SKINS.find((s) => s.group === e.target.value);
+              if (first) change({ skin: first.id });
             }}
           >
             {GROUPS.map((g) => {
@@ -47,21 +44,13 @@ export function SkinPicker() {
             })}
           </select>
           <select aria-label="테마" value={choice.skin} onChange={(e) => change({ skin: e.target.value })}>
-            <option value={BASE}>원래 화면</option>
             {SKINS.filter((s) => s.group === group).map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
               </option>
             ))}
           </select>
-          {/* 원래 화면은 좌측 메뉴만 있다. 고른 메뉴 위치는 기억해 두었다가 다음 테마에 쓴다 */}
-          <select
-            aria-label="메뉴 위치"
-            value={isBase || choice.side ? 'side' : 'top'}
-            disabled={isBase}
-            title={isBase ? '원래 화면은 좌측 메뉴만 있어요' : undefined}
-            onChange={(e) => change({ side: e.target.value === 'side' })}
-          >
+          <select aria-label="메뉴 위치" value={choice.side ? 'side' : 'top'} onChange={(e) => change({ side: e.target.value === 'side' })}>
             <option value="top">상단 메뉴</option>
             <option value="side">좌측 메뉴</option>
           </select>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BASE, formatChoice, parseChoice, pickChoice } from './pick';
+import { DEFAULT_SKIN, formatChoice, parseChoice, pickChoice } from './pick';
 
 const ids = ['tm464', 'tm590'];
 const plain = (skin: string) => ({ skin, side: false, narrow: false });
@@ -8,19 +8,25 @@ describe('pickChoice', () => {
   it('주소의 ?skin= 이 기억한 값보다 먼저', () => {
     expect(pickChoice('tm590', 'tm464', ids)).toEqual(plain('tm590'));
   });
-  it('주소에서 원래 화면(base)을 고르면 기억한 테마보다 먼저', () => {
-    expect(pickChoice(BASE, 'tm464', ids)).toEqual(plain(BASE));
-  });
   it('주소의 이름이 없는 테마면 무시하고 기억한 값', () => {
-    expect(pickChoice('tm999', 'tm464', ids)).toEqual(plain('tm464'));
-    expect(pickChoice('tm999:side:narrow', 'tm464', ids)).toEqual(plain('tm464'));
+    expect(pickChoice('tm999', 'tm590', ids)).toEqual(plain('tm590'));
+    expect(pickChoice('tm999:side:narrow', 'tm590', ids)).toEqual(plain('tm590'));
   });
-  it('기억한 테마 폴더를 지웠으면 원래 화면', () => {
-    expect(pickChoice(null, 'tm999', ids)).toEqual(plain(BASE));
+  it('아무것도 없으면 기본 테마(464) · 상단 메뉴 · 넓은 본문 폭', () => {
+    expect(DEFAULT_SKIN).toBe('tm464');
+    expect(pickChoice(null, null, ids)).toEqual(plain('tm464'));
+    expect(pickChoice('', '', ids)).toEqual(plain('tm464'));
   });
-  it('아무것도 없으면 원래 화면 · 상단 메뉴 · 넓은 본문 폭', () => {
-    expect(pickChoice(null, null, ids)).toEqual(plain(BASE));
-    expect(pickChoice('', '', [])).toEqual(plain(BASE));
+  it('기억한 테마 폴더를 지웠으면 기본 테마', () => {
+    expect(pickChoice(null, 'tm999', ids)).toEqual(plain('tm464'));
+  });
+  it('예전의 원래 화면(base)은 주소 · 기억 모두 기본 테마로', () => {
+    expect(pickChoice('base', null, ids)).toEqual(plain('tm464'));
+    expect(pickChoice(null, 'base:side:narrow', ids)).toEqual(plain('tm464'));
+    expect(pickChoice('base', 'tm590:side', ids)).toEqual({ skin: 'tm590', side: true, narrow: false });
+  });
+  it('기본 테마 폴더도 없으면 남은 테마 중 첫 번째', () => {
+    expect(pickChoice(null, null, ['tm590', 'tm606'])).toEqual(plain('tm590'));
   });
   it('예전 형식(꼬리표 없음 · :side)도 그대로 고른다', () => {
     expect(pickChoice('tm464:side', 'tm590', ids)).toEqual({ skin: 'tm464', side: true, narrow: false });
@@ -31,14 +37,11 @@ describe('pickChoice', () => {
     expect(pickChoice('tm464:side:narrow', null, ids)).toEqual(both);
     expect(pickChoice('tm464:narrow:side', null, ids)).toEqual(both);
   });
-  it('원래 화면에도 꼬리표를 기억해 둔다(좌측 메뉴는 다음에 고를 테마에 이어 쓴다)', () => {
-    expect(pickChoice('base:side:narrow', 'tm464', ids)).toEqual({ skin: BASE, side: true, narrow: true });
-  });
 });
 
 describe('parseChoice · formatChoice', () => {
   it('글자 ↔ 고른 값이 서로 되돌아간다', () => {
-    for (const v of ['tm464', 'tm464:side', 'tm464:narrow', 'tm464:side:narrow', BASE, 'base:narrow']) {
+    for (const v of ['tm464', 'tm464:side', 'tm464:narrow', 'tm464:side:narrow', 'tm590:narrow']) {
       expect(formatChoice(parseChoice(v))).toBe(v);
     }
   });
