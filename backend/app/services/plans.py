@@ -48,7 +48,7 @@ def _write_steps(t: db.Tx, roadmap_id: str, plan: dict) -> None:
                        VALUES(CAST(:r AS uuid), :o, :t, :a, :du, :c, :done, :d) RETURNING step_id""",
                     r=roadmap_id, o=i, t=a['title'], a=a.get('how') or (res['title'] if res else None), du=f"{course_time.display_hours(a['hours'])} · {a['wFrom']}~{a['wTo']}주차",
                     c=0 if plan.get('opt') == 'A1' and a.get('res') else res['cost'] if res and res['cost'] is not None else None, done=a['id'] in done,
-                    d=db.J({k: a.get(k) for k in ('id', 'stage', 'res', 'task', 'hours', 'wFrom', 'wTo', 'skills')}))  # skills: 과제가 다루는 스킬 이름(10/23)
+                    d=db.J({k: a.get(k) for k in ('id', 'stage', 'res', 'task', 'hours', 'wFrom', 'wTo', 'skills', 'skill')}))  # skills: 과제가 다루는 스킬 이름(10/23)
         if res and res['type'] in ('course', 'book', 'cert'):
             col = {'course': 'course_id', 'book': 'isbn', 'cert': 'certification_id'}[res['type']]
             val = a['res'] if res['type'] == 'course' else a['res'].replace('book_', '', 1) if res['type'] == 'book' else int(a['res'].replace('cert_', '', 1))
@@ -116,7 +116,10 @@ def _post(row: dict, plan: dict) -> dict:
         t.run(lost_sql, f=db.J({'cause': jobs.lost_cause()}), r=row['roadmap_id'])
         t.run(lost_deep, f=json.dumps({'cause': jobs.lost_cause()}, ensure_ascii=False), r=row['roadmap_id'])
     pc = db.one('SELECT goal_self, attachment, running, fail, job_id, deep FROM app_ext.post_checks WHERE roadmap_id = :r', r=row['roadmap_id']) or {}
-    return {'answers': ans, 'goalSelf': str(pc['goal_self']) if pc.get('goal_self') else '', 'file': pc.get('attachment'), 'running': bool(pc.get('running')),
+    from .post_quiz import public_assessment
+    post_survey=(pc.get('deep') or {}).get('v2Quiz')
+    public_survey=public_assessment({'v2':{'survey':post_survey}})['v2']['survey'] if post_survey else None
+    return {'quizSurvey': public_survey, 'quizAnswers': (pc.get('deep') or {}).get('v2Answers') or {}, 'answers': ans, 'goalSelf': str(pc['goal_self']) if pc.get('goal_self') else '', 'file': pc.get('attachment'), 'running': bool(pc.get('running')),
             'fail': pc.get('fail'), 'jobId': str(pc['job_id']) if pc.get('job_id') and pc.get('running') else None, 'deep': _post_deep(plan, pc.get('deep'))}
 
 
@@ -205,6 +208,9 @@ def record(row: dict, for_mgr: bool = False) -> dict:
                            'request': rv['request']}
         if rv['status'] == 'ready':
             rec['pending'] = rv['result']
+    from .post_quiz import public_assessment
+    for version in [rec['plan']]+rec['versions']:
+        if version.get('assess'):version['assess']=public_assessment(version['assess'])
     return rec
 
 
@@ -224,7 +230,7 @@ def _owned(employee_id: int, roadmap_id: str) -> dict:
     return rows[0]
 
 
-MGR_HIDDEN = ('deep', 'goalSelf', 'file')
+MGR_HIDDEN = ('deep', 'goalSelf', 'file', 'executionSnapshot')
 
 
 def reports(employee_id: int, for_mgr: bool = False) -> list[dict]:
@@ -234,7 +240,7 @@ def reports(employee_id: int, for_mgr: bool = False) -> list[dict]:
     out = []
     for r in rows:
         # 수준값은 화면에 보내지 않는다. 부서장 화면에는 심화 질문 결과(10/23)와 사후 점검 원본 응답·첨부(목표 달성 답·결과물 파일 · PR #23 리뷰)를 빼고 보낸다
-        c = {k: v for k, v in r['report_content'].items() if k != 'hidden' and not (for_mgr and k in MGR_HIDDEN)}
+        c = {k: v for k, v in r['report_content'].items() if k != 'hidden' and not (for_mgr and k in (*MGR_HIDDEN,'quizEvidence','surveyEvidence'))}
         c.update(id=str(r['report_id']), planId=str(r['roadmap_id']), confirmed=bool(r['confirmed']), createdAt=_d(r['created_at']))
         out.append(c)
     return out
@@ -475,6 +481,15 @@ def accept_revision(employee_id: int, roadmap_id: str, revision_id: str) -> dict
         from .drafts import selection_of
         plan = dict(pd['to'], version=cur['version'] + 1, confirmedAt=today(), why=pd['label'], assess=cur.get('assess'), prefs=pd['prefsTo'], handoff=pd['handoff'],
                     selection=selection_of(pd['to']['def']) if changed else cur.get('selection'))
+        # 최초 확정 근거는 수정 모델의 결과로 교체하거나 새로 만들지 않는다.
+        baseline_row = t.one('SELECT baseline_content FROM public.roadmaps WHERE roadmap_id = :r FOR UPDATE', r=row['roadmap_id']) or {}
+        baseline = baseline_row.get('baseline_content') or {}
+        evidence = baseline.get('selectionEvidence') if isinstance(baseline, dict) else None
+        if not isinstance(evidence, dict):
+            evidence = cur.get('selectionEvidence')
+        plan.pop('selectionEvidence', None)
+        if isinstance(evidence, dict):
+            plan['selectionEvidence'] = copy.deepcopy(evidence)
         validate_free_plan(t, plan)
         # 로드맵 내용이 바뀌면 팀 DB 트리거가 코멘트에 '수정 완료' 시각만 적는다. 그 갱신은 작성자 검사 트리거(본문·작성자·로드맵 열)를 거치지 않는다
         t.run('UPDATE public.roadmaps SET content = :c, strategy_type = :st, strategy_title = :tt, summary = :s, updated_at = now() WHERE roadmap_id = :r',
@@ -578,6 +593,13 @@ def save_post(employee_id: int, roadmap_id: str, body: dict) -> dict:
         raise ApiError(409, 'NOT_ACTIVE', '진행 중인 로드맵만 사후 점검할 수 있어요')
     qs = row['content']['assess']['questions']
     labels = dict(D['answerOpts'])
+    from .post_quiz import validate as validate_quiz
+    quiz_answers=None
+    if 'quizAnswers' in body:
+        from .post_quiz import with_survey,questions
+        stored=(db.one('SELECT deep FROM app_ext.post_checks WHERE roadmap_id = :r',r=row['roadmap_id']) or {}).get('deep') or {}
+        if questions(row['content']) and not stored.get('v2Quiz'):raise ApiError(409,'POST_QUIZ_REQUIRED','사후 퀴즈를 먼저 생성해 주세요.')
+        quiz_answers=validate_quiz(with_survey(row['content'],stored['v2Quiz']) if stored.get('v2Quiz') else row['content'],body['quizAnswers'])
     with db.tx() as t:
         pre = t.all("SELECT question_id, skill, question, options, sequence_no FROM public.assessment_questions WHERE diagnostic_round_id = :d AND assessment_type = 'PRE' ORDER BY sequence_no",
                     d=row['diagnostic_round_id'])
@@ -600,6 +622,8 @@ def save_post(employee_id: int, roadmap_id: str, body: dict) -> dict:
         t.run("""INSERT INTO app_ext.post_checks(roadmap_id, goal_self, attachment) VALUES(:r, :g, :a)
                  ON CONFLICT (roadmap_id) DO UPDATE SET goal_self = EXCLUDED.goal_self, attachment = coalesce(EXCLUDED.attachment, app_ext.post_checks.attachment), updated_at = now()""",
               r=row['roadmap_id'], g=int(gs) if str(gs or '').isdigit() else None, a=db.J(body['file']) if body.get('file') else None)
+        if quiz_answers is not None:
+            t.run("UPDATE app_ext.post_checks SET deep = coalesce(deep, '{}'::jsonb) || jsonb_build_object('v2Answers', CAST(:answers AS jsonb)), updated_at = now() WHERE roadmap_id = :r",answers=db.J(quiz_answers),r=row['roadmap_id'])
         if 'clearFail' in body:
             t.run('UPDATE app_ext.post_checks SET fail = NULL WHERE roadmap_id = :r', r=row['roadmap_id'])
         if 'deepMcq' in body or 'deepEssay' in body:
@@ -640,8 +664,16 @@ def report_start(employee_id: int, roadmap_id: str) -> str:
     A = pl['assess']
     if not all(post['answers'].get(q['id']) for q in A['questions']) or not post['goalSelf']:
         raise ApiError(409, 'POST_INCOMPLETE', '사후 점검 문항과 목표 달성에 모두 답해 주세요')
+    from .post_quiz import validate as validate_quiz, comparison as quiz_comparison
+    from .post_quiz import with_survey,questions
+    stored=(db.one('SELECT deep FROM app_ext.post_checks WHERE roadmap_id = :r',r=row['roadmap_id']) or {}).get('deep') or {}
+    if questions(pl) and not stored.get('v2Quiz'):raise ApiError(409,'POST_QUIZ_REQUIRED','사후 퀴즈를 먼저 완료해 주세요.')
+    validate_quiz(with_survey(pl,stored['v2Quiz']) if stored.get('v2Quiz') else pl,post.get('quizAnswers') or {},complete=True)
+    quiz_evidence=quiz_comparison(row['content'],post.get('quizAnswers') or {},stored.get('v2Quiz'))
     items = [{'id': q['id'], 'area': q['area'], 'text': q['text'], 'skill': DG.skill_label(q.get('skill') or ''), 'pre': A['answers'].get(q['id']), 'post': post['answers'][q['id']]} for q in A['questions']]
     prog = rec['progress']
+    from .report_snapshot import capture,evidence
+    execution_snapshot=capture(pl,prog)
     done = [a for a in pl['acts'] if (prog.get(a['id']) or {}).get('status') == 'done']
     rest = [a for a in pl['acts'] if (prog.get(a['id']) or {}).get('status') != 'done']
     goal_self = D['goalSelf'][int(post['goalSelf']) - 1] if post['goalSelf'] else ''
@@ -656,10 +688,12 @@ def report_start(employee_id: int, roadmap_id: str) -> str:
         ctx = rt.context(employee_id)
         inp = {'goal': pl['goal'], 'planName': pl['name'], 'opt': pl['opt'], 'domain': A.get('domain'), 'items': items, 'doneTitles': [a['title'] for a in done],
                'restTitles': [a['title'] for a in rest], 'total': len(pl['acts']), 'goalSelf': goal_self}
+        inp['executionEvidence']=evidence(execution_snapshot)
+        if quiz_evidence:inp['quizEvidence']=quiz_evidence
         if deep_inp:
             inp['deep'] = deep_inp
         try:
-            out = DG.report(ctx, inp, sim=rt.sim_once(ctx, 'report', json.dumps([roadmap_id, post['answers'], post['goalSelf']], sort_keys=True)))
+            out = DG.report(ctx, inp, sim=rt.sim_once(ctx, 'report', json.dumps([roadmap_id, post['answers'], post.get('quizAnswers'), post['goalSelf']], sort_keys=True)))
         except AgentError as e:
             with db.tx() as t:
                 t.run('UPDATE app_ext.post_checks SET running = false, fail = :f WHERE roadmap_id = :r', f=db.J({'cause': e.info}), r=row['roadmap_id'])
@@ -670,6 +704,10 @@ def report_start(employee_id: int, roadmap_id: str) -> str:
              'doneTitles': inp['doneTitles'], 'restTitles': inp['restTitles'], 'goalSelf': goal_self, 'file': post.get('file'),
              'good': out['good'], 'improve': out['improve'], 'next': out['next'],
              'hidden': {'pre': level_pre, 'post': DG.level_of(A['questions'], post['answers'])}}
+        r['executionSnapshot']=execution_snapshot
+        # 생성한 설명이 아니라 동일 문항 ID로 대응한 실제 응답을 보고서 시점에 보존한다.
+        r['surveyEvidence']=[dict(item) for item in items]
+        if quiz_evidence:r['quizEvidence']=quiz_evidence
         if deep_inp:
             # 보고서에는 개념별 사전→사후 결과와 영역별 서술형 판단만(부서장 화면에는 보내지 않음 · reports(for_mgr))
             judge = out.get('judge') or {}
@@ -696,10 +734,17 @@ def report_start(employee_id: int, roadmap_id: str) -> str:
 
 def confirm_report(employee_id: int, report_id: str) -> dict:
     with db.tx() as t:
-        r = t.one("""SELECT g.report_id, g.roadmap_id, g.project_id FROM public.growth_reports g JOIN public.projects p ON p.project_id = g.project_id
+        r = t.one("""SELECT g.report_id, g.roadmap_id, g.project_id, g.report_content, rm.content FROM public.growth_reports g JOIN public.roadmaps rm ON rm.roadmap_id = g.roadmap_id JOIN public.projects p ON p.project_id = g.project_id
                      WHERE g.report_id = CAST(:i AS uuid) AND p.employee_id = :e""", i=report_id, e=employee_id)
         if not r:
             raise not_found('결과 보고서')
+        snapshot=(r.get('report_content') or {}).get('executionSnapshot')
+        if snapshot:
+            from .report_snapshot import matches
+            progress={str(item['activity_id']):{'status':item['status'],'memo':item.get('memo') or '', 'file':item.get('attachment')}
+                for item in t.all('SELECT activity_id,status,memo,attachment FROM app_ext.activity_progress WHERE roadmap_id = :r FOR UPDATE',r=r['roadmap_id'])}
+            if not matches(snapshot,r['content'],progress):
+                raise ApiError(409,'REPORT_STALE','보고서 작성 후 실행 기록이 바뀌었어요. 최신 기록으로 보고서를 다시 만든 뒤 종료해 주세요.')
         t.run('INSERT INTO app_ext.report_meta(report_id, confirmed, confirmed_at) VALUES(:i, true, now()) ON CONFLICT (report_id) DO UPDATE SET confirmed = true, confirmed_at = now()',
               i=r['report_id'])
         t.run("UPDATE public.projects SET status = 'COMPLETED', updated_at = now() WHERE project_id = :p AND status <> 'COMPLETED'", p=r['project_id'])

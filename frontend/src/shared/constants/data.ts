@@ -455,17 +455,17 @@ export const D: GpData = {
   },
   "perspectives": {
     "A1": {
-      "name": "Free Track",
+      "name": "Free Course",
       "short": "Free",
       "focus": "비용 부담 최소화. 무료 강좌·공식 문서와 직접 실습 중심"
     },
     "A2": {
-      "name": "Fast Track",
+      "name": "Crash Course",
       "short": "Fast",
       "focus": "짧은 기간·적은 학습 부담. 핵심 강의와 꼭 필요한 실습만"
     },
     "A3": {
-      "name": "Challenge Track",
+      "name": "Challenge Course",
       "short": "Challenge",
       "focus": "담당 업무에 바로 활용. 실제 업무 과제와 결과물 중심"
     }

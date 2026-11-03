@@ -1,3 +1,4 @@
+import { inputSignature, invalidateDraft } from './invalidation';
 /* 작성 중인 로드맵 서버 동기화 (5차 gp-parts.js 의 syncDraft·flush·ensureDraft·takeDraft·pullDraft 를 옮김)
    화면이 고치는 값(목표·기획서 이름·세부 사항·응답·고른 안·수정 화면 입력·마지막 단계)은 고친 뒤 0.4초 기다렸다가 서버에 저장한다.
    에이전트 결과(문항·진단·3안·지원 조건·기획서 요약 상태)는 서버만 쓰고, 화면은 서버 응답으로 받는다 */
@@ -13,7 +14,7 @@ import { freshDraft, fromWorkspace, updateWs, useWs, ws, type WsState } from '@/
 const CLIENT = ['goal', 'project', 'prefs', 'detailsOk', 'answers', 'deepOn', 'deepMcq', 'deepEssay', 'chosen', 'edit'] as const;
 
 const snap = (st: WsState): string =>
-  JSON.stringify([CLIENT.map((k) => st.draft[k]), st.lastNew, st.draft.doc ? st.draft.doc.summary : null, (st.draft.gen && st.draft.gen.cur) || null]);
+  JSON.stringify([CLIENT.map((k) => st.draft[k]), st.lastNew, st.draft.doc ? st.draft.doc.summary : null, (st.draft.gen && st.draft.gen.cur) || null, st.pendingFlow === 'inputs' || st.pendingFlow === 'options' ? st.pendingFlow : null]);
 const hasContent = (st: WsState): boolean => !!(String(st.draft.goal || '').trim() || st.draft.detailsOk || st.draft.project);
 
 /* 보고 있는 버전(genCur)은 사용자가 버전을 바꿨을 때만 보낸다. 백엔드(drafts._apply_client)는 genCur 를 받으면
@@ -25,6 +26,7 @@ function bodyOf(st: WsState): Record<string, unknown> {
   const d = st.draft;
   const b: Record<string, unknown> = Object.fromEntries(CLIENT.map((k) => [k, d[k]]));
   b.lastNew = st.lastNew;
+  if (st.pendingFlow === 'inputs' || st.pendingFlow === 'options') b.resetAfter = st.pendingFlow;
   if (d.doc && d.doc.status === 'ok') b.docSummary = d.doc.summary || '';
   if (d.gen && d.gen.cur && curJ(st) !== serverGenCur) b.genCur = d.gen.cur;
   return b;
@@ -54,13 +56,26 @@ export function takeDraftInto(st: WsState, r: Partial<DraftResponse> | null | un
   mergeReg(r.reg);
   st.draftId = r.draftId || null;
   const server = r.draft || freshDraft();
+  const staleInputResponse = soft && inputSignature(st.draft) !== inputSignature(server);
+  const staleAnswerResponse = soft && st.draft.v2Assessment?.generationId === server.v2Assessment?.generationId && st.draft.v2Assessment?.completed === false && server.v2Assessment?.completed === true;
   if (soft && st.draft) {
     const keep = Object.fromEntries(CLIENT.map((k) => [k, st.draft[k]]));
     const summary = st.draft.doc && server.doc ? st.draft.doc.summary : undefined;
     st.draft = { ...freshDraft(), ...server, ...keep };
-    if (summary !== undefined && st.draft.doc) st.draft.doc.summary = summary;
+    if (summary !== undefined && st.draft.doc) st.draft.doc = { ...st.draft.doc, summary };
   } else st.draft = { ...freshDraft(), ...server };
   st.draftPlan = r.draftPlan || null;
+  if (staleInputResponse) invalidateDraft(st);
+  else if (staleAnswerResponse) invalidateDraft(st, 'answers');
+  else if (soft && st.pendingFlow === 'inputs') {
+    if (!server.gen && !server.v2Assessment) st.pendingFlow = undefined;
+    else invalidateDraft(st);
+  } else if (soft && st.pendingFlow === 'options') {
+    if (!server.v2Assessment?.materialsReady && !r.draftPlan && server.chosen === st.draft.chosen) st.pendingFlow = undefined;
+    else invalidateDraft(st, 'options');
+  } else if (soft && st.pendingFlow === 'materials') invalidateDraft(st, 'materials');
+  else if (soft && st.pendingFlow === 'answers') invalidateDraft(st, 'answers');
+  if (!soft) st.pendingFlow = undefined;
   if (!soft && r.lastNew !== undefined && r.lastNew !== null) st.lastNew = r.lastNew;
 }
 
@@ -144,13 +159,22 @@ export async function ensureDraft(): Promise<string> {
   return ws().draftId as string;
 }
 
+function readDependency(st: WsState) {
+  return JSON.stringify([st.draftId, inputSignature(st.draft), st.draft.chosen, st.draft.v2Assessment,
+    st.pendingFlow, st.draft.gen?.key, st.draft.gen?.cur,
+    st.draft.chosen ? st.draft.gen?.options[st.draft.chosen]?.learningSkillsKey : null]);
+}
+
 /** 서버 상태를 다시 읽는다(진행 중인 작업 확인용). 바뀌었으면 true */
 export async function pullDraft(): Promise<boolean> {
   const st = ws();
   if (!st.draftId) return false;
   const before = JSON.stringify([st.draft, st.draftPlan]);
+  const dependency = readDependency(st);
   try {
-    takeDraft(await draftsApi.get(st.draftId), true);
+    const response = await draftsApi.get(st.draftId);
+    if (ws().owner !== st.owner || readDependency(ws()) !== dependency) return false;
+    takeDraft(response, true);
   } catch (err) {
     if (err instanceof ApiError && err.status === 404)
       updateWs((s) => {

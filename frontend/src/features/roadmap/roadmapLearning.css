@@ -1,0 +1,35 @@
+.roadmap-resource-index{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0;align-items:start}
+.roadmap-resource-category{padding:0 14px;margin:0;min-width:0}.roadmap-resource-category+.roadmap-resource-category{border-left:1px solid var(--line)}
+.roadmap-resource-category>h2{display:flex;gap:8px;align-items:center;font-size:13px;font-weight:650;margin:0}
+.roadmap-resource-category ul{list-style:none;padding:0;margin:8px 0 0}
+.roadmap-resource-category li+li{border-top:1px solid var(--line)}
+.roadmap-resource-category li button{display:flex;align-items:center;gap:8px;text-align:left;padding:9px 0;background:none;border:0;width:100%;font-size:12px;color:inherit;cursor:pointer}
+.roadmap-resource-category li button>span:first-of-type{flex:1;min-width:0}
+.roadmap-resource-category li small{display:block;margin-top:3px;font-size:10px;color:var(--muted)}
+.roadmap-resource-category img{width:28px;height:38px;object-fit:contain;flex-shrink:0}
+.roadmap-learning-groups{display:grid;gap:14px}
+.roadmap-learning-group>summary{display:flex;align-items:center;gap:9px;margin-bottom:12px;flex-wrap:wrap}
+.roadmap-learning-group h2{font-size:14px;margin:0;flex:1}
+.roadmap-learning-category+ .roadmap-learning-category{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.roadmap-learning-category h3{font-size:12px;margin:0 0 7px;color:var(--muted)}
+.roadmap-learning-readonly{display:flex;align-items:center;gap:10px;padding:9px 0}
+.roadmap-learning-readonly .tx{flex:1;min-width:0;font-size:13px}
+.roadmap-learning-readonly small{display:block;font-size:11px;color:var(--muted);margin-top:3px}
+.roadmap-learning-anchor{scroll-margin-top:70px;border-radius:8px;outline:none}
+.roadmap-learning-anchor:focus{outline:2px solid var(--accent,#147d69);outline-offset:4px}
+@media(max-width:650px){.roadmap-resource-index{grid-template-columns:1fr}.roadmap-resource-category{padding:0}.roadmap-resource-category+.roadmap-resource-category{border-left:0;border-top:1px solid var(--line);padding-top:12px}.roadmap-learning-group>summary>.small{flex-basis:100%;padding-left:30px}}
+.roadmap-resource-category li button{font-size:11px;line-height:1.45}.roadmap-resource-category li b{font-size:11px;font-weight:500}.roadmap-resource-category>h2{font-size:12px}.roadmap-resource-category li small{font-size:10px}
+
+.roadmap-resource-index-box{margin:14px 0}
+.roadmap-resource-index-box>summary{display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;font-size:13px;font-weight:650;list-style:none}
+.roadmap-resource-index-box>summary::-webkit-details-marker{display:none}
+.resource-index-more,.resource-index-less{font-size:11px;font-weight:400;color:var(--muted)}
+.resource-index-less{display:none}.roadmap-resource-index-box[open] .resource-index-more{display:none}.roadmap-resource-index-box[open] .resource-index-less{display:inline}
+.roadmap-resource-index-box .roadmap-resource-index{margin:14px 0 0}
+
+.roadmap-learning-group>summary{cursor:pointer;list-style:none}.roadmap-learning-group>summary::-webkit-details-marker{display:none}
+.learning-toggle-more,.learning-toggle-less{font-size:11px;color:var(--muted)}.learning-toggle-less{display:none}.roadmap-learning-group[open] .learning-toggle-more{display:none}.roadmap-learning-group[open] .learning-toggle-less{display:inline}.roadmap-learning-group:not([open])>summary{margin-bottom:0}
+
+.review-skill-block.is-current-week,.roadmap-learning-group.is-current-week{background:#f1f9f3;border-color:#c8e4d0}
+.roadmap-learning-anchor.is-current-week{background:#e7f5eb}.roadmap-learning-anchor.is-current-week .act-row{background:transparent}
+.review-skill-block.is-current-week,.roadmap-learning-group.is-current-week{box-shadow:inset 4px 0 0 #4d9b70}

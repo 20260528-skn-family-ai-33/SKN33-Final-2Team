@@ -60,3 +60,29 @@ describe('저장 실패 뒤 진행 막기', () => {
     expect(api.toast).not.toHaveBeenCalled();
   });
 });
+
+
+describe('늦은 조회 응답의 단계 되돌림 방지', () => {
+  it('자료 저장 전에 시작한 조회가 늦게 끝나도 6번 완료 상태를 해제하지 않는다', async () => {
+    wsMod.updateWs(s=>{s.draft.chosen='A1';s.draft.v2Assessment={generationId:'g',completed:true,materialsReady:false};});
+    const old={draftId:'d1',draft:structuredClone(wsMod.ws().draft),draftPlan:null};
+    let finish!:(value:unknown)=>void;api.get.mockReturnValue(new Promise(resolve=>{finish=resolve;}));
+    const pending=sync.pullDraft();
+    wsMod.updateWs(s=>{s.draft.v2Assessment={generationId:'g',completed:true,materialsReady:true,materialsKey:'new'};});
+    finish(old);await pending;
+    expect(wsMod.ws().draft.v2Assessment?.materialsReady).toBe(true);
+    expect(wsMod.ws().draft.v2Assessment?.materialsKey).toBe('new');
+  });
+});
+
+describe('점검 완료 직후 전환', () => {
+  it('실제 스토어에서 응답 변경 표시를 해제하여 다음 자동 저장이 완료 상태를 되돌리지 않는다', () => {
+    wsMod.updateWs(s=>{s.pendingFlow='answers';s.draft.detailsOk=true;s.draft.v2Assessment={generationId:'g',completed:false};});
+    const completed={draftId:'d1',draft:{...wsMod.ws().draft,v2Assessment:{generationId:'g',completed:true}},draftPlan:null};
+    sync.takeDraft(completed);
+    expect(wsMod.ws().pendingFlow).toBeUndefined();
+    expect(wsMod.ws().draft.v2Assessment?.completed).toBe(true);
+    sync.takeDraft(completed,true);
+    expect(wsMod.ws().draft.v2Assessment?.completed).toBe(true);
+  });
+});

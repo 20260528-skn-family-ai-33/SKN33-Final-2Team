@@ -174,8 +174,8 @@ JSON 형식: {"level":{"AI 이해":0.6},"startStage":2,"startReason":"...","know
 (essayJudge는 deepCheck가 있을 때만 쓴다.)"""
 PROMPT_VERSION = 'v2.4'  # v2.2 + 심화 질문(10/23)
 GAPS_MAX = 8  # 응답이 모두 '보통'이면 후보가 많아 6개로는 목표의 일이 빠졌다(10/23 C1 비교)
-# 진단·로드맵 에이전트에 넘기는 업무 정보(10/23 결정 D2). 평정·이름·사번·부서는 넘기지 않는다
-PROFILE_KEYS = ('job', 'task', 'workDescription', 'techStack')
+# 진단·로드맵에 필요한 업무·인사 맥락만 전달한다. 평정·이름·사번은 제외한다.
+PROFILE_KEYS = ('department','parentDepartment','grade','position','jobFamily','education','job','task','workDescription','techStack','certifications','learning')
 
 
 def work_profile(me: dict | None) -> dict:
@@ -279,7 +279,9 @@ def assess(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
 
 
 # ── 결과 보고서 ──
-REP_SYS = """너는 GrowPath '진단 에이전트'다. 사전·사후 점검 응답(5점 척도: 1 전혀 아님 ~ 5 매우 그렇다) 변화와 실행 기록으로 결과 보고서 문장을 쓴다.
+REP_SYS = """executionEvidence가 있으면 asOf 시점의 활동 상태·메모·과제 요구사항·첨부 여부만 실행 근거로 사용한다. 미완료 활동은 수행하거나 역량을 획득했다고 쓰지 않는다. 계획된 기간이 지났거나 미래 활동이 있다는 이유로 완료를 추정하지 않는다. 첨부 파일 내용은 검증되지 않았으므로 제출 여부와 내용 검증을 구분한다. 조기 종료이면 그 시점까지 확인된 성과와 남은 과제·학습을 분리한다.
+quizEvidence가 있으면 동일 스킬·개념의 사전·사후 퀴즈 정오답을 학습 확인 근거로 함께 반영한다. 자기평가 응답 변화와 객관식 결과를 구분하고, 퀴즈만으로 실무 역량이나 과제 제출 여부를 단정하지 않는다.
+너는 GrowPath '진단 에이전트'다. 사전·사후 점검 응답(5점 척도: 1 전혀 아님 ~ 5 매우 그렇다) 변화와 실행 기록으로 결과 보고서 문장을 쓴다.
 - 잘된 점은 응답이 오른 문항을, 보완할 점은 응답이 그대로이거나 내려간 문항을 중심으로 쓴다.
 - 점수, 개수, 비율 같은 숫자는 쓰지 않는다. 자기보고이며 실제 역량 판정이나 인사평가가 아님을 전제로 쓴다. 해요체.
 - deep(사용자가 심화 질문을 골랐을 때): concepts는 개념별 사전·사후 객관식 결과(맞음/틀림/모름/답 안 함), essays는 사후 서술형(id, area, question, points: 채점 핵심 요소, answer: 사용자 답, preLevel: 사전 판단)이다.
@@ -335,6 +337,8 @@ def report(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
     def api(_):
         payload = {'goal': inp['goal'], 'plan': inp['planName'], 'items': [{'area': x['area'], 'question': x['text'], 'before': ans(x['pre']), 'after': ans(x['post'])} for x in inp['items']],
                    'completed': inp['doneTitles'], 'notCompleted': inp['restTitles'], 'goalSelf': inp['goalSelf']}
+        if inp.get('executionEvidence'):payload['executionEvidence']=inp['executionEvidence']
+        if inp.get('quizEvidence'):payload['quizEvidence']=inp['quizEvidence']
         if inp.get('deep'):
             payload['deep'] = inp['deep']
         r = rt.llm_json(ctx, REP_SYS, payload)

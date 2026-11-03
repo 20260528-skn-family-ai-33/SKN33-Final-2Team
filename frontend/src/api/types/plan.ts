@@ -43,7 +43,7 @@ export interface PlanContent {
   why?: string;
   confirmedAt?: string;
   prefs?: Prefs;
-  assess?: { domain: string; questions: QuizQuestion[]; answers: Record<string, string>; deep?: Record<string, unknown> | null };
+  assess?: { v2?: { survey: import('@/features/draft/quiz/assessment/flow').Survey; answers: Record<string, number> }; domain: string; questions: QuizQuestion[]; answers: Record<string, string>; deep?: Record<string, unknown> | null };
   handoff?: Handoff;
   selection?: { at: string; name: string; agent: string; source: string; perspective: string } | null;
 }
@@ -85,6 +85,8 @@ export interface PostDeep {
 }
 
 export interface PostCheck {
+  quizSurvey?: import('@/features/draft/quiz/assessment/flow').Survey | null;
+  quizAnswers?: Record<string, string>;
   answers: Record<string, string>;
   goalSelf: string;
   file: { name: string; size?: number; fileId?: string } | null;
@@ -170,6 +172,10 @@ export interface ReportItem {
 }
 
 export interface Report {
+  /** 본인 보고서의 동일 설문 문항별 사전·사후 응답. 이전 보고서에는 없을 수 있음. */
+  surveyEvidence?: { id: string; area: string; skill: string; text: string; pre: string | null; post: string }[];
+  executionSnapshot?: { asOf: string; early: boolean; version: number; activities: { id: string; title: string; status: string; task: boolean; file?: { name: string } | null }[] };
+  quizEvidence?: { skill: string; question: string; pre: string; post: string }[];
   id: string;
   planId: string;
   opt: string;

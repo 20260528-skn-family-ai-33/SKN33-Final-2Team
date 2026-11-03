@@ -19,6 +19,7 @@ export function buildPlan(def: OptionDef, prm: Partial<PlanParams>, goal: string
       const r = resOf(a.res);
       const x: Activity = {
         id: a.id,
+        skill: a.skill,
         stage: a.stage,
         title: a.title,
         res: a.res || null,
@@ -35,13 +36,22 @@ export function buildPlan(def: OptionDef, prm: Partial<PlanParams>, goal: string
       if (p.patch[a.id]) Object.assign(x, p.patch[a.id]);
       return x;
     });
+  const slots = new Map<string, [number, number]>();
+  let studyWeeks = 0;
+  for (const row of def.materialSchedule || []) {
+    slots.set(row.skill, [studyWeeks + 1, Math.max(studyWeeks + 1, studyWeeks + row.weeks)]);
+    studyWeeks += row.weeks;
+  }
   let cum = 0;
   acts.forEach((a) => {
     a.wFrom = Math.floor(cum / p.hours) + 1;
     cum += a.hours;
     a.wTo = Math.max(a.wFrom, Math.ceil(cum / p.hours));
+    const skill = def.acts.find(source => source.id === a.id)?.skill;
+    const slot = typeof skill === 'string' ? slots.get(skill) : undefined;
+    if (slot) [a.wFrom, a.wTo] = slot;
   });
-  const weeks = Math.max(1, Math.ceil(cum / p.hours));
+  const weeks = def.materialSchedule?.length ? studyWeeks : Math.max(1, Math.ceil(cum / p.hours));
   const resIds = [...new Set(acts.map((a) => a.res).filter(Boolean) as string[])];
   const cost = resIds.reduce((s, r) => s + (resOf(r)?.cost || 0), 0);
   const costUnknown = resIds.some((r) => !resOf(r) || resOf(r)?.cost == null);

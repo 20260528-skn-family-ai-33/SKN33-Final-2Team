@@ -564,5 +564,37 @@ class RoadmapIntegrationTests(unittest.TestCase):
                     rm._catalog_payload('A2', {'handoff': {'goal': 'SQL', 'prefs': {}, 'skillNames': skills}})
 
 
+    def test_free_book_policy_survives_main_candidate_budget_and_output(self):
+        rows = {'free': resource('free', title='SQL 무료 강좌'),
+                'paid': resource('paid', title='SQL 유료 강좌', cost=100),
+                'unknown': resource('unknown', title='SQL 가격 미확인 강좌', cost=None),
+                'book_paid': resource('book_paid', type='book', kind='도서', title='SQL 유료 도서', cost=100),
+                'book_unknown': resource('book_unknown', type='book', kind='도서', title='SQL 미확인 도서', cost=None)}
+        h = {'goal': 'SQL', 'prefs': {}, 'skillNames': ['SQL'],
+             'selectedResourceIds': list(rows)}
+        with patch.object(catalog, 'items', return_value=rows), patch.object(budget, 'tokens', side_effect=measured):
+            out = rm._catalog_payload('A1', {'handoff': h})
+            self.assertEqual({r['id'] for r in out['catalog']}, {'free', 'book_paid', 'book_unknown'})
+            self.assertEqual(set(out['catalogExcluded']), {'paid', 'unknown'})
+            option = rm.finish_option('A1', {'acts': [{'res': r['id']} for r in out['catalog']]}, 'test')
+            self.assertEqual({a['res'] for a in option['acts']}, {'free', 'book_paid', 'book_unknown'})
+
+    def test_project_handoff_exclusions_and_order_reach_fast_candidates(self):
+        from app.services.planning_handoff import build_handoff
+        names = [f'skill-{i}' for i in range(5)]
+        saved = {'completed': True, 'generationId': 'assessment', 'project': {'goal': 'SQL'},
+                 'selection': {'skills': []}, 'survey': {'groups': []}, 'answers': {},
+                 'recommendations': {'skills': [{'name': n, 'courses': [], 'books': []} for n in names]},
+                 'skillOrder': list(reversed(names)),
+                 'resourceChoices': {n: {'course': None, 'books': [], 'enabled': n != 'skill-3'} for n in names}}
+        h = build_handoff(saved, {}, {})
+        with patch.object(catalog, 'items', return_value=resources(5, 1)), patch.object(budget, 'tokens', side_effect=measured):
+            out = rm._catalog_payload('A2', {'handoff': h, 'skillTags': names})
+        self.assertEqual(out['trackGuidance']['coreSkills'], ['skill-4', 'skill-2', 'skill-1'])
+        self.assertEqual({r['id'] for r in out['catalog']}, {'4-00', '2-00', '1-00'})
+        self.assertEqual(out['skillTags'], names)
+        self.assertEqual(h['skillNames'], ['skill-4', 'skill-2', 'skill-1', 'skill-0'])
+
+
 if __name__ == '__main__':
     unittest.main()

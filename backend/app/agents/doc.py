@@ -16,6 +16,7 @@ V_SYS = """너는 GrowPath의 '진단 에이전트'다. 사용자가 적용할 �
 JSON 형식: {"images":[{"n":1,"desc":"..."}]}"""
 S_SYS = """너는 GrowPath의 '진단 에이전트'다. 사용자가 AI 역량을 키워 적용하려는 업무 프로젝트 기획서를 읽고(text: 기획서 글자, imageNotes: 기획서 이미지 설명), 학습 로드맵을 짜는 데 필요한 내용만 요약한다.
 - purpose(하려는 일·목적), data(다룰 데이터·문서), tech(쓰려는 기술·시스템·도구), schedule(일정·기한), constraints(보안·예산·인력 등 제약)를 각각 1~2문장으로 쓴다.
+- purpose에 포함 범위와 제외 범위를 구분해 보존하고 constraints에 명시적인 제한을 빠뜨리지 않는다.
 - 기획서에 없는 항목은 "기획서에 없음"으로 쓴다. 기획서에 없는 내용은 지어내지 않는다.
 JSON 형식: {"purpose":"...","data":"...","tech":"...","schedule":"...","constraints":"..."}"""
 DOC_FIELDS = [('purpose', '목적'), ('data', '다룰 데이터'), ('tech', '기술·도구'), ('schedule', '일정'), ('constraints', '제약')]

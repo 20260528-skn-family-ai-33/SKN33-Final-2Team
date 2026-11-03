@@ -116,6 +116,7 @@ export interface Handoff {
 
 /** 에이전트가 쓴 활동(안 정의 안) */
 export interface ActDef {
+  skill?: string;
   id: string;
   stage: number;
   title: string;
@@ -136,7 +137,15 @@ export interface Support {
 }
 
 /** 관점 하나의 로드맵 안(A1·A2·A3) */
+export type LearningSkill = { name: string; application: string };
+export type LearningSkillSelection = { name: string; enabled: boolean };
 export interface OptionDef {
+  optionId?: string;
+  promptProvenance?: { promptVersionId: string; agentId: string; storedPromptHash: string; effectivePromptHash: string; source: string };
+  materialSchedule?: { skill: string; weeks: number }[];
+  learningSkills?: LearningSkill[];
+  learningSkillsKey?: string;
+  learningSkillSelection?: LearningSkillSelection[];
   id: string;
   name: string;
   short: string;
@@ -237,6 +246,7 @@ export interface RegenRequest {
 }
 
 export interface DraftDoc {
+  v2Assessment?: { generationId: string; completed: boolean; materialsReady?: boolean; materialsKey?: string | null; activitiesReady?: boolean };
   goal: string;
   project: { name: string; size?: number } | null;
   prefs: Prefs;

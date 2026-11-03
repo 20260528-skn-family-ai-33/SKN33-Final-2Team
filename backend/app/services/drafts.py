@@ -28,7 +28,7 @@ from ..free_track import validate_free_plan
 from . import plans as PL
 from . import profile as PF
 
-STEP_ROUTES = ['new-goal', 'new-details', 'new-details-check', 'new-quiz', 'new-result', 'new-result-edit', 'new-gen', 'new-options', 'new-review']
+STEP_ROUTES = ['new-goal', 'new-details', 'new-details-check', 'new-quiz', 'new-result', 'new-result-edit', 'new-gen', 'new-options', 'new-materials', 'new-review']
 # deepOn·deepMcq·deepEssay: 심화 질문을 풀지(체크)와 객관식·서술형 답(10/23)
 CLIENT_KEYS = ('goal', 'project', 'prefs', 'detailsOk', 'answers', 'deepOn', 'deepMcq', 'deepEssay', 'chosen', 'edit', 'lastNew')
 _images: dict[str, list] = {}   # 기획서 이미지(base64)는 DB에 넣지 않고 서버 메모리에만 잠깐 둔다
@@ -174,6 +174,18 @@ def clear_from(d: dict, stage: str) -> None:
     d.update(handoff=None, gen=None, chosen=None, genRun=None)
 
 
+def input_signature(d):
+    return json.dumps([d.get('goal'),d.get('project'),d.get('prefs'),doc_summary(d)],ensure_ascii=False,sort_keys=True)
+
+
+def invalidate_inputs(w):
+    clear_from(w['draft'],'quiz')
+    w['draft'].update(detailsOk=False,genPrefs=None)
+    w['draft'].pop('v2Assessment',None)
+    w.pop('v2Survey',None)
+    w['draftPlan']=None
+
+
 # ── 저장 ──
 def _wrap(raw) -> dict:
     if isinstance(raw, dict) and raw.get('gp5') and isinstance(raw.get('draft'), dict):
@@ -244,11 +256,24 @@ def present(w: dict | None, draft_id: str | None) -> dict:
     if not w:
         return {'draftId': None, 'draft': None, 'draftPlan': None, 'lastNew': None, 'res': {}, 'reg': {'articles': {}, 'regs': {}}}
     d = w['draft']
+    displayed_plan=w.get('draftPlan')
+    assessment = w.get('v2Survey')
+    if isinstance(assessment, dict):
+        from app.services.activity_selection import current_record, materials_ready
+        from app.services.course_recommendations import scope_view
+        scoped = scope_view(assessment, d.get('chosen'), ((d.get('gen') or {}).get('options') or {}).get(d.get('chosen')))
+        proposal = current_record(scoped, d)
+        from app.services.activity_selection import materials_key
+        ready=materials_ready(scoped) or bool(proposal)
+        d = dict(d, v2Assessment={'generationId': assessment['generationId'], 'completed': bool(assessment.get('completed')), 'materialsReady': ready, 'materialsKey': materials_key(scoped) if ready else None, 'activitiesReady': bool(proposal and proposal.get('selectedIds'))})
+        if ready and not displayed_plan:
+            from app.services.material_plan import preview
+            displayed_plan=preview(scoped,d)
     q = d.get('quiz')
     if q and q.get('deep'):
         # 심화 질문 정답·해설·모범 답안은 점검 결과가 나온 뒤에만 보낸다(10/23 · 화면에서는 접어 둠)
         d = dict(d, quiz=dict(q, deep=DC.public(q['deep'], bool((d.get('diag') or {}).get('deep')))))
-    return {'draftId': draft_id, 'draft': d, 'draftPlan': w.get('draftPlan'), 'lastNew': w.get('lastNew'),
+    return {'draftId': draft_id, 'draft': d, 'draftPlan': displayed_plan, 'lastNew': w.get('lastNew'),
             'res': catalog.resources_for(_res_keys(w)), 'reg': regstore.bundle(_basis_ids(w))}
 
 
@@ -329,6 +354,8 @@ def create(employee_id: int, body: dict) -> dict:
 
 def _apply_client(w: dict, body: dict) -> None:
     d = w['draft']
+    previous_inputs=input_signature(d)
+    previous_chosen=d.get('chosen')
     for k in CLIENT_KEYS:
         if k in body:
             if k == 'lastNew':
@@ -341,17 +368,26 @@ def _apply_client(w: dict, body: dict) -> None:
         g = d['gen']
         for pid, i in body['genCur'].items():
             lst = (g.get('hist') or {}).get(pid)
-            if lst and 0 <= int(i) < len(lst):
+            if lst and 0 <= int(i) < len(lst) and int(i)!=(g.get('cur') or {}).get(pid,0):
+                if (g.get('regenRun') or {}).get(pid):raise ApiError(409,'REGEN_RUNNING','계획 생성이 끝난 뒤 버전을 바꿔 주세요.')
+                from app.services.course_recommendations import invalidate_course_tail
+                invalidate_course_tail(w,pid)
                 g.setdefault('cur', {})[pid] = int(i)
                 g['options'][pid] = lst[int(i)]
                 if w.get('draftPlan') and w['draftPlan'].get('opt') == pid:
                     w['draftPlan'] = None
+    if input_signature(d)!=previous_inputs or body.get('resetAfter')=='inputs':
+        invalidate_inputs(w)
+    elif previous_chosen!=d.get('chosen') or body.get('resetAfter')=='options':
+        from app.services.course_recommendations import invalidate_course_tail
+        invalidate_course_tail(w,d.get('chosen'))
+        w['draftPlan']=None
     if d.get('quizFail') and d['quizFail'].get('key') != quiz_key(d):
         d['quizFail'] = None
 
 
 def patch(employee_id: int, draft_id: str, body: dict) -> dict:
-    """목표·기획서 요약·세부 사항·응답 등 화면 입력 저장(API-16 · 응답은 API-24 도 같은 동작). 뒤 단계 결과는 지우지 않는다"""
+    """목표·기획서 요약·세부 사항·응답 등 화면 입력 저장(API-16 · 응답은 API-24 도 같은 동작). 입력이 바뀌면 이후 결과를 초기화한다"""
     def fn(t: db.Tx, w: dict):
         before = dict(w['draft'].get('answers') or {})
         _apply_client(w, body)
@@ -415,6 +451,7 @@ def doc_read(employee_id: int, draft_id: str, name: str, raw: bytes) -> dict:
         _images[draft_id] = ex.get('images') or []
 
     def fn(t, w):
+        invalidate_inputs(w)
         w['draft']['project'] = {'name': name, 'size': len(raw)}
         w['draft']['doc'] = {'name': name, 'status': 'reading', 'step': 'vision', 'fail': None, 'format': ex.get('format'), 'chars': ex.get('chars'),
                              'truncated': ex.get('truncated'), 'pages': ex.get('pages'), 'text': ex.get('text') or '', 'imageTotal': ex.get('imageTotal') or 0,
@@ -469,7 +506,9 @@ def doc_summary_start(employee_id: int, draft_id: str, skip_images: bool = False
 
 def _set_doc(employee_id: int, draft_id: str, patch_: dict) -> None:
     def fn(t, w):
+        before=doc_summary(w['draft'])
         w['draft']['doc'] = dict(w['draft'].get('doc') or {}, **patch_)
+        if before!=doc_summary(w['draft']):invalidate_inputs(w)
     _mutate(employee_id, draft_id, fn)
 
 
@@ -478,6 +517,7 @@ def clear_project(employee_id: int, draft_id: str) -> dict:
         _images.pop(draft_id, None)
 
     def fn(t, w):
+        invalidate_inputs(w)
         w['draft']['project'] = None
         w['draft']['doc'] = None
     return present(_mutate(employee_id, draft_id, fn), draft_id)
@@ -676,10 +716,19 @@ def options_start(employee_id: int, draft_id: str) -> dict:
 
     def fn(t, w):
         d = w['draft']
-        if not d.get('diag') or d['diag']['key'] != diag_key(d):
-            raise ApiError(409, 'DIAG_REQUIRED', '점검 결과를 먼저 정리해 주세요')
-        h = build_handoff(d, work_info)
-        if not d.get('gen') or d['gen'].get('key') != h['key'] or (d['gen'].get('missing') or []):
+        if w.get('v2Survey'):
+            from app.routers.preassessment import recommendation_context
+            from app.services.planning_handoff import build_handoff as build_v2_handoff
+            saved = recommendation_context(t, employee_id, draft_id)
+            try:
+                h = build_v2_handoff(saved, handoff_prefs(d['prefs']), work_info)
+            except ValueError as error:
+                raise ApiError(422, 'PLAN_INPUT_INVALID', str(error)) from error
+        else:
+            if not d.get('diag') or d['diag']['key'] != diag_key(d):
+                raise ApiError(409, 'DIAG_REQUIRED', '점검 결과를 먼저 정리해 주세요')
+            h = build_handoff(d, work_info)
+        if not d.get('gen') or d['gen'].get('key') != h['key']:
             d.update(gen=None, chosen=None, genRun=None)
             w['draftPlan'] = None
         d['handoff'] = h
@@ -729,6 +778,10 @@ def _run_option(employee_id: int, draft_id: str, pid: str) -> str:
             row.update(st='ok' if out else 'fail', out=out, err=err, jobId=None)
             rows = [r['rows'][x] for x in D['optionOrder']]
             d2 = w2['draft']
+            current = d2.get('gen')
+            if out and current and current['key'] == key and pid in (current.get('missing') or []):
+                current['options'][pid] = out
+                current['missing'] = [name for name in current['missing'] if name != pid]
             if not any(x['st'] == 'run' for x in rows) and all(x['st'] == 'ok' for x in rows) and (not d2.get('gen') or d2['gen'].get('key') != key):
                 d2['gen'] = {'key': key, 'options': {x: r['rows'][x]['out'] for x in D['optionOrder']}, 'missing': []}
         _mutate(employee_id, draft_id, save)
@@ -869,7 +922,10 @@ def regenerate(employee_id: int, draft_id: str, pid: str, req: dict | None) -> d
         g = w['draft'].get('gen')
         if not g or pid not in g['options']:
             raise ApiError(409, 'NO_OPTION', '다시 만들 안이 없어요')
+        if (g.get('regenRun') or {}).get(pid):raise ApiError(409,'REGEN_RUNNING','해당 계획을 이미 다시 생성하고 있어요.')
         _sync(g)
+        from app.services.course_recommendations import invalidate_course_tail
+        invalidate_course_tail(w,pid)
         lst = _hist(g, pid)
         g.setdefault('regenRun', {})[pid] = {'req': req, 'from': g['cur'].get(pid, 0), 'err': None}
         g.setdefault('regenErr', {}).pop(pid, None)
@@ -926,7 +982,7 @@ def regenerate(employee_id: int, draft_id: str, pid: str, req: dict | None) -> d
     return dict(present(w, draft_id), jobs={pid: jid})
 
 
-def select(employee_id: int, draft_id: str, pid: str) -> dict:
+def select(employee_id: int, draft_id: str, pid: str, displayed: list | None = None) -> dict:
     """안 선택 → 검토용 계획(API-34)"""
     def fn(t, w):
         d = w['draft']
@@ -936,10 +992,15 @@ def select(employee_id: int, draft_id: str, pid: str) -> dict:
         if (g.get('regenRun') or {}).get(pid):
             raise ApiError(409, 'REGEN_RUNNING', '그 안을 다시 쓰는 중이에요. 잠시 뒤에 골라 주세요')
         _sync(g)
+        from app.services.prompt_selection_store import comparison_snapshot
+        d['selectionComparison'] = comparison_snapshot(g, displayed)
+        if d.get('chosen')!=pid:
+            from app.services.course_recommendations import invalidate_course_tail
+            invalidate_course_tail(w,pid)
         d['chosen'] = pid
         o = g['options'][pid]
         w['draftPlan'] = RM.build_plan(o, RM.params_of(d['handoff'], o), d['goal'])
-        w['lastNew'] = 'new-review'
+        w['lastNew'] = 'new-materials'
     return present(_mutate(employee_id, draft_id, fn), draft_id)
 
 
@@ -957,16 +1018,43 @@ def confirm(employee_id: int, draft_id: str) -> dict:
             raise ApiError(409, 'NOT_SELECTED', '확정할 안을 먼저 골라 주세요')
         g = d['gen']
         _sync(g)
-        o = g['options'][d['chosen']]
+        assessment = w.get('v2Survey')
+        final_handoff = copy.deepcopy(d['handoff'])
+        if assessment:
+            from app.services.activity_selection import context as activity_context, current_record, selection_option
+            assessment, _ = activity_context(t, employee_id, draft_id)
+            proposal = current_record(assessment, d)
+            o = selection_option(assessment, d, (proposal or {}).get('selectedIds') or [])
+            if assessment.get('skillSelectionKey'):
+                names=list(assessment['skillOrder'])
+                final_handoff.update(focus=names,skillNames=names,skillOrder=names,
+                    skillDetails=copy.deepcopy(assessment['selection']['skills']),
+                    skillMaterials=copy.deepcopy(assessment['resourceChoices']),
+                    excludedSkills=[name for name in d['handoff'].get('skillNames',[]) if name not in names])
+        else:
+            o = g['options'][d['chosen']]
         plan = RM.build_plan(o, RM.params_of(d['handoff'], o), d['goal'])
         validate_free_plan(t, plan)
-        assess = {'questions': d['quiz']['questions'], 'answers': dict(d['answers']), 'domain': d['quiz']['domain']}
-        if deep_on(d) and (d.get('diag') or {}).get('deep'):
+        if assessment:
+            questions = [dict(q, skill=group['skill'], area=group['skill']) for group in assessment['survey']['groups'] for q in group['surveys']]
+            answers = {q['id']: str(assessment['answers'][q['id']]) for q in questions}
+            capture = dict(d, quiz={'questions': questions, 'domain': ' · '.join(final_handoff['focus'])}, answers=answers)
+            _save_questions(t, draft_id, capture)
+            _save_answers(t, draft_id, capture)
+            assess = {'questions': questions, 'answers': answers, 'domain': capture['quiz']['domain'],
+                'v2': {'survey': copy.deepcopy(assessment['survey']), 'answers': copy.deepcopy(assessment['answers'])}}
+        else:
+            assess = {'questions': d['quiz']['questions'], 'answers': dict(d['answers']), 'domain': d['quiz']['domain']}
+        if not assessment and deep_on(d) and (d.get('diag') or {}).get('deep'):
             # 심화 질문(사전): 사후 점검 비교와 결과 보고서용. 부서장 화면에는 보내지 않는다(plans.record for_mgr 가 assess 를 비움)
             assess['deep'] = {'on': True, 'quiz': d['quiz']['deep'], 'mcq': dict(d.get('deepMcq') or {}), 'essay': dict(d.get('deepEssay') or {}),
                               'grade': d['diag']['deep']['grade'], 'judge': d['diag']['deep']['judge']}
         plan.update(version=1, confirmedAt=today(), why='최초 확정', assess=assess,
-                    prefs=copy.deepcopy(d['prefs']), handoff=d['handoff'], selection=selection_of(o))
+                    prefs=copy.deepcopy(d['prefs']), handoff=final_handoff, selection=selection_of(o))
+        from app.services.prompt_selection_store import confirmation_evidence
+        evidence = confirmation_evidence(str(draft_id), d)
+        if evidence:
+            plan['selectionEvidence'] = evidence
         rid = _round(t, draft_id, d)
         roadmap_id = PL.insert_roadmap(t, draft_id, rid, plan)
         t.run("""UPDATE public.projects SET status = 'IN_PROGRESS', current_stage = 7, draft_choices = :w, updated_at = now() WHERE project_id = CAST(:p AS uuid)""",

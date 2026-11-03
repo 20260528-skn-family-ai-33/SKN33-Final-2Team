@@ -26,6 +26,7 @@ export function onBound(fn: After): () => void {
 
 export function setAt(path: string, val: unknown, evt: 'input' | 'change' = 'change'): void {
   updateWs((s) => {
+    if (Object.is(getAt(s, path), val)) return;
     setIn(s as unknown as Record<string, unknown>, path, val);
     afters.forEach((f) => f(s, path, evt));
   });

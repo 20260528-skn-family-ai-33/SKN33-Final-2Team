@@ -1,3 +1,4 @@
+import { MaterialsStep } from '@/features/draft/materials/MaterialsStep';
 /* 주소 ↔ 화면. handle: 좌측 메뉴 강조(nav)·제목(title)·본문 폭(width)·권한(role) — 5차 화면 정의(scr.*)의 nav·title·width·role 그대로 */
 import { createBrowserRouter, Navigate, type RouteObject } from 'react-router';
 import { DatasetPage } from '@/features/admin/DatasetPage';
@@ -44,7 +45,8 @@ export const router = createBrowserRouter([
       r(paths.newResult, <DraftScreen step="result"><ResultStep /></DraftScreen>, { nav: 'new', title: '점검 결과', width: 'wide' }),
       r(paths.newResultEdit, <DraftScreen step="result" extra={editGate}><ResultEdit /></DraftScreen>, { nav: 'new', title: '점검 결과 수정', width: 'wide' }),
       r(paths.newGen, <DraftScreen extra={genGate} step="goal" remember={false}><GenerationStep /></DraftScreen>, { nav: 'new', title: '로드맵 3안 작성', width: 'wide' }),
-      r(paths.newOptions, <DraftScreen extra={optionsGate} step="goal"><OptionsStep /></DraftScreen>, { nav: 'new', title: '로드맵 3안', width: 'xwide' }),
+      r(paths.newOptions, <DraftScreen extra={optionsGate} step="goal"><OptionsStep /></DraftScreen>, { nav: 'new', title: '로드맵 선택', width: 'xwide' }),
+      r(paths.newMaterials, <DraftScreen step="materials"><MaterialsStep /></DraftScreen>, { nav: 'new', title: '자료·활동 선택', width: 'wide' }),
       r(paths.newReview, <DraftScreen step="review"><ReviewStep /></DraftScreen>, { nav: 'new', title: '검토·확정', width: 'wide' }),
       // 내 로드맵
       r(paths.roadmaps, <RoadmapPage />, { nav: 'roadmap', title: '내 로드맵', width: 'wide' }),

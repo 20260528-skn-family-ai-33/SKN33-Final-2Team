@@ -57,7 +57,7 @@ def main() -> None:
             assert all(row['id'] in records for row in rows)
             assert len({row['id'] for row in rows}) == len(rows)
             if pid == 'A1':
-                assert all(row['cost'] == 0 for row in rows)
+                assert all(records[row['id']].get('type') == 'book' or row['cost'] == 0 for row in rows)
             if pid == 'A2':
                 assert payload['trackGuidance']['maxWeeks'] == 6
                 assert len(payload['trackGuidance']['coreSkills']) <= 3
@@ -88,7 +88,7 @@ def main() -> None:
     else:
         raise AssertionError('긴 요청이 차단되지 않음')
     report = {'database_readonly': True, 'model_calls': 0, 'courses': sum(r['type'] == 'course' for r in records.values()),
-              'prompt_source': 'database_active_unchanged',
+              'prompt_source': 'database_active_with_free_book_exception',
               'cases_passed': len(cases), 'cold_catalog_load_ms': round(load_ms, 2),
               'selection_and_budget_ms': stats(elapsed), 'timing_samples': len(elapsed),
               'tokenizer_revision': budget.TOKENIZER_REVISION, 'tokenizer_sha256': budget.TOKENIZER_SHA256,

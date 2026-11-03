@@ -1,0 +1,4 @@
+# Only the final model reference is versioned. Keep local artifacts untouched.
+*
+!README.md
+!.gitignore

@@ -202,7 +202,7 @@ def select(records: dict[str, dict], skills: list[str], texts: list[str], track:
     index, terms = cached_index(records), query_terms(texts)
     topics = depth_terms(texts)
     required = list(dict.fromkeys(k for k in required or [] if k))
-    excluded = [k for k in required if k in records and track == 'A1' and records[k].get('cost') != 0]
+    excluded = [k for k in required if k in records and track == 'A1' and records[k].get('type') != 'book' and records[k].get('cost') != 0]
     required = [k for k in required if k not in excluded]
     if any(k not in records or not records[k].get('usable') for k in required):
         raise ValueError('선택한 자료가 삭제되었거나 추천 불가 상태입니다. 자료를 다시 선택해 주세요.')
@@ -215,7 +215,7 @@ def select(records: dict[str, dict], skills: list[str], texts: list[str], track:
         r = x['record']
         if not r.get('usable') or r.get('type') == 'cert' or not x['skills'].intersection(skills):
             continue
-        if track == 'A1' and r.get('cost') != 0:
+        if track == 'A1' and r.get('type') != 'book' and r.get('cost') != 0:
             continue
         learning_outline = x['outline'] if track == 'A1' else x['own_outline']
         relevance = 3 * matches(r['title'].casefold(), terms) + 2 * min(5, matches(learning_outline, terms)) + min(3, matches(x['description'], terms))

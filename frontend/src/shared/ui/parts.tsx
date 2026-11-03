@@ -7,6 +7,7 @@ import { ai, connFor, PROV, type Cause, type ModelRole } from '@/shared/state/ai
 import { resOf } from '@/shared/state/catalog';
 import { useGo } from '@/shared/hooks/useGo';
 import { Icon } from './Icon';
+import { ResourceImage } from './ResourceImage';
 
 export function Page(o: { back?: string; eyebrow?: ReactNode; title: ReactNode; lead?: ReactNode; children?: ReactNode; foot?: ReactNode }) {
   const go = useGo();
@@ -165,13 +166,13 @@ export const CostB = ({ c, unk }: { c: number; unk?: boolean }) => (
   </>
 );
 
-export const Stats = ({ pl, bare }: { pl: Pick<PlanContent, 'weeks' | 'hours' | 'cost' | 'costUnknown'>; bare?: boolean }) => (
+export const Stats = ({ pl, bare, periodLabel = '기간', periodWeeks }: { pl: Pick<PlanContent, 'weeks' | 'hours' | 'cost' | 'costUnknown'>; bare?: boolean; periodLabel?: string; periodWeeks?: number | null }) => (
   <div className={`stats ${bare ? 'bare' : ''}`}>
     <div>
-      <small>기간</small>
+      <small>{periodLabel}</small>
       <b>
-        {pl.weeks}
-        <em>주</em>
+        {periodWeeks === null ? '확인 중' : periodWeeks ?? pl.weeks}
+        {periodWeeks !== null && <em>주</em>}
       </b>
     </div>
     <div>
@@ -207,8 +208,8 @@ export function Thumb({ r, size, type }: { r?: Partial<Resource> | null; size?: 
   const t = type || (r && (r.type || TH_TYPE[r.kind || ''])) || 'doc';
   const src = r && /^https?:\/\//i.test(r.image || '') ? (r.image as string) : '';
   return (
-    <span className={`rthumb ${t}${size ? ' ' + size : ''}${src ? '' : ' none'}`} aria-hidden="true">
-      {src ? (
+    <span className={`rthumb ${t}${size ? ' ' + size : ''}${src || ['book', 'course', 'cert'].includes(t) ? '' : ' none'}`} aria-hidden="true">
+      {['book', 'course', 'cert'].includes(t) ? <ResourceImage image={r?.image} type={t} /> : src ? (
         <img
           src={src}
           alt=""

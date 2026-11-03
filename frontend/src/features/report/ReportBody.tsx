@@ -3,49 +3,42 @@ import type { PlanRecord, Report } from '@/api/types/plan';
 import { DeepReveal } from '@/features/assessment/quizParts';
 import { ansLabel } from '@/shared/lib/prefs';
 import { Note } from '@/shared/ui/parts';
+import './surveyComparison.css';
 
-const Lst = <T,>({ arr, f }: { arr: T[]; f: (x: T, i: number) => React.ReactNode }) =>
-  arr.length ? <ul className="plain-list">{arr.map(f)}</ul> : <p className="muted small">없음</p>;
+const SURVEY_CHOICES = ['전혀 아니다', '아니다', '보통이다', '그렇다', '매우 그렇다'];
+
+function SurveyComparisonRow({ phase, value }: { phase: 'pre' | 'post'; value?: string | number | null }) {
+  const label = phase === 'pre' ? '사전' : '사후';
+  return <div className={`report-answer-row report-answer-${phase}`}>
+    <b className="report-answer-phase">{label}</b>
+    <ol className="report-answer-options" aria-label={`${label} 응답: ${value ? ansLabel(String(value)) : '응답 없음'}`}>
+      {SURVEY_CHOICES.map((text, index) => <li key={text} className={Number(value) === index + 1 ? 'is-selected' : ''}>
+        <span className="report-answer-number">{index + 1}</span><span>{text}</span>
+        {Number(value) === index + 1 && <span className="report-answer-mark">✓ {label}</span>}
+      </li>)}
+    </ol>
+  </div>;
+}
 
 export function ReportBody({ r }: { r: Report }) {
   return (
     <>
-      <div className="grid2">
-        <div className="card">
-          <h2 className="st">응답이 오른 것</h2>
-          <Lst
-            arr={r.gained}
-            f={(x, i) => (
-              <li key={i}>
-                <b>{x.skill}</b>{' '}
-                <span className="small muted">
-                  {ansLabel(x.from)} → {ansLabel(x.to)}
-                </span>
-              </li>
-            )}
-          />
-        </div>
-        <div className="card">
-          <h2 className="st">그대로이거나 내려간 것</h2>
-          <Lst
-            arr={r.still}
-            f={(x, i) => (
-              <li key={i}>
-                {x.skill}{' '}
-                <span className="small muted">
-                  {ansLabel(x.from)} → {ansLabel(x.to)}
-                </span>
-              </li>
-            )}
-          />
-        </div>
-      </div>
+      {r.executionSnapshot && <div className="card"><h2 className="st">{r.executionSnapshot.early ? '조기 종료 기준 기록' : '학습 종료 기준 기록'}</h2><p className="small muted">기준 시점: {new Date(r.executionSnapshot.asOf).toLocaleString('ko-KR')} · 이 시점까지 저장된 활동·메모·제출 여부를 반영했어요. 첨부 내용은 검증하지 않았어요.</p></div>}
+      {!!r.surveyEvidence?.length && <details className="card report-survey">
+        <summary><span>설문 응답 비교</span></summary>
+        <p className="small muted">동일한 문항의 사전·사후 선택을 비교해요.</p>
+        <ol className="report-survey-questions">{r.surveyEvidence.map((row, index) => <li key={row.id}>
+          <b className="small muted">{row.skill || row.area}</b><p className={row.pre && row.post ? Number(row.post) > Number(row.pre) ? 'report-survey-post' : 'report-survey-pre' : undefined}>{index + 1}. {row.text}</p>
+          <SurveyComparisonRow phase="pre" value={row.pre} />
+          <SurveyComparisonRow phase="post" value={row.post} />
+        </li>)}</ol>
+      </details>}
       <div className="card" style={{ marginTop: 12 }}>
         <h2 className="st">실행 기록</h2>
         <dl className="kv">
-          <dt>완료로 기록</dt>
+          <dt>완료</dt>
           <dd>{r.doneTitles.join(', ') || '없음'}</dd>
-          <dt>진행 중</dt>
+          <dt>미완료 활동</dt>
           <dd className="muted">{r.restTitles.join(', ') || '없음'}</dd>
           {/* 목표 달성 답·결과물은 본인 화면에만 온다(부서장 응답에는 없음 · 없을 때 '붙이지 않음'으로 보이지 않게 줄째 숨김) */}
           {r.goalSelf !== undefined ? (
@@ -63,7 +56,7 @@ export function ReportBody({ r }: { r: Report }) {
                     {r.file.name} <span className="small muted">· 내용 미검증</span>
                   </>
                 ) : (
-                  '붙이지 않음'
+                  '제출물 없음'
                 )}
               </dd>
             </>

@@ -24,7 +24,7 @@ export function DetailsStep() {
       <Stepper cur="details" />
       <Page
         title="학습 여건을 알려 주세요"
-        lead="모두 선택 사항이에요. 비워 둔 칸은 ‘알아서’로 두고 로드맵 계획 에이전트가 목표에 맞게 정해요. 자격증 계획은 고르지 않으면 ‘계획 없음’이에요."
+        lead="모두 선택 사항이에요. 비워 둔 항목은 알아서 정해요."
         foot={
           <>
             <button className="btn line" onClick={() => go(paths.newGoal)}>
@@ -38,11 +38,10 @@ export function DetailsStep() {
         }
       >
         <div className="card">
-          <DetailsForm path="draft.prefs" />
+          <DetailsForm path="draft.prefs" learningConditionsOnly />
         </div>
         <StaleNote kind="gen" />
-        <StaleNote kind="cert" />
-        {hasQuiz ? <Note>사전 점검 문항은 이미 만들었어요. 자격증 계획을 바꾸면 문항부터 다시 만들고, 나머지는 로드맵을 만들 때 반영해요.</Note> : null}
+        {hasQuiz ? <Note>사전 점검 문항은 이미 만들었어요. 학습 여건을 바꾸면 로드맵을 만들 때 반영해요.</Note> : null}
       </Page>
     </>
   );
@@ -55,7 +54,7 @@ export const DetailsView = ({ p }: { p: Prefs }) => (
       진단 에이전트에게 넘길 세부 사항
     </p>
     <dl className="kv">
-      {D.detailFields.map(([k, l]) => (
+      {D.detailFields.filter(([key]) => key !== 'format' && key !== 'cert').map(([k, l]) => (
         <Fragment key={k}>
           <dt>{l}</dt>
           <dd className={`${prefAuto(k as keyof Prefs, p) ? 'auto' : ''}${k === 'etc' ? ' etc' : ''}`}>{prefText(k as keyof Prefs, p)}</dd>
@@ -85,7 +84,7 @@ export function DetailsCheck() {
         lead={
           made
             ? '사전 점검 문항은 이미 만들었어요. ‘다음’을 누르면 사전 점검으로 넘어가요. 여기 내용은 로드맵을 만들 때 반영해요.'
-            : '‘다음’을 누르면 진단 에이전트가 목표·기획서 요약·자격증 계획으로 사전 점검 문항을 만들어요. 나머지 항목은 로드맵을 만들 때 반영하고, ‘알아서’인 항목은 로드맵 계획 에이전트가 목표에 맞게 정해요.'
+            : '‘다음’을 누르면 진단 에이전트가 기획서 요약·선정 스킬·키우고 싶은 역량·개인 DB 프로필로 사전 점검 문항을 만들어요. 나머지 항목은 로드맵을 만들 때 반영하고, ‘알아서’인 항목은 로드맵 계획 에이전트가 목표에 맞게 정해요.'
         }
         foot={
           <>

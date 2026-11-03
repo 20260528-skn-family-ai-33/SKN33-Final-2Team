@@ -1,3 +1,4 @@
+import { invalidateDraft } from './invalidation';
 /* 작성 단계 진입 조건 (5차 화면 guard) — 앞 단계를 마치지 않았으면 그 단계로 돌려보낸다 */
 import type { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router';
@@ -26,6 +27,7 @@ export function StepGate({ step, extra, children }: { step: StepKey; extra?: (s:
 onBound((s, path) => {
   if (!path.startsWith('draft.')) return;
   const d = s.draft;
-  if (path.startsWith('draft.prefs.')) d.detailsOk = false;
+  if (path === 'draft.chosen') { invalidateDraft(s, 'options'); return; }
+  if (path === 'draft.goal' || path === 'draft.project' || path === 'draft.doc.summary' || path.startsWith('draft.prefs.')) { invalidateDraft(s); return; }
   if (d.quizFail && d.quizFail.key !== quizKey(d)) d.quizFail = null;
 });

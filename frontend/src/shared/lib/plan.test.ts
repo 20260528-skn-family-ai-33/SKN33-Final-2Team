@@ -77,3 +77,16 @@ describe('진행 계산', () => {
     expect(range(pl.acts.slice(2))).toBe('3주차');
   });
 });
+
+
+describe('자료 기준 기간', () => {
+  it('스킬별 자료 5주·8주는 과제 시간이 커져도 합계 13주를 유지한다', () => {
+    const option: OptionDef = { ...def, materialSchedule: [{ skill: 'S', weeks: 5 }, { skill: 'T', weeks: 8 }], acts: [
+      { id: 'task-s', skill: 'S', stage: 3, title: '과제 S', hours: 100 },
+      { id: 'task-t', skill: 'T', stage: 3, title: '과제 T', hours: 100 },
+    ] };
+    const plan = buildPlan(option, { hours: 4 }, '목표');
+    expect(plan.weeks).toBe(13);
+    expect(plan.acts.map(act => [act.skill, act.wFrom, act.wTo])).toEqual([['S', 1, 5], ['T', 6, 13]]);
+  });
+});

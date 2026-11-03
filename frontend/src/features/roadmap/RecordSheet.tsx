@@ -18,6 +18,7 @@ import { updateWs, useWs, ws } from '@/shared/state/workspace';
 import { BText } from '@/shared/ui/bound';
 import { Icon } from '@/shared/ui/Icon';
 import { Note, Thumb } from '@/shared/ui/parts';
+import { TaskDescription } from '@/shared/ui/TaskDescription';
 import { saveProgress } from './planActions';
 
 const STATUS: [string, string][] = [
@@ -66,19 +67,20 @@ function RecBody({ pid, id }: { pid: string; id: string }) {
   const pr = R.progress[a.id] || {};
   const r = a.res ? resOf(a.res) : null;
   const sup = me()?.mySupervisor;
+  const isBook = r?.type === 'book' || r?.kind === '도서';
   return (
     <>
       <p className="small muted">
-        {a.stage}단계 {stageName(a.stage)} · {a.wFrom === a.wTo ? a.wFrom : a.wFrom + '~' + a.wTo}주차 · {hrs(a.hours)}
+        {a.skill || `${a.stage}단계 ${stageName(a.stage)}`} · {a.wFrom === a.wTo ? a.wFrom : a.wFrom + '~' + a.wTo}주차 · {hrs(a.hours)}
       </p>
       <p style={{ fontWeight: 650, fontSize: 17, margin: '4px 0 14px' }}>{a.title}</p>
-      {a.task ? (
+      {(a.task || !a.res) ? (
         <div className="callout soft">
           <Icon name="flag" />
           <div>
             <b>직접 수행 과제</b>
             <br />
-            {a.how}
+            <TaskDescription text={a.how || ''} />
           </div>
         </div>
       ) : (
@@ -103,7 +105,7 @@ function RecBody({ pid, id }: { pid: string; id: string }) {
         </label>
         <BText path="tmp.memo" className="textarea sm" placeholder="한 일, 막힌 점, 다음에 할 일" />
       </div>
-      <div className="field">
+      {!isBook && <div className="field">
         <label>
           결과물·수료증 <span className="muted small">선택 · 서버에 보관(배포 때는 파일 저장소)</span>
         </label>
@@ -113,9 +115,9 @@ function RecBody({ pid, id }: { pid: string; id: string }) {
           </p>
         ) : null}
         <input className="input" type="file" id="recFile" onChange={(e) => (recFile = (e.target.files && e.target.files[0]) || null)} />
-      </div>
+      </div>}
       <Note>
-        메모·첨부는 나만 봐요.{sup ? ` 완료 여부는 부서장 ${sup.name} 님에게 진행 상태로 보여요.` : ''} 자료를 내지 않았다고 하지 않은 것으로 보지 않아요.
+        {isBook ? '메모는 나만 봐요.' : '메모·첨부는 나만 봐요.'}{sup ? ` 완료 여부는 부서장 ${sup.name} 님에게 진행 상태로 보여요.` : ''} {!isBook && '자료를 내지 않았다고 하지 않은 것으로 보지 않아요.'}
       </Note>
     </>
   );
@@ -158,5 +160,5 @@ export function openRecord(pid: string, id: string): void {
   const pr = R.progress[id] || {};
   updateWs((s) => void (s.tmp = { pid, id, status: st(R.progress, id), memo: pr.memo || '' }));
   recFile = null;
-  openSheet({ title: '실행 기록', sub: R.plan.goal, body: () => <RecBody pid={pid} id={id} />, foot: () => <RecFoot /> });
+  openSheet({ title: a.res ? '실행 기록' : '과제물 제출', sub: R.plan.goal, body: () => <RecBody pid={pid} id={id} />, foot: () => <RecFoot /> });
 }

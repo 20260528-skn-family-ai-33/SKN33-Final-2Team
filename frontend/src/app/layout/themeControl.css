@@ -1,0 +1,10 @@
+.ribbon .theme-compact { display: flex; align-items: center; gap: 8px; flex: none; }
+.ribbon .theme-compact .foot-lbl { margin: 0; color: #c9cac6; font-size: 11px; }
+.ribbon .theme { gap: 6px; }
+.ribbon .theme button { width: 18px; height: 18px; border-color: #1c1d20; box-shadow: 0 0 0 1px #777; }
+.ribbon .theme button.on { box-shadow: 0 0 0 2px #fff; }
+.ribbon .theme button:focus-visible { outline: 2px solid #fff; outline-offset: 4px; }
+@media (max-width: 420px) {
+  .ribbon { gap: 10px; padding-inline: 12px; }
+  .ribbon .theme-compact .foot-lbl { display: none; }
+}

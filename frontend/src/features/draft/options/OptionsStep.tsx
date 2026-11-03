@@ -1,16 +1,20 @@
+import { invalidateDraft } from '../invalidation';
+import { CourseSkills } from './CourseSkills';
+import { OptionSummary } from './OptionSummary';
+import { comparisonEvidence } from './comparisonEvidence';
 import { trackName } from '@/shared/constants/data';
 /* 5. 3안 비교표 (10/14 · 5차 scr['new-options']): 열 순서는 A1·A2·A3 고정.
    마음에 들지 않는 안은 요청을 적어 그 안만 다시 만들고(API-32 · 버전으로 쌓임), ‹ › 로 버전을 넘겨 본다 */
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { draftsApi } from '@/api/endpoints/drafts';
 import type { DraftDoc, OptionDef, RegenRequest } from '@/api/types/draft';
 import type { PlanContent } from '@/api/types/plan';
 import { paths } from '@/app/paths';
 import { D } from '@/shared/constants/data';
 import { useGo } from '@/shared/hooks/useGo';
-import { hrs, won } from '@/shared/lib/format';
-import { buildPlan, stageActs } from '@/shared/lib/plan';
-import { cause, PROV } from '@/shared/state/ai';
+import { hrs } from '@/shared/lib/format';
+import { buildPlan } from '@/shared/lib/plan';
+import { cause } from '@/shared/state/ai';
 import { setAt } from '@/shared/state/bind';
 import { resOf, useCatalog } from '@/shared/state/catalog';
 import { failToast } from '@/shared/lib/fail';
@@ -40,11 +44,16 @@ const regenErr = (d: DraftDoc, pid: string) => (d.gen && d.gen.regenErr && d.gen
 export async function choose(go: ReturnType<typeof useGo>, id: string): Promise<void> {
   try {
     await flush();
-    takeDraft(await draftsApi.select(ws().draftId as string, id));
-    go(paths.newReview);
+    takeDraft(await draftsApi.select(ws().draftId as string, id, comparisonEvidence(ws().draft.gen)));
+    go(paths.newMaterials);
   } catch (err) {
     if (!(err instanceof DraftSaveError)) failToast(err, '안을 고르지 못했어요');
   }
+}
+
+function regeneratePlan(pid: string) {
+  if (ws().draft.chosen === pid) updateWs(s => invalidateDraft(s, 'options'));
+  return draftCall('해당 계획을 다시 생성하지 못했어요', id => draftsApi.regenerate(id, pid, null), { soft: true });
 }
 
 async function ver(pid: string, dir: number): Promise<void> {
@@ -59,6 +68,7 @@ async function ver(pid: string, dir: number): Promise<void> {
     gg.cur = gg.cur || {};
     gg.cur[pid] = i;
     gg.options[pid] = list[i];
+    if (s.draft.chosen === pid) invalidateDraft(s, 'options');
     if (s.draftPlan && s.draftPlan.opt === pid) s.draftPlan = null;
   });
   try {
@@ -198,6 +208,10 @@ function useRegenToast(): void {
 }
 
 export function OptionsStep() {
+  const [supportOpen, setSupportOpen] = useState(false);
+  const [summariesOpen, setSummariesOpen] = useState(false);
+  const [skillsSaving, setSkillsSaving] = useState<Record<string, boolean>>({});
+  const handleSkillsSaving = useCallback((course: string, saving: boolean) => setSkillsSaving(old => old[course] === saving ? old : { ...old, [course]: saving }), []);
   const go = useGo();
   const d = useWs((s) => s.draft);
   useCatalog((s) => s.res);
@@ -212,17 +226,18 @@ export function OptionsStep() {
   const ps = optsOf(d);
   const cur = d.chosen;
   const colCls = (p: PlanContent) => (regenBusy(d, p.opt) ? 'busy' : undefined);
-  const src = (o: OptionDef) => (o.source && o.source !== 'mock' ? <span className="tag acc">{PROV[o.source] || 'API'} 작성</span> : <span className="tag">가데이터</span>);
   const off = ps.some((p) => p.def.offDomain);
   const missing = g.missing || [];
   const row = (k: string, f: (p: PlanContent, x: OptionDef) => React.ReactNode) => (
     <tr>
       <td className="k">{k}</td>
-      {ps.map((p) => (
-        <td key={p.opt} data-col={p.opt} className={colCls(p)}>
+      {D.optionOrder.map(id => {
+        const p = ps.find(plan => plan.opt === id);
+        return p ? (
+        <td key={p.opt} data-col={p.opt} className={colCls(p)} onClick={event => { if (!(event.target as HTMLElement).closest('button,a,input,summary')) setAt('draft.chosen', p.opt); }} style={{ cursor: 'pointer' }}>
           {f(p, p.def)}
         </td>
-      ))}
+      ) : <td key={id} data-col={id} className="muted">—</td>; })}
     </tr>
   );
   const Ver = ({ p }: { p: PlanContent }) => {
@@ -259,34 +274,19 @@ export function OptionsStep() {
     const busy = regenBusy(d, p.opt);
     const err = regenErr(d, p.opt);
     return (
-      <th key={p.opt} data-col={p.opt} className={colCls(p)}>
-        <label>
-          <input type="radio" name="pick" value={p.opt} checked={cur === p.opt} onChange={() => setAt('draft.chosen', p.opt)} />
-          <span>
-            <b>
-              {trackName(p.opt, p.name)}
-            </b>
-            <small>{p.tagline}</small>
-          </span>
-        </label>
+      <th key={p.opt} data-col={p.opt} className={colCls(p)} onClick={event => { if (!(event.target as HTMLElement).closest('button,a,input,label')) setAt('draft.chosen', p.opt); }} style={{ cursor: 'pointer' }}>
+        <div className="course-title-row">
+          <label><input type="radio" name="pick" value={p.opt} checked={cur === p.opt} onChange={() => setAt('draft.chosen', p.opt)} /><b>{trackName(p.opt, p.name)}</b></label>
+          <button type="button" className="course-regenerate" disabled={busy} onClick={() => void regeneratePlan(p.opt)}>{busy ? '계획 생성 중…' : '해당 계획 다시 생성'}</button>
+        </div>
+        <small className="course-tagline">{p.tagline}</small>
+        <OptionSummary id={`course-summary-${p.opt}`} reason={p.def.reason} pros={p.def.pros} expanded={summariesOpen} />
         <Ver p={p} />
-        <button className="regen" disabled={busy} onClick={() => openRegenSheet(p.opt)}>
-          {busy ? (
-            <>
-              <span className="sp" />
-              다시 쓰는 중…
-            </>
-          ) : (
-            <>
-              <Icon name="history" />이 안만 다시 만들기
-            </>
-          )}
-        </button>
         {err && !busy ? (
           <>
             <span className="small rev fail-t">
               <Icon name="x" />
-              <span>다시 만들지 못했어요 · {err.user}. 이전 안을 그대로 뒀어요. 다시 해 보려면 ‘이 안만 다시 만들기’를 눌러 주세요.</span>
+              <span>다시 만들지 못했어요 · {err.user}. 이전 안을 그대로 뒀어요. 다시 시도하려면 제목 옆 ‘해당 계획 다시 생성’을 눌러 주세요.</span>
             </span>
             <OpsBox items={[['', err]]} cls="sm" />
           </>
@@ -296,10 +296,10 @@ export function OptionsStep() {
   };
   return (
     <>
-      <Stepper cur="options" />
+      <Stepper cur="options" busy={Object.values(skillsSaving).some(Boolean)} />
       <Page
-        title={ps.length === 3 ? '로드맵 3안을 비교하고 골라 주세요' : ps.length === 1 ? '작성된 로드맵을 확인해 주세요' : `작성된 로드맵 ${ps.length}안을 비교하고 골라 주세요`}
-        lead="같은 목표와 학습 여건으로 방법만 달라요. 마음에 들지 않는 안은 바라는 점을 적어 그 안만 다시 만들 수 있고, 다시 만든 안은 버전으로 넘겨 볼 수 있어요."
+        title={ps.length === 3 ? '로드맵 제안' : ps.length === 1 ? '작성된 로드맵을 확인해 주세요' : `작성된 로드맵 ${ps.length}안을 비교하고 골라 주세요`}
+        lead="로드맵마다 추천하는 지식·역량을 확인하고, 포함 여부와 학습 순서를 정해 주세요. 해당 계획을 다시 생성하면 역량 추천도 다시 검토해요."
         foot={
           <>
             <button className="btn line" onClick={() => go(paths.newResult)}>
@@ -308,7 +308,7 @@ export function OptionsStep() {
             </button>
             <button
               className="btn pri"
-              disabled={!cur}
+              disabled={!cur || Object.values(skillsSaving).some(Boolean)}
               onClick={() => {
                 if (!cur) return;
                 if (regenBusy(ws().draft, cur)) {
@@ -323,81 +323,40 @@ export function OptionsStep() {
           </>
         }
       >
+        <style>{`.v2-course-boundaries [data-col]{border-left:3px solid #f2f2f2}.v2-course-boundaries [data-col]:last-child{border-right:3px solid #f2f2f2}`}</style>
         <div className="tblwrap">
-          <table className="cmp">
+          <table className="cmp v2-course-boundaries">
             <thead>
               <tr>
                 <th />
-                {ps.map(head)}
+                {D.optionOrder.map(id => {
+                  const p = ps.find(plan => plan.opt === id);
+                  if (p) return head(p);
+                  const running = d.genRun?.rows[id]?.st === 'run';
+                  return <th key={id} data-col={id}><div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                    <b>{trackName(id, D.perspectives[id].name)}</b><span style={{ color: 'var(--danger, #dc3545)', fontSize: 12 }}>생성되지 않음</span>
+                    <button className="link" disabled={running} onClick={() => void draftCall('계획을 재생성하지 못했어요', draftId => draftsApi.optionRetry(draftId, id), { soft: true })}>
+                      {running ? <><span className="sp" aria-hidden="true" /> 생성 중</> : '재생성'}
+                    </button></div></th>;
+                })}
               </tr>
+              {ps.some(plan => (plan.def.reason || '').trim().length > 48 || plan.def.pros.length > 2 || plan.def.pros.some(value => value.length > 32)) && <tr><th /><th colSpan={3} style={{ textAlign: 'center', padding: '2px 8px 7px', fontWeight: 400 }}><button type="button" className="course-more" aria-expanded={summariesOpen} aria-controls={ps.map(plan => `course-summary-${plan.opt}`).join(' ')} onClick={() => setSummariesOpen(open => !open)}>{summariesOpen ? '접기' : '더보기'}</button></th></tr>}
             </thead>
             <tbody>
-              {row('기간 · 주당', (p) => (
-                <>
-                  <span className="numv">{p.weeks}주</span> · 주 {p.hours}시간
-                  {d.handoff?.prefs.hoursAuto ? <small className="muted"> (에이전트가 정함)</small> : null}
-                </>
+              {row('예상 기간(주당)', (p) => (
+                <><span className="numv">{p.weeks}주</span> · 주 {p.hours}시간</>
               ))}
-              {row('예상 비용', (p) => (
-                <span className="numv">
-                  {won(p.cost)}
-                  {p.costUnknown ? ' + 확인 필요' : ''}
-                </span>
-              ))}
-              {row('활동', (p) => (
-                <details className="more" open>
-                  <summary>
-                    <Icon name="right" />
-                    {p.acts.length}개 보기
-                  </summary>
-                  <ul className="cmp-acts">
-                    {p.acts.map((a) => (
-                      <li key={a.id}>
-                        <ActThumb a={a} size="xs" />
-                        <span>
-                          {a.title}{' '}
-                          <span className="muted small">
-                            {a.task ? '직접 수행' : ''} {hrs(a.hours)}
-                          </span>
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              ))}
-              {row('지원 조건', (_p, x) => (
-                <SupCell o={x} />
-              ))}
-              {row('단계', (p) =>
-                D.stages
-                  .filter((s) => s.n >= p.start && stageActs(p, s.n).length)
-                  .map((s) => s.name)
-                  .join(' › '),
-              )}
-              {row('추천 이유', (_p, x) => x.reason)}
-              {row('좋은 점', (_p, x) => (
-                <ul>
-                  {x.pros.map((t, i) => (
-                    <li key={i}>{t}</li>
-                  ))}
-                </ul>
-              ))}
-              {row('아쉬운 점', (_p, x) => (
-                <ul>
-                  {x.cons.map((t, i) => (
-                    <li key={i}>{t}</li>
-                  ))}
-                </ul>
-              ))}
-              {row('작성', (_p, x) => src(x))}
+              {row('익히게 될 지식·역량', p => <CourseSkills option={p.def} disabled={regenBusy(d, p.opt)} onSavingChange={handleSkillsSaving} />)}
+              <tr><td className="k"><button className="link" aria-expanded={supportOpen} onClick={() => setSupportOpen(open => !open)}>지원 조건 {supportOpen ? '접기' : '보기'}</button></td>
+                {D.optionOrder.map(id => { const p = ps.find(plan => plan.opt === id); return <td key={id} data-col={id} className={p ? colCls(p) : undefined}>{p && supportOpen && <SupCell o={p.def} />}</td>; })}
+              </tr>
             </tbody>
           </table>
         </div>
         <SupNote />
-        {ps.some((p) => p.costUnknown) ? <Note>‘확인 필요’는 팀 DB에 가격이 없는 자료(도서 가격·응시료·K-MOOC 수강료 등)가 들어 있다는 뜻이에요. 예상 비용에는 넣지 않았어요.</Note> : null}
         {missing.length ? (
           <Note>
-            {missing.map((id) => `${D.perspectives[id].name}`).join(', ')}은 작성에 실패해 빠졌어요. 세 안을 다시 받으려면 ‘점검 결과’에서 ‘로드맵 생성’을 다시 눌러 주세요.
+            {missing.map((id) => `${D.perspectives[id].name}`).join(', ')}은 생성되지 않았어요. 코스 이름 옆 ‘재생성’으로 해당 코스만 다시 받을 수 있어요. 성공한 코스는 유지됩니다.
           </Note>
         ) : null}
         <Note>

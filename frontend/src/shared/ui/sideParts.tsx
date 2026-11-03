@@ -46,14 +46,14 @@ export function Brand() {
   );
 }
 
-export function ThemePicker() {
+export function ThemePicker({ compact = false }: { compact?: boolean }) {
   const theme = useTheme((s) => s.theme);
   return (
-    <div>
-      <div className="foot-lbl">테마 색상</div>
+    <div className={compact ? 'theme-compact' : undefined}>
+      <div className="foot-lbl">{compact ? '테마' : '테마 색상'}</div>
       <div className="theme" role="group" aria-label="테마 색상">
         {THEMES.map(([k, n, c]) => (
-          <button key={k} style={{ background: c }} className={theme === k ? 'on' : ''} title={n} aria-label={n} onClick={() => setTheme(k)} />
+          <button type="button" key={k} style={{ background: c }} className={theme === k ? 'on' : ''} title={n} aria-label={n} aria-pressed={theme === k} onClick={() => setTheme(k)} />
         ))}
       </div>
     </div>

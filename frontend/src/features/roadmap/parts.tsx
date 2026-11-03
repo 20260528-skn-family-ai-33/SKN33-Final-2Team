@@ -16,12 +16,13 @@ import { openRecord } from './RecordSheet';
 
 /** 활동 한 줄(홈·내 로드맵 진행 중). 줄 전체가 실행 기록 창을 여는 버튼이고, 상태는 보여 주기만 한다 */
 export function ActRow({ a, R }: { a: Activity; R: PlanRecord }) {
-  useCatalog((s) => s.res);
+  const resource = useCatalog(s => a.res ? s.res[a.res] : undefined);
+  const isCourse = resource?.type === 'course' || resource?.kind === '강좌';
   const done = st(R.progress, a.id) === 'done';
   const memo = R.progress[a.id]?.memo;
   return (
     <li>
-      <button className="act-row" aria-label={`${a.title}, ${done ? '완료' : '진행 중'}${memo ? ', 메모 있음' : ''}, 실행 기록 열기`} onClick={() => openRecord(R.id, a.id)}>
+      <button className="act-row" aria-label={`${a.title}, ${done ? '완료' : isCourse ? '미완료' : '진행 중'}${isCourse ? `, 진도 ${done ? 100 : 0}%` : ''}${memo ? ', 메모 있음' : ''}, 실행 기록 열기`} onClick={() => openRecord(R.id, a.id)}>
         <ActThumb a={a} />
         <span className="tx">
           {a.title}
@@ -33,10 +34,10 @@ export function ActRow({ a, R }: { a: Activity; R: PlanRecord }) {
         {done ? (
           <span className="tag acc">
             <Icon name="check" />
-            완료
+            {isCourse ? '완료 · 100%' : '완료'}
           </span>
         ) : (
-          <span className="tag">진행 중</span>
+          <span className="tag">{isCourse ? '미완료 · 0%' : '진행 중'}</span>
         )}
         <Icon name="right" cls="act-go" />
       </button>
@@ -239,7 +240,7 @@ export function postStart(go: ReturnType<typeof useGo>, pid: string): void {
         <p style={{ marginTop: 0 }}>
           아직 ‘진행 중’인 활동이 <b>{left}개</b> 있어요.
         </p>
-        <p className="small muted">지금 사후 점검을 하면 결과 보고서에 그 활동은 ‘진행 중’으로 남아요. 보고서를 확인하면 이 로드맵을 마친 것으로 기록해요.</p>
+        <p className="small muted">보고서는 생성 시점까지의 기록을 기준으로 작성하고, 남은 활동은 미완료로 보존해요. 보고서를 확인하면 최종 종료되어 다시 진행할 수 없어요. 나중에 이어 하려면 보관을 이용해 주세요.</p>
       </>
     ),
     foot: () => (

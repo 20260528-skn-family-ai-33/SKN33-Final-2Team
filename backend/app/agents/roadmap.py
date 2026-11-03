@@ -17,6 +17,8 @@ import copy
 import json
 import math
 import re
+import hashlib
+from uuid import uuid4
 
 from .. import catalog, catalog_budget, db, llm, track_policy
 from . import runtime as rt
@@ -59,8 +61,8 @@ def finish_option(pid: str, raw: dict, source: str, off_domain: bool = False, ke
         r = _res(rid)
         if rid and not r:
             continue
-        if pid == 'A1' and r and r.get('cost') != 0:
-            raise llm.LlmError('Free Track은 비용이 0으로 확인된 무료 자료만 허용합니다.')
+        if pid == 'A1' and r and r.get('type') != 'book' and r.get('cost') != 0:
+            raise llm.LlmError('Free Course의 강좌는 비용이 0으로 확인된 자료만 허용합니다. 도서는 가격을 제한하지 않습니다.')
         try:
             stage = min(4, max(1, round(float(a.get('stage') or 2))))
         except (TypeError, ValueError):
@@ -72,6 +74,8 @@ def finish_option(pid: str, raw: dict, source: str, off_domain: bool = False, ke
         hours = (r['hours'] if r and r['hours'] is not None else min(60, max(0.5, h_in))) if r else min(60, max(0.5, h_in))
         acts.append({'id': f'{pid.lower()}-{i + 1}', 'stage': stage, 'title': str(a.get('title') or (r['title'] if r else '직접 수행 과제'))[:80],
                      'res': rid, 'task': not rid, 'hours': hours, 'how': str(a.get('how') or '')})
+        if isinstance(a.get('skill'), str):
+            acts[-1]['skill'] = a['skill']
         if not rid:
             acts[-1]['skills'] = _task_skills(a.get('skills'))
         if keep_key and a.get('key') not in (None, ''):
@@ -93,12 +97,18 @@ def build_plan(d: dict, prm: dict, goal: str) -> dict:
     p = dict({'start': 1, 'hours': 4, 'format': 'mixed', 'patch': {}}, **(prm or {}))
     hrs = p['hours'] or AUTO_HOURS
     acts, cum = [], 0.0
+    schedule=d.get('materialSchedule')
+    slots={}; study_weeks=0
+    if schedule:
+        for row in schedule:
+            weeks=row['weeks'];slots[row['skill']]=(study_weeks+1,max(study_weeks+1,study_weeks+weeks));study_weeks+=weeks
     for a in d['acts']:
         if a['stage'] < p['start']:
             continue
         r = _res(a.get('res'))
         x = {'id': a['id'], 'stage': a['stage'], 'title': a['title'], 'res': a.get('res') or None, 'task': not a.get('res'), 'how': a.get('how') or '',
              'hours': (r['hours'] if r and r['hours'] is not None else a.get('hours') or 2) if a.get('res') else a.get('hours') or 2}
+        if a.get('skill'):x['skill']=a['skill']
         if not a.get('res') and a.get('skills'):
             x['skills'] = list(a['skills'])
         if r:
@@ -108,8 +118,9 @@ def build_plan(d: dict, prm: dict, goal: str) -> dict:
         x['wFrom'] = math.floor(cum / hrs) + 1
         cum += x['hours']
         x['wTo'] = max(x['wFrom'], math.ceil(cum / hrs))
+        if schedule and a.get('skill') in slots:x['wFrom'],x['wTo']=slots[a['skill']]
         acts.append(x)
-    weeks = max(1, math.ceil(cum / hrs))
+    weeks = study_weeks if schedule else max(1, math.ceil(cum / hrs))
     res_ids = list(dict.fromkeys(a['res'] for a in acts if a['res']))
     costs = [(_res(r) or {}).get('cost') for r in res_ids]
     return {'displayTitle': d.get('displayTitle') or '', 'opt': d['id'], 'name': d['name'], 'short': d['short'], 'tagline': d['tagline'], 'goal': goal, 'def': d, 'params': p, 'start': p['start'],
@@ -132,7 +143,7 @@ def keep_ids(d: dict, base: dict, ver: int) -> dict:
     """같은 활동은 이전 id를 이어 받는다: 0) 에이전트가 돌려준 원래 활동 key(같은 활동일 때만 · 10/23) 1) 같은 자료 또는 같은 제목의 과제
     2) 같은 단계 과제 중 제목이 다른 쪽을 포함. 제목을 다듬어도 key 로 진행 기록이 이어지게 하려는 것이다"""
     used, got = set(), set()
-    key = lambda a: ('r:' + a['res']) if a.get('res') else ('t:' + a['title'])  # noqa: E731
+    key = lambda a: ((('r:' + a['res']) if a.get('res') else ('t:' + a['title'])), a.get('skill'))  # noqa: E731
     norm = lambda t: re.sub(r'\s+', '', t or '')  # noqa: E731
     by_id = {x['id']: x for x in base['acts']}
     for i, a in enumerate(d['acts']):
@@ -154,7 +165,7 @@ def keep_ids(d: dict, base: dict, ver: int) -> dict:
     for i, a in enumerate(d['acts']):
         if i in got:
             continue
-        old = None if a.get('res') else next((x for x in base['acts'] if x['id'] not in used and not x.get('res') and x['stage'] == a['stage']
+        old = None if a.get('res') else next((x for x in base['acts'] if x['id'] not in used and not x.get('res') and x['stage'] == a['stage'] and x.get('skill') == a.get('skill')
                                               and (norm(x['title']) in norm(a['title']) or norm(a['title']) in norm(x['title']))), None)
         a['id'] = old['id'] if old else f"{d['id'].lower()}-v{ver}-{i + 1}"
         if old:
@@ -168,7 +179,7 @@ def _alt_same(rid: str, used: set, fmt: str | None, *, free_only: bool = False) 
         return None
     for k, x in sorted(_cat().items(), key=lambda kv: kv[1]['title']):
         if k != rid and k not in used and x['usable'] and x['kind'] != '자격' and x['stage'] == r['stage'] and (not fmt or x['format'] == fmt) \
-                and set(x['skills']) & set(r['skills']) and (not free_only or x.get('cost') == 0):
+                and set(x['skills']) & set(r['skills']) and (not free_only or x.get('type') == 'book' or x.get('cost') == 0):
             return k
     return None
 
@@ -184,13 +195,13 @@ def _filter_free_mock_acts(pid: str, acts: list[dict]) -> tuple[list[dict], list
             kept.append(act)
             continue
         resource = _res(rid)
-        if resource and resource.get('cost') == 0:
+        if resource and (resource.get('type') == 'book' or resource.get('cost') == 0):
             kept.append(act)
         else:
             excluded.append((resource or {}).get('title') or act.get('title') or rid)
     notes = []
     if excluded:
-        notes.append('Free Track은 무료 자료만 사용하므로 유료·비용 미확인 또는 조회되지 않는 자료를 제외했어요: ' + ', '.join(dict.fromkeys(excluded)))
+        notes.append('Free Course의 유료·비용 미확인 강좌 또는 조회되지 않는 자료를 제외했어요: ' + ', '.join(dict.fromkeys(excluded)))
     return kept, notes
 
 
@@ -305,6 +316,11 @@ def _catalog_payload(pid: str, payload: dict, system: str = '', extra_ids: list 
     payload = copy.deepcopy(payload)
     handoff = payload['handoff']
     texts = [handoff.get('goal') or '', handoff.get('projectSummary') or ''] + list(handoff.get('focus') or []) + list(handoff.get('gaps') or [])
+    # 같은 DB 태그라도 실제 적용 범위에 맞는 단원을 찾는다. 제외/비핵심 스킬은 검색에 섞지 않는다.
+    active = set(handoff.get('skillNames') or handoff.get('focus') or []) - set(handoff.get('excludedSkills') or [])
+    applications = [str(row.get('application') or '').strip()[:600] for row in handoff.get('skillDetails') or []
+                    if row.get('name') in active and row.get('application')]
+    texts += list(dict.fromkeys(applications))
     required = list(extra_ids or []) + list(handoff.get('selectedResourceIds') or [])
     cert = (handoff.get('prefs') or {}).get('certRes')
     if cert:
@@ -312,6 +328,16 @@ def _catalog_payload(pid: str, payload: dict, system: str = '', extra_ids: list 
     try:
         selection = catalog.roadmap_selection(texts, pid, skill_names=handoff.get('skillNames'),
                                              required=required, hints=handoff.get('resourceHints'))
+        from app.learner_knowledge import exclusion,from_profile
+        knowledge=handoff.get('learnerKnowledge') or from_profile(handoff.get('profile'))
+        if knowledge.get('technologies') or knowledge.get('certifications'):
+            selection=copy.copy(selection)
+            rejected={row['id']:exclusion(row,knowledge,handoff.get('goal') or '') for row in selection.records}
+            rejected={key:value for key,value in rejected.items() if value}
+            selection.records=[row for row in selection.records if row['id'] not in rejected]
+            selection.required=[key for key in selection.required if key not in rejected]
+            payload['learnerKnowledge']=knowledge
+            payload['learnerExclusions']=[{'id':key,'reason':value} for key,value in rejected.items()]
         if pid in track_policy.CANDIDATE_PREFERENCE:
             payload['trackGuidance'] = {'policyVersion': track_policy.VERSION,
                                         'candidatePreference': track_policy.CANDIDATE_PREFERENCE[pid],
@@ -395,9 +421,10 @@ JSON 형식(형식만 보여 주는 예): {{"tagline":"...","reason":"...","pros
 TRACK_PROMPT_AGENTS = {'A1': 'agent_certified', 'A2': 'agent_fasttrack', 'A3': 'agent_practical'}
 
 
-def _sys(pid: str, tpl: str) -> str:
+def _sys(pid: str, tpl: str, provenance: dict | None = None, evaluation_prompt: str | None = None) -> str:
     """DB 활성 버전 사용. 누락 또는 중복 시 코드 프롬프트로 대체하지 않는다."""
-    rows = db.all_('SELECT system_prompt FROM public.prompt_versions WHERE agent_id = :agent AND is_active', agent=TRACK_PROMPT_AGENTS[pid])
+    # 내부 비교 평가에서만 임시 전문을 사용한다. 운영 프롬프트를 DB에 쓰지 않고 재생한다.
+    rows = [{'system_prompt': evaluation_prompt}] if evaluation_prompt is not None else db.all_('SELECT prompt_version_id,system_prompt FROM public.prompt_versions WHERE agent_id = :agent AND is_active', agent=TRACK_PROMPT_AGENTS[pid])
     if len(rows) != 1:
         raise llm.LlmError('Track의 DB 활성 프롬프트가 정확히 하나 필요합니다.')
     sections = rows[0]['system_prompt'].split('\n### REVISION\n', 1)
@@ -406,6 +433,11 @@ def _sys(pid: str, tpl: str) -> str:
     text = sections[1] if tpl is REV_SYS else sections[0][len('### GENERATION\n'):]
     if not text.strip():
         raise llm.LlmError('DB Track 프롬프트가 비어 있습니다.')
+    if provenance is not None and rows[0].get('prompt_version_id'):
+        provenance.update(promptVersionId=str(rows[0]['prompt_version_id']), agentId=TRACK_PROMPT_AGENTS[pid],
+                          storedPromptHash=hashlib.sha256(rows[0]['system_prompt'].encode('utf-8')).hexdigest())
+    if pid == 'A1':
+        text += '\n[최신 Free Course 정책] 강좌는 0원만 허용한다. 도서는 가격·예산과 무관하게 유료·가격 미확인도 추천할 수 있다. 도서 비용은 표시하되 무료 강좌 제한에 포함하지 않는다.'
     return text.strip()
 
 
@@ -413,9 +445,32 @@ def _track_catalog(pid: str, handoff: dict, extra_ids: list | None = None) -> li
     return agent_catalog(handoff, extra_ids, free_only=pid == 'A1', track=pid)
 
 
+def _validate_learning_acts(raw,handoff):
+    from app.learner_knowledge import exclusion,from_profile
+    knowledge=handoff.get('learnerKnowledge') or from_profile(handoff.get('profile'))
+    for act in raw.get('acts') or []:
+        resource=_res(act.get('res')) if isinstance(act,dict) and act.get('res') else None
+        reason=exclusion(resource,knowledge,handoff.get('goal') or '') if resource else None
+        if reason:raise llm.LlmError(f'기존 지식 반영 필요: {reason}')
+
+
 def option(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
     """inp: pid, handoff, variant?, request?, previousDef?, previous?"""
     pid = inp['pid']
+    if inp['handoff'].get('assessmentGenerationId'):
+        inp = dict(inp, handoff=copy.deepcopy(inp['handoff']))
+        inp['handoff']['courseSkillSelection']=True
+    if pid == 'A2' and inp['handoff'].get('assessmentGenerationId'):
+        inp = dict(inp, handoff=copy.deepcopy(inp['handoff']))
+        handoff = inp['handoff']
+        previous_focus = list(handoff['focus'])
+        handoff['focus'] = handoff['focus'][:3]
+        handoff['excludedSkills'] = list(handoff.get('excludedSkills') or []) + previous_focus[3:]
+        handoff['skillDetails'] = [row for row in handoff.get('skillDetails', []) if row['name'] in handoff['focus']]
+        if handoff.get('skillMaterials'):
+            handoff['resourceHints'] = list(dict.fromkeys(rid for name in handoff['focus'] for rid in [handoff['skillMaterials'][name]['course']] + handoff['skillMaterials'][name]['books'] if rid))
+        handoff['skillOrder'] = handoff.get('skillOrder', handoff['focus'])[:3]
+        handoff['agentNotes'] = list(handoff.get('agentNotes') or []) + ['Crash Course는 우선순위 상위 3개 역량만 다룬다. 다른 역량을 추가하지 않는다.']
 
     def api(_):
         extra = ('\n- 사용자가 요청(request)과 함께 이 관점의 안을 다시 만들어 달라고 했다. previous(지금 안)를 바탕으로 request를 반영해 고친다.\n'
@@ -424,18 +479,35 @@ def option(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
                  '  · summary에 바꾼 점을 한 문장으로 쓰고, 반영하지 못한 요청은 notes에 쓴다. JSON에 "summary":"...","notes":[] 를 더한다.') if inp.get('request') else \
             ('\n- 사용자가 이 관점의 안을 다시 요청했다. previous와 활동 구성이 분명히 다르게 쓴다. 관점과 한도는 그대로 지킨다.' if inp.get('previous') else '')
         prev_ids = [a.get('res') for a in ((inp.get('previous') or {}).get('acts') or [])]
-        system = _sys(pid, R_SYS) + extra
+        from app.learner_knowledge import POLICY
+        provenance = {}
+        system = _sys(pid, R_SYS, provenance, inp.get('_evaluationPrompt')) + extra + POLICY + track_policy.challenge_guidance(pid, 'plan')
+        if inp['handoff'].get('courseSkillSelection'):
+            from app.services.course_skills import CONTRACT
+            system += CONTRACT
         payload = _catalog_payload(pid, {'handoff': inp['handoff'], 'skillTags': catalog.skill_names(),
-                                        'previous': inp.get('previous'), 'request': inp.get('request')}, system, prev_ids,
+                                        'previous': inp.get('previous'), 'previousLearningSkills': (inp.get('previousDef') or {}).get('learningSkills'), 'request': inp.get('request')}, system, prev_ids,
                                    rt.S.ollama_num_ctx if ctx.mode == 'ollama' else 16384)
         r = rt.llm_json(ctx, system, payload, role='roadmap')
+        _validate_learning_acts(r,inp['handoff'])
         o = finish_option(pid, r, ctx.mode)
+        if provenance:
+            o['optionId'] = str(uuid4())
+            o['promptProvenance'] = dict(provenance, source=ctx.mode,
+                                        effectivePromptHash=hashlib.sha256(system.encode('utf-8')).hexdigest())
+        if inp['handoff'].get('courseSkillSelection'):
+            from app.services.course_skills import validate_recommendations, recommendation_key
+            allowed={row['name'] for row in payload['handoff'].get('skillDetails',[])}
+            try:o['learningSkills']=validate_recommendations(r.get('learningSkills'),allowed,pid,require_depth=True)
+            except ValueError as error:raise llm.LlmError(str(error)) from error
+            o['learningSkillsVersion']=str(uuid4())
+            o['learningSkillsKey']=recommendation_key(o)
         if inp.get('request'):
             o.update(summary=str(r.get('summary') or '').strip()[:80], notes=rt.arr(r.get('notes'), 3))
         return o
     task = f"{D['perspectives'][pid]['name']} {'요청 반영해 다시 작성' if inp.get('request') else '다시 작성' if inp.get('variant') else '작성'}"
     return rt.run(ctx, f'로드맵 계획 · {pid}', task, inp, _mock_option, api, role='roadmap', sim=sim, mock_delay=0.7 + D['optionOrder'].index(pid) * 0.26,
-                  log_input={k: v for k, v in inp.items() if k != 'previousDef'})
+                  log_input={k: v for k, v in inp.items() if k not in ('previousDef', '_evaluationPrompt')})
 
 
 # ── 수정안 (확정한 로드맵) ──
@@ -450,7 +522,7 @@ def _mock_revise(inp: dict) -> dict:
         done.append(f"{pid} {D['perspectives'][pid]['name']}으로 다시 쓰기")
     else:
         acts = [{'key': a['id'], 'stage': a['stage'], 'title': a['title'], 'res': a.get('res'), 'hours': a.get('hours'), 'how': a.get('how'), 'done': a.get('done'),
-                 'skills': a.get('skills')} for a in plan['acts']]
+                 'skills': a.get('skills'), 'skill': a.get('skill')} for a in plan['acts']]
     used = lambda: {a['res'] for a in acts if a.get('res')}  # noqa: E731
     if c.get('startStage'):
         if not c.get('perspective') and c['startStage'] < plan['start']:
@@ -552,7 +624,7 @@ REV_SYS = """너는 GrowPath '로드맵 계획 에이전트'의 관점별 하위
 
 [무엇을 바꾸나]
 - changes의 항목은 반드시 반영한다. request는 사용자가 적은 요청 문장이다(부서장 코멘트에서 옮긴 것일 수 있다). 함께 반영하고, 둘이 부딪히면 changes를 따른다.
-- 바꾸지 않는 활동은 current의 stage·title·res·hours·how·skills를 글자 그대로 쓴다. 표현만 다듬지 않는다. 요청과 관계없는 주당 시간도 그대로 둔다.
+- 바꾸지 않는 활동은 current의 stage·title·res·hours·how·skills·skill을 글자 그대로 쓴다. 표현만 다듬지 않는다. 요청과 관계없는 주당 시간도 그대로 둔다.
 - 활동마다 key를 쓴다. current의 활동을 그대로 두거나 단계·시간·설명만 고친 활동은 그 활동의 key를 그대로 쓴다(진행 기록이 key로 이어진다). 다른 자료·다른 과제로 바꾸거나 새로 넣은 활동은 key를 null로 둔다.
 - 완료한 활동(done: true)은 요청이 없으면 빼거나 바꾸지 않는다. 요청에 없는 활동을 새로 더하지 않는다.
 - changes.perspective가 있으면 너의 관점으로 로드맵을 새로 쓴다. current는 참고만 하고, 계속 쓸 자료와 완료한 활동은 그대로 둔다.
@@ -590,17 +662,35 @@ def revise(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
 
     def api(_):
         current = {'perspective': f"{pl['opt']} {pl['name']}", 'weeklyHours': pl['hours'], 'startStage': pl['start'],
-                   'acts': [dict({'key': a['id'], 'stage': a['stage'], 'title': a['title'], 'res': a.get('res'), 'hours': a.get('hours'), 'how': a.get('how') or '', 'done': a.get('done')},
+                   'acts': [dict({'key': a['id'], 'stage': a['stage'], 'title': a['title'], 'res': a.get('res'), 'hours': a.get('hours'), 'how': a.get('how') or '', 'done': a.get('done'), 'skill': a.get('skill')},
                                  **({} if a.get('res') else {'skills': a.get('skills') or []})) for a in pl['acts']]}
         removed = {a.get('key') for a in (inp['changes'].get('removeActs') or []) + (inp['changes'].get('replaceActs') or [])}
         extra_ids = [a.get('res') for a in pl['acts'] if a['id'] not in removed] + list(inp['changes'].get('addResources') or [])
-        system = _sys(pid, REV_SYS)
-        payload = _catalog_payload(pid, {'current': current, 'handoff': inp['handoff'], 'changes': inp['changes'],
+        # 이전 자료 선택 스냅샷이 제외·교체 요청을 다시 필수 후보로 되살리지 않게 한다.
+        handoff = copy.deepcopy(inp['handoff'])
+        gone_resources = {a.get('res') for a in pl['acts'] if a['id'] in removed and a.get('res')} - set(extra_ids)
+        handoff['selectedResourceIds'] = [rid for rid in handoff.get('selectedResourceIds') or [] if rid not in gone_resources]
+        if (handoff.get('prefs') or {}).get('certRes') in gone_resources:
+            handoff['prefs'] = dict(handoff['prefs'], certRes=None)
+        from app.learner_knowledge import POLICY
+        system = _sys(pid, REV_SYS, evaluation_prompt=inp.get('_evaluationPrompt')) + POLICY + track_policy.challenge_guidance(pid, 'tasks')
+        current['learningSkills'] = (pl.get('def') or {}).get('learningSkills') or []
+        if (pl.get('def') or {}).get('learningReport'):
+            current['skillOrder'] = pl['def']['learningReport']['skillOrder']
+            system += '\n각 활동에 소속 skill을 skillOrder 중 정확히 하나로 반환한다. 유지 활동은 key와 skill을 보존한다. 추가·교체 활동도 실제 소속을 명시한다. 과제의 skills 태그 목록과 단일 소속 skill은 구분한다.'
+        payload = _catalog_payload(pid, {'current': current, 'skillTargets': current['learningSkills'], 'handoff': handoff, 'changes': inp['changes'],
                                         'request': inp.get('request'), 'skillTags': catalog.skill_names()}, system, extra_ids,
                                    rt.S.ollama_num_ctx if ctx.mode == 'ollama' else 16384)
         r = rt.llm_json(ctx, system, payload, role='roadmap')
+        _validate_learning_acts(r,inp['handoff'])
         o = finish_option(pid, r, ctx.mode, keep_key=True)
         o.update(summary=str(r.get('summary') or '').strip()[:80], notes=rt.arr(r.get('notes'), 4))
         return o
+    from app.services.material_plan import rebuild_revision
+    def checked(callback):
+        def run(data):
+            result = _drop_gone_keys(callback(data), inp['changes'])
+            return rebuild_revision(result, pl, inp['handoff'])
+        return run
     task = '관점 바꿔 다시 작성' if inp['changes'].get('perspective') else '수정안 작성'
-    return _drop_gone_keys(rt.run(ctx, f'로드맵 계획 · {pid}', task, inp, _mock_revise, api, role='roadmap', sim=sim, mock_delay=0.9), inp['changes'])
+    return _drop_gone_keys(rt.run(ctx, f'로드맵 계획 · {pid}', task, inp, checked(_mock_revise), checked(api), role='roadmap', sim=sim, mock_delay=0.9), inp['changes'])
