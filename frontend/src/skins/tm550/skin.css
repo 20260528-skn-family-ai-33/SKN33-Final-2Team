@@ -237,6 +237,16 @@
   .report-survey-post, .report-answer-post .report-answer-phase { color: #60A5FA; }
   .report-answer-pre .is-selected { border-color: #F87171; background: rgba(248, 113, 113, .12); color: #FCA5A5; }
   .report-answer-post .is-selected { border-color: #60A5FA; background: rgba(96, 165, 250, .12); color: #93C5FD; }
+  /* #59 로 들어온 역량 테스트 결과 보기도 정답·오답 칸과 문항 번호에 옅은 바탕색을 직접 적어, 어두운 화면에서 밝은 상자로 튄다
+     → 어두운 바탕에 밝은 글자로(파랑 정답 · 빨강 오답 · 초록 고른 정답은 그대로) */
+  .v2-survey-review label.answer-correct { border-color: rgba(96, 165, 250, .5); background: rgba(96, 165, 250, .12); color: #93C5FD; }
+  .v2-survey-review label.answer-wrong { border-color: rgba(248, 113, 113, .5); background: rgba(248, 113, 113, .12); color: #FCA5A5; }
+  .v2-survey-review label.answer-chosen-correct { border-color: #4ADE80; background: rgba(74, 222, 128, .12); color: #86EFAC; }
+  .v2-survey-review label.answer-correct input { accent-color: #60A5FA; }
+  .v2-survey-review label.answer-wrong input { accent-color: #F87171; }
+  .v2-survey-review label.answer-chosen-correct input { accent-color: #4ADE80; }
+  .v2-survey-review .quiz-result-number.correct { border-color: rgba(74, 222, 128, .45); background: rgba(74, 222, 128, .12); color: #86EFAC; }
+  .v2-survey-review .quiz-result-number.wrong { border-color: rgba(248, 113, 113, .45); background: rgba(248, 113, 113, .12); color: #FCA5A5; }
   .adm-tbl th { background: var(--surface-2); }
   .v2-survey .primary { color: var(--tm-on-accent); }
   .login-side > p, .login-side .small { color: var(--ink-3); }

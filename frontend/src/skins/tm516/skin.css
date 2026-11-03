@@ -191,6 +191,12 @@
   .feat { background: rgba(255, 255, 255, .14); border-color: rgba(255, 255, 255, .3); }
   .feat .ico { border-radius: 100%; background: var(--tm-indigo); }
 
+  /* #59 로 들어온 화면(입력 확인 · 스킬 순서 · 3안 자료 비교) 보정
+     - 입력 확인 상자는 안쪽 카드를 평평하게 펴는데, 이 테마의 카드 그림자 규칙이 더 강해 그림자가 남는다 → 끈다
+     - 스킬 번호·고른 자료 탭·펼친 자료 단추 글자를 강조색으로 적어, 이 테마의 밝은 강조색은 옅은 강조 바탕 위에서 흐리다 → 글자용 강조색으로 */
+  .input-confirm-box > .card { box-shadow: none; }
+  .skill-confirm-number, .input-skill-number, .material-skill-tabs > button[aria-selected=true], .material-expand.is-open { color: var(--accent-ink); }
+
   /* ── 좁은 화면(900px 이하): 두 버전 모두 원래의 한 줄 메뉴 배치에 색만 ── */
   @media (max-width: 900px) {
     .side { border-bottom: 0; background: #fff; box-shadow: 0 1px 30px rgba(0, 0, 0, .1); color: #454545; }

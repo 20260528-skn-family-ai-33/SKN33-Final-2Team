@@ -243,6 +243,10 @@
   .ls-card:nth-child(2) .ls-art { background-image: url('./photo-3.jpg'), url('./photo-4.jpg'); }
   .ls-card:nth-child(3) .ls-art { background-image: url('./photo-6.jpg'), url('./photo-5.jpg'); }
 
+  /* #59 로 들어온 화면(입력 확인 · 스킬 순서 · 3안 자료 비교) 보정
+     - 입력 확인 상자는 안쪽 카드를 평평하게 펴는데, 이 테마의 카드 그림자 규칙이 더 강해 그림자가 남는다 → 끈다 */
+  .input-confirm-box > .card { box-shadow: none; }
+
   /* ── 좁은 화면(900px 이하): 원래의 한 줄 메뉴 배치에 색만 ── */
   @media (max-width: 900px) {
     .side { background: linear-gradient(rgba(31, 39, 43, .55), rgba(31, 39, 43, .55)), url('./heading-bg.jpg') center 30% / cover; border-bottom: 0; color: #fff; }

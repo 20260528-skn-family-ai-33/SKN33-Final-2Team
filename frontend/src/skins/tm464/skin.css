@@ -310,6 +310,10 @@
   .ls-art::after { content: ''; position: absolute; inset: 0; background: var(--accent); opacity: 0; transition: opacity .4s ease-in-out; }
   .ls-card:hover .ls-art::after { opacity: .8; }
 
+  /* #59 로 들어온 화면(입력 확인 · 스킬 순서 · 3안 자료 비교) 보정
+     - 스킬 번호·고른 자료 탭·펼친 자료 단추 글자를 강조색으로 적어, 이 테마의 밝은 강조색은 옅은 강조 바탕 위에서 흐리다 → 글자용 강조색으로 */
+  .skill-confirm-number, .input-skill-number, .material-skill-tabs > button[aria-selected=true], .material-expand.is-open { color: var(--accent-ink); }
+
   /* ── 좁은 화면(900px 이하): 원래의 한 줄 메뉴 배치를 쓰고 색·글자만 맞춘다 ── */
   @media (max-width: 900px) {
     .side { background: #fff; border-bottom: 0; box-shadow: 0 2px 8px 0 rgba(50, 50, 50, .08); }

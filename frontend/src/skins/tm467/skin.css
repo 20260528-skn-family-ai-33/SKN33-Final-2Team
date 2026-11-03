@@ -195,6 +195,10 @@
   .feat { background: rgba(255, 255, 255, .12); border-color: rgba(255, 255, 255, .25); }
   .feat .ico { border-radius: 50%; background: #fff; color: var(--accent); }
 
+  /* #59 로 들어온 화면(입력 확인 · 스킬 순서 · 3안 자료 비교) 보정
+     - 입력 확인 상자는 안쪽 카드를 평평하게 펴는데, 이 테마의 카드 그림자 규칙이 더 강해 그림자가 남는다 → 끈다 */
+  .input-confirm-box > .card { box-shadow: none; }
+
   /* ── 좁은 화면(900px 이하): 두 버전 모두 원래의 한 줄 메뉴 배치에 색만 ── */
   @media (max-width: 900px) {
     .side { border-bottom: 0; background: linear-gradient(rgba(32, 64, 144, .35), rgba(32, 64, 144, .6)), url('./sky.jpg') center / cover; color: #fff; }
