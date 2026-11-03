@@ -6,6 +6,7 @@ import { useWs, ws } from '@/shared/state/workspace';
 import { reviewScope } from './reviewScope';
 import { reviewTasks } from './reviewTasks';
 import { flush, takeDraft } from '../draftSync';
+import { totalWeeks } from '../result/skillOrder';
 
 type Activity = { res?: string | null; id: string; title: string; skill: string; how: string; hours: number };
 type Proposal = { id: string; key: string; skillProposalIds?: Record<string, string>; skillSummaries?: Record<string, string[]>; option: { acts: Activity[] }; selectedIds: string[] };
@@ -99,9 +100,8 @@ function ScopedDeliverableSelection({ ref, onReadyChange, onBusyChange, onDurati
   }, [scope, loading, busy, versions, chosen, skillPicks]);
   useEffect(() => {
     if (!materials) { onDurationChange(null); return; }
-    const names = (materials.skillOrder || materials.recommendations?.skills.map(skill => skill.name) || []).filter(name => materials.choices[name]?.enabled !== false);
-    const values = names.map(name => materials.durationEstimates?.[name]?.weeks);
-    onDurationChange(values.length && values.every(value => typeof value === 'number') ? values.reduce<number>((sum, value) => sum + (value || 0), 0) : null);
+    const names = materials.skillOrder || materials.recommendations?.skills.map(skill => skill.name) || [];
+    onDurationChange(totalWeeks(names, materials.choices, materials.durationEstimates || {}));
   }, [materials, onDurationChange]);
   useEffect(() => onReadyChange(!!proposal?.selectedIds.length && !loading), [proposal, loading, onReadyChange]);
   useEffect(() => onBusyChange(busy || loading), [busy, loading, onBusyChange]);

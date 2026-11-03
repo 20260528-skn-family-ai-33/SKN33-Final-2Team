@@ -207,7 +207,13 @@ def recommendation_view(saved: dict) -> dict:
 @r.get('/api/v2/drafts/{project_id}/recommendations')
 def get_recommendations(project_id: UUID, a: Account = Depends(require_employee), course: str | None = None):
     with db.tx() as t:
-        return recommendation_view(course_context(t, a.id, str(project_id), course))
+        saved=course_context(t, a.id, str(project_id), course)
+        if (saved.get('recommendations') or {}).get('skills') and saved.get('resourceChoices'):
+            from app.services.material_plan import duration_estimates
+            from app.services import drafts as draft_service
+            draft=draft_service._row(t,a.id,str(project_id),lock=False)['draft_choices'].get('draft') or {}
+            saved['durationEstimates']=duration_estimates(saved,draft)
+        return recommendation_view(saved)
 
 
 @r.post('/api/v2/drafts/{project_id}/recommendations')
@@ -260,9 +266,13 @@ def generate_durations(project_id: UUID, body: ChoicesBody, a: Account = Depends
             raise ApiError(409,'RECOMMENDATIONS_CHANGED','점검 또는 추천이 변경됐어요.')
         selected_course=course_input(t,a.id,str(project_id),course)
         weekly=(selected_course or {}).get('weeklyHours') or AUTO_HOURS
-        proposals=calculate_durations(dict(pre['project'], selectedCourse=selected_course),recommendations,body.choices,
+        project=deepcopy(pre['project'])
+        if selected_course:
+            project.setdefault('details',{})['hours']=weekly
+        proposals=calculate_durations(dict(project, selectedCourse=selected_course),recommendations,body.choices,
             body.skillOrder if body.skillOrder is not None else pre.get('skillOrder',[row['name'] for row in recommendations['skills']]),weekly)
-        preview=dict(pre,durationEstimates={**(pre.get('durationEstimates') or {}),**proposals})
+        preview=dict(pre,durationEstimates=proposals,resourceChoices=deepcopy(body.choices),
+                     skillOrder=body.skillOrder if body.skillOrder is not None else pre.get('skillOrder'))
         return recommendation_view(preview)
 
 

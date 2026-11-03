@@ -8,6 +8,7 @@ import { resOf } from '@/shared/state/catalog';
 import { hrs, won } from './format';
 import { prefText } from './prefs';
 import { resourceSource } from './resourceSource';
+import { applyMaterialSchedule } from './materialSchedule';
 
 export const stageName = (n: number): string => D.stages.find((s) => s.n === n)?.name || '';
 
@@ -55,7 +56,7 @@ export function buildPlan(def: OptionDef, prm: Partial<PlanParams>, goal: string
   const resIds = [...new Set(acts.map((a) => a.res).filter(Boolean) as string[])];
   const cost = resIds.reduce((s, r) => s + (resOf(r)?.cost || 0), 0);
   const costUnknown = resIds.some((r) => !resOf(r) || resOf(r)?.cost == null);
-  return {
+  return applyMaterialSchedule({
     displayTitle: def.displayTitle,
     opt: def.id,
     name: def.name,
@@ -72,7 +73,7 @@ export function buildPlan(def: OptionDef, prm: Partial<PlanParams>, goal: string
     weeks,
     cost,
     costUnknown,
-  };
+  });
 }
 
 export const range = (acts: Activity[]): string => {

@@ -17,3 +17,8 @@ it('one skill, different courses, books, and tasks are not merged',()=>{
 it('each roadmap is grouped independently',()=>{
  expect(sharedCourses([activity('a','SQL','c',1,2)],resources)).toEqual([]);expect(sharedCourses([activity('b','Python','c',3,4)],resources)).toEqual([]);
 });
+it('canonical shared course window is preserved instead of expanding through a later skill span',()=>{
+ const acts=[{...activity('one','SQL','c',1,2),resourceWindow:{from:1,to:2}},activity('two','Python','c',4,5)];
+ const before=JSON.stringify(acts),group=sharedCourses(acts,resources)[0];
+ expect([group.from,group.to]).toEqual([1,2]);expect(group.skills).toEqual(['SQL','Python']);expect(JSON.stringify(acts)).toBe(before);
+});

@@ -27,7 +27,8 @@ JSON: {"skillSummaries":{"선택 스킬명":["통합 역량 명사형 요약 1",
 
 def materials_key(saved):
     data = [saved['generationId'], (saved.get('recommendations') or {}).get('id'),
-            saved.get('resourceChoices'), saved.get('skillOrder') or [row['name'] for row in (saved.get('recommendations') or {}).get('skills', [])]]
+            saved.get('resourceChoices'), saved.get('skillOrder') or [row['name'] for row in (saved.get('recommendations') or {}).get('skills', [])],
+            (saved.get('project') or {}).get('details')]
     return sha256(json.dumps(data, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
 
 
@@ -36,7 +37,9 @@ def materials_ready(saved):
 
 
 def fingerprint(saved, draft):
-    data=[saved['generationId'], (saved.get('recommendations') or {}).get('id'), saved.get('resourceChoices'), saved.get('skillOrder'), draft.get('chosen'), (draft.get('handoff') or {}).get('key')]
+    data=[saved['generationId'], (saved.get('recommendations') or {}).get('id'), saved.get('resourceChoices'), saved.get('skillOrder'), draft.get('chosen'), (draft.get('handoff') or {}).get('key'),
+          ((draft.get('handoff') or {}).get('prefs') or {}).get('weeklyHours'),
+          ((((draft.get('gen') or {}).get('options') or {}).get(draft.get('chosen')) or {}).get('weeklyHours'))]
     return sha256(json.dumps(data,ensure_ascii=False,sort_keys=True).encode()).hexdigest()
 
 def current_record(saved, draft):
@@ -162,15 +165,18 @@ def selection_option(saved,draft,selected,proposal_id_=None):
     option=deepcopy(record['option']);option['acts']=[a for a in option['acts'] if a['id'] in selected]
     estimates=saved.get('durationEstimates') or {}
     names=[name for name in saved.get('skillOrder',[]) if saved['resourceChoices'][name].get('enabled',True)]
-    if names and all(isinstance((estimates.get(name) or {}).get('weeks'),int) for name in names):
-        option['materialSchedule']=[{'skill':name,'weeks':estimates[name]['weeks']} for name in names]
     if (saved.get('recommendations') or {}).get('skills'):
-        from app.services.material_plan import report
+        from app.services.material_plan import report, duration_estimates
+        from app.services.duration_proposals import schedule_rows
+        estimates=duration_estimates(saved,draft)
+        option['materialSchedule']=schedule_rows(estimates)
         summaries=record.get('skillSummaries') or {}
         if not summaries:
             from app.services.learning_outcomes import current
             summaries=current(saved,draft) or {}
-        option['learningReport']=report(saved,summaries)
+        option['learningReport']=report(dict(saved,durationEstimates=estimates),summaries)
+    elif names and all(isinstance((estimates.get(name) or {}).get('weeks'),int) for name in names):
+        option['materialSchedule']=[{'skill':name,'weeks':estimates[name]['weeks']} for name in names]
     return option
 
 def compose_skill_selection(saved,draft,base_id,picks):

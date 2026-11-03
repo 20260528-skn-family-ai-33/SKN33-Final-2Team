@@ -14,9 +14,10 @@ class DurationTests(unittest.TestCase):
  def test_unknown_course_hours_is_one_week(self):
   self.rec['skills'][0]['courses'][0]['hours']=None
   self.assertEqual(self.compute()['A']['weeks'],2)
- def test_estimated_hours_treated_as_unconfirmed(self):
+ def test_estimated_hours_used_without_claiming_confirmed(self):
   self.rec['skills'][0]['courses'][0]['estimated']=['hours']
-  self.assertEqual(self.compute()['A']['courseWeeks'],1)
+  self.assertEqual(self.compute()['A']['courseWeeks'],2)
+  self.assertEqual(self.compute()['A']['estimatedCourses'],['Ac'])
  def test_course_weekly_hours_used_if_no_input(self):
   self.project['details']['hours']=''
   self.assertEqual(self.compute(4)['A']['weeks'],3)

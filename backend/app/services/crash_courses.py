@@ -4,9 +4,9 @@ from __future__ import annotations
 import math
 from copy import deepcopy
 from itertools import product
-from app.services.resource_evidence import facts, hours, outline
+from app.services.resource_evidence import facts, hours, suitable, suitability_key
 
-VERSION = 'crash-short-courses/20261103-v4'
+VERSION = 'crash-short-courses/20261104-v5-stage-evidence'
 REVIEW_LIMIT = 20
 SIMILARITY_WINDOW = .10
 
@@ -16,19 +16,25 @@ def is_crash(course) -> bool:
 
 
 def quality(info: dict, skill: str) -> tuple:
-    return (skill not in info['supported'], bool(info['hasAnchors'] and not info['anchorHits']),
-            not info['scopeEvidence'].get(skill, True))
+    return suitability_key(info, skill)
 
 
 def rank(rows: list[dict], project: dict, selection: dict, skill: dict, *, limit: int | None = None,
          cache: dict | None = None, similarity_gate: bool = True) -> list[dict]:
     """입력 시간을 바꾸지 않고 관련성이 가까운 후보를 시간 효율 순으로 정렬한다."""
     rows = list(rows)
-    scores = [float(row['retrievalScore']) for row in rows if row.get('retrievalScore') is not None]
+    cache = cache if cache is not None else {}
+    for row in rows:
+        if row['id'] not in cache:
+            cache[row['id']] = facts(row, project, selection)
+    # 소개 단원의 높은 유사도가 실제 구현 후보를 검토 창에서 밀어내지 않게 한다.
+    best = min((quality(cache[row['id']], skill['name']) for row in rows), default=None)
+    scores = [float(row['retrievalScore']) for row in rows if row.get('retrievalScore') is not None
+              and quality(cache[row['id']], skill['name']) == best]
     if similarity_gate and scores:
         minimum = max(scores) - SIMILARITY_WINDOW
-        rows = [row for row in rows if row.get('retrievalScore') is not None and float(row['retrievalScore']) >= minimum]
-    cache = cache if cache is not None else {}
+        rows = [row for row in rows if quality(cache[row['id']], skill['name']) != best
+                or (row.get('retrievalScore') is not None and float(row['retrievalScore']) >= minimum)]
 
     def key(row):
         if row['id'] not in cache:
@@ -37,7 +43,7 @@ def rank(rows: list[dict], project: dict, selection: dict, skill: dict, *, limit
         duration = hours(row)
         estimated = 'hours' in (row.get('estimated') or []) or row.get('timeStatus') == 'estimated'
         certainty = 2 if duration is None else 1 if estimated else 0
-        coverage = max(1, len(info['supported']))
+        coverage = max(1, sum(suitable(info, selected['name']) for selected in selection['skills']))
         # 여러 스킬의 학습 근거가 있을 때만 같은 강좌를 공유할 수 있는 효율을 인정한다.
         effective = duration / coverage if duration is not None else math.inf
         return (*quality(info, skill['name']), certainty, effective, duration or math.inf, -coverage,
@@ -71,9 +77,15 @@ def align_shared_courses(pools: list[dict], project: dict, selection: dict, cach
             if row['id'] not in cache:
                 cache[row['id']] = facts(row, project, selection)
         best = min(quality(cache[row['id']], pool['name']) for row in pool['courses'])
-        if best[0]:
-            return pools  # 해당 스킬의 학습 근거가 없으면 공동 학습을 확정하지 않는다.
-        groups.append([row for row in pool['courses'] if quality(cache[row['id']], pool['name']) == best][:6])
+        if not any(suitable(cache[row['id']], pool['name']) for row in pool['courses']):
+            return pools  # 해당 스킬의 적용 단계·기술 근거가 없으면 공동 학습을 확정하지 않는다.
+        if (pool.get('courseDiagnostic') or {}).get('reason') == 'longer_for_coverage':
+            preferred = pool['courses'][0]
+            if not suitable(cache[preferred['id']], pool['name']):
+                return pools
+            groups.append([preferred])  # 더 긴 강좌가 필요한 학습 내용을 모델이 명시한 선택은 유지한다.
+        else:
+            groups.append([row for row in pool['courses'] if quality(cache[row['id']], pool['name']) == best][:6])
 
     def cost(bundle):
         unique = {row['id']: row for row in bundle}
@@ -102,7 +114,7 @@ def share_candidates(pools: list[dict], project: dict, selection: dict, sources:
             source = sources.get(rid) or {}
             info = cache[rid]
             if (rid in local or source.get('type') != 'course' or not source.get('usable')
-                    or pool['name'] not in (source.get('skills') or []) or pool['name'] not in info['supported']
+                    or pool['name'] not in (source.get('skills') or []) or not suitable(info, pool['name'])
                     or (best is not None and quality(info, pool['name']) > best)):
                 continue
             card = deepcopy(row)
@@ -124,7 +136,7 @@ def study_plan(pools: list[dict], project: dict, selection: dict, references: di
                 cache[row['id']] = facts(row, project, selection)
     aligned = align_shared_courses(pools, project, selection, cache)
     picked = [pool['courses'][0] for pool in aligned]
-    if any(pool['name'] not in cache[row['id']]['supported'] for pool, row in zip(aligned, picked)):
+    if any(not suitable(cache[row['id']], pool['name']) for pool, row in zip(aligned, picked)):
         return None
     unique = {row['id']: row for row in picked}
     confirmed = all(hours(row) is not None and 'hours' not in (row.get('estimated') or [])

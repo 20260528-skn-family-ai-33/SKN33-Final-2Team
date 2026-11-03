@@ -20,7 +20,7 @@ import re
 import hashlib
 from uuid import uuid4
 
-from .. import catalog, catalog_budget, catalog_candidates, db, llm, track_policy
+from .. import catalog, catalog_budget, catalog_candidates, db, llm, roadmap_input, track_policy
 from . import runtime as rt
 from .demo import D, TEMPLATES, TEMPLATES_ALT, domain_of
 
@@ -123,9 +123,11 @@ def build_plan(d: dict, prm: dict, goal: str) -> dict:
     weeks = study_weeks if schedule else max(1, math.ceil(cum / hrs))
     res_ids = list(dict.fromkeys(a['res'] for a in acts if a['res']))
     costs = [(_res(r) or {}).get('cost') for r in res_ids]
-    return {'displayTitle': d.get('displayTitle') or '', 'opt': d['id'], 'name': d['name'], 'short': d['short'], 'tagline': d['tagline'], 'goal': goal, 'def': d, 'params': p, 'start': p['start'],
+    plan = {'displayTitle': d.get('displayTitle') or '', 'opt': d['id'], 'name': d['name'], 'short': d['short'], 'tagline': d['tagline'], 'goal': goal, 'def': d, 'params': p, 'start': p['start'],
             'hours': hrs, 'format': p['format'], 'acts': acts, 'totalH': cum, 'weeks': weeks, 'cost': int(sum(c for c in costs if c)),
             'costUnknown': any(c is None for c in costs)}
+    from app.services.duration_proposals import apply_plan_schedule
+    return apply_plan_schedule(plan)
 
 
 def params_of(handoff: dict, opt: dict | None) -> dict:
@@ -322,10 +324,10 @@ def _catalog_payload(pid: str, payload: dict, system: str = '', extra_ids: list 
     if cert:
         required.append(cert)
     try:
-        selection = catalog.roadmap_selection(texts, pid, skill_names=handoff.get('skillNames'),
+        selection = catalog.roadmap_selection(texts, pid, skill_names=roadmap_input.skill_reference(handoff),
                                              required=required, hints=handoff.get('resourceHints'),
                                              **({'preserve_skills': True} if handoff.get('selectedSkillsFixed') else {}))
-        handoff['skillNames'] = list(selection.skills)
+        roadmap_input.synchronize_skills(handoff, selection.skills)
         from app.learner_knowledge import exclusion,from_profile
         knowledge=handoff.get('learnerKnowledge') or from_profile(handoff.get('profile'))
         if knowledge.get('technologies') or knowledge.get('certifications'):
@@ -342,15 +344,13 @@ def _catalog_payload(pid: str, payload: dict, system: str = '', extra_ids: list 
                                         'selectionNote': '후보 순위는 목표 관련성과 커리큘럼의 관점 적합도를 함께 평가한 검토 순서다. 최종 선택과 편성은 DB 시스템 프롬프트와 사용자 조건을 따른다.'}
         if pid == 'A2':
             handoff['prefs'] = dict(handoff.get('prefs') or {})
-            if not handoff.get('selectedSkillsFixed'):
-                handoff['skillNames'] = list(selection.skills)
             # 학습 범위와 과제 분류를 분리해 Docker 과제를 다른 핵심 스킬로 오표기하지 않게 한다.
             payload['trackGuidance'].update({
                                         'maxCoreSkills': len(handoff['skillOrder']) if handoff.get('selectedSkillsFixed') else track_policy.FAST_SKILLS,
                                         'coreSkills': list(handoff['skillOrder']) if handoff.get('selectedSkillsFixed') else list(selection.skills),
                                         'taskSkillNote': 'coreSkills는 집중 학습할 핵심 스킬이다. 과제 skills는 핵심 스킬에 억지로 맞추지 말고 skillTags 중 실제 수행 내용에 맞는 이름을 1~3개 고른다. 보조 태그를 쓴다고 별도 학습 스킬이나 과제를 추가하지 않는다.',
                                         'planningNote': '선택한 핵심 스킬과 목표 범위에 집중한다. 기간 상한은 적용하지 않고 실제 자료 시간과 주당 시간으로 기간을 계산한다. 최종 강좌 선택은 목표와 목차·소개를 보고 판단한다.'})
-        return catalog_budget.pack(selection, system, payload, context_limit)
+        return catalog_budget.pack(selection, system, roadmap_input.project(payload), context_limit)
     except catalog_candidates.UnavailableResourcesError as error:
         # 원본이 삭제돼도 기존 계획에 저장된 활동명과 자료 ID로 대상을 찾을 수 있다.
         titles = {a['res']: a['title'] for section in ('previous', 'current')
@@ -503,13 +503,16 @@ def option(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
                                         effectivePromptHash=hashlib.sha256(system.encode('utf-8')).hexdigest())
         if inp['handoff'].get('courseSkillSelection'):
             from app.services.course_skills import validate_recommendations, recommendation_key
-            allowed={row['name'] for row in payload['handoff'].get('skillDetails',[])}
+            allowed=set(payload['handoff']['skillNames'])
             try:
                 if inp['handoff'].get('selectedSkillsFixed'):
                     checked=validate_recommendations(r.get('learningSkills'),allowed,pid,require_depth=True,max_skills=5)
                     proposed={row['name']:row for row in checked}
                     if set(proposed)!=allowed:raise ValueError('선택한 스킬을 모두 유지한 계획이 필요해요. 다시 생성해 주세요.')
-                    o['learningSkills']=[{**proposed[row['name']],'name':row['name'],'application':row['application']} for row in inp['handoff']['skillDetails']]
+                    details = {row['name']: row for row in payload['handoff'].get('skillDetails') or []}
+                    o['learningSkills'] = [dict(proposed[name], **({'application': details[name]['application']}
+                                          if (details.get(name) or {}).get('application') else {}))
+                                          for name in payload['handoff']['skillOrder']]
                 else:
                     o['learningSkills']=validate_recommendations(r.get('learningSkills'),allowed,pid,require_depth=True)
             except ValueError as error:raise llm.LlmError(str(error)) from error

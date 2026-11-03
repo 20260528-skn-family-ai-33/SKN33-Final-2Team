@@ -267,18 +267,23 @@ def agent_views(records: list[dict], texts: list[str] | None = None) -> list[dic
     return catalog_evidence.pack(records, texts)
 
 
-def roadmap_skills(texts: list[str], skill_names: list[str] | None = None) -> list[str]:
+def roadmap_skills(texts: list[str], skill_names: list[str] | None = None, *, preserve_skills: bool = False) -> list[str]:
     records = items()
     known = {s for r in records.values() for s in r.get('skills') or []}
     if skill_names is not None:
         if not isinstance(skill_names, list) or any(not isinstance(s, str) for s in skill_names):
             raise ValueError('선정 스킬은 이름 목록이어야 합니다.')
-        # 저장 뒤 이름 변경·삭제가 가능하다. 남아 있는 이름의 순서는 보존한다.
+        if preserve_skills and (not skill_names or any(s not in known for s in skill_names)
+                                or len(set(skill_names)) != len(skill_names)):
+            raise ValueError('확정한 스킬 이름을 현재 목록에서 확인할 수 없습니다. 스킬을 다시 선택하고 순서를 확인해 주세요.')
+        # 구판 추정 스킬만 남은 이름을 보존하거나 목표에서 다시 추정한다.
         want = list(dict.fromkeys(s for s in skill_names if s in known))
         if len(want) > catalog_candidates.MAX_SKILLS:
             raise ValueError('선정 스킬은 최대 5개입니다.')
         if want:
             return want
+    if preserve_skills:
+        raise ValueError('확정한 스킬 목록이 없습니다. 스킬을 다시 선택해 주세요.')
     # 구판 또는 저장된 스킬이 전부 사라진 handoff는 현재 이름으로 다시 추정한다.
     exact = [s for text in texts for s in sorted(known) if s in text]
     return list(dict.fromkeys(s for s in exact + skills_for(texts) if s in known))[:catalog_candidates.MAX_SKILLS]
@@ -287,7 +292,7 @@ def roadmap_skills(texts: list[str], skill_names: list[str] | None = None) -> li
 def roadmap_selection(texts: list[str], track: str, *, skill_names: list[str] | None = None,
                       required: list[str] | None = None, hints: list[str] | None = None,
                       preserve_skills: bool = False) -> catalog_candidates.Selection:
-    return catalog_candidates.select(items(), roadmap_skills(texts, skill_names), texts, track, required, hints, preserve_skills=preserve_skills)
+    return catalog_candidates.select(items(), roadmap_skills(texts, skill_names, preserve_skills=preserve_skills), texts, track, required, hints, preserve_skills=preserve_skills)
 
 
 def cert_groups() -> list[dict]:

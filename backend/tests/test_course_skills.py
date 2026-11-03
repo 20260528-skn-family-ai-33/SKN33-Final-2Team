@@ -77,7 +77,7 @@ class CourseSkillsTests(unittest.TestCase):
     def test_generation_attaches_track_specific_skills_and_sends_previous_skills(self):
         from types import SimpleNamespace
         from app.agents import roadmap
-        h={'assessmentGenerationId':'g','focus':['S','T'],'skillOrder':['S','T'],'skillDetails':[{'name':'S'},{'name':'T'}]}
+        h={'assessmentGenerationId':'g','focus':['S','T'],'skillNames':['S','T'],'skillOrder':['S','T'],'skillDetails':[{'name':'S'},{'name':'T'}]}
         previous={'learningSkills':[{'name':'S','application':'기존 학습'}]}
         captured=[]
         def payload(pid,value,system,*args):
