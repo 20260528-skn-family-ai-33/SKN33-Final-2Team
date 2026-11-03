@@ -24,3 +24,14 @@ class SelectedSkillGenerationTests(TestCase):
         scoped=scope_view(saved,'A2',option)
         self.assertEqual(scoped['skillOrder'],['B','A'])
         self.assertEqual([r['application'] for r in scoped['selection']['skills']],['B scope','A scope'])
+
+    def test_skill_preview_does_not_send_learning_conditions_to_the_model(self):
+        from types import SimpleNamespace
+        from uuid import uuid4
+        project={'goal':'SQL goal','projectSummary':'기획서 요약','details':{'hours':8,'weeks':12,'budget':10000,'etc':'주말'},'selectedSkills':[{'name':'SQL','application':'Join'}]}
+        with patch.object(api,'generation_guard',return_value=nullcontext()),patch.object(api.db,'tx',side_effect=lambda:transaction(Mock())),patch.object(api,'project_input',side_effect=lambda *_:dict(project)),patch.object(api.profile,'view',return_value={}),patch.object(api,'profile_input',return_value={}),patch.object(api.runtime,'context',return_value=Mock(live=True)),patch.object(api,'select_from_catalog',return_value={'skills':[]}) as select:
+            api.preview_skills.__wrapped__(uuid4(),a=SimpleNamespace(id=1))
+        payload=select.call_args.args[1]
+        self.assertNotIn('details',payload);self.assertNotIn('selectedSkills',payload)
+        self.assertEqual(payload['goal'],'SQL goal');self.assertEqual(payload['projectSummary'],'기획서 요약')
+        self.assertIn('details',project)

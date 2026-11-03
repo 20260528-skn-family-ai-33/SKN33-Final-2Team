@@ -100,7 +100,7 @@ def save_answers(t: Any, employee_id: int, project_id: str, generation_id: str,
     changed=value.get('answers')!=answers
     reset=None
     if changed:
-        for field in ('recommendations','resourceChoices','skillOrder','durationEstimates','courseRecommendations','activityProposal','activityVersions','materialsSelectionKey','learningOutcomes'):
+        for field in ('recommendations','resourceChoices','skillOrder','durationEstimates','courseRecommendations','courseRecommendationVersions','activityProposal','activityVersions','materialsSelectionKey','learningOutcomes'):
             value.pop(field,None)
         if isinstance(raw.get('draft'),dict):
             from app.services.drafts import clear_from

@@ -323,7 +323,8 @@ def _catalog_payload(pid: str, payload: dict, system: str = '', extra_ids: list 
         required.append(cert)
     try:
         selection = catalog.roadmap_selection(texts, pid, skill_names=handoff.get('skillNames'),
-                                             required=required, hints=handoff.get('resourceHints'))
+                                             required=required, hints=handoff.get('resourceHints'),
+                                             **({'preserve_skills': True} if handoff.get('selectedSkillsFixed') else {}))
         from app.learner_knowledge import exclusion,from_profile
         knowledge=handoff.get('learnerKnowledge') or from_profile(handoff.get('profile'))
         if knowledge.get('technologies') or knowledge.get('certifications'):

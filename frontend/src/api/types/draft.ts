@@ -247,6 +247,7 @@ export interface RegenRequest {
 
 export interface SelectedSkill { name: string; application: string; reason?: string }
 export interface DraftDoc {
+  selectionNotice?: string;
   selectedSkills?: SelectedSkill[];
   skillCandidates?: SelectedSkill[];
   skillInputKey?: string;

@@ -39,14 +39,40 @@ class FlowCompatibilityTests(unittest.TestCase):
     for key in ('quiz','diag','handoff','gen','chosen'):self.assertIsNone(w['draft'][key])
     self.assertIsNone(w['draftPlan'])
 
- def test_switching_plan_version_discards_all_its_material_and_task_caches(self):
+ def test_switching_plan_version_restores_its_material_and_task_caches(self):
   w,_=self.state();g=w['draft']['gen'];old=g['options']['A1'];new=copy.deepcopy(old);new['learningSkillsVersion']='v2'
   g.update(hist={'A1':[old,new]},cur={'A1':0})
   drafts._apply_client(w,{'genCur':{'A1':1}})
   self.assertNotIn('A1',w['v2Survey']['courseRecommendations']);self.assertIsNone(w['draftPlan'])
   self.assertEqual(w['v2Survey']['courseRecommendations']['A3'],{'marker':'보존'})
   drafts._apply_client(w,{'genCur':{'A1':0}})
-  self.assertIsNone(scope_view(w['v2Survey'],'A1',old)['recommendations'])
+  restored=scope_view(w['v2Survey'],'A1',old)
+  self.assertEqual(restored['recommendations']['id'],'r')
+  self.assertEqual(restored['resourceChoices']['S']['books'],['b'])
+  self.assertEqual(restored['activityProposal']['id'],'proposal')
+
+ def test_regeneration_failure_keeps_version_materials_and_plan(self):
+  from app.errors import AgentError
+  w,_=self.state();before=copy.deepcopy(w);pending=[]
+  def mutate(employee,project,fn):fn(Mock(),w);return w
+  with patch.object(drafts,'_mutate',side_effect=mutate),patch.object(drafts.jobs,'start',side_effect=lambda kind,employee,key,work:pending.append(work) or 'job'),patch.object(drafts,'present',side_effect=lambda state,*_:state),patch.object(drafts.rt,'context',return_value=Mock()),patch.object(drafts.RM,'option',side_effect=AgentError('실패')):
+   drafts.regenerate(1,'p','A1',None)
+   with self.assertRaises(AgentError):pending[0](Mock())
+  self.assertEqual(scope_view(w['v2Survey'],'A1',w['draft']['gen']['options']['A1'])['resourceChoices'],scope_view(before['v2Survey'],'A1',before['draft']['gen']['options']['A1'])['resourceChoices'])
+  self.assertEqual(w['draftPlan'],before['draftPlan'])
+
+ def test_successful_regeneration_preserves_old_snapshot_and_starts_new_material_scope(self):
+  w,_=self.state();pending=[];old=copy.deepcopy(w['draft']['gen']['options']['A1'])
+  newer=dict(copy.deepcopy(old),optionId='new-option',learningSkillsVersion='new-skills')
+  def mutate(employee,project,fn):fn(Mock(),w);return w
+  with patch.object(drafts,'_mutate',side_effect=mutate),patch.object(drafts.jobs,'start',side_effect=lambda kind,employee,key,work:pending.append(work) or 'job'),patch.object(drafts,'present',side_effect=lambda state,*_:state),patch.object(drafts.rt,'context',return_value=Mock()),patch.object(drafts.RM,'option',return_value=newer),patch.object(drafts,'_maybe_support'):
+   drafts.regenerate(1,'p','A1',None);pending[0](Mock())
+  self.assertIsNone(scope_view(w['v2Survey'],'A1',newer)['recommendations'])
+  drafts._apply_client(w,{'genCur':{'A1':0}})
+  restored=scope_view(w['v2Survey'],'A1',old)
+  self.assertEqual(restored['recommendations']['id'],'r')
+  self.assertEqual(restored['resourceChoices']['S']['books'],['b'])
+  self.assertEqual(w['v2Survey']['courseRecommendations']['A3'],{'marker':'보존'})
 
  def test_material_edit_clears_all_tasks_versions_outcomes_and_old_review(self):
   w,scoped=self.state();t=Mock();t.one.return_value={'draft_choices':w};t.run.return_value=1
@@ -108,3 +134,18 @@ class FlowCompatibilityTests(unittest.TestCase):
   self.assertEqual(plan['weeks'],2)
   self.assertEqual([a['res'] for a in plan['acts']],['c'])
   self.assertTrue(all(not a['task'] for a in plan['acts']))
+
+ def test_missing_chosen_option_is_presented_for_reselection_without_mutating_saved_data(self):
+  w,_=self.state();w['draft']['gen']['options'].pop('A1');w['v2Survey']['project']['selectedSkills']=[{'name':'S','application':'검색'}]
+  before=copy.deepcopy(w)
+  with patch.object(drafts.catalog,'resources_for',return_value={}),patch.object(drafts.regstore,'bundle',return_value={}):
+   result=drafts.present(w,'p')
+  self.assertIsNone(result['draft']['chosen']);self.assertIsNone(result['draftPlan'])
+  self.assertIn('다시 선택',result['draft']['selectionNotice'])
+  self.assertFalse(result['draft']['v2Assessment']['materialsReady']);self.assertFalse(result['draft']['v2Assessment']['activitiesReady'])
+  self.assertIn('A3',result['draft']['gen']['options']);self.assertEqual(w,before)
+
+ def test_scope_with_fixed_skills_and_no_option_does_not_raise(self):
+  base={'generationId':'g','project':{'selectedSkills':[{'name':'S','application':'검색'}]},'selection':{'skills':[{'name':'S','application':'검색'}]}}
+  result=scope_view(base,'A1',None)
+  self.assertIsNone(result['recommendations']);self.assertEqual(result['skillOrder'],['S'])

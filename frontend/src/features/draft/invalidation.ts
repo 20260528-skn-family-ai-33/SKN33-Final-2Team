@@ -20,3 +20,8 @@ export function invalidateDraft(s: WsState, from: 'inputs' | 'answers' | 'option
 export function inputSignature(d: WsState['draft']) {
   return JSON.stringify(sortKeys([d.goal, d.project, d.prefs, d.doc?.status === 'ok' ? d.doc.summary : null, d.selectedSkills || null]));
 }
+
+/** Editing another comparison column must not invalidate the selected course's review. */
+export function invalidateMaterialChoices(s: WsState, course: string) {
+  if (s.draft.chosen === course) invalidateDraft(s, 'materials');
+}

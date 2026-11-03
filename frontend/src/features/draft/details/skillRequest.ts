@@ -4,10 +4,10 @@ import { ws } from '@/shared/state/workspace';
 import { ensureDraft, flush } from '../draftSync';
 import { skillInputKey } from './skillInput';
 const flights=new Map<string,Promise<SelectedSkill[]>>();
-export function summaryStage(draft: DraftDoc): 'ready'|'reading'|'missing' {
+export function summaryStage(draft: DraftDoc, allowGoalOnly = false): 'ready'|'reading'|'missing' {
   if (!draft.project) return 'ready';
   if (draft.doc?.status==='reading') return 'reading';
-  return draft.doc?.status==='ok' && !!draft.doc.summary?.trim() ? 'ready' : 'missing';
+  return (draft.doc?.status==='ok' && !!draft.doc.summary?.trim()) || allowGoalOnly ? 'ready' : 'missing';
 }
 export async function loadSkills(owner: string|null, signature: string): Promise<SelectedSkill[]> {
   const current=()=>ws().owner===owner && skillInputKey(ws().draft)===signature;

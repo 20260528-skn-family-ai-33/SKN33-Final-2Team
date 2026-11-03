@@ -2,7 +2,7 @@
    열쇠 계산은 서버(drafts.quiz_key·diag_key)와 같아야 한다 — 서버가 바뀌면 여기도 함께 고친다 */
 import type { DraftDoc, EditDoc, Prefs } from '@/api/types/draft';
 import { paths } from '@/app/paths';
-import { skillsReady } from './details/skillInput';
+import { canContinueSkills } from './details/skillInput';
 import { sameJ } from '@/shared/lib/format';
 import { certOf } from '@/shared/lib/prefs';
 import type { WsState } from '@/shared/state/workspace';
@@ -34,11 +34,12 @@ export const docIdle = (d: DraftDoc): boolean => !d.doc || d.doc.status !== 'rea
 export function stepDone(s: Pick<WsState, 'draft' | 'draftPlan'>, k: StepKey): boolean {
   const d = s.draft;
   /* 세부 사항은 모두 선택 사항이라, 확인 화면에서 '다음'을 눌렀거나 역량 테스트 문항이 있으면 지난 것으로 본다 */
-  return { goal: goalOk(d), details: skillsReady(d) || !!(!d.selectedSkills && (d.detailsOk || d.quiz)), check: !!(d.detailsOk || d.quiz), quiz: quizDone(d), result: !!(d.handoff || d.gen || d.v2Assessment?.completed), options: d.v2Assessment ? !!(d.chosen && d.gen?.options[d.chosen] && !d.gen.regenRun?.[d.chosen]) : !!s.draftPlan, materials: !!(d.v2Assessment?.materialsReady || d.v2Assessment?.activitiesReady), review: false }[k];
+  return { goal: goalOk(d), details: canContinueSkills(d) || !!(!d.selectedSkills && (d.detailsOk || d.quiz)), check: !!(d.detailsOk || d.quiz), quiz: quizDone(d), result: !!(d.handoff || d.gen || d.v2Assessment?.completed), options: d.v2Assessment ? !!(d.chosen && d.gen?.options[d.chosen] && !d.gen.regenRun?.[d.chosen]) : !!s.draftPlan, materials: !!(d.v2Assessment?.materialsReady || d.v2Assessment?.activitiesReady), review: false }[k];
 }
 
 /** 이 단계 앞에 마치지 않은 단계가 있으면 그 단계 주소 */
-export function blockedTo(s: Pick<WsState, 'draft' | 'draftPlan'>, k: StepKey): string | null {
+export function blockedTo(s: Pick<WsState, 'draft' | 'draftPlan'> & Partial<Pick<WsState,'pendingFlow'>>, k: StepKey): string | null {
+  if(k==='review'&&s.pendingFlow==='materials')return paths.newOptions;
   if(k==='review' && s.draft.v2Assessment && !s.draft.v2Assessment.materialsReady && !s.draft.v2Assessment.activitiesReady)return paths.newOptions;
   const i = STEPS.findIndex((x) => x[0] === (k==='materials'?'options':k));
   const b = STEPS.slice(0, i).find(([kk]) => !stepDone(s, kk));

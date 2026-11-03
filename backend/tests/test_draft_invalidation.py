@@ -24,7 +24,7 @@ class InvalidationTests(unittest.TestCase):
   t.one.return_value={'draft_choices':{'draft':drafts.fresh_draft()}}
   value=survey_store.save_generated(t,1,'p',fixture.project,fixture.selection(1),fixture.profile,fixture.result(1))
   answers={q['id']:(1 if kind=='surveys' else 0) for g in value['survey']['groups'] for kind in ('surveys','quizzes') for q in g[kind]}
-  value.update(answers=answers,completed=True,courseRecommendations={'A1':{'activityProposal':{'old':True}}})
+  value.update(courseRecommendationVersions={'A1':{'old':{'recommendations':{'id':'stale'}}}},answers=answers,completed=True,courseRecommendations={'A1':{'activityProposal':{'old':True}}})
   raw={'draft':dict(drafts.fresh_draft(),gen={'key':'old','options':{}},handoff={'key':'old'}),'v2Survey':value}
   t.one.return_value={'draft_choices':raw}
   result=survey_store.save_answers(t,1,'p',value['generationId'],answers,complete=True)
@@ -36,6 +36,7 @@ class InvalidationTests(unittest.TestCase):
   value['completed']=False
   result=survey_store.save_answers(t,1,'p',value['generationId'],changed,complete=True)
   self.assertNotIn('courseRecommendations',result)
+  self.assertNotIn('courseRecommendationVersions',result)
   self.assertIsNone(json.loads(t.run.call_args.kwargs['draft'])['gen'])
   self.assertIn("'{draftPlan}'",t.run.call_args.args[0])
 

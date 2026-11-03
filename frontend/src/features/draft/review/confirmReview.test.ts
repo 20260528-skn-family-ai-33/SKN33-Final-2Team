@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 const mock=vi.hoisted(()=>({
-  state:{owner:'u' as string|null,draftId:'d' as string|null,lastNew:'old' as string|null,draft:{goal:'검색 구현',prefs:{hours:4},chosen:'A1',v2Assessment:{generationId:'g',materialsKey:'m'}}},
+  state:{pendingFlow:undefined as 'materials'|undefined,owner:'u' as string|null,draftId:'d' as string|null,lastNew:'old' as string|null,draft:{goal:'검색 구현',prefs:{hours:4},chosen:'A1',v2Assessment:{generationId:'g',materialsKey:'m'}}},
   flush:vi.fn(),confirm:vi.fn(),reload:vi.fn(),toast:vi.fn(),
 }));
 vi.mock('@/shared/state/workspace',()=>({ws:()=>mock.state,updateWs:(fn:(s:typeof mock.state)=>void)=>fn(mock.state)}));
@@ -10,7 +10,7 @@ vi.mock('../draftSync',()=>({flush:mock.flush,reloadWorkspace:mock.reload,DraftS
 import { confirmReview } from './confirmReview';
 function deferred<T>() {let resolve!:(value:T)=>void; const work=new Promise<T>(done=>{resolve=done;});return {work,resolve};}
 beforeEach(()=>{
-  vi.resetAllMocks();mock.state.owner='u';mock.state.draftId='d';mock.state.lastNew='old';mock.state.draft.goal='검색 구현';mock.state.draft.chosen='A1';
+  vi.resetAllMocks();mock.state.pendingFlow=undefined;mock.state.owner='u';mock.state.draftId='d';mock.state.lastNew='old';mock.state.draft.goal='검색 구현';mock.state.draft.chosen='A1';
   mock.flush.mockResolvedValue(undefined);mock.confirm.mockResolvedValue({planId:'plan'});mock.reload.mockResolvedValue(true);
 });
 it('연속 확정 클릭은 산출물 저장·확정·화면 이동을 각각 한 번만 실행한다',async()=>{
@@ -47,4 +47,14 @@ it('확정 오류는 자동 재시도하지 않고 사용자가 다시 클릭할
   mock.confirm.mockRejectedValueOnce(Error('offline')).mockResolvedValue({planId:'plan'});const go=vi.fn();
   expect(await confirmReview(go)).toBe(false);expect(mock.confirm).toHaveBeenCalledOnce();expect(mock.toast).toHaveBeenCalledOnce();
   expect(await confirmReview(go)).toBe(true);expect(mock.confirm).toHaveBeenCalledTimes(2);
+});
+
+it('자료 선택을 저장하지 않으면 이전 산출물 저장과 확정 API를 호출하지 않는다',async()=>{
+ mock.state.pendingFlow='materials';const save=vi.fn(),go=vi.fn();
+ expect(await confirmReview(go,save)).toBe(false);expect(save).not.toHaveBeenCalled();expect(mock.confirm).not.toHaveBeenCalled();expect(mock.toast).toHaveBeenCalledOnce();
+});
+it('확정 준비 대기 중 자료가 바뀌면 이전 계획을 확정하지 않는다',async()=>{
+ const pending=deferred<void>();mock.flush.mockReturnValue(pending.work);const save=vi.fn(),go=vi.fn();
+ const work=confirmReview(go,save);await Promise.resolve();mock.state.pendingFlow='materials';pending.resolve();
+ expect(await work).toBe(false);expect(save).not.toHaveBeenCalled();expect(mock.confirm).not.toHaveBeenCalled();
 });

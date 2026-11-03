@@ -1,6 +1,6 @@
 import { InputSkills } from './InputSkills';
 import './detailsCheck.css';
-import { skillsReady } from './skillInput';
+import { canContinueSkills, hasExistingSkillProgress } from './skillInput';
 import { flush } from '../draftSync';
 import { loadSurvey } from '../quiz/surveyRequest';
 import { inputSignature } from '../invalidation';
@@ -37,7 +37,7 @@ export function DetailsStep() {
               <Icon name="left" />
               이전
             </button>
-            <button className="btn pri" disabled={!skillsReady(draft)} onClick={() => { go(paths.newDetailsCheck); }}>
+            <button className="btn pri" disabled={!canContinueSkills(draft)} onClick={() => { go(paths.newDetailsCheck); }}>
               다음: 입력 내용 확인
             </button>
           </>
@@ -82,9 +82,11 @@ export function DetailsCheck() {
   }, []);
   const owner = useWs(s => s.owner);
   const signature = inputSignature(d);
+  const preserveLegacy=hasExistingSkillProgress(d)&&!d.v2Assessment;
   useEffect(()=>{
+    if(preserveLegacy)return;
     void (async()=>{await flush();return loadSurvey(`${owner}:${signature}`);})().catch(()=>{});
-  },[owner,signature]);
+  },[owner,signature,preserveLegacy]);
   return (
     <>
       <Stepper cur="check" />

@@ -1,12 +1,55 @@
 """V_2 코스별 추천·선택·주차·활동 캐시. 공통 점검 스킬은 유지한다."""
 from copy import deepcopy
+from hashlib import sha256
+import json
 FIELDS=('recommendations','resourceChoices','durationEstimates','activityProposal','activityVersions','materialsSelectionKey','skillSelectionKey','learningOutcomes')
+
+def option_cache_key(option):
+    """지원 조건 등 비동기 부가 정보와 무관한 자료 버전 식별자."""
+    if not option:
+        return None
+    if option.get('optionId'):
+        data = [option['optionId'], option.get('learningSkillsVersion')]
+    else:
+        data = {key: option.get(key) for key in ('id','name','scope','reason','tagline','acts','weeklyHours',
+                'learningSkills','learningSkillsVersion')}
+    return sha256(json.dumps(data, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+
+
+def archive_course_cache(w, course, option=None):
+    """기존 JSON 안에 현재 버전의 추천·선택을 보관한다. DB 스키마 변경 없음."""
+    saved = w.get('v2Survey') or {}
+    cache = (saved.get('courseRecommendations') or {}).get(course)
+    if not cache:
+        return
+    option = option or (((w['draft'].get('gen') or {}).get('options') or {}).get(course))
+    key = cache.get('optionKey') or option_cache_key(option)
+    if key:
+        cache['optionKey'] = key
+        saved.setdefault('courseRecommendationVersions', {}).setdefault(course, {})[key] = deepcopy(dict(cache, optionKey=key))
+
+
+def prune_course_versions(w, course):
+    saved = w.get('v2Survey') or {}
+    versions = (saved.get('courseRecommendationVersions') or {}).get(course)
+    if not versions:
+        return
+    generation = w['draft'].get('gen') or {}
+    options = (generation.get('hist') or {}).get(course) or [(generation.get('options') or {}).get(course)]
+    keep = {option_cache_key(option) for option in options}
+    saved['courseRecommendationVersions'][course] = {key: value for key, value in versions.items() if key in keep}
+
 
 def scope_view(saved,course,option=None):
     if not course:return deepcopy(saved)
     scoped=deepcopy(saved)
     scoped['_course']=course
+    key = option_cache_key(option)
+    scoped['_optionKey'] = key
     cache=(saved.get('courseRecommendations') or {}).get(course) or {}
+    if key and cache.get('optionKey') != key:
+        version = ((saved.get('courseRecommendationVersions') or {}).get(course) or {}).get(key)
+        cache = version if version is not None else (cache if not cache.get('optionKey') else {})
     for field in FIELDS:scoped[field]=deepcopy(cache.get(field))
     scoped['resourceChoices']=scoped.get('resourceChoices') or {}
     from app.services.course_skills import selected
@@ -21,7 +64,7 @@ def scope_view(saved,course,option=None):
         scoped['skillOrder']=[row['name'] for row in active]
         from hashlib import sha256
         import json
-        key=sha256(json.dumps([option.get('learningSkillsVersion'),sorted(scoped['selection']['skills'],key=lambda row:row['name'])],ensure_ascii=False,sort_keys=True).encode()).hexdigest()
+        key=sha256(json.dumps([(option or {}).get('learningSkillsVersion'),sorted(scoped['selection']['skills'],key=lambda row:row['name'])],ensure_ascii=False,sort_keys=True).encode()).hexdigest()
         if cache.get('skillSelectionKey')!=key:
             for field in FIELDS:scoped[field]=None
             scoped['resourceChoices']={}
@@ -44,7 +87,11 @@ def merge_scope(base,scoped):
     course=scoped.get('_course')
     if not course:return {k:deepcopy(v) for k,v in scoped.items() if not k.startswith('_course')}
     result=deepcopy(base)
-    result.setdefault('courseRecommendations',{})[course]={field:deepcopy(scoped.get(field)) for field in FIELDS}
+    cache = {field:deepcopy(scoped.get(field)) for field in FIELDS}
+    if scoped.get('_optionKey'):
+        cache['optionKey'] = scoped['_optionKey']
+        result.setdefault('courseRecommendationVersions', {}).setdefault(course, {})[scoped['_optionKey']] = deepcopy(cache)
+    result.setdefault('courseRecommendations',{})[course] = cache
     return result
 
 def free_cache_valid(recommendations,items):
@@ -60,11 +107,12 @@ def free_cache_valid(recommendations,items):
 
 def dependency_key(scoped):
     import hashlib,json
-    return hashlib.sha256(json.dumps([scoped.get('generationId'),scoped.get('_course'),scoped.get('skillSelectionKey'),scoped.get('skillOrder'),scoped.get('selection')],ensure_ascii=False,sort_keys=True).encode()).hexdigest()
+    return hashlib.sha256(json.dumps([scoped.get('generationId'),scoped.get('_course'),scoped.get('_optionKey'),scoped.get('skillSelectionKey'),scoped.get('skillOrder'),scoped.get('selection')],ensure_ascii=False,sort_keys=True).encode()).hexdigest()
 
 
 def invalidate_course_tail(w,course):
-    """바뀐 계획 이후의 자료·과제·검토를 모두 제거하고 다른 계획은 보존한다."""
+    """현재 자료는 버전별로 보관하고 활성 코스 캐시만 비운다."""
     if course:
+        archive_course_cache(w,course)
         ((w.get('v2Survey') or {}).get('courseRecommendations') or {}).pop(course,None)
     if w['draft'].get('chosen')==course:w['draftPlan']=None

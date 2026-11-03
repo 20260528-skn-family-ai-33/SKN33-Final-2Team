@@ -37,7 +37,7 @@ def project_input(t, employee_id: int, project_id: str) -> dict:
     if not desired:
         raise ApiError(422, 'SURVEY_INPUT_REQUIRED', '키우고 싶은 역량을 입력해 주세요.')
     summary = doc_summary(draft) or None
-    if draft.get('project') and not summary:
+    if draft.get('project') and not summary and (draft.get('doc') or {}).get('status') == 'reading':
         raise ApiError(422, 'PROJECT_SUMMARY_PENDING', '첨부한 기획서의 요약이 아직 완료되지 않았어요. 요약 상태를 확인해 주세요.')
     result = {'goal': desired, 'desiredCompetencies': desired, 'projectSummary': summary}
     if 'prefs' in draft:
@@ -373,6 +373,7 @@ def preview_skills(project_id: UUID, a: Account = Depends(require_employee)):
         with db.tx() as t:
             project = project_input(t, a.id, str(project_id))
         project.pop('selectedSkills', None)
+        project.pop('details', None)  # 학습 여건과 스킬 추천은 독립된 입력이다.
         ctx = runtime.context(a.id)
         if not ctx.live:
             raise ApiError(503, 'MODEL_REQUIRED', '스킬 추천에 사용할 모델을 연결해 주세요.')

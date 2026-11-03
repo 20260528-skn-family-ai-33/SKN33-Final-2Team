@@ -26,3 +26,11 @@ it('요약 생성 중과 실패를 구분하고 첨부 없는 목표도 추천 �
  expect(summaryStage({...d,project,doc:{name:'기획서',status:'ok',summary:'요약'}})).toBe('ready');
  expect(summaryStage({...d,project,doc:{name:'기획서',status:'fail'}})).toBe('missing');
 });
+
+it('explicit goal-only fallback unblocks missing summaries but never bypasses a running summary',()=>{
+ const d=mock.state.draft as DraftDoc,project={name:'기획서'} as DraftDoc['project'];
+ expect(summaryStage({...d,project,doc:{name:'기획서',status:'fail'}},true)).toBe('ready');
+ expect(summaryStage({...d,project,doc:{name:'기획서',status:'ok',summary:' '}},true)).toBe('ready');
+ expect(summaryStage({...d,project,doc:{name:'기획서',status:'reading'}},true)).toBe('reading');
+ expect(summaryStage({...d,project,doc:{name:'기획서',status:'fail'}})).toBe('missing');
+});

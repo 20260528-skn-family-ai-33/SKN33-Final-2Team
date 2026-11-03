@@ -1,3 +1,4 @@
+import { materialVersionKey } from './materialVersion';
 import { MaterialSkillTabs } from './MaterialSkillTabs';
 import { AssessmentResults } from './AssessmentResults';
 import { prepareRoadmaps } from '../prepareRoadmaps';
@@ -34,18 +35,19 @@ const recommendationFlights = new Map<string, Promise<Result>>();
 function loadRecommendations(key: string, path: string): Promise<Result> {
   const pending = recommendationFlights.get(key);
   if (pending) return pending;
-  const work = request(path).then(body => body.recommendations ? body : request(path, { method: 'POST', headers: { Prefer: 'respond-async' } }));
+  // Persist genCur before reading the materials of a newly selected proposal version.
+  const work = flush().then(()=>request(path)).then(body => body.recommendations ? body : request(path, { method: 'POST', headers: { Prefer: 'respond-async' } }));
   recommendationFlights.set(key, work);
   void work.finally(() => { if (recommendationFlights.get(key) === work) recommendationFlights.delete(key); }).catch(() => {});
   return work;
 }
 export function usePrepareMaterials() {
   const id=useWs(s=>s.draftId), generation=useWs(s=>s.draft.v2Assessment?.generationId);
-  const optionsKey=useWs(s=>JSON.stringify(Object.entries(s.draft.gen?.options||{}).filter(([course])=>!s.draft.gen?.regenRun?.[course]).map(([course,option])=>[course,option])));
+  const optionsKey=useWs(s=>JSON.stringify(Object.entries(s.draft.gen?.options||{}).filter(([course])=>!s.draft.gen?.regenRun?.[course]).map(([course,option])=>[course,materialVersionKey(option)])));
   useEffect(()=>{
     if(!id||!generation)return;
-    for(const [course] of JSON.parse(optionsKey) as [string,unknown][]) {
-      void loadRecommendations(`${id}:${generation}:${course}`,recommendationUrl(id,course)).catch(()=>{});
+    for(const [course,version] of JSON.parse(optionsKey) as [string,string][]) {
+      void loadRecommendations(`${id}:${generation}:${course}:${version}`,recommendationUrl(id,course)).catch(()=>{});
     }
   },[id,generation,optionsKey]);
 }
@@ -65,7 +67,7 @@ function ResourceCard({ resource, kind, checked, disabled, onChange }: { resourc
   </article>;
 
 }
-export type ResourceSelectionHandle = { save: () => Promise<boolean> };
+export type ResourceSelectionHandle = { save: () => Promise<boolean>; saveForVersion: () => Promise<boolean> };
 export type MaterialTotals = { weeks: number | null; amount: number; unknown: boolean };
 export function ResultStep() {
   usePrepareMaterials();
@@ -84,11 +86,12 @@ export function ResultStep() {
       {error&&<p role="alert">{error} 다음 버튼으로 다시 시도할 수 있어요.</p>}
     </Page></>;
 }
-export function ResourceSelection({ ref, onChoicesChanged, locked, courseId, onTotals, onPrepared, skillFilter, sectionOpen, onSectionToggle }: { ref?: Ref<ResourceSelectionHandle>; onChoicesChanged?: () => void; locked?: boolean; courseId?: string; onTotals?: (course:string,totals:MaterialTotals)=>void; onPrepared?:(course:string,state:'ready'|'pending'|'failed')=>void; skillFilter?:string; sectionOpen?:{books:boolean;courses:boolean}; onSectionToggle?:(kind:'books'|'courses',open:boolean)=>void }) { const scope=useWs(s=>JSON.stringify([s.owner,s.draftId,s.draft.v2Assessment?.generationId,courseId||s.draft.chosen,s.draft.gen?.options[courseId||s.draft.chosen||'']])); return <ResultSelection key={scope} resourcesOnly editorRef={ref} onChoicesChanged={onChoicesChanged} locked={locked} courseId={courseId} onTotals={onTotals} onPrepared={onPrepared} skillFilter={skillFilter} sectionOpen={sectionOpen} onSectionToggle={onSectionToggle} />; }
-function ResultSelection({ resourcesOnly = false, editorRef, onChoicesChanged, locked = false, courseId, onTotals, onPrepared, skillFilter, sectionOpen, onSectionToggle }: { resourcesOnly?: boolean; editorRef?: Ref<ResourceSelectionHandle>; onChoicesChanged?: () => void; locked?: boolean; courseId?:string; onTotals?:(course:string,totals:MaterialTotals)=>void; onPrepared?:(course:string,state:'ready'|'pending'|'failed')=>void; skillFilter?:string; sectionOpen?:{books:boolean;courses:boolean}; onSectionToggle?:(kind:'books'|'courses',open:boolean)=>void }) {
+export function ResourceSelection({ ref, onChoicesChanged, locked, courseId, onTotals, onPrepared, skillFilter, sectionOpen, onSectionToggle }: { ref?: Ref<ResourceSelectionHandle>; onChoicesChanged?: () => void; locked?: boolean; courseId?: string; onTotals?: (course:string,totals:MaterialTotals)=>void; onPrepared?:(course:string,state:'ready'|'pending'|'failed',version:string)=>void; skillFilter?:string; sectionOpen?:{books:boolean;courses:boolean}; onSectionToggle?:(kind:'books'|'courses',open:boolean)=>void }) { const scope=useWs(s=>JSON.stringify([s.owner,s.draftId,s.draft.v2Assessment?.generationId,courseId||s.draft.chosen,materialVersionKey(s.draft.gen?.options[courseId||s.draft.chosen||''])])); return <ResultSelection key={scope} resourcesOnly editorRef={ref} onChoicesChanged={onChoicesChanged} locked={locked} courseId={courseId} onTotals={onTotals} onPrepared={onPrepared} skillFilter={skillFilter} sectionOpen={sectionOpen} onSectionToggle={onSectionToggle} />; }
+function ResultSelection({ resourcesOnly = false, editorRef, onChoicesChanged, locked = false, courseId, onTotals, onPrepared, skillFilter, sectionOpen, onSectionToggle }: { resourcesOnly?: boolean; editorRef?: Ref<ResourceSelectionHandle>; onChoicesChanged?: () => void; locked?: boolean; courseId?:string; onTotals?:(course:string,totals:MaterialTotals)=>void; onPrepared?:(course:string,state:'ready'|'pending'|'failed',version:string)=>void; skillFilter?:string; sectionOpen?:{books:boolean;courses:boolean}; onSectionToggle?:(kind:'books'|'courses',open:boolean)=>void }) {
   const id = useWs(s => s.draftId);
   const draft = useWs(s => s.draft);
   const course = courseId || (resourcesOnly ? draft.chosen : undefined);
+  const version = materialVersionKey(draft.gen?.options[course || '']);
   const generation = useWs(s => s.draft.v2Assessment?.generationId);
   const go = useGo();
   const [storedResult, setResult] = useState<Result | null>(null);
@@ -103,31 +106,37 @@ function ResultSelection({ resourcesOnly = false, editorRef, onChoicesChanged, l
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [estimating, setEstimating] = useState(false);
+  const savedSelection = useRef('');
   const attemptedDurations = useRef(new Set<string>());
-  useImperativeHandle(editorRef, () => ({ save }));
+  useImperativeHandle(editorRef, () => ({ save, saveForVersion: async () => {
+    if(!result?.recommendations)return true;
+    if(savedSelection.current===JSON.stringify([choices,order]))return true;
+    return save();
+  } }));
   useEffect(() => {
     if (!id) return;
     let active = true;
-    void loadRecommendations(`${id}:${generation}:${course || 'base'}`, recommendationUrl(id, course)).then(body => {
-      if (active) { setResult(body); setChoices(body.choices); setOrder(body.skillOrder ?? body.recommendations?.skills.map(s => s.name) ?? []); setEstimates(body.durationEstimates ?? {}); }
+    void loadRecommendations(`${id}:${generation}:${course || 'base'}:${version}`, recommendationUrl(id, course)).then(body => {
+      if (active) { setResult(body); setChoices(body.choices); setOrder(body.skillOrder ?? body.recommendations?.skills.map(s => s.name) ?? []); setEstimates(body.durationEstimates ?? {}); savedSelection.current=JSON.stringify([body.choices,body.skillOrder ?? body.recommendations?.skills.map(s=>s.name) ?? []]); }
     }).catch(e => { if (active) setError(e instanceof Error ? e.message : '추천을 읽지 못했어요.'); });
     return () => { active = false; };
-  }, [id, generation, course]);
+  }, [id, generation, course, version]);
   async function generate() {
     if (!id || busy) return;
     setBusy(true); setError('');
     try {
       const body = await request(recommendationUrl(id, course), { method: 'POST', headers: { Prefer: 'respond-async' } });
-      setResult(body); setChoices(body.choices); setOrder(body.skillOrder ?? body.recommendations?.skills.map(s => s.name) ?? []); setEstimates(body.durationEstimates ?? {});
+      setResult(body); setChoices(body.choices); setOrder(body.skillOrder ?? body.recommendations?.skills.map(s => s.name) ?? []); setEstimates(body.durationEstimates ?? {}); savedSelection.current=JSON.stringify([body.choices,body.skillOrder ?? body.recommendations?.skills.map(s=>s.name) ?? []]);
     } catch (e) { setError(e instanceof Error ? e.message : '추천하지 못했어요.'); }
     finally { setBusy(false); }
   }
   async function save() {
-    if (!id || !result?.recommendations || busy || saving) return false;
+    if (!id || !result?.recommendations || busy || saving) { setError(busy||saving?'자료를 처리하고 있어요. 잠시 뒤 다시 시도해 주세요.':'자료 추천을 준비한 뒤 저장해 주세요.'); return false; }
     setSaving(true); setError('');
     try {
       await flush();
       await request(recommendationUrl(id, course, '/choices'), { method: 'PUT', body: JSON.stringify({ generationId: result.generationId, recommendationId: result.recommendations.id, choices, skillOrder: order }) });
+      savedSelection.current=JSON.stringify([choices,order]);
       return true;
     } catch (e) { setError(e instanceof Error ? e.message : '선택을 저장하지 못했어요.'); return false; }
     finally { setSaving(false); }
@@ -164,7 +173,7 @@ function ResultSelection({ resourcesOnly = false, editorRef, onChoicesChanged, l
   const amount=[...selectedCourses.values()].reduce((sum,resource)=>sum+(resource.cost||0),0);
   const unknown=[...selectedCourses.values()].some(resource=>resource.cost==null);
   useEffect(()=>{if(course && result?.recommendations)onTotals?.(course,{weeks:total,amount,unknown});},[course,total,amount,unknown,onTotals,result?.recommendations]);
-  useEffect(()=>{if(course)onPrepared?.(course,result?.recommendations?'ready':error?'failed':'pending');},[course,result?.recommendations,error,onPrepared]);
+  useEffect(()=>{if(course)onPrepared?.(course,result?.recommendations?'ready':error?'failed':'pending',version);},[course,version,result?.recommendations,error,onPrepared]);
   const activeNames = order.filter(name => choices[name]?.enabled !== false);
   const missingCount = activeNames.filter(name => !choices[name] || currentWeeks(choices[name], estimates[name]) === null).length;
   const knownWeeks = activeNames.reduce((sum, name) => sum + (choices[name] ? currentWeeks(choices[name], estimates[name]) ?? 0 : 0), 0);

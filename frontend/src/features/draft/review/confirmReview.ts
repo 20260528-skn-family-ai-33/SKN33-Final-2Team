@@ -12,10 +12,11 @@ export function confirmReview(go: Go, save?: () => Promise<boolean>): Promise<bo
   const initial = ws(), scope = reviewScope(initial), id = initial.draftId, owner = initial.owner;
   const pending = flights.get(scope);
   if (pending) return pending;
-  const current = () => ws().owner === owner && reviewScope(ws()) === scope;
+  const current = () => ws().owner === owner && reviewScope(ws()) === scope && ws().pendingFlow !== 'materials';
   const work = Promise.resolve().then(async () => {
     try {
       if (!id || !owner) return false;
+      if(ws().pendingFlow==='materials'){failToast(new Error('자료 선택을 먼저 저장해 주세요.'),'확정할 수 없어요');return false;}
       await flush();
       if (!current()) return false;
       if (save && !await save()) return false;
