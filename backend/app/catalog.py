@@ -118,6 +118,13 @@ def items(refresh: bool = False) -> dict[str, dict]:
         return _cache['items']
 
 
+def warmup_roadmap() -> None:
+    """서버 시작 시 읽기만 수행해 검색 색인과 고정 토크나이저를 준비한다."""
+    catalog_candidates.cached_index(items())
+    from . import catalog_budget
+    catalog_budget.tokens('')
+
+
 def skill_names() -> list[str]:
     """팀 DB 스킬 태그 이름(skill_tags · 번호 순). 로드맵 에이전트가 직접 수행 과제의 스킬을 이 목록에서 고른다(10/23)"""
     items()
@@ -264,16 +271,17 @@ def roadmap_skills(texts: list[str], skill_names: list[str] | None = None) -> li
     records = items()
     known = {s for r in records.values() for s in r.get('skills') or []}
     if skill_names is not None:
-        if not isinstance(skill_names, list) or not skill_names or any(not isinstance(s, str) or s not in known for s in skill_names):
-            raise ValueError('선정 스킬은 DB에 등록된 스킬 이름이어야 합니다.')
-        if len(set(skill_names)) > catalog_candidates.MAX_SKILLS:
+        if not isinstance(skill_names, list) or any(not isinstance(s, str) for s in skill_names):
+            raise ValueError('선정 스킬은 이름 목록이어야 합니다.')
+        # 저장 뒤 이름 변경·삭제가 가능하다. 남아 있는 이름의 순서는 보존한다.
+        want = list(dict.fromkeys(s for s in skill_names if s in known))
+        if len(want) > catalog_candidates.MAX_SKILLS:
             raise ValueError('선정 스킬은 최대 5개입니다.')
-        want = skill_names
-    else:
-        # 구판 handoff 호환. 정확한 스킬명이 전달되면 키워드 추정보다 우선한다.
-        exact = [s for text in texts for s in sorted(known) if s in text]
-        want = list(dict.fromkeys(s for s in exact + skills_for(texts) if s in known))[:catalog_candidates.MAX_SKILLS]
-    return list(dict.fromkeys(want))
+        if want:
+            return want
+    # 구판 또는 저장된 스킬이 전부 사라진 handoff는 현재 이름으로 다시 추정한다.
+    exact = [s for text in texts for s in sorted(known) if s in text]
+    return list(dict.fromkeys(s for s in exact + skills_for(texts) if s in known))[:catalog_candidates.MAX_SKILLS]
 
 
 def roadmap_selection(texts: list[str], track: str, *, skill_names: list[str] | None = None,

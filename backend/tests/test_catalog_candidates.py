@@ -280,13 +280,16 @@ class CandidateSelectionTests(unittest.TestCase):
             self.assertFalse(selected.records)
             self.assertEqual(candidates.entry(rows['x'], selected)['curriculum'], [])
 
-    def test_goal_profile_cache_is_bounded_and_invalidated_on_catalog_refresh(self):
+    def test_goal_profile_cache_is_bounded_and_reused_only_for_unchanged_records(self):
         rows = {'x': resource('x')}
         for text in ('SQL', '조인', '조회', '결과', '실습', '목표'):
             candidates.select(rows, ['SQL'], [text], 'A2')
         self.assertLessEqual(len(candidates.cached_index(rows)['x']['query_profiles']), 4)
         refreshed = candidates.cached_index(copy.deepcopy(rows))
-        self.assertEqual(refreshed['x']['query_profiles'], {})
+        self.assertIs(refreshed['x']['query_profiles'], candidates.cached_index(rows)['x']['query_profiles'])
+        changed = copy.deepcopy(rows)
+        changed['x']['content'] = '변경된 SQL 설명'
+        self.assertEqual(candidates.cached_index(changed)['x']['query_profiles'], {})
 
     def test_challenge_excerpts_include_goal_related_validation_evidence(self):
         rows = {'x': resource('x', content='', curriculum={'items': [
@@ -349,6 +352,20 @@ class CandidateSelectionTests(unittest.TestCase):
         rows = resources(2)
         with self.assertRaises(ValueError):
             candidates.select(rows, ['skill-0'], ['SQL'], 'A2', list(rows)[:41])
+
+    def test_unavailable_required_error_identifies_title_id_and_action(self):
+        rows = {'retired': resource('retired', title='SQL 조인 실무', usable=False)}
+        with self.assertRaises(candidates.UnavailableResourcesError) as result:
+            candidates.select(rows, ['SQL'], ['SQL'], 'A2', ['retired', 'deleted'])
+        self.assertEqual(result.exception.resource_ids, ['retired', 'deleted'])
+        for label in ('SQL 조인 실무 [retired]', '[deleted]', '삭제·교체'):
+            self.assertIn(label, str(result.exception))
+
+    def test_unavailable_resource_error_bounds_titles_and_display_count(self):
+        with self.assertRaises(candidates.UnavailableResourcesError) as result:
+            candidates.select({}, [], ['SQL'], 'A3', [f'missing-{n}' for n in range(7)])
+        self.assertIn('외 2개', str(result.exception))
+        self.assertNotIn('missing-6', str(result.exception))
 
     def test_cache_reuses_snapshot_and_refresh_rebuilds(self):
         rows = resources(1, 1)
@@ -557,9 +574,87 @@ class RoadmapIntegrationTests(unittest.TestCase):
                 out = rm._catalog_payload(pid, {'handoff': h}, extra_ids=['0-29'])
                 self.assertTrue({'chosen', '0-29'}.issubset({r['id'] for r in out['catalog']}))
 
-    def test_explicit_unknown_or_too_many_skills_fail(self):
+    def test_stale_skill_names_keep_survivors_in_order_without_expanding_scope(self):
+        saved = ['옛 SQL 이름', 'Python', 'SQL', 'Python']
+        with patch.object(catalog, 'items', return_value={'sql': resource('sql'), 'py': resource('py', 'Python')}):
+            self.assertEqual(catalog.roadmap_skills(['SQL'], saved), ['Python', 'SQL'])
+            self.assertEqual(catalog.roadmap_skills(['SQL'], ['옛 이름', 'Python']), ['Python'])
+        self.assertEqual(saved, ['옛 SQL 이름', 'Python', 'SQL', 'Python'])
+
+    def test_all_stale_or_empty_skills_fall_back_to_current_names(self):
+        with patch.object(catalog, 'items', return_value={'sql': resource('sql', 'SQL 새 이름')}):
+            for saved in (None, [], ['SQL 옛 이름']):
+                with self.subTest(saved=saved):
+                    self.assertEqual(catalog.roadmap_skills(['SQL 새 이름으로 조회'], saved), ['SQL 새 이름'])
+            # 재추정 근거가 없을 때도 사라진 이름이나 임의 스킬을 만들어내지 않는다.
+            self.assertEqual(catalog.roadmap_skills(['무관한 목표'], ['SQL 옛 이름']), [])
+
+    def test_stale_names_recover_via_keyword_rules_and_keep_five_skill_limit(self):
+        rows = {str(n): resource(str(n), f'new-{n}') for n in range(8)}
+        with patch.object(catalog, 'items', return_value=rows), \
+                patch.object(catalog, 'skills_for', return_value=[f'new-{n}' for n in range(8)]):
+            self.assertEqual(catalog.roadmap_skills(['목표'], ['old']), [f'new-{n}' for n in range(5)])
+
+    def test_stale_saved_skills_allow_generation_regeneration_and_revision(self):
+        rows = {'sql': resource('sql', 'SQL 새 이름', title='SQL 조인 강좌')}
+        h = {'goal': 'SQL 새 이름 조회', 'prefs': {}, 'skillNames': ['SQL 옛 이름']}
+        captured = []
+
+        def capture(ctx, system, payload, **kwargs):
+            captured.append(payload)
+            self.assertEqual(payload['handoff']['skillNames'], ['SQL 새 이름'])
+            self.assertEqual([r['id'] for r in payload['catalog']], ['sql'])
+            return {'acts': [{'stage': 2, 'res': 'sql'}]}
+
+        with patch.object(catalog, 'items', return_value=rows), patch.object(budget, 'tokens', side_effect=measured), \
+                patch.object(rm, '_sys', return_value='DB active unchanged'), patch.object(catalog, 'skill_names', return_value=['SQL 새 이름']), \
+                patch.object(rm.rt, 'llm_json', side_effect=capture), \
+                patch.object(rm.rt, 'run', side_effect=lambda ctx, name, task, inp, mock, api, **kw: api(None)):
+            ctx = SimpleNamespace(mode='openai')
+            for pid in ('A1', 'A2', 'A3'):
+                rm.option(ctx, {'pid': pid, 'handoff': h})
+                rm.option(ctx, {'pid': pid, 'handoff': h, 'previous': {'acts': [{'res': 'sql'}]}})
+                plan = {'opt': pid, 'name': 'Track', 'hours': 6, 'start': 1,
+                        'acts': [{'id': 'old', 'stage': 2, 'title': 'SQL 조회', 'res': 'sql', 'hours': 4}]}
+                rm.revise(ctx, {'pid': pid, 'handoff': h, 'plan': plan, 'changes': {}, 'request': '설명 보완'})
+        self.assertEqual(len(captured), 9)
+        self.assertEqual(h['skillNames'], ['SQL 옛 이름'])
+
+    def test_old_plan_unavailable_resource_error_identifies_snapshot_even_when_completed(self):
+        rows = {'sql': resource('sql')}
+        h = {'goal': 'SQL', 'prefs': {}, 'skillNames': ['SQL']}
+        with patch.object(catalog, 'items', return_value=rows), patch.object(rm, '_sys', return_value='DB active'), \
+                patch.object(rm.rt, 'llm_json') as model, \
+                patch.object(rm.rt, 'run', side_effect=lambda ctx, name, task, inp, mock, api, **kw: api(None)):
+            for done in (False, True):
+                old = {'id': 'old', 'stage': 2, 'title': '기존 SQL 자료 학습', 'res': 'deleted', 'hours': 4, 'done': done}
+                inp = {'pid': 'A2', 'handoff': h, 'previous': {'acts': [old]}}
+                with self.subTest(path='regeneration', done=done), self.assertRaisesRegex(llm.LlmError, r'기존 SQL 자료 학습 \[deleted\]'):
+                    rm.option(SimpleNamespace(mode='openai'), inp)
+                plan = {'opt': 'A2', 'name': 'Fast', 'hours': 6, 'start': 1, 'acts': [old]}
+                with self.subTest(path='revision', done=done), self.assertRaisesRegex(llm.LlmError, r'기존 SQL 자료 학습 \[deleted\]'):
+                    rm.revise(SimpleNamespace(mode='openai'), {'pid': 'A2', 'handoff': h, 'plan': plan, 'changes': {}})
+            model.assert_not_called()
+
+    def test_unavailable_existing_resource_can_be_explicitly_removed_or_replaced(self):
+        rows = {'sql': resource('sql')}
+        h = {'goal': 'SQL', 'prefs': {}, 'skillNames': ['SQL']}
+        old = {'id': 'old', 'stage': 2, 'title': '없어진 SQL 자료', 'res': 'deleted', 'hours': 4, 'done': True}
+        plan = {'opt': 'A2', 'name': 'Fast', 'hours': 6, 'start': 1, 'acts': [old]}
+        with patch.object(catalog, 'items', return_value=rows), patch.object(budget, 'tokens', side_effect=measured), \
+                patch.object(rm, '_sys', return_value='DB active'), \
+                patch.object(rm.rt, 'llm_json', return_value={'acts': [{'stage': 2, 'res': 'sql'}]}) as model, \
+                patch.object(rm.rt, 'run', side_effect=lambda ctx, name, task, inp, mock, api, **kw: api(None)):
+            for change in ('removeActs', 'replaceActs'):
+                out = rm.revise(SimpleNamespace(mode='openai'), {'pid': 'A2', 'handoff': h, 'plan': plan,
+                               'changes': {change: [{'key': 'old'}]}})
+                self.assertEqual(out['acts'][0]['res'], 'sql')
+                self.assertNotIn('deleted', {r['id'] for r in model.call_args.args[2]['catalog']})
+        self.assertTrue(old['done'])
+
+    def test_invalid_or_too_many_skills_fail(self):
         with patch.object(catalog, 'items', return_value=resources(6)):
-            for skills in ([], ['unknown'], [f'skill-{n}' for n in range(6)]):
+            for skills in ('skill-0', [None], [1], [f'skill-{n}' for n in range(6)]):
                 with self.subTest(skills=skills), self.assertRaises(llm.LlmError):
                     rm._catalog_payload('A2', {'handoff': {'goal': 'SQL', 'prefs': {}, 'skillNames': skills}})
 

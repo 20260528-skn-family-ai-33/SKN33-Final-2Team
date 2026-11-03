@@ -20,7 +20,7 @@ import re
 import hashlib
 from uuid import uuid4
 
-from .. import catalog, catalog_budget, db, llm, track_policy
+from .. import catalog, catalog_budget, catalog_candidates, db, llm, track_policy
 from . import runtime as rt
 from .demo import D, TEMPLATES, TEMPLATES_ALT, domain_of
 
@@ -328,6 +328,7 @@ def _catalog_payload(pid: str, payload: dict, system: str = '', extra_ids: list 
     try:
         selection = catalog.roadmap_selection(texts, pid, skill_names=handoff.get('skillNames'),
                                              required=required, hints=handoff.get('resourceHints'))
+        handoff['skillNames'] = list(selection.skills)
         from app.learner_knowledge import exclusion,from_profile
         knowledge=handoff.get('learnerKnowledge') or from_profile(handoff.get('profile'))
         if knowledge.get('technologies') or knowledge.get('certifications'):
@@ -345,7 +346,6 @@ def _catalog_payload(pid: str, payload: dict, system: str = '', extra_ids: list 
         if pid == 'A2':
             handoff['prefs'] = dict(handoff.get('prefs') or {})
             handoff['prefs']['deadlineWeeks'] = track_policy.fast_weeks(handoff['prefs'])
-            handoff['skillNames'] = list(selection.skills)
             # 학습 범위와 과제 분류를 분리해 Docker 과제를 다른 핵심 스킬로 오표기하지 않게 한다.
             payload['trackGuidance'].update({'maxWeeks': track_policy.fast_weeks(handoff.get('prefs') or {}),
                                         'maxCoreSkills': track_policy.FAST_SKILLS,
@@ -353,6 +353,12 @@ def _catalog_payload(pid: str, payload: dict, system: str = '', extra_ids: list 
                                         'taskSkillNote': 'coreSkills는 집중 학습할 핵심 스킬이다. 과제 skills는 핵심 스킬에 억지로 맞추지 말고 skillTags 중 실제 수행 내용에 맞는 이름을 1~3개 고른다. 보조 태그를 쓴다고 별도 학습 스킬이나 과제를 추가하지 않는다.',
                                         'planningNote': '최대 6주·핵심 스킬 3개 안에서 편성한다. 최종 강좌 선택은 목표와 목차·소개를 보고 판단한다. 후보별 시간 상한은 아니다.'})
         return catalog_budget.pack(selection, system, payload, context_limit)
+    except catalog_candidates.UnavailableResourcesError as error:
+        # 원본이 삭제돼도 기존 계획에 저장된 활동명과 자료 ID로 대상을 찾을 수 있다.
+        titles = {a['res']: a['title'] for section in ('previous', 'current')
+                  for a in (payload.get(section) or {}).get('acts') or [] if a.get('res') and a.get('title')}
+        detail = catalog_candidates.UnavailableResourcesError(error.resource_ids, {**titles, **error.titles})
+        raise llm.LlmError(str(detail)) from error
     except ValueError as error:
         raise llm.LlmError(str(error)) from error
 

@@ -1,7 +1,7 @@
 """DB 프롬프트는 유지하고 Fast 후보 선정·전달 입력에 적용하는 추가 기준."""
 from __future__ import annotations
 
-VERSION = '20261101-project-skills-free-books-v5'
+VERSION = '20261103-course-preparation-crash-v6'
 FAST_WEEKS = 6
 FAST_SKILLS = 3
 FAST_MIN_OUTLINE_UNITS = 6

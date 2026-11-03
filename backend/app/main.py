@@ -8,19 +8,23 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from contextlib import suppress
 import asyncio
+import logging
 import os
+import time
 from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 
-from . import jobs
+from . import catalog, jobs
 from .config import ROOT
 from .errors import ApiError, api_error_handler
 from .routers import account, team, work, preassessment
 
 WEB = ROOT / 'web'
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -28,6 +32,14 @@ async def lifespan(_: FastAPI):
     n = jobs.mark_lost()
     if n:
         print(f'  서버가 다시 시작돼 끊긴 작업 {n}개를 실패로 남겼어요(다시 시도는 사용자가 누를 때만)')
+    started = time.perf_counter()
+    try:
+        await run_in_threadpool(catalog.warmup_roadmap)
+    except Exception:
+        # 사전 준비 실패로 다른 기능까지 막지 않는다. 로드맵 요청은 기존 검사로 다시 확인한다.
+        logger.exception('로드맵 사전 로딩 실패: 로드맵 요청 시 다시 확인합니다.')
+    else:
+        logger.info('로드맵 사전 로딩 완료: %.0fms', (time.perf_counter() - started) * 1000)
     prompt_task = None
     if os.environ.get('PROMPT_IMPROVEMENT_ENABLED', '0') == '1':
         from .services.prompt_evaluation_replay import load_cases

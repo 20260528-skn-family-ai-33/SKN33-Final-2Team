@@ -8,12 +8,19 @@ import math
 from time import perf_counter
 from app import db, llm
 from app.agents.resource_recommendations import RecommendationError, candidate_pools
+from app.services import book_candidates
 
 MODEL = 'text-embedding-3-small'
 DIMENSIONS = 1536
-VERSION = 'resource-pgvector-rag/v5-period-filter'
+VERSION = 'resource-pgvector-rag/v9-focused-shared-courses'
 PER_KIND = 6
+COURSE_REVIEW = 20
 FIELDS = ('id','title','provider','cost','hours','estimated','image','url','skills','content','curriculum')
+
+
+def version_for(course=None):
+    from app.services.crash_courses import is_crash, VERSION as CRASH_VERSION
+    return VERSION + '/' + CRASH_VERSION if is_crash(course) else VERSION
 
 
 def query_text(project: dict, skill: dict, course: dict | None) -> str:
@@ -67,22 +74,29 @@ def search_vectors(resource_type, ids, vector, limit, free_only):
 def retrieve(project, selection, items, course=None, *, embed=None, search=None):
     started=perf_counter()
     free_only=bool(course and course.get('id')=='A1')
-    # 개수 제한 없이 조건을 적용하고, 벡터 순위로 정렬한 뒤 6개로 줄인다.
-    all_pools=candidate_pools(project,selection,items,limit=max(1,len(items)),free_only=free_only)
+    # 조건을 먼저 적용한다. 코스별 강좌는 벡터 상위 20개를 재평가하고 최종 후보는 종류별 6개다.
+    all_pools=candidate_pools(project,selection,items,limit=max(1,len(items)),free_only=free_only,course=course,rank_courses=False)
     active=[index for index,pool in enumerate(all_pools) if pool['courses'] or pool['books']]
     pools=[{'name':pool['name'],'application':pool['application'],'courses':[],'books':[]} for pool in all_pools]
     if not active:
-        return pools,{'version':VERSION,'model':MODEL,'perKind':PER_KIND,'matches':[],'elapsedMs':round((perf_counter()-started)*1000)}
+        return pools,{'version':version_for(course),'model':MODEL,'perKind':PER_KIND,'perCourse':PER_KIND,
+                      'maxUniqueBooks':book_candidates.LIMIT,'matches':[],'elapsedMs':round((perf_counter()-started)*1000)}
     texts=tuple(query_text(project,selection['skills'][index],course) for index in active)
     vectors=validate_vectors((embed or cached_vectors)(texts),len(texts))
     search=search or search_vectors
     matches=[]
+    from app.services import crash_courses
+    from app.services import resource_evidence
+    crash_cache = {}
     for index,vector in zip(active,vectors):
         for key,kind,prefix in [('courses','courses',''),('books','books','book_')]:
             allowed={row['id'][len(prefix):] if prefix and row['id'].startswith(prefix) else row['id']: row for row in all_pools[index][key]}
-            rows=search(kind,list(allowed),vector,PER_KIND,free_only and key == 'courses') if allowed else []
+            scoped_course = isinstance(course, dict) and course.get('id') in ('A1', 'A2', 'A3')
+            review_limit = (COURSE_REVIEW if key == 'courses' else book_candidates.REVIEW_LIMIT) if scoped_course else PER_KIND
+            rows=search(kind,list(allowed),vector,review_limit,free_only and key == 'courses') if allowed else []
             seen=set()
-            for match in rows[:PER_KIND]:
+            found = []
+            for match in rows[:review_limit]:
                 rid=str(match['resource_id'])
                 if rid not in allowed or rid in seen:raise RecommendationError('벡터 검색 결과가 허용된 자료와 일치하지 않아요.')
                 row=deepcopy(allowed[rid]);row['cost']=match.get('current_cost',row.get('cost'))
@@ -90,9 +104,28 @@ def retrieve(project, selection, items, course=None, *, embed=None, search=None)
                 score=match.get('similarity')
                 if score is None or not math.isfinite(float(score)):raise RecommendationError('자료 검색 유사도가 올바르지 않아요.')
                 seen.add(rid)
-                pools[index][key].append({**{field:row.get(field) for field in FIELDS},'retrievalScore':float(score)})
-                matches.append({'skill':pools[index]['name'],'resourceId':row['id'],'similarity':float(score)})
+                found.append({**{field:row.get(field) for field in FIELDS},'retrievalScore':float(score),
+                              **({'timeStatus':row.get('timeStatus')} if key == 'courses' and crash_courses.is_crash(course) else {})})
+            if key == 'courses' and crash_courses.is_crash(course):
+                for row in found:
+                    if row['id'] not in crash_cache:
+                        crash_cache[row['id']] = crash_courses.facts(items[row['id']], project, selection)
+                # 20개 검토 결과를 스킬별로 먼저 6개로 자르면 공통 단기 강좌를 잃을 수 있다.
+                found = crash_courses.rank(found, project, selection, selection['skills'][index], cache=crash_cache)
+            elif key == 'courses' and scoped_course:
+                found = resource_evidence.rank_applicable(found, project, selection, selection['skills'][index], course,
+                                                          limit=PER_KIND, sources=items, cache=crash_cache)
+            pools[index][key] = found
+            for row in found:
+                matches.append({'skill':pools[index]['name'],'resourceId':row['id'],'similarity':row['retrievalScore']})
             if allowed and not rows:
                 # 벡터가 없는 자료를 키워드 검색으로 몰래 대체하지 않는다.
                 raise RecommendationError('조건에 맞는 자료의 검색 벡터를 찾지 못했어요. 등록된 임베딩 상태를 확인해 주세요.')
-    return pools,{'version':VERSION,'model':MODEL,'perKind':PER_KIND,'matches':matches,'elapsedMs':round((perf_counter()-started)*1000)}
+    if crash_courses.is_crash(course):
+        pools = crash_courses.share_candidates(pools, project, selection, items, cache=crash_cache)
+        matches = [{'skill':pool['name'],'resourceId':row['id'],'similarity':row.get('retrievalScore'),
+                    **({'sourceSkill':row['sourceSkill'],'sharedCandidate':True} if row.get('sharedCandidate') else {})}
+                   for pool in pools for key in ('courses','books') for row in pool[key]]
+    return pools,{'version':version_for(course),'model':MODEL,'perKind':PER_KIND,
+                  'perCourse':PER_KIND,'bookReview':book_candidates.REVIEW_LIMIT,
+                  'maxUniqueBooks':book_candidates.LIMIT,'matches':matches,'elapsedMs':round((perf_counter()-started)*1000)}
