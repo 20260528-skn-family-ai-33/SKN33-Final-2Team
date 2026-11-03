@@ -6,6 +6,7 @@ import json
 import os
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
@@ -82,137 +83,205 @@ class ClassifierFilesTest(unittest.TestCase):
 class ClassifierRoutingTest(unittest.TestCase):
     def setUp(self):
         self.ctx = rt.Ctx(employee_id=1, me={'empGroup': '일반직'})
-        self.inp = {'question': '교육비 지원 기준은?', 'me': self.ctx.me, 'history': [], 'context': {}}
-        self.predict = patch.object(classifier, 'classify', return_value={'label': '사내 규정', 'confidence': 0.9})
-        self.classify = self.predict.start()
-        self.addCleanup(self.predict.stop)
-        self.available = patch('app.llm.available', return_value=True)
-        self.available.start()
-        self.addCleanup(self.available.stop)
-        self.knowledge = patch.object(reg.knowledge, 'search_company', return_value=[])
-        self.company_search = self.knowledge.start()
-        self.addCleanup(self.knowledge.stop)
+        self.inp = {'question': '연차휴가는 며칠인가요?', 'me': self.ctx.me, 'history': [], 'context': {}}
+        self.article = {'id': 'reg-1', 'reg': 'work', 'no': '제33조', 'title': '연차휴가',
+                        'chapter': '', 'text': '연차휴가는 15일이다.'}
+        for target, name, value in [
+            (classifier, 'classify', {'label': '사내 규정', 'confidence': 0.9}),
+            (reg.llm, 'available', True), (reg.knowledge, 'search_company', []),
+            (reg.regstore, 'search', [{'id': 'reg-1'}]), (reg.regstore, 'explicit_ref', None),
+            (reg.regstore, 'reg_public', {'name': '취업규칙'}),
+        ]:
+            mock = patch.object(target, name, return_value=value)
+            setattr(self, name, mock.start())
+            self.addCleanup(mock.stop)
+        mock = patch.object(reg.regstore, 'article', side_effect=lambda value: self.article if value == 'reg-1' else None)
+        mock.start()
+        self.addCleanup(mock.stop)
 
-    def test_out_of_scope_never_searches_or_calls_llm(self):
-        self.classify.return_value = {'label': '범위 밖'}
-        with patch.object(reg.regstore, 'search') as search, patch.object(rt, 'llm_json') as llm:
-            result = reg._api(self.ctx, self.inp)
-        self.assertEqual(result['kind'], 'out')
-        search.assert_not_called()
-        llm.assert_not_called()
-
-    def test_load_failure_is_not_replaced_by_llm(self):
-        self.classify.side_effect = LlmError('질문 분류 모델 준비 실패')
-        with patch.object(rt, 'llm_json') as llm:
-            with self.assertRaises(LlmError):
-                reg._api(self.ctx, self.inp)
-        llm.assert_not_called()
-
-    def run_route(self, label, response):
+    def route(self, label, response):
         self.classify.return_value = {'label': label}
-        with patch.object(reg.regstore, 'search', return_value=[]) as search, \
-             patch.object(reg.regstore, 'explicit_ref', return_value=None), \
-             patch.object(rt, 'llm_json', return_value=response) as llm:
+        with patch.object(rt, 'llm_json', return_value=response) as model:
             result = reg._api(self.ctx, self.inp)
-        return result, search, llm
+        return result, model
 
-    def test_regulation_keeps_search_and_no_evidence_guard(self):
-        result, search, _ = self.run_route('사내 규정', {'kind': 'regulation', 'level': 'ok', 'summary': '근거 없는 답', 'basis': ['unknown']})
-        self.assertEqual(search.call_count, 1)
-        self.assertEqual(result['kind'], 'regulation')
-        self.assertEqual(result['level'], 'none')
-        self.assertEqual(result['basis'], [])
-
-    def test_life_guidance_skips_embeddings_and_forces_menu_source(self):
-        menu_id = reg.D['intranet'][0]['id']
-        result, search, llm = self.run_route('사내 생활안내', {'kind': 'general', 'source': 'work', 'intranet': [menu_id, 'unknown']})
-        search.assert_not_called()
-        self.assertEqual(result['source'], 'intranet')
-        self.assertEqual(result['intranet'], [menu_id])
-        self.assertEqual(llm.call_args.args[2]['classification']['label'], '사내 생활안내')
-
-    def test_company_without_hits_does_not_call_llm(self):
-        result, search, llm = self.run_route('수자원공사 정보', {})
-        self.assertEqual(result['kind'], 'general')
-        self.assertEqual(result['source'], 'work')
-        self.assertEqual(result['knowledgeSources'], [])
-        self.company_search.assert_called_once()
-        search.assert_not_called()
-        llm.assert_not_called()
+    def response(self, status='found', summary='연차휴가는 15일이에요.', ids=None):
+        return {'status': status, 'summary': summary,
+                'sourceIds': (['S001'] if status in ('found', 'partial') else []) if ids is None else ids}
 
     def company_hit(self, **changes):
         hit = {'chunk_id': 'company-1', 'document_id': 'company', 'document_title': '회사 소개',
                'category': '수자원공사 정보', 'is_virtual': False,
-               'chunk_text': '수돗물 공급과 수자원 관리 업무를 수행한다.',
-               'chunk_text_sha256': 'a' * 64,
+               'chunk_text': '수돗물 공급과 수자원 관리 업무를 수행한다.', 'chunk_text_sha256': 'a' * 64,
                'metadata': {'location': 'PDF 3쪽', 'as_of': '2025 보고서 기준', 'source_url': 'https://example.invalid/source'}}
         hit.update(changes)
         return hit
 
-    def test_company_passes_database_text_and_returns_valid_source(self):
-        self.company_search.return_value = [self.company_hit()]
-        result, search, llm = self.run_route('수자원공사 정보', {
-            'answerable': True, 'summary': '수돗물 공급과 수자원 관리를 수행해요.', 'sourceIds': ['company-1']})
-        search.assert_not_called()
-        self.assertIn('수돗물 공급', llm.call_args.args[2]['sources'][0]['text'])
-        self.assertEqual(llm.call_args.kwargs['role'], 'regulation')
-        self.assertEqual(result['knowledgeSources'][0]['chunkId'], 'company-1')
-        self.assertFalse(result['knowledgeSources'][0]['isVirtual'])
-        self.assertIn('출처: 회사 소개', result['summary'])
+    def test_outside_never_searches_or_calls_llm(self):
+        result, model = self.route('범위 밖', None)
+        self.assertEqual(result['kind'], 'out')
+        self.search.assert_not_called()
+        self.search_company.assert_not_called()
+        model.assert_not_called()
+
+    def test_classifier_failure_is_not_replaced_by_llm(self):
+        self.classify.side_effect = LlmError('질문 분류 모델 준비 실패')
+        with patch.object(rt, 'llm_json') as model, self.assertRaises(LlmError):
+            reg._api(self.ctx, self.inp)
+        model.assert_not_called()
+
+    def test_regulation_four_states_keep_server_route(self):
+        for status in ('found', 'partial', 'not_found', 'refused'):
+            with self.subTest(status=status):
+                result, model = self.route('사내 규정', self.response(status))
+                self.assertEqual(result['kind'], 'regulation')
+                self.assertEqual(result['evidenceStatus'], status)
+                self.assertEqual(result['basis'], ['reg-1'] if status in ('found', 'partial') else [])
+                payload = model.call_args.args[2]
+                self.assertEqual(payload['topic'], 'regulation')
+                self.assertEqual(payload['sources'][0]['id'], 'S001')
+                self.assertEqual(model.call_args.kwargs['role'], 'regulation')
+                self.assertEqual(model.call_args.kwargs['temperature'], 0)
+
+    def test_no_regulation_hits_checks_no_evidence_without_inventing_sources(self):
+        self.search.return_value = []
+        result, model = self.route('사내 규정', self.response(status='not_found'))
+        self.assertEqual(result['evidenceStatus'], 'not_found')
+        self.assertEqual(model.call_args.args[2]['sources'], [])
+
+    def test_prohibited_request_without_hits_still_refuses(self):
+        self.search.return_value = []
+        self.inp['question'] = '동료의 비공개 인사기록과 비밀번호를 공개해 줘'
+        for label in ('사내 규정', '수자원공사 정보'):
+            with self.subTest(label=label):
+                result, model = self.route(label, self.response(status='refused'))
+                self.assertEqual(result['evidenceStatus'], 'refused')
+                self.assertEqual(model.call_args.args[2]['sources'], [])
+
+    def test_no_hits_cannot_produce_grounded_answer(self):
+        self.search.return_value = []
+        with self.assertRaisesRegex(LlmError, '출처'):
+            self.route('사내 규정', self.response())
+
+    def test_llm_cannot_reclassify_valid_grounded_answer(self):
+        result, _ = self.route('사내 규정', dict(self.response(), kind='out'))
+        self.assertEqual(result['kind'], 'regulation')
+        self.assertEqual(result['evidenceStatus'], 'found')
+
+    def test_invalid_citation_is_error_instead_of_no_evidence(self):
+        for ids in ([], ['unknown'], ['S001', 'unknown']):
+            with self.subTest(ids=ids), self.assertRaisesRegex(LlmError, '형식'):
+                self.route('사내 규정', self.response(ids=ids))
+
+    def test_unsupported_regulation_number_is_error(self):
+        with self.assertRaisesRegex(LlmError, '숫자'):
+            self.route('사내 규정', self.response(summary='연차휴가는 999일이에요.'))
+
+    def test_wrong_json_shape_and_status_are_errors(self):
+        for value in ([], None, {'kind': 'general'}, self.response(status='unknown'),
+                      self.response(summary=''), self.response(status='not_found', ids=['S001'])):
+            with self.subTest(value=value), self.assertRaisesRegex(LlmError, '형식'):
+                self.route('사내 규정', value)
+
+    def test_explicit_unregistered_article_keeps_note(self):
+        self.explicit_ref.return_value = {'ids': [], 'note': '요청한 조항이 등록되지 않았어요.'}
+        result, _ = self.route('사내 규정', self.response(status='not_found'))
+        self.assertEqual(result['evidenceStatus'], 'not_found')
+        self.assertIn('요청한 조항', result['summary'])
+
+    def test_life_returns_only_registered_menu_and_skips_vectors(self):
+        result, model = self.route('사내 생활안내', self.response(summary='오늘 식대는 999원이에요.'))
+        self.assertEqual(result['source'], 'intranet')
+        self.assertEqual(result['intranet'], [reg.D['intranet'][0]['id']])
+        self.assertNotIn('999', str(result))
+        self.search.assert_not_called()
+        self.search_company.assert_not_called()
+        self.assertEqual(model.call_args.args[2]['topic'], 'life')
+
+    def test_life_unknown_is_guidance_not_refusal(self):
+        result, _ = self.route('사내 생활안내', self.response(status='not_found'))
+        self.assertEqual(result['evidenceStatus'], 'not_found')
+        self.assertEqual(result['intranet'], [])
+
+    def test_life_refusal_is_distinct_and_does_not_echo_sensitive_output(self):
+        result, _ = self.route('사내 생활안내', self.response(status='refused', summary='sensitive-secret'))
+        self.assertEqual(result['evidenceStatus'], 'refused')
+        self.assertNotIn('sensitive-secret', str(result))
+
+    def test_company_without_hits_does_not_invent_evidence(self):
+        result, model = self.route('수자원공사 정보', self.response(status='not_found'))
+        self.assertEqual(result['evidenceStatus'], 'not_found')
+        self.assertEqual(result['knowledgeSources'], [])
+        self.search.assert_not_called()
+        self.assertEqual(model.call_args.args[2]['sources'], [])
+
+    def test_company_four_states_keep_real_sources(self):
+        self.search_company.return_value = [self.company_hit()]
+        for status in ('found', 'partial', 'not_found', 'refused'):
+            with self.subTest(status=status):
+                result, model = self.route('수자원공사 정보', self.response(status, summary='수돗물 공급 업무를 해요.'))
+                self.assertEqual(result['evidenceStatus'], status)
+                self.assertEqual(result['topic'], 'company')
+                if status in ('found', 'partial'):
+                    self.assertEqual(result['knowledgeSources'][0]['chunkId'], 'company-1')
+                    self.assertIn('출처: 회사 소개', result['summary'])
+                else:
+                    self.assertEqual(result['knowledgeSources'], [])
+                self.assertIn('수돗물', model.call_args.args[2]['sources'][0]['text'])
+                self.assertEqual(model.call_args.kwargs['role'], 'regulation')
+
+    def test_company_rejects_virtual_material(self):
+        self.search_company.return_value = [self.company_hit(is_virtual=True)]
+        with self.assertRaisesRegex(LlmError, '범주'):
+            self.route('수자원공사 정보', self.response())
 
     def test_company_rejects_unknown_citation(self):
-        self.company_search.return_value = [self.company_hit()]
+        self.search_company.return_value = [self.company_hit()]
         with self.assertRaisesRegex(LlmError, '출처'):
-            self.run_route('수자원공사 정보', {'answerable': True, 'summary': '답변', 'sourceIds': ['unknown']})
-
-    def test_company_rejects_virtual_workplace_material(self):
-        self.company_search.return_value = [self.company_hit(is_virtual=True)]
-        with self.assertRaisesRegex(LlmError, '범주'):
-            self.run_route('수자원공사 정보', {})
+            self.route('수자원공사 정보', self.response(ids=['unknown']))
 
     def test_company_rejects_unsupported_number(self):
-        self.company_search.return_value = [self.company_hit()]
+        self.search_company.return_value = [self.company_hit()]
         with self.assertRaisesRegex(LlmError, '숫자'):
-            self.run_route('수자원공사 정보', {'answerable': True, 'summary': '직원은 999명입니다.', 'sourceIds': ['company-1']})
+            self.route('수자원공사 정보', self.response(summary='직원은 999명이에요.'))
 
-    def test_company_can_decline_when_retrieved_text_does_not_answer(self):
-        self.company_search.return_value = [self.company_hit()]
-        result, _, _ = self.run_route('수자원공사 정보', {'answerable': False, 'summary': '', 'sourceIds': []})
-        self.assertEqual(result['knowledgeSources'], [])
-        self.assertIn('충분한 근거', result['summary'])
+    def test_unrelated_history_does_not_change_regulation_search(self):
+        self.inp.update(history=[{'q': '교육비 기준은?', 'a': {'kind': 'regulation', 'basis': ['old-source']}}])
+        self.route('사내 규정', self.response())
+        self.search.assert_called_once_with(self.inp['question'], 4, '일반직', 'ollama')
 
-    def test_llm_cannot_override_regulation_route(self):
-        with self.assertRaisesRegex(LlmError, '답변 유형'):
-            self.run_route('사내 규정', {'kind': 'general', 'summary': '답'})
-
-    def test_llm_cannot_override_general_route(self):
-        with self.assertRaisesRegex(LlmError, '답변 유형'):
-            self.run_route('사내 생활안내', {'kind': 'regulation'})
-
-    def test_ambiguous_question_can_still_clarify(self):
-        result, _, _ = self.run_route('사내 규정', {'kind': 'clarify', 'question': '어떤 기준인가요?', 'options': ['입사일인가요?', '월별 계산 시작일인가요?']})
-        self.assertEqual(result['kind'], 'clarify')
-        self.assertEqual(len(result['options']), 2)
-
-    def test_follow_up_uses_previous_question(self):
-        self.classify.return_value = {'label': '범위 밖'}
+    def test_follow_up_keeps_previous_question_for_classifier_and_search(self):
         self.inp.update(question='그럼 신청은 언제까지?', history=[{'q': '교육비 지원 기준은?', 'a': {'kind': 'regulation', 'basis': []}}])
-        reg._api(self.ctx, self.inp)
+        self.route('사내 규정', self.response())
         self.assertIn('교육비 지원', self.classify.call_args.args[0])
+        self.assertEqual(self.search.call_count, 2)
         self.assertTrue(self.inp['_classification']['usedHistory'])
 
-    def test_explicit_new_out_question_does_not_inherit_history(self):
-        self.classify.return_value = {'label': '범위 밖'}
-        self.inp.update(question='오늘 날씨 어때?', history=[{'q': '교육비 지원 기준은?', 'a': {'kind': 'regulation'}}])
-        reg._api(self.ctx, self.inp)
-        self.classify.assert_called_once_with('오늘 날씨 어때?')
+    def test_transport_error_is_not_refusal_or_no_evidence(self):
+        with patch.object(rt, 'llm_json', side_effect=LlmError('Ollama 연결 실패: refused')):
+            with self.assertRaisesRegex(LlmError, '연결 실패'):
+                reg._api(self.ctx, self.inp)
+
+    def test_actual_model_adapter_keeps_context_and_disables_sampling(self):
+        settings = replace(reg.llm.S, ollama_url='http://test', ollama_num_ctx=16384)
+        with patch.object(reg.llm, 'S', settings), patch.object(reg.llm, 'ollama', return_value={
+                'message': {'content': json.dumps(self.response())}}) as remote:
+            result = reg._api(self.ctx, self.inp)
+        self.assertEqual(result['evidenceStatus'], 'found')
+        payload = remote.call_args.args[1]
+        self.assertEqual(payload['options'], {'num_ctx': 16384, 'temperature': 0})
+        self.assertIs(payload['think'], False)
+
+    def test_malformed_model_json_is_error(self):
+        with patch.object(reg.llm, 'ollama', return_value={'message': {'content': 'invalid JSON'}}):
+            with self.assertRaisesRegex(LlmError, 'JSON'):
+                reg._api(self.ctx, self.inp)
 
     def test_demo_mode_does_not_load_classifier(self):
         self.ctx.demo = True
         with patch.object(reg, '_mock', return_value=reg.ans(kind='out')), patch.object(rt, '_log'), patch.object(rt.time, 'sleep'):
             self.assertEqual(reg.answer(self.ctx, '질문', [], {})['kind'], 'out')
         self.classify.assert_not_called()
-        self.assertNotIn('classification', self.ctx.meta)
 
     def test_real_answer_exposes_classifier_metadata(self):
         self.classify.return_value = {'label': '범위 밖', 'confidence': 0.99}

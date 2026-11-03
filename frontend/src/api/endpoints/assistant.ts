@@ -5,8 +5,9 @@ import type { RegBundle } from '../types/catalog';
 import type { JobStarted } from '../types/common';
 
 export type AnswerKind = 'regulation' | 'general' | 'clarify' | 'out';
-/** regulation: ok·missing·unclear·none·scope · general: general · clarify · out */
-export type AnswerLevel = 'ok' | 'missing' | 'unclear' | 'none' | 'scope' | 'general' | 'clarify' | 'out';
+/** 근거 상태·제공 금지 거절. 기존 대화의 missing·scope·clarify 등도 유지한다. */
+export type AnswerLevel = 'ok' | 'missing' | 'unclear' | 'none' | 'scope' | 'general' | 'clarify' | 'out' | 'refused';
+export type EvidenceStatus = 'found' | 'partial' | 'not_found' | 'refused';
 
 /** 회사 정보 답변이 실제로 인용한 DB 원문 출처. 규정 조항 basis와 구분한다. */
 export interface CompanyKnowledgeSource {
@@ -26,6 +27,9 @@ export interface CompanyKnowledgeSource {
 export interface AssistantAnswer {
   kind: AnswerKind;
   level: AnswerLevel;
+  topic?: 'regulation' | 'company' | 'life';
+  /** refused는 제공 금지 요청의 거절이다. 연결·형식 오류는 기존 실패 응답으로 구분한다. */
+  evidenceStatus?: EvidenceStatus;
   /** general 일 때 intranet(사내 홈페이지 안내)·work(업무·학습)·app(사용법) */
   source?: string;
   summary: string;

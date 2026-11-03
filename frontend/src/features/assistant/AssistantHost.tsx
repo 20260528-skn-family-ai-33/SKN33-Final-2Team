@@ -1,8 +1,8 @@
 /* 사내 생활 도우미 (우측 하단 · API-09 · 5차 gp-reg.js)
-   서버의 규정 에이전트가 LLM 지시문으로 질문을 분류해 유형에 맞게만 답한다.
+   RoBERTa가 질문을 분류하고 LLM은 등록 자료를 근거로 답한다.
      규정 질문 → 내 직원 구분의 팀 DB 규정 근거 조항과 함께(규정에 없으면 답하지 않고 담당 부서 안내) · 맞는 규정 묶음이 없으면 '적용 대상 아님'
-     일반 질문 → 사내 생활은 가상 사내 홈페이지 메뉴 안내, 업무·학습은 일반 답변, 앱 사용법은 메뉴 안내
-     범위 밖(주식·날씨·스포츠 등) → 답하지 않음 · 애매하면 되묻기 */
+     회사 질문 → 등록된 회사 자료로 답변 · 사내 생활 → 알려진 가상 홈페이지 안내
+     범위 밖 → 검색·LLM 없이 종료. 이전 대화·가데이터의 일반 답변과 되묻기 카드는 유지한다 */
 import { useEffect, useRef } from 'react';
 import type { AssistantAnswer } from '@/api/endpoints/assistant';
 import type { Article } from '@/api/types/catalog';
@@ -16,11 +16,11 @@ import { toast } from '@/shared/state/ui';
 import { Icon } from '@/shared/ui/Icon';
 import { OpsBox } from '@/shared/ui/parts';
 import { ask, clearLog, closeAssistant, openAssistant, pick, retry, setInput, stop, useAssistant, type Msg } from './assistantStore';
+import { answerStatus } from './answerStatus';
 
-const SUGS = ['교육비 지원을 받을 수 있나요?', '통근버스 시간표는 어디서 봐요?', '승진 기준이 궁금해요', '근무성적평정은 언제 하나요?', 'RAG가 뭐예요?', '로드맵 기간을 바꾸고 싶어요'];
+const SUGS = ['교육비 지원을 받을 수 있나요?', '통근버스 시간표는 어디서 봐요?', '승진 기준이 궁금해요', '근무성적평정은 언제 하나요?', '수자원공사는 어떤 일을 하나요?', '회의실 예약은 어디서 하나요?'];
 /** 대화가 이만큼 길어지면 '새 대화'를 권한다(넘기는 양은 줄이지 않음) */
 const LONG_TURNS = 10;
-const LV: Record<string, [string, string]> = { ok: ['근거 확인', 'acc'], missing: ['관련 자료 미확보', 'warn'], unclear: ['일부만 확인', 'warn'] };
 
 const setLabel = () => regSet()?.label || '규정';
 const artHead = (a: Article, lead?: string) =>
@@ -56,10 +56,21 @@ const eun = (w: string) => {
   return c >= 0xac00 && c <= 0xd7a3 ? ((c - 0xac00) % 28 ? '은' : '는') : '은(는)';
 };
 
-function RegCard({ a }: { a: AssistantAnswer }) {
+export function RegCard({ a }: { a: AssistantAnswer }) {
   const go = useGo();
   useCatalog((s) => s.articles);
   const { summary, apply, more } = a;
+  const [statusLabel, statusStyle] = answerStatus(a);
+  if (a.evidenceStatus === 'refused')
+    return (
+      <div className="ans">
+        <div className="who">
+          <Icon name="chat" />
+          사내 생활 도우미 <span className={`tag ${statusStyle}`}>{statusLabel}</span>
+        </div>
+        <p className="sum">{summary}</p>
+      </div>
+    );
   if (a.kind === 'out')
     return (
       <div className="ans">
@@ -68,7 +79,7 @@ function RegCard({ a }: { a: AssistantAnswer }) {
           사내 생활 도우미 <span className="tag line">범위 밖</span>
         </div>
         <p className="sum">업무·사내 생활과 관련 없는 질문이라 답하지 않아요.</p>
-        <p className="small muted">규정, 사내 생활(사내 홈페이지 안내), 업무·학습, GrowPath 사용법에 대해 물어봐 주세요.</p>
+        <p className="small muted">규정, 수자원공사 정보, 사내 생활(사내 홈페이지 안내)에 대해 물어봐 주세요.</p>
       </div>
     );
   if (a.kind === 'clarify')
@@ -97,7 +108,7 @@ function RegCard({ a }: { a: AssistantAnswer }) {
       <div className="ans">
         <div className="who">
           <Icon name="scale" />
-          규정 에이전트 <span className="tag warn">적용 대상 아님</span>
+          규정 에이전트 <span className={`tag ${statusStyle}`}>{statusLabel}</span>
         </div>
         <h4>답변 요약</h4>
         <p className="sum">{summary}</p>
@@ -128,7 +139,7 @@ function RegCard({ a }: { a: AssistantAnswer }) {
       <div className="ans">
         <div className="who">
           <Icon name="scale" />
-          규정 에이전트 <span className="tag warn">등록된 규정에서 확인 불가</span>
+          규정 에이전트 <span className={`tag ${statusStyle}`}>{statusLabel}</span>
         </div>
         <p className="sum">{summary || `등록된 ${setLabel()}에 이 내용이 명시돼 있지 않아 답하지 않아요.`}</p>
         <p>인사 제도에 관한 내용은 인사 담당 부서(인재경영실)에 문의해 주세요.</p>
@@ -142,7 +153,7 @@ function RegCard({ a }: { a: AssistantAnswer }) {
       <div className="ans">
         <div className="who">
           <Icon name="chat" />
-          사내 생활 도우미 <span className="tag">사내 생활 안내</span>
+          사내 생활 도우미 <span className="tag">{statusLabel}</span>
         </div>
         {items.length ? (
           <>
@@ -183,7 +194,7 @@ function RegCard({ a }: { a: AssistantAnswer }) {
       <div className="ans">
         <div className="who">
           <Icon name="chat" />
-          사내 생활 도우미 <span className="tag">{isCompany ? '수자원공사 정보' : a.source === 'app' ? '사용법 안내' : '일반 답변'}</span>
+          사내 생활 도우미 <span className={`tag ${isCompany ? statusStyle : ''}`}>{isCompany ? statusLabel : a.source === 'app' ? '사용법 안내' : '일반 답변'}</span>
         </div>
         <h4>답변 요약</h4>
         <p className="sum">{answerSummary}</p>
@@ -210,7 +221,6 @@ function RegCard({ a }: { a: AssistantAnswer }) {
       </div>
     );
   }
-  const [lvT, lvC] = LV[a.level] || LV.unclear;
   const arts = (a.basis || []).map(article).filter(Boolean) as Article[];
   /* 실무직 관리규정 제3조(다른 규정과의 관계)는 근거에 있으면 '기본 원칙'으로 표시한다 */
   const base = arts.find((x) => x.no === '제3조' && regOf(x.reg)?.name === '실무직 관리규정') || null;
@@ -218,7 +228,7 @@ function RegCard({ a }: { a: AssistantAnswer }) {
     <div className="ans">
       <div className="who">
         <Icon name="scale" />
-        규정 에이전트 <span className={`tag ${lvC}`}>{lvT}</span>
+        규정 에이전트 <span className={`tag ${statusStyle}`}>{statusLabel}</span>
       </div>
       <h4>답변 요약</h4>
       <p className="sum">{summary}</p>
@@ -268,7 +278,7 @@ function Bubble({ m, i }: { m: Msg; i: number }) {
         <div className="ans fail">
           <div className="who">
             <Icon name="alert" />
-            사내 생활 도우미 <span className="tag fail">답변 실패</span>
+            사내 생활 도우미 <span className="tag fail">오류</span>
           </div>
           <p className="sum">답변을 받지 못했어요.</p>
           <p>{errText(m.fail as Cause)}</p>
@@ -329,7 +339,7 @@ export function AssistantHost() {
           </span>
           <div>
             <b>사내 생활 도우미</b>
-            <small id="regSub">업무·사내 생활 질문에 답해요 · 규정 질문은 등록된 규정 원문에서 근거를 찾아요</small>
+            <small id="regSub">규정·수자원공사 정보는 등록 자료를 근거로, 사내 생활은 알려진 안내만 답해요</small>
           </div>
           <button
             className="btn ghost sm reg-new"
@@ -370,8 +380,8 @@ export function AssistantHost() {
         <div className="chat-b" id="regLog" aria-live="polite" ref={logRef}>
           <div className="msg bot">
             <div className="plain">
-              업무·학습·사내 생활에 대해 물어보세요. 교육 지원·근무시간·보수처럼 규정에 관한 질문은 등록된 원문의 근거 조항과 함께, 식당·통근버스·복지몰 같은 사내 생활은 사내
-              홈페이지(가상) 메뉴로 안내해 드려요. 업무와 관계없는 질문(주식·날씨·스포츠 등)에는 답하지 않아요. 앞 이야기에 이어서 물어봐도 돼요.
+              규정·수자원공사 정보·사내 생활에 대해 물어보세요. 규정과 회사 정보는 등록 자료의 근거를 찾아 답하고, 사내 생활은 알려진 사내 홈페이지(가상) 메뉴로 안내해 드려요.
+              범위 밖 질문에는 답하지 않아요. 앞 이야기에 이어서 물어봐도 돼요.
             </div>
           </div>
           {st.log.map((m, i) => (
@@ -397,7 +407,7 @@ export function AssistantHost() {
               if (ask(st.input)) setInput('');
             }}
           >
-            <input className="input" id="regIn" ref={inRef} placeholder="업무·사내 생활에 대해 물어보세요" autoComplete="off" aria-label="질문" value={st.input} onChange={(e) => setInput(e.target.value)} />
+            <input className="input" id="regIn" ref={inRef} placeholder="규정·수자원공사·사내 생활을 물어보세요" autoComplete="off" aria-label="질문" value={st.input} onChange={(e) => setInput(e.target.value)} />
             <button className="btn pri" id="regSend" aria-label="보내기" hidden={st.running}>
               <Icon name="send" />
             </button>

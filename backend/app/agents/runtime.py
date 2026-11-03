@@ -167,13 +167,15 @@ def parse_json(t: str) -> dict:
         raise llm.LlmError('모델 응답이 JSON 형식이 아니에요')
 
 
-def llm_json(ctx: Ctx, system: str, inp, role: str = 'default', images: list | None = None, history: list | None = None) -> dict:
+def llm_json(ctx: Ctx, system: str, inp, role: str = 'default', images: list | None = None, history: list | None = None,
+             temperature: float | None = None) -> dict:
     """실제 모델에 JSON 응답을 요청한다. ctx.mode 가 ollama/openai 일 때만 부른다"""
     user = {'role': 'user', 'content': json.dumps(inp, ensure_ascii=False, default=str)}
     if images:
         user['images'] = images
     messages = [{'role': 'system', 'content': system}] + list(history or []) + [user]
-    res = llm.chat(ctx.mode, messages, role=role, json_mode=True, reasoning=ctx.reasoning.get(ctx.mode))
+    options = {} if temperature is None else {'temperature': temperature}
+    res = llm.chat(ctx.mode, messages, role=role, json_mode=True, reasoning=ctx.reasoning.get(ctx.mode), **options)
     ctx.meta = {'loadMs': res.get('loadMs', 0)}
     return parse_json(res['content'])
 

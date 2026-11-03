@@ -143,7 +143,8 @@ def _ollama_takes(model: str, level: str) -> bool:
     return levels is None or level in levels
 
 
-def chat(provider: str, messages: list, role: str = 'default', json_mode: bool = True, reasoning: str | None = None) -> dict:
+def chat(provider: str, messages: list, role: str = 'default', json_mode: bool = True, reasoning: str | None = None,
+         temperature: float | None = None) -> dict:
     """한 번의 대화 호출 → {content, model, provider, loadMs, totalMs}.
     reasoning: 직원이 화면에서 고른 추론 정도(단계 이름). 없으면 .env 기본값(OLLAMA_THINK / OPENAI_REASONING_EFFORT),
     그것도 비면 보내지 않아 모델 기본값을 따른다. 이미지 읽기 모델은 화면에서 고르지 않아 직원 값을 쓰지 않는다.
@@ -158,6 +159,8 @@ def chat(provider: str, messages: list, role: str = 'default', json_mode: bool =
             payload['format'] = 'json'
         if S.ollama_num_ctx:
             payload['options'] = {'num_ctx': S.ollama_num_ctx}
+        if temperature is not None:
+            payload.setdefault('options', {})['temperature'] = temperature
         if S.ollama_keep_alive:
             payload['keep_alive'] = S.ollama_keep_alive
         if role == 'regulation':
@@ -174,6 +177,8 @@ def chat(provider: str, messages: list, role: str = 'default', json_mode: bool =
         raise LlmError('OpenAI 비전 모델 설정이 없어요 (.env 의 OPENAI_VISION_MODEL)')
     model = model_name('openai', role)
     payload = {'model': model, 'messages': _with_images(messages, 'openai')}
+    if temperature is not None:
+        payload['temperature'] = temperature
     if json_mode and S.openai_json:
         payload['response_format'] = {'type': 'json_object'}
     # .env 의 단계 목록은 OPENAI_MODEL 의 것이라 다른 비전 모델에는 보내지 않는다.
