@@ -85,9 +85,6 @@ svg.i { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor;
 .seg { display: grid; grid-template-columns: 1fr 1fr; padding: 3px; border-radius: 10px; background: #ECECE7; }
 .seg button { height: 30px; border: 0; border-radius: 8px; background: transparent; font-size: 12.5px; color: var(--ink-3); }
 .seg button.on { background: #fff; color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, .1); }
-.theme { display: flex; align-items: center; gap: 7px; }
-.theme button { width: 20px; height: 20px; padding: 0; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--line-2); }
-.theme button.on { box-shadow: 0 0 0 2px var(--ink); }
 .demo { font-size: 12px; color: var(--ink-3); }
 .demo summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 4px; }
 .demo summary::-webkit-details-marker { display: none; }
@@ -95,10 +92,41 @@ svg.i { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor;
 .demo select { width: 100%; height: 32px; border: 1px solid var(--line-2); border-radius: 8px; background: #fff; font-size: 12.5px; padding: 0 6px; }
 .demo .btn { margin-top: 6px; width: 100%; }
 
+/* ── 좌측 메뉴 접기(2026-11): 메뉴 맨 아래 단추로 접으면 아이콘만 남은 72px 줄이 된다(<html data-side="collapsed"> · shared/state/sideMenu.ts).
+   단추 글자색은 메뉴 글자색을 그대로 따라 테마의 밝은·어두운 메뉴 어디서나 읽힌다.
+   넓은 화면의 좌측 메뉴에서만 쓴다: 화면 테마의 상단 메뉴(data-skin 이 있고 data-nav="side" 가 아님)와 좁은 화면(900px 이하)에서는
+   단추를 숨기고 접힌 상태도 무시한다. 테마의 좌측 메뉴 규칙보다 우선하도록 접힌 상태 규칙의 선택자를 한 단계 더 구체적으로 둔다 ── */
+.side-toggle {
+  display: flex; align-items: center; gap: 8px; width: 100%; height: 32px; padding: 0 6px;
+  border: 0; border-radius: 8px; background: transparent; font-size: 12.5px;
+}
+.side-toggle:hover { background: rgba(127, 127, 127, .14); }
+.side-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.side-toggle svg { width: 16px; height: 16px; }
+:root[data-skin]:not([data-nav="side"]) .side-toggle { display: none; }
+@media (min-width: 901px) {
+  :root[data-side="collapsed"]:not([data-skin]:not([data-nav="side"])) {
+    --side-w: 72px !important;
+    .side { padding-inline: 10px; overflow-x: hidden; }
+    .side .brand { align-self: stretch; justify-content: center; gap: 0; padding-inline: 0; }
+    /* 글자만 쓰는 테마(504·512 등)도 접으면 글자가 사라지므로 로고를 보인다 */
+    .side .brand .logo { display: grid; }
+    .side .brand-t, .side .me .grow, .side .me-go, .side .nav-appx .lbl, .side .demo, .side-foot .lbl { display: none; }
+    .side .me { justify-content: center; padding-inline: 0; }
+    .side .nav a { position: relative; justify-content: center; gap: 0; padding: 0; }
+    /* 이름은 화면에서만 숨긴다(링크 이름으로 읽히게) · 마우스를 올리면 title 로 보인다 */
+    .side .nav a .nav-l { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+    .side .nav a .dot { position: absolute; top: 8px; right: 8px; margin: 0; }
+    .side-foot .logout, .side-foot .side-toggle { justify-content: center; padding: 0; }
+  }
+}
+
 .main { min-width: 0; padding: 44px 40px 150px; }
-.view { max-width: 580px; margin: 0 auto; animation: rise .22s ease-out; }
-.view.wide { max-width: 760px; }
-.view.xwide { max-width: 980px; }
+/* 본문 폭: 데스크톱에서 넓게 쓴다(2026-11 · 모바일 접속은 거의 없음). 5차 원래 값은 580(기본) · 760(wide) · 980px(xwide).
+   1240px 은 화면 테마의 상단 메뉴 폭과 같아, 테마에서는 본문 좌우 끝이 로고·오른쪽 메뉴 끝에 맞는다.
+   비교 브랜치의 고르기 상자에서 '이전 본문 폭'을 고르면 원래 값으로 돌아간다(skins/width.css) */
+.view { max-width: var(--view-w, 1240px); margin: 0 auto; animation: rise .22s ease-out; }
+.view.wide, .view.xwide { max-width: var(--view-w, 1240px); }
 @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
 /* ── 글자 ── */
@@ -478,7 +506,7 @@ details.more[open] > summary { margin-bottom: 12px; }
   .nav-appx { margin: 0; padding: 0; border: 0; order: 4; }
   .nav-appx .lbl { display: none; }
   .side-foot { order: 2; margin: 0 0 0 auto; padding: 0; display: flex; align-items: center; gap: 12px; }
-  .side-foot .foot-lbl, .demo { display: none; }
+  .side-foot .foot-lbl, .demo, .side-foot .side-toggle { display: none; }
   .seg { width: 150px; }
   .main { padding: 28px 16px 140px; }
   .t { font-size: 22px; }
