@@ -24,8 +24,24 @@ Free는 실제 가용 자료 안에서 핵심 수행, Crash는 핵심 기능의 
 """
 
 
-def validate_recommendations(rows, allowed, course, *, require_depth=False):
-    limit = 3 if course == 'A2' else 5
+FIXED_SELECTION_CONTRACT = """
+[현재 실행 단계: 역량 테스트 완료 후 로드맵 3안 비교]
+사용자는 목표·학습 여건·스킬과 학습 순서를 이미 확정했고 설문·퀴즈를 완료했다.
+앞의 스킬 재선정·삭제·코스별 최대 3개 지시 대신 handoff.skillOrder 전체와 순서를 그대로 유지한다.
+세 코스의 스킬 이름은 같아야 하며, 코스 차이는 목표 범위 안의 수행 깊이·검증 수준으로 표현한다.
+현재는 자료 최종 선택 전이다. catalog는 검토 후보이며 사용자가 이미 강좌·도서를 선택했다고 단정하지 않는다.
+최종 자료 선택은 다음 로드맵·자료 선택 단계, 스킬별 산출물 선택은 마지막 검토 단계에서 한다.
+learningSkills는 필수이며 각 항목의 name은 skillOrder 이름 그대로, application은 프로젝트 적용 범위다.
+A3 Challenge는 모든 learningSkills 항목에 targetOutcome(구체적인 산출물 목표 문자열)과
+completionCriteria(서로 다른 완료 기준 문자열 2~4개)를 반드시 함께 반환한다. 설명 본문만 쓰고 필드를 생략하면 실패다.
+A3 형식: {"learningSkills":[{"name":"skillOrder의 스킬명","application":"프로젝트 적용 범위",
+"targetOutcome":"프로젝트에 맞는 확인 가능한 산출물 목표","completionCriteria":["확인 기준 1","확인 기준 2"]}]}
+이는 산출물의 목표 기준이며 사용자가 최종 산출물을 이미 선택한 것은 아니다. A1·A2도 learningSkills의 name·application은 필수다.
+"""
+
+
+def validate_recommendations(rows, allowed, course, *, require_depth=False, max_skills=None):
+    limit = max_skills if max_skills is not None else (3 if course == 'A2' else 5)
     if not isinstance(rows, list) or not 1 <= len(rows) <= limit:
         raise ValueError('로드맵별 지식·역량 추천을 확인하지 못했어요. 새 안을 만들어 주세요.')
     result=[]; seen=set()

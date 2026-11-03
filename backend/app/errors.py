@@ -41,6 +41,7 @@ def bad(message: str, code: str = 'BAD_REQUEST') -> ApiError:
 # ── 에이전트(모델) 오류 → 원인·종류·할 일 (4차 gp-ai.js 의 AI.cause 를 서버로 옮김) ──
 # 앞머리 문구(Ollama 연결 실패 / RunPod 프록시 / OpenAI 401 …)는 llm.py 가 만드는 오류 문구와 맞춘다
 CAUSES = [
+    (r'^Challenge (추천에는|산출물|완료 기준)', 'format', 'Challenge 응답의 산출물 목표·완료 기준 형식을 확인하지 못했어요'),
     (r'^회사 정보 검색 임베딩', 'config', '회사 정보 검색의 임베딩 모델·키·저장 벡터 설정을 확인해 주세요'),
     (r'^질문 분류 모델', 'classifier', '로컬 질문 분류 모델을 읽거나 실행하지 못했어요'),
     (r'^모드 사용 불가', 'off', '고른 AI 모델 모드가 설정되지 않아 쓸 수 없어요'),

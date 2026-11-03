@@ -439,8 +439,8 @@ class RoadmapIntegrationTests(unittest.TestCase):
         with patch.object(catalog, 'items', return_value=rows), patch.object(budget, 'tokens', side_effect=measured):
             out = rm._catalog_payload('A2', base)
         self.assertEqual(base, original)
-        self.assertEqual(out['trackGuidance']['maxWeeks'], 6)
-        self.assertEqual(out['handoff']['prefs']['deadlineWeeks'], 6)
+        self.assertNotIn('maxWeeks', out['trackGuidance'])
+        self.assertEqual(out['handoff']['prefs']['deadlineWeeks'], 12)
         self.assertEqual(out['trackGuidance']['coreSkills'], h['skillNames'][:3])
         self.assertEqual(out['skillTags'], h['skillNames'])
         self.assertEqual(out['handoff']['skillNames'], h['skillNames'][:3])
@@ -453,7 +453,8 @@ class RoadmapIntegrationTests(unittest.TestCase):
             for weeks, expected in [(None, 6), (4, 4), (6, 6), (12, 6)]:
                 h = {'goal': 'SQL', 'prefs': {'deadlineWeeks': weeks}, 'skillNames': ['skill-0']}
                 out = rm._catalog_payload('A2', {'handoff': h})
-                self.assertEqual(out['trackGuidance']['maxWeeks'], expected)
+                self.assertNotIn('maxWeeks', out['trackGuidance'])
+                self.assertEqual(out['handoff']['prefs']['deadlineWeeks'], weeks)
 
     def test_fast_task_tags_survive_generation_regeneration_and_revision(self):
         skills = ['RESTful API 서버 아키텍처', '웹 프레임워크 (FastAPI/Django)', '클라우드', 'Docker', 'MLOps']
@@ -468,7 +469,7 @@ class RoadmapIntegrationTests(unittest.TestCase):
             self.assertEqual(payload['skillTags'], skills)
             self.assertEqual(payload['trackGuidance']['coreSkills'], skills[:3])
             self.assertEqual(payload['trackGuidance']['maxCoreSkills'], 3)
-            self.assertEqual(payload['handoff']['prefs']['deadlineWeeks'], 6)
+            self.assertEqual(payload['handoff']['prefs']['deadlineWeeks'], 12)
             self.assertEqual({r['id'] for r in payload['catalog']}, {'0', '1', '2'})
             self.assertIn('보조 태그', payload['trackGuidance']['taskSkillNote'])
             return {'acts': [{**task, 'key': task['id']}], 'weeklyHours': 6}
@@ -598,3 +599,32 @@ class RoadmapIntegrationTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class FixedCrashSkillCandidatesTests(unittest.TestCase):
+    def test_fixed_four_and_five_skills_reach_final_model_catalog(self):
+        for count in (4,5):
+            with self.subTest(count=count):
+                names=[f'skill-{i}' for i in range(count)]
+                handoff={'goal':'SQL 조인','prefs':{'weeklyHours':4},'selectedSkillsFixed':True,'skillNames':names,'skillOrder':names,'focus':names,
+                         'skillDetails':[{'name':name,'application':'SQL 분석'} for name in names]}
+                before=copy.deepcopy(handoff)
+                with patch.object(catalog,'items',return_value=resources(count)),patch.object(budget,'tokens',side_effect=measured):
+                    result=rm._catalog_payload('A2',{'handoff':handoff})
+                self.assertEqual(list(result['catalogSkillMap'].values()),names)
+                referenced={skill for row in result['catalog'] for skill in row['skills']}
+                self.assertEqual(referenced,set(result['catalogSkillMap']))
+                self.assertEqual(result['trackGuidance']['maxCoreSkills'],count)
+                self.assertEqual(result['handoff']['skillOrder'],names)
+                self.assertEqual(handoff,before)
+
+    def test_fixed_crash_does_not_hide_a_missing_skills_empty_candidate_pool(self):
+        names=[f'skill-{i}' for i in range(5)]
+        selected=candidates.select(resources(4),names,['SQL'],'A2',preserve_skills=True)
+        self.assertEqual(selected.skills,names)
+        self.assertEqual(selected.per_skill['skill-4'],0)
+        self.assertNotIn('skill-4',{skill for row in selected.records for skill in row['skills']})
+
+    def test_legacy_crash_focus_remains_three_without_fixed_selection(self):
+        selected=candidates.select(resources(5),[f'skill-{i}' for i in range(5)],['SQL'],'A2')
+        self.assertEqual(len(selected.skills),3)

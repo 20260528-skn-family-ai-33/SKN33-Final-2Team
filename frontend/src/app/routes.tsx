@@ -41,7 +41,7 @@ export const router = createBrowserRouter([
       r(paths.newGoal, <DraftScreen><GoalStep /></DraftScreen>, { nav: 'new', title: '새 로드맵 작성', width: 'wide' }),
       r(paths.newDetails, <DraftScreen step="details"><DetailsStep /></DraftScreen>, { nav: 'new', title: '세부 사항', width: 'wide' }),
       r(paths.newDetailsCheck, <DraftScreen step="details"><DetailsCheck /></DraftScreen>, { nav: 'new', title: '세부 사항 확인', width: 'wide' }),
-      r(paths.newQuiz, <DraftScreen step="quiz"><QuizStep /></DraftScreen>, { nav: 'new', title: '사전 점검', width: 'wide' }),
+      r(paths.newQuiz, <DraftScreen step="quiz"><QuizStep /></DraftScreen>, { nav: 'new', title: '역량 테스트', width: 'wide' }),
       r(paths.newResult, <DraftScreen step="result"><ResultStep /></DraftScreen>, { nav: 'new', title: '점검 결과', width: 'wide' }),
       r(paths.newResultEdit, <DraftScreen step="result" extra={editGate}><ResultEdit /></DraftScreen>, { nav: 'new', title: '점검 결과 수정', width: 'wide' }),
       r(paths.newGen, <DraftScreen extra={genGate} step="goal" remember={false}><GenerationStep /></DraftScreen>, { nav: 'new', title: '로드맵 3안 작성', width: 'wide' }),

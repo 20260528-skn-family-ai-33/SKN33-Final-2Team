@@ -11,7 +11,7 @@ from app.agents.resource_recommendations import RecommendationError, candidate_p
 
 MODEL = 'text-embedding-3-small'
 DIMENSIONS = 1536
-VERSION = 'resource-pgvector-rag/v5-period-filter'
+VERSION = 'resource-pgvector-rag/v7-no-period-cap'
 PER_KIND = 6
 FIELDS = ('id','title','provider','cost','hours','estimated','image','url','skills','content','curriculum')
 

@@ -79,12 +79,13 @@ def append_proposal(saved, draft, proposal):
     saved['activityProposal'] = value
 
 
-def context(t, employee_id, project_id):
+def context(t, employee_id, project_id, course=None):
     from app.routers.preassessment import course_context
     from app.services.survey_store import read
     saved=read(t, employee_id, project_id)
     raw=drafts._row(t,employee_id,project_id,lock=False)['draft_choices']
-    d=raw['draft']; chosen=d.get('chosen')
+    d=deepcopy(raw['draft']); chosen=course or d.get('chosen')
+    if course is not None:d['chosen']=course
     if not chosen or not d.get('gen') or chosen not in d['gen']['options']:
         raise ApiError(409,'COURSE_REQUIRED','로드맵 코스를 먼저 선택해 주세요.')
     saved=course_context(t,employee_id,project_id,chosen)

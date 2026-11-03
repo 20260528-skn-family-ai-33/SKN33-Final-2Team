@@ -245,7 +245,12 @@ export interface RegenRequest {
   replaceActs: { key: string; title: string }[];
 }
 
+export interface SelectedSkill { name: string; application: string; reason?: string }
 export interface DraftDoc {
+  selectionNotice?: string;
+  selectedSkills?: SelectedSkill[];
+  skillCandidates?: SelectedSkill[];
+  skillInputKey?: string;
   v2Assessment?: { generationId: string; completed: boolean; materialsReady?: boolean; materialsKey?: string | null; activitiesReady?: boolean };
   goal: string;
   project: { name: string; size?: number } | null;

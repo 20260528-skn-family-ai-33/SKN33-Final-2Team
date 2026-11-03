@@ -51,7 +51,7 @@ def save_generated(t: Any, employee_id: int, project_id: str, project: dict,
         raise StoreError('설문이 이미 있거나 다른 창에서 변경됐습니다. 다시 조회해 주세요.')
     if existing is None and replace_generation_id is not None:
         raise StoreError('기존 설문이 변경됐습니다. 다시 조회해 주세요.')
-    snapshot = {key: deepcopy(project.get(key)) for key in ('goal', 'projectSummary', 'desiredCompetencies', 'details', 'projectFile', 'projectSourceHash') if key in project}
+    snapshot = {key: deepcopy(project.get(key)) for key in ('goal', 'projectSummary', 'desiredCompetencies', 'details', 'projectFile', 'projectSourceHash', 'selectedSkills') if key in project}
     value = {'version': 1, 'generationId': str(uuid4()), 'project': snapshot,
              'selection': deepcopy(selection), 'profile': deepcopy(profile),
              'survey': checked, 'answers': {}, 'completed': False}
@@ -79,6 +79,10 @@ def save_answers(t: Any, employee_id: int, project_id: str, generation_id: str,
     value = deepcopy(raw.get(KEY))
     if not isinstance(value, dict) or value.get('version') != 1 or value.get('generationId') != generation_id:
         raise StoreError('문항이 변경되었거나 없습니다. 다시 조회해 주세요.')
+    if value.get('completed'):
+        if complete and answers == value.get('answers'):
+            return value
+        raise StoreError('완료한 점검 응답은 바꿀 수 없어요. 앞 단계 입력을 변경한 뒤 새 점검을 진행해 주세요.')
     allowed = {}
     for group in value['survey']['groups']:
         for kind in ('surveys', 'quizzes'):
@@ -96,7 +100,7 @@ def save_answers(t: Any, employee_id: int, project_id: str, generation_id: str,
     changed=value.get('answers')!=answers
     reset=None
     if changed:
-        for field in ('recommendations','resourceChoices','skillOrder','durationEstimates','courseRecommendations','activityProposal','activityVersions','materialsSelectionKey','learningOutcomes'):
+        for field in ('recommendations','resourceChoices','skillOrder','durationEstimates','courseRecommendations','courseRecommendationVersions','activityProposal','activityVersions','materialsSelectionKey','learningOutcomes'):
             value.pop(field,None)
         if isinstance(raw.get('draft'),dict):
             from app.services.drafts import clear_from
@@ -112,8 +116,9 @@ def public_view(value: dict) -> dict:
     survey = deepcopy(value['survey'])
     for group in survey['groups']:
         for question in group['quizzes']:
-            question.pop('answer', None)
-            question.pop('explain', None)
+            if not value.get('completed'):
+                question.pop('answer', None)
+                question.pop('explain', None)
             for key in ('concept', 'questionType', 'difficulty'):
                 question.pop(key, None)
     return {'generationId': value['generationId'], **survey,
@@ -158,6 +163,10 @@ def save_resource_choices(t: Any, employee_id: int, project_id: str, generation_
     validate_choices(recommendations, choices)
     order = skill_order if skill_order is not None else current.get('skillOrder', [row['name'] for row in recommendations['skills']])
     validate_skill_order(recommendations, order)
+    if (current.get('project') or {}).get('selectedSkills'):
+        fixed=[row['name'] for row in current['selection']['skills']]
+        if list(order)!=fixed or any(not choices[name].get('enabled',True) for name in fixed):
+            raise StoreError('스킬과 순서는 앞 단계에서 변경해 주세요.')
     if current.get('resourceChoices')!=choices or current.get('skillOrder')!=list(order):
         for field in ('activityProposal','activityVersions','learningOutcomes','materialsSelectionKey'):
             current.pop(field,None)
