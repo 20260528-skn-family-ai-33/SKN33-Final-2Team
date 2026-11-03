@@ -282,6 +282,22 @@
   .msg.bot .plain { background: var(--sunk); }
   /* 도우미 답변의 출처 상자(gp.css)는 --ink-2 바탕에 흰 글자라 어두운 테마에서는 바탕이 밝아져 글자가 묻힌다 */
   .ans .company-sources { background: var(--sunk); color: var(--ink-2); }
+  /* #47 로 들어온 화면(홈 자료 묶음 · 3안 검토 자료 카드 · 로드맵 이번 주차 · 보고서 설문 비교)도 옅은 바탕색을 직접 적어,
+     글자가 밝은 어두운 테마에서는 글자가 묻힌다 → 어두운 상자로 바꾸고, 원래 초록 표시는 이 테마의 강조색으로 */
+  .home-material-group, .home-material-group[data-kind="도서"] { background: var(--surface-2); }
+  .review-resource-card, .review-task-choice { border-color: var(--line); }
+  .review-resource-card[data-kind=course] { border-left-color: #60A5FA; background: rgba(96, 165, 250, .06); }
+  .review-resource-card[data-kind=book] { border-left-color: #D6B57E; background: rgba(214, 181, 126, .06); }
+  .review-resource-card[data-kind=course] .review-kind-badge { color: #93C5FD; }
+  .review-resource-card[data-kind=book] .review-kind-badge { color: #E5C995; }
+  .review-task-choice:has(input:checked) { border-color: var(--accent-line); background: var(--accent-soft); }
+  .review-generation-status { background: var(--accent-soft); color: var(--accent-ink); }
+  .review-skill-block.is-current-week, .roadmap-learning-group.is-current-week { border-color: var(--accent-line); background: var(--accent-soft); box-shadow: inset 4px 0 0 var(--accent); }
+  .roadmap-learning-anchor.is-current-week { background: var(--accent-soft2); }
+  .report-survey-pre, .report-answer-pre .report-answer-phase { color: #F87171; }
+  .report-survey-post, .report-answer-post .report-answer-phase { color: #60A5FA; }
+  .report-answer-pre .is-selected { border-color: #F87171; background: rgba(248, 113, 113, .12); color: #FCA5A5; }
+  .report-answer-post .is-selected { border-color: #60A5FA; background: rgba(96, 165, 250, .12); color: #93C5FD; }
   .adm-panel { top: calc(var(--rib-h) + var(--nav-h) + 12px); border-radius: 16px; background: var(--surface); }
   @media (max-width: 1100px) { .adm-panel { top: calc(var(--rib-h) + var(--nav-h)); border-radius: 0; } }
   .adm-tbl th { background: #1F1F1F; }
