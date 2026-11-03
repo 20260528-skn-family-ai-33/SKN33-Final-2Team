@@ -1,0 +1,9 @@
+{
+  "status": "PASS",
+  "checked_records": 3000,
+  "tokenizer_tested": "Qwen3.5-4B",
+  "over_7168_count": 0,
+  "prefix_mask_issues_count": 0,
+  "duplicates_count": 0,
+  "leakage_against_eval_v2": 0
+}

@@ -1,0 +1,13 @@
+{
+  "run_id": "ebbefba5-2634-4133-bd32-3789ecd66751",
+  "adapter_hashes": {
+    "README.md": "b623ad7ef47f1be4c160c992c11b1a5e38a31a02dc8a20301e8f208951014e9f",
+    "adapter_model.safetensors": "a2b7e225bb76177fdcbbd2ad33e95878dd0fd461b1ae58819db176e64e8af743",
+    "adapter_config.json": "6025f99a08f886909376d4d1bd80825d337100bce3288cf32ec95c39f6546828",
+    "chat_template.jinja": "c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041",
+    "tokenizer_config.json": "6fc30221b0ec773811dfa2a04ebf0eec1a7e36a3bb1698888e28b38eabc1126c",
+    "tokenizer.json": "a5cd9732badce41de57e6efce8302930ded1c1188c5f81feb2bd6c24c4a1941f",
+    "training_args.bin": "c8b9d078d630981e32ee6c0d20c8093267033bcd6e422dd2888bab3aedc67cca"
+  },
+  "verified": true
+}

@@ -1,0 +1,2 @@
+# CPU data-contract checks only. Saved-artifact verification uses the Python standard library.
+PyYAML==6.0.3

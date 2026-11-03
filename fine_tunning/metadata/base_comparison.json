@@ -1,0 +1,1553 @@
+{
+  "as_of": "2026-10-28",
+  "final_model_user_confirmed": {
+    "name": "27B V18",
+    "training_epochs": 2,
+    "source": "latest explicit user confirmation; historical1epoch execution is separate"
+  },
+  "public_HF_metadata_parent_verified": {
+    "repo": "Ssum-mer/qwen3.8-27b-growpath-v18",
+    "commit": "66d1af509ab0681f3b9365227e5c794c65801fbf",
+    "shards": 12,
+    "dtype": "BF16",
+    "total_parameters": 27356728560,
+    "total_size_bytes": 54713457120,
+    "scope": "parent provided public-metadata verification; this child made no network call"
+  },
+  "inference_generation_or_scoring_performed": false,
+  "scoring_origin_user_confirmed": "existing scores are Gemini evaluation; no rescoring here",
+  "input_file_sha256": "7c1565e23373411d1adf5ef50c31ac8842ad68b92fb9c3610440ea1cc411cafe",
+  "base": {
+    "cases": 10,
+    "strict_JSON_parse_count": 10,
+    "stored_tokens_total": 9259,
+    "stored_tokens_mean": 925.9,
+    "stored_seconds_total": 574.9607681749912,
+    "stored_seconds_mean": 57.49607681749912,
+    "stored_seconds_median": 53.682897975013475,
+    "stored_weighted_tokens_per_second": 16.10370743970829,
+    "ended_with_eos_true": 10,
+    "hit_token_limit_true": 0,
+    "generate_roadmap_checks": {
+      "declared_duration_equals_request": {
+        "true": 0,
+        "false": 8,
+        "unknown": 0
+      },
+      "numeric_duration_sum_equals_request": {
+        "true": 0,
+        "false": 1,
+        "unknown": 7
+      },
+      "declared_hours_within_capacity": {
+        "true": 0,
+        "false": 0,
+        "unknown": 8
+      },
+      "numeric_hours_sum_within_capacity": {
+        "true": 0,
+        "false": 0,
+        "unknown": 8
+      },
+      "declared_cost_within_budget": {
+        "true": 0,
+        "false": 0,
+        "unknown": 8
+      }
+    },
+    "revise_roadmap_all_other_fields_preserved": 1
+  },
+  "V18": {
+    "cases": 10,
+    "strict_JSON_parse_count": 10,
+    "stored_tokens_total": 11828,
+    "stored_tokens_mean": 1182.8,
+    "stored_seconds_total": 269.8,
+    "stored_seconds_mean": 26.98,
+    "stored_seconds_median": 26.98,
+    "stored_weighted_tokens_per_second": 43.83988139362491,
+    "ended_with_eos_true": 10,
+    "hit_token_limit_true": 0,
+    "generate_roadmap_checks": {
+      "declared_duration_equals_request": {
+        "true": 8,
+        "false": 0,
+        "unknown": 0
+      },
+      "numeric_duration_sum_equals_request": {
+        "true": 8,
+        "false": 0,
+        "unknown": 0
+      },
+      "declared_hours_within_capacity": {
+        "true": 8,
+        "false": 0,
+        "unknown": 0
+      },
+      "numeric_hours_sum_within_capacity": {
+        "true": 8,
+        "false": 0,
+        "unknown": 0
+      },
+      "declared_cost_within_budget": {
+        "true": 8,
+        "false": 0,
+        "unknown": 0
+      }
+    },
+    "revise_roadmap_all_other_fields_preserved": 0
+  },
+  "base_matches_historical_objects_count": 10,
+  "same_input_same_environment_fresh_base_comparison_proven": false,
+  "cases": [
+    {
+      "case": 1,
+      "source": "C:\\final_team2\\project\\fine_tunning\\reports\\smoke_compare_v_fin_27B_c00\\comparison.json",
+      "source_sha256": "2ce9ba1b02c78eb3360a8ada1537185ba53f6beda0d98cc1f2a675568de13901",
+      "created_at": "2026-10-28T03:30:43.483012+00:00",
+      "task": "generate_roadmap",
+      "input_constraints": {
+        "budget_krw": 20000,
+        "duration_weeks": 6,
+        "start_stage": 2,
+        "weekly_hours": 3
+      },
+      "input_messages_sha256_canonical_json": "afe5c57d3a4b4d110d61a46f870d817b47bcb1b7cef88acece5bf72945770cdb",
+      "messages_equal_current_canonical": true,
+      "test_sha256": "7c1565e23373411d1adf5ef50c31ac8842ad68b92fb9c3610440ea1cc411cafe",
+      "container_model_metadata": {
+        "base_model_id": "Ssum-mer/qwen3.8-27b-growpath-v18",
+        "revision": "main"
+      },
+      "generation_container_metadata": {
+        "max_new_tokens": 3072,
+        "do_sample": false
+      },
+      "quantization_container_metadata": {
+        "load_in_4bit": false,
+        "dtype": "bfloat16"
+      },
+      "runtime_container_metadata": {
+        "linear_attention_backend": "sdpa_merged_bf16"
+      },
+      "base_original_source": "C:\\final_team2\\project\\fine_tunning\\reports\\smoke_compare_P01_epoch1_c0aae3f9_0\\comparison.json",
+      "base_matches_original_all_fields": true,
+      "original_model_metadata": {
+        "base_model_id": "Qwen/Qwen3.8-27B",
+        "revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+      },
+      "original_generation_metadata": {
+        "max_new_tokens": 3072,
+        "do_sample": false,
+        "num_beams": 1,
+        "use_cache": true,
+        "pad_token_id": 248044,
+        "eos_token_id": 248046
+      },
+      "base": {
+        "tokens": 1199,
+        "seconds": 111.75184890898527,
+        "hit_token_limit": false,
+        "ended_with_eos": true,
+        "text_sha256": "b2cec8e1623de8410e28f1e98f5f9b750ae1dee3a5aa8ab6a9dc7f0f8677ae94",
+        "stored_tokens_per_second": 10.729128973754241,
+        "strict_JSON_parse": true,
+        "total_duration_weeks": 2,
+        "total_hours": null,
+        "total_cost_krw": null,
+        "milestone_count": 2,
+        "milestone_durations": [
+          1,
+          1
+        ],
+        "milestone_hours": [
+          null,
+          null
+        ],
+        "numeric_duration_sum": 2,
+        "numeric_hours_sum": null,
+        "checks": {
+          "declared_duration_equals_request": false,
+          "numeric_duration_sum_equals_request": false,
+          "declared_hours_within_capacity": null,
+          "numeric_hours_sum_within_capacity": null,
+          "declared_cost_within_budget": null
+        }
+      },
+      "V18": {
+        "tokens": 1444,
+        "seconds": 27.87,
+        "hit_token_limit": false,
+        "ended_with_eos": true,
+        "text_sha256": "bdcf7117662bdb3c566fc7028fcf95135ff0e758e8a6e7f6a5f0fb4b22eba5c1",
+        "stored_tokens_per_second": 51.81198421241478,
+        "strict_JSON_parse": true,
+        "total_duration_weeks": 6,
+        "total_hours": 18,
+        "total_cost_krw": 0,
+        "milestone_count": 4,
+        "milestone_durations": [
+          1,
+          2,
+          2,
+          1
+        ],
+        "milestone_hours": [
+          3,
+          6,
+          6,
+          3
+        ],
+        "numeric_duration_sum": 6,
+        "numeric_hours_sum": 18,
+        "checks": {
+          "declared_duration_equals_request": true,
+          "numeric_duration_sum_equals_request": true,
+          "declared_hours_within_capacity": true,
+          "numeric_hours_sum_within_capacity": true,
+          "declared_cost_within_budget": true
+        }
+      }
+    },
+    {
+      "case": 2,
+      "source": "C:\\final_team2\\project\\fine_tunning\\reports\\smoke_compare_v_fin_27B_c01\\comparison.json",
+      "source_sha256": "291bbbd54c6f8cc6c3d2c210ce7ef8fe434931387a9d6fdf4358bed58bc789d3",
+      "created_at": "2026-10-28T03:30:43.483012+00:00",
+      "task": "generate_roadmap",
+      "input_constraints": {
+        "budget_krw": 20000,
+        "duration_weeks": 8,
+        "start_stage": 2,
+        "weekly_hours": 3
+      },
+      "input_messages_sha256_canonical_json": "07a6dd84776b646c4863178a36b7a2db7e007ec381c6398100c9c898d2a46eb5",
+      "messages_equal_current_canonical": true,
+      "test_sha256": "7c1565e23373411d1adf5ef50c31ac8842ad68b92fb9c3610440ea1cc411cafe",
+      "container_model_metadata": {
+        "base_model_id": "Ssum-mer/qwen3.8-27b-growpath-v18",
+        "revision": "main"
+      },
+      "generation_container_metadata": {
+        "max_new_tokens": 3072,
+        "do_sample": false
+      },
+      "quantization_container_metadata": {
+        "load_in_4bit": false,
+        "dtype": "bfloat16"
+      },
+      "runtime_container_metadata": {
+        "linear_attention_backend": "sdpa_merged_bf16"
+      },
+      "base_original_source": "C:\\final_team2\\project\\fine_tunning\\reports\\smoke_compare_P01_epoch1_c0aae3f9_1\\comparison.json",
+      "base_matches_original_all_fields": true,
+      "original_model_metadata": {
+        "base_model_id": "Qwen/Qwen3.8-27B",
+        "revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+      },
+      "original_generation_metadata": {
+        "max_new_tokens": 3072,
+        "do_sample": false,
+        "num_beams": 1,
+        "use_cache": true,
+        "pad_token_id": 248044,
+        "eos_token_id": 248046
+      },
+      "base": {
+        "tokens": 1540,
+        "seconds": 87.42657186699216,
+        "hit_token_limit": false,
+        "ended_with_eos": true,
+        "text_sha256": "24ed059fc1a66ee4e86b499fc24fa7ed851ed5b622cf7c3a54140625ceae0447",
+        "stored_tokens_per_second": 17.614781949164197,
+        "strict_JSON_parse": true,
+        "total_duration_weeks": 2,
+        "total_hours": null,
+        "total_cost_krw": null,
+        "milestone_count": 4,
+        "milestone_durations": [
+          "Week 1 (Day 1-2)",
+          "Week 1 (Day 3-4) & Week 2 (Day 1)",
+          "Week 2 (Day 2-3)",
+          "Week 2 (Day 4-5)"
+        ],
+        "milestone_hours": [
+          null,
+          null,
+          null,
+          null
+        ],
+        "numeric_duration_sum": null,
+        "numeric_hours_sum": null,
+        "checks": {
+          "declared_duration_equals_request": false,
+          "numeric_duration_sum_equals_request": null,
+          "declared_hours_within_capacity": null,
+          "numeric_hours_sum_within_capacity": null,
+          "declared_cost_within_budget": null
+        }
+      },
+      "V18": {
+        "tokens": 1536,
+        "seconds": 27.87,
+        "hit_token_limit": false,
+        "ended_with_eos": true,
+        "text_sha256": "0f3b218d74cfbdbe1e89c31b122b3340369a9297b53da8aa347942629caff50d",
+        "stored_tokens_per_second": 55.11302475780409,
+        "strict_JSON_parse": true,
+        "total_duration_weeks": 8,
+        "total_hours": 24,
+        "total_cost_krw": 0,
+        "milestone_count": 4,
+        "milestone_durations": [
+          2,
+          3,
+          2,
+          1
+        ],
+        "milestone_hours": [
+          6,
+          9,
+          6,
+          3
+        ],
+        "numeric_duration_sum": 8,
+        "numeric_hours_sum": 24,
+        "checks": {
+          "declared_duration_equals_request": true,
+          "numeric_duration_sum_equals_request": true,
+          "declared_hours_within_capacity": true,
+          "numeric_hours_sum_within_capacity": true,
+          "declared_cost_within_budget": true
+        }
+      }
+    },
+    {
+      "case": 3,
+      "source": "C:\\final_team2\\project\\fine_tunning\\reports\\smoke_compare_v_fin_27B_c02\\comparison.json",
+      "source_sha256": "61ea530acc83bcc57a526fced08f120adad7b9ccb656d33336e8093ac0f636d5",
+      "created_at": "2026-10-28T03:30:43.483012+00:00",
+      "task": "generate_roadmap",
+      "input_constraints": {
+        "budget_krw": 20000,
+        "duration_weeks": 4,
+        "start_stage": 2,
+        "weekly_hours": 3
+      },
+      "input_messages_sha256_canonical_json": "bc8e0b99fd045170b5af2c07bb51d038a00cdcb1d482c23b247041a2406fa860",
+      "messages_equal_current_canonical": true,
+      "test_sha256": "7c1565e23373411d1adf5ef50c31ac8842ad68b92fb9c3610440ea1cc411cafe",
+      "container_model_metadata": {
+        "base_model_id": "Ssum-mer/qwen3.8-27b-growpath-v18",
+        "revision": "main"
+      },
+      "generation_container_metadata": {
+        "max_new_tokens": 3072,
+        "do_sample": false
+      },
+      "quantization_container_metadata": {
+        "load_in_4bit": false,
+        "dtype": "bfloat16"
+      },
+      "runtime_container_metadata": {
+        "linear_attention_backend": "sdpa_merged_bf16"
+      },
+      "base_original_source": "C:\\final_team2\\project\\fine_tunning\\reports\\smoke_compare_P01_epoch1_c0aae3f9_2\\comparison.json",
+      "base_matches_original_all_fields": true,
+      "original_model_metadata": {
+        "base_model_id": "Qwen/Qwen3.8-27B",
+        "revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+      },
+      "original_generation_metadata": {
+        "max_new_tokens": 3072,
+        "do_sample": false,
+        "num_beams": 1,
+        "use_cache": true,
+        "pad_token_id": 248044,
+        "eos_token_id": 248046
+      },
+      "base": {
+        "tokens": 958,
+        "seconds": 54.680389001005096,
+        "hit_token_limit": false,
+        "ended_with_eos": true,
+        "text_sha256": "8f09a58adb5bcaae9af30040946b30cfea9222b556d8633b3a40d82ee94cd8c3",
+        "stored_tokens_per_second": 17.519992404998998,
+        "strict_JSON_parse": true,
+        "total_duration_weeks": 2,
+        "total_hours": null,
+        "total_cost_krw": null,
+        "milestone_count": 2,
+        "milestone_durations": [
+          "1주",
+          "1주"
+        ],
+        "milestone_hours": [
+          null,
+          null
+        ],
+        "numeric_duration_sum": null,
+        "numeric_hours_sum": null,
+        "checks": {
+          "declared_duration_equals_request": false,
+          "numeric_duration_sum_equals_request": null,
+          "declared_hours_within_capacity": null,
+          "numeric_hours_sum_within_capacity": null,
+          "declared_cost_within_budget": null
+        }
+      },
+      "V18": {
+        "tokens": 1376,
+        "seconds": 27.87,
+        "hit_token_limit": false,
+        "ended_with_eos": true,
+        "text_sha256": "1442f525fb7a1b98c933d9f3c6b96b9468ee908e9d61044896d87e530bac94c1",
+        "stored_tokens_per_second": 49.372084678866166,
+        "strict_JSON_parse": true,
+        "total_duration_weeks": 4,
+        "total_hours": 12,
+        "total_cost_krw": 0,
+        "milestone_count": 4,
+        "milestone_durations": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "milestone_hours": [
+          3,
+          3,
+          3,
+          3
+        ],
+        "numeric_duration_sum": 4,
+        "numeric_hours_sum": 12,
+        "checks": {
+          "declared_duration_equals_request": true,
+          "numeric_duration_sum_equals_request": true,
+          "declared_hours_within_capacity": true,
+          "numeric_hours_sum_within_capacity": true,
+          "declared_cost_within_budget": true
+        }
+      }
+    },
+    {
+      "case": 4,
+      "source": "C:\\final_team2\\project\\fine_tunning\\reports\\smoke_compare_v_fin_27B_c03\\comparison.json",
+      "source_sha256": "4a1c725889d025c049b2581384155d9c13717cea15887dbcc6622e015e06c11f",
+      "created_at": "2026-10-28T03:30:43.483012+00:00",
+      "task": "generate_roadmap",
+      "input_constraints": {
+        "budget_krw": 0,
+        "duration_weeks": 10,
+        "start_stage": 2,
+        "weekly_hours": 2
+      },
+      "input_messages_sha256_canonical_json": "dd2d95695331a96fd0dc36bba208d3bee715f0d1a4165eee90786db1f083748d",
+      "messages_equal_current_canonical": true,
+      "test_sha256": "7c1565e23373411d1adf5ef50c31ac8842ad68b92fb9c3610440ea1cc411cafe",
+      "container_model_metadata": {
+        "base_model_id": "Ssum-mer/qwen3.8-27b-growpath-v18",
+        "revision": "main"
+      },
+      "generation_container_metadata": {
+        "max_new_tokens": 3072,
+        "do_sample": false
+      },
+      "quantization_container_metadata": {
+        "load_in_4bit": false,
+        "dtype": "bfloat16"
+      },
+      "runtime_container_metadata": {
+        "linear_attention_backend": "sdpa_merged_bf16"
+      },
+      "base_original_source": "C:\\final_team2\\project\\fine_tunning\\reports\\smoke_compare_P01_epoch1_c0aae3f9_3\\comparison.json",
+      "base_matches_original_all_fields": true,
+      "original_model_metadata": {
+        "base_model_id": "Qwen/Qwen3.8-27B",
+        "revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+      },
+      "original_generation_metadata": {
+        "max_new_tokens": 3072,
+        "do_sample": false,
+        "num_beams": 1,
+        "use_cache": true,
+        "pad_token_id": 248044,
+        "eos_token_id": 248046
+      },
+      "base": {
+        "tokens": 1009,
+        "seconds": 56.48678955901414,
+        "hit_token_limit": false,
+        "ended_with_eos": true,
+        "text_sha256": "3956cc558c67bb55b2d53178b6311a60cb21ec52f11a9c24a7b90b4c5266baf5",
+        "stored_tokens_per_second": 17.862583585952517,
+        "strict_JSON_parse": true,
+        "total_duration_weeks": 2,
+        "total_hours": null,
+        "total_cost_krw": null,
+        "milestone_count": 2,
+        "milestone_durations": [
+          "1주",
+          "1주"
+        ],
+        "milestone_hours": [
+          null,
+          null
+        ],
+        "numeric_duration_sum": null,
+        "numeric_hours_sum": null,
+        "checks": {
+          "declared_duration_equals_request": false,
+          "numeric_duration_sum_equals_request": null,
+          "declared_hours_within_capacity": null,
+          "numeric_hours_sum_within_capacity": null,
+          "declared_cost_within_budget": null
+        }
+      },
+      "V18": {
+        "tokens": 1286,
+        "seconds": 27.87,
+        "hit_token_limit": false,
+        "ended_with_eos": true,
+        "text_sha256": "e71e107dd4f9cc1904af8df82e9cbb48d9899da4233deeffda99e86330701a83",
+        "stored_tokens_per_second": 46.14280588446358,
+        "strict_JSON_parse": true,
+        "total_duration_weeks": 10,
+        "total_hours": 20,
+        "total_cost_krw": 0,
+        "milestone_count": 4,
+        "milestone_durations": [
+          3,
+          3,
+          3,
+          1
+        ],
+        "milestone_hours": [
+          6,
+          6,
+          6,
+          2
+        ],
+        "numeric_duration_sum": 10,
+        "numeric_hours_sum": 20,
+        "checks": {
+          "declared_duration_equals_request": true,
+          "numeric_duration_sum_equals_request": true,
+          "declared_hours_within_capacity": true,
+          "numeric_hours_sum_within_capacity": true,
+          "declared_cost_within_budget": true
+        }
+      }
+    },
+    {
+      "case": 5,
+      "source": "C:\\final_team2\\project\\fine_tunning\\reports\\smoke_compare_v_fin_27B_c04\\comparison.json",
+      "source_sha256": "79e1e9ad1eb54dc0858556e7b3fd990375077802bccd5ed240288a7e45664ebb",
+      "created_at": "2026-10-28T03:30:43.483012+00:00",
+      "task": "generate_roadmap",
+      "input_constraints": {
+        "budget_krw": 0,
+        "duration_weeks": 5,
+        "start_stage": 3,
+        "weekly_hours": 4
+      },
+      "input_messages_sha256_canonical_json": "455488f1bbe3e1f85b278f78a368d6ba65854c7940947cab5483e4ee0511eaa3",
+      "messages_equal_current_canonical": true,
+      "test_sha256": "7c1565e23373411d1adf5ef50c31ac8842ad68b92fb9c3610440ea1cc411cafe",
+      "container_model_metadata": {
+        "base_model_id": "Ssum-mer/qwen3.8-27b-growpath-v18",
+        "revision": "main"
+      },
+      "generation_container_metadata": {
+        "max_new_tokens": 3072,
+        "do_sample": false
+      },
+      "quantization_container_metadata": {
+        "load_in_4bit": false,
+        "dtype": "bfloat16"
+      },
+      "runtime_container_metadata": {
+        "linear_attention_backend": "sdpa_merged_bf16"
+      },
+      "base_original_source": "C:\\final_team2\\project\\fine_tunning\\reports\\smoke_compare_P01_epoch1_c0aae3f9_4\\comparison.json",
+      "base_matches_original_all_fields": true,
+      "original_model_metadata": {
+        "base_model_id": "Qwen/Qwen3.8-27B",
+        "revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+      },
+      "original_generation_metadata": {
+        "max_new_tokens": 3072,
+        "do_sample": false,
+        "num_beams": 1,
+        "use_cache": true,
+        "pad_token_id": 248044,
+        "eos_token_id": 248046
+      },
+      "base": {
+        "tokens": 744,
+        "seconds": 41.56584348299657,
+        "hit_token_limit": false,
+        "ended_with_eos": true,
+        "text_sha256": "277793a162d3ed284fc83d69d4a89b4a98eae332f2c491e4624e3de66e1ccb56",
+        "stored_tokens_per_second": 17.89931197485141,
+        "strict_JSON_parse": true,
+        "total_duration_weeks": 1,
+        "total_hours": null,
+        "total_cost_krw": null,
+        "milestone_count": 2,
+        "milestone_durations": [
+          "2시간",
+          "2시간"
+        ],
+        "milestone_hours": [
+          null,
+          null
+        ],
+        "numeric_duration_sum": null,
+        "numeric_hours_sum": null,
+        "checks": {
+          "declared_duration_equals_request": false,
+          "numeric_duration_sum_equals_request": null,
+          "declared_hours_within_capacity": null,
+          "numeric_hours_sum_within_capacity": null,
+          "declared_cost_within_budget": null
+        }
+      },
+      "V18": {
+        "tokens": 1096,
+        "seconds": 27.87,
+        "hit_token_limit": false,
+        "ended_with_eos": true,
+        "text_sha256": "a28eeb38ae1a9b396c72433f303c217f4a36a8764d0aa25f8a6e964bb0330cd1",
+        "stored_tokens_per_second": 39.325439540724794,
+        "strict_JSON_parse": true,
+        "total_duration_weeks": 5,
+        "total_hours": 20,
+        "total_cost_krw": 0,
+        "milestone_count": 4,
+        "milestone_durations": [
+          1,
+          2,
+          1,
+          1
+        ],
+        "milestone_hours": [
+          4,
+          8,
+          4,
+          4
+        ],
+        "numeric_duration_sum": 5,
+        "numeric_hours_sum": 20,
+        "checks": {
+          "declared_duration_equals_request": true,
+          "numeric_duration_sum_equals_request": true,
+          "declared_hours_within_capacity": true,
+          "numeric_hours_sum_within_capacity": true,
+          "declared_cost_within_budget": true
+        }
+      }
+    },
+    {
+      "case": 6,
+      "source": "C:\\final_team2\\project\\fine_tunning\\reports\\smoke_compare_v_fin_27B_c05\\comparison.json",
+      "source_sha256": "d7acf3f4571249b278e967fae5bac2abd90236009ce9529dee29d3f63929348d",
+      "created_at": "2026-10-28T03:30:43.483012+00:00",
+      "task": "generate_roadmap",
+      "input_constraints": {
+        "budget_krw": 10000,
+        "duration_weeks": 7,
+        "start_stage": 2,
+        "weekly_hours": 3
+      },
+      "input_messages_sha256_canonical_json": "956cdc3b12a3809e8cf36b992422f3b2831cc7b74fa710405d318b137dfe85f7",
+      "messages_equal_current_canonical": true,
+      "test_sha256": "7c1565e23373411d1adf5ef50c31ac8842ad68b92fb9c3610440ea1cc411cafe",
+      "container_model_metadata": {
+        "base_model_id": "Ssum-mer/qwen3.8-27b-growpath-v18",
+        "revision": "main"
+      },
+      "generation_container_metadata": {
+        "max_new_tokens": 3072,
+        "do_sample": false
+      },
+      "quantization_container_metadata": {
+        "load_in_4bit": false,
+        "dtype": "bfloat16"
+      },
+      "runtime_container_metadata": {
+        "linear_attention_backend": "sdpa_merged_bf16"
+      },
+      "base_original_source": "C:\\final_team2\\project\\fine_tunning\\reports\\smoke_compare_P01_epoch1_c0aae3f9_5\\comparison.json",
+      "base_matches_original_all_fields": true,
+      "original_model_metadata": {
+        "base_model_id": "Qwen/Qwen3.8-27B",
+        "revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+      },
+      "original_generation_metadata": {
+        "max_new_tokens": 3072,
+        "do_sample": false,
+        "num_beams": 1,
+        "use_cache": true,
+        "pad_token_id": 248044,
+        "eos_token_id": 248046
+      },
+      "base": {
+        "tokens": 918,
+        "seconds": 52.68540694902185,
+        "hit_token_limit": false,
+        "ended_with_eos": true,
+        "text_sha256": "7a497a5544964f9bf100712d1b05d9ac88b4630c454e5f21059d5e5489334b66",
+        "stored_tokens_per_second": 17.424179733265653,
+        "strict_JSON_parse": true,
+        "total_duration_weeks": 2,
+        "total_hours": null,
+        "total_cost_krw": null,
+        "milestone_count": 2,
+        "milestone_durations": [
+          "1주",
+          "1주"
+        ],
+        "milestone_hours": [
+          null,
+          null
+        ],
+        "numeric_duration_sum": null,
+        "numeric_hours_sum": null,
+        "checks": {
+          "declared_duration_equals_request": false,
+          "numeric_duration_sum_equals_request": null,
+          "declared_hours_within_capacity": null,
+          "numeric_hours_sum_within_capacity": null,
+          "declared_cost_within_budget": null
+        }
+      },
+      "V18": {
+        "tokens": 1291,
+        "seconds": 26.09,
+        "hit_token_limit": false,
+        "ended_with_eos": true,
+        "text_sha256": "515fc857a7efb751ca3b8adf7862c47b8e7bc9cb773f49dac57f31895bfeb0e3",
+        "stored_tokens_per_second": 49.48256036795707,
+        "strict_JSON_parse": true,
+        "total_duration_weeks": 7,
+        "total_hours": 21,
+        "total_cost_krw": 0,
+        "milestone_count": 4,
+        "milestone_durations": [
+          2,
+          3,
+          1,
+          1
+        ],
+        "milestone_hours": [
+          6,
+          9,
+          3,
+          3
+        ],
+        "numeric_duration_sum": 7,
+        "numeric_hours_sum": 21,
+        "checks": {
+          "declared_duration_equals_request": true,
+          "numeric_duration_sum_equals_request": true,
+          "declared_hours_within_capacity": true,
+          "numeric_hours_sum_within_capacity": true,
+          "declared_cost_within_budget": true
+        }
+      }
+    },
+    {
+      "case": 7,
+      "source": "C:\\final_team2\\project\\fine_tunning\\reports\\smoke_compare_v_fin_27B_c06\\comparison.json",
+      "source_sha256": "f9028daf2fb3c52c0c9317735f47bdfab042ef531b86ec3cf8630fa07f7154f2",
+      "created_at": "2026-10-28T03:30:43.483012+00:00",
+      "task": "generate_roadmap",
+      "input_constraints": {
+        "budget_krw": 0,
+        "duration_weeks": 12,
+        "start_stage": 2,
+        "weekly_hours": 2
+      },
+      "input_messages_sha256_canonical_json": "73d66235b21628e13785d3bb9cbce6c4aca8467486c3d24adc38a8585e4e3271",
+      "messages_equal_current_canonical": true,
+      "test_sha256": "7c1565e23373411d1adf5ef50c31ac8842ad68b92fb9c3610440ea1cc411cafe",
+      "container_model_metadata": {
+        "base_model_id": "Ssum-mer/qwen3.8-27b-growpath-v18",
+        "revision": "main"
+      },
+      "generation_container_metadata": {
+        "max_new_tokens": 3072,
+        "do_sample": false
+      },
+      "quantization_container_metadata": {
+        "load_in_4bit": false,
+        "dtype": "bfloat16"
+      },
+      "runtime_container_metadata": {
+        "linear_attention_backend": "sdpa_merged_bf16"
+      },
+      "base_original_source": "C:\\final_team2\\project\\fine_tunning\\reports\\smoke_compare_P01_epoch1_c0aae3f9_6\\comparison.json",
+      "base_matches_original_all_fields": true,
+      "original_model_metadata": {
+        "base_model_id": "Qwen/Qwen3.8-27B",
+        "revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+      },
+      "original_generation_metadata": {
+        "max_new_tokens": 3072,
+        "do_sample": false,
+        "num_beams": 1,
+        "use_cache": true,
+        "pad_token_id": 248044,
+        "eos_token_id": 248046
+      },
+      "base": {
+        "tokens": 339,
+        "seconds": 22.106473594991257,
+        "hit_token_limit": false,
+        "ended_with_eos": true,
+        "text_sha256": "d0666a9d4f165317e6aaaa4d21a4265fa0a34a5d7aa91fe40eee0866dc89cf47",
+        "stored_tokens_per_second": 15.3348745806662,
+        "strict_JSON_parse": true,
+        "total_duration_weeks": null,
+        "total_hours": null,
+        "total_cost_krw": null,
+        "milestone_count": 0,
+        "milestone_durations": [],
+        "milestone_hours": [],
+        "numeric_duration_sum": null,
+        "numeric_hours_sum": null,
+        "checks": {
+          "declared_duration_equals_request": false,
+          "numeric_duration_sum_equals_request": null,
+          "declared_hours_within_capacity": null,
+          "numeric_hours_sum_within_capacity": null,
+          "declared_cost_within_budget": null
+        }
+      },
+      "V18": {
+        "tokens": 1424,
+        "seconds": 26.09,
+        "hit_token_limit": false,
+        "ended_with_eos": true,
+        "text_sha256": "21f3f115475a6d568be55b24f1867823b3069db65de9fc4d4baa68837e4302ef",
+        "stored_tokens_per_second": 54.58029896512074,
+        "strict_JSON_parse": true,
+        "total_duration_weeks": 12,
+        "total_hours": 24,
+        "total_cost_krw": 0,
+        "milestone_count": 4,
+        "milestone_durations": [
+          3,
+          4,
+          3,
+          2
+        ],
+        "milestone_hours": [
+          6,
+          8,
+          6,
+          4
+        ],
+        "numeric_duration_sum": 12,
+        "numeric_hours_sum": 24,
+        "checks": {
+          "declared_duration_equals_request": true,
+          "numeric_duration_sum_equals_request": true,
+          "declared_hours_within_capacity": true,
+          "numeric_hours_sum_within_capacity": true,
+          "declared_cost_within_budget": true
+        }
+      }
+    },
+    {
+      "case": 8,
+      "source": "C:\\final_team2\\project\\fine_tunning\\reports\\smoke_compare_v_fin_27B_c07\\comparison.json",
+      "source_sha256": "17fbbf18ca611695a0ba5f9b1c52143fe9946ccf304f4be9d5a2e8b71c85d008",
+      "created_at": "2026-10-28T03:30:43.483012+00:00",
+      "task": "generate_roadmap",
+      "input_constraints": {
+        "budget_krw": 0,
+        "duration_weeks": 9,
+        "start_stage": 2,
+        "weekly_hours": 3
+      },
+      "input_messages_sha256_canonical_json": "b1bcaf92e8002275756b0fe10a2ed88a2408d1874f089587da1026a2f0651048",
+      "messages_equal_current_canonical": true,
+      "test_sha256": "7c1565e23373411d1adf5ef50c31ac8842ad68b92fb9c3610440ea1cc411cafe",
+      "container_model_metadata": {
+        "base_model_id": "Ssum-mer/qwen3.8-27b-growpath-v18",
+        "revision": "main"
+      },
+      "generation_container_metadata": {
+        "max_new_tokens": 3072,
+        "do_sample": false
+      },
+      "quantization_container_metadata": {
+        "load_in_4bit": false,
+        "dtype": "bfloat16"
+      },
+      "runtime_container_metadata": {
+        "linear_attention_backend": "sdpa_merged_bf16"
+      },
+      "base_original_source": "C:\\final_team2\\project\\fine_tunning\\reports\\smoke_compare_P01_epoch1_c0aae3f9_7\\comparison.json",
+      "base_matches_original_all_fields": true,
+      "original_model_metadata": {
+        "base_model_id": "Qwen/Qwen3.8-27B",
+        "revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+      },
+      "original_generation_metadata": {
+        "max_new_tokens": 3072,
+        "do_sample": false,
+        "num_beams": 1,
+        "use_cache": true,
+        "pad_token_id": 248044,
+        "eos_token_id": 248046
+      },
+      "base": {
+        "tokens": 1067,
+        "seconds": 64.24970921699423,
+        "hit_token_limit": false,
+        "ended_with_eos": true,
+        "text_sha256": "cfe31585f6221ad9f512262bba5ca9ab577984609b5f9b444239a7483065504a",
+        "stored_tokens_per_second": 16.60707905146091,
+        "strict_JSON_parse": true,
+        "total_duration_weeks": 2,
+        "total_hours": null,
+        "total_cost_krw": null,
+        "milestone_count": 2,
+        "milestone_durations": [
+          "1 week",
+          "1 week"
+        ],
+        "milestone_hours": [
+          null,
+          null
+        ],
+        "numeric_duration_sum": null,
+        "numeric_hours_sum": null,
+        "checks": {
+          "declared_duration_equals_request": false,
+          "numeric_duration_sum_equals_request": null,
+          "declared_hours_within_capacity": null,
+          "numeric_hours_sum_within_capacity": null,
+          "declared_cost_within_budget": null
+        }
+      },
+      "V18": {
+        "tokens": 1216,
+        "seconds": 26.09,
+        "hit_token_limit": false,
+        "ended_with_eos": true,
+        "text_sha256": "b8e2063a5a143bc54705bc987cf598bfe2f73def552cb25e67e0f875e2ab7e3d",
+        "stored_tokens_per_second": 46.60789574549636,
+        "strict_JSON_parse": true,
+        "total_duration_weeks": 9,
+        "total_hours": 27,
+        "total_cost_krw": 0,
+        "milestone_count": 4,
+        "milestone_durations": [
+          2,
+          3,
+          3,
+          1
+        ],
+        "milestone_hours": [
+          6,
+          9,
+          9,
+          3
+        ],
+        "numeric_duration_sum": 9,
+        "numeric_hours_sum": 27,
+        "checks": {
+          "declared_duration_equals_request": true,
+          "numeric_duration_sum_equals_request": true,
+          "declared_hours_within_capacity": true,
+          "numeric_hours_sum_within_capacity": true,
+          "declared_cost_within_budget": true
+        }
+      }
+    },
+    {
+      "case": 9,
+      "source": "C:\\final_team2\\project\\fine_tunning\\reports\\smoke_compare_v_fin_27B_c08\\comparison.json",
+      "source_sha256": "4e9f7d2de8a28258ab51820983823417296052f6d33d942543cfac32d4d74ac1",
+      "created_at": "2026-10-28T03:30:43.483012+00:00",
+      "task": "revise_roadmap",
+      "input_constraints": {
+        "budget_krw": 50000,
+        "duration_weeks": 6,
+        "start_stage": 2,
+        "weekly_hours": 3
+      },
+      "input_messages_sha256_canonical_json": "fb0fdf36e201c0220d4d0427ff9827d419f1da6f24e894fa75e565c2fb1d9f8f",
+      "messages_equal_current_canonical": true,
+      "test_sha256": "7c1565e23373411d1adf5ef50c31ac8842ad68b92fb9c3610440ea1cc411cafe",
+      "container_model_metadata": {
+        "base_model_id": "Ssum-mer/qwen3.8-27b-growpath-v18",
+        "revision": "main"
+      },
+      "generation_container_metadata": {
+        "max_new_tokens": 3072,
+        "do_sample": false
+      },
+      "quantization_container_metadata": {
+        "load_in_4bit": false,
+        "dtype": "bfloat16"
+      },
+      "runtime_container_metadata": {
+        "linear_attention_backend": "sdpa_merged_bf16"
+      },
+      "base_original_source": "C:\\final_team2\\project\\fine_tunning\\reports\\smoke_compare_P01_epoch1_c0aae3f9_8\\comparison.json",
+      "base_matches_original_all_fields": true,
+      "original_model_metadata": {
+        "base_model_id": "Qwen/Qwen3.8-27B",
+        "revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+      },
+      "original_generation_metadata": {
+        "max_new_tokens": 3072,
+        "do_sample": false,
+        "num_beams": 1,
+        "use_cache": true,
+        "pad_token_id": 248044,
+        "eos_token_id": 248046
+      },
+      "base": {
+        "tokens": 730,
+        "seconds": 41.23627638799371,
+        "hit_token_limit": false,
+        "ended_with_eos": true,
+        "text_sha256": "284ef2e6c0bf1edbf5759ec4620a2ac768c51889e0a2863c78e07b43b43ada71",
+        "stored_tokens_per_second": 17.702859325400816,
+        "strict_JSON_parse": true,
+        "total_duration_weeks": null,
+        "total_hours": 12,
+        "total_cost_krw": 0,
+        "milestone_count": 4,
+        "milestone_durations": [
+          null,
+          null,
+          null,
+          null
+        ],
+        "milestone_hours": [
+          1,
+          2,
+          7,
+          2
+        ],
+        "numeric_duration_sum": null,
+        "numeric_hours_sum": 12,
+        "revision": {
+          "allowed_changed_paths_for_this_case": [
+            "/milestones/1/hours",
+            "/milestones/2/hours"
+          ],
+          "all_differences": [
+            {
+              "path": "/milestones/1/hours",
+              "before": 3,
+              "after": 2
+            },
+            {
+              "path": "/milestones/2/hours",
+              "before": 6,
+              "after": 7
+            }
+          ],
+          "unexpected_differences": [],
+          "unexpected_difference_count": 0,
+          "all_other_fields_preserved": true,
+          "current_roadmap_total_hours": 12,
+          "declared_hours_preserved": true,
+          "declared_cost_preserved": true,
+          "scope_note": "Case9의hours2/7변경,Case10의completion_criterion변경은허용한다. 추가phase/phase_name변경은허용범위밖이다."
+        }
+      },
+      "V18": {
+        "tokens": 557,
+        "seconds": 26.09,
+        "hit_token_limit": false,
+        "ended_with_eos": true,
+        "text_sha256": "b7c134001c39de13ac9935ff84be0f48b30c1af177e79346dfbdda50ad1c1899",
+        "stored_tokens_per_second": 21.349175929474896,
+        "strict_JSON_parse": true,
+        "total_duration_weeks": null,
+        "total_hours": 12,
+        "total_cost_krw": 0,
+        "milestone_count": 4,
+        "milestone_durations": [
+          null,
+          null,
+          null,
+          null
+        ],
+        "milestone_hours": [
+          1,
+          2,
+          7,
+          2
+        ],
+        "numeric_duration_sum": null,
+        "numeric_hours_sum": 12,
+        "revision": {
+          "allowed_changed_paths_for_this_case": [
+            "/milestones/1/hours",
+            "/milestones/2/hours"
+          ],
+          "all_differences": [
+            {
+              "path": "/milestones/0/phase",
+              "before": null,
+              "after": 1
+            },
+            {
+              "path": "/milestones/0/phase_name",
+              "before": "기초 다지기",
+              "after": "1단계 · 기초 다지기"
+            },
+            {
+              "path": "/milestones/1/hours",
+              "before": 3,
+              "after": 2
+            },
+            {
+              "path": "/milestones/1/phase",
+              "before": null,
+              "after": 2
+            },
+            {
+              "path": "/milestones/1/phase_name",
+              "before": "핵심 이해",
+              "after": "2단계 · 핵심 이해"
+            },
+            {
+              "path": "/milestones/2/hours",
+              "before": 6,
+              "after": 7
+            },
+            {
+              "path": "/milestones/2/phase",
+              "before": null,
+              "after": 3
+            },
+            {
+              "path": "/milestones/2/phase_name",
+              "before": "업무 적용",
+              "after": "3단계 · 업무 적용"
+            },
+            {
+              "path": "/milestones/3/phase",
+              "before": null,
+              "after": 4
+            },
+            {
+              "path": "/milestones/3/phase_name",
+              "before": "성과 확인",
+              "after": "4단계 · 성과 확인"
+            }
+          ],
+          "unexpected_differences": [
+            {
+              "path": "/milestones/0/phase",
+              "before": null,
+              "after": 1
+            },
+            {
+              "path": "/milestones/0/phase_name",
+              "before": "기초 다지기",
+              "after": "1단계 · 기초 다지기"
+            },
+            {
+              "path": "/milestones/1/phase",
+              "before": null,
+              "after": 2
+            },
+            {
+              "path": "/milestones/1/phase_name",
+              "before": "핵심 이해",
+              "after": "2단계 · 핵심 이해"
+            },
+            {
+              "path": "/milestones/2/phase",
+              "before": null,
+              "after": 3
+            },
+            {
+              "path": "/milestones/2/phase_name",
+              "before": "업무 적용",
+              "after": "3단계 · 업무 적용"
+            },
+            {
+              "path": "/milestones/3/phase",
+              "before": null,
+              "after": 4
+            },
+            {
+              "path": "/milestones/3/phase_name",
+              "before": "성과 확인",
+              "after": "4단계 · 성과 확인"
+            }
+          ],
+          "unexpected_difference_count": 8,
+          "all_other_fields_preserved": false,
+          "current_roadmap_total_hours": 12,
+          "declared_hours_preserved": true,
+          "declared_cost_preserved": true,
+          "scope_note": "Case9의hours2/7변경,Case10의completion_criterion변경은허용한다. 추가phase/phase_name변경은허용범위밖이다."
+        }
+      }
+    },
+    {
+      "case": 10,
+      "source": "C:\\final_team2\\project\\fine_tunning\\reports\\smoke_compare_v_fin_27B_c09\\comparison.json",
+      "source_sha256": "3a90cf148f51c2cd4343965f4c62843676468673e8a4783ac13dffe9fbbf23f6",
+      "created_at": "2026-10-28T03:30:43.483012+00:00",
+      "task": "revise_roadmap",
+      "input_constraints": {
+        "budget_krw": 50000,
+        "duration_weeks": 8,
+        "start_stage": 2,
+        "weekly_hours": 3
+      },
+      "input_messages_sha256_canonical_json": "68410ce95a23eb2256540040438a92dc576fc9b7a720456c5eb8e2d7eb0dca81",
+      "messages_equal_current_canonical": true,
+      "test_sha256": "7c1565e23373411d1adf5ef50c31ac8842ad68b92fb9c3610440ea1cc411cafe",
+      "container_model_metadata": {
+        "base_model_id": "Ssum-mer/qwen3.8-27b-growpath-v18",
+        "revision": "main"
+      },
+      "generation_container_metadata": {
+        "max_new_tokens": 3072,
+        "do_sample": false
+      },
+      "quantization_container_metadata": {
+        "load_in_4bit": false,
+        "dtype": "bfloat16"
+      },
+      "runtime_container_metadata": {
+        "linear_attention_backend": "sdpa_merged_bf16"
+      },
+      "base_original_source": "C:\\final_team2\\project\\fine_tunning\\reports\\smoke_compare_P01_epoch1_c0aae3f9_9\\comparison.json",
+      "base_matches_original_all_fields": true,
+      "original_model_metadata": {
+        "base_model_id": "Qwen/Qwen3.8-27B",
+        "revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"
+      },
+      "original_generation_metadata": {
+        "max_new_tokens": 3072,
+        "do_sample": false,
+        "num_beams": 1,
+        "use_cache": true,
+        "pad_token_id": 248044,
+        "eos_token_id": 248046
+      },
+      "base": {
+        "tokens": 755,
+        "seconds": 42.77145920699695,
+        "hit_token_limit": false,
+        "ended_with_eos": true,
+        "text_sha256": "a2eb6ea5c2d61d45f431173baec13827a839c433acdd4b99eef33ba7d80c7556",
+        "stored_tokens_per_second": 17.651957964447707,
+        "strict_JSON_parse": true,
+        "total_duration_weeks": null,
+        "total_hours": 12,
+        "total_cost_krw": 0,
+        "milestone_count": 4,
+        "milestone_durations": [
+          null,
+          null,
+          null,
+          null
+        ],
+        "milestone_hours": [
+          1,
+          3,
+          6,
+          2
+        ],
+        "numeric_duration_sum": null,
+        "numeric_hours_sum": 12,
+        "revision": {
+          "allowed_changed_paths_for_this_case": [
+            "/milestones/3/completion_criterion"
+          ],
+          "all_differences": [
+            {
+              "path": "/milestones/0/completion_record",
+              "before": "보고서 양식 검토 완료",
+              "after": "질문 목록 작성 완료"
+            },
+            {
+              "path": "/milestones/0/deliverable",
+              "before": "보고서 양식 요약",
+              "after": "경험 요약"
+            },
+            {
+              "path": "/milestones/0/focus_goal",
+              "before": "기존 보고서 작성 경험 및 양식을 정리한다",
+              "after": "기존 문서 검색 경험을 정리한다"
+            },
+            {
+              "path": "/milestones/0/key_actions/0",
+              "before": "기존 보고서 작성 경험 및 양식을 정리한다",
+              "after": "기존 문서 검색 경험을 정리한다"
+            },
+            {
+              "path": "/milestones/1/focus_goal",
+              "before": "보고서 데이터 수집 및 처리 흐름을 정리한다",
+              "after": "RAG 처리 흐름을 정리한다"
+            },
+            {
+              "path": "/milestones/1/key_actions/0",
+              "before": "보고서 데이터 수집 및 처리 흐름을 정리한다",
+              "after": "RAG 처리 흐름을 정리한다"
+            },
+            {
+              "path": "/milestones/2/focus_goal",
+              "before": "사내 데이터 집계 및 보고서 생성 시제품을 만든다",
+              "after": "가상 문서 검색 시제품을 만든다"
+            },
+            {
+              "path": "/milestones/2/key_actions/0",
+              "before": "사내 데이터 집계 및 보고서 생성 시제품을 만든다",
+              "after": "가상 문서 검색 시제품을 만든다"
+            },
+            {
+              "path": "/milestones/3/completion_criterion",
+              "before": "시험 결과표을 저장하고 검토 기록을 남김",
+              "after": "시험 결과표을 저장하고 검토 기록을 남김, 실패 사례 2건의 원인·개선안을 기록한다"
+            },
+            {
+              "path": "/milestones/3/deliverable",
+              "before": "보고서 검증 결과표",
+              "after": "시험 결과표"
+            },
+            {
+              "path": "/milestones/3/focus_goal",
+              "before": "테스트 데이터로 정기 보고서 생성 결과를 검증한다",
+              "after": "고정 질문으로 근거를 검증한다"
+            },
+            {
+              "path": "/milestones/3/key_actions/0",
+              "before": "테스트 데이터로 정기 보고서 생성 결과를 검증한다",
+              "after": "고정 질문으로 근거를 검증한다"
+            },
+            {
+              "path": "/strategy_title",
+              "before": "기존 업무 보고서 자동화 실습 계획",
+              "after": "기존 RAG 실습 계획"
+            },
+            {
+              "path": "/summary",
+              "before": "부분 수정 전 가상 사용자 보고서 작성 계획",
+              "after": "부분 수정 전 가상 사용자 학습 계획"
+            }
+          ],
+          "unexpected_differences": [
+            {
+              "path": "/milestones/0/completion_record",
+              "before": "보고서 양식 검토 완료",
+              "after": "질문 목록 작성 완료"
+            },
+            {
+              "path": "/milestones/0/deliverable",
+              "before": "보고서 양식 요약",
+              "after": "경험 요약"
+            },
+            {
+              "path": "/milestones/0/focus_goal",
+              "before": "기존 보고서 작성 경험 및 양식을 정리한다",
+              "after": "기존 문서 검색 경험을 정리한다"
+            },
+            {
+              "path": "/milestones/0/key_actions/0",
+              "before": "기존 보고서 작성 경험 및 양식을 정리한다",
+              "after": "기존 문서 검색 경험을 정리한다"
+            },
+            {
+              "path": "/milestones/1/focus_goal",
+              "before": "보고서 데이터 수집 및 처리 흐름을 정리한다",
+              "after": "RAG 처리 흐름을 정리한다"
+            },
+            {
+              "path": "/milestones/1/key_actions/0",
+              "before": "보고서 데이터 수집 및 처리 흐름을 정리한다",
+              "after": "RAG 처리 흐름을 정리한다"
+            },
+            {
+              "path": "/milestones/2/focus_goal",
+              "before": "사내 데이터 집계 및 보고서 생성 시제품을 만든다",
+              "after": "가상 문서 검색 시제품을 만든다"
+            },
+            {
+              "path": "/milestones/2/key_actions/0",
+              "before": "사내 데이터 집계 및 보고서 생성 시제품을 만든다",
+              "after": "가상 문서 검색 시제품을 만든다"
+            },
+            {
+              "path": "/milestones/3/deliverable",
+              "before": "보고서 검증 결과표",
+              "after": "시험 결과표"
+            },
+            {
+              "path": "/milestones/3/focus_goal",
+              "before": "테스트 데이터로 정기 보고서 생성 결과를 검증한다",
+              "after": "고정 질문으로 근거를 검증한다"
+            },
+            {
+              "path": "/milestones/3/key_actions/0",
+              "before": "테스트 데이터로 정기 보고서 생성 결과를 검증한다",
+              "after": "고정 질문으로 근거를 검증한다"
+            },
+            {
+              "path": "/strategy_title",
+              "before": "기존 업무 보고서 자동화 실습 계획",
+              "after": "기존 RAG 실습 계획"
+            },
+            {
+              "path": "/summary",
+              "before": "부분 수정 전 가상 사용자 보고서 작성 계획",
+              "after": "부분 수정 전 가상 사용자 학습 계획"
+            }
+          ],
+          "unexpected_difference_count": 13,
+          "all_other_fields_preserved": false,
+          "current_roadmap_total_hours": 12,
+          "declared_hours_preserved": true,
+          "declared_cost_preserved": true,
+          "scope_note": "Case9의hours2/7변경,Case10의completion_criterion변경은허용한다. 추가phase/phase_name변경은허용범위밖이다."
+        }
+      },
+      "V18": {
+        "tokens": 602,
+        "seconds": 26.09,
+        "hit_token_limit": false,
+        "ended_with_eos": true,
+        "text_sha256": "d3fbba86ff280b765071fef45abbbe290f36c90243d8d4e5174e55fe53e1672e",
+        "stored_tokens_per_second": 23.073974702951322,
+        "strict_JSON_parse": true,
+        "total_duration_weeks": null,
+        "total_hours": 12,
+        "total_cost_krw": 0,
+        "milestone_count": 4,
+        "milestone_durations": [
+          null,
+          null,
+          null,
+          null
+        ],
+        "milestone_hours": [
+          1,
+          3,
+          6,
+          2
+        ],
+        "numeric_duration_sum": null,
+        "numeric_hours_sum": 12,
+        "revision": {
+          "allowed_changed_paths_for_this_case": [
+            "/milestones/3/completion_criterion"
+          ],
+          "all_differences": [
+            {
+              "path": "/milestones/0/phase",
+              "before": null,
+              "after": 1
+            },
+            {
+              "path": "/milestones/0/phase_name",
+              "before": "기초 다지기",
+              "after": "1단계 · 기초 다지기"
+            },
+            {
+              "path": "/milestones/1/phase",
+              "before": null,
+              "after": 2
+            },
+            {
+              "path": "/milestones/1/phase_name",
+              "before": "핵심 이해",
+              "after": "2단계 · 핵심 이해"
+            },
+            {
+              "path": "/milestones/2/phase",
+              "before": null,
+              "after": 3
+            },
+            {
+              "path": "/milestones/2/phase_name",
+              "before": "업무 적용",
+              "after": "3단계 · 업무 적용"
+            },
+            {
+              "path": "/milestones/3/completion_criterion",
+              "before": "시험 결과표을 저장하고 검토 기록을 남김",
+              "after": "시험 결과표을 저장하고 검토 기록을 남김; 보고서 생성 오류 2건의 원인·개선안을 기록한다"
+            },
+            {
+              "path": "/milestones/3/phase",
+              "before": null,
+              "after": 4
+            },
+            {
+              "path": "/milestones/3/phase_name",
+              "before": "성과 확인",
+              "after": "4단계 · 성과 확인"
+            }
+          ],
+          "unexpected_differences": [
+            {
+              "path": "/milestones/0/phase",
+              "before": null,
+              "after": 1
+            },
+            {
+              "path": "/milestones/0/phase_name",
+              "before": "기초 다지기",
+              "after": "1단계 · 기초 다지기"
+            },
+            {
+              "path": "/milestones/1/phase",
+              "before": null,
+              "after": 2
+            },
+            {
+              "path": "/milestones/1/phase_name",
+              "before": "핵심 이해",
+              "after": "2단계 · 핵심 이해"
+            },
+            {
+              "path": "/milestones/2/phase",
+              "before": null,
+              "after": 3
+            },
+            {
+              "path": "/milestones/2/phase_name",
+              "before": "업무 적용",
+              "after": "3단계 · 업무 적용"
+            },
+            {
+              "path": "/milestones/3/phase",
+              "before": null,
+              "after": 4
+            },
+            {
+              "path": "/milestones/3/phase_name",
+              "before": "성과 확인",
+              "after": "4단계 · 성과 확인"
+            }
+          ],
+          "unexpected_difference_count": 8,
+          "all_other_fields_preserved": false,
+          "current_roadmap_total_hours": 12,
+          "declared_hours_preserved": true,
+          "declared_cost_preserved": true,
+          "scope_note": "Case9의hours2/7변경,Case10의completion_criterion변경은허용한다. 추가phase/phase_name변경은허용범위밖이다."
+        }
+      }
+    }
+  ]
+}

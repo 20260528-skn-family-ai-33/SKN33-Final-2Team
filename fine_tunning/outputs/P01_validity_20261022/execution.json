@@ -1,0 +1,23 @@
+{
+  "run_id": "c0aae3f9-bd4f-43b8-8cad-6f884d534f4a",
+  "weight_id": "25c44a3d-9f80-450b-8d91-60977f4189fa",
+  "preset": "P01",
+  "epochs": 1,
+  "learning_rate": 0.0001,
+  "batch_size": 1,
+  "accumulation": 16,
+  "max_length": 7168,
+  "r": 32,
+  "lora_alpha": 64,
+  "lora_dropout": 0.05,
+  "weight_decay": 0.01,
+  "warmup_ratio": 0.05,
+  "scheduler": "cosine",
+  "seed": 42,
+  "data_file": "data/revision_1500/assembled/all.jsonl",
+  "data_sha256": "998a9499a14f6c08de0526919567bcf5a9fcf31642f75aa24fca143c51265529",
+  "eval_sha256": "d0e1b2d687063250aadeed1b7735dafaaa5d9fce25a82566b79dffbe30b050ac",
+  "evaluation": "same fixed ten, base vs tuned; no independent heldout loss",
+  "review_policy": "full local automatic checks, targeted content repairs and representative review; quality remains experimental",
+  "config_sha256": "2232d5b5d854af42d300e7b436b90b48dac5442f0cd43a1ebad580b618d5f373"
+}

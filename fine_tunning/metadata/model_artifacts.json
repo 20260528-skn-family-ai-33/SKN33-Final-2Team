@@ -1,0 +1,32 @@
+{
+  "model_version": "V18",
+  "artifacts": [
+    {
+      "repo": "Ssum-mer/qwen3.8-27b-growpath",
+      "commit": "6725d0f37b1fcc875c5d6191f56a2b15d7d02962",
+      "file": "qwen3.8-27b-growpath-BF16.gguf",
+      "bytes": 53808282112,
+      "sha256": "32d69322977ccd21240d4005a5b4cedb877702724c1159a57faa174f87e1cb81",
+      "precision": "BF16",
+      "remote_size_and_lfs_sha256": "PASS",
+      "remote_manifest": "PASS",
+      "download_url": "https://huggingface.co/Ssum-mer/qwen3.8-27b-growpath/resolve/6725d0f37b1fcc875c5d6191f56a2b15d7d02962/qwen3.8-27b-growpath-BF16.gguf"
+    },
+    {
+      "repo": "Ssum-mer/qwen3.8-27b-growpath-Q4",
+      "commit": "c7ecb907439398ef686251a0a86febb26422cd9f",
+      "file": "qwen3.8-27b-growpath-Q4.gguf",
+      "bytes": 16547400192,
+      "sha256": "7626f16dc9237c04704011fc50c2b7e89a4d495c2cd1810f271746e96b1d9d16",
+      "precision": "Q4_K_M",
+      "remote_size_and_lfs_sha256": "PASS",
+      "remote_manifest": "PASS",
+      "download_url": "https://huggingface.co/Ssum-mer/qwen3.8-27b-growpath-Q4/resolve/c7ecb907439398ef686251a0a86febb26422cd9f/qwen3.8-27b-growpath-Q4.gguf"
+    }
+  ],
+  "source_revision": "66d1af509ab0681f3b9365227e5c794c65801fbf",
+  "source_hash_verification": "PASS",
+  "smoke_test": "PASS",
+  "remote_verification": "PASS",
+  "pod_stopped_and_exited_verified": true
+}

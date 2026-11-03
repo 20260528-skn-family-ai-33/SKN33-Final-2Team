@@ -1,0 +1,33 @@
+{
+  "repo": "Ssum-mer/qwen3.8-27b-growpath-v18",
+  "before_revision": "66d1af509ab0681f3b9365227e5c794c65801fbf",
+  "model_card_revision": "f931cb0c5b89f39f935ef7bfd27920351dcbb9da",
+  "after_revision": "f931cb0c5b89f39f935ef7bfd27920351dcbb9da",
+  "pipeline_tag": "text-generation",
+  "tags": [
+    "transformers",
+    "safetensors",
+    "qwen3_5",
+    "image-text-to-text",
+    "growpath",
+    "qwen3.8",
+    "fine-tuned",
+    "lora",
+    "merged",
+    "korean",
+    "roadmap-generation",
+    "text-generation",
+    "conversational",
+    "ko",
+    "en",
+    "base_model:Qwen/Qwen3.8-27B",
+    "base_model:finetune:Qwen/Qwen3.8-27B",
+    "license:apache-2.0",
+    "endpoints_compatible",
+    "region:us"
+  ],
+  "weights_unchanged": true,
+  "only_uploaded_path": "README.md",
+  "architecture_config_unchanged": true,
+  "verification": "PASS"
+}

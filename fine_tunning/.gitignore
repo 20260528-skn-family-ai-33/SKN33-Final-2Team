@@ -1,0 +1,18 @@
+# Reproduction evidence is versioned in this independent folder.
+!reports/
+!reports/**
+!outputs/
+!outputs/**
+
+# Download model weights and tokenizers from the pinned external model.
+**/tokenizer.json
+*.safetensors
+*.gguf
+*.pt
+*.bin
+*.zip
+__pycache__/
+*.py[cod]
+.env
+.env.*
+**/checkpoints/
