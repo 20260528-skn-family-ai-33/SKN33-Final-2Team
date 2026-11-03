@@ -25,4 +25,44 @@ def calculate_durations(project,recommendations,choices,order,weekly_hours):
         book_weeks=len(choice['books'])
         result[name]={'weeks':course_weeks+book_weeks,'courseWeeks':course_weeks,'bookWeeks':book_weeks,'weeklyHours':weekly,
             'basis':f"강좌 {course_weeks}주 + 도서 {book_weeks}권 × 1주",'method':METHOD,'course':choice['course'],'books':sorted(choice['books'])}
+    limit = period_limit(project)
+    stored_limit = positive(recommendations.get('periodWeeks'))
+    if stored_limit:
+        limit = min(limit, stored_limit) if limit else stored_limit
+    if limit and sum(row['weeks'] for row in result.values()) > limit:
+        raise RecommendationError('선택한 자료의 총 학습 기간이 입력한 기간을 넘어요. 더 짧은 강좌·도서를 다시 선택해 주세요.')
     return result
+
+
+def material_duration(courses, books, weekly_hours):
+    """자료 활동만의 기간. 추가된 여러 강좌도 같은 규칙으로 합산한다."""
+    weekly = positive(weekly_hours)
+    if weekly is None:
+        raise RecommendationError('주당 학습시간을 확인해 주세요.')
+    course_weeks = 0
+    for course in courses:
+        hours = positive(course.get('hours')) if 'hours' not in (course.get('estimated') or []) else None
+        course_weeks += max(1, math.ceil(hours / weekly)) if hours else 1
+    book_weeks = len(books)
+    return {'weeks': course_weeks + book_weeks, 'courseWeeks': course_weeks,
+            'bookWeeks': book_weeks, 'weeklyHours': weekly,
+            'basis': f'강좌 {course_weeks}주 + 도서 {book_weeks}권 × 1주', 'method': METHOD,
+            'course': courses[0]['id'] if courses else None,
+            'courses': [item['id'] for item in courses], 'books': sorted(item['id'] for item in books)}
+
+
+def period_limit(project, course=None):
+    details = project.get('details') or {}
+    course = course or project.get('selectedCourse') or {}
+    limits = [value for value in (positive(details.get('weeks')), positive((course or {}).get('weeks'))) if value]
+    return min(limits) if limits else None
+
+
+def course_fits_period(item, project, course=None):
+    limit = period_limit(project, course)
+    weekly = positive((project.get('details') or {}).get('hours')) or positive((course or {}).get('weeklyHours'))
+    hours = positive(item.get('hours'))
+    # 미확인·추정 시간을 확정된 짧은 강좌로 간주하지 않는다. 기존 추정 표시는 유지한다.
+    if not limit or not weekly or not hours or 'hours' in (item.get('estimated') or []):
+        return True
+    return math.ceil(hours / weekly) <= limit

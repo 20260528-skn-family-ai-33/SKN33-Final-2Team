@@ -42,6 +42,9 @@ def candidate_pools(project: dict, selection: dict, items: dict[str, dict], limi
         for kind, key in (('course', 'courses'), ('book', 'books')):
             # 스킬·종류·사용 가능 여부를 후보 개수 제한보다 먼저 적용한다.
             available = [row for row in items.values() if row.get('usable') and row.get('type') == kind and not exclusion(row,knowledge,str(project.get('goal') or '')) and skill['name'] in (row.get('skills') or []) and (not free_only or kind == 'book' or (row.get('cost') == 0 and not isinstance(row.get('cost'), bool)))]
+            if kind == 'course':
+                from app.services.duration_proposals import course_fits_period
+                available = [row for row in available if course_fits_period(row, project, project.get('selectedCourse'))]
             available.sort(key=lambda row: (-score(row), str(row.get('title') or ''), row['id']))
             by_kind[key] = [deepcopy({field: row.get(field) for field in
                 ('id', 'title', 'provider', 'cost', 'hours', 'estimated', 'image', 'url', 'skills', 'content', 'curriculum')})
@@ -151,9 +154,12 @@ def recommend_from_catalog(ctx: Any, pre: dict, course: dict | None = None) -> d
     items = catalog.items()
     from app.learner_knowledge import from_profile,hr_context
     project=dict(pre['project'],learnerKnowledge=from_profile(pre.get('profile')),hrContext=hr_context(pre.get('profile')))
+    project['selectedCourse'] = deepcopy(course)
     pools, retrieval = retrieve(project, pre['selection'], items, course)
     result = recommend_resources(project, pre['selection'], items,
         lambda system, payload: runtime.llm_json(ctx, system, payload), course=course, retrieved_pools=pools)
+    from app.services.duration_proposals import period_limit
+    result['periodWeeks'] = period_limit(project, course)
     result['retrieval'] = retrieval
     return result
 

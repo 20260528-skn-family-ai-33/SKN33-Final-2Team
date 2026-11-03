@@ -30,3 +30,27 @@ class DurationTests(unittest.TestCase):
  def test_weekly_time_must_be_valid(self):
   self.project['details']['hours']=''
   with self.assertRaises(RecommendationError):self.compute(None)
+
+
+class PeriodLimitTests(unittest.TestCase):
+ def test_known_long_course_filtered_without_changing_hours(self):
+  from app.services.duration_proposals import course_fits_period
+  project={'details':{'weeks':8,'hours':4}}
+  course={'hours':72}
+  self.assertFalse(course_fits_period(course,project))
+  self.assertEqual(course['hours'],72)
+  self.assertTrue(course_fits_period({'hours':32},project))
+ def test_course_plan_limit_used_when_user_period_is_auto(self):
+  from app.services.duration_proposals import course_fits_period
+  self.assertFalse(course_fits_period({'hours':72},{'details':{}},{'weeks':8,'weeklyHours':4}))
+ def test_unconfirmed_hours_not_claimed_as_verified_fit(self):
+  from app.services.duration_proposals import course_fits_period
+  self.assertTrue(course_fits_period({'hours':None},{'details':{'weeks':8,'hours':4}}))
+ def test_selected_total_over_deadline_is_rejected(self):
+  rec={'skills':[{'name':n,'courses':[{'id':n,'hours':20}],'books':[]} for n in ('A','B')]}
+  choices={n:{'course':n,'books':[]} for n in ('A','B')}
+  with self.assertRaises(RecommendationError):calculate_durations({'details':{'weeks':8,'hours':4}},rec,choices,['A','B'],4)
+
+ def test_saved_recommendation_plan_limit_applies_when_user_period_auto(self):
+  rec={'periodWeeks':8,'skills':[{'name':'A','courses':[{'id':'a','hours':72}],'books':[]}]}
+  with self.assertRaises(RecommendationError):calculate_durations({'details':{}},rec,{'A':{'course':'a','books':[]}},['A'],4)

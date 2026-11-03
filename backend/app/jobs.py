@@ -33,11 +33,23 @@ class JobCtx:
 
 def start(kind: str, employee_id: int | None, ref: str, fn: Callable[[JobCtx], Any], progress: dict | None = None,
           *, before_start: Callable[[str], None] | None = None) -> str:
-    with db.tx() as t:
-        jid = str(t.val("INSERT INTO app_ext.jobs(employee_id, kind, ref, status, progress) VALUES(:e, :k, :r, 'running', :p) RETURNING job_id",
-                        e=employee_id, k=kind, r=ref, p=db.J(progress or {})))
+    owner = None
+    try:
+        with db.tx() as t:
+            jid = str(t.val("INSERT INTO app_ext.jobs(employee_id, kind, ref, status, progress) VALUES(:e, :k, :r, 'running', :p) RETURNING job_id",
+                            e=employee_id, k=kind, r=ref, p=db.J(progress or {})))
+            if kind == 'learning_generation':
+                from .services.generation_lock import generation_guard
+                owner = generation_guard('job', jid)
+                owner.__enter__()
+    except Exception:
+        if owner is not None:
+            owner.__exit__(None, None, None)
+        raise
 
-    def work() -> None:
+    def perform() -> None:
+        if kind == 'learning_generation' and db.val('SELECT status FROM app_ext.jobs WHERE job_id = CAST(:j AS uuid)', j=jid) != 'running':
+            return
         ctx = JobCtx(jid)
         status, result, error = 'done', None, None
         try:
@@ -53,13 +65,24 @@ def start(kind: str, employee_id: int | None, ref: str, fn: Callable[[JobCtx], A
             t.run("UPDATE app_ext.jobs SET status = :s, result = :r, error = :e, updated_at = now() WHERE job_id = :j AND status = 'running'",
                   s=status, r=db.J(result), e=db.J(error), j=jid)
 
-    if before_start:
+    def work() -> None:
         try:
+            perform()
+        finally:
+            if owner is not None:
+                owner.__exit__(None, None, None)
+
+    try:
+        if before_start:
             before_start(jid)
-        except Exception:
+        POOL.submit(work)
+    except Exception:
+        try:
             cancel(jid, employee_id)
-            raise
-    POOL.submit(work)
+        finally:
+            if owner is not None:
+                owner.__exit__(None, None, None)
+        raise
     return jid
 
 
@@ -88,10 +111,17 @@ def cancel(job_id: str, employee_id: int | None) -> str:
 
 
 def mark_lost() -> int:
-    """서버를 다시 켜면 돌던 작업은 끊긴 것으로 남긴다. 다시 시도는 사용자가 누를 때만"""
+    """학습 생성은 세션 소유자를 확인해 다른 서버의 살아 있는 작업을 보존한다."""
+    from .services.generation_lock import lock_key
     err = cause('서버가 다시 시작돼 진행 중이던 작업이 끊겼어요')
     with db.tx() as t:
-        return t.run("UPDATE app_ext.jobs SET status = 'failed', error = :e, updated_at = now() WHERE status = 'running'", e=db.J(err))
+        count = t.run("UPDATE app_ext.jobs SET status = 'failed', error = :e, updated_at = now() WHERE status = 'running' AND kind <> 'learning_generation'", e=db.J(err))
+        pending = t.all("SELECT job_id FROM app_ext.jobs WHERE status = 'running' AND kind = 'learning_generation' FOR UPDATE SKIP LOCKED")
+        for row in pending:
+            key = lock_key('job', str(row['job_id']))
+            if t.val('SELECT pg_try_advisory_xact_lock(:key)', key=key):
+                count += t.run("UPDATE app_ext.jobs SET status = 'failed', error = :e, updated_at = now() WHERE job_id = :j AND status = 'running'", e=db.J(err), j=row['job_id'])
+        return count
 
 
 def lost_cause() -> dict:

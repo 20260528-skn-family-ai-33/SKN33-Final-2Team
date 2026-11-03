@@ -74,6 +74,8 @@ def finish_option(pid: str, raw: dict, source: str, off_domain: bool = False, ke
         hours = (r['hours'] if r and r['hours'] is not None else min(60, max(0.5, h_in))) if r else min(60, max(0.5, h_in))
         acts.append({'id': f'{pid.lower()}-{i + 1}', 'stage': stage, 'title': str(a.get('title') or (r['title'] if r else '직접 수행 과제'))[:80],
                      'res': rid, 'task': not rid, 'hours': hours, 'how': str(a.get('how') or '')})
+        if isinstance(a.get('skill'), str):
+            acts[-1]['skill'] = a['skill']
         if not rid:
             acts[-1]['skills'] = _task_skills(a.get('skills'))
         if keep_key and a.get('key') not in (None, ''):
@@ -141,7 +143,7 @@ def keep_ids(d: dict, base: dict, ver: int) -> dict:
     """같은 활동은 이전 id를 이어 받는다: 0) 에이전트가 돌려준 원래 활동 key(같은 활동일 때만 · 10/23) 1) 같은 자료 또는 같은 제목의 과제
     2) 같은 단계 과제 중 제목이 다른 쪽을 포함. 제목을 다듬어도 key 로 진행 기록이 이어지게 하려는 것이다"""
     used, got = set(), set()
-    key = lambda a: ('r:' + a['res']) if a.get('res') else ('t:' + a['title'])  # noqa: E731
+    key = lambda a: ((('r:' + a['res']) if a.get('res') else ('t:' + a['title'])), a.get('skill'))  # noqa: E731
     norm = lambda t: re.sub(r'\s+', '', t or '')  # noqa: E731
     by_id = {x['id']: x for x in base['acts']}
     for i, a in enumerate(d['acts']):
@@ -163,7 +165,7 @@ def keep_ids(d: dict, base: dict, ver: int) -> dict:
     for i, a in enumerate(d['acts']):
         if i in got:
             continue
-        old = None if a.get('res') else next((x for x in base['acts'] if x['id'] not in used and not x.get('res') and x['stage'] == a['stage']
+        old = None if a.get('res') else next((x for x in base['acts'] if x['id'] not in used and not x.get('res') and x['stage'] == a['stage'] and x.get('skill') == a.get('skill')
                                               and (norm(x['title']) in norm(a['title']) or norm(a['title']) in norm(x['title']))), None)
         a['id'] = old['id'] if old else f"{d['id'].lower()}-v{ver}-{i + 1}"
         if old:
@@ -520,7 +522,7 @@ def _mock_revise(inp: dict) -> dict:
         done.append(f"{pid} {D['perspectives'][pid]['name']}으로 다시 쓰기")
     else:
         acts = [{'key': a['id'], 'stage': a['stage'], 'title': a['title'], 'res': a.get('res'), 'hours': a.get('hours'), 'how': a.get('how'), 'done': a.get('done'),
-                 'skills': a.get('skills')} for a in plan['acts']]
+                 'skills': a.get('skills'), 'skill': a.get('skill')} for a in plan['acts']]
     used = lambda: {a['res'] for a in acts if a.get('res')}  # noqa: E731
     if c.get('startStage'):
         if not c.get('perspective') and c['startStage'] < plan['start']:
@@ -622,7 +624,7 @@ REV_SYS = """너는 GrowPath '로드맵 계획 에이전트'의 관점별 하위
 
 [무엇을 바꾸나]
 - changes의 항목은 반드시 반영한다. request는 사용자가 적은 요청 문장이다(부서장 코멘트에서 옮긴 것일 수 있다). 함께 반영하고, 둘이 부딪히면 changes를 따른다.
-- 바꾸지 않는 활동은 current의 stage·title·res·hours·how·skills를 글자 그대로 쓴다. 표현만 다듬지 않는다. 요청과 관계없는 주당 시간도 그대로 둔다.
+- 바꾸지 않는 활동은 current의 stage·title·res·hours·how·skills·skill을 글자 그대로 쓴다. 표현만 다듬지 않는다. 요청과 관계없는 주당 시간도 그대로 둔다.
 - 활동마다 key를 쓴다. current의 활동을 그대로 두거나 단계·시간·설명만 고친 활동은 그 활동의 key를 그대로 쓴다(진행 기록이 key로 이어진다). 다른 자료·다른 과제로 바꾸거나 새로 넣은 활동은 key를 null로 둔다.
 - 완료한 활동(done: true)은 요청이 없으면 빼거나 바꾸지 않는다. 요청에 없는 활동을 새로 더하지 않는다.
 - changes.perspective가 있으면 너의 관점으로 로드맵을 새로 쓴다. current는 참고만 하고, 계속 쓸 자료와 완료한 활동은 그대로 둔다.
@@ -660,7 +662,7 @@ def revise(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
 
     def api(_):
         current = {'perspective': f"{pl['opt']} {pl['name']}", 'weeklyHours': pl['hours'], 'startStage': pl['start'],
-                   'acts': [dict({'key': a['id'], 'stage': a['stage'], 'title': a['title'], 'res': a.get('res'), 'hours': a.get('hours'), 'how': a.get('how') or '', 'done': a.get('done')},
+                   'acts': [dict({'key': a['id'], 'stage': a['stage'], 'title': a['title'], 'res': a.get('res'), 'hours': a.get('hours'), 'how': a.get('how') or '', 'done': a.get('done'), 'skill': a.get('skill')},
                                  **({} if a.get('res') else {'skills': a.get('skills') or []})) for a in pl['acts']]}
         removed = {a.get('key') for a in (inp['changes'].get('removeActs') or []) + (inp['changes'].get('replaceActs') or [])}
         extra_ids = [a.get('res') for a in pl['acts'] if a['id'] not in removed] + list(inp['changes'].get('addResources') or [])
@@ -673,6 +675,9 @@ def revise(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
         from app.learner_knowledge import POLICY
         system = _sys(pid, REV_SYS, evaluation_prompt=inp.get('_evaluationPrompt')) + POLICY + track_policy.challenge_guidance(pid, 'tasks')
         current['learningSkills'] = (pl.get('def') or {}).get('learningSkills') or []
+        if (pl.get('def') or {}).get('learningReport'):
+            current['skillOrder'] = pl['def']['learningReport']['skillOrder']
+            system += '\n각 활동에 소속 skill을 skillOrder 중 정확히 하나로 반환한다. 유지 활동은 key와 skill을 보존한다. 추가·교체 활동도 실제 소속을 명시한다. 과제의 skills 태그 목록과 단일 소속 skill은 구분한다.'
         payload = _catalog_payload(pid, {'current': current, 'skillTargets': current['learningSkills'], 'handoff': handoff, 'changes': inp['changes'],
                                         'request': inp.get('request'), 'skillTags': catalog.skill_names()}, system, extra_ids,
                                    rt.S.ollama_num_ctx if ctx.mode == 'ollama' else 16384)
@@ -681,5 +686,11 @@ def revise(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
         o = finish_option(pid, r, ctx.mode, keep_key=True)
         o.update(summary=str(r.get('summary') or '').strip()[:80], notes=rt.arr(r.get('notes'), 4))
         return o
+    from app.services.material_plan import rebuild_revision
+    def checked(callback):
+        def run(data):
+            result = _drop_gone_keys(callback(data), inp['changes'])
+            return rebuild_revision(result, pl, inp['handoff'])
+        return run
     task = '관점 바꿔 다시 작성' if inp['changes'].get('perspective') else '수정안 작성'
-    return _drop_gone_keys(rt.run(ctx, f'로드맵 계획 · {pid}', task, inp, _mock_revise, api, role='roadmap', sim=sim, mock_delay=0.9), inp['changes'])
+    return _drop_gone_keys(rt.run(ctx, f'로드맵 계획 · {pid}', task, inp, checked(_mock_revise), checked(api), role='roadmap', sim=sim, mock_delay=0.9), inp['changes'])

@@ -1,9 +1,11 @@
 """프로젝트 기반 사전 점검·자료 추천·활동 선택 API."""
 from __future__ import annotations
 
+from app.services.generation_job import queued_generation
+
 from copy import deepcopy
 import hashlib
-from threading import Lock
+from app.services.generation_lock import generation_guard
 from uuid import UUID
 
 from fastapi import Depends, APIRouter
@@ -20,8 +22,6 @@ from app.agents.survey_generation import SurveyError, generate_survey, profile_i
 from app.services.survey_store import StoreError, public_view, read, save_answers, save_generated, save_recommendations, save_resource_choices, save_duration_proposals
 from app.agents.resource_recommendations import RecommendationError, recommend_from_catalog
 
-# 독립 실험 서버는 단일 worker로 실행한다. 동시 유료 생성을 거절한다.
-_generation_lock = Lock()
 
 
 def project_input(t, employee_id: int, project_id: str) -> dict:
@@ -54,9 +54,7 @@ def inputs_match(saved: dict, project: dict, personal: dict) -> bool:
 
 
 def generate_for(employee_id: int, project_id: str) -> dict:
-    if not _generation_lock.acquire(blocking=False):
-        raise ApiError(409, 'GENERATION_BUSY', '다른 문항을 생성 중이에요. 잠시 후 확인해 주세요.')
-    try:
+    with generation_guard('draft', str(project_id)):
         me = profile.view(employee_id)
         if me is None:
             raise ApiError(404, 'PROFILE_NOT_FOUND', '개인 DB 프로필을 찾을 수 없어요.')
@@ -86,8 +84,6 @@ def generate_for(employee_id: int, project_id: str) -> dict:
                 raise ApiError(409, 'SURVEY_INPUT_CHANGED', '생성 중 입력이 변경됐어요. 다시 생성해 주세요.')
             saved = save_generated(t, employee_id, project_id, project, selection, personal, survey, replace_generation_id=previous_id)
         return public_view(saved)
-    finally:
-        _generation_lock.release()
 
 
 class AnswerBody(BaseModel):
@@ -126,6 +122,7 @@ def get_survey(project_id: UUID, a: Account = Depends(require_employee)):
 
 
 @r.post('/api/v2/drafts/{project_id}/survey')
+@queued_generation
 def make_survey(project_id: UUID, a: Account = Depends(require_employee)):
     return {'survey': generate_for(a.id, str(project_id))}
 
@@ -186,7 +183,9 @@ def course_input(t, employee_id, project_id, course):
     option=draft['gen']['options'][course]
     from app.services.course_skills import selected
     targets=selected(option) or []
-    return {'id':course,**{key:deepcopy(option.get(key)) for key in ('name','reason','scope','weeklyHours')},'learningSkills':[{k:v for k,v in row.items() if k!='enabled'} for row in targets if row['enabled']]}
+    from app.agents.roadmap import build_plan, params_of
+    planned = build_plan(option, params_of(draft['handoff'], option), draft['goal'])
+    return {'id':course,'weeks':planned['weeks'],**{key:deepcopy(option.get(key)) for key in ('name','reason','scope')},'weeklyHours':planned['hours'],'learningSkills':[{k:v for k,v in row.items() if k!='enabled'} for row in targets if row['enabled']]}
 
 
 def recommendation_view(saved: dict) -> dict:
@@ -203,10 +202,9 @@ def get_recommendations(project_id: UUID, a: Account = Depends(require_employee)
 
 
 @r.post('/api/v2/drafts/{project_id}/recommendations')
+@queued_generation
 def generate_recommendations(project_id: UUID, a: Account = Depends(require_employee), course: str | None = None):
-    if not _generation_lock.acquire(timeout=120):
-        raise ApiError(409, 'GENERATION_BUSY', '생성 대기가 길어지고 있어요. 잠시 후 다시 확인해 주세요.')
-    try:
+    with generation_guard('draft', str(project_id)):
         with db.tx() as t:
             pre = course_context(t, a.id, str(project_id), course)
             selected_course = course_input(t, a.id, str(project_id), course)
@@ -222,8 +220,6 @@ def generate_recommendations(project_id: UUID, a: Account = Depends(require_empl
                 raise ApiError(409, 'RECOMMENDATIONS_CHANGED', '생성 중 역량·순서 또는 선택한 계획이 변경됐어요. 최신 조건으로 다시 추천받아 주세요.')
             saved = save_recommendations(t, a.id, str(project_id), pre['generationId'], result, course=course, replace=True)
         return recommendation_view(saved)
-    finally:
-        _generation_lock.release()
 
 
 class ChoicesBody(BaseModel):
@@ -255,7 +251,7 @@ def generate_durations(project_id: UUID, body: ChoicesBody, a: Account = Depends
             raise ApiError(409,'RECOMMENDATIONS_CHANGED','점검 또는 추천이 변경됐어요.')
         selected_course=course_input(t,a.id,str(project_id),course)
         weekly=(selected_course or {}).get('weeklyHours') or AUTO_HOURS
-        proposals=calculate_durations(pre['project'],recommendations,body.choices,
+        proposals=calculate_durations(dict(pre['project'], selectedCourse=selected_course),recommendations,body.choices,
             body.skillOrder if body.skillOrder is not None else pre.get('skillOrder',[row['name'] for row in recommendations['skills']]),weekly)
         preview=dict(pre,durationEstimates={**(pre.get('durationEstimates') or {}),**proposals})
         return recommendation_view(preview)
@@ -269,10 +265,10 @@ def get_activities(project_id: UUID,a: Account=Depends(require_employee)):
         return activities.view(saved,d)
 
 @r.post('/api/v2/drafts/{project_id}/activities')
+@queued_generation
 def propose_activities(project_id: UUID,a: Account=Depends(require_employee),regenerate: bool=False,skill: str | None=None):
     from app.services import activity_selection as activities
-    if not _generation_lock.acquire(timeout=120): raise ApiError(409,'GENERATION_BUSY','생성 대기가 길어지고 있어요. 잠시 후 다시 확인해 주세요.')
-    try:
+    with generation_guard('draft', str(project_id)):
         with db.tx() as t:saved,d=activities.context(t,a.id,str(project_id))
         existing=activities.current_record(saved,d)
         if existing and not regenerate and not skill:return activities.view(saved,d)
@@ -293,7 +289,6 @@ def propose_activities(project_id: UUID,a: Account=Depends(require_employee),reg
         current_result=draft_service._mutate(a.id,str(project_id),save)
         from app.services.course_recommendations import scope_view
         return activities.view(scope_view(current_result['v2Survey'],d['chosen'],((d.get('gen') or {}).get('options') or {}).get(d['chosen'])),d)
-    finally:_generation_lock.release()
 
 class ActivitySelectionBody(BaseModel):
     model_config=ConfigDict(extra='forbid')
@@ -321,6 +316,7 @@ def select_course_skills(project_id:UUID,course:str,body:SkillSelectionBody,a:Ac
 
 
 @r.post('/api/v2/drafts/{project_id}/options/{course}/skills')
+@queued_generation
 def initialize_course_skills(project_id:UUID,course:str,a:Account=Depends(require_employee)):
     from app.services.course_skills import initialize
     return initialize(a.id,str(project_id),course)
@@ -335,11 +331,11 @@ def get_learning_outcomes(project_id:UUID,a:Account=Depends(require_employee)):
 
 
 @r.post('/api/v2/drafts/{project_id}/learning-outcomes')
+@queued_generation
 def generate_learning_outcomes(project_id:UUID,a:Account=Depends(require_employee)):
     from app.services import activity_selection,learning_outcomes,drafts
     from app.services.course_recommendations import merge_scope
-    if not _generation_lock.acquire(timeout=120):raise ApiError(409,'GENERATION_BUSY','생성 대기가 길어지고 있어요. 잠시 후 다시 시도해 주세요.')
-    try:
+    with generation_guard('draft', str(project_id)):
         with db.tx() as t:
             saved,draft=activity_selection.context(t,a.id,str(project_id))
             existing=learning_outcomes.current(saved,draft)
@@ -354,4 +350,3 @@ def generate_learning_outcomes(project_id:UUID,a:Account=Depends(require_employe
             w['v2Survey']=merge_scope(w['v2Survey'],latest)
         drafts._mutate(a.id,str(project_id),save)
         return {'summaries':result['summaries']}
-    finally:_generation_lock.release()

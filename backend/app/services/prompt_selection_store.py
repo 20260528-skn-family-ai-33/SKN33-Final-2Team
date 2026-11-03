@@ -37,5 +37,5 @@ def confirmation_evidence(decision_id: str, draft: dict, finalized_at: datetime 
 
 def read_decisions() -> list[dict]:
     """실제 최종 확정 저장이 성공한 로드맵의 근거만 조회한다. 과거 기록을 추정하지 않는다."""
-    rows = db.all_("SELECT content -> 'selectionEvidence' AS evidence FROM public.roadmaps WHERE selected_at IS NOT NULL AND content ? 'selectionEvidence'")
+    rows = db.all_("SELECT baseline_content -> 'selectionEvidence' AS evidence FROM public.roadmaps WHERE selected_at IS NOT NULL AND baseline_content ? 'selectionEvidence'")
     return [row['evidence'] for row in rows if isinstance(row.get('evidence'), dict)]

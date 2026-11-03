@@ -8,6 +8,11 @@ from app.errors import ApiError
 
 
 class CourseSkillsTests(unittest.TestCase):
+    def setUp(self):
+        from contextlib import nullcontext
+        guard = patch.object(skills, 'generation_guard', side_effect=lambda *args: nullcontext())
+        guard.start(); self.addCleanup(guard.stop)
+
     def option(self):
         return {'id':'A1','learningSkills':[{'name':'S','application':'검색 구성'},{'name':'T','application':'근거 검증'}]}
 
@@ -127,4 +132,3 @@ class CourseSkillsTests(unittest.TestCase):
         with patch.object(db,'tx',side_effect=lambda:nullcontext(Mock())),patch.object(preassessment,'recommendation_context',return_value=pre),patch.object(drafts,'_row',return_value={'draft_choices':w}),patch.object(drafts,'_wrap',side_effect=lambda value:value),patch.object(drafts,'_mutate',side_effect=mutate),patch.object(runtime,'context',return_value=SimpleNamespace(live=True)),patch.object(runtime,'llm_json',return_value={'learningSkills':[{'name':'S','application':'검색 구성'}]}):
             with self.assertRaises(ApiError):skills.initialize(1,'project','A1')
         self.assertNotIn('learningSkills',option)
-        self.assertFalse(skills._initial_lock.locked())

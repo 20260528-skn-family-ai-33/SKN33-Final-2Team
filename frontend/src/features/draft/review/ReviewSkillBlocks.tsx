@@ -2,7 +2,7 @@ import './reviewSkills.css';
 import { ResourceImage } from '@/shared/ui/ResourceImage';
 import { TaskDescription } from '@/shared/ui/TaskDescription';
 export type ReviewResource = { id: string; title: string; provider?: string; image?: string; url?: string; cost?: number | null; knowledge?: string; competencySummary?: string[]; content?: string };
-export type ReviewMaterials = { recommendations: { skills: { name: string; courses: ReviewResource[]; books: ReviewResource[] }[] } | null; choices: Record<string, { course: string | null; books: string[]; enabled?: boolean }>; skillOrder?: string[]; skillDetails?: { name: string; application: string; competencySummary?: string[] }[]; durationEstimates?: Record<string, { weeks?: number }> };
+export type ReviewMaterials = { recommendations: { skills: { name: string; courses: ReviewResource[]; books: ReviewResource[] }[] } | null; choices: Record<string, { course: string | null; courses?: string[]; books: string[]; enabled?: boolean }>; skillOrder?: string[]; skillDetails?: { name: string; application: string; competencySummary?: string[] }[]; durationEstimates?: Record<string, { weeks?: number }> };
 type Act = { id: string; title: string; skill: string; how: string; hours: number; res?: string | null };
 export function ReviewSkillBlocks({ materials, acts, selectedIds, busy, onToggle, onPropose, confirmed = false, onSubmit, onOpenResource, currentSkillNames = [], alternatives, onPick, generatingSkill }: { generatingSkill?: string | null; alternatives?: Record<string, { proposalId: string; task: Act }[]>; onPick?: (skill: string, proposalId: string) => void; materials: ReviewMaterials; acts: Act[]; selectedIds: string[]; busy: boolean; onToggle?: (id: string) => void; onPropose?: (skill: string) => void; confirmed?: boolean; onSubmit?: (skill: string) => void; onOpenResource?: (skill: string, resourceId: string) => void; currentSkillNames?: string[] }) {
   const skills = materials.recommendations?.skills || [];
@@ -10,7 +10,7 @@ export function ReviewSkillBlocks({ materials, acts, selectedIds, busy, onToggle
   return <div className="review-skill-blocks">{names.map((name, index) => {
     const skill = skills.find(s => s.name === name); if (!skill) return null;
     const choice = materials.choices[name];
-    const rows = [...skill.courses.filter(r => r.id === choice?.course), ...skill.books.filter(r => choice?.books.includes(r.id))];
+    const rows = [...skill.courses.filter(r => r.id === choice?.course || choice?.courses?.includes(r.id)), ...skill.books.filter(r => choice?.books.includes(r.id))];
     const outcomes = materials.skillDetails?.find(s => s.name === name)?.competencySummary || [];
     const tasks = acts.filter(a => a.skill === name && !a.res);
     const latest = alternatives?.[name]?.filter(item => !tasks.some(task => task.id === item.task.id)).slice(-1) || [];

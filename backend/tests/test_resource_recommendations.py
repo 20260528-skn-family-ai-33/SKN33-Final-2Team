@@ -75,3 +75,11 @@ class RecommendationTests(unittest.TestCase):
         self.assertEqual(result['skills'][0]['courses'][0]['id'],'course0')
         raw=self.raw();raw['skills'][0]['courses'][0]={'key':'S1-B1','why':'이유','knowledge':'지식'}
         with self.assertRaises(RecommendationError):self.recommend(raw)
+
+
+class PeriodCandidateTests(unittest.TestCase):
+    def test_short_course_survives_limit_instead_of_long_top_candidate(self):
+        items={str(i):{'id':str(i),'title':'AAA long','type':'course','usable':True,'skills':['SQL'],'hours':72} for i in range(20)}
+        items['short']={'id':'short','title':'ZZZ short','type':'course','usable':True,'skills':['SQL'],'hours':16}
+        pools=candidate_pools({'details':{'weeks':8,'hours':4}}, {'skills':[{'name':'SQL'}]},items,limit=1)
+        self.assertEqual([row['id'] for row in pools[0]['courses']], ['short'])

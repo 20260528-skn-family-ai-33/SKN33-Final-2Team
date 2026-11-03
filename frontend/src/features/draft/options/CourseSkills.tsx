@@ -1,3 +1,4 @@
+import { waitJob } from '@/api/jobs';
 import { useEffect, useState } from 'react';
 import type { DraftResponse, LearningSkillSelection, OptionDef } from '@/api/types/draft';
 import { useWs } from '@/shared/state/workspace';
@@ -23,10 +24,10 @@ export function CourseSkills({ option, disabled, onSavingChange }: { option: Opt
     onSavingChange?.(option.id, true);
     let work = initialFlights.get(initialKey);
     if (!work) {
-      work = fetch(`/api/v2/drafts/${id}/options/${option.id}/skills`, { method: 'POST', credentials: 'same-origin' }).then(async response => {
+      work = fetch(`/api/v2/drafts/${id}/options/${option.id}/skills`, { method: 'POST', credentials: 'same-origin', headers: { Prefer: 'respond-async' } }).then(async response => {
         const body = await response.json();
         if (!response.ok) throw new Error(body?.error?.message || '최초 역량 추천을 만들지 못했어요.');
-        return body as DraftResponse;
+        return response.status === 202 ? waitJob<DraftResponse>(body.jobId) : body as DraftResponse;
       });
       initialFlights.set(initialKey, work);
       void work.finally(() => { if (initialFlights.get(initialKey) === work) initialFlights.delete(initialKey); }).catch(() => {});

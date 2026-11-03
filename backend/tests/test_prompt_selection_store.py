@@ -45,6 +45,8 @@ class PromptSelectionStoreTests(TestCase):
         with patch.object(store.db,'all_',return_value=[{'evidence':{'eventType':'roadmap_confirmed'}},{'evidence':None}]) as read:
             self.assertEqual(len(store.read_decisions()),1)
         self.assertIn('selected_at IS NOT NULL',read.call_args.args[0])
+        self.assertIn("baseline_content -> 'selectionEvidence'", read.call_args.args[0])
+        self.assertIn("baseline_content ? 'selectionEvidence'", read.call_args.args[0])
         self.assertTrue(read.call_args.args[0].startswith('SELECT '))
 
     def test_generation_captures_actual_db_version_and_effective_prompt_hash(self):

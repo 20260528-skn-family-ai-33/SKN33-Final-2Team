@@ -1,6 +1,8 @@
 """새 로드맵 작성·내 로드맵·점검·보고서·학습 자료·사내 생활 도우미·작업 (API-09, 14~54)."""
 from __future__ import annotations
 
+from app.services.generation_job import queued_generation
+
 import json
 import time
 import uuid
@@ -400,11 +402,11 @@ def api_reg_sets(a: Account = Depends(require_account)):
 
 
 @r.post('/plans/{plan_id}/post-quiz')
+@queued_generation
 def api_post_quiz(plan_id: str,a: Account = Depends(require_employee)):
-    from .preassessment import _generation_lock
+    from app.services.generation_lock import generation_guard
     from ..services.post_quiz import generate,questions
-    if not _generation_lock.acquire(timeout=120):raise ApiError(409,'GENERATION_BUSY','문항 생성 대기가 길어지고 있어요. 다시 시도해 주세요.')
-    try:
+    with generation_guard('roadmap', str(plan_id)):
         row=PL._owned(a.id,plan_id)
         if PL.STATUS.get(row['status'])!='active':raise ApiError(409,'NOT_ACTIVE','진행 중인 로드맵만 사후 점검할 수 있어요.')
         if not questions(row['content']):raise ApiError(409,'POST_QUIZ_UNAVAILABLE','이 로드맵에는 사전 퀴즈가 없어요.')
@@ -416,4 +418,3 @@ def api_post_quiz(plan_id: str,a: Account = Depends(require_employee)):
             with db.tx() as t:
                 t.run("INSERT INTO app_ext.post_checks(roadmap_id,deep) VALUES(:r,:d) ON CONFLICT(roadmap_id) DO UPDATE SET deep=coalesce(app_ext.post_checks.deep,'{}'::jsonb) || EXCLUDED.deep,updated_at=now()",r=row['roadmap_id'],d=db.J({'v2Quiz':survey,'v2Answers':{}}))
         return _plan_out(PL.record(PL._owned(a.id,plan_id)))
-    finally:_generation_lock.release()

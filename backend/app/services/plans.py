@@ -48,7 +48,7 @@ def _write_steps(t: db.Tx, roadmap_id: str, plan: dict) -> None:
                        VALUES(CAST(:r AS uuid), :o, :t, :a, :du, :c, :done, :d) RETURNING step_id""",
                     r=roadmap_id, o=i, t=a['title'], a=a.get('how') or (res['title'] if res else None), du=f"{course_time.display_hours(a['hours'])} · {a['wFrom']}~{a['wTo']}주차",
                     c=0 if plan.get('opt') == 'A1' and a.get('res') else res['cost'] if res and res['cost'] is not None else None, done=a['id'] in done,
-                    d=db.J({k: a.get(k) for k in ('id', 'stage', 'res', 'task', 'hours', 'wFrom', 'wTo', 'skills')}))  # skills: 과제가 다루는 스킬 이름(10/23)
+                    d=db.J({k: a.get(k) for k in ('id', 'stage', 'res', 'task', 'hours', 'wFrom', 'wTo', 'skills', 'skill')}))  # skills: 과제가 다루는 스킬 이름(10/23)
         if res and res['type'] in ('course', 'book', 'cert'):
             col = {'course': 'course_id', 'book': 'isbn', 'cert': 'certification_id'}[res['type']]
             val = a['res'] if res['type'] == 'course' else a['res'].replace('book_', '', 1) if res['type'] == 'book' else int(a['res'].replace('cert_', '', 1))
@@ -481,6 +481,15 @@ def accept_revision(employee_id: int, roadmap_id: str, revision_id: str) -> dict
         from .drafts import selection_of
         plan = dict(pd['to'], version=cur['version'] + 1, confirmedAt=today(), why=pd['label'], assess=cur.get('assess'), prefs=pd['prefsTo'], handoff=pd['handoff'],
                     selection=selection_of(pd['to']['def']) if changed else cur.get('selection'))
+        # 최초 확정 근거는 수정 모델의 결과로 교체하거나 새로 만들지 않는다.
+        baseline_row = t.one('SELECT baseline_content FROM public.roadmaps WHERE roadmap_id = :r FOR UPDATE', r=row['roadmap_id']) or {}
+        baseline = baseline_row.get('baseline_content') or {}
+        evidence = baseline.get('selectionEvidence') if isinstance(baseline, dict) else None
+        if not isinstance(evidence, dict):
+            evidence = cur.get('selectionEvidence')
+        plan.pop('selectionEvidence', None)
+        if isinstance(evidence, dict):
+            plan['selectionEvidence'] = copy.deepcopy(evidence)
         validate_free_plan(t, plan)
         # 로드맵 내용이 바뀌면 팀 DB 트리거가 코멘트에 '수정 완료' 시각만 적는다. 그 갱신은 작성자 검사 트리거(본문·작성자·로드맵 열)를 거치지 않는다
         t.run('UPDATE public.roadmaps SET content = :c, strategy_type = :st, strategy_title = :tt, summary = :s, updated_at = now() WHERE roadmap_id = :r',

@@ -85,8 +85,7 @@ def save(employee_id,project_id,course,key,selection):
     return drafts.present(drafts._mutate(employee_id,project_id,apply),project_id)
 
 
-from threading import Lock
-_initial_lock=Lock()
+from app.services.generation_lock import generation_guard
 
 
 def option_signature(option):
@@ -101,9 +100,7 @@ def initialize(employee_id,project_id,course):
     from app.routers.preassessment import recommendation_context
     from app.errors import ApiError
     from uuid import uuid4
-    if not _initial_lock.acquire(timeout=120):
-        raise ApiError(409,'GENERATION_BUSY','역량 추천을 준비 중이에요. 잠시 후 다시 확인해 주세요.')
-    try:
+    with generation_guard('draft', str(project_id)):
         with db.tx() as t:
             saved=recommendation_context(t,employee_id,project_id)
             w=drafts._wrap(drafts._row(t,employee_id,project_id,lock=False)['draft_choices'])
@@ -136,4 +133,3 @@ def initialize(employee_id,project_id,course):
                 target['learningSkillsVersion']=str(uuid4())
                 target['learningSkillsKey']=recommendation_key(target)
         return drafts.present(drafts._mutate(employee_id,project_id,apply),project_id)
-    finally:_initial_lock.release()

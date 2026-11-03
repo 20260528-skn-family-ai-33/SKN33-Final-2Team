@@ -1,3 +1,4 @@
+import { waitJob } from '@/api/jobs';
 import { sameJ } from '@/shared/lib/format';
 import { useEffect, useRef, useState } from 'react';
 import { paths } from '@/app/paths';
@@ -18,8 +19,9 @@ class SurveyRequestError extends Error {
   constructor(message: string, readonly code: string) { super(message); }
 }
 async function request(path: string, init?: RequestInit): Promise<Stored | null> {
-  const response = await fetch(path, { ...init, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', ...init?.headers } });
-  const body = await response.json().catch(() => null);
+  const response = await fetch(path, { ...init, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', ...(init?.method === 'POST' ? { Prefer: 'respond-async' } : {}), ...init?.headers } });
+  let body = await response.json().catch(() => null);
+  if (response.status === 202 && body?.jobId) body = await waitJob<{ survey: Stored }>(body.jobId);
   if (!response.ok) throw new SurveyRequestError(body?.error?.message ?? '문항 요청을 처리하지 못했어요.', body?.error?.code ?? 'REQUEST_FAILED');
   if (!body || typeof body !== 'object') throw new SurveyRequestError('서버 응답을 확인하지 못했어요. 다시 시도해 주세요.', 'EMPTY_RESPONSE');
   return body.survey ?? null;

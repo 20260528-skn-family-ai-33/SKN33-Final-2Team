@@ -1,6 +1,6 @@
 from app.services.resource_rag import VERSION as RESOURCE_RAG_VERSION
 import copy
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 import unittest
 from unittest.mock import Mock, patch
 from uuid import uuid4
@@ -25,6 +25,8 @@ def transaction(t):
 
 class ApiTests(unittest.TestCase):
     def setUp(self):
+        guard = patch.object(api, 'generation_guard', side_effect=lambda *args: nullcontext())
+        guard.start(); self.addCleanup(guard.stop)
         fixture = fixtures.SurveyTests(); fixture.setUp()
         self.fixture = fixture
         self.pid = str(uuid4())
@@ -136,14 +138,11 @@ class ApiTests(unittest.TestCase):
         save.assert_not_called()
 
     def test_busy_generation_is_rejected_before_db_or_model(self):
-        api._generation_lock.acquire()
-        try:
-            with patch.object(api.db, 'tx') as query, self.assertRaises(api.ApiError) as error:
-                api.generate_for(7, self.pid)
-            self.assertEqual(error.exception.code, 'GENERATION_BUSY')
-            query.assert_not_called()
-        finally:
-            api._generation_lock.release()
+        with patch.object(api, 'generation_guard', side_effect=api.ApiError(409, 'GENERATION_BUSY', 'busy')), \
+             patch.object(api.db, 'tx') as query, self.assertRaises(api.ApiError) as error:
+            api.generate_for(7, self.pid)
+        self.assertEqual(error.exception.code, 'GENERATION_BUSY')
+        query.assert_not_called()
 
 
     def test_changed_input_is_not_returned_as_current_survey(self):
@@ -216,15 +215,17 @@ class ApiTests(unittest.TestCase):
         self.auth(); rid=str(uuid4())
         rec={'id':rid,'skills':[{'name':'S','courses':[{'id':'c','hours':8}],'books':[{'id':'b'}]}]}
         saved=dict(self.saved,completed=True,recommendations=rec,skillOrder=['S'],resourceChoices={'S':{'course':'c','books':['b']}})
-        with patch.object(api.db,'tx',side_effect=lambda:transaction(Mock())),patch.object(api,'course_context',return_value=saved),patch.object(api,'course_input',return_value={'weeklyHours':4}),patch.object(api,'save_duration_proposals',side_effect=lambda *args,**kwargs:dict(saved,durationEstimates=args[5])),patch.object(api.runtime,'context') as context,patch.object(api.runtime,'llm_json') as generate,patch.object(api,'_generation_lock') as lock:
+        with patch.object(api.db,'tx',side_effect=lambda:transaction(Mock())),patch.object(api,'course_context',return_value=saved),patch.object(api,'course_input',return_value={'weeklyHours':4}),patch.object(api,'save_duration_proposals',side_effect=lambda *args,**kwargs:dict(saved,durationEstimates=args[5])),patch.object(api.runtime,'context') as context,patch.object(api.runtime,'llm_json') as generate,patch.object(api,'generation_guard') as lock:
             response=self.client.post(f'/api/v2/drafts/{self.pid}/recommendations/durations?course=A2',json={'generationId':saved['generationId'],'recommendationId':rid,'choices':saved['resourceChoices'],'skillOrder':['S']})
         self.assertEqual(response.status_code,200)
         self.assertEqual(response.json()['durationEstimates']['S']['weeks'],3)
-        context.assert_not_called();generate.assert_not_called();lock.acquire.assert_not_called()
+        context.assert_not_called();generate.assert_not_called();lock.assert_not_called()
 
 
 class ActivityVersionApiTests(unittest.TestCase):
     def setUp(self):
+        guard = patch.object(api, 'generation_guard', side_effect=lambda *args: nullcontext())
+        guard.start(); self.addCleanup(guard.stop)
         from app.services import activity_selection as activities
         self.activities=activities
         self.pid=str(uuid4())
@@ -251,7 +252,7 @@ class ActivityVersionApiTests(unittest.TestCase):
             response=self.client.post(f'/api/v2/drafts/{self.pid}/activities?regenerate=true')
         self.assertEqual(response.status_code,422)
         self.assertEqual(self.saved,before)
-        self.assertFalse(api._generation_lock.locked())
+
 
     def test_reproposal_appends_without_losing_previous(self):
         from app.services import drafts
