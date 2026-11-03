@@ -264,7 +264,7 @@ function GoalRow({ R }: { R: PlanRecord }) {
       </div>
       <div className="ef-c">
         <p className="small muted" style={{ margin: 0 }}>
-          목표가 바뀌면 사전 점검부터 다시 해야 해서 새 로드맵으로 만들어요. 지금 로드맵은 새 로드맵을 확정할 때까지 그대로예요.
+          목표가 바뀌면 역량 테스트부터 다시 해야 해서 새 로드맵으로 만들어요. 지금 로드맵은 새 로드맵을 확정할 때까지 그대로예요.
         </p>
         <div>
           {drafting ? (

@@ -51,6 +51,7 @@ export async function genStart(go: ReturnType<typeof useGo>): Promise<void> {
     openStaleSheet(go, st, paths.newResult);
     return;
   }
+  if(ws().draft.gen){go(paths.newOptions,{force:true});return;}
   const r = await draftCall('로드맵 생성을 시작하지 못했어요', (id) => draftsApi.optionsStart(id));
   if (!r) return;
   go(ws().draft.gen ? paths.newOptions : paths.newGen, { force: true });
@@ -154,7 +155,7 @@ export function ResultStep() {
         <Stepper cur="result" />
         <FailPage
           title="점검 결과를 정리하는 중 문제가 발생했어요"
-          desc="진단 에이전트가 사전 점검 응답을 정리하지 못했어요. 입력한 목표·세부 사항과 사전 점검 응답은 그대로 남아 있어요."
+          desc="진단 에이전트가 역량 테스트 응답을 정리하지 못했어요. 입력한 목표·세부 사항과 역량 테스트 응답은 그대로 남아 있어요."
           cause={errText(err)}
           body={
             <div className="agents">
@@ -166,7 +167,7 @@ export function ResultStep() {
             <>
               <button className="btn line" onClick={() => go(paths.newQuiz)}>
                 <Icon name="left" />
-                사전 점검 응답 고치기
+                역량 테스트 응답 고치기
               </button>
               <button
                 className="btn pri"
@@ -188,7 +189,7 @@ export function ResultStep() {
       <Stepper cur="result" />
       <Page
         title="이런 로드맵이 만들어질 예정이에요"
-        lead="사전 점검 응답과 세부 사항을 진단 에이전트가 정리했어요. 바꿀 내용이 있으면 아래 ‘수정’을 눌러 주세요. 수준 점수는 보여주지 않고 사후 점검 비교용으로만 저장해요."
+        lead="역량 테스트 응답과 세부 사항을 진단 에이전트가 정리했어요. 바꿀 내용이 있으면 아래 ‘수정’을 눌러 주세요. 수준 점수는 보여주지 않고 사후 점검 비교용으로만 저장해요."
         foot={
           <>
             <button className="btn line" onClick={() => go(paths.newQuiz)}>
@@ -219,11 +220,11 @@ export function ResultStep() {
                 title="심화 질문 정답·모범 답안 보기"
               />
             ) : null}
-            <Note>목표·기획서나 사전 점검 응답을 고치려면 위 단계를 눌러 이동하세요. ‘로드맵 생성’을 누를 때 지금 내용이 로드맵 계획 에이전트에게 전달돼요.</Note>
+            <Note>목표·기획서나 역량 테스트 응답을 고치려면 위 단계를 눌러 이동하세요. ‘로드맵 생성’을 누를 때 지금 내용이 로드맵 계획 에이전트에게 전달돼요.</Note>
           </>
         ) : (
           <div className="agents">
-            <AgentRow st="run" name={DIAG_AGENT} sub={runSub('default', '사전 점검 응답과 세부 사항을 정리하고 있어요')} />
+            <AgentRow st="run" name={DIAG_AGENT} sub={runSub('default', '역량 테스트 응답과 세부 사항을 정리하고 있어요')} />
           </div>
         )}
       </Page>
@@ -389,7 +390,7 @@ export function ResultEdit() {
               <li>로드맵 3안{ws().draftPlan ? '과 고른 안' : ''}</li>
             </ul>
             <p className="small muted" style={{ marginTop: 10 }}>
-              점검 결과와 사전 점검 응답은 그대로예요.
+              점검 결과와 역량 테스트 응답은 그대로예요.
             </p>
           </>
         ),
@@ -420,7 +421,7 @@ export function ResultEdit() {
       <Page
         eyebrow="점검 결과 수정"
         title="바꿀 내용을 고친 뒤 저장해 주세요"
-        lead="점검 결과 화면에 보이는 내용을 여기서 한꺼번에 고쳐요. 저장해야 반영되고, 취소하면 그대로예요. 목표·기획서나 사전 점검 응답은 위 단계를 눌러 고치세요."
+        lead="점검 결과 화면에 보이는 내용을 여기서 한꺼번에 고쳐요. 저장해야 반영되고, 취소하면 그대로예요. 목표·기획서나 역량 테스트 응답은 위 단계를 눌러 고치세요."
         foot={
           <>
             <button

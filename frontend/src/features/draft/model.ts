@@ -2,24 +2,25 @@
    열쇠 계산은 서버(drafts.quiz_key·diag_key)와 같아야 한다 — 서버가 바뀌면 여기도 함께 고친다 */
 import type { DraftDoc, EditDoc, Prefs } from '@/api/types/draft';
 import { paths } from '@/app/paths';
+import { skillsReady } from './details/skillInput';
 import { sameJ } from '@/shared/lib/format';
 import { certOf } from '@/shared/lib/prefs';
 import type { WsState } from '@/shared/state/workspace';
 
-export type StepKey = 'goal' | 'details' | 'quiz' | 'result' | 'options' | 'materials' | 'review';
+export type StepKey = 'goal' | 'details' | 'check' | 'quiz' | 'result' | 'options' | 'materials' | 'review';
 
 export const STEPS: [StepKey, string, string][] = [
   ['goal', '목표·기획서', paths.newGoal],
-  ['details', '세부 사항', paths.newDetails],
-  ['quiz', '사전 점검', paths.newQuiz],
-  ['result', '점검 결과', paths.newResult],
-  ['options', '로드맵 선택', paths.newOptions],
-  ['materials', '자료 선택', paths.newMaterials],
-  ['review', '검토·확정', paths.newReview],
+  ['details', '세부사항·스킬 선택', paths.newDetails],
+  ['check', '입력 내용 확인', paths.newDetailsCheck],
+  ['quiz', '역량 테스트', paths.newQuiz],
+  ['result', '테스트 결과', paths.newResult],
+  ['options', '로드맵·자료 선택', paths.newOptions],
+  ['review', '검토·산출물 선택·확정', paths.newReview],
 ];
 
 /** 단계 표시에 따로 없는 하위 화면은 속한 단계로 보여 준다 */
-export const SUB: Record<string, StepKey> = { [paths.newDetailsCheck]: 'details', [paths.newResultEdit]: 'result', [paths.newGen]: 'options' };
+export const SUB: Record<string, StepKey> = { [paths.newMaterials]: 'options', [paths.newResultEdit]: 'result', [paths.newGen]: 'options' };
 export const stepOfPath = (p: string): StepKey | undefined => STEPS.find((x) => x[2] === p)?.[0] || SUB[p];
 
 /* ── 검사 ── */
@@ -32,18 +33,19 @@ export const docIdle = (d: DraftDoc): boolean => !d.doc || d.doc.status !== 'rea
 
 export function stepDone(s: Pick<WsState, 'draft' | 'draftPlan'>, k: StepKey): boolean {
   const d = s.draft;
-  /* 세부 사항은 모두 선택 사항이라, 확인 화면에서 '다음'을 눌렀거나 사전 점검 문항이 있으면 지난 것으로 본다 */
-  return { goal: goalOk(d), details: !!(d.detailsOk || d.quiz), quiz: quizDone(d), result: !!(d.handoff || d.gen || d.v2Assessment?.completed), options: d.v2Assessment ? !!(d.chosen && d.gen?.options[d.chosen] && !d.gen.regenRun?.[d.chosen]) : !!s.draftPlan, materials: !!(d.v2Assessment?.materialsReady || d.v2Assessment?.activitiesReady), review: false }[k];
+  /* 세부 사항은 모두 선택 사항이라, 확인 화면에서 '다음'을 눌렀거나 역량 테스트 문항이 있으면 지난 것으로 본다 */
+  return { goal: goalOk(d), details: skillsReady(d) || !!(!d.selectedSkills && (d.detailsOk || d.quiz)), check: !!(d.detailsOk || d.quiz), quiz: quizDone(d), result: !!(d.handoff || d.gen || d.v2Assessment?.completed), options: d.v2Assessment ? !!(d.chosen && d.gen?.options[d.chosen] && !d.gen.regenRun?.[d.chosen]) : !!s.draftPlan, materials: !!(d.v2Assessment?.materialsReady || d.v2Assessment?.activitiesReady), review: false }[k];
 }
 
 /** 이 단계 앞에 마치지 않은 단계가 있으면 그 단계 주소 */
 export function blockedTo(s: Pick<WsState, 'draft' | 'draftPlan'>, k: StepKey): string | null {
-  const i = STEPS.findIndex((x) => x[0] === k);
+  if(k==='review' && s.draft.v2Assessment && !s.draft.v2Assessment.materialsReady && !s.draft.v2Assessment.activitiesReady)return paths.newOptions;
+  const i = STEPS.findIndex((x) => x[0] === (k==='materials'?'options':k));
   const b = STEPS.slice(0, i).find(([kk]) => !stepDone(s, kk));
   return b ? b[2] : null;
 }
 
-/* ── 열쇠: 사전 점검 문항은 목표·기획서(파일과 요약)·자격증 계획으로 만든다 ── */
+/* ── 열쇠: 역량 테스트 문항은 목표·기획서(파일과 요약)·자격증 계획으로 만든다 ── */
 export const docSummary = (d: DraftDoc): string => (d.doc && d.doc.status === 'ok' ? String(d.doc.summary || '').trim() : '');
 export const certKey = (p: Prefs): string => (certOf(p) ? p.cert : '');
 export const quizRest = (d: DraftDoc): string => String(d.goal || '').trim() + '|' + (d.project ? d.project.name : '') + '|' + docSummary(d);
@@ -85,7 +87,7 @@ export const DOWN: Record<Stale['kind'], string[]> = {
   gen: [paths.newGen, paths.newOptions, paths.newReview],
 };
 
-/** 지금 입력이 뒤 단계 결과를 만들 때와 다르면 그 단계: quiz(목표·기획서·자격증 계획) > diag(사전 점검 응답) > gen(그 밖의 세부 사항) */
+/** 지금 입력이 뒤 단계 결과를 만들 때와 다르면 그 단계: quiz(목표·기획서·자격증 계획) > diag(역량 테스트 응답) > gen(그 밖의 세부 사항) */
 export function staleOf(d: DraftDoc): Stale | null {
   // V_2의 문항·응답 유효성은 입력 스냅샷을 확인하는 API가 판정한다.
   if (d.v2Assessment) return null;
@@ -95,7 +97,7 @@ export function staleOf(d: DraftDoc): Stale | null {
     if (cert && !rest) return { kind: 'quiz', note: 'cert', input: paths.newDetails, what: '자격증 계획을', back: !!d.quiz.base };
     return { kind: 'quiz', input: paths.newGoal, what: cert ? '목표·기획서와 자격증 계획을' : '목표·기획서를', back: !!d.quiz.base };
   }
-  if (d.diag && d.diag.key !== diagKey(d)) return { kind: 'diag', input: paths.newQuiz, what: '사전 점검 응답을', back: !!d.diag.answers };
+  if (d.diag && d.diag.key !== diagKey(d)) return { kind: 'diag', input: paths.newQuiz, what: '역량 테스트 응답을', back: !!d.diag.answers };
   if ((d.handoff || d.gen) && d.genPrefs && !sameJ(d.genPrefs, d.prefs)) return { kind: 'gen', input: paths.newDetails, what: '세부 사항을', back: true };
   return null;
 }
@@ -104,7 +106,7 @@ export function lossList(s: Pick<WsState, 'draft' | 'draftPlan'>, st: Stale): st
   const d = s.draft;
   const n = Object.values(d.answers || {}).filter(Boolean).length;
   const out: string[] = [];
-  if (st.kind === 'quiz') out.push(`사전 점검 문항${n ? `과 응답 ${n}개` : ''}`);
+  if (st.kind === 'quiz') out.push(`역량 테스트 문항${n ? `과 응답 ${n}개` : ''}`);
   if (st.kind !== 'gen' && d.diag) out.push(`점검 결과${d.fix || d.startStage ? ' (직접 고친 내용 포함)' : ''}`);
   if (d.gen || d.handoff) out.push(`로드맵 3안${s.draftPlan ? '과 고른 안' : ''}`);
   return out;

@@ -439,8 +439,8 @@ class RoadmapIntegrationTests(unittest.TestCase):
         with patch.object(catalog, 'items', return_value=rows), patch.object(budget, 'tokens', side_effect=measured):
             out = rm._catalog_payload('A2', base)
         self.assertEqual(base, original)
-        self.assertEqual(out['trackGuidance']['maxWeeks'], 6)
-        self.assertEqual(out['handoff']['prefs']['deadlineWeeks'], 6)
+        self.assertNotIn('maxWeeks', out['trackGuidance'])
+        self.assertEqual(out['handoff']['prefs']['deadlineWeeks'], 12)
         self.assertEqual(out['trackGuidance']['coreSkills'], h['skillNames'][:3])
         self.assertEqual(out['skillTags'], h['skillNames'])
         self.assertEqual(out['handoff']['skillNames'], h['skillNames'][:3])
@@ -453,7 +453,8 @@ class RoadmapIntegrationTests(unittest.TestCase):
             for weeks, expected in [(None, 6), (4, 4), (6, 6), (12, 6)]:
                 h = {'goal': 'SQL', 'prefs': {'deadlineWeeks': weeks}, 'skillNames': ['skill-0']}
                 out = rm._catalog_payload('A2', {'handoff': h})
-                self.assertEqual(out['trackGuidance']['maxWeeks'], expected)
+                self.assertNotIn('maxWeeks', out['trackGuidance'])
+                self.assertEqual(out['handoff']['prefs']['deadlineWeeks'], weeks)
 
     def test_fast_task_tags_survive_generation_regeneration_and_revision(self):
         skills = ['RESTful API 서버 아키텍처', '웹 프레임워크 (FastAPI/Django)', '클라우드', 'Docker', 'MLOps']
@@ -468,7 +469,7 @@ class RoadmapIntegrationTests(unittest.TestCase):
             self.assertEqual(payload['skillTags'], skills)
             self.assertEqual(payload['trackGuidance']['coreSkills'], skills[:3])
             self.assertEqual(payload['trackGuidance']['maxCoreSkills'], 3)
-            self.assertEqual(payload['handoff']['prefs']['deadlineWeeks'], 6)
+            self.assertEqual(payload['handoff']['prefs']['deadlineWeeks'], 12)
             self.assertEqual({r['id'] for r in payload['catalog']}, {'0', '1', '2'})
             self.assertIn('보조 태그', payload['trackGuidance']['taskSkillNote'])
             return {'acts': [{**task, 'key': task['id']}], 'weeklyHours': 6}

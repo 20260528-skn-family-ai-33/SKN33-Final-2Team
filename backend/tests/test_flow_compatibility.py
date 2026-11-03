@@ -12,6 +12,10 @@ from app.errors import ApiError
 from test_preassessment_api import api_app
 
 class FlowCompatibilityTests(unittest.TestCase):
+ def setUp(self):
+  guard=patch.object(api,'generation_guard',side_effect=lambda *args:nullcontext())
+  guard.start();self.addCleanup(guard.stop)
+
  def state(self):
   option={'id':'A1','name':'Free','short':'기초','tagline':'목표','pros':[],'cons':[],
    'learningSkillsVersion':'v1','learningSkills':[{'name':'S','application':'검색 구성'}],'acts':[]}
@@ -75,7 +79,7 @@ class FlowCompatibilityTests(unittest.TestCase):
   def start(kind,employee,key,work):jobs.append(work);return 'job'
   with patch.object(drafts,'_mutate',side_effect=mutate),patch.object(drafts.jobs,'start',side_effect=start),patch.object(drafts,'present',side_effect=lambda state,*_:state),patch.object(drafts.rt,'context',return_value=Mock()),patch.object(drafts.RM,'option',return_value={'id':'A1','acts':[]}),patch.object(drafts,'_maybe_support'):
    drafts.regenerate(1,'p','A1',None)
-   self.assertNotIn('A1',w['v2Survey']['courseRecommendations']);self.assertIsNone(w['draftPlan'])
+   self.assertIn('A1',w['v2Survey']['courseRecommendations']) # Keep the old result until replacement succeeds.
    drafts._apply_client(w,{'goal':'완전히 바뀐 목표'})
    jobs[0](Mock())
   self.assertIsNone(w['draft']['gen']);self.assertNotIn('v2Survey',w)

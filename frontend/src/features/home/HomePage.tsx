@@ -110,6 +110,7 @@ function StageCard({ R }: { R: PlanRecord }) {
           <ul className="acts">{categories.get(kind)!.map(a => <ActRow key={a.id} a={a} R={R} />)}</ul>
         </div>)}
       </section>)}</div>
+      <PostCta R={R} />
     </div>
   );
 }
@@ -160,7 +161,7 @@ export function HomePage() {
           {[
             ['목표 적기', '기획서는 선택'],
             ['세부 사항', '비워 두면 알아서'],
-            ['사전 점검', '1~5점 척도'],
+            ['역량 테스트', '1~5점 척도'],
             ['3안 비교', '관점별 작성'],
             ['확정', '고친 뒤'],
           ].map(([a, b], i) => (
@@ -196,7 +197,6 @@ export function HomePage() {
           </div>
           <Alerts R={R} />
           <StageCard R={R} />
-          <PostCta R={R} />
         </section>
       ))}
       {drafting ? (

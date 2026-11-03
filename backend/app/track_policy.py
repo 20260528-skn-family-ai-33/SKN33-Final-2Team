@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 VERSION = '20261101-project-skills-free-books-v5'
-FAST_WEEKS = 6
 FAST_SKILLS = 3
 FAST_MIN_OUTLINE_UNITS = 6
 FAST_MIN_FOCUS = 1 / 3
@@ -13,10 +12,6 @@ CANDIDATE_PREFERENCE = {
     'A3': '목표 관련 설계·성능 측정·문제 해결이 있는 중급·고급 과정을 우선 검토한다. Beginner도 심화 근거가 있거나 기초 보강에 필요하면 사용할 수 있다. 단순 구현·배포 따라하기는 후순위다. 높은 난이도·긴 시간만으로 선택하지 말고 known·gaps·deepCheck의 학습자 수준과 시간·예산 안에서 최종 편성한다.',
 }
 
-
-def fast_weeks(prefs: dict) -> int:
-    value = prefs.get('deadlineWeeks')
-    return min(FAST_WEEKS, max(1, int(value))) if value is not None else FAST_WEEKS
 
 
 CHALLENGE_DEPTH_VERSION = 'challenge-depth/20261101-v1'
@@ -39,3 +34,10 @@ CHALLENGE_STAGES = {
 def challenge_guidance(course,stage):
     course_id=course.get('id') if isinstance(course,dict) else course
     return CHALLENGE_DEPTH+'\n'+CHALLENGE_STAGES[stage] if course_id=='A3' else ''
+
+PERIOD_GUIDANCE = """
+[현재 확정 기간 정책 · 앞의 상충하는 기간 상한 지시보다 우선]
+Free·Crash·Challenge 모두 기간 상한을 적용하지 않는다. deadlineWeeks는 참고 값이다.
+입력 기간을 넘었다는 이유만으로 자료·스킬을 빼거나, 실제 강좌 시간을 축소하거나, 계획을 실패시키지 않는다.
+실제 자료 시간과 주당 시간으로 예상 기간을 계산하고 주당 시간·가격·무료 강좌 조건·프로젝트 포함 범위는 유지한다.
+"""

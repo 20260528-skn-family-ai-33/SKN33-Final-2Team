@@ -30,7 +30,7 @@ from . import profile as PF
 
 STEP_ROUTES = ['new-goal', 'new-details', 'new-details-check', 'new-quiz', 'new-result', 'new-result-edit', 'new-gen', 'new-options', 'new-materials', 'new-review']
 # deepOn·deepMcq·deepEssay: 심화 질문을 풀지(체크)와 객관식·서술형 답(10/23)
-CLIENT_KEYS = ('goal', 'project', 'prefs', 'detailsOk', 'answers', 'deepOn', 'deepMcq', 'deepEssay', 'chosen', 'edit', 'lastNew')
+CLIENT_KEYS = ('goal', 'project', 'prefs', 'detailsOk', 'answers', 'deepOn', 'deepMcq', 'deepEssay', 'chosen', 'edit', 'lastNew', 'selectedSkills', 'skillInputKey', 'skillCandidates')
 _images: dict[str, list] = {}   # 기획서 이미지(base64)는 DB에 넣지 않고 서버 메모리에만 잠깐 둔다
 _img_lock = threading.Lock()
 
@@ -175,7 +175,7 @@ def clear_from(d: dict, stage: str) -> None:
 
 
 def input_signature(d):
-    return json.dumps([d.get('goal'),d.get('project'),d.get('prefs'),doc_summary(d)],ensure_ascii=False,sort_keys=True)
+    return json.dumps([d.get('goal'),d.get('project'),d.get('prefs'),doc_summary(d),d.get('selectedSkills')],ensure_ascii=False,sort_keys=True)
 
 
 def invalidate_inputs(w):
@@ -380,7 +380,8 @@ def _apply_client(w: dict, body: dict) -> None:
         invalidate_inputs(w)
     elif previous_chosen!=d.get('chosen') or body.get('resetAfter')=='options':
         from app.services.course_recommendations import invalidate_course_tail
-        invalidate_course_tail(w,d.get('chosen'))
+        if previous_chosen==d.get('chosen'):
+            invalidate_course_tail(w,d.get('chosen'))
         w['draftPlan']=None
     if d.get('quizFail') and d['quizFail'].get('key') != quiz_key(d):
         d['quizFail'] = None
@@ -735,6 +736,8 @@ def options_start(employee_id: int, draft_id: str) -> dict:
         d['genPrefs'] = copy.deepcopy(d['prefs'])
         rid = _round(t, draft_id, d)
         t.run('UPDATE public.diagnostic_rounds SET agent_input = :h WHERE diagnostic_round_id = CAST(:r AS uuid)', h=db.J(h), r=rid)
+        if not d.get('gen') and (d.get('genRun') or {}).get('key') == h['key'] and any((row or {}).get('st') == 'run' for row in d['genRun'].get('rows', {}).values()):
+            return False
         if not d.get('gen'):
             d['genRun'] = {'key': h['key'], 'rows': {pid: {'st': 'run', 'tries': 0, 'out': None, 'err': None, 'jobId': None} for pid in D['optionOrder']}}
             return True
@@ -924,8 +927,6 @@ def regenerate(employee_id: int, draft_id: str, pid: str, req: dict | None) -> d
             raise ApiError(409, 'NO_OPTION', '다시 만들 안이 없어요')
         if (g.get('regenRun') or {}).get(pid):raise ApiError(409,'REGEN_RUNNING','해당 계획을 이미 다시 생성하고 있어요.')
         _sync(g)
-        from app.services.course_recommendations import invalidate_course_tail
-        invalidate_course_tail(w,pid)
         lst = _hist(g, pid)
         g.setdefault('regenRun', {})[pid] = {'req': req, 'from': g['cur'].get(pid, 0), 'err': None}
         g.setdefault('regenErr', {}).pop(pid, None)
@@ -966,6 +967,8 @@ def regenerate(employee_id: int, draft_id: str, pid: str, req: dict | None) -> d
                 del lst[1]  # 처음 안과 최근 다섯 버전만 둔다
             g['cur'][pid] = len(lst) - 1
             g['options'][pid] = lst[-1]
+            from app.services.course_recommendations import invalidate_course_tail
+            invalidate_course_tail(w,pid)
             (g.get('regenRun') or {}).pop(pid, None)
             if w.get('draftPlan') and w['draftPlan'].get('opt') == pid:
                 w['draftPlan'] = None
@@ -994,9 +997,7 @@ def select(employee_id: int, draft_id: str, pid: str, displayed: list | None = N
         _sync(g)
         from app.services.prompt_selection_store import comparison_snapshot
         d['selectionComparison'] = comparison_snapshot(g, displayed)
-        if d.get('chosen')!=pid:
-            from app.services.course_recommendations import invalidate_course_tail
-            invalidate_course_tail(w,pid)
+        # Course caches are scoped by option; selecting a course must preserve its materials.
         d['chosen'] = pid
         o = g['options'][pid]
         w['draftPlan'] = RM.build_plan(o, RM.params_of(d['handoff'], o), d['goal'])

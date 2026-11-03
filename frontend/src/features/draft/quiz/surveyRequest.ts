@@ -1,0 +1,29 @@
+import { waitJob } from '@/api/jobs';
+import { ensureDraft } from '../draftSync';
+import type { Answers, Survey } from './assessment/flow';
+export type Stored = Survey & { answers: Answers; completed: boolean };
+const flights = new Map<string, Promise<Stored>>();
+export class SurveyRequestError extends Error {
+  constructor(message: string, readonly code: string) { super(message); }
+}
+export async function request(path: string, init?: RequestInit): Promise<Stored | null> {
+  const response = await fetch(path, { ...init, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', ...(init?.method === 'POST' ? { Prefer: 'respond-async' } : {}), ...init?.headers } });
+  let body = await response.json().catch(() => null);
+  if (response.status === 202 && body?.jobId) body = await waitJob<{ survey: Stored }>(body.jobId);
+  if (!response.ok) throw new SurveyRequestError(body?.error?.message ?? '문항 요청을 처리하지 못했어요.', body?.error?.code ?? 'REQUEST_FAILED');
+  if (!body || typeof body !== 'object') throw new SurveyRequestError('서버 응답을 확인하지 못했어요. 다시 시도해 주세요.', 'EMPTY_RESPONSE');
+  return body.survey ?? null;
+}
+export async function loadSurvey(owner: string): Promise<Stored> {
+  const id=await ensureDraft();
+  const key=`${owner}:${id}`;
+  const pending=flights.get(key);if(pending)return pending;
+  const work=(async()=>{
+    const path=`/api/v2/drafts/${id}/survey`;
+    const existing=await request(path);
+    const result=existing??await request(path,{method:'POST'});
+    if(!result)throw new Error('생성된 문항이 없어요.');
+    return result;
+  })();
+  flights.set(key,work);void work.finally(()=>{if(flights.get(key)===work)flights.delete(key);}).catch(()=>{});return work;
+}

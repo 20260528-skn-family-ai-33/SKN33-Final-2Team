@@ -170,7 +170,7 @@ export function openPreAnswers(pid: string): void {
   const pl = R && R.plan;
   const A = pl && pl.assess ? pl.assess : { questions: ws().draft.quiz?.questions || [], answers: ws().draft.answers };
   openSheet({
-    title: '사전 점검 응답',
+    title: '역량 테스트 응답',
     sub: pl ? pl.goal : '',
     wide: true,
     body: () => (

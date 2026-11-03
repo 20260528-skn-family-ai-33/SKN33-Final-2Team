@@ -230,10 +230,6 @@ def _mock_option(inp: dict) -> dict:
     hours_of = lambda a: (_res(a['res']) or {}).get('hours') or 2 if a.get('res') else a.get('hours') or 2  # noqa: E731
     total = lambda: sum(hours_of(a) for a in acts if a['stage'] >= h['startStage'])  # noqa: E731
     pick = lambda: min(12, max(2, math.ceil(total() / pr['deadlineWeeks']))) if pr.get('deadlineWeeks') else AUTO_HOURS  # noqa: E731
-    cap = pr['deadlineWeeks'] * (pr.get('weeklyHours') or 12) if pr.get('deadlineWeeks') else None
-    if pid == 'A2' and cap and cert and total() > cap:
-        acts.pop()
-        reason += f" {pr['deadlineWeeks']}주 안에 끝내려고 자격 준비는 다음 계획으로 미뤘어요."
     wh = pr.get('weeklyHours') or pick()
     if pid == 'A1' and pr.get('formatKey') == 'practice':
         reason += ' 직접 구현을 선호한다고 해서 실습 과제를 넣었어요.'
@@ -344,14 +340,14 @@ def _catalog_payload(pid: str, payload: dict, system: str = '', extra_ids: list 
                                         'selectionNote': '후보 순위는 목표 관련성과 커리큘럼의 관점 적합도를 함께 평가한 검토 순서다. 최종 선택과 편성은 DB 시스템 프롬프트와 사용자 조건을 따른다.'}
         if pid == 'A2':
             handoff['prefs'] = dict(handoff.get('prefs') or {})
-            handoff['prefs']['deadlineWeeks'] = track_policy.fast_weeks(handoff['prefs'])
-            handoff['skillNames'] = list(selection.skills)
+            if not handoff.get('selectedSkillsFixed'):
+                handoff['skillNames'] = list(selection.skills)
             # 학습 범위와 과제 분류를 분리해 Docker 과제를 다른 핵심 스킬로 오표기하지 않게 한다.
-            payload['trackGuidance'].update({'maxWeeks': track_policy.fast_weeks(handoff.get('prefs') or {}),
-                                        'maxCoreSkills': track_policy.FAST_SKILLS,
-                                        'coreSkills': list(selection.skills),
+            payload['trackGuidance'].update({
+                                        'maxCoreSkills': len(handoff['skillOrder']) if handoff.get('selectedSkillsFixed') else track_policy.FAST_SKILLS,
+                                        'coreSkills': list(handoff['skillOrder']) if handoff.get('selectedSkillsFixed') else list(selection.skills),
                                         'taskSkillNote': 'coreSkills는 집중 학습할 핵심 스킬이다. 과제 skills는 핵심 스킬에 억지로 맞추지 말고 skillTags 중 실제 수행 내용에 맞는 이름을 1~3개 고른다. 보조 태그를 쓴다고 별도 학습 스킬이나 과제를 추가하지 않는다.',
-                                        'planningNote': '최대 6주·핵심 스킬 3개 안에서 편성한다. 최종 강좌 선택은 목표와 목차·소개를 보고 판단한다. 후보별 시간 상한은 아니다.'})
+                                        'planningNote': '선택한 핵심 스킬과 목표 범위에 집중한다. 기간 상한은 적용하지 않고 실제 자료 시간과 주당 시간으로 기간을 계산한다. 최종 강좌 선택은 목표와 목차·소개를 보고 판단한다.'})
         return catalog_budget.pack(selection, system, payload, context_limit)
     except ValueError as error:
         raise llm.LlmError(str(error)) from error
@@ -393,7 +389,7 @@ R_SYS = """너는 GrowPath '로드맵 계획 에이전트'의 관점별 하위 �
 - agentNotes, userNotes: 반영한다. userNotes는 사용자가 적은 일정·환경 제약이다.
 - deepCheck(있을 때): 사용자가 푼 심화 질문 결과다. concepts[].check가 틀림·모름인 개념은 자기평가(self)가 높아도 2단계에서 작은 예제로 다루고, 맞음인 개념은 짧게 하거나 뺀다. essays[].level이 부족·답 없음인 영역은 그 영역 과제의 완료 기준에 why에서 빠졌다고 한 점을 확인하는 내용을 넣는다. 점수·개수는 쓰지 않는다.
 - projectSummary(업무 프로젝트 기획서 요약)가 있으면 3단계 과제를 그 프로젝트의 데이터·시스템으로 한다. profile은 목표에 맞는 업무 맥락(쓰는 기술, 맡은 시스템 종류)으로만 쓰고, 업무 설명에 목표와 다른 계획이 있으면 끌어오지 않는다. projectExperience는 본인 입력의 프로젝트 경험이므로 새 기획서나 숙련도 증빙으로 간주하지 않는다. 업무 설명에만 나온 시스템·도구는 적용 대상으로 쓰지 않고, 기획서가 없으면 목표 문장에 나온 대상이나 공개 샘플에 적용한다. 입력에 없는 사내 시스템·데이터 이름은 지어내지 않고 "내 업무 문서", "공개 샘플 데이터"처럼 쓴다.
-- prefs의 주당 시간(weeklyHours), 기간(deadlineWeeks), 예산(budgetWon)을 넘지 않는다. weeklyHours가 null이면 사용자가 '알아서'로 둔 것이니 관점과 기간에 맞게 정해 weeklyHours에 쓴다. 값이 있으면 그대로 쓴다.
+- prefs의 주당 시간(weeklyHours)과 예산(budgetWon)을 지킨다. 기간(deadlineWeeks)은 참고 조건이며 모든 코스에 기간 상한을 적용하지 않는다. 실제 자료 시간과 주당 시간으로 필요한 기간을 계산한다. weeklyHours가 null이면 사용자가 '알아서'로 둔 것이니 관점과 기간에 맞게 정해 weeklyHours에 쓴다. 값이 있으면 그대로 쓴다.
 - prefs.format(학습 방식)에 맞는 자료를 먼저 고른다. 영상 강의면 catalog의 format이 "영상"인 자료, 문서·도서 읽기면 "문서"인 자료를 먼저 쓰고, 직접 구현하며 학습이면 실습 과제 비중을 높인다. '알아서'면 관점에 맞게 고른다.
 - prefs.certRes가 있으면 그 자격 자료를 4단계에 넣는다.
 
@@ -460,7 +456,7 @@ def option(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
     if inp['handoff'].get('assessmentGenerationId'):
         inp = dict(inp, handoff=copy.deepcopy(inp['handoff']))
         inp['handoff']['courseSkillSelection']=True
-    if pid == 'A2' and inp['handoff'].get('assessmentGenerationId'):
+    if pid == 'A2' and inp['handoff'].get('assessmentGenerationId') and not inp['handoff'].get('selectedSkillsFixed'):
         inp = dict(inp, handoff=copy.deepcopy(inp['handoff']))
         handoff = inp['handoff']
         previous_focus = list(handoff['focus'])
@@ -481,10 +477,12 @@ def option(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
         prev_ids = [a.get('res') for a in ((inp.get('previous') or {}).get('acts') or [])]
         from app.learner_knowledge import POLICY
         provenance = {}
-        system = _sys(pid, R_SYS, provenance, inp.get('_evaluationPrompt')) + extra + POLICY + track_policy.challenge_guidance(pid, 'plan')
+        system = _sys(pid, R_SYS, provenance, inp.get('_evaluationPrompt')) + extra + POLICY + track_policy.challenge_guidance(pid, 'plan') + track_policy.PERIOD_GUIDANCE
         if inp['handoff'].get('courseSkillSelection'):
-            from app.services.course_skills import CONTRACT
-            system += CONTRACT
+            from app.services.course_skills import CONTRACT, FIXED_SELECTION_CONTRACT
+            system += FIXED_SELECTION_CONTRACT if inp['handoff'].get('selectedSkillsFixed') else CONTRACT
+        if inp['handoff'].get('selectedSkillsFixed'):
+            system += '\n사용자가 선정한 skillOrder는 확정이다. 이 목록과 순서를 모두 유지하고 learningSkills에 반환한다. 관점 때문에 역량을 빼거나 더하지 않는다.'
         payload = _catalog_payload(pid, {'handoff': inp['handoff'], 'skillTags': catalog.skill_names(),
                                         'previous': inp.get('previous'), 'previousLearningSkills': (inp.get('previousDef') or {}).get('learningSkills'), 'request': inp.get('request')}, system, prev_ids,
                                    rt.S.ollama_num_ctx if ctx.mode == 'ollama' else 16384)
@@ -498,7 +496,14 @@ def option(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
         if inp['handoff'].get('courseSkillSelection'):
             from app.services.course_skills import validate_recommendations, recommendation_key
             allowed={row['name'] for row in payload['handoff'].get('skillDetails',[])}
-            try:o['learningSkills']=validate_recommendations(r.get('learningSkills'),allowed,pid,require_depth=True)
+            try:
+                if inp['handoff'].get('selectedSkillsFixed'):
+                    checked=validate_recommendations(r.get('learningSkills'),allowed,pid,require_depth=True,max_skills=5)
+                    proposed={row['name']:row for row in checked}
+                    if set(proposed)!=allowed:raise ValueError('선택한 스킬을 모두 유지한 계획이 필요해요. 다시 생성해 주세요.')
+                    o['learningSkills']=[{**proposed[row['name']],'name':row['name'],'application':row['application']} for row in inp['handoff']['skillDetails']]
+                else:
+                    o['learningSkills']=validate_recommendations(r.get('learningSkills'),allowed,pid,require_depth=True)
             except ValueError as error:raise llm.LlmError(str(error)) from error
             o['learningSkillsVersion']=str(uuid4())
             o['learningSkillsKey']=recommendation_key(o)
@@ -629,7 +634,7 @@ REV_SYS = """너는 GrowPath '로드맵 계획 에이전트'의 관점별 하위
 - 완료한 활동(done: true)은 요청이 없으면 빼거나 바꾸지 않는다. 요청에 없는 활동을 새로 더하지 않는다.
 - changes.perspective가 있으면 너의 관점으로 로드맵을 새로 쓴다. current는 참고만 하고, 계속 쓸 자료와 완료한 활동은 그대로 둔다.
 - removeActs의 활동은 뺀다. replaceActs의 활동은 catalog의 다른 자료나 다른 실습 과제로 바꾼다(replaceHint 참고). addResources는 catalog id를 그대로 res로 넣고, addTasks는 실습 과제(res null)로 넣는다.
-- handoff.prefs의 주당 시간(weeklyHours)·기간(deadlineWeeks)·예산(budgetWon)·학습 방식(format)·자격(certRes)을 지킨다. weeklyHours가 null이면 관점과 기간에 맞게 정해 weeklyHours에 쓴다. certRes가 있으면 그 자격 자료를 4단계에 넣고, 없으면 자격 준비 활동은 뺀다.
+- handoff.prefs의 주당 시간(weeklyHours)·예산(budgetWon)·학습 방식(format)·자격(certRes)을 지킨다. 기간(deadlineWeeks)은 참고 조건이며 모든 코스에 기간 상한을 적용하지 않는다. 실제 자료 기준의 기간을 계산한다. weeklyHours가 null이면 관점과 기간에 맞게 정해 weeklyHours에 쓴다. certRes가 있으면 그 자격 자료를 4단계에 넣고, 없으면 자격 준비 활동은 뺀다.
 - handoff.projectSummary(업무 프로젝트 기획서 요약)가 있으면 바꾸는 과제도 그 프로젝트에 맞춘다. profile은 목표에 맞는 업무 맥락(쓰는 기술, 맡은 시스템 종류)으로만 쓰고, projectExperience는 과거 프로젝트 참고이며 현재 기획서나 숙련도 증빙으로 간주하지 않는다. 업무 설명에만 나온 시스템·도구는 적용 대상으로 쓰지 않는다. 기획서가 없으면 목표 문장에 나온 대상이나 공개 샘플에 적용하고, 입력에 없는 사내 시스템·데이터 이름은 지어내지 않는다.
 - handoff.deepCheck(심화 질문 결과)가 있으면 새로 넣거나 바꾸는 활동에 반영한다: 틀림·모름인 개념은 작은 예제로 다루고, 서술형이 부족한 영역은 빠진 점을 완료 기준에 넣는다.
 
@@ -673,7 +678,7 @@ def revise(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
         if (handoff.get('prefs') or {}).get('certRes') in gone_resources:
             handoff['prefs'] = dict(handoff['prefs'], certRes=None)
         from app.learner_knowledge import POLICY
-        system = _sys(pid, REV_SYS, evaluation_prompt=inp.get('_evaluationPrompt')) + POLICY + track_policy.challenge_guidance(pid, 'tasks')
+        system = _sys(pid, REV_SYS, evaluation_prompt=inp.get('_evaluationPrompt')) + POLICY + track_policy.challenge_guidance(pid, 'tasks') + track_policy.PERIOD_GUIDANCE
         current['learningSkills'] = (pl.get('def') or {}).get('learningSkills') or []
         if (pl.get('def') or {}).get('learningReport'):
             current['skillOrder'] = pl['def']['learningReport']['skillOrder']

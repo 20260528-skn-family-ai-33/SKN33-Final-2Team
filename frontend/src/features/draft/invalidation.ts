@@ -18,5 +18,5 @@ export function invalidateDraft(s: WsState, from: 'inputs' | 'answers' | 'option
 }
 
 export function inputSignature(d: WsState['draft']) {
-  return JSON.stringify(sortKeys([d.goal, d.project, d.prefs, d.doc?.status === 'ok' ? d.doc.summary : null]));
+  return JSON.stringify(sortKeys([d.goal, d.project, d.prefs, d.doc?.status === 'ok' ? d.doc.summary : null, d.selectedSkills || null]));
 }

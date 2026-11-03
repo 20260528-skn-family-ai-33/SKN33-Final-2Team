@@ -78,8 +78,9 @@ class RecommendationTests(unittest.TestCase):
 
 
 class PeriodCandidateTests(unittest.TestCase):
-    def test_short_course_survives_limit_instead_of_long_top_candidate(self):
-        items={str(i):{'id':str(i),'title':'AAA long','type':'course','usable':True,'skills':['SQL'],'hours':72} for i in range(20)}
-        items['short']={'id':'short','title':'ZZZ short','type':'course','usable':True,'skills':['SQL'],'hours':16}
-        pools=candidate_pools({'details':{'weeks':8,'hours':4}}, {'skills':[{'name':'SQL'}]},items,limit=1)
-        self.assertEqual([row['id'] for row in pools[0]['courses']], ['short'])
+    def test_all_courses_keep_long_and_short_candidates_without_mutating_hours(self):
+        items={key:{'id':key,'title':key,'type':'course','usable':True,'skills':['SQL'],'hours':hours,'cost':0} for key,hours in [('long',72),('short',16)]}
+        for course in ('A1','A2','A3'):
+            pools=candidate_pools({'details':{'weeks':8,'hours':4},'selectedCourse':{'id':course}}, {'skills':[{'name':'SQL'}]},items)
+            self.assertEqual({row['id'] for row in pools[0]['courses']},{'long','short'})
+        self.assertEqual(items['long']['hours'],72)

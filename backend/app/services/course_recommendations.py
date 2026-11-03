@@ -11,6 +11,10 @@ def scope_view(saved,course,option=None):
     scoped['resourceChoices']=scoped.get('resourceChoices') or {}
     from app.services.course_skills import selected
     learning=selected(option or {})
+    if (saved.get('project') or {}).get('selectedSkills'):
+        fixed=(saved.get('selection') or {}).get('skills') or []
+        by_name={row['name']:row for row in learning or []}
+        learning=[dict(row,**{k:v for k,v in by_name.get(row['name'],{}).items() if k not in ('name','application','enabled')},enabled=True) for row in fixed]
     if learning is not None:
         active=[row for row in learning if row['enabled']]
         scoped['selection']={'skills':[{k:v for k,v in row.items() if k!='enabled'} for row in active]}

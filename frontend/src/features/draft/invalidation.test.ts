@@ -40,7 +40,7 @@ describe('늦게 도착한 응답 저장 상태', () => {
     expect(state.draft.v2Assessment?.completed).toBe(true);
   });
 });
-describe('사전 점검 선택 복원', () => {
+describe('역량 테스트 선택 복원', () => {
   it('같은 직원·초안·문항·입력에서만 복원하며 퀴즈 0번 응답도 보존한다', () => {
     const key = answerMemoryKey('u', 'd', 'g', 'inputs');
     rememberAnswers(key, { s: 5, q: 0 }, 'quizzes');
@@ -62,7 +62,7 @@ describe('선택 단계부터 검토까지의 이동 호환성', () => {
     invalidateDraft(state,'materials');
     expect(state.draft.v2Assessment?.completed).toBe(true);
     expect(blockedTo(state,'materials')).toBeNull();
-    expect(blockedTo(state,'review')).toBe('/new/materials');
+    expect(blockedTo(state,'review')).toBe('/new/options');
     expect(state.draft.v2Assessment?.materialsKey).toBeUndefined();
     state.draft.v2Assessment!.materialsReady=true;
     expect(blockedTo(state,'review')).toBeNull();

@@ -18,7 +18,7 @@ export const DEMO_TOOLS = import.meta.env.VITE_DEMO_TOOLS !== 'off';
 export const JUMPS: [string, string][] = [
   ['start', '처음부터'],
   ['details', '세부 사항부터'],
-  ['quiz', '사전 점검부터'],
+  ['quiz', '역량 테스트부터'],
   ['result', '점검 결과부터'],
   ['options', '로드맵 3안부터'],
   ['review', '확정 직전'],
@@ -32,7 +32,7 @@ export const JUMPS: [string, string][] = [
 const FAILS: [string, string][] = [
   ['goal', '목표 후보 제안'],
   ['doc', '기획서 읽기(이미지·요약)'],
-  ['quiz', '사전 점검 문항 생성'],
+  ['quiz', '역량 테스트 문항 생성'],
   ['diag', '점검 결과(수준 진단)'],
   ['gen', '로드맵 3안 (Fast Track·Challenge Track)'],
   ['sup', '지원 조건 확인'],

@@ -242,7 +242,7 @@ function RoadView({ R }: { R: PlanRecord }) {
         버전 이력
       </button>
       <button className="btn ghost sm" onClick={() => openPreAnswers(R.id)}>
-        사전 점검 응답
+        역량 테스트 응답
       </button>
       {cmBtn}
     </>
