@@ -46,9 +46,6 @@ def candidate_pools(project: dict, selection: dict, items: dict[str, dict], limi
         for kind, key in (('course', 'courses'), ('book', 'books')):
             # 스킬·종류·사용 가능 여부를 후보 개수 제한보다 먼저 적용한다.
             available = [row for row in items.values() if row.get('usable') and row.get('type') == kind and not exclusion(row,knowledge,str(project.get('goal') or '')) and skill['name'] in (row.get('skills') or []) and (not free_only or kind == 'book' or (row.get('cost') == 0 and not isinstance(row.get('cost'), bool)))]
-            if kind == 'course':
-                from app.services.duration_proposals import course_fits_period
-                available = [row for row in available if course_fits_period(row, project, course)]
             available.sort(key=lambda row: (-score(row), str(row.get('title') or ''), row['id']))
             if kind == 'course' and rank_courses and crash_courses.is_crash(course):
                 available = crash_courses.rank(available, project, selection, skill, cache=crash_cache)
@@ -63,6 +60,7 @@ def candidate_pools(project: dict, selection: dict, items: dict[str, dict], limi
 
 def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
                         generate: Callable[[str, dict], dict], *, course: dict | None = None, retrieved_pools: list[dict] | None = None) -> dict:
+    project = dict(project, selectedCourse=deepcopy(course or project.get('selectedCourse')))
     pools = retrieved_pools if retrieved_pools is not None else candidate_pools(project, selection, items, free_only=bool(course and course.get('id') == 'A1'), course=course)
     if not any(row['courses'] or row['books'] for row in pools):
         return {'skills': [{'name': row['name'], 'courses': [], 'books': [],
@@ -132,13 +130,13 @@ def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
                          ('id', 'name', 'tagline', 'reason', 'scope', 'weeklyHours', 'weeks', 'learningSkills') if key in course}
                         if isinstance(course, dict) else None)
     payload['project']['details'] = deepcopy(project.get('details') or {})
-    rules = '\n선택한 course의 방향과 범위를 따라 추천한다. A1 Free Course는 강좌만 예산과 무관하게 비용 0원으로 제한하고 도서는 유료·가격 미확인도 허용하며 가격과 예산으로 제외하지 않는다, A2 Crash Course는 단기간에 필요한 내용을 익힐 자료, A3 Challenge Course는 프로젝트에 직접 적용하는 실습 중심 자료를 우선한다. 없는 자료를 채우지 않는다.'
+    rules = '\n선택한 course의 방향과 범위를 따라 추천한다. A1 Free Course는 강좌만 예산과 무관하게 비용 0원으로 제한하고 도서는 유료·가격 미확인도 허용하며 가격과 예산으로 제외하지 않는다, 기간은 참고 조건이며 모든 코스에서 기간 초과만으로 후보를 제외하지 않는다. A2 Crash Course는 목표에 필요한 핵심 범위를 우선한다. A3 Challenge Course는 프로젝트에 직접 적용하는 실습 중심 자료를 우선한다. 없는 자료를 채우지 않는다.'
     rules += '\noutline은 목표·스킬 적용 범위와 관련된 실제 단원 최대 3개의 발췌다. index는 원래 목차의 0부터 시작하는 위치다. 전체 목차로 간주하거나 없는 단원을 추정하지 않는다.'
     if crash_courses.is_crash(course):
         rules += '\nCrash는 목표·스킬 적용 범위에 맞는 후보 중 확인된 총 학습시간이 짧은 속성 강좌를 우선 추천한다. 더 짧다는 이유로 목표에 명시된 기술을 다른 기술로 대체하지 않는다. supportedSelectedSkills는 제목·학습 설명·목차에서 근거를 찾은 선정 스킬이며, 공통 강좌가 필요한 학습 내용을 충족하면 해당 스킬들에서 함께 추천할 수 있다. 태그만 여러 개라는 이유로 학습 범위를 충족했다고 단정하지 않는다. 추정·미확인 시간을 확정된 짧은 시간처럼 취급하지 않는다. 강좌 시간을 임의로 축약하거나 필수 스킬을 빼지 않는다.'
         rules += '\nCrash의 핵심 목적은 필요한 스킬을 익히는 고유 강좌 총 수강시간을 줄이는 것이다. 스킬마다 다른 강좌를 고를 필요가 없으며 동일 choiceKey를 여러 스킬에서 공유할 수 있다. 같은 스킬 안에서는 같은 키를 중복 선택하지 않는다. crashStudyPlan은 제공 후보의 학습 근거와 확인된 전체 시간을 비교한 짧은 기본 조합이므로 먼저 검토한다. 더 긴 강좌는 이 조합으로 충족되지 않는 명시된 학습 내용이 있을 때만 선택한다. 한 강좌가 충분하면 대안을 3개까지 채우지 않아도 된다. 짧은 조합의 근거가 목표와 맞지 않으면 제외하되, 강좌를 비워 시간을 줄인 것처럼 만들지 않는다. 최종 적합성 판단은 제목·설명·관련 단원에 근거한다.'
     elif course:
-        rules += '\n기본 추천 강좌의 중복을 뺀 총 학습시간도 제공된 project.details의 기간·주당 시간 안에서 고른다. hours는 전체 강좌 시간이며 발췌한 단원만의 시간으로 줄이지 않는다. 같은 강좌가 여러 역량의 적용 범위를 충족하면 함께 추천할 수 있다. 조건에 맞는 자료가 없으면 빈 추천을 허용하고 무관한 자료로 채우지 않는다.'
+        rules += '\n기간은 참고 조건이며 기간 초과만으로 자료를 제외하지 않는다. hours는 전체 강좌 시간이며 발췌한 단원만의 시간으로 줄이지 않는다. 같은 강좌가 여러 역량의 적용 범위를 충족하면 함께 추천할 수 있다. 조건에 맞는 자료가 없으면 빈 추천을 허용하고 무관한 자료로 채우지 않는다.'
     from app.track_policy import challenge_guidance
     from app.learner_knowledge import POLICY
     raw = generate(SYSTEM + rules + POLICY + challenge_guidance(course, 'resources'), payload)
@@ -233,8 +231,6 @@ def recommend_from_catalog(ctx: Any, pre: dict, course: dict | None = None) -> d
     pools, retrieval = retrieve(project, pre['selection'], items, course)
     result = recommend_resources(project, pre['selection'], items,
         lambda system, payload: runtime.llm_json(ctx, system, payload, role='resources'), course=course, retrieved_pools=pools)
-    from app.services.duration_proposals import period_limit
-    result['periodWeeks'] = period_limit(project, course)
     result['retrieval'] = retrieval
     return result
 

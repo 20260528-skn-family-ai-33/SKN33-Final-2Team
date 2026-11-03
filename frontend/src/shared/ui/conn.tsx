@@ -130,7 +130,7 @@ export function ConnErr() {
     <div className="conn-err" role="alert">
       <Icon name="alert" />
       <div>
-        <b>{userText(c.kind)}.</b> {userTodo(c.kind).join(' ')} 이대로 넘어가면 사전 점검 문항을 만들지 못할 수 있어요.
+        <b>{userText(c.kind)}.</b> {userTodo(c.kind).join(' ')} 이대로 넘어가면 역량 테스트 문항을 만들지 못할 수 있어요.
         <ConnOps c={c} />
       </div>
     </div>
@@ -140,8 +140,7 @@ export function ConnErr() {
 export const ConnBox = () => (
   <div className="connbox">
     <div className="cb-h">
-      <Icon name="spark" />
-      진단 에이전트
+      진단 에이전트 체크
       <span className="conn-w" id="dConn" aria-live="polite">
         <ConnView />
       </span>

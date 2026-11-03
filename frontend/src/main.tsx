@@ -6,6 +6,8 @@ import { RouterProvider } from 'react-router';
 import '@/styles/gp.css';
 import '@/styles/gp-v2.css';
 import '@/styles/gp-admin.css';
+// 화면 테마 비교(비교 브랜치 전용 · skins/index.ts 설명): 테마 CSS 를 기본 CSS 뒤에 불러오고, 고른 테마를 바로 적용한다
+import { SkinPicker } from '@/skins/SkinPicker';
 import '@/features/draft/draftSync';
 import { queryClient } from '@/app/queryClient';
 import { router } from '@/app/routes';
@@ -17,6 +19,7 @@ createRoot(document.getElementById('root') as HTMLElement).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
+      <SkinPicker />
     </QueryClientProvider>
   </StrictMode>,
 );

@@ -1,0 +1,48 @@
+/* 홈 '나의 학습 공간' 그림 카드 — 색·모서리는 화면 공통 값(--surface · --line · --r-lg · --accent)을 따라 테마마다 자연히 바뀐다.
+   카드 묶음은 본문 폭 그대로 써서 위쪽 제목·버튼·단계 표시와 좌우 끝이 같다(본문 폭은 gp.css .view).
+   카드 그림(.ls-art)은 배경 그림이다. 아래는 기본(원래 화면) 그림이고, 테마는 skin.css 에서
+   .ls-card:nth-child(1~3) .ls-art 의 background-image 를 자기 그림으로 바꾼다 */
+.ls { margin-top: 52px; }
+.ls-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin-bottom: 22px; }
+.ls-t { margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -.02em; color: var(--ink); }
+.ls-sub { font-size: 15px; color: var(--ink-3); }
+.ls-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
+
+.ls-card {
+  display: flex; flex-direction: column; padding: 26px 26px 22px;
+  border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); color: inherit;
+  transition: border-color .2s, box-shadow .2s, transform .2s;
+}
+.ls-card:hover { border-color: var(--accent-line); box-shadow: 0 14px 34px rgba(20, 40, 50, .08); transform: translateY(-2px); }
+.ls-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.ls-h { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.ls-h h3 { margin: 0; font-size: 19px; line-height: 1.4; font-weight: 800; letter-spacing: -.02em; color: var(--ink); }
+/* 카드 번호 색: 남색 · 적갈색 · 보라 (테마에서 --ls-c 로 바꿀 수 있다) */
+.ls-no {
+  flex: none; padding: 3px 9px; border-radius: 8px; background: var(--ls-c); color: #fff;
+  font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.ls-card:nth-child(1) { --ls-c: #1F4E6B; }
+.ls-card:nth-child(2) { --ls-c: #B9644A; }
+.ls-card:nth-child(3) { --ls-c: #6C69A6; }
+.ls-d { margin: 10px 0 0; font-size: 14px; line-height: 1.6; color: var(--ink-2); }
+
+/* 기본 그림: undraw 일러스트(무료 · 출처 표기 없이 사용 가능 · templatemo 590 패키지에 있던 파일).
+   흰 바탕 그림이라 흰색이 카드 바탕색에 묻히게 곱하기로 섞는다 */
+.ls-art {
+  position: relative; display: block; height: 150px; margin: 24px 0 20px;
+  background: center / contain no-repeat; mix-blend-mode: multiply;
+}
+.ls-card:nth-child(1) .ls-art { background-image: url('./img/space-roadmap.png'); }
+.ls-card:nth-child(2) .ls-art { background-image: url('./img/space-resources.png'); }
+.ls-card:nth-child(3) .ls-art { background-image: url('./img/space-growth.png'); }
+
+.ls-go { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 14.5px; font-weight: 700; color: var(--accent-ink); }
+.ls-go svg { width: 20px; height: 20px; transition: transform .2s; }
+.ls-card:hover .ls-go svg { transform: translateX(3px); }
+
+@media (max-width: 900px) {
+  .ls { margin-top: 40px; }
+  .ls-grid { grid-template-columns: 1fr; gap: 14px; }
+  .ls-art { height: 130px; }
+}

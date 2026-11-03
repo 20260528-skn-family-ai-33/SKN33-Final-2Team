@@ -2,28 +2,56 @@ import { reviewRequest as request } from './reviewRequest';
 import { ReviewSkillBlocks, type ReviewMaterials } from './ReviewSkillBlocks';
 import { useEffect, useImperativeHandle, useState, type Ref } from 'react';
 import type { DraftResponse } from '@/api/types/draft';
-import { useWs } from '@/shared/state/workspace';
+import { useWs, ws } from '@/shared/state/workspace';
+import { reviewScope } from './reviewScope';
+import { reviewTasks } from './reviewTasks';
 import { flush, takeDraft } from '../draftSync';
 
 type Activity = { res?: string | null; id: string; title: string; skill: string; how: string; hours: number };
 type Proposal = { id: string; key: string; skillProposalIds?: Record<string, string>; skillSummaries?: Record<string, string[]>; option: { acts: Activity[] }; selectedIds: string[] };
 type ProposalResponse = { proposal: Proposal | null; versions: Proposal[] };
-const initialFlights = new Map<string, Promise<ProposalResponse>>();
-
-function initializeProposal(id: string, course: string, dependency: string) {
-  const key = `${id}:${course}:${dependency}`;
-  const pending = initialFlights.get(key);
-  if (pending) return pending;
-  const work = flush().then(() => request<ProposalResponse>(`/api/v2/drafts/${id}/activities`)).then(body => body.proposal ? body : request<ProposalResponse>(`/api/v2/drafts/${id}/activities`, { method: 'POST' }));
-  initialFlights.set(key, work);
-  void work.finally(() => { if (initialFlights.get(key) === work) initialFlights.delete(key); }).catch(() => {});
-  return work;
+// Clear reusable results and detach pending flights on logout/account change.
+useWs.subscribe((state, previous) => { if (state.owner !== previous.owner) reviewTasks.clear(); });
+type ReviewBundle = { body: ProposalResponse; resources: ReviewMaterials; summaries?: Record<string, string[]> };
+function reviewPath(id: string, route: string, course: string, extra = '') {
+  return `/api/v2/drafts/${id}/${route}?course=${encodeURIComponent(course)}${extra}`;
+}
+async function initializeReview(id: string, course: string, scope: string): Promise<ReviewBundle> {
+  // Rejoining a scope while its explicit regeneration runs must await that version.
+  await reviewTasks.waitForChanges(scope);
+  return reviewTasks.run(scope, 'initial', async () => {
+    await flush();
+    if (reviewScope(ws()) !== scope) throw new Error('검토 입력이 변경됐어요.');
+    const [existing, resources] = await Promise.all([
+      request<ProposalResponse>(reviewPath(id, 'activities', course)),
+      request<ReviewMaterials>(reviewPath(id, 'recommendations', course)),
+    ]);
+    let body = existing;
+    if (!body.proposal) {
+      if (reviewScope(ws()) !== scope) throw new Error('검토 입력이 변경됐어요.');
+      body = await request<ProposalResponse>(reviewPath(id, 'activities', course), {method: 'POST'});
+    }
+    if (!body.proposal) throw new Error('산출물 제안을 확인하지 못했어요. 다시 시도해 주세요.');
+    let summaries: Record<string, string[]> | undefined;
+    if (!body.proposal.skillSummaries) {
+      // Do not start additional model work for a scope the user has left.
+      if (reviewScope(ws()) !== scope) throw new Error('검토 입력이 변경됐어요.');
+      summaries = (await request<{summaries: Record<string, string[]>}>(reviewPath(id, 'learning-outcomes', course), {method: 'POST'})).summaries;
+    }
+    return {body, resources, summaries};
+  });
 }
 
 export type DeliverableSelectionHandle = { save: () => Promise<boolean> };
-export function DeliverableSelection({ ref, onReadyChange, onBusyChange, onDurationChange }: {
+type SelectionProps = {
   ref?: Ref<DeliverableSelectionHandle>; onReadyChange: (ready: boolean) => void; onBusyChange: (busy: boolean) => void; onDurationChange: (weeks: number | null) => void;
-}) {
+};
+export function DeliverableSelection(props: SelectionProps) {
+  const scope = useWs(reviewScope);
+  return <ScopedDeliverableSelection key={scope} {...props} scope={scope} />;
+}
+function ScopedDeliverableSelection({ ref, onReadyChange, onBusyChange, onDurationChange, scope }: SelectionProps & { scope: string }) {
+  const current = () => reviewScope(ws()) === scope;
   const id = useWs(s => s.draftId);
   const course = useWs(s => s.draft.chosen);
   const dependency = useWs(s => JSON.stringify([s.draft.v2Assessment?.generationId, s.draft.v2Assessment?.materialsKey]));
@@ -46,16 +74,29 @@ export function DeliverableSelection({ ref, onReadyChange, onBusyChange, onDurat
   useEffect(() => {
     if (!id) return;
     let active = true;
-    void Promise.all([initializeProposal(id, course || '', dependency), request<ReviewMaterials>(`/api/v2/drafts/${id}/recommendations?course=${encodeURIComponent(course || '')}`).then(resources => { if (active) setMaterials(resources); return resources; })]).then(async ([body, resources]) => {
-      if (!active) return;
-      setVersions(body.versions); setChosen(body.proposal?.id || ''); setSkillPicks(body.proposal?.skillProposalIds || {}); setMaterials(resources);
-      if (!body.proposal?.skillSummaries) {
-        const result = await request<{ summaries: Record<string, string[]> }>(`/api/v2/drafts/${id}/learning-outcomes`, { method: 'POST' });
-        if (active) setSummaries(result.summaries);
-      }
+    // Existing materials and proposals are readable before any missing AI work finishes.
+    void Promise.all([
+      request<ReviewMaterials>(reviewPath(id,'recommendations',course || '')),
+      request<ProposalResponse>(reviewPath(id,'activities',course || '')),
+    ]).then(([resources,existing])=>{
+      if(!active||reviewScope(ws())!==scope)return;
+      setMaterials(resources);
+      if(existing.proposal){setVersions(existing.versions);setChosen(existing.proposal.id);setSkillPicks(existing.proposal.skillProposalIds||{});}
+    }).catch(()=>{});
+    void initializeReview(id, course || '', scope).then(({body, resources, summaries}) => {
+      if (!active || reviewScope(ws()) !== scope) return;
+      const picks = reviewTasks.recall<{versions: Proposal[]; chosen: string; skillPicks: Record<string, string>}>(scope, 'picks');
+      const reusable = picks && body.versions.some(row => row.id === picks.chosen);
+      setVersions(reusable ? picks.versions : body.versions); setChosen(reusable ? picks.chosen : body.proposal?.id || ''); setSkillPicks(reusable ? picks.skillPicks : body.proposal?.skillProposalIds || {}); setMaterials(resources);
+      setSummaries(summaries || null);
     }).catch(e => { if (active) setError(e.message); }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [id, course, dependency, attempt]);
+  }, [id, course, dependency, scope, attempt]);
+  useEffect(() => {
+    if (!loading && !busy && chosen && versions.length && reviewScope(ws()) === scope) {
+      reviewTasks.remember(scope, 'picks', {versions, chosen, skillPicks});
+    }
+  }, [scope, loading, busy, versions, chosen, skillPicks]);
   useEffect(() => {
     if (!materials) { onDurationChange(null); return; }
     const names = (materials.skillOrder || materials.recommendations?.skills.map(skill => skill.name) || []).filter(name => materials.choices[name]?.enabled !== false);
@@ -69,9 +110,18 @@ export function DeliverableSelection({ ref, onReadyChange, onBusyChange, onDurat
     setBusy(true); setError('');
     try {
       await flush();
+      if (!current()) return false;
+      const latest = await request<ProposalResponse>(reviewPath(id, 'activities', course || ''));
+      if (!current()) return false;
+      if (!latest.versions.some(row => row.id === proposal.id && row.key === proposal.key)) {
+        reviewTasks.forget(scope); setLoading(true); setAttempt(value => value + 1);
+        throw new Error('저장된 제안이 변경되어 최신 결과를 다시 준비합니다.');
+      }
       const body = await request<DraftResponse>(`/api/v2/drafts/${id}/activities/selection`, {
         method: 'PUT', body: JSON.stringify({ key: proposal.key, proposalId: proposal.id, selectedIds: proposal.selectedIds, skillProposalIds: skillPicks }),
       });
+      if (!current()) return false;
+      reviewTasks.forget(scope);
       takeDraft(body);
       return true;
     } catch (e) { setError(e instanceof Error ? e.message : '산출물 선택을 저장하지 못했어요.'); return false; }
@@ -83,7 +133,14 @@ export function DeliverableSelection({ ref, onReadyChange, onBusyChange, onDurat
     setBusy(true); setError('');
     try {
       await flush();
-      const body = await request<ProposalResponse>(`/api/v2/drafts/${id}/activities${proposal ? skill ? `?skill=${encodeURIComponent(skill)}` : '?regenerate=true' : ''}`, { method: 'POST' });
+      if (!current()) return;
+      reviewTasks.forget(scope);
+      const body = await reviewTasks.run(scope, `regenerate:${skill || 'all'}`, async () => {
+        const result = await request<ProposalResponse>(reviewPath(id, 'activities', course || '', proposal ? skill ? `&skill=${encodeURIComponent(skill)}` : '&regenerate=true' : ''), {method: 'POST'});
+        reviewTasks.forget(scope);
+        return result;
+      }, true);
+      if (!current()) return;
       if (!body.proposal) throw new Error('제안 결과가 없어요. 기존 제안은 유지됩니다.');
       const original = proposal?.option.acts.find(act => !act.res && act.skill === skill);
       const replacement = body.proposal.option.acts.find(act => !act.res && act.skill === skill);

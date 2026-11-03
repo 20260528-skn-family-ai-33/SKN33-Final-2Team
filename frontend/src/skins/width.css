@@ -1,0 +1,11 @@
+/* 이전 본문 폭(<html data-width="narrow"> · 비교 브랜치 전용) — 본문 폭을 5차 원래 값 580(기본) · 760(wide) · 980px(xwide)으로 되돌린다.
+   기본(넓은 본문 폭)은 gp.css 의 1240px 이다. 로그인(.view.login)·관리자 데이터 화면(.view.adm-ds)은 원래부터 따로 정한 폭이라 그대로 둔다.
+   홈 '나의 학습 공간' 카드 3장은 줄어든 본문 폭 안에서 한 줄을 지킨다(넓은 화면에서만 · 좁은 화면은 원래대로 한 장씩) */
+:root[data-width="narrow"] {
+  & .view:not(.login, .adm-ds) { max-width: 580px; }
+  & .view.wide:not(.adm-ds) { max-width: 760px; }
+  & .view.xwide { max-width: 980px; }
+  @media (min-width: 901px) {
+    & .ls-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+}

@@ -37,11 +37,13 @@ def project_input(t, employee_id: int, project_id: str) -> dict:
     if not desired:
         raise ApiError(422, 'SURVEY_INPUT_REQUIRED', '키우고 싶은 역량을 입력해 주세요.')
     summary = doc_summary(draft) or None
-    if draft.get('project') and not summary:
+    if draft.get('project') and not summary and (draft.get('doc') or {}).get('status') == 'reading':
         raise ApiError(422, 'PROJECT_SUMMARY_PENDING', '첨부한 기획서의 요약이 아직 완료되지 않았어요. 요약 상태를 확인해 주세요.')
     result = {'goal': desired, 'desiredCompetencies': desired, 'projectSummary': summary}
     if 'prefs' in draft:
         result['details'] = deepcopy(draft['prefs'])
+    if draft.get('selectedSkills') is not None:
+        result['selectedSkills'] = deepcopy(draft['selectedSkills'])
     if draft.get('project'):
         result['projectFile'] = deepcopy(draft['project'])
         text = str((draft.get('doc') or {}).get('text') or '')
@@ -70,7 +72,12 @@ def generate_for(employee_id: int, project_id: str) -> dict:
             raise ApiError(503, 'MODEL_REQUIRED', '사용 가능한 실제 모델을 선택해 주세요.')
         # 네트워크 호출은 DB 트랜잭션·행 잠금 밖에서 한다.
         from app.learner_knowledge import from_profile,hr_context
-        selection = select_from_catalog(ctx, dict(project,learnerKnowledge=from_profile(personal),hrContext=hr_context(personal)))
+        if 'selectedSkills' in project:
+            from app.services.preassessment_flow import checked_skills
+            from app import catalog
+            selection = checked_skills(project['selectedSkills'], catalog.skill_names())
+        else:
+            selection = select_from_catalog(ctx, dict(project,learnerKnowledge=from_profile(personal),hrContext=hr_context(personal)))
         survey = generate_survey(project, selection, personal,
                                  lambda system, payload: runtime.llm_json(ctx, system, payload),
                                  require_measurement=True)
@@ -164,8 +171,10 @@ def course_context(t, employee_id: int, project_id: str, course: str | None = No
     from app.services.course_recommendations import scope_view, free_cache_valid
     from app import catalog
     draft = draft_service._row(t, employee_id, project_id, lock=False)['draft_choices']['draft']
-    if course not in ('A1','A2','A3') or draft.get('chosen') != course or course not in (draft.get('gen') or {}).get('options', {}):
+    if course not in ('A1','A2','A3') or course not in (draft.get('gen') or {}).get('options', {}):
         raise ApiError(409,'COURSE_CHANGED','선택한 코스를 다시 확인해 주세요.')
+    if (draft['gen'].get('regenRun') or {}).get(course):
+        raise ApiError(409,'REGEN_RUNNING','해당 로드맵을 다시 만드는 중이에요. 완료 후 자료를 확인해 주세요.')
     scoped=scope_view(saved,course,draft['gen']['options'][course])
     expected_names = {row['name'] for row in scoped['selection']['skills']}
     cached_names = {row['name'] for row in (scoped.get('recommendations') or {}).get('skills', [])}
@@ -204,7 +213,7 @@ def get_recommendations(project_id: UUID, a: Account = Depends(require_employee)
 @r.post('/api/v2/drafts/{project_id}/recommendations')
 @queued_generation
 def generate_recommendations(project_id: UUID, a: Account = Depends(require_employee), course: str | None = None):
-    with generation_guard('draft', str(project_id)):
+    with generation_guard('draft-materials', f'{project_id}:{course or "base"}'):
         with db.tx() as t:
             pre = course_context(t, a.id, str(project_id), course)
             selected_course = course_input(t, a.id, str(project_id), course)
@@ -258,18 +267,20 @@ def generate_durations(project_id: UUID, body: ChoicesBody, a: Account = Depends
 
 
 @r.get('/api/v2/drafts/{project_id}/activities')
-def get_activities(project_id: UUID,a: Account=Depends(require_employee)):
+def get_activities(project_id: UUID,a: Account=Depends(require_employee),course: str | None=None):
     from app.services import activity_selection as activities
     with db.tx() as t:
-        saved,d=activities.context(t,a.id,str(project_id))
+        saved,d=activities.context(t,a.id,str(project_id),**({'course':course} if course else {}))
         return activities.view(saved,d)
 
 @r.post('/api/v2/drafts/{project_id}/activities')
 @queued_generation
-def propose_activities(project_id: UUID,a: Account=Depends(require_employee),regenerate: bool=False,skill: str | None=None):
+def propose_activities(project_id: UUID,a: Account=Depends(require_employee),regenerate: bool=False,skill: str | None=None,course: str | None=None):
     from app.services import activity_selection as activities
-    with generation_guard('draft', str(project_id)):
-        with db.tx() as t:saved,d=activities.context(t,a.id,str(project_id))
+    with db.tx() as t:_, target=activities.context(t,a.id,str(project_id),**({'course':course} if course else {}))
+    course=target['chosen']
+    with generation_guard('draft-review', f'{project_id}:{target["chosen"]}'):
+        with db.tx() as t:saved,d=activities.context(t,a.id,str(project_id),**({'course':course} if course else {}))
         existing=activities.current_record(saved,d)
         if existing and not regenerate and not skill:return activities.view(saved,d)
         ctx=runtime.context(a.id)
@@ -277,7 +288,7 @@ def propose_activities(project_id: UUID,a: Account=Depends(require_employee),reg
         model=lambda system,payload:runtime.llm_json(ctx,system,payload,role='roadmap')
         proposal=activities.repropose_skill(saved,d,skill,model,ctx.mode) if skill else activities.propose(saved,d,model,ctx.mode,previous=activities.versions(saved,d) if regenerate else None)
         def save(t,w):
-            current,draft=activities.context(t,a.id,str(project_id))
+            current,draft=activities.context(t,a.id,str(project_id),**({'course':course} if course else {}))
             if activities.fingerprint(current,draft)!=proposal['key']:raise ApiError(409,'ACTIVITIES_CHANGED','자료가 변경됐어요. 다시 제안받아 주세요.')
             active=activities.current_record(current,draft)
             if (activities.proposal_id(active) if active else None)!=(activities.proposal_id(existing) if existing else None):
@@ -323,30 +334,48 @@ def initialize_course_skills(project_id:UUID,course:str,a:Account=Depends(requir
 
 
 @r.get('/api/v2/drafts/{project_id}/learning-outcomes')
-def get_learning_outcomes(project_id:UUID,a:Account=Depends(require_employee)):
+def get_learning_outcomes(project_id:UUID,a:Account=Depends(require_employee),course: str | None=None):
     from app.services import activity_selection,learning_outcomes
     with db.tx() as t:
-        saved,draft=activity_selection.context(t,a.id,str(project_id))
+        saved,draft=activity_selection.context(t,a.id,str(project_id),**({'course':course} if course else {}))
         return {'summaries':learning_outcomes.current(saved,draft)}
 
 
 @r.post('/api/v2/drafts/{project_id}/learning-outcomes')
 @queued_generation
-def generate_learning_outcomes(project_id:UUID,a:Account=Depends(require_employee)):
+def generate_learning_outcomes(project_id:UUID,a:Account=Depends(require_employee),course: str | None=None):
     from app.services import activity_selection,learning_outcomes,drafts
     from app.services.course_recommendations import merge_scope
-    with generation_guard('draft', str(project_id)):
+    with db.tx() as t:_, target=activity_selection.context(t,a.id,str(project_id),**({'course':course} if course else {}))
+    course=target['chosen']
+    with generation_guard('draft-review', f'{project_id}:{target["chosen"]}'):
         with db.tx() as t:
-            saved,draft=activity_selection.context(t,a.id,str(project_id))
+            saved,draft=activity_selection.context(t,a.id,str(project_id),**({'course':course} if course else {}))
             existing=learning_outcomes.current(saved,draft)
             if existing is not None:return {'summaries':existing}
         ctx=runtime.context(a.id)
         if not ctx.live:raise ApiError(503,'MODEL_REQUIRED','실제 모델 연결이 필요해요.')
         result=learning_outcomes.generate(saved,draft,lambda system,payload:runtime.llm_json(ctx,system,payload,role='roadmap'))
         def save(t,w):
-            latest,d=activity_selection.context(t,a.id,str(project_id))
+            latest,d=activity_selection.context(t,a.id,str(project_id),**({'course':course} if course else {}))
             if activity_selection.fingerprint(latest,d)!=result['key']:raise ApiError(409,'MATERIALS_CHANGED','선택한 자료가 변경됐어요. 다시 확인해 주세요.')
             latest['learningOutcomes']=result
             w['v2Survey']=merge_scope(w['v2Survey'],latest)
         drafts._mutate(a.id,str(project_id),save)
         return {'summaries':result['summaries']}
+
+
+@r.post('/api/v2/drafts/{project_id}/skills')
+@queued_generation
+def preview_skills(project_id: UUID, a: Account = Depends(require_employee)):
+    with generation_guard('draft', str(project_id)):
+        personal = profile_input(profile.view(a.id) or {})
+        with db.tx() as t:
+            project = project_input(t, a.id, str(project_id))
+        project.pop('selectedSkills', None)
+        project.pop('details', None)  # 학습 여건과 스킬 추천은 독립된 입력이다.
+        ctx = runtime.context(a.id)
+        if not ctx.live:
+            raise ApiError(503, 'MODEL_REQUIRED', '스킬 추천에 사용할 모델을 연결해 주세요.')
+        from app.learner_knowledge import from_profile, hr_context
+        return select_from_catalog(ctx, dict(project, learnerKnowledge=from_profile(personal), hrContext=hr_context(personal)))

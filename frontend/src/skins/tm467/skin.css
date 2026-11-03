@@ -1,0 +1,215 @@
+/* 화면 테마 tm467 · templatemo 467 Easy Profile (Blue)
+   원본: https://templatemo.com/tm-467-easy-profile — 무료 · 상업/비상업 사용 허용. 사진도 템플릿에 들어 있던 것(크기만 줄임).
+   전부 :root[data-skin="tm467"] 안에 적어 이 테마를 고른 때만 적용된다. 메뉴 위치가 다른 두 버전:
+   상단 메뉴(&:not([data-nav="side"])) · 좌측 메뉴(&[data-nav="side"]).
+
+   템플릿에서 가져온 것: 파랑(#3366cc) · 하늘(#66ccff) · 푸른 산 사진 메뉴 · 둥근 프로필 아바타 · 흰/파랑 번갈아 카드. 템플릿 글꼴(Proxima Nova)은 상용이라 비슷한 Figtree 로 대신 */
+
+:root[data-skin="tm467"] {
+  --accent: #3366CC !important;
+  --accent-ink: #24519F;
+  --tm-sky: #66CCFF;
+  --tm-navy: #204090;
+  --tm-wrap: 1240px;
+  --nav-h: 80px;
+  --bg: #F5F5F5; --surface: #FFFFFF; --surface-2: #F9F9F9; --sunk: #EEF1F6; --line: #E6E9EF; --line-2: #CED4DE;
+  --ink: #202020; --ink-2: #555555; --ink-3: #888888; --ink-4: #AAAAAA;
+  --side-w: 0px; --r-lg: 0px; --r-md: 0px;
+  --shadow-pop: 0 18px 45px rgba(32, 64, 144, .2), 0 2px 8px rgba(50, 50, 50, .08);
+
+  body { background: var(--bg); color: var(--ink-2); font-family: 'Figtree', 'Pretendard Variable', Pretendard, -apple-system, 'Malgun Gothic', sans-serif; }
+
+  /* ── 공통 모서리 ── */
+  .list, .stage, .opt, .tblwrap, .roadmap-preview, .check-plan-group, .connbox, .cm-item, .gsug, .docbox, .cause,
+  .sheet, .regp, .login-card, .login-side, .loading, .stats, .agent, .diff .d, .alert, .callout, .ck-list, .rec-res, .pstrip div,
+  .api-picker-panel, .cp-pop, .feat, .ls-card { border-radius: 0; }
+  .btn, .btn.sm, .back, .fab, .toast { border-radius: 3px; }
+  .input, .textarea, .cp-btn { border-radius: 3px; }
+  .tag, .ls-no, .ribbon .mode, .api-picker-button, .login-side .pill { border-radius: 3px; }
+  .v2-survey section, .v2-survey fieldset { border-radius: 0; }
+  .v2-survey button { border-radius: 3px; }
+
+  /* ── 상단 띠(AI 모델 고르기) ── */
+  .ribbon { padding: 0 max(20px, calc((100% - var(--tm-wrap)) / 2)); background: var(--tm-navy); color: rgba(255, 255, 255, .8); }
+  .api-picker-button { padding: 5px 12px; font-size: 12px; }
+  body.auth .ribbon { display: none; }
+
+  /* 상단 메뉴가 있으면 관리자 고치기 창은 그 아래에서 시작(좌측 메뉴 버전은 --nav-h: 0) */
+  .adm-panel { top: calc(var(--rib-h) + var(--nav-h) + 12px); border-radius: 0; }
+  @media (max-width: 1100px) { .adm-panel { top: calc(var(--rib-h) + var(--nav-h)); border-radius: 0; } }
+
+  /* ── 로그인 ── */
+  body.auth .app { min-height: 100vh; }
+  body.auth .main { min-height: 100vh; display: flex; align-items: center; background: url('./sky.jpg') center / cover fixed; }
+  body.auth .main::before { display: none; }
+  body.auth .view { width: 100%; }
+  .login-side::after { display: none; }
+
+  /* ── 홈 '나의 학습 공간' 카드 그림: 템플릿 사진을 카드 폭 가득 ── */
+  .ls-card .ls-art { height: 170px; margin: 22px -26px 20px; background-size: cover; mix-blend-mode: normal; }
+  .ls-card:nth-child(1) .ls-art { background-image: url('./card-roadmap.jpg'); }
+  .ls-card:nth-child(2) .ls-art { background-image: url('./sky.jpg'); }
+  .ls-card:nth-child(3) .ls-art { background-image: url('./card-growth.jpg'); }
+
+  /* ── 상단 메뉴 버전(기본): 좌측 메뉴 버전(data-nav="side")을 고르지 않은 때만 ── */
+  &:not([data-nav="side"]) {
+    @media (min-width: 901px) {
+      & { scroll-padding-top: calc(var(--rib-h) + var(--nav-h) + 12px); }
+      .app { display: block; }
+      .side {
+        position: sticky; top: var(--rib-h); z-index: 39;
+        height: auto; min-height: var(--nav-h); overflow: visible;
+        flex-direction: row; flex-wrap: wrap; align-items: center; gap: 0 12px;
+        padding: 0 max(20px, calc((100% - var(--tm-wrap)) / 2));
+        border: 0; background: linear-gradient(rgba(32, 64, 144, .2), rgba(32, 64, 144, .45)), url('./sky.jpg') center 35% / cover; box-shadow: 0 2px 8px rgba(50, 50, 50, .15); color: #fff;
+      }
+      .side:empty { display: none; }
+      .side .brand { order: 0; margin-right: auto; padding: 0; font-size: 24px; font-weight: 700; text-shadow: 0 1px 2px rgba(0, 0, 0, .2); }
+      .side .brand .logo { width: 32px; height: 32px; border-radius: 50%; background: #fff; color: var(--accent); box-shadow: 0 0 0 2px rgba(255, 255, 255, .6); }
+      .side .nav { order: 1; flex-direction: row; align-items: center; gap: 0; }
+      .side .nav a { position: relative; height: var(--nav-h); padding: 0 12px; background: transparent; white-space: nowrap; border-radius: 0; color: #fff; font-size: 14.5px; font-weight: 600; text-shadow: 0 1px 2px rgba(0, 0, 0, .25); }
+      .side .nav a svg { display: none; }
+      .side .nav a:hover { color: var(--tm-sky); }
+      .side .nav a.on { background: transparent; color: #fff; }
+      .side .nav a.on::after { content: ''; position: absolute; left: 12px; right: 12px; bottom: 18px; height: 2px; background: #fff; }
+      .side .nav a .dot { margin: 0 0 12px 3px; }
+      .side .nav-appx { order: 2; display: flex; align-items: center; margin: 0; padding: 0; border: 0; }
+      .side .nav-appx::before { content: ''; width: 1px; height: 18px; margin: 0 4px; background: rgba(255, 255, 255, .45); }
+      .side .nav-appx .lbl { display: none; }
+      .side .me { order: 3; margin: 0 0 0 6px; padding: 4px 12px 4px 4px; gap: 8px; border: 1px solid rgba(255, 255, 255, .5); border-radius: 40px; background: rgba(255, 255, 255, .15); }
+      .side .me .avatar { width: 30px; height: 30px; font-size: 11px; border-radius: 50%; background: #fff; color: var(--accent); box-shadow: 0 0 0 2px #fff; }
+      .side .me small, .side .me .me-go { display: none; }
+      .side .me b { font-size: 13px; white-space: nowrap; }
+      .side a.me:hover, .side a.me.on { box-shadow: none; border-color: #fff; }
+      .side .side-foot { order: 4; margin: 0; padding: 0; display: flex; align-items: center; gap: 6px; }
+      .side .side-foot .foot-lbl { display: none; }
+      .side .logout { height: 34px; padding: 0 10px; color: inherit; }
+      .side .logout:hover { background: transparent; color: var(--tm-sky); }
+      .side .logout .lbl { display: none; }
+      /* 시연 도구: 메뉴 줄에는 버튼만, 펼치면 메뉴 아래 오른쪽에 떠 있는 창(자리는 비워 두어 메뉴가 밀리지 않게) */
+      .side .demo { order: -1; color: inherit; }
+      .side .demo > summary {
+        width: 96px; height: 34px; justify-content: center; padding: 0 8px; border: 1px dashed currentColor; border-radius: 3px;
+        font-size: 12px; font-weight: 600; white-space: nowrap; opacity: .85;
+      }
+      .side .side-foot:has(> .demo[open]) { padding-left: 102px; }
+      .side .demo[open] {
+        position: fixed; z-index: 45; top: calc(var(--rib-h) + var(--nav-h) + 10px);
+        right: max(20px, calc((100% - var(--tm-wrap)) / 2));
+        width: 300px; max-height: calc(100vh - var(--rib-h) - var(--nav-h) - 32px); overflow-y: auto;
+        padding: 0 16px 16px; border: 1px solid var(--line); border-radius: 0; background: var(--surface); color: var(--ink-3); box-shadow: var(--shadow-pop);
+      }
+      .side .demo[open] > summary {
+        width: auto; height: 46px; margin: 0 -16px 12px; padding: 0 16px; justify-content: flex-start;
+        border: 0; border-bottom: 1px solid var(--line); border-radius: 0; color: var(--ink); opacity: 1;
+      }
+      .side .demo[open] .foot-lbl { display: block; font-weight: 700; }
+    }
+    /* 좁은 데스크톱: 메뉴가 두 줄로 넘치지 않게 조금 줄인다 */
+    @media (min-width: 901px) and (max-width: 1240px) {
+      --nav-h: 68px;
+      .side .brand { font-size: 20px; }
+      .side .nav a { padding: 0 8px; font-size: 12.5px; letter-spacing: 0; }
+      .side .me { padding: 3px; }
+      .side .me .grow { display: none; }
+    }
+  }
+
+  /* ── 좌측 메뉴 버전(data-nav="side"): 원래 화면과 같은 좌측 메뉴 배치에 푸른 산 사진 · 흰 글자 · 흰 칸 표시 ── */
+  &[data-nav="side"] {
+    --nav-h: 0px;
+    @media (min-width: 901px) {
+      --side-w: 248px;
+      .side { background: linear-gradient(rgba(32, 64, 144, .3), rgba(32, 64, 144, .78)), url('./sky.jpg') 30% center / cover; border-right: 0; color: #fff; }
+      .side .brand { font-size: 22px; font-weight: 700; }
+      .side .brand .logo { border-radius: 50%; background: #fff; color: var(--accent); }
+      .side .me { border: 1px solid rgba(255, 255, 255, .4); border-radius: 16px; background: rgba(255, 255, 255, .15); }
+      .side .me small, .side .me .me-go { color: rgba(255, 255, 255, .82); }
+      .side .me .avatar { border-radius: 50%; background: #fff; color: var(--accent); box-shadow: 0 0 0 2px #fff; }
+      .side a.me:hover, .side a.me.on { box-shadow: none; border-color: #fff; }
+      .side .nav a { border-radius: 3px; color: #fff; font-size: 14.5px; font-weight: 600; }
+      .side .nav a:hover { background: rgba(255, 255, 255, .15); color: #fff; }
+      .side .nav a.on { background: #fff; color: var(--accent); }
+      .side .nav-appx { border-top-color: rgba(255, 255, 255, .4); }
+      .side .nav-appx .lbl, .side .foot-lbl { color: rgba(255, 255, 255, .82); }
+      .side .logout { color: inherit; }
+      .side .logout:hover { background: rgba(255, 255, 255, .15); color: #fff; }
+      .side .demo { color: rgba(255, 255, 255, .82); }
+      .side .demo[open] { padding: 10px 12px 12px; border: 1px solid var(--line); border-radius: 0; background: var(--surface); color: var(--ink-3); }
+      .side .demo[open] summary { color: var(--ink-2); }
+      .side .demo[open] .foot-lbl { color: var(--ink-4); }
+    }
+  }
+
+  /* ── 글자: 파랑 짧은 밑줄(템플릿 header hr) ── */
+  .eyebrow { font-size: 13.5px; font-weight: 700; color: var(--accent); }
+  .t { position: relative; padding-bottom: 14px; margin-bottom: 20px; font-size: 34px; font-weight: 600; color: var(--ink); }
+  .t::after { content: ''; position: absolute; left: 0; bottom: 0; width: 60px; height: 2px; background: var(--accent); }
+  .t.lg { font-size: 40px; }
+  .st, .hp-t { font-weight: 700; color: var(--accent-ink); }
+  .link { color: var(--accent); }
+
+  /* ── 버튼·선택 ── */
+  .btn { font-weight: 600; }
+  .btn.pri { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.pri:hover { background: var(--tm-navy); border-color: var(--tm-navy); }
+  .btn.pri:disabled, .btn.pri:disabled:hover { background: #CED4DE; border-color: #CED4DE; }
+  .btn.line { background: #fff; border-color: var(--accent); color: var(--accent); }
+  .btn.line:hover:not(:disabled) { background: var(--accent); color: #fff; }
+  .chip:has(input:checked), .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .choice:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+  .input:focus, .textarea:focus, .cpick.open .cp-btn { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(51, 102, 204, .18); }
+  .bar i, .bars .track i { background: var(--accent); }
+
+  /* ── 카드: 각진 흰 상자 + 옅은 그림자, 강조 상자는 파랑(템플릿 Skills 상자) ── */
+  .card, .list, .stage, .opt, .tblwrap, .stats, .agent, .roadmap-preview, .check-plan-group, .pstrip div { border-color: transparent; box-shadow: 0 2px 8px rgba(50, 50, 50, .08); }
+  .card.tap:hover, .opt:hover { box-shadow: 0 8px 24px rgba(50, 50, 50, .15); }
+  .pstrip div { padding: 14px; background: #fff; }
+  .pstrip div b { color: var(--accent-ink); }
+  .hero, .next { border: 0; background: var(--accent); color: #fff; }
+  .hero .t, .hero .lead { color: #fff; }
+  .hero .t::after { left: 50%; transform: translateX(-50%); background: #fff; }
+  .hero .btn.pri { background: #fff; border-color: #fff; color: var(--accent); }
+  .hero .btn.line { background: transparent; border-color: #fff; color: #fff; }
+  .sheet-h, .adm-ph { background: var(--accent); color: #fff; border-bottom: 0; }
+  .sheet-h small, .adm-ph small { color: rgba(255, 255, 255, .85); }
+  .sheet-h .x, .adm-ph .x, .sheet-h .btn.line { background: transparent; color: #fff; border-color: rgba(255, 255, 255, .6); }
+  .toast { background: var(--tm-navy); }
+  .fab { border-radius: 30px; background: var(--accent); }
+  .fab:hover { background: var(--tm-navy); }
+  .msg.me { background: var(--accent); }
+
+  /* ── 홈 카드: 흰 · 파랑 · 흰 번갈아 ── */
+  .ls-card { border-color: transparent; box-shadow: 0 2px 8px rgba(50, 50, 50, .08); }
+  .ls-card:hover { border-color: transparent; box-shadow: 0 8px 24px rgba(50, 50, 50, .15); }
+  .ls-card:nth-child(2) { background: var(--accent); }
+  .ls-card:nth-child(2) .ls-h h3, .ls-card:nth-child(2) .ls-d, .ls-card:nth-child(2) .ls-go { color: #fff; }
+  .ls-card:nth-child(2) .ls-no { background: #fff; color: var(--accent); }
+  .ls-card:nth-child(1) { --ls-c: var(--accent); }
+  .ls-card:nth-child(3) { --ls-c: var(--tm-navy); }
+
+  /* ── 로그인: 푸른 산 사진 화면 + 파랑 소개 ── */
+  .login-card { border: 0; box-shadow: 0 2px 8px rgba(50, 50, 50, .15); }
+  .login-side { background: var(--accent); }
+  .login-side .pill { background: rgba(255, 255, 255, .2); }
+  .feat { background: rgba(255, 255, 255, .12); border-color: rgba(255, 255, 255, .25); }
+  .feat .ico { border-radius: 50%; background: #fff; color: var(--accent); }
+
+  /* #59 로 들어온 화면(입력 확인 · 스킬 순서 · 3안 자료 비교) 보정
+     - 입력 확인 상자는 안쪽 카드를 평평하게 펴는데, 이 테마의 카드 그림자 규칙이 더 강해 그림자가 남는다 → 끈다 */
+  .input-confirm-box > .card { box-shadow: none; }
+
+  /* ── 좁은 화면(900px 이하): 두 버전 모두 원래의 한 줄 메뉴 배치에 색만 ── */
+  @media (max-width: 900px) {
+    .side { border-bottom: 0; background: linear-gradient(rgba(32, 64, 144, .35), rgba(32, 64, 144, .6)), url('./sky.jpg') center / cover; color: #fff; }
+    .side .nav a { color: #fff; font-weight: 600; }
+    .side .nav a.on { background: #fff; color: var(--accent); }
+    .side a.me { border-color: rgba(255, 255, 255, .5); background: rgba(255, 255, 255, .15); color: #fff; }
+    .side .logout { color: inherit; }
+    .main { padding: 32px 16px 140px; }
+    .t { font-size: 24px; }
+    .t.lg { font-size: 28px; }
+    body.auth .main { padding: 24px 16px; background-attachment: scroll; }
+    .adm-panel { top: var(--rib-h); }
+  }
+}

@@ -172,12 +172,12 @@ class CrashCourseTests(unittest.TestCase):
         self.assertEqual([r['id'] for r in free[0]['courses']], ['0', '1', '2', '3', '4', '5'])
         self.assertEqual(meta['version'], rag.VERSION)
 
-    def test_confirmed_period_limit_still_applies_before_twenty_course_search(self):
+    def test_main_no_period_cap_policy_preserves_long_courses_in_the_review_pool(self):
         items = {'long': course('long', 100), 'short': course('short', 2)}
         search = Mock(return_value=[{'resource_id': 'short', 'similarity': .8, 'current_cost': 0}])
         rag.retrieve(self.project, self.selection, items, {'id': 'A2'},
                      embed=lambda _: [[1.0] + [0.0] * (rag.DIMENSIONS - 1)], search=search)
-        self.assertEqual(search.call_args.args[1], ['short'])
+        self.assertEqual(set(search.call_args.args[1]), {'long','short'})
 
     def test_late_relevant_outline_reaches_model_and_selected_cards_are_sorted(self):
         rows = [course('long', 12), course('short', 2, curriculum={'items': [
@@ -235,6 +235,19 @@ class CrashCourseTests(unittest.TestCase):
         result=recommend_resources(self.project,self.selection,{r['id']:r for r in rows},generate,
                                    course={'id':'A2'},retrieved_pools=[{'name':'SQL','courses':rows,'books':[]}])
         self.assertEqual(result['skills'][0]['selectedCourse'],'long')
+
+    def test_main_fixed_five_skills_are_preserved_in_the_short_shared_plan(self):
+        names=['SQL','Python','Docker','RAG','ETL']
+        selection={'skills':[{'name':name} for name in names]}
+        common=course('common',3,skills=names,content='SQL Python Docker RAG ETL 실습')
+        pools=[{'name':name,'courses':[course(name,2,skills=[name],content=name+' 실습'),common],'books':[]} for name in names]
+        cache={}
+        aligned=crash.align_shared_courses(pools,self.project,selection,cache)
+        self.assertEqual([pool['name'] for pool in aligned],names)
+        self.assertEqual([pool['courses'][0]['id'] for pool in aligned],['common']*5)
+        plan=crash.study_plan(aligned,self.project,selection,{'common':'S1-C2'},cache=cache)
+        self.assertEqual([row['name'] for row in plan['skills']],names)
+        self.assertEqual(plan['uniqueHours'],3)
 
     def test_estimated_study_plan_does_not_claim_a_confirmed_short_total(self):
         row=course('estimate',.5,estimated=['hours'])

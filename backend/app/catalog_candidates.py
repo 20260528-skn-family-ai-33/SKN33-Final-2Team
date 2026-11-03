@@ -215,10 +215,10 @@ def track_fit(x: dict, terms: list[re.Pattern], track: str, topics: list[re.Patt
 
 
 def select(records: dict[str, dict], skills: list[str], texts: list[str], track: str,
-           required: list[str] | None = None, hints: list[str] | None = None) -> Selection:
+           required: list[str] | None = None, hints: list[str] | None = None, *, preserve_skills: bool = False) -> Selection:
     if track not in ('A1', 'A2', 'A3'):
         raise ValueError('알 수 없는 로드맵 관점입니다.')
-    skills = list(dict.fromkeys(skills))[:track_policy.FAST_SKILLS if track == 'A2' else MAX_SKILLS]
+    skills = list(dict.fromkeys(skills))[:track_policy.FAST_SKILLS if track == 'A2' and not preserve_skills else MAX_SKILLS]
     index, terms = cached_index(records), query_terms(texts)
     topics = depth_terms(texts)
     required = list(dict.fromkeys(k for k in required or [] if k))

@@ -53,7 +53,7 @@ describe('사후 점검 저장 실패 뒤 보고서 막기', () => {
   });
 });
 
-/* 사전 점검에서 세부 질문을 고른 로드맵: 사후 심화 문항이 준비되면 저장 뒤 화면의 심화 답을 다시 넣는다(immer 상태 · 이슈 #48) */
+/* 역량 테스트에서 세부 질문을 고른 로드맵: 사후 심화 문항이 준비되면 저장 뒤 화면의 심화 답을 다시 넣는다(immer 상태 · 이슈 #48) */
 describe('사후 심화 문항이 준비된 로드맵의 저장', () => {
   const deep = (mcq: Record<string, string>, essay: Record<string, string>) => ({ status: 'ready', judge: null, mcq, essay });
 

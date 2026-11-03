@@ -313,6 +313,7 @@ export function AssistantHost() {
         className={`fab${st.fresh ? ' new' : ''}`}
         id="regFab"
         aria-label="사내 생활 도우미 열기"
+        title="사내 생활 도우미"
         hidden={st.open}
         onClick={() => {
           openAssistant();
@@ -320,7 +321,6 @@ export function AssistantHost() {
         }}
       >
         <Icon name="chat" />
-        <span>사내 생활 도우미</span>
       </button>
       <section className="regp" id="regPanel" hidden={!st.open} aria-label="사내 생활 도우미">
         <div className="sheet-h">

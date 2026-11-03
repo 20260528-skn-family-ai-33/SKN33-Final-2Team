@@ -36,7 +36,7 @@ def build_handoff(saved, prefs, profile):
         'startReason':'프로젝트에 필요한 선정 스킬을 순서대로 학습합니다. 수준 판정에 따른 시작 단계가 아닙니다.',
         'known':list(knowledge['technologies']),'gaps':[],'focus':names,'outcome':project['goal'],'resourceHints':hints,'prefs':deepcopy(prefs),
         'profile':deepcopy(profile),'userNotes':[project.get('details',{}).get('etc')] if project.get('details',{}).get('etc') else [],
-        'agentNotes':['skillOrder의 포함 스킬을 모두 다루고 순서를 지킨다. 제외 스킬을 다시 추가하지 않는다. 설문 수준 때문에 스킬을 빼지 않는다. 도서·강좌의 최종 선택은 검토·확정에서 한다.'],
+        'agentNotes':['skillOrder의 포함 스킬을 모두 다루고 순서를 지킨다. 제외 스킬을 다시 추가하지 않는다. 설문 수준 때문에 스킬을 빼지 않는다. 도서·강좌는 로드맵·자료 선택에서 고르고, 산출물은 마지막 검토·확정에서 고른다.'],
         'userEdited':['스킬 순서·포함 여부'],'skillOrder':names,
         'skillNames':list(names),'trackPolicyVersion':track_policy.VERSION,
         'skillDetails':[deepcopy(details[name]) for name in names if name in details],
@@ -46,6 +46,10 @@ def build_handoff(saved, prefs, profile):
         'durationEstimates':{name:deepcopy((saved.get('durationEstimates') or {}).get(name)) for name in names},
         'assessmentGenerationId':saved['generationId']}
     h['courseSkillSelection']=True
+    if project.get('selectedSkills'):
+        h['selectedSkillsFixed']=True
     h['agentNotes']=['각 Track이 후보 역량 중 관점에 맞는 지식·역량을 따로 추천한다. 사용자는 로드맵 선택에서 포함 여부와 순서를 정한다. 자료는 자료 선택에서 고른다.']
+    if h.get('selectedSkillsFixed'):
+        h['agentNotes']=['사용자가 앞 단계에서 확정한 skillOrder 전체와 순서를 유지한다. 스킬을 추가·제외·재정렬하지 않고 관점별 수행 깊이와 자료를 조정한다.']
     h['key']=hashlib.sha1(json.dumps(h,ensure_ascii=False,sort_keys=True).encode()).hexdigest()[:16]
     return h

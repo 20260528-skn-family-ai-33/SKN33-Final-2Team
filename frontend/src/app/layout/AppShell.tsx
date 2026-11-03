@@ -1,5 +1,5 @@
 /* 앱 틀 (5차 gp-core.js boot·render) — 상단 띠 · 좌측 메뉴 · 본문. 화면마다 정한 메뉴 강조·제목·폭(handle)을 읽어 그린다 */
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Navigate, Outlet, useLocation, useMatches } from 'react-router';
 import { paths } from '@/app/paths';
 import { AdminSide } from '@/features/admin/AdminSide';
@@ -11,8 +11,6 @@ import { updateWs } from '@/shared/state/workspace';
 import { SheetHost, ToastHost } from '@/shared/ui/SheetHost';
 import { Loading } from '@/shared/ui/parts';
 import { AiBox, Sidebar } from './Sidebar';
-import { ThemePicker } from '@/shared/ui/sideParts';
-import './themeControl.css';
 
 export interface ScreenHandle {
   nav?: string;
@@ -23,6 +21,16 @@ export interface ScreenHandle {
 
 function ModeChip() {
   const [open, setOpen] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const closeOutside = (event: PointerEvent) => {
+      if (event.target instanceof Node && !pickerRef.current?.contains(event.target)) setOpen(false);
+    };
+    document.addEventListener('pointerdown', closeOutside, true);
+    return () => document.removeEventListener('pointerdown', closeOutside, true);
+  }, [open]);
   const acct = useSession((s) => s.account);
   const { mode, choice, checked, conn } = useAiMode();
   const server = useAi((s) => s.status.server);
@@ -69,7 +77,7 @@ function ModeChip() {
   const label = mode === 'mock' ? '시연용 가데이터' : PROV[choice];
 
   return (
-    <div className="api-picker">
+    <div className="api-picker" ref={pickerRef}>
       <button
         type="button"
         className={`api-picker-button ${color}`}
@@ -141,7 +149,6 @@ export function AppShell() {
   return (
     <>
       <header className="ribbon">
-        <ThemePicker compact />
         <ModeChip />
       </header>
       <div className="app">

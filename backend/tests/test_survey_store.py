@@ -143,6 +143,26 @@ class StoreTests(unittest.TestCase):
                     replace_generation_id='old-generation')
         self.tx.run.assert_not_called()
 
+    def test_completed_answers_cannot_be_changed_or_reopened(self):
+        value=self.prepare();value.update(answers=self.all_answers(value),completed=True)
+        self.tx.run.reset_mock()
+        self.assertEqual(store.save_answers(self.tx,1,'project',value['generationId'],value['answers'],complete=True),value)
+        changed=dict(value['answers']);changed[next(iter(changed))]=5
+        for answers,complete in ((changed,True),(value['answers'],False)):
+            with self.assertRaises(store.StoreError):store.save_answers(self.tx,1,'project',value['generationId'],answers,complete=complete)
+        self.tx.run.assert_not_called()
+
+    def test_correct_answers_revealed_only_after_completion(self):
+        value=self.prepare()
+        self.assertNotIn('answer',store.public_view(value)['groups'][0]['quizzes'][0])
+        value.update(answers=self.all_answers(value),completed=True)
+        self.assertIn('answer',store.public_view(value)['groups'][0]['quizzes'][0])
+
+    def test_selected_skill_snapshot_is_preserved_for_input_matching(self):
+        project=dict(self.fixture.project,selectedSkills=self.fixture.selection(2)['skills'])
+        value=store.save_generated(self.tx,1,'project',project,self.fixture.selection(2),self.fixture.profile,self.fixture.result(2))
+        self.assertEqual(value['project']['selectedSkills'],project['selectedSkills'])
+
 
 if __name__ == '__main__':
     unittest.main()

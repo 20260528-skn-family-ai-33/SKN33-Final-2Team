@@ -61,8 +61,8 @@ def rank(rows: list[dict], project: dict, selection: dict, skill: dict, *, limit
 
 
 def align_shared_courses(pools: list[dict], project: dict, selection: dict, cache: dict | None = None) -> list[dict]:
-    """최대 3스킬의 첫 추천을 고유 강좌 시간 합이 작은 조합으로 맞춘다. 나머지 후보는 보존한다."""
-    if not 1 < len(pools) <= 3 or any(not pool['courses'] for pool in pools):
+    """선택 스킬을 유지하며 첫 추천의 고유 강좌 시간 합을 비교한다. 나머지 후보는 보존한다."""
+    if not 1 < len(pools) <= 5 or any(not pool['courses'] for pool in pools):
         return pools
     cache = cache if cache is not None else {}
     groups = []
@@ -82,7 +82,7 @@ def align_shared_courses(pools: list[dict], project: dict, selection: dict, cach
         total = sum(hours(row) or 0 for row in unique.values())
         return (unknown, estimated, total, len(unique), tuple(row['id'] for row in bundle))
 
-    chosen = min(product(*groups), key=cost)  # 최대 6^3=216개 조합이며 모델·추가 DB 호출은 없다.
+    chosen = min(product(*groups), key=cost)  # 사용자 확정 5스킬에서도 최대 6^5=7,776개, 추가 모델·DB 호출 없음.
     return [{**pool, 'courses': [selected] + [row for row in pool['courses'] if row['id'] != selected['id']]}
             for pool, selected in zip(pools, chosen)]
 

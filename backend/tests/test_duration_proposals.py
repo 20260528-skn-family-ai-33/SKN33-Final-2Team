@@ -33,19 +33,6 @@ class DurationTests(unittest.TestCase):
 
 
 class PeriodLimitTests(unittest.TestCase):
- def test_known_long_course_filtered_without_changing_hours(self):
-  from app.services.duration_proposals import course_fits_period
-  project={'details':{'weeks':8,'hours':4}}
-  course={'hours':72}
-  self.assertFalse(course_fits_period(course,project))
-  self.assertEqual(course['hours'],72)
-  self.assertTrue(course_fits_period({'hours':32},project))
- def test_course_plan_limit_used_when_user_period_is_auto(self):
-  from app.services.duration_proposals import course_fits_period
-  self.assertFalse(course_fits_period({'hours':72},{'details':{}},{'weeks':8,'weeklyHours':4}))
- def test_unconfirmed_hours_not_claimed_as_verified_fit(self):
-  from app.services.duration_proposals import course_fits_period
-  self.assertTrue(course_fits_period({'hours':None},{'details':{'weeks':8,'hours':4}}))
  def test_selected_total_over_deadline_keeps_actual_estimate(self):
   rec={'skills':[{'name':n,'courses':[{'id':n,'hours':20}],'books':[]} for n in ('A','B')]}
   choices={n:{'course':n,'books':[]} for n in ('A','B')}
@@ -56,3 +43,10 @@ class PeriodLimitTests(unittest.TestCase):
   rec={'periodWeeks':8,'skills':[{'name':'A','courses':[{'id':'a','hours':72}],'books':[]}]}
   result=calculate_durations({'details':{}},rec,{'A':{'course':'a','books':[]}},['A'],4)
   self.assertEqual(result['A']['weeks'],18)
+
+
+ def test_all_courses_keep_actual_estimate_over_input_period(self):
+  for course in ('A1','A2','A3'):
+   rec={'skills':[{'name':'A','courses':[{'id':'a','hours':72}],'books':[]}]}
+   result=calculate_durations({'details':{'weeks':8,'hours':4},'selectedCourse':{'id':course}},rec,{'A':{'course':'a','books':[]}},['A'],4)
+   self.assertEqual(result['A']['weeks'],18)

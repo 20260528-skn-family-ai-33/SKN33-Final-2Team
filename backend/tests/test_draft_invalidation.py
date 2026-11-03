@@ -1,7 +1,7 @@
 import copy
 import json
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 from app.services import drafts,survey_store
 import test_survey_generation as fixtures
 
@@ -24,13 +24,35 @@ class InvalidationTests(unittest.TestCase):
   t.one.return_value={'draft_choices':{'draft':drafts.fresh_draft()}}
   value=survey_store.save_generated(t,1,'p',fixture.project,fixture.selection(1),fixture.profile,fixture.result(1))
   answers={q['id']:(1 if kind=='surveys' else 0) for g in value['survey']['groups'] for kind in ('surveys','quizzes') for q in g[kind]}
-  value.update(answers=answers,completed=True,courseRecommendations={'A1':{'activityProposal':{'old':True}}})
+  value.update(courseRecommendationVersions={'A1':{'old':{'recommendations':{'id':'stale'}}}},answers=answers,completed=True,courseRecommendations={'A1':{'activityProposal':{'old':True}}})
   raw={'draft':dict(drafts.fresh_draft(),gen={'key':'old','options':{}},handoff={'key':'old'}),'v2Survey':value}
   t.one.return_value={'draft_choices':raw}
-  result=survey_store.save_answers(t,1,'p',value['generationId'],answers,complete=False)
+  result=survey_store.save_answers(t,1,'p',value['generationId'],answers,complete=True)
   self.assertTrue(result['completed']);self.assertIn('courseRecommendations',result)
   changed=dict(answers);changed[next(iter(changed))]=2
+  t.run.reset_mock()
+  with self.assertRaises(survey_store.StoreError):survey_store.save_answers(t,1,'p',value['generationId'],changed,complete=True)
+  t.run.assert_not_called()
+  value['completed']=False
   result=survey_store.save_answers(t,1,'p',value['generationId'],changed,complete=True)
   self.assertNotIn('courseRecommendations',result)
+  self.assertNotIn('courseRecommendationVersions',result)
   self.assertIsNone(json.loads(t.run.call_args.kwargs['draft'])['gen'])
   self.assertIn("'{draftPlan}'",t.run.call_args.args[0])
+
+ def test_switching_course_preserves_each_courses_material_cache(self):
+  w=self.state();w['v2Survey']['courseRecommendations']={'A1':{'recommendations':{'id':'one'}},'A2':{'recommendations':{'id':'two'}}}
+  before=copy.deepcopy(w['v2Survey'])
+  drafts._apply_client(w,{'chosen':'A2'})
+  self.assertEqual(w['v2Survey'],before)
+  self.assertIsNone(w['draftPlan'])
+
+ def test_select_api_preserves_recommendation_ids(self):
+  w=self.state();w['draft']['gen']['options']={'A1':{'id':'A1'},'A2':{'id':'A2'}}
+  w['v2Survey']['courseRecommendations']={'A1':{'recommendations':{'id':'one'}},'A2':{'recommendations':{'id':'two'}}}
+  before=copy.deepcopy(w['v2Survey'])
+  def mutate(employee,project,fn):fn(Mock(),w);return w
+  with patch.object(drafts,'_mutate',side_effect=mutate),patch.object(drafts,'present',side_effect=lambda state,*_:state),patch.object(drafts.RM,'params_of',return_value={}),patch.object(drafts.RM,'build_plan',return_value={'opt':'A2'}),patch('app.services.prompt_selection_store.comparison_snapshot',return_value=[]):
+   drafts.select(1,'p','A2')
+  self.assertEqual(w['v2Survey'],before)
+  self.assertEqual(w['draft']['chosen'],'A2')

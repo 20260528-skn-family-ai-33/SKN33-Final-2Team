@@ -89,8 +89,9 @@ class RevisionMaterialsTests(TestCase):
         out = roadmap.keep_ids(self.rebuild(), self.old, 2)
         self.assertEqual([a['id'] for a in out['acts']], ['old-course', 'old-task', 'other-course'])
 
-    def test_revision_over_explicit_deadline_fails_and_preserves_original(self):
-        original = deepcopy(self.old)
-        self.handoff['prefs']['deadlineWeeks'] = 1
-        with self.assertRaises(llm.LlmError): self.rebuild()
-        self.assertEqual(self.old, original)
+    def test_all_course_revisions_keep_actual_duration_over_input_period(self):
+        self.handoff['prefs']['deadlineWeeks']=1
+        for course in ('A1','A2','A3'):
+            self.option['id']=course
+            out=self.rebuild()
+            self.assertEqual(out['materialSchedule'][0]['weeks'],2)

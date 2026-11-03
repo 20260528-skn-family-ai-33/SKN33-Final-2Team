@@ -273,18 +273,25 @@ def save_progress(employee_id: int, roadmap_id: str, act_id: str, body: dict) ->
     row = _owned(employee_id, roadmap_id)
     if STATUS.get(row['status']) != 'active':
         raise ApiError(409, 'NOT_ACTIVE', '진행 중인 로드맵만 기록할 수 있어요')
-    if not any(a['id'] == act_id for a in row['content']['acts']):
+    activity = next((a for a in row['content']['acts'] if a['id'] == act_id), None)
+    if activity is None:
         raise not_found('활동')
     st = body.get('status') if body.get('status') in ('doing', 'done') else 'doing'
+    resource = catalog.items().get(activity.get('res')) if activity.get('res') else None
+    shared = bool(resource and (resource.get('type') == 'course' or resource.get('kind') == '강좌') and not activity.get('task'))
+    targets = [a['id'] for a in row['content']['acts'] if a['id'] == act_id or
+               (shared and a.get('res') == activity.get('res') and not a.get('task'))]
     with db.tx() as t:
-        old = t.one('SELECT memo, attachment FROM app_ext.activity_progress WHERE roadmap_id = CAST(:r AS uuid) AND activity_id = :a', r=roadmap_id, a=act_id) or {}
-        memo = body['memo'] if 'memo' in body and body['memo'] is not None else old.get('memo')
-        att = body['file'] if 'file' in body else old.get('attachment')
-        t.run("""INSERT INTO app_ext.activity_progress(roadmap_id, activity_id, status, memo, attachment) VALUES(CAST(:r AS uuid), :a, :s, :m, :f)
-                 ON CONFLICT (roadmap_id, activity_id) DO UPDATE SET status = EXCLUDED.status, memo = EXCLUDED.memo, attachment = EXCLUDED.attachment, updated_at = now()""",
-              r=roadmap_id, a=act_id, s=st, m=memo or '', f=db.J(att) if att else None)
-        # 완료 여부만 ERD 단계 행에 맞춘다(완료 여부만 바뀌면 팀 DB 트리거가 코멘트를 건드리지 않음)
-        t.run("UPDATE public.roadmap_steps SET is_completed = :d WHERE roadmap_id = CAST(:r AS uuid) AND details->>'id' = :a", d=st == 'done', r=roadmap_id, a=act_id)
+        for target in targets:
+            old = t.one('SELECT memo, attachment FROM app_ext.activity_progress WHERE roadmap_id = CAST(:r AS uuid) AND activity_id = :a', r=roadmap_id, a=target) or {}
+            # Share status only; other skills keep their own notes and attachments.
+            own = target == act_id
+            memo = body['memo'] if own and 'memo' in body and body['memo'] is not None else old.get('memo')
+            att = body['file'] if own and 'file' in body else old.get('attachment')
+            t.run("""INSERT INTO app_ext.activity_progress(roadmap_id, activity_id, status, memo, attachment) VALUES(CAST(:r AS uuid), :a, :s, :m, :f)
+                     ON CONFLICT (roadmap_id, activity_id) DO UPDATE SET status = EXCLUDED.status, memo = EXCLUDED.memo, attachment = EXCLUDED.attachment, updated_at = now()""",
+                  r=roadmap_id, a=target, s=st, m=memo or '', f=db.J(att) if att else None)
+            t.run("UPDATE public.roadmap_steps SET is_completed = :d WHERE roadmap_id = CAST(:r AS uuid) AND details->>'id' = :a", d=st == 'done', r=roadmap_id, a=target)
     return record(_owned(employee_id, roadmap_id))
 
 

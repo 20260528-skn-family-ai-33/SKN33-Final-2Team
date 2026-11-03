@@ -20,6 +20,7 @@ import { Icon } from '@/shared/ui/Icon';
 import { useCatalog } from '@/shared/state/catalog';
 import './homeSkills.css';
 import { GanttAll } from './Gantt';
+import { LearningSpace } from './LearningSpace';
 
 function DraftBox() {
   const go = useGo();
@@ -110,6 +111,7 @@ function StageCard({ R }: { R: PlanRecord }) {
           <ul className="acts">{categories.get(kind)!.map(a => <ActRow key={a.id} a={a} R={R} />)}</ul>
         </div>)}
       </section>)}</div>
+      <PostCta R={R} />
     </div>
   );
 }
@@ -143,6 +145,7 @@ export function HomePage() {
           <p className="lead">이어서 작성하면 마지막으로 작성하던 단계부터 이어가요.</p>
           <DraftBox />
           <PastLink />
+          <LearningSpace />
         </>
       );
     return (
@@ -160,7 +163,7 @@ export function HomePage() {
           {[
             ['목표 적기', '기획서는 선택'],
             ['세부 사항', '비워 두면 알아서'],
-            ['사전 점검', '1~5점 척도'],
+            ['역량 테스트', '1~5점 척도'],
             ['3안 비교', '관점별 작성'],
             ['확정', '고친 뒤'],
           ].map(([a, b], i) => (
@@ -172,6 +175,7 @@ export function HomePage() {
             </div>
           ))}
         </div>
+        <LearningSpace />
       </>
     );
   }
@@ -196,7 +200,6 @@ export function HomePage() {
           </div>
           <Alerts R={R} />
           <StageCard R={R} />
-          <PostCta R={R} />
         </section>
       ))}
       {drafting ? (
@@ -205,6 +208,7 @@ export function HomePage() {
         </div>
       ) : null}
       <PastLink />
+      <LearningSpace />
     </>
   );
 }

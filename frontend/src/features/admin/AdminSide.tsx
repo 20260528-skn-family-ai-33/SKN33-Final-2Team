@@ -6,7 +6,7 @@ import { AdminDemoTools } from '@/features/demo/DemoTools';
 import { useGo } from '@/shared/hooks/useGo';
 import { useSession } from '@/shared/state/session';
 import { Icon } from '@/shared/ui/Icon';
-import { Brand, NavLink, ThemePicker } from '@/shared/ui/sideParts';
+import { Brand, NavLink, SideToggle } from '@/shared/ui/sideParts';
 import { useUpload } from './adminData';
 import { DS, REG } from './datasets';
 
@@ -45,12 +45,12 @@ export function AdminSide() {
         <NavLink to={paths.adminHistory} active={active === 'admin-history'} icon="history" label="변경 이력" />
       </nav>
       <div className="side-foot">
-        <ThemePicker />
         <AdminDemoTools />
         <button className="btn ghost sm logout" aria-label="로그아웃" onClick={() => void logoutAndReset(go)}>
           <Icon name="logout" />
           <span className="lbl">로그아웃</span>
         </button>
+        <SideToggle />
       </div>
     </>
   );

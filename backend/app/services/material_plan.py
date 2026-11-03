@@ -35,7 +35,7 @@ def preview(saved,draft):
 def rebuild_revision(option, plan, handoff):
     """스킬형 계획만 재구성. 불명확한 소속은 실패시켜 기존 계획을 보존한다."""
     from app import llm
-    from app.services.duration_proposals import material_duration, positive, RecommendationError
+    from app.services.duration_proposals import material_duration, RecommendationError
     prior = plan.get('def') or {}
     old_report = prior.get('learningReport')
     if not isinstance(old_report, dict):
@@ -87,9 +87,6 @@ def rebuild_revision(option, plan, handoff):
             estimates[name] = material_duration(courses, books, weekly)
         except RecommendationError as error:
             raise llm.LlmError(str(error)) from error
-    deadline = positive((handoff.get('prefs') or {}).get('deadlineWeeks'))
-    if deadline and sum(row['weeks'] for row in estimates.values()) > deadline:
-        raise llm.LlmError('수정된 자료의 학습 기간이 요청 기간을 넘어요. 더 짧은 자료로 다시 수정해 주세요. 기존 계획은 유지됩니다.')
     details = []
     for name in names:
         detail = deepcopy(next((row for row in old_report.get('skillDetails', []) if row['name'] == name), {'name': name, 'application': ''}))

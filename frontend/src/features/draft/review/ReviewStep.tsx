@@ -3,33 +3,19 @@ import { DeliverableSelection, type DeliverableSelectionHandle } from './Deliver
 import { trackName } from '@/shared/constants/data';
 /* 6. 검토·확정 (5차 scr['new-review'] · P.confirm)
    확정(API-35): 새 로드맵 기록. 진행 중인 다른 로드맵은 보관하지 않고 함께 진행한다(10/14 · 묻지 않음) */
-import { draftsApi } from '@/api/endpoints/drafts';
 import { paths } from '@/app/paths';
 import { SkillMap } from '@/features/skillmap/SkillMap';
 import { useGo } from '@/shared/hooks/useGo';
-import { failToast } from '@/shared/lib/fail';
 import { useMe } from '@/shared/state/session';
-import { recs, updateWs, useWs, ws } from '@/shared/state/workspace';
+import { recs, useWs } from '@/shared/state/workspace';
 import { Icon } from '@/shared/ui/Icon';
 import { Note, Page, Stats } from '@/shared/ui/parts';
 import { StagesView } from '@/shared/ui/StagesView';
-import { DraftSaveError, flush, reloadWorkspace } from '../draftSync';
+import { confirmReview } from './confirmReview';
 import { useKickSupport } from '../generation/GenerationStep';
 import { SupCell, SupNote } from '../options/support';
 import { Stepper } from '../Stepper';
 import { useDraftWatch } from '../useDraftWatch';
-
-export async function confirmDraft(go: ReturnType<typeof useGo>): Promise<void> {
-  try {
-    await flush();
-    const r = await draftsApi.confirm(ws().draftId as string);
-    await reloadWorkspace();
-    updateWs((s) => void (s.lastNew = null));
-    go(paths.confirmed(r.planId), { force: true });
-  } catch (err) {
-    if (!(err instanceof DraftSaveError)) failToast(err, '로드맵을 확정하지 못했어요');
-  }
-}
 
 export function ReviewStep() {
   const go = useGo();
@@ -48,11 +34,11 @@ export function ReviewStep() {
   async function submit() {
     if (busy || submitting || (assessment && !ready)) return;
     setSubmitting(true);
-    try { if (!assessment || await deliverables.current?.save()) await confirmDraft(go); }
+    try { await confirmReview(go, assessment ? () => deliverables.current?.save() || Promise.resolve(false) : undefined); }
     finally { setSubmitting(false); }
   }
   if (!pl) return <><Stepper cur="review" busy={submitting} /><Page title="이 로드맵으로 확정할까요?" foot={<>
-    <button className="btn line" disabled={submitting} onClick={() => go(paths.newMaterials)}>이전: 자료 선택</button>
+    <button className="btn line" disabled={submitting} onClick={() => go(paths.newOptions)}>이전: 로드맵·자료 선택</button>
     <button className="btn pri" disabled={busy || submitting || !ready} onClick={() => void submit()}>확정하기</button>
   </>}>
     {assessment ? <DeliverableSelection ref={deliverables} onReadyChange={setReady} onBusyChange={setBusy} onDurationChange={setMaterialWeeks} /> : <p role="status">최종 검토 결과를 불러오는 중…</p>}
@@ -67,9 +53,9 @@ export function ReviewStep() {
         title="이 로드맵으로 확정할까요?"
         foot={
           <>
-            <button className="btn line" disabled={submitting} onClick={() => go(paths.newMaterials)}>
+            <button className="btn line" disabled={submitting} onClick={() => go(paths.newOptions)}>
               <Icon name="left" />
-              이전: 자료 선택
+              이전: 로드맵·자료 선택
             </button>
             <button className="btn pri" disabled={busy || submitting || (assessment && !ready)} onClick={() => void submit()}>
               확정하기
@@ -85,7 +71,7 @@ export function ReviewStep() {
         </div>
         {assessment && <DeliverableSelection ref={deliverables} onReadyChange={setReady} onBusyChange={setBusy} onDurationChange={setMaterialWeeks} />}
         {!assessment && <><SkillMap pl={pl} /><div className="sec"><StagesView pl={pl} /></div></>}
-        <p className="small muted">자료를 바꾸려면 <button className="link" onClick={() => go(paths.newMaterials)}>자료 선택으로 돌아가기</button></p>
+        <p className="small muted">자료를 바꾸려면 <button className="link" onClick={() => go(paths.newOptions)}>자료 선택으로 돌아가기</button></p>
         <div className="sec">
           <details className="card flat"><summary>지원 조건 보기</summary>
             <dl className="kv">
