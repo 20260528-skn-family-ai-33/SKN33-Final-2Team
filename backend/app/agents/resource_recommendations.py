@@ -42,9 +42,6 @@ def candidate_pools(project: dict, selection: dict, items: dict[str, dict], limi
         for kind, key in (('course', 'courses'), ('book', 'books')):
             # 스킬·종류·사용 가능 여부를 후보 개수 제한보다 먼저 적용한다.
             available = [row for row in items.values() if row.get('usable') and row.get('type') == kind and not exclusion(row,knowledge,str(project.get('goal') or '')) and skill['name'] in (row.get('skills') or []) and (not free_only or kind == 'book' or (row.get('cost') == 0 and not isinstance(row.get('cost'), bool)))]
-            if kind == 'course':
-                from app.services.duration_proposals import course_fits_period
-                available = [row for row in available if course_fits_period(row, project, project.get('selectedCourse'))]
             available.sort(key=lambda row: (-score(row), str(row.get('title') or ''), row['id']))
             by_kind[key] = [deepcopy({field: row.get(field) for field in
                 ('id', 'title', 'provider', 'cost', 'hours', 'estimated', 'image', 'url', 'skills', 'content', 'curriculum')})
@@ -55,6 +52,7 @@ def candidate_pools(project: dict, selection: dict, items: dict[str, dict], limi
 
 def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
                         generate: Callable[[str, dict], dict], *, course: dict | None = None, retrieved_pools: list[dict] | None = None) -> dict:
+    project = dict(project, selectedCourse=deepcopy(course or project.get('selectedCourse')))
     pools = retrieved_pools if retrieved_pools is not None else candidate_pools(project, selection, items, free_only=bool(course and course.get('id') == 'A1'))
     if not any(row['courses'] or row['books'] for row in pools):
         return {'skills': [{'name': row['name'], 'courses': [], 'books': [],
@@ -80,7 +78,7 @@ def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
     payload['hrContext']=deepcopy(project.get('hrContext') or {})
     payload['course'] = deepcopy(course)
     payload['project']['details'] = deepcopy(project.get('details') or {})
-    rules = '\n선택한 course의 방향과 범위를 따라 추천한다. A1 Free Course는 강좌만 예산과 무관하게 비용 0원으로 제한하고 도서는 유료·가격 미확인도 허용하며 가격과 예산으로 제외하지 않는다, A2 Crash Course는 단기간에 필요한 내용을 익힐 자료, A3 Challenge Course는 프로젝트에 직접 적용하는 실습 중심 자료를 우선한다. 없는 자료를 채우지 않는다.'
+    rules = '\n선택한 course의 방향과 범위를 따라 추천한다. A1 Free Course는 강좌만 예산과 무관하게 비용 0원으로 제한하고 도서는 유료·가격 미확인도 허용하며 가격과 예산으로 제외하지 않는다, 기간은 참고 조건이며 모든 코스에서 기간 초과만으로 후보를 제외하지 않는다. A2 Crash Course는 목표에 필요한 핵심 범위를 우선한다. A3 Challenge Course는 프로젝트에 직접 적용하는 실습 중심 자료를 우선한다. 없는 자료를 채우지 않는다.'
     from app.track_policy import challenge_guidance
     from app.learner_knowledge import POLICY
     raw = generate(SYSTEM + rules + POLICY + challenge_guidance(course, 'resources'), payload)
@@ -158,8 +156,6 @@ def recommend_from_catalog(ctx: Any, pre: dict, course: dict | None = None) -> d
     pools, retrieval = retrieve(project, pre['selection'], items, course)
     result = recommend_resources(project, pre['selection'], items,
         lambda system, payload: runtime.llm_json(ctx, system, payload), course=course, retrieved_pools=pools)
-    from app.services.duration_proposals import period_limit
-    result['periodWeeks'] = period_limit(project, course)
     result['retrieval'] = retrieval
     return result
 

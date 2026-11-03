@@ -6,11 +6,10 @@ import { draftsApi } from '@/api/endpoints/drafts';
 import { paths } from '@/app/paths';
 import { useGo } from '@/shared/hooks/useGo';
 import { kb } from '@/shared/lib/format';
-import { cause, DOC_CHARS, errText, PROV, type Cause } from '@/shared/state/ai';
+import { cause, errText, PROV, type Cause } from '@/shared/state/ai';
 import { setAt } from '@/shared/state/bind';
 import { toast } from '@/shared/state/ui';
 import { updateWs, useWs, ws } from '@/shared/state/workspace';
-import type { DocState } from '@/api/types/draft';
 import { BText } from '@/shared/ui/bound';
 import { me } from '@/shared/state/session';
 import { resolveGoalInput } from './goalInput';
@@ -175,33 +174,6 @@ const DOC_STEP: Record<string, string> = {
   summary: '기획서를 요약하고 있어요',
 };
 
-/** 이미지 안내: 읽은 이미지 / 읽지 않은 이유 (비전 모델 없음·가데이터·작은 아이콘 등) */
-function imageLine(doc: DocState): string {
-  const sk = doc.imageSkipped || {};
-  const other = (sk.small || 0) + (sk.big || 0) + (sk.format || 0) + (sk.more || 0);
-  if (!doc.imageTotal) return '';
-  const why = [
-    sk.small && `작은 아이콘 ${sk.small}`,
-    sk.big && `1.5MB가 넘는 이미지 ${sk.big}`,
-    sk.format && `EMF·WMF 같은 형식 ${sk.format}`,
-    sk.more && `4장을 넘는 이미지 ${sk.more}`,
-  ]
-    .filter(Boolean)
-    .join(', ');
-  if (doc.imagesRead) return `이미지 ${doc.imagesRead}장을 비전 모델이 보고 요약에 합쳤어요.${other ? ` 그 밖의 ${other}개(${why})는 보지 않았어요.` : ''}`;
-  const base =
-    (
-      {
-        mock: '가데이터 모드라 이미지는 보지 않았어요.',
-        novision: '이미지를 볼 수 있는 AI 모델이 설정되지 않아 이미지는 보지 않았어요.',
-        skip: '이미지는 건너뛰고 글자만 요약했어요.',
-        lost: '서버를 다시 켜 이미지는 보지 못했어요. 이미지까지 보려면 파일을 다시 골라 주세요.',
-        none: '읽을 수 있는 크기·형식의 이미지가 없어 보지 않았어요.',
-      } as Record<string, string>
-    )[doc.visionWhy || ''] || '이미지는 보지 않았어요.';
-  return `이미지 ${doc.imageTotal}개 · ${base}${doc.visionWhy === 'none' && why ? ` (${why})` : ''} 그림·도표의 중요한 내용은 요약에 직접 적어 주세요.`;
-}
-
 function DocFailBox({ title, c, children }: { title: string; c: Cause; children: React.ReactNode }) {
   return (
     <div className="docbox fail">
@@ -257,64 +229,7 @@ function DocBox() {
       </DocFailBox>
     );
   }
-  const meta = [
-    doc.format,
-    doc.pages ? `${doc.pages}쪽` : '',
-    `글자 ${(doc.chars || 0).toLocaleString('ko-KR')}자`,
-    (doc.chars || 0) > DOC_CHARS ? `앞 ${DOC_CHARS.toLocaleString('ko-KR')}자로 요약` : '',
-  ]
-    .filter(Boolean)
-    .join(' · ');
-  const real = doc.source && doc.source !== 'mock';
-  const img = imageLine(doc);
-  return (
-    <div className="docbox">
-      <div className="db-top">
-        <p className="eyebrow">
-          <Icon name="spark" />
-          기획서 요약 · 진단 에이전트
-        </p>
-        <span className={`tag ${real ? 'acc' : ''}`}>{real ? `${PROV[doc.source as string]} 요약` : '가데이터 요약'}</span>
-      </div>
-      <p className="small muted db-meta">{meta}</p>
-      {(doc.warnings || []).map((w, i) => (
-        <p className="small warn-t" key={i}>
-          <Icon name="info" />
-          {w}
-        </p>
-      ))}
-      {doc.summary || doc.text ? (
-        <>
-          <BText path="draft.doc.summary" className="textarea sm" maxLength={1500} ariaLabel="기획서 요약" rows={6} />
-          <p className="small muted">틀리거나 빠진 내용은 직접 고쳐 주세요. 이 요약만 사전 점검·진단·로드맵 에이전트에게 넘어가요.</p>
-        </>
-      ) : (
-        <p className="small muted">요약할 글자를 찾지 못했어요. 기획서 없이 목표만으로 진행해요.</p>
-      )}
-      {img ? (
-        <>
-          <p className="small db-img">
-            <Icon name="file" />
-            {img}
-          </p>
-          {doc.visionWhy === 'novision' ? (
-            <OpsBox
-              items={[
-                [
-                  '',
-                  {
-                    text: '비전 모델 설정 없음',
-                    hint: 'RunPod-Ollama 팀 모델은 이미지를 읽지 않아요. OpenAI API 모드에서 .env에 OPENAI_VISION_MODEL을 넣고 서버를 다시 실행하면 이미지도 읽어요',
-                  },
-                ],
-              ]}
-              cls="sm"
-            />
-          ) : null}
-        </>
-      ) : null}
-    </div>
-  );
+  return null;
 }
 
 async function uploadProject(file: File): Promise<void> {

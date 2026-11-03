@@ -2,7 +2,7 @@ import { blockedTo } from './model';
 import type { OptionDef } from '@/api/types/draft';
 import { describe, expect, it } from 'vitest';
 import { freshWs } from '@/shared/state/workspace';
-import { inputSignature, invalidateDraft } from './invalidation';
+import { inputSignature, invalidateDraft, invalidateMaterialChoices } from './invalidation';
 import { takeDraftInto } from './draftSync';
 import { answerMemoryKey, pendingAnswers, rememberAnswers } from './quiz/assessment/answerMemory';
 
@@ -40,7 +40,7 @@ describe('늦게 도착한 응답 저장 상태', () => {
     expect(state.draft.v2Assessment?.completed).toBe(true);
   });
 });
-describe('사전 점검 선택 복원', () => {
+describe('역량 테스트 선택 복원', () => {
   it('같은 직원·초안·문항·입력에서만 복원하며 퀴즈 0번 응답도 보존한다', () => {
     const key = answerMemoryKey('u', 'd', 'g', 'inputs');
     rememberAnswers(key, { s: 5, q: 0 }, 'quizzes');
@@ -62,9 +62,11 @@ describe('선택 단계부터 검토까지의 이동 호환성', () => {
     invalidateDraft(state,'materials');
     expect(state.draft.v2Assessment?.completed).toBe(true);
     expect(blockedTo(state,'materials')).toBeNull();
-    expect(blockedTo(state,'review')).toBe('/new/materials');
+    expect(blockedTo(state,'review')).toBe('/new/options');
     expect(state.draft.v2Assessment?.materialsKey).toBeUndefined();
     state.draft.v2Assessment!.materialsReady=true;
+    expect(blockedTo(state,'review')).toBe('/new/options');
+    state.pendingFlow=undefined; // A successful explicit material save clears the dirty marker.
     expect(blockedTo(state,'review')).toBeNull();
     invalidateDraft(state);
     expect(blockedTo(state,'review')).toBe('/new/details');
@@ -98,5 +100,21 @@ describe('DB JSON 항목 순서 호환성', () => {
     takeDraftInto(state,{draftId:'d',draft:server},true);
     expect(state.draft.v2Assessment?.completed).toBe(true);
     expect(state.pendingFlow).toBeUndefined();
+  });
+});
+
+describe('코스별 자료 수정과 검토 이동',()=>{
+  function ready(){const s=freshWs('u');s.draftId='d';s.draft.chosen='A1';s.draft.v2Assessment={generationId:'g',completed:true,materialsReady:true,activitiesReady:true,materialsKey:'old'};return s;}
+  it('선택한 코스의 자료 수정은 검토 단계 바로가기를 막는다',()=>{
+    const s=ready();invalidateMaterialChoices(s,'A1');
+    expect(blockedTo(s,'review')).toBe('/new/options');expect(s.pendingFlow).toBe('materials');expect(s.draft.v2Assessment?.completed).toBe(true);
+    const server={draftId:'d',draft:{...s.draft,v2Assessment:{generationId:'g',completed:true,materialsReady:true,activitiesReady:true,materialsKey:'old'}}};
+    takeDraftInto(s,server,true);expect(blockedTo(s,'review')).toBe('/new/options');
+  });
+  it('다른 코스의 자료 수정은 현재 선택 코스의 검토를 초기화하지 않는다',()=>{
+    const s=ready();const before=structuredClone(s);invalidateMaterialChoices(s,'A3');expect(s).toEqual(before);
+  });
+  it('늦은 응답의 준비 플래그가 남아도 미저장 표시는 검토 진입을 차단한다',()=>{
+    const s=ready();s.pendingFlow='materials';expect(blockedTo(s,'review')).toBe('/new/options');
   });
 });

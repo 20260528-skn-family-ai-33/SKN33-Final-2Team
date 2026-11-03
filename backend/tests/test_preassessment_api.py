@@ -107,9 +107,19 @@ class ApiTests(unittest.TestCase):
         self.assertIsNone(project['projectSummary'])
         self.assertEqual(project['desiredCompetencies'], 'Python으로 데이터 분석')
         t.one.return_value['draft_choices']['draft']['project'] = {'name': 'test.pdf'}
+        t.one.return_value['draft_choices']['draft']['doc'] = {'status':'reading'}
         with self.assertRaises(api.ApiError) as error:
             api.project_input(t, 7, self.pid)
         self.assertEqual(error.exception.code, 'PROJECT_SUMMARY_PENDING')
+
+    def test_failed_or_empty_summary_allows_goal_only_without_inventing_summary(self):
+        for doc in ({'status':'fail','text':'RAW SECRET','summary':'unfinished'}, {'status':'ok','summary':'   '}, {}):
+            with self.subTest(doc=doc):
+                t=Mock();draft={'goal':'Python으로 데이터 분석','project':{'name':'test.pdf'},'doc':doc}
+                t.one.return_value={'draft_choices':{'draft':draft}}
+                before=copy.deepcopy(draft);result=api.project_input(t,7,self.pid)
+                self.assertIsNone(result['projectSummary']);self.assertEqual(result['goal'],draft['goal'])
+                self.assertEqual(result['projectFile']['name'],'test.pdf');self.assertNotIn('text',result);self.assertEqual(draft,before)
 
     def test_existing_survey_reuses_without_model_calls(self):
         t = Mock()

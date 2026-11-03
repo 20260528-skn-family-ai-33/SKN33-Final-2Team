@@ -1,5 +1,11 @@
+import { InputSkills } from './InputSkills';
+import './detailsCheck.css';
+import { canContinueSkills, hasExistingSkillProgress } from './skillInput';
+import { flush } from '../draftSync';
+import { loadSurvey } from '../quiz/surveyRequest';
+import { inputSignature } from '../invalidation';
 /* 2. 세부 사항 · 2-1. 세부 사항 확인 (5차 scr['new-details'] · scr['new-details-check'])
-   확인 화면은 입력한 내용(빈 칸은 '알아서')과 진단 에이전트 연결 상태를 보여 주고, '다음'을 누르면 사전 점검 문항을 만든다 */
+   확인 화면은 입력한 내용(빈 칸은 '알아서')과 진단 에이전트 연결 상태를 보여 주고, '다음'을 누르면 역량 테스트 문항을 만든다 */
 import { Fragment, useEffect } from 'react';
 import { paths } from '@/app/paths';
 import type { Prefs } from '@/api/types/draft';
@@ -11,27 +17,27 @@ import { updateWs, useWs } from '@/shared/state/workspace';
 import { ConnBox } from '@/shared/ui/conn';
 import { Icon } from '@/shared/ui/Icon';
 import { Note, Page } from '@/shared/ui/parts';
-import { docSummary, quizKey } from '../model';
 import { StaleNote } from '../stale';
 import { Stepper } from '../Stepper';
 import { DetailsForm } from './DetailsForm';
 
 export function DetailsStep() {
   const go = useGo();
-  const hasQuiz = useWs((s) => !!s.draft.quiz);
+  const draft = useWs(s => s.draft);
+  const hasQuiz = !!draft.v2Assessment?.completed;
   return (
     <>
       <Stepper cur="details" />
       <Page
-        title="학습 여건을 알려 주세요"
-        lead="모두 선택 사항이에요. 비워 둔 항목은 알아서 정해요."
+        title="학습 여건과 학습할 스킬을 정해 주세요"
+        lead="학습 여건은 비워 두면 알아서 정해요. 학습할 스킬은 하나 이상 선택해 주세요."
         foot={
           <>
             <button className="btn line" onClick={() => go(paths.newGoal)}>
               <Icon name="left" />
               이전
             </button>
-            <button className="btn pri" onClick={() => go(paths.newDetailsCheck)}>
+            <button className="btn pri" disabled={!canContinueSkills(draft)} onClick={() => { go(paths.newDetailsCheck); }}>
               다음: 입력 내용 확인
             </button>
           </>
@@ -40,8 +46,9 @@ export function DetailsStep() {
         <div className="card">
           <DetailsForm path="draft.prefs" learningConditionsOnly />
         </div>
+        <InputSkills />
         <StaleNote kind="gen" />
-        {hasQuiz ? <Note>사전 점검 문항은 이미 만들었어요. 학습 여건을 바꾸면 로드맵을 만들 때 반영해요.</Note> : null}
+        {hasQuiz ? <Note>점검 완료 응답은 고정돼요. 목표·세부사항·스킬을 변경하면 새 점검을 진행해요.</Note> : null}
       </Page>
     </>
   );
@@ -50,8 +57,7 @@ export function DetailsStep() {
 export const DetailsView = ({ p }: { p: Prefs }) => (
   <div className="card acc preview">
     <p className="eyebrow">
-      <Icon name="spark" />
-      진단 에이전트에게 넘길 세부 사항
+      세부사항
     </p>
     <dl className="kv">
       {D.detailFields.filter(([key]) => key !== 'format' && key !== 'cert').map(([k, l]) => (
@@ -68,24 +74,26 @@ export function DetailsCheck() {
   const go = useGo();
   const d = useWs((s) => s.draft);
   const conn = useAi((s) => s.conn);
-  const made = !!(d.quiz && d.quiz.key === quizKey(d));
+
   useEffect(() => {
     if (ai.live() && (conn.provider !== ai.mode() || conn.state === 'idle' || Date.now() - conn.at > 60000)) void ping();
     // 화면에 들어올 때 한 번만 확인한다
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const sum = docSummary(d);
+  const owner = useWs(s => s.owner);
+  const signature = inputSignature(d);
+  const preserveLegacy=hasExistingSkillProgress(d)&&!d.v2Assessment;
+  useEffect(()=>{
+    if(preserveLegacy)return;
+    void (async()=>{await flush();return loadSurvey(`${owner}:${signature}`);})().catch(()=>{});
+  },[owner,signature,preserveLegacy]);
   return (
     <>
-      <Stepper cur="details" />
+      <Stepper cur="check" />
       <Page
         eyebrow="세부 사항 확인"
-        title={made ? '입력한 세부 사항이에요' : '이 내용으로 사전 점검을 만들까요?'}
-        lead={
-          made
-            ? '사전 점검 문항은 이미 만들었어요. ‘다음’을 누르면 사전 점검으로 넘어가요. 여기 내용은 로드맵을 만들 때 반영해요.'
-            : '‘다음’을 누르면 진단 에이전트가 기획서 요약·선정 스킬·키우고 싶은 역량·개인 DB 프로필로 사전 점검 문항을 만들어요. 나머지 항목은 로드맵을 만들 때 반영하고, ‘알아서’인 항목은 로드맵 계획 에이전트가 목표에 맞게 정해요.'
-        }
+        title="학습 목표·프로젝트 요약과 선택한 스킬을 확인해 주세요"
+        lead="입력한 학습 목표·프로젝트 요약과 선택한 스킬을 확인해 주세요."
         foot={
           <>
             <button className="btn line" onClick={() => go(paths.newDetails)}>
@@ -99,24 +107,37 @@ export function DetailsCheck() {
                 go(paths.newQuiz);
               }}
             >
-              다음: 사전 점검
+              다음: 역량 테스트
             </button>
           </>
         }
       >
-        <p className="small muted goal-line">목표 · {d.goal}</p>
-        {sum ? (
-          <div className="card flat doc-line">
-            <p className="eyebrow">
-              <Icon name="file" />
-              기획서 요약 · {d.doc?.name}
-            </p>
-            <p className="pre small">{sum}</p>
-          </div>
-        ) : null}
+        <div className="card input-confirm-box">
+        <section className="card check-goal" aria-labelledby="checkGoalTitle"><h2 id="checkGoalTitle">학습 목표</h2><p>{d.goal}</p></section>
+        <details className="card check-goal check-project">
+          <summary><span>프로젝트 요약</span><span className="check-project-more">더보기</span><span className="check-project-less">접기</span></summary>
+          {d.doc?.name && <p className="small muted">첨부 파일 · {d.doc.name}</p>}
+          <ProjectSummary text={d.doc?.status==='reading'?'프로젝트 요약을 준비하고 있어요.':d.doc?.summary?.trim()||'등록된 프로젝트 요약이 없어요.'} />
+        </details>
         <DetailsView p={d.prefs} />
+        <section className="card skill-confirm" aria-labelledby="confirmedSkillsTitle">
+          <header className="skill-confirm-header"><h2 id="confirmedSkillsTitle">선택한 스킬 · 학습 순서</h2><span>{d.selectedSkills?.length||0}개 스킬</span></header>
+          <ol className="skill-confirm-list">{d.selectedSkills?.map((row,index)=><li key={row.name}>
+            <span className="skill-confirm-number" aria-hidden="true">{String(index+1).padStart(2,'0')}</span>
+            <div><h3>{row.name}</h3><p>{row.application}</p></div>
+          </li>)}</ol>
+        </section>
+        </div>
         <ConnBox />
       </Page>
     </>
   );
+}
+
+function ProjectSummary({text}:{text:string}) {
+  const lines=text.split(/\r?\n/).map(line=>line.trim()).filter(Boolean);
+  return <dl className="check-project-summary">{lines.map((line,index)=>{
+    const match=line.match(/^(목적|다룰 데이터|기술·도구|기술 및 도구|일정|제약)\s*[:：]\s*(.*)$/);
+    return match?<div key={index}><dt>{match[1]}</dt><dd>{match[2]}</dd></div>:<div className="summary-paragraph" key={index}><dd>{line}</dd></div>;
+  })}</dl>;
 }

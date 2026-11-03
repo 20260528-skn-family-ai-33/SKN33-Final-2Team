@@ -11,7 +11,7 @@ import { me, setWorkspaceLoader } from '@/shared/state/session';
 import { failToast } from '@/shared/lib/fail';
 import { freshDraft, fromWorkspace, updateWs, useWs, ws, type WsState } from '@/shared/state/workspace';
 
-const CLIENT = ['goal', 'project', 'prefs', 'detailsOk', 'answers', 'deepOn', 'deepMcq', 'deepEssay', 'chosen', 'edit'] as const;
+const CLIENT = ['goal', 'project', 'prefs', 'detailsOk', 'answers', 'deepOn', 'deepMcq', 'deepEssay', 'chosen', 'edit', 'selectedSkills', 'skillInputKey', 'skillCandidates'] as const;
 
 const snap = (st: WsState): string =>
   JSON.stringify([CLIENT.map((k) => st.draft[k]), st.lastNew, st.draft.doc ? st.draft.doc.summary : null, (st.draft.gen && st.draft.gen.cur) || null, st.pendingFlow === 'inputs' || st.pendingFlow === 'options' ? st.pendingFlow : null]);
@@ -215,10 +215,12 @@ setWorkspaceLoader(async () => {
   lastSent = snap(ws());
 });
 
-export const reloadWorkspace = async (): Promise<void> => {
+export const reloadWorkspace = async (accept: () => boolean = () => true): Promise<boolean> => {
   const u = me();
-  if (!u) return;
+  if (!u) return false;
+  const owner = ws().owner;
   const w = await accountApi.workspace();
+  if (me()?.id !== u.id || ws().owner !== owner || !accept()) return false;
   const keep = { lastRoute: ws().lastRoute };
   const st = fromWorkspace(w, u.id, (s, d) => takeDraftInto(s, d));
   applying = true;
@@ -226,4 +228,5 @@ export const reloadWorkspace = async (): Promise<void> => {
   applying = false;
   serverGenCur = curJ(ws());
   lastSent = snap(ws());
+  return true;
 };

@@ -15,3 +15,5 @@
 
 /* 가로 이동해도 그래프가 고정된 이름 영역을 침범하지 않게 자른다. */
 .gt-pan .gt-row>.gt-tl,.gt-pan .gt-h>.gt-tl,.gt-pan .gt-grid,.gt-pan .gt-week-boundaries{clip-path:inset(0 0 0 var(--gt-scroll-left,0px))}
+
+.gt-shared-note{position:absolute;left:8px;top:8px;font-size:10px;color:var(--ink-3,#68776f)}
