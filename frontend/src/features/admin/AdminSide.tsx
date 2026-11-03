@@ -6,7 +6,7 @@ import { AdminDemoTools } from '@/features/demo/DemoTools';
 import { useGo } from '@/shared/hooks/useGo';
 import { useSession } from '@/shared/state/session';
 import { Icon } from '@/shared/ui/Icon';
-import { Brand, NavLink } from '@/shared/ui/sideParts';
+import { Brand, NavLink, SideToggle } from '@/shared/ui/sideParts';
 import { useUpload } from './adminData';
 import { DS, REG } from './datasets';
 
@@ -50,6 +50,7 @@ export function AdminSide() {
           <Icon name="logout" />
           <span className="lbl">로그아웃</span>
         </button>
+        <SideToggle />
       </div>
     </>
   );
