@@ -46,11 +46,13 @@ class PeriodLimitTests(unittest.TestCase):
  def test_unconfirmed_hours_not_claimed_as_verified_fit(self):
   from app.services.duration_proposals import course_fits_period
   self.assertTrue(course_fits_period({'hours':None},{'details':{'weeks':8,'hours':4}}))
- def test_selected_total_over_deadline_is_rejected(self):
+ def test_selected_total_over_deadline_keeps_actual_estimate(self):
   rec={'skills':[{'name':n,'courses':[{'id':n,'hours':20}],'books':[]} for n in ('A','B')]}
   choices={n:{'course':n,'books':[]} for n in ('A','B')}
-  with self.assertRaises(RecommendationError):calculate_durations({'details':{'weeks':8,'hours':4}},rec,choices,['A','B'],4)
+  result=calculate_durations({'details':{'weeks':8,'hours':4}},rec,choices,['A','B'],4)
+  self.assertEqual(sum(row['weeks'] for row in result.values()),10)
 
- def test_saved_recommendation_plan_limit_applies_when_user_period_auto(self):
+ def test_saved_recommendation_limit_does_not_block_selection(self):
   rec={'periodWeeks':8,'skills':[{'name':'A','courses':[{'id':'a','hours':72}],'books':[]}]}
-  with self.assertRaises(RecommendationError):calculate_durations({'details':{}},rec,{'A':{'course':'a','books':[]}},['A'],4)
+  result=calculate_durations({'details':{}},rec,{'A':{'course':'a','books':[]}},['A'],4)
+  self.assertEqual(result['A']['weeks'],18)

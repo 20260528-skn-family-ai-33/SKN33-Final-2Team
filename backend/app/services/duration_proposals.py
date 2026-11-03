@@ -25,12 +25,7 @@ def calculate_durations(project,recommendations,choices,order,weekly_hours):
         book_weeks=len(choice['books'])
         result[name]={'weeks':course_weeks+book_weeks,'courseWeeks':course_weeks,'bookWeeks':book_weeks,'weeklyHours':weekly,
             'basis':f"강좌 {course_weeks}주 + 도서 {book_weeks}권 × 1주",'method':METHOD,'course':choice['course'],'books':sorted(choice['books'])}
-    limit = period_limit(project)
-    stored_limit = positive(recommendations.get('periodWeeks'))
-    if stored_limit:
-        limit = min(limit, stored_limit) if limit else stored_limit
-    if limit and sum(row['weeks'] for row in result.values()) > limit:
-        raise RecommendationError('선택한 자료의 총 학습 기간이 입력한 기간을 넘어요. 더 짧은 강좌·도서를 다시 선택해 주세요.')
+    # Selection estimates remain informative; period policy is handled during recommendation.
     return result
 
 
