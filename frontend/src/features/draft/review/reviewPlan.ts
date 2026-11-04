@@ -11,6 +11,16 @@ export type ReviewProposal = {
 };
 export type ReviewPlanState = { scope: string; plan: PlanContent | null; error?: string };
 
+/** 계산 대기·실패 중에는 확인 가능한 과제만 표시하고 자료의 원본 시간을 사용하지 않는다. */
+export function reviewTaskDisplay(proposal: ReviewProposal | null, versions: ReviewProposal[], picks: Record<string, string>, start = 1): ReviewActivity[] {
+  if (!proposal) return [];
+  return proposal.option.acts.filter(act => !act.res).flatMap(task => {
+    const id = picks[task.skill];
+    const tasks = id ? versions.find(row => row.id === id && row.key === proposal.key)?.option.acts.filter(act => !act.res && act.skill === task.skill) : [task];
+    return tasks?.length === 1 && tasks[0].stage >= start ? [structuredClone(tasks[0])] : [];
+  });
+}
+
 /** 저장 시 compose_skill_selection → selection_option → build_plan과 같은 선택을 미리 계산한다. */
 export function reviewPlan(proposal: ReviewProposal, versions: ReviewProposal[], picks: Record<string, string>,
   materials: ReviewMaterials, handoff: Pick<Handoff, 'startStage'> & { prefs: Pick<Handoff['prefs'], 'weeklyHours' | 'formatKey'> }, goal: string) {

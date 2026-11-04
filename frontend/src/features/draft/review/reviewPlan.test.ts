@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { reviewPlan, type ReviewProposal } from './reviewPlan';
+import { reviewPlan, reviewTaskDisplay, type ReviewProposal } from './reviewPlan';
 import { ReviewSkillBlocks, type ReviewMaterials } from './ReviewSkillBlocks';
 import { Stats } from '@/shared/ui/parts';
 
@@ -74,5 +74,34 @@ describe('검토 선택과 확정 계획의 시간 기준', () => {
     expect(() => reviewPlan(proposal, [proposal], {}, {...materials, recommendations: null}, handoff, 'SQL')).toThrow('불러오는 중');
     materials.choices.SQL.books = [];
     expect(() => reviewPlan(proposal, [proposal], {}, materials, handoff, 'SQL')).toThrow('자료가 현재 선택과 달라');
+  });
+});
+
+
+describe('검토 계산 대기·오류 중 과제 표시', () => {
+  it('자료 시간 대신 기존 과제와 선택 여부를 보존하고 재제안만 막는다', () => {
+    const {materials, proposal} = fixture();
+    const acts = reviewTaskDisplay(proposal, [proposal], {});
+    expect(acts.map(act => act.id)).toEqual(['t']);
+    for (const busy of [false, true]) {
+      const html = renderToStaticMarkup(createElement(ReviewSkillBlocks, {materials, acts, selectedIds: proposal.selectedIds, busy, proposeDisabled: true}));
+      expect(html).toContain('Task'); expect(html).toContain('checked');
+      expect(html).not.toContain('산출물을 제안받으면'); expect(html).not.toContain('계획 10시간');
+      expect(html).toMatch(/<button[^>]*disabled[^>]*>과제 다시 제안받기/);
+      if (!busy) expect(html).not.toMatch(/<input[^>]*disabled/);
+    }
+  });
+  it('기본 제안 대신 실제 선택한 다른 버전의 과제를 표시한다', () => {
+    const {proposal} = fixture(); const alternative = structuredClone(proposal); alternative.id = 'new';
+    alternative.option.acts[2] = {...alternative.option.acts[2], id: 'new-task', hours: 3};
+    expect(reviewTaskDisplay(proposal, [proposal, alternative], {SQL: 'new'})).toEqual([alternative.option.acts[2]]);
+    expect(proposal.option.acts[2].id).toBe('t');
+  });
+  it('다른 입력의 제안·없는 버전·시작 단계 이전 과제를 끌어오지 않는다', () => {
+    const {proposal} = fixture();
+    expect(reviewTaskDisplay(proposal, [{...proposal, key: 'old'}], {SQL: 'base'})).toEqual([]);
+    expect(reviewTaskDisplay(proposal, [], {SQL: 'missing'})).toEqual([]);
+    expect(reviewTaskDisplay(proposal, [proposal], {}, 4)).toEqual([]);
+    expect(reviewTaskDisplay(null, [], {})).toEqual([]);
   });
 });

@@ -6,7 +6,7 @@ import { useWs, ws } from '@/shared/state/workspace';
 import { reviewScope } from './reviewScope';
 import { reviewTasks } from './reviewTasks';
 import { flush, takeDraft } from '../draftSync';
-import { reviewPlan, type ReviewActivity as Activity, type ReviewProposal as Proposal, type ReviewPlanState } from './reviewPlan';
+import { reviewPlan, reviewTaskDisplay, type ReviewActivity as Activity, type ReviewProposal as Proposal, type ReviewPlanState } from './reviewPlan';
 
 type ProposalResponse = { proposal: Proposal | null; versions: Proposal[] };
 // Clear reusable results and detach pending flights on logout/account change.
@@ -131,7 +131,7 @@ function ScopedDeliverableSelection({ ref, onReadyChange, onBusyChange, onPlanCh
     finally { setBusy(false); }
   } }));
   async function propose(skill?: string) {
-    if (!id || busy || loading) return;
+    if (!id || busy || loading || preview.error || error) return;
     setGeneratingSkill(skill || null);
     setBusy(true); setError('');
     try {
@@ -175,7 +175,7 @@ function ScopedDeliverableSelection({ ref, onReadyChange, onBusyChange, onPlanCh
     <p className="small muted">선택한 강좌·도서를 바탕으로 스킬별 산출물을 제안받아요. 기본으로 모두 선택되며 필요 없는 항목만 제외할 수 있어요.</p>
     {(loading || busy) && <p className="review-generation-status" role="status"><span className="review-proposal-spinner" aria-hidden="true" />{loading ? '최종 검토 결과 생성 중… 선택한 자료를 바탕으로 역량과 산출물을 준비하고 있어요.' : '해당 스킬의 과제를 다시 제안하고 있어요.'}</p>}
     {(error || preview.error) && <div><p className="err" role="alert">{error || preview.error}</p><button type="button" className="btn line small" disabled={busy || loading} onClick={() => { reviewTasks.forget(scope); setLoading(true); setError(''); setAttempt(n => n + 1); }}>다시 불러오기</button></div>}
-    {materials && <ReviewSkillBlocks materials={{ ...materials, durationEstimates: preview.value?.plan.def.learningReport?.durationEstimates || materials.durationEstimates, skillDetails: (materials.skillOrder || materials.recommendations?.skills.map(s => s.name) || []).map(name => ({ name, application: '', competencySummary: proposal?.skillSummaries?.[name] || summaries?.[name] || materials.skillDetails?.find(s => s.name === name)?.competencySummary })) }} acts={preview.value?.acts || []} alternatives={alternatives} onPick={pick} selectedIds={proposal?.selectedIds || []} busy={busy || loading} generatingSkill={generatingSkill} onToggle={toggle} onPropose={name => void propose(proposal ? name : undefined)} />}
+    {materials && <ReviewSkillBlocks materials={{ ...materials, durationEstimates: preview.value?.plan.def.learningReport?.durationEstimates || materials.durationEstimates, skillDetails: (materials.skillOrder || materials.recommendations?.skills.map(s => s.name) || []).map(name => ({ name, application: '', competencySummary: proposal?.skillSummaries?.[name] || summaries?.[name] || materials.skillDetails?.find(s => s.name === name)?.competencySummary })) }} acts={preview.value?.acts || reviewTaskDisplay(proposal, versions, skillPicks, handoff?.startStage)} alternatives={alternatives} onPick={pick} selectedIds={proposal?.selectedIds || []} busy={busy || loading} proposeDisabled={!!preview.error || !!error} generatingSkill={generatingSkill} onToggle={toggle} onPropose={name => void propose(proposal ? name : undefined)} />}
 
   </section>;
 }
