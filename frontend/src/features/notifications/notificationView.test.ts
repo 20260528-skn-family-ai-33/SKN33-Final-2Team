@@ -1,7 +1,7 @@
 /* 완료 알림(#82): 받는 쪽(본인·부서장)과 종류(로드맵·보고서)에 따라 문구와 이동할 주소가 맞는지 */
 import { describe, expect, it } from 'vitest';
 import type { AppNotification } from '@/api/types/notification';
-import { needsWorkspace, notificationSub, notificationTarget, notificationTime, notificationTitle } from './notificationView';
+import { mergeReports, notificationSub, notificationTarget, notificationTime, notificationTitle } from './notificationView';
 
 const base: AppNotification = {
   id: 'n1',
@@ -58,15 +58,18 @@ describe('notificationTime', () => {
   });
 });
 
-describe('needsWorkspace', () => {
-  const ws = { plans: { p1: {} }, reports: [{ id: 'r1' }] };
-  it('본인 알림인데 화면에 아직 없는 로드맵·보고서면 다시 받는다', () => {
-    expect(needsWorkspace(base, ws)).toBe(false);
-    expect(needsWorkspace(n({ planId: 'p2' }), ws)).toBe(true);
-    expect(needsWorkspace(n({ kind: 'report', reportId: 'r1' }), ws)).toBe(false);
-    expect(needsWorkspace(n({ kind: 'report', reportId: 'r2' }), ws)).toBe(true);
+describe('mergeReports', () => {
+  const cur = [
+    { id: 'old', planId: 'p1' },
+    { id: 'other', planId: 'p2' },
+  ];
+  it('그 로드맵의 옛 보고서(다시 만들어 서버에서 지워진 것)는 빼고 새 보고서를 앞에 둔다', () => {
+    expect(mergeReports(cur, 'p1', [{ id: 'new', planId: 'p1' }])).toEqual([
+      { id: 'new', planId: 'p1' },
+      { id: 'other', planId: 'p2' },
+    ]);
   });
-  it('부서장 알림은 부서장 화면이 직접 받으므로 다시 받지 않는다', () => {
-    expect(needsWorkspace(n({ audience: 'head', planId: 'p2' }), ws)).toBe(false);
+  it('다른 로드맵 보고서는 서버 응답에 섞여 와도 건드리지 않는다', () => {
+    expect(mergeReports(cur, 'p1', [{ id: 'x', planId: 'p2' }])).toEqual([{ id: 'other', planId: 'p2' }]);
   });
 });

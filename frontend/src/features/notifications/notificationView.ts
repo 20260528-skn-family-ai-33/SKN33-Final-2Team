@@ -33,9 +33,8 @@ export function notificationTime(iso: string, now: Date = new Date()): string {
   return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`;
 }
 
-/** 본인 알림인데 화면이 들고 있는 작업 공간에 그 로드맵·보고서가 아직 없으면(백그라운드로 끝난 보고서 등) 이동 전에 다시 받는다.
- *  부서장 화면은 들어갈 때마다 서버에서 새로 받으므로 필요 없다 */
-export function needsWorkspace(n: AppNotification, ws: { plans: Record<string, unknown>; reports: { id: string }[] }): boolean {
-  if (n.audience !== 'self') return false;
-  return n.kind === 'report' ? !ws.reports.some((r) => r.id === n.reportId) : !ws.plans[n.planId];
+/** 한 로드맵의 보고서만 서버에서 새로 받은 것으로 바꾼다. 확인 전 보고서를 다시 만들면 서버는 이전 보고서를 지우므로
+ *  그 로드맵의 옛 보고서는 남기지 않고, 다른 로드맵의 보고서는 그대로 둔다. 새 보고서를 앞에(서버 목록처럼 최근 것 먼저) */
+export function mergeReports<T extends { planId: string }>(current: T[], planId: string, fresh: T[]): T[] {
+  return [...fresh.filter((r) => r.planId === planId), ...current.filter((r) => r.planId !== planId)];
 }

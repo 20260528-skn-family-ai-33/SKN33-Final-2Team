@@ -1,18 +1,18 @@
 /* 완료 알림(#82) — 상단 띠의 알림 버튼과 목록 창. 직원 계정(부서장 포함)에서만 보인다.
-   30초마다(창이 보일 때만)·화면을 옮길 때·창을 열 때 새로 받는다. 누르면 읽음으로 바꾸고 그 로드맵·보고서 화면으로 간다 */
+   30초마다(창이 보일 때만)·화면을 옮길 때·창을 열 때 새로 받는다. 누르면 읽음으로 바꾸고 그 로드맵·보고서 화면으로 간다.
+   서버 동기화(직원별 캐시·늦은 응답 버리기·대상 기록만 받기)는 notificationActions.ts */
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router';
 import { notificationsApi } from '@/api/endpoints/notifications';
-import type { AppNotification, NotificationInbox } from '@/api/types/notification';
-import { reloadWorkspace } from '@/features/draft/draftSync';
+import type { AppNotification } from '@/api/types/notification';
 import { useGo } from '@/shared/hooks/useGo';
 import { failToast } from '@/shared/lib/fail';
-import { useWs } from '@/shared/state/workspace';
+import { useMe } from '@/shared/state/session';
 import { Icon } from '@/shared/ui/Icon';
-import { needsWorkspace, notificationSub, notificationTarget, notificationTime, notificationTitle } from './notificationView';
+import { markRead, notificationKey, refreshTarget, stillSignedIn } from './notificationActions';
+import { notificationSub, notificationTarget, notificationTime, notificationTitle } from './notificationView';
 
-const notificationKey = ['notifications'] as const;
 const POLL_MS = 30_000;
 
 export function NotificationBell() {
@@ -21,7 +21,8 @@ export function NotificationBell() {
   const qc = useQueryClient();
   const go = useGo();
   const { pathname } = useLocation();
-  const q = useQuery({ queryKey: notificationKey, queryFn: notificationsApi.inbox, refetchInterval: POLL_MS });
+  const owner = useMe()?.id || '';
+  const q = useQuery({ queryKey: notificationKey(owner), queryFn: notificationsApi.inbox, refetchInterval: POLL_MS, enabled: !!owner });
   const items = q.data?.items || [];
   const unread = q.data?.unread || 0;
 
@@ -32,8 +33,8 @@ export function NotificationBell() {
       first.current = false;
       return;
     }
-    void qc.invalidateQueries({ queryKey: notificationKey });
-  }, [pathname, qc]);
+    void qc.invalidateQueries({ queryKey: notificationKey(owner) });
+  }, [pathname, qc, owner]);
 
   useEffect(() => {
     if (!open) return;
@@ -44,33 +45,38 @@ export function NotificationBell() {
     return () => document.removeEventListener('pointerdown', closeOutside, true);
   }, [open]);
 
-  const save = (box: NotificationInbox) => qc.setQueryData(notificationKey, box);
-
   const openItem = async (n: AppNotification) => {
+    // 누른 직원(owner)이 기다리는 사이 로그아웃·다른 계정 로그인이 되면 응답을 넣지도, 이동하지도 않는다(PR #84 리뷰 P1)
     setOpen(false);
     if (!n.read) {
       try {
-        save(await notificationsApi.read(n.id));
+        await markRead(qc, owner, n.id);
       } catch (err) {
         // 읽음 저장에 실패해도 보려던 화면으로는 간다(알림은 읽지 않은 채로 남는다)
-        failToast(err, '알림을 읽음으로 바꾸지 못했어요');
+        if (stillSignedIn(owner)) failToast(err, '알림을 읽음으로 바꾸지 못했어요');
       }
     }
-    if (needsWorkspace(n, useWs.getState())) {
-      try {
-        await reloadWorkspace();
-      } catch (err) {
-        failToast(err, '최신 기록을 불러오지 못했어요');
-      }
+    if (!stillSignedIn(owner)) return;
+    if (n.audience === 'head') {
+      // 직원 기록을 새로 받기 시작한 뒤 기다리지 않고 바로 옮긴다. 기다리면 지금 보고 있는 옛 보고서 화면이 새 기록(옛 보고서가
+      // 지워진)으로 먼저 다시 그려져 직원 목록으로 튕긴다. 옮긴 화면은 받는 동안 '불러오는 중'을 보여 준다(TeamPages)
+      void refreshTarget(qc, owner, n);
+      go(notificationTarget(n));
+      return;
     }
-    go(notificationTarget(n));
+    try {
+      await refreshTarget(qc, owner, n);
+    } catch (err) {
+      if (stillSignedIn(owner)) failToast(err, '최신 기록을 불러오지 못했어요');
+    }
+    if (stillSignedIn(owner)) go(notificationTarget(n));
   };
 
   const readAll = async () => {
     try {
-      save(await notificationsApi.readAll());
+      await markRead(qc, owner);
     } catch (err) {
-      failToast(err, '알림을 모두 읽음으로 바꾸지 못했어요');
+      if (stillSignedIn(owner)) failToast(err, '알림을 모두 읽음으로 바꾸지 못했어요');
     }
   };
 
