@@ -406,3 +406,24 @@ PR #57 HEAD `64b020b`를 기준으로 수정했다. 아래 내용은 로컬 수�
 검증: 백엔드 411개·프롬프트 6개·프런트 168개, 타입·린트 오류 0개(기존 Fast Refresh 경고 41개)·빌드. 단위 검사는 실제 DB에 연결되지 않는 주소로 실행했다. 실제 모델·부하·다중 서버·전체 화면 시나리오 검증과 월간 자동 개선 운영 검증은 완료로 간주하지 않는다. DB 스키마·마이그레이션 변경 없음.
 
 동일 강좌 정책: 같은 로드맵의 동일 강좌는 관련 스킬의 전체 배정 주차 범위로 표시하고 가격은 자료 ID별 한 번만 합산한다. 각 스킬에 강좌 내용을 그대로 유지하며 분할하지 않는다. 진행 기록 저장 시 해당 강좌의 상태를 함께 반영하되 스킬별 메모·첨부는 보존한다. 도서·과제·다른 로드맵에는 전파하지 않는다. 실 DB 일괄 변경·스키마 변경은 실행하지 않았다. Crash 중복을 인접 스킬로 한정하는 방안은 후속 이슈에서 검토한다.
+
+### 로드맵·결과 보고서 작성 완료 알림 (#82, 2026-11-04)
+
+로드맵 확정(`services/drafts.confirm`)과 결과 보고서 저장(`services/plans.report_start` 작업)의 같은 트랜잭션에서 `services/notifications.py`가 작성한 직원 본인과 같은 부서의 부서장(`profile.members_of`와 같은 조건)에게 알림을 넣는다. 저장이 실패하거나 보고서 작성이 실패하면 알림도 남지 않는다. 부서장 본인의 로드맵·보고서는 본인에게만 간다.
+
+- 저장: `db/02_app_ext.sql`의 `app_ext.notifications`(새 표). 기존 DB는 `python tools/setup_db.py`(compose 는 `backend-setup`) 재실행으로 만들어진다. 되돌릴 때는 `DROP TABLE app_ext.notifications;` 한 줄이며 다른 표는 바뀌지 않는다.
+- 확인 전 보고서를 다시 만들면 이전 보고서를 지우므로 그 알림도 `report_id ON DELETE CASCADE`로 함께 지워지고 새 보고서 알림만 남는다. 로드맵이 지워질 때도 같다.
+- API: `GET /api/v1/notifications`·`POST /api/v1/notifications/{id}/read`·`POST /api/v1/notifications/read-all`(직원 계정만 · `routers/notifications.py`). 부서장 알림은 그 직원이 지금도 같은 부서일 때만 목록·읽지 않은 수에 들어간다.
+- 시연 도구의 '단계로 바로 이동'은 확정·보고서 작성 함수를 거치지 않고 기록을 직접 만들어서 알림을 남기지 않는다.
+
+### LLM 도서 후보 최소 확보 (#76)
+
+세 코스 모두 스킬별 벡터 검색 최대 30권을 검토하고, 공통 도서 입력은 중복을 제거한 최대 30권으로 유지한다. `book_candidates.common_pool`은 스킬의 application·targetOutcome·완료 기준과 제목·소개를 대조해 순위를 보완한 뒤, 각 스킬의 후보 3권을 먼저 확보하고 나머지를 교차 배분한다. 실제로 태그가 연결된 공유 도서만 다른 스킬의 후보로 사용할 수 있고, 사용 불가 자료·태그 불일치·중복 ISBN은 최소 수량에 포함하지 않는다.
+
+**최소 3권은 LLM 입력 후보의 기준이다.** 모델이 최종 선택하는 도서는 기존처럼 스킬당 0~3권이며, 적합하지 않은 책을 자동으로 채우거나 최종 3권을 강제하지 않는다. 검색된 사용 가능 후보 자체가 3권 미만이면 있는 책만 제공하고 입력에 `bookCandidateTarget=3`, 실제 `bookCandidateCount`, 부족 수 `bookCandidateShortfall`을 보낸다. 추가 LLM 호출·재시도·검색 요청으로 수량을 채우지 않는다. 공통 한도를 최소 후보보다 작게 명시하면 조용히 후보를 버리지 않고 오류를 반환한다.
+
+추천 규칙 버전은 `resource-pgvector-rag/v13-book-minimum-three`다. 기존 초안의 자료 후보 캐시는 다음 조회 때 기존 버전 검사로 갱신된다. 확정 로드맵·진행 기록을 일괄 수정하거나 DB 스키마·벡터를 변경하지 않는다. 강좌 공유 키 오류, 강좌 재정렬, 화면 미선정 사유 등 #76의 다른 항목은 이 변경에 포함하지 않는다.
+
+검증: `PYTHONPATH=.:tests`인 backend 경로에서 `python -m unittest tests.test_book_candidates tests.test_resource_recommendations tests.test_resource_rag tests.test_resource_evidence tests.test_crash_courses tests.test_course_recommendations tests.test_learner_knowledge tests.test_preassessment_api tests.test_preassessment_flow tests.test_preassessment_flow_api -q`로 128개 통과. 외부 연결 없는 검사이며, 최초 실행의 fixture import 오류는 테스트 경로 설정으로 해결했다. 0·1·2권 부족, 5스킬 최소 확보, 공유·중복·무관 태그, 낮은 벡터 순위의 세부 역량 도서 보존, 기존 최종 추천 0~3권 및 API 흐름을 검사했다.
+
+849권 검증 DB의 기존 실제 검색 결과 18건을 같은 입력으로 재생해 36스킬·54항목 모두 LLM 후보 3권 이상과 공통 30권 상한을 확인했다. 이 사례들은 이전에도 입력 수량은 3권 이상이었다. 이번 변경은 명시적인 최소 후보 확보와 내용 순위 보완이며 수량 증가를 품질 개선으로 해석하지 않는다. 별도로 읽기 전용 DB에서 SQL·Python 비동기·컨테이너 사례를 실제 `gpt-6-luna`(low)로 3회 실행해 모두 통과했다. Python 비동기 입력에는 이전에 누락된 Asyncio 도서가 포함됐고 최종 추천 0→1권, CI/CD는 입력 후보 3권 중 최종 1권으로 선택됐다. 실제 호출은 질문 임베딩 9개/3요청·2,609토큰, Luna 입력 42,816·출력 967토큰이다. 자료 추천 총 시간은 3.38~6.11초이며 표본 3건으로 운영 성능 개선율을 단정하지 않는다. 후보 묶기만 같은 18입력을 20회씩 비교한 CPU 시간 중앙값은 0.634→2.702ms(각 360회)다. 추가 검색·모델 호출은 없다. DB 저장·운영 배포·UI 검증·Git 게시·사람 리뷰는 수행하지 않았다.

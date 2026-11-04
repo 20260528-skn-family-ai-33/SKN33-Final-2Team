@@ -23,6 +23,7 @@ from ..agents import runtime as rt
 from ..agents.demo import D
 from ..errors import AgentError, ApiError, forbidden, not_found
 from ..free_track import validate_free_plan
+from . import notifications as NT
 from . import profile
 
 STATUS = {'IN_PROGRESS': 'active', 'COMPLETED': 'done', 'ARCHIVED': 'archived'}
@@ -733,6 +734,8 @@ def report_start(employee_id: int, roadmap_id: str) -> str:
             t.run('INSERT INTO app_ext.report_meta(report_id) VALUES(CAST(:i AS uuid))', i=rep_id)
             t.run('UPDATE public.diagnostic_rounds SET post_completed_at = now() WHERE diagnostic_round_id = :d', d=row['diagnostic_round_id'])
             t.run('UPDATE app_ext.post_checks SET running = false, fail = NULL WHERE roadmap_id = :r', r=row['roadmap_id'])
+            # 보고서 작성 완료 알림(#82): 본인·부서장. 위에서 지운 이전 보고서의 알림은 함께 지워졌다(report_id ON DELETE CASCADE)
+            NT.report_created(t, employee_id, str(row['roadmap_id']), rep_id)
         return {'reportId': rep_id}
     jid = jobs.start('report', employee_id, roadmap_id, work)
     with db.tx() as t:

@@ -5,6 +5,7 @@ import { paths } from '@/app/paths';
 import { AdminSide } from '@/features/admin/AdminSide';
 import { AssistantHost } from '@/features/assistant/AssistantHost';
 import { DraftNavGuard } from '@/features/draft/stale';
+import { NotificationBell } from '@/features/notifications/NotificationBell';
 import { connFor, PROV, useAi, useAiMode } from '@/shared/state/ai';
 import { isSup, meOf, useSession } from '@/shared/state/session';
 import { updateWs } from '@/shared/state/workspace';
@@ -150,6 +151,7 @@ export function AppShell() {
     <>
       <header className="ribbon">
         <ModeChip />
+        {booted && acct?.accountType === 'employee' ? <NotificationBell /> : null}
       </header>
       <div className="app">
         <aside className="side" id="side">

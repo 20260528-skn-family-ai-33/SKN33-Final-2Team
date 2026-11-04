@@ -11,6 +11,71 @@ def item(key, skills, kind='book', **extra):
 
 
 class BookCandidateTests(unittest.TestCase):
+    def test_each_of_five_skills_keeps_three_candidates_before_filling_thirty(self):
+        items = {}
+        pools = []
+        for skill in ('SQL', 'RAG', 'Python', 'Docker', 'CI/CD'):
+            rows = [item(f'{skill}-{i}', [skill]) for i in range(40 if skill != 'CI/CD' else 3)]
+            items.update({row['id']: row for row in rows})
+            pools.append({'name': skill, 'courses': [], 'books': rows})
+        selected, common = books.common_pool(pools, items)
+        self.assertEqual(len(common), 30)
+        for pool in selected:
+            self.assertGreaterEqual(len(pool['books']), 3)
+            self.assertEqual(pool['bookCandidateShortfall'], 0)
+        self.assertEqual(len(selected[-1]['books']), 3)
+
+    def test_unusable_wrong_tag_and_duplicates_cannot_consume_minimum_slots(self):
+        good = [item(f'good{i}', ['SQL']) for i in range(3)]
+        bad = [item('deleted', ['SQL'], usable=False), item('wrong', ['NLP']),
+               item('course', ['SQL'], kind='course')]
+        items = {row['id']: row for row in good + bad}
+        pools = [{'name':'SQL', 'courses':[], 'books':bad + [good[0]] * 20 + good}]
+        selected, common = books.common_pool(pools, items)
+        self.assertEqual({row['id'] for row in common}, {row['id'] for row in good})
+        self.assertEqual(selected[0]['bookCandidateCount'], 3)
+
+    def test_shared_candidate_late_in_another_pool_is_reserved_for_rare_skill(self):
+        rows = [item(f'common{i}', ['Python']) for i in range(40)]
+        shared = [item(f'shared{i}', ['Python', '비동기']) for i in range(3)]
+        items = {r['id']:r for r in rows + shared}
+        pools = [{'name':'Python', 'courses':[], 'books':rows+shared},
+                 {'name':'비동기', 'courses':[], 'books':[]}]
+        selected, common = books.common_pool(pools, items)
+        self.assertEqual(len(selected[1]['books']), 3)
+        self.assertTrue(all(row['sharedCandidate'] for row in selected[1]['books']))
+        self.assertLessEqual(len(common), 30)
+
+    def test_missing_books_report_shortfall_without_padding_or_cross_tag_borrowing(self):
+        for count in (0, 1, 2):
+            with self.subTest(count=count):
+                rows = [item(f'b{i}', ['SQL']) for i in range(count)]
+                items = {row['id']:row for row in rows}
+                selected, common = books.common_pool([{'name':'SQL', 'courses':[], 'books':rows}], items)
+                self.assertEqual(len(common), count)
+                self.assertEqual(selected[0]['bookCandidateTarget'], 3)
+                self.assertEqual(selected[0]['bookCandidateShortfall'], 3-count)
+                self.assertEqual(selected[0]['bookCandidateCount'], count)
+
+    def test_specific_application_book_is_kept_despite_lower_vector_rank(self):
+        broad = [item(f'ml{i}', ['Python'], title=f'파이썬 머신러닝 {i}',
+                      content='프로젝트 구현 실무 정리 '*20, retrievalScore=.9) for i in range(16)]
+        focused = item('async', ['Python'], title='파이썬 비동기 라이브러리 Asyncio',
+                       content='비동기 I/O와 작업 취소를 다룬다.', retrievalScore=.5)
+        items = {row['id']:row for row in broad + [focused]}
+        pools = [{'name':'Python', 'courses':[], 'books':broad+[focused]}]
+        before = deepcopy(pools)
+        selected, _ = books.common_pool(pools, items, limit=3,
+            selection={'skills':[{'name':'Python','application':'Python 비동기 I/O와 작업 취소·오류 처리'}]})
+        self.assertEqual(selected[0]['books'][0]['id'], 'async')
+        self.assertEqual(selected[0]['books'][0]['retrievalScore'], .5)
+        self.assertEqual(pools, before)
+
+    def test_impossible_explicit_cap_fails_instead_of_silently_losing_minimum(self):
+        rows = [item(f'b{i}', ['SQL']) for i in range(3)]
+        with self.assertRaises(ValueError):
+            books.common_pool([{'name':'SQL','books':rows}], {r['id']:r for r in rows}, limit=2)
+
     def test_thirty_unique_books_are_balanced_across_skills_and_rare_skill_is_kept(self):
         items={f'b{i}':item(f'b{i}',['ML']) for i in range(50)}
         items['rare']=item('rare',['ETL'])
