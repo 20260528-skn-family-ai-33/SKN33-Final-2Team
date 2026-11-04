@@ -373,7 +373,8 @@ export function MemberRoadPage() {
   if (teamLoading || !e) return <Loading text="서버에서 불러오는 중…" />;
   if (!q.data) return <Page back={paths.member(uid)} eyebrow={who(e)} title="확정한 로드맵"><MemberLoading q={q} /></Page>;
   const R = q.data.plans[pid];
-  if (!R) return <Navigate to={paths.member(uid)} replace />;
+  // 알림으로 새 로드맵에 들어오면 캐시의 옛 기록에는 아직 없다. 새로 받는 중이면 기다리고, 받은 뒤에도 없을 때만 목록으로(#82)
+  if (!R) return q.isFetching ? <Loading text="서버에서 소속 직원의 기록을 불러오는 중…" /> : <Navigate to={paths.member(uid)} replace />;
   const pl = R.plan;
   const live = R.status === 'active';
   const cs = (R.comments || []).slice().reverse();
@@ -480,7 +481,8 @@ export function MemberReportPage() {
   if (teamLoading || !e) return <Loading text="서버에서 불러오는 중…" />;
   if (!q.data) return <Page back={paths.member(uid)} eyebrow={who(e)} title="학습 결과 보고서"><MemberLoading q={q} /></Page>;
   const r = q.data.reports.find((x) => x.id === rid);
-  if (!r) return <Navigate to={paths.member(uid)} replace />;
+  // 다시 만든 보고서는 id 가 바뀐다. 새로 받는 중이면 기다리고, 받은 뒤에도 없을 때만 목록으로(#82)
+  if (!r) return q.isFetching ? <Loading text="서버에서 소속 직원의 기록을 불러오는 중…" /> : <Navigate to={paths.member(uid)} replace />;
   const R = q.data.plans[r.planId];
   return (
     <Page back={R ? paths.memberPlan(uid, R.id) : paths.member(uid)} eyebrow={`${who(e)} · 결과 보고서 · ${trackName(r.opt)} v${r.version} · ${r.createdAt}`} title="학습 결과 보고서" lead={r.goal}>

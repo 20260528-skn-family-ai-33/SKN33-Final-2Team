@@ -21,7 +21,7 @@ from starlette.concurrency import run_in_threadpool
 from . import catalog, jobs
 from .config import ROOT
 from .errors import ApiError, api_error_handler
-from .routers import account, team, work, preassessment
+from .routers import account, notifications, team, work, preassessment
 
 WEB = ROOT / 'web'
 logger = logging.getLogger(__name__)
@@ -63,6 +63,7 @@ app.include_router(account.r)
 app.include_router(work.r)
 app.include_router(team.r)
 app.include_router(preassessment.r)
+app.include_router(notifications.r)
 for error_type in (preassessment.StoreError, preassessment.SelectionError, preassessment.SurveyError, preassessment.RecommendationError):
     app.add_exception_handler(error_type, preassessment.validation_error)
 try:

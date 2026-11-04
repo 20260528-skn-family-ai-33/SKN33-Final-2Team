@@ -29,8 +29,14 @@ export const setWorkspaceLoader = (fn: () => Promise<void>): void => {
   loadWorkspace = fn;
 };
 
+/** 로그인 회차: 계정이 정해질 때(로그인·새로 고침)와 로그아웃을 시작할 때마다 1씩 는다. 같은 직원이 다시 로그인해도 값이 달라
+ *  늦게 온 응답이 지금 로그인에서 시작한 요청인지 가릴 수 있다(#82 PR #84 리뷰 P3). 내 정보 저장(setMeView)으로는 바뀌지 않는다 */
+let signIn = 0;
+export const signInSeq = (): number => signIn;
+
 /** 로그인한 뒤에만 읽을 수 있는 값(모델 설정·자격증 목록·규정 묶음)은 계정이 정해질 때 읽는다 */
 export async function setAccount(acct: Account | null): Promise<void> {
+  signIn += 1;
   useSession.setState({ account: acct });
   if (acct) await Promise.all([checkStatus(), loadCerts(), loadRegSets()]);
   if (acct && acct.accountType === 'employee') {
@@ -71,6 +77,7 @@ export async function login(employeeNo: string, password: string, keep: boolean)
 
 /** 로그아웃: 쓰던 입력은 먼저 서버에 저장한다(flush 는 작성 흐름이 넣어 준다) */
 export async function logout(flush: () => Promise<void>): Promise<void> {
+  signIn += 1; // 로그아웃을 시작하면 그 전에 보낸 요청의 응답은 더 반영하지 않는다
   try {
     await flush();
     await accountApi.logout();

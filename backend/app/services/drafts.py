@@ -25,6 +25,7 @@ from ..agents import runtime as rt
 from ..agents.demo import D
 from ..errors import AgentError, ApiError, cause, not_found
 from ..free_track import validate_free_plan
+from . import notifications as NT
 from . import plans as PL
 from . import profile as PF
 
@@ -1091,6 +1092,8 @@ def confirm(employee_id: int, draft_id: str) -> dict:
         roadmap_id = PL.insert_roadmap(t, draft_id, rid, plan)
         t.run("""UPDATE public.projects SET status = 'IN_PROGRESS', current_stage = 7, draft_choices = :w, updated_at = now() WHERE project_id = CAST(:p AS uuid)""",
               w=db.J({'gp5': 1, 'confirmed': True, 'roadmapId': roadmap_id}), p=draft_id)
+        # 로드맵 생성 완료 알림(#82): 본인·부서장. 확정과 같은 트랜잭션이라 확정이 실패하면 남지 않는다
+        NT.roadmap_created(t, employee_id, roadmap_id)
     with _img_lock:
         _images.pop(draft_id, None)
     return {'planId': roadmap_id, 'version': 1, 'selection': plan['selection'], 'sharedWith': PL.shared_with(employee_id)}
