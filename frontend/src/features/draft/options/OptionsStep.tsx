@@ -19,7 +19,7 @@ import { paths } from '@/app/paths';
 import { D } from '@/shared/constants/data';
 import { useGo } from '@/shared/hooks/useGo';
 import { hrs } from '@/shared/lib/format';
-import { buildPlan } from '@/shared/lib/plan';
+import { buildPlan, planWeeklyHours } from '@/shared/lib/plan';
 import { cause } from '@/shared/state/ai';
 import { setAt } from '@/shared/state/bind';
 import { resOf, useCatalog } from '@/shared/state/catalog';
@@ -38,7 +38,7 @@ import { SupCell, SupNote, syncGenCur } from './support';
 /** 고른 안의 계획 계산 매개변수(진단 에이전트가 넘긴 학습 선호 기준) */
 export function paramsOf(d: DraftDoc, opt?: OptionDef) {
   const h = d.handoff;
-  return { start: h?.startStage || 1, hours: h?.prefs.weeklyHours || opt?.weeklyHours || D.autoHours, format: h?.prefs.formatKey || 'mixed', patch: {} };
+  return { start: h?.startStage || 1, hours: planWeeklyHours(h?.prefs.weeklyHours, opt?.weeklyHours), format: h?.prefs.formatKey || 'mixed', patch: {} };
 }
 
 export const optionIds = (d: DraftDoc): string[] => (d.gen ? D.optionOrder.filter((k) => d.gen?.options[k]) : []);

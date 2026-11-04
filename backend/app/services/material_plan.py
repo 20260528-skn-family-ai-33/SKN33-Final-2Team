@@ -1,6 +1,18 @@
 """자료 저장 이후의 검토 초안. 이전 계획의 활동·기간을 재사용하지 않는다."""
 from copy import deepcopy
 from app.agents import roadmap
+from app.services.duration_proposals import resource_schedule, schedule_rows, calculate_durations
+
+
+def duration_estimates(saved, draft):
+    """저장된 부분 캐시 대신 현재 전체 선택과 주당시간으로 계산한다."""
+    option = ((draft.get('gen') or {}).get('options') or {}).get(saved.get('_course') or draft.get('chosen')) or {}
+    project = deepcopy(saved.get('project') or {})
+    weekly = ((draft.get('handoff') or {}).get('prefs') or {}).get('weeklyHours')
+    if weekly:
+        project.setdefault('details', {})['hours'] = weekly
+    return calculate_durations(project, saved['recommendations'], saved['resourceChoices'], saved['skillOrder'],
+                               option.get('weeklyHours') or roadmap.AUTO_HOURS)
 
 
 def report(saved,summaries):
@@ -26,16 +38,16 @@ def preview(saved,draft):
             if resource['id']!=choice['course'] and resource['id'] not in choice['books']:continue
             acts.append({'id':f"material-{index}-{resource['id']}",'skill':name,'stage':2,'title':resource['title'],'res':resource['id'],'hours':resource.get('hours') or 2,'how':''})
     option['acts']=acts
-    estimates=saved.get('durationEstimates') or {}
-    if names and all(isinstance((estimates.get(name) or {}).get('weeks'),int) for name in names):
-        option['materialSchedule']=[{'skill':name,'weeks':estimates[name]['weeks']} for name in names]
+    estimates=duration_estimates(saved,draft)
+    option['materialSchedule']=schedule_rows(estimates)
+    option['learningReport']=report(dict(saved,durationEstimates=estimates),{})
     return roadmap.build_plan(option,roadmap.params_of(draft['handoff'],option),draft['goal'])
 
 
 def rebuild_revision(option, plan, handoff):
     """스킬형 계획만 재구성. 불명확한 소속은 실패시켜 기존 계획을 보존한다."""
     from app import llm
-    from app.services.duration_proposals import material_duration, RecommendationError
+    from app.services.duration_proposals import RecommendationError
     prior = plan.get('def') or {}
     old_report = prior.get('learningReport')
     if not isinstance(old_report, dict):
@@ -74,7 +86,7 @@ def rebuild_revision(option, plan, handoff):
             if resource.get('type') in ('course', 'book') and activity['stage'] >= handoff.get('startStage', plan['start']):
                 resources[activity['skill']][resource['id']] = deepcopy(resource)
     weekly = (handoff.get('prefs') or {}).get('weeklyHours') or option.get('weeklyHours') or plan['hours']
-    rec, choices, estimates = [], {}, {}
+    rec, choices = [], {}
     for name in names:
         items = list(resources[name].values())
         courses = [item for item in items if item['type'] == 'course']
@@ -83,10 +95,10 @@ def rebuild_revision(option, plan, handoff):
         choices[name] = {'course': courses[0]['id'] if courses else None,
                          'courses': [item['id'] for item in courses],
                          'books': [item['id'] for item in books], 'enabled': True}
-        try:
-            estimates[name] = material_duration(courses, books, weekly)
-        except RecommendationError as error:
-            raise llm.LlmError(str(error)) from error
+    try:
+        estimates = resource_schedule({'skills': rec}, choices, names, weekly)['estimates']
+    except RecommendationError as error:
+        raise llm.LlmError(str(error)) from error
     details = []
     for name in names:
         detail = deepcopy(next((row for row in old_report.get('skillDetails', []) if row['name'] == name), {'name': name, 'application': ''}))
@@ -99,5 +111,5 @@ def rebuild_revision(option, plan, handoff):
             option[field] = deepcopy(prior[field])
     option['learningReport'] = {'recommendations': {'skills': rec}, 'choices': choices,
                                 'skillOrder': names, 'skillDetails': details, 'durationEstimates': estimates}
-    option['materialSchedule'] = [{'skill': name, 'weeks': estimates[name]['weeks']} for name in names]
+    option['materialSchedule'] = schedule_rows(estimates)
     return option

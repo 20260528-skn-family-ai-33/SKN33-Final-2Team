@@ -8,6 +8,8 @@ export interface Activity extends ActDef {
   hours: number;
   hoursEstimated?: boolean;
   hoursBasis?: string;
+  timeStatus?: string;
+  resourceWindow?: { from: number; to: number };
   wFrom: number;
   wTo: number;
 }
@@ -34,6 +36,9 @@ export interface PlanContent {
   format: string;
   acts: Activity[];
   totalH: number;
+  totalHUnknown?: boolean;
+  totalHEstimated?: boolean;
+  durationBasis?: 'materials-only';
   weeks: number;
   cost: number;
   costUnknown: boolean;

@@ -12,6 +12,21 @@ PER_SKILL = 20
 MAX_SKILLS = 5
 DEFAULT_COUNT = 32
 MAX_COUNT = 40
+
+
+class UnavailableResourcesError(ValueError):
+    """후보에서 사용할 수 없는 필수 자료를 식별해 저장된 활동 이름으로도 안내한다."""
+
+    def __init__(self, resource_ids: list[str], titles: dict[str, str]):
+        self.resource_ids = resource_ids
+        self.titles = titles
+        labels = [f'{titles[key][:100]} [{key}]' if titles.get(key) else f'[{key}]' for key in resource_ids[:5]]
+        if len(resource_ids) > 5:
+            labels.append(f'외 {len(resource_ids) - 5}개')
+        super().__init__('선택한 자료가 삭제되었거나 추천 불가 상태입니다: ' + ', '.join(labels)
+                         + '. 해당 자료의 기존 활동을 삭제·교체하거나 선택을 해제한 뒤 다시 요청해 주세요.')
+
+
 # DB Fast/Challenge 정책의 학습 행동. 제목의 홍보 문구만으로 실무 깊이를 판정하지 않는다.
 _actions = {
     'build': re.compile(r'만들|구현|구축|연결|개발|실습|프로젝트|\b(?:build\w*|implement\w*|develop\w*|integrat\w*|project|hands[- ]on|labs?)\b', re.I),
@@ -60,6 +75,11 @@ def cached_index(records: dict[str, dict]) -> dict:
         if _source is not records:
             index = {}
             for key, r in records.items():
+                previous = _index.get(key)
+                if previous is not None and previous['record'] == r:
+                    # 진행 중인 요청의 스냅샷은 유지하고 동일 자료의 정규화 결과만 재사용한다.
+                    index[key] = dict(previous, record=r)
+                    continue
                 lines = [line for line in learning_lines(r.get('_learning_description') or r.get('content') or '')
                          if not _course_admin.search(line)]
                 outline = r.get('curriculum') or {}
@@ -204,8 +224,9 @@ def select(records: dict[str, dict], skills: list[str], texts: list[str], track:
     required = list(dict.fromkeys(k for k in required or [] if k))
     excluded = [k for k in required if k in records and track == 'A1' and records[k].get('type') != 'book' and records[k].get('cost') != 0]
     required = [k for k in required if k not in excluded]
-    if any(k not in records or not records[k].get('usable') for k in required):
-        raise ValueError('선택한 자료가 삭제되었거나 추천 불가 상태입니다. 자료를 다시 선택해 주세요.')
+    unavailable = [k for k in required if k not in records or not records[k].get('usable')]
+    if unavailable:
+        raise UnavailableResourcesError(unavailable, {k: records[k]['title'] for k in unavailable if k in records})
     if len(required) > MAX_COUNT:
         raise ValueError('선택한 자료가 40개를 넘습니다. 자료 수를 줄여 주세요.')
     hints = set(hints or [])

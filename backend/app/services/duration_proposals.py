@@ -1,46 +1,196 @@
-"""강좌 시간÷주당 시간(올림) + 도서 권당 1주. 모델 호출 없음."""
+"""자료 ID 기준 일정. 스킬 구간은 겹칠 수 있으므로 전체 기간과 구분한다."""
+from copy import deepcopy
+from decimal import Decimal, ROUND_CEILING, ROUND_FLOOR
+from hashlib import sha256
+import json
 import math
-from app.agents.resource_recommendations import validate_choices, validate_skill_order, RecommendationError
-METHOD='course-hours-books/v1'
+
+from app.agents.resource_recommendations import (
+    RecommendationError, validate_choices, validate_skill_order,
+)
+
+METHOD = 'resource-hours-books/v3'
+
 
 def positive(value):
-    if isinstance(value,bool):return None
-    try:number=float(value)
-    except (ValueError,TypeError):return None
-    return number if math.isfinite(number) and number>0 else None
-
-def calculate_durations(project,recommendations,choices,order,weekly_hours):
-    validate_choices(recommendations,choices)
-    validate_skill_order(recommendations,order)
-    weekly=positive((project.get('details') or {}).get('hours')) or positive(weekly_hours)
-    if weekly is None:raise RecommendationError('주당 학습시간을 확인해 주세요.')
-    by_name={row['name']:row for row in recommendations['skills']}
-    result={}
-    for name in order:
-        choice=choices[name]
-        if choice.get('enabled',True) is False:continue
-        course=next((row for row in by_name[name]['courses'] if row['id']==choice['course']),None)
-        hours=positive((course or {}).get('hours')) if 'hours' not in ((course or {}).get('estimated') or []) else None
-        course_weeks=(max(1,math.ceil(hours/weekly)) if hours else 1) if course else 0
-        book_weeks=len(choice['books'])
-        result[name]={'weeks':course_weeks+book_weeks,'courseWeeks':course_weeks,'bookWeeks':book_weeks,'weeklyHours':weekly,
-            'basis':f"강좌 {course_weeks}주 + 도서 {book_weeks}권 × 1주",'method':METHOD,'course':choice['course'],'books':sorted(choice['books'])}
-    # Duration estimates are informative; no period cap is enforced.
-    return result
+    if isinstance(value, bool):
+        return None
+    try:
+        number = float(value)
+    except (ValueError, TypeError):
+        return None
+    return number if math.isfinite(number) and number > 0 else None
 
 
-def material_duration(courses, books, weekly_hours):
-    """자료 활동만의 기간. 추가된 여러 강좌도 같은 규칙으로 합산한다."""
+def _courses(choice: dict) -> list[str]:
+    return list(dict.fromkeys(choice.get('courses') or ([choice['course']] if choice.get('course') else [])))
+
+
+def _time(course: dict, weekly: float) -> tuple[float, str]:
+    hours = positive(course.get('hours'))
+    status = course.get('timeStatus')
+    if hours is None or status == 'unknown':
+        return weekly, 'unknown'
+    estimated = 'hours' in (course.get('estimated') or []) or status == 'estimated'
+    return hours, 'estimated' if estimated else 'confirmed'
+
+
+def _ceil(value: Decimal) -> int:
+    return int(value.to_integral_value(rounding=ROUND_CEILING))
+
+
+def resource_schedule(recommendations: dict, choices: dict, order: list[str], weekly_hours) -> dict:
+    """첫 참조에 자료를 배정하고 이후 참조는 같은 구간을 사용한다.
+
+    올림은 누적 작업량에만 적용한다. 도서는 고유 ID당 1주이며, 주 중간에
+    시작한 자료의 달력 구간은 그 작업량보다 길 수 있다.
+    """
     weekly = positive(weekly_hours)
     if weekly is None:
         raise RecommendationError('주당 학습시간을 확인해 주세요.')
-    course_weeks = 0
-    for course in courses:
-        hours = positive(course.get('hours')) if 'hours' not in (course.get('estimated') or []) else None
-        course_weeks += max(1, math.ceil(hours / weekly)) if hours else 1
-    book_weeks = len(books)
-    return {'weeks': course_weeks + book_weeks, 'courseWeeks': course_weeks,
-            'bookWeeks': book_weeks, 'weeklyHours': weekly,
-            'basis': f'강좌 {course_weeks}주 + 도서 {book_weeks}권 × 1주', 'method': METHOD,
-            'course': courses[0]['id'] if courses else None,
-            'courses': [item['id'] for item in courses], 'books': sorted(item['id'] for item in books)}
+    by_name = {row['name']: row for row in recommendations['skills']}
+    active = [name for name in order if choices[name].get('enabled', True)]
+    selection = {name: {'enabled': choices[name].get('enabled', True),
+                        'courses': _courses(choices[name]), 'books': sorted(choices[name]['books'])}
+                 for name in order}
+    context = {'skillOrder': list(order), 'selection': selection, 'weeklyHours': weekly}
+    key = sha256(json.dumps([METHOD, recommendations.get('id'), context], ensure_ascii=False,
+                            sort_keys=True).encode()).hexdigest()
+    # 동일 ID의 카드가 다르면 확인된 근거를 우선하고 같은 등급에서는 큰 값을 쓴다.
+    times = {}
+    rank = {'unknown': 0, 'estimated': 1, 'confirmed': 2}
+    for name in active:
+        selected = set(_courses(choices[name]))
+        for course in by_name[name]['courses']:
+            if course['id'] in selected:
+                value = _time(course, weekly)
+                if course['id'] not in times or (rank[value[1]], value[0]) > (rank[times[course['id']][1]], times[course['id']][0]):
+                    times[course['id']] = value
+        if not selected <= times.keys():
+            raise RecommendationError('선택한 강좌의 시간 근거를 확인해 주세요.')
+    budget = Decimal(str(weekly))
+    cursor = Decimal(0)
+    course_slots, book_slots, estimates = {}, {}, {}
+
+    def allocate(hours: Decimal) -> dict:
+        nonlocal cursor
+        start = int((cursor / budget).to_integral_value(rounding=ROUND_FLOOR)) + 1
+        cursor += hours
+        return {'startWeek': start, 'endWeek': _ceil(cursor / budget)}
+
+    for name in active:
+        before = _ceil(cursor / budget)
+        choice = choices[name]
+        slots = []
+        for rid in _courses(choice):
+            if rid not in course_slots:
+                hours, status = times[rid]
+                course_slots[rid] = dict(allocate(Decimal(str(hours))), id=rid,
+                                         hours=None if status == 'unknown' else hours, timeStatus=status)
+            slots.append(course_slots[rid])
+        course_added = _ceil(cursor / budget) - before
+        book_added = 0
+        for rid in sorted(choice['books']):
+            if rid not in book_slots:
+                book_slots[rid] = dict(allocate(budget), id=rid)
+                book_added += 1
+            slots.append(book_slots[rid])
+        start = min((slot['startWeek'] for slot in slots), default=None)
+        end = max((slot['endWeek'] for slot in slots), default=None)
+        unknown = [rid for rid in _courses(choice) if times[rid][1] == 'unknown']
+        estimated = [rid for rid in _courses(choice) if times[rid][1] == 'estimated']
+        note = f'시간 미확인 {len(unknown)}개(각 1주 가정)' if unknown else ''
+        if estimated:
+            note = ' · '.join(filter(None, [note, f'추정 시간 {len(estimated)}개 포함']))
+        estimates[name] = {**deepcopy(context), 'weeks': end - start + 1 if slots else 0,
+                           'startWeek': start, 'endWeek': end,
+                           'addedWeeks': _ceil(cursor / budget) - before,
+                           'courseWeeks': course_added, 'bookWeeks': book_added,
+                           'basis': ' · '.join(filter(None, ['강좌 ID별 시간 1회 합산 후 전체 올림 + 도서 ID별 1주', note])),
+                           'method': METHOD, 'scheduleKey': key,
+                           'course': choice.get('course'), 'courses': _courses(choice),
+                           'books': sorted(choice['books']), 'unknownCourses': unknown, 'estimatedCourses': estimated,
+                           'resources': deepcopy(slots)}
+    total = _ceil(cursor / budget)
+    for estimate in estimates.values():
+        estimate['totalWeeks'] = total
+    return {'estimates': estimates, 'weeks': total, 'courses': course_slots, 'books': book_slots}
+
+
+def calculate_durations(project, recommendations, choices, order, weekly_hours):
+    validate_choices(recommendations, choices)
+    validate_skill_order(recommendations, order)
+    if any('courses' in choice and choice['courses'] != ([choice['course']] if choice.get('course') else [])
+           for choice in choices.values()):
+        raise RecommendationError('추천 자료에서는 스킬별 강좌 한 개만 선택할 수 있습니다.')
+    weekly = positive((project.get('details') or {}).get('hours')) or positive(weekly_hours)
+    return resource_schedule(recommendations, choices, order, weekly)['estimates']
+
+
+def material_duration(courses, books, weekly_hours):
+    """독립 자료 묶음도 전체 일정과 같은 계산 규칙을 사용한다."""
+    choice = {'course': courses[0]['id'] if courses else None,
+              'courses': [item['id'] for item in courses], 'books': [item['id'] for item in books]}
+    return resource_schedule({'skills': [{'name': 'materials', 'courses': courses, 'books': books}]},
+                             {'materials': choice}, ['materials'], weekly_hours)['estimates']['materials']
+
+
+def schedule_rows(estimates: dict) -> list[dict]:
+    return [{'skill': name, 'weeks': row['weeks'], 'startWeek': row.get('startWeek'),
+             'endWeek': row.get('endWeek'), 'addedWeeks': row.get('addedWeeks'),
+             'totalWeeks': row.get('totalWeeks')} for name, row in estimates.items()]
+
+
+def apply_plan_schedule(plan: dict) -> dict:
+    """build_plan의 마지막에 호출. 기존 확정 기록을 읽거나 변경하지 않는다."""
+    option = plan.get('def') or {}
+    report = option.get('learningReport')
+    if 'materialSchedule' not in option or not isinstance(report, dict) or not report.get('recommendations'):
+        return plan
+    # build_plan의 def는 호출자의 option과 같은 객체일 수 있다.
+    plan = deepcopy(plan)
+    option = plan['def']
+    report = option['learningReport']
+    schedule = resource_schedule(report['recommendations'], report['choices'], report['skillOrder'], plan['hours'])
+    plan['acts'] = [activity for activity in plan['acts']
+                    if report['choices'].get(activity.get('skill'), {}).get('enabled', True)]
+    report['durationEstimates'] = schedule['estimates']
+    option['materialSchedule'] = schedule_rows(schedule['estimates'])
+    plan['weeks'] = schedule['weeks']
+    seen_courses = set()
+    seen_books = set()
+    total_hours = Decimal(0)
+    for activity in plan['acts']:
+        name, rid = activity.get('skill'), activity.get('res')
+        resource_slot = schedule['courses'].get(rid) or schedule['books'].get(rid)
+        slot = resource_slot
+        slot = slot or schedule['estimates'].get(name)
+        if slot:
+            activity['wFrom'] = slot['startWeek'] or max(1, plan['weeks'])
+            activity['wTo'] = slot['endWeek'] or activity['wFrom']
+            if resource_slot:
+                activity['resourceWindow'] = {'from': slot['startWeek'], 'to': slot['endWeek']}
+            if slot.get('timeStatus'):
+                activity['hoursEstimated'] = slot['timeStatus'] != 'confirmed'
+                activity['timeStatus'] = slot['timeStatus']
+                if slot.get('hours') is not None:
+                    activity['hours'] = slot['hours']
+        if rid in schedule['courses']:
+            if rid in seen_courses:
+                continue
+            seen_courses.add(rid)
+            hours = schedule['courses'][rid]['hours']
+        elif rid in schedule['books']:
+            if rid in seen_books:
+                continue
+            seen_books.add(rid)
+            hours = positive(activity.get('hours'))
+        else:
+            hours = positive(activity.get('hours'))
+        if hours is not None:
+            total_hours += Decimal(str(hours))
+    plan['totalH'] = float(total_hours)
+    plan['totalHUnknown'] = any(row['timeStatus'] == 'unknown' for row in schedule['courses'].values())
+    plan['totalHEstimated'] = any(activity.get('hoursEstimated') for activity in plan['acts'])
+    plan['durationBasis'] = 'materials-only'
+    return plan

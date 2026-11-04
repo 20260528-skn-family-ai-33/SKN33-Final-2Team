@@ -50,7 +50,8 @@ class RevisionMaterialsTests(TestCase):
     def test_changed_weekly_time_recalculates_without_task_time(self):
         self.handoff['prefs']['weeklyHours'] = 8
         out = self.rebuild()
-        self.assertEqual(out['materialSchedule'], [{'skill': 'SQL', 'weeks': 1}])
+        self.assertEqual(out['materialSchedule'], [{'skill': 'SQL', 'weeks': 1, 'startWeek': 1,
+                                                   'endWeek': 1, 'addedWeeks': 1, 'totalWeeks': 1}])
 
     def test_unknown_skill_fails_without_mutating_existing_plan(self):
         original = deepcopy(self.old)

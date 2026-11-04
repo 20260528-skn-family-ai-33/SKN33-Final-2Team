@@ -58,11 +58,12 @@ def main() -> None:
             assert len({row['id'] for row in rows}) == len(rows)
             if pid == 'A1':
                 assert all(records[row['id']].get('type') == 'book' or row['cost'] == 0 for row in rows)
+            assert 'maxWeeks' not in payload.get('trackGuidance', {})
+            assert payload['handoff']['prefs']['deadlineWeeks'] == 12
+            assert handoff['prefs']['deadlineWeeks'] == 12
             if pid == 'A2':
-                assert payload['trackGuidance']['maxWeeks'] == 6
+                assert payload['trackGuidance']['maxCoreSkills'] == 3
                 assert len(payload['trackGuidance']['coreSkills']) <= 3
-                assert payload['handoff']['prefs']['deadlineWeeks'] == 6
-                assert handoff['prefs']['deadlineWeeks'] == 12
             input_tokens = budget.tokens(system) + budget.tokens(payload) + budget.FRAMING_RESERVE
             assert input_tokens <= budget.INPUT_TOKENS
             for row in rows:
@@ -77,10 +78,31 @@ def main() -> None:
                 selected_handoff = dict(handoff, selectedResourceIds=[chosen])
                 selected = rm._catalog_payload(pid, dict(base, handoff=selected_handoff), system)
                 assert chosen in {r['id'] for r in selected['catalog']}
+            assert payload['catalogCounts']['sent'] == len(rows)
             cases.append({'goal': goal, 'track': pid, 'skills': len(selection.skills),
                           'per_skill_reviewed': selection.per_skill, 'server_candidates': len(selection.records),
                           'sent': len(rows), 'with_evidence': sum(bool(r.get('content') or r['curriculum']) for r in rows),
-                          'catalog_tokens': budget.tokens(rows), 'input_tokens': input_tokens})
+                          'catalog_tokens': budget.tokens(rows), 'input_tokens': input_tokens,
+                          'delivered_per_skill': payload['catalogCounts']['perSkill']})
+    # 자동 선정의 3스킬 정책과 사용자 확정 5스킬 유지를 나누어 검사한다.
+    fixed_skills = list(dict.fromkeys(skill for row in records.values() if row.get('usable') for skill in row.get('skills') or []))[:5]
+    assert len(fixed_skills) == 5, '확정 5스킬 검사에 쓸 등록 스킬이 부족합니다.'
+    fixed_cases = []
+    for pid in ('A1', 'A2', 'A3'):
+        handoff = {'goal': goals[0], 'prefs': {'weeklyHours': 6, 'deadlineWeeks': 12},
+                   'selectedSkillsFixed': True, 'skillNames': fixed_skills, 'skillOrder': fixed_skills,
+                   'skillDetails': [{'name': name, 'application': name} for name in fixed_skills]}
+        payload = rm._catalog_payload(pid, {'handoff': handoff}, rm._sys(pid, rm.R_SYS))
+        assert payload['handoff']['skillNames'] == fixed_skills
+        assert payload['handoff']['skillOrder'] == fixed_skills
+        assert list(payload['catalogSkillMap'].values()) == fixed_skills
+        assert payload['handoff']['prefs']['deadlineWeeks'] == 12
+        assert 'maxWeeks' not in payload.get('trackGuidance', {})
+        if pid == 'A2':
+            assert payload['trackGuidance']['coreSkills'] == fixed_skills
+            assert payload['trackGuidance']['maxCoreSkills'] == 5
+        fixed_cases.append({'track': pid, 'skills': fixed_skills, 'sent': len(payload['catalog']),
+                            'delivered_per_skill': payload['catalogCounts']['perSkill']})
     try:
         rm._catalog_payload('A2', {'handoff': {'goal': goals[0], 'prefs': {}}, 'request': '검증요청키 q7z_ ' * 12000}, 'system')
     except llm.LlmError:
@@ -93,8 +115,8 @@ def main() -> None:
               'selection_and_budget_ms': stats(elapsed), 'timing_samples': len(elapsed),
               'tokenizer_revision': budget.TOKENIZER_REVISION, 'tokenizer_sha256': budget.TOKENIZER_SHA256,
               'code_sha256': {name: hashlib.sha256((Path(__file__).resolve().parents[1] / name).read_bytes()).hexdigest()
-                             for name in ['app/catalog.py', 'app/catalog_candidates.py', 'app/catalog_budget.py', 'app/track_policy.py', 'app/agents/roadmap.py', 'app/services/drafts.py', 'tools/install_track_prompts.py']},
-              'long_input_rejected': True, 'cases': cases,
+                             for name in ['app/catalog.py', 'app/catalog_candidates.py', 'app/catalog_budget.py', 'app/roadmap_input.py', 'app/track_policy.py', 'app/agents/roadmap.py', 'app/services/drafts.py', 'tools/install_track_prompts.py']},
+              'long_input_rejected': True, 'cases': cases, 'fixed_five_cases': fixed_cases,
               'limitations': ['실제 LLM 지연·품질 미측정', '동시 접속 부하 검사 아님', '신규 합성 handoff 사용; 프롬프트 출처는 prompt_source 참조']}
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
