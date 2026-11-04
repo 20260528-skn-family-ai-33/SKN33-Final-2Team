@@ -45,17 +45,6 @@
 
 근거: 로컬 보존 `metadata/final_model.json`·`outputs/P01_validity_20261022/execution.json`. 보존 execution은 과거 **1에폭** 기록이며, 위 최종 **2에폭**은 사용자 확정값이다. 이 기록을 최종 2에폭의 전체 실행 로그로 취급하지 않는다. 별도 4B·3,000건 실험 설정과 혼합하지 않는다.
 
-## 현재 프로젝트의 로드맵 생성 설정
-
-| 항목 | 값 |
-|---|---|
-| 입력 상한 | **11,000** Qwen 기준 토큰 · 시스템 지침·자료 후보·프레이밍 여유 포함 |
-| 출력 상한 | **7,000** · OpenAI `max_completion_tokens`, Ollama `num_predict` |
-| 기본 문맥 / 로컬 Ollama 설정 | **20,480** |
-| 입력 예산 계산의 추가 안전 여유 | **1,024** |
-
-생성·수정의 입력 예산은 `backend/app/catalog_budget.py`, 출력 상한은 `backend/app/llm.py`의 `roadmap` 역할에 적용한다. OpenAI 출력 상한에는 내부 추론 토큰도 포함된다. 명시적으로 더 작은 Ollama 문맥을 사용하면 출력·안전 여유를 먼저 확보하고 입력 예산을 줄인다. 학습 최대 길이와 서비스 문맥 설정은 별개다. 실제 GPU 메모리·지연·출력 품질은 실행 환경별 확인이 필요하다.
-
 ## 저장소 포함 범위
 
 위치: `backend/models/fine_tunning/`.
