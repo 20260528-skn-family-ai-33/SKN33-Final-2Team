@@ -134,6 +134,17 @@
 | `GET /team/members` · `GET /team/members/{uid}/plans` | 소속 직원 목록 · 직원 기록(공개 범위만). 직원 정보는 이름·사번·소속·직급·직위·부서장 여부만(`TeamUser`), 보고서에서는 심화 질문 결과·목표 달성 답·결과물 첨부를 뺌 |
 | `POST /team/plans/{pid}/comments` · `PATCH /team/plans/{pid}/comments/{cid}` | 코멘트 보내기 · 고치기(설계서 밖 추가 · 10/23) |
 
+### 완료 알림 — `notifications.ts` (설계서 밖 추가 · #82)
+
+로드맵 확정(`POST /drafts/{id}/confirm`)과 결과 보고서 작성 작업이 끝나 보고서가 저장된 때(`POST /plans/{id}/reports`의 작업 성공) 서버가 작성한 직원 본인(`audience: 'self'`)과 같은 부서의 부서장(`'head'`)에게 알림을 남겨요. 부서장 본인의 로드맵·보고서는 본인에게만 가요. 직원 계정만 쓸 수 있어요(관리자 403).
+
+| 요청 | 쓰는 곳 |
+| --- | --- |
+| `GET /notifications` | 상단 띠 알림 버튼·목록(30초마다·화면 이동·창 열 때). `{items: AppNotification[] (최근 50건), unread}` — `unread`는 목록 길이와 관계없이 전체 수 |
+| `POST /notifications/{id}/read` · `POST /notifications/read-all` | 한 건 읽음(내 알림이 아니면 404) · 모두 읽음. 둘 다 바뀐 목록을 그대로 돌려줌 |
+
+`AppNotification`은 `{id, kind: 'roadmap'|'report', audience: 'self'|'head', employee: {id, name}, planId, planTitle, track, reportId, createdAt, read}`예요. 문구와 이동할 주소는 화면이 정해요(`features/notifications/notificationView.ts`): 본인은 `/roadmaps/{planId}`·`/reports/{reportId}`, 부서장은 `/team/{employee.id}/plans/{planId}`·`/team/{employee.id}/reports/{reportId}`. 확인 전 보고서를 다시 만들면 이전 보고서 알림은 지워지고 새 보고서 알림만 남아요. 부서장 알림은 그 직원이 지금도 같은 부서일 때만 보여요.
+
 ### 관리자 — `admin.ts` (5차 목업에서 추가 · 2026-10-21 사용자 결정 · 설계서 반영 여부는 사람 확인 필요)
 
 | 요청 | 쓰는 곳 |
@@ -163,6 +174,7 @@
 | 확정 로드맵·진행·수정안·코멘트·사후 점검·보고서 | `api/types/plan.ts` |
 | 학습 자료·자격증·규정·스킬 지도 | `api/types/catalog.ts` |
 | 부서장 | `api/types/team.ts` |
+| 완료 알림 | `api/types/notification.ts` |
 | 관리자 | `api/types/admin.ts` |
 | 도우미 답 | `api/endpoints/assistant.ts` |
 

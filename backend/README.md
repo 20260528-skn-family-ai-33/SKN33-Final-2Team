@@ -383,3 +383,12 @@ PR #57 HEAD `64b020b`를 기준으로 수정했다. 아래 내용은 로컬 수�
 검증: 백엔드 411개·프롬프트 6개·프런트 168개, 타입·린트 오류 0개(기존 Fast Refresh 경고 41개)·빌드. 단위 검사는 실제 DB에 연결되지 않는 주소로 실행했다. 실제 모델·부하·다중 서버·전체 화면 시나리오 검증과 월간 자동 개선 운영 검증은 완료로 간주하지 않는다. DB 스키마·마이그레이션 변경 없음.
 
 동일 강좌 정책: 같은 로드맵의 동일 강좌는 관련 스킬의 전체 배정 주차 범위로 표시하고 가격은 자료 ID별 한 번만 합산한다. 각 스킬에 강좌 내용을 그대로 유지하며 분할하지 않는다. 진행 기록 저장 시 해당 강좌의 상태를 함께 반영하되 스킬별 메모·첨부는 보존한다. 도서·과제·다른 로드맵에는 전파하지 않는다. 실 DB 일괄 변경·스키마 변경은 실행하지 않았다. Crash 중복을 인접 스킬로 한정하는 방안은 후속 이슈에서 검토한다.
+
+### 로드맵·결과 보고서 작성 완료 알림 (#82, 2026-11-04)
+
+로드맵 확정(`services/drafts.confirm`)과 결과 보고서 저장(`services/plans.report_start` 작업)의 같은 트랜잭션에서 `services/notifications.py`가 작성한 직원 본인과 같은 부서의 부서장(`profile.members_of`와 같은 조건)에게 알림을 넣는다. 저장이 실패하거나 보고서 작성이 실패하면 알림도 남지 않는다. 부서장 본인의 로드맵·보고서는 본인에게만 간다.
+
+- 저장: `db/02_app_ext.sql`의 `app_ext.notifications`(새 표). 기존 DB는 `python tools/setup_db.py`(compose 는 `backend-setup`) 재실행으로 만들어진다. 되돌릴 때는 `DROP TABLE app_ext.notifications;` 한 줄이며 다른 표는 바뀌지 않는다.
+- 확인 전 보고서를 다시 만들면 이전 보고서를 지우므로 그 알림도 `report_id ON DELETE CASCADE`로 함께 지워지고 새 보고서 알림만 남는다. 로드맵이 지워질 때도 같다.
+- API: `GET /api/v1/notifications`·`POST /api/v1/notifications/{id}/read`·`POST /api/v1/notifications/read-all`(직원 계정만 · `routers/notifications.py`). 부서장 알림은 그 직원이 지금도 같은 부서일 때만 목록·읽지 않은 수에 들어간다.
+- 시연 도구의 '단계로 바로 이동'은 확정·보고서 작성 함수를 거치지 않고 기록을 직접 만들어서 알림을 남기지 않는다.
