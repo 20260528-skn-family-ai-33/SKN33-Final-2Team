@@ -20,7 +20,7 @@ from app.learner_knowledge import VERSION as KNOWLEDGE_VERSION
 
 
 def _hash(inp: dict) -> str:
-    return hashlib.sha256(json.dumps([KNOWLEDGE_VERSION,inp['profile']], ensure_ascii=False, sort_keys=True).encode('utf-8')).hexdigest()[:16]
+    return hashlib.sha256(json.dumps([G.PROMPT_VERSION,KNOWLEDGE_VERSION,inp['profile']], ensure_ascii=False, sort_keys=True).encode('utf-8')).hexdigest()[:16]
 
 
 def get(employee_id: int) -> dict:

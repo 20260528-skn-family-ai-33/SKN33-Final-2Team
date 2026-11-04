@@ -35,8 +35,8 @@ class ChallengeDepthTests(unittest.TestCase):
   saved={'generationId':'g','project':{'goal':'검색'},'recommendations':{'id':'r'},'selection':{'skills':[self.target()]},'skillOrder':['S'],'resourceChoices':{'S':{'course':'c','books':[]}}}
   draft={'chosen':'A3','handoff':{'key':'h'},'gen':{'options':{'A3':{'id':'A3','learningSkills':[self.target()]}}}}
   def generate(system,payload):
-   self.assertIn('단순 수강·요약·코드 실행만으로 완료시키지 않는다',system)
-   self.assertIn('다시 제안해도 같은 도달 수준',system)
+   self.assertIn('단순 수강·요약·코드 실행만으로 완료 판정 금지',system)
+   self.assertIn('선택 자료·강좌 근거·도달 수준 유지',system)
    self.assertEqual(payload['skillTargets']['S']['completionCriteria'],self.target()['completionCriteria'])
    return {'skillSummaries':{'S':['대안 설계','결과 비교','개선 검증']},'acts':[{'skill':'S','stage':2,'title':'자료 학습','res':'c','hours':2,'how':'자료 확인'},{'skill':'S','stage':3,'title':'쿼리 비교·개선 검증','res':None,'hours':3,'how':'두 대안을 비교한다. 결과 정합성과 실행 계획을 기록한다.'}]}
   with patch.object(activities.catalog,'items',return_value={'c':{'id':'c','type':'course','title':'비교','cost':0,'content':'비교 검증'}}),patch.object(activities.RM,'finish_option',side_effect=lambda pid,raw,source:{**raw,'acts':[dict(row,id=str(i)) for i,row in enumerate(raw['acts'])]}):

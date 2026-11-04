@@ -9,21 +9,8 @@ from app.errors import ApiError
 from app.services import drafts
 from app.services.survey_store import _write
 
-SYSTEM = """선택한 코스와 스킬 순서, 프로젝트 요약, 선택 자료만으로 학습 활동을 제안한다.
-각 스킬에 자료 학습과 정확히 하나의 프로젝트 적용 산출물 과제(res=null)를 작성한다. 외부 자료는 materials의 id만 res로 사용한다.
-선택된 자료를 모두 다루고, 제외 스킬이나 선택하지 않은 자료를 추가하지 않는다. 자료 없는 스킬은 직접 수행 과제로 쓴다.
-원본 단계 체계(stage 1~4)를 유지한다. 자료 학습 활동의 title은 짧고 구체적으로, how는 수행 내용과 완료 기준을 쓴다. 프로젝트 산출물 과제는 아래 과제 명세 형식을 따른다.
-자료 목차·시간 등 없는 정보는 사실처럼 만들지 않는다. 코스 특성은 course의 reason·scope를 참고한다.
-선택 강좌·도서를 함께 학습해서 얻는 통합 역량을 skillSummaries에 스킬별로 정확히 3개씩 쓴다. 각 항목은 짧은 명사형 요약이며, 자료별 역량을 나누지 않는다. 선택 자료의 content·skills와 프로젝트 목표에 근거하고 자료에 없는 내용을 보장하지 않는다.
-각 줄은 학습 주제·목차·활동 지시가 아니라, 학습자가 해당 자료를 활용해 수행할 수 있게 되는 구체적인 역량을 표현한다. 대상과 수행 능력을 함께 쓰고 명사형으로 끝낸다. 예: "SQL 문법 학습" 대신 "다중 테이블 조인과 집계 쿼리 작성 능력", "데이터 분석" 대신 "분석 결과의 해석 및 근거 기반 설명 능력". 예시의 기술을 그대로 복사하지 않고 해당 스킬·선택 자료의 DB 근거에 맞춘다. "이해", "활용", "역량 강화" 같은 추상적인 단어만 나열하지 않는다.
-프로젝트 산출물 과제는 choices[스킬].course로 선택한 강좌의 실제 content·curriculum·skills에 근거한 핵심 실습을 중심으로 설계한다. 선택 도서는 그 실습의 개념·검증을 보조한다. 강좌가 없으면 선택 도서 근거로 설계하고, 자료가 모두 없으면 프로젝트 직접 수행 과제로 명확히 한정한다.
-과제 title은 만들 대상과 핵심 기능이 드러나는 하나의 구체적인 결과물 이름이다. 단순 학습·조사·요약·브리프 작성처럼 무엇을 제출할지 불명확한 제목으로 끝내지 않는다.
-과제 how는 다음 네 항목을 줄바꿈으로 구분한다: "만들 것: [프로젝트에 적용할 구체적인 결과물과 사용 입력]", "필수 항목: [강좌 근거로 구현·분석할 2~3개 핵심 요구사항]", "제출물: [결과물 파일·형식 및 실행/확인 방법, 필요한 검증 증거]", "평가 기준: [제출물에서 통과 여부를 확인할 2~3개 관찰 가능한 기준]". 각 항목은 짧고 구체적으로 쓰고 스킬당 하나의 집중된 과제 안에서 연결한다.
-사후 점검과 역량 보고서에서 제출물과 실행 결과로 해당 스킬을 판단할 수 있어야 한다. 평가 기준은 필수 항목과 대응시키고 결과 정확성·재현성·설명 근거 중 해당 과제에 맞는 증거를 요구한다. 수강 완료·자기평가·설명 분량만으로 역량을 입증했다고 하지 않는다. 아직 제출하지 않은 결과나 획득 역량을 사실로 단정하지 않는다.
-DB에서 확인되지 않은 강좌 실습·제공 데이터·평가 방식은 존재한다고 쓰지 않는다. 별도 입력이 필요하면 학습자가 준비할 예제·합성 데이터의 조건을 명시한다. 개인정보·비공개 프로젝트 데이터 제출을 요구하지 않는다. 임의의 성능 목표 수치 대신 예상 결과·검증 방법을 제시한다.
-재제안은 같은 스킬과 강좌 근거·도달 수준을 유지하면서 구체적인 구현 대상이나 문제를 바꾸며, 제출물과 평가 기준도 새 과제에 맞춘다.
-JSON: {"skillSummaries":{"선택 스킬명":["통합 역량 명사형 요약 1","통합 역량 명사형 요약 2","통합 역량 명사형 요약 3"]},"acts":[{"skill":"선택 스킬명","stage":2,"title":"활동","res":null,"hours":2,"how":"만들 것: 구체적인 결과물\n필수 항목: 구현 요구사항\n제출물: 파일 형식과 검증 증거\n평가 기준: 관찰 가능한 통과 기준","skills":["선택 스킬명"]}]}
-"""
+from .activity_instructions import SYSTEM, instructions
+
 
 def materials_key(saved):
     data = [saved['generationId'], (saved.get('recommendations') or {}).get('id'),
@@ -129,12 +116,9 @@ def propose(saved, draft, generate, source, *, previous=None):
     active,payload=learning_context(saved,draft)
     choices=saved['resourceChoices']
     ids=[row['id'] for row in payload['materials']]
-    from app.track_policy import challenge_guidance
-    from app.learner_knowledge import POLICY
-    system=SYSTEM+POLICY+challenge_guidance(draft['chosen'],'tasks')
+    system=instructions(draft['chosen'])
     if previous:
         payload['previousProposals']=[{'acts':record['option']['acts']} for record in previous]
-        system+='\n같은 스킬·순서·코스·선택 자료를 유지하되 previousProposals와 구별되는 프로젝트 적용 과제와 산출물을 제안한다. 자료 학습을 누락하거나 선택 자료를 바꾸지 않는다.'
     raw=generate(system,payload)
     acts=raw.get('acts') if isinstance(raw,dict) else None
     if not isinstance(acts,list) or not acts: raise ApiError(422,'ACTIVITIES_INVALID','활동 제안을 확인하지 못했어요.')

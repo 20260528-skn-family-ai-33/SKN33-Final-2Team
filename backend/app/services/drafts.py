@@ -23,7 +23,7 @@ from ..agents import regulation as REG
 from ..agents import roadmap as RM
 from ..agents import runtime as rt
 from ..agents.demo import D
-from ..errors import AgentError, ApiError, not_found
+from ..errors import AgentError, ApiError, cause, not_found
 from ..free_track import validate_free_plan
 from . import plans as PL
 from . import profile as PF
@@ -296,7 +296,7 @@ def _heal(t: db.Tx, w: dict) -> None:
     행을 잠근 채 작업 표를 보므로, 작업이 결과를 쓴 뒤 끝난 경우를 끊김으로 잘못 보지 않는다(작업은 결과를 쓴 다음에 끝남으로 바뀐다)"""
     ids = _run_jobs(w)
     live = jobs.alive(ids, t)
-    if all(i in live for i in ids):
+    if all(i in live for i in ids) and not _orphaned_options(w):
         return
     d, lost = w['draft'], jobs.lost_cause()
     for run, fail, key_of, done in (('quizRun', 'quizFail', quiz_key, 'quiz'), ('diagRun', 'diagFail', diag_key, 'diag')):
@@ -309,7 +309,7 @@ def _heal(t: db.Tx, w: dict) -> None:
     if doc.get('status') == 'reading' and doc.get('jobId') and doc['jobId'] not in live:
         doc.update(status='fail', step=doc.get('step') or 'summary', fail={'cause': lost})
     for row in ((d.get('genRun') or {}).get('rows') or {}).values():
-        if row and row.get('st') == 'run' and row.get('jobId') and row['jobId'] not in live:
+        if row and row.get('st') == 'run' and row.get('jobId') not in live:
             row.update(st='fail', err=lost, jobId=None)
     g = d.get('gen') or {}
     for pid, x in list((g.get('regenRun') or {}).items()):
@@ -318,9 +318,14 @@ def _heal(t: db.Tx, w: dict) -> None:
             g.setdefault('regenErr', {})[pid] = lost
 
 
+def _orphaned_options(w: dict) -> bool:
+    return any(row and row.get('st') == 'run' and not row.get('jobId')
+               for row in ((w['draft'].get('genRun') or {}).get('rows') or {}).values())
+
+
 def _healed(employee_id: int, draft_id: str, w: dict) -> dict:
     ids = _run_jobs(w)
-    if ids and not all(i in jobs.alive(ids) for i in ids):
+    if _orphaned_options(w) or (ids and not all(i in jobs.alive(ids) for i in ids)):
         return _mutate(employee_id, draft_id, _heal)
     return w
 
@@ -716,7 +721,7 @@ def _plans_brief(employee_id: int) -> list:
 
 def options_start(employee_id: int, draft_id: str) -> dict:
     """전달 내용 확정 + 3안 병렬 작성 시작(API-27). 같은 내용으로 세 안을 모두 받은 적이 있으면 그 결과를 쓴다"""
-    jids = {}
+    jids, pending = {}, []
     work_info = DG.work_profile(PF.view(employee_id))  # 업무 정보가 바뀌면 전달 내용 키도 바뀌어 3안을 새로 만든다
 
     def fn(t, w):
@@ -733,42 +738,53 @@ def options_start(employee_id: int, draft_id: str) -> dict:
             if not d.get('diag') or d['diag']['key'] != diag_key(d):
                 raise ApiError(409, 'DIAG_REQUIRED', '점검 결과를 먼저 정리해 주세요')
             h = build_handoff(d, work_info)
-        if not d.get('gen') or d['gen'].get('key') != h['key']:
+        _heal(t, w)
+        if (d.get('gen') or {}).get('key') != h['key'] and (d.get('genRun') or {}).get('key') != h['key']:
             d.update(gen=None, chosen=None, genRun=None)
             w['draftPlan'] = None
         d['handoff'] = h
         d['genPrefs'] = copy.deepcopy(d['prefs'])
         rid = _round(t, draft_id, d)
         t.run('UPDATE public.diagnostic_rounds SET agent_input = :h WHERE diagnostic_round_id = CAST(:r AS uuid)', h=db.J(h), r=rid)
-        if not d.get('gen') and (d.get('genRun') or {}).get('key') == h['key'] and any((row or {}).get('st') == 'run' for row in d['genRun'].get('rows', {}).values()):
-            return False
-        if not d.get('gen'):
-            d['genRun'] = {'key': h['key'], 'rows': {pid: {'st': 'run', 'tries': 0, 'out': None, 'err': None, 'jobId': None} for pid in D['optionOrder']}}
-            return True
-        return False
-    w = _mutate(employee_id, draft_id, lambda t, w: jids.__setitem__('start', fn(t, w)))
-    if jids['start']:
-        for pid in D['optionOrder']:
-            jids[pid] = _run_option(employee_id, draft_id, pid)
+        if not d.get('genRun') or d['genRun'].get('key') != h['key']:
+            if d.get('gen'):
+                return
+            # 아직 작업이 없는 안은 실행 중으로 표시하지 않는다.
+            d['genRun'] = {'key': h['key'], 'rows': {pid: {'st': 'fail', 'tries': 0, 'out': None, 'err': None, 'jobId': None} for pid in D['optionOrder']}}
+        pending.extend((pid, h['key']) for pid, row in d['genRun']['rows'].items() if row.get('st') == 'fail')
+    w = _mutate(employee_id, draft_id, fn)
+    for pid, key in pending:
+        try:
+            jids[pid] = _run_option(employee_id, draft_id, pid, expected_key=key)
+        except ApiError as error:
+            if error.code not in ('OPTION_RUNNING', 'OPTION_READY', 'STALE_RUN'):
+                raise
+    if pending:
         w = _mutate(employee_id, draft_id, lambda t, w: None)
-    return dict(present(w, draft_id), jobs={k: v for k, v in jids.items() if k != 'start'})
+    return dict(present(w, draft_id), jobs=jids)
 
 
-def _run_option(employee_id: int, draft_id: str, pid: str) -> str:
-    # 작업을 시작하기 전에 '작성 중'으로 표시한다(작업이 빨리 끝나도 결과를 덮어쓰지 않게)
+def _run_option(employee_id: int, draft_id: str, pid: str, *, expected_key: str | None = None) -> str:
+    # 작업 ID와 실행 상태를 같은 행 잠금 안에서 저장한 뒤 워커를 시작한다.
     info: dict = {}
 
-    def mark(t, w2):
-        r = w2['draft'].get('genRun')
-        if not r:
-            raise ApiError(409, 'NO_RUN', '작성 중인 3안이 없어요')
-        row = r['rows'][pid]
-        row.update(st='run', err=None, jobId=None, tries=(row.get('tries') or 0) + 1)
-        info.update(h=w2['draft']['handoff'], key=r['key'], tries=row['tries'])
-    _mutate(employee_id, draft_id, mark)
-    h, key, tries = info['h'], info['key'], info['tries']
+    def mark(jid: str) -> None:
+        def save_run(t, w2):
+            _heal(t, w2)
+            r = w2['draft'].get('genRun')
+            if not r or (expected_key is not None and r['key'] != expected_key):
+                raise ApiError(409, 'STALE_RUN', '입력이 바뀌었어요. 현재 계획을 확인해 주세요')
+            row = r['rows'][pid]
+            if row.get('st') == 'run':
+                raise ApiError(409, 'OPTION_RUNNING', '이미 작성 중인 계획이에요')
+            if row.get('st') == 'ok':
+                raise ApiError(409, 'OPTION_READY', '이미 작성된 계획이에요')
+            row.update(st='run', err=None, jobId=jid, tries=(row.get('tries') or 0) + 1)
+            info.update(h=copy.deepcopy(w2['draft']['handoff']), key=r['key'], tries=row['tries'], jid=jid)
+        _mutate(employee_id, draft_id, save_run)
 
     def work(job: jobs.JobCtx):
+        h, key, tries = info['h'], info['key'], info['tries']
         ctx = rt.context(employee_id)
         sim = rt.SIM_ERR['openai' if ctx.provider == 'openai' else 'ollama'][pid] if ctx.fail_sim.get('gen') and pid in ('A2', 'A3') and tries == 1 else None
         out, err = None, None
@@ -782,6 +798,8 @@ def _run_option(employee_id: int, draft_id: str, pid: str) -> str:
             if not r or r['key'] != key:
                 return
             row = r['rows'][pid]
+            if row.get('jobId') != job.job_id or row.get('tries') != tries:
+                return
             row.update(st='ok' if out else 'fail', out=out, err=err, jobId=None)
             rows = [r['rows'][x] for x in D['optionOrder']]
             d2 = w2['draft']
@@ -796,30 +814,33 @@ def _run_option(employee_id: int, draft_id: str, pid: str) -> str:
         if err:
             raise AgentError(err['raw'] or err['text'])
         return {'pid': pid}
-    jid = jobs.start('option', employee_id, f'{draft_id}:{pid}', work)
-
-    def note_job(t, w2):
-        r = w2['draft'].get('genRun')
-        if r and r['key'] == key and r['rows'][pid]['st'] == 'run':
-            r['rows'][pid]['jobId'] = jid
-    _mutate(employee_id, draft_id, note_job)
-    return jid
+    try:
+        return jobs.start('option', employee_id, f'{draft_id}:{pid}', work, before_start=mark)
+    except Exception:
+        if info:
+            def failed_start(t, w2):
+                r = w2['draft'].get('genRun')
+                row = (r or {}).get('rows', {}).get(pid) or {}
+                if r and r['key'] == info['key'] and row.get('jobId') == info['jid']:
+                    row.update(st='fail', jobId=None, err=cause('작업을 시작하지 못했어요. 다시 시도해 주세요.'))
+            _mutate(employee_id, draft_id, failed_start)
+        raise
 
 
 def option_retry(employee_id: int, draft_id: str, pid: str) -> dict:
     """실패한 안만 다시 작성(API-29 · 사용자가 누를 때만)"""
-    with db.tx() as t:
-        w = _wrap(_row(t, employee_id, draft_id, lock=False)['draft_choices'])
+    w = _mutate(employee_id, draft_id, _heal)
     r = w['draft'].get('genRun')
     if not r or (r['rows'].get(pid) or {}).get('st') != 'fail':
         raise ApiError(409, 'NOT_FAILED', '다시 작성할 안이 없어요')
-    jid = _run_option(employee_id, draft_id, pid)
+    jid = _run_option(employee_id, draft_id, pid, expected_key=r['key'])
     return dict(get(employee_id, draft_id), jobs={pid: jid})
 
 
 def accept_partial(employee_id: int, draft_id: str) -> dict:
     """작성된 안만으로 진행(API-30). 실패한 안은 저장하지 않는다"""
     def fn(t, w):
+        _heal(t, w)
         d = w['draft']
         r = d.get('genRun')
         rows = [r['rows'][x] for x in D['optionOrder']] if r else []

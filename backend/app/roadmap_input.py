@@ -80,11 +80,14 @@ def assessment_evidence(assessment: dict) -> dict:
     return result
 
 
-def project(payload: dict) -> dict:
+def project(payload: dict, *, compact_assessment: bool = False) -> dict:
     """생성·재생성·수정의 공통 전달 형식. 알 수 없는 개인 입력 필드는 보존한다."""
     result = deepcopy(payload)
     handoff = result['handoff']
-    if isinstance(handoff.get('assessment'), dict) and 'groups' in handoff['assessment'] and 'answers' in handoff['assessment']:
+    if compact_assessment and 'assessment' in handoff:
+        from app.services.assessment_context import compact
+        handoff['assessment'] = compact(handoff['assessment'])
+    elif isinstance(handoff.get('assessment'), dict) and 'groups' in handoff['assessment'] and 'answers' in handoff['assessment']:
         handoff['assessment'] = assessment_evidence(handoff['assessment'])
         if 'skillNames' in handoff:
             groups = handoff['assessment']['groups']
@@ -94,6 +97,18 @@ def project(payload: dict) -> dict:
                     del group['skill']
                 handoff['assessment']['unmatchedGroups'] = unmatched
                 handoff['assessment']['groups'] = [group for group in groups if group['skill'] in handoff['skillNames']]
+    # 현행 압축 결과도 실제 소속을 확인한다. 새 스킬로 과거 점검 근거 전용 금지.
+    assessment = handoff.get('assessment')
+    if isinstance(assessment, dict) and assessment.get('version') == 'assessment-evidence/v1':
+        names = handoff.get('skillNames', handoff.get('skillOrder'))
+        if names is not None:
+            groups = assessment['skills']
+            unmatched = [dict(group, priorSkill=group['skill']) for group in groups if group['skill'] not in names]
+            if unmatched:
+                for group in unmatched:
+                    del group['skill']
+                assessment['unmatchedSkills'] = unmatched
+                assessment['skills'] = [group for group in groups if group['skill'] in names]
     knowledge = handoff.get('learnerKnowledge') or result.get('learnerKnowledge') or {}
     hr = handoff.get('hrContext') or {}
     profile = handoff.get('profile')

@@ -42,14 +42,47 @@ class SurveyTests(unittest.TestCase):
         with self.assertRaises(SurveyError):
             generate_survey(self.project, self.selection(2), self.profile, model, require_measurement=True)
 
-    def test_known_technology_and_certifications_reach_measurement_input(self):
-        self.profile['self'] = {'tech': ['Python'], 'certs': ['SQLD']}
+    def test_complete_profile_reaches_model_once_without_source_mutation(self):
+        self.profile['self'] = {'tech': ['Python'], 'certs': ['SQLD'],
+                                'learning': ['비동기 교육'], 'projects': ['API 프로젝트'],
+                                'profile': {'workDesc': '업무', 'expSummary': '경험', 'devYears': 0}}
+        before = copy.deepcopy((self.project, self.profile))
         model = Mock(return_value=self.result(2))
         generate_survey(self.project, self.selection(2), self.profile, model)
-        payload = model.call_args.args[1]
-        self.assertEqual(payload['learnerKnowledge']['technologies'], ['Python'])
-        self.assertEqual(payload['learnerKnowledge']['certifications'], ['SQLD'])
-        self.assertEqual(payload['hrContext']['department'], '운영부')
+        system, payload = model.call_args.args
+        self.assertEqual(set(payload), {'goal', 'projectSummary', 'desiredCompetencies', 'skills',
+                                        'profile', 'surveysPerSkill', 'quizzesPerSkill'})
+        self.assertEqual(payload['profile'], self.profile)
+        self.assertEqual(payload['profile']['self']['tech'], ['Python'])
+        self.assertEqual(payload['profile']['self']['certs'], ['SQLD'])
+        self.assertEqual(payload['profile']['department'], '운영부')
+        self.assertIn('profile.self.tech', system)
+        self.assertIn('profile.self.certs', system)
+        self.assertNotIn('learnerKnowledge', system)
+        payload['profile']['self']['tech'].append('모델 입력 수정')
+        self.assertEqual((self.project, self.profile), before)
+
+    def test_only_exact_duplicate_desired_is_omitted_without_changing_source_or_questions(self):
+        for desired in ('수질 예측', '  수질 예측  ', '수질 예측 심화', '수질  예측'):
+            with self.subTest(desired=desired):
+                project = dict(self.project, desiredCompetencies=desired)
+                before = copy.deepcopy(project)
+                model = Mock(return_value=self.result(2))
+                result = generate_survey(project, self.selection(2), self.profile, model)
+                system, payload = model.call_args.args
+                if desired.strip() == project['goal'].strip():
+                    self.assertNotIn('desiredCompetencies', payload)
+                else:
+                    self.assertEqual(payload['desiredCompetencies'], desired.strip())
+                self.assertEqual(project, before)
+                self.assertEqual(result['questionCount'], 12)
+                self.assertEqual([g['skill'] for g in result['groups']], ['스킬0', '스킬1'])
+                self.assertIn('미제공 시 goal 기준으로 스킬 내 세부 주제 조정', system)
+        for desired in (None, '', '   '):
+            model = Mock()
+            with self.subTest(invalid=desired), self.assertRaises(SurveyError):
+                generate_survey(dict(self.project, desiredCompetencies=desired), self.selection(2), self.profile, model)
+            model.assert_not_called()
 
     def test_exact_counts_for_every_allowed_skill_count(self):
         for n in range(1, 6):

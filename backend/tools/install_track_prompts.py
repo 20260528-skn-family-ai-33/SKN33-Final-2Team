@@ -1,6 +1,8 @@
 """이슈 #38: Track 프롬프트 새 버전 등록. 이전 이력 보존 및 동일 내용 재실행 지원."""
 from app import db
 from app.agents import roadmap as rm
+from app.agents.roadmap_generation import generation as generation_prompt
+from app.agents.roadmap_revision import revision as revision_prompt
 
 POLICIES = {
     'A1': '''Free Track: 무료 자료만 허용한다.
@@ -28,8 +30,8 @@ def install():
         for pid, agent in rm.TRACK_PROMPT_AGENTS.items():
             t.val('SELECT pg_advisory_xact_lock(hashtext(:key))', key='prompt:' + agent)
             values = dict(rm.D['perspectives'][pid], id=pid, rules=POLICIES[pid], focus=POLICIES[pid])
-            generation = rm.R_SYS.format(**values) + '\n\n[최우선 Track 정책]\n' + POLICIES[pid]
-            revision = rm.REV_SYS.format(**values) + '\n\n[최우선 Track 정책]\n' + POLICIES[pid]
+            generation = generation_prompt(pid)
+            revision = revision_prompt(pid)
             prompt = '### GENERATION\n' + generation + '\n### REVISION\n' + revision
             active = t.all('SELECT prompt_version_id,system_prompt FROM public.prompt_versions WHERE agent_id=:a AND is_active FOR UPDATE', a=agent)
             if len(active) > 1:
