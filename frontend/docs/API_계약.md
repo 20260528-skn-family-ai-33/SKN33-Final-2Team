@@ -20,6 +20,16 @@
 
 ## 엔드포인트 (영역별)
 
+### 자료 선택 기간 — `/api/v2/drafts/{id}/recommendations/durations`
+
+기간 응답의 `durationEstimates[skill]`은 `resource-hours-books/v3` 기준이다. `startWeek`·`endWeek`·`weeks`는 해당 스킬 자료의 달력 구간이며, 공유 강좌·도서 때문에 다른 스킬과 겹칠 수 있다. 화면 합계는 `weeks`를 더하지 않고 `totalWeeks`를 사용한다. `addedWeeks`는 해당 스킬이 전체 일정에 더한 주차이고, 자료가 없는 스킬은 0주와 null 구간으로 표시한다.
+
+같은 강좌 ID는 전체에서 한 번만 시간에 포함한다. 도서는 고유 ID당 1주이며, 여러 스킬에서 같은 책을 선택하면 첫 배정 구간을 공유한다. `bookWeeks`는 해당 스킬에서 새로 추가한 도서 주차이므로 이미 배정된 책은 0이다. 제목이 같아도 ID가 다르면 별도 도서로 센다. 미확인 강좌 시간의 1주 가정과 숫자로 확보한 추정 시간은 구분한다. `scheduleKey`·`selection`·`skillOrder`·`weeklyHours`로 현재 선택과 계산 결과의 일치를 확인한다. 선택·순서·주당시간이 바뀌면 전체를 다시 계산하고 오래된 결과의 저장을 거부한다. v2 캐시도 다시 계산해야 하므로 백엔드·프런트를 함께 배포한다.
+
+새 계획에는 공유 강좌·도서의 `resourceWindow: {from,to}`, `durationBasis: materials-only`, `totalHUnknown`·`totalHEstimated`가 포함될 수 있다. `totalH`도 같은 강좌·도서 ID는 한 번만 더하지만 활동 ID·소속 스킬은 유지한다. 자료 기간에는 과제 소요 주차가 포함되지 않으며 과제 시간은 `totalH`에 남는다. 기존 확정 계획은 일괄 변경하지 않으며 도서 완료 상태를 함께 갱신하는 변경도 포함하지 않는다.
+
+추천 스킬 응답에는 선택적인 `courseDiagnostic: {reason,detail}`이 올 수 있다. 후보 없음, 근거·기술·범위 부족 또는 긴 강좌가 필요한 사유를 기록하며, 일부 강좌를 추천한 경우에도 남은 범위의 부족을 설명할 수 있다. 기존 진단 필드 없는 응답도 허용한다. 이 필드는 현재 추천 화면에 별도 표시하지 않는다.
+
 `{}`는 경로 값. 화면 함수 이름은 `api/endpoints/<파일>`의 이름이에요.
 
 ### 계정·내 정보·AI 모드·시연 도구 — `account.ts` (`accountApi`·`aiApi`·`demoApi`)

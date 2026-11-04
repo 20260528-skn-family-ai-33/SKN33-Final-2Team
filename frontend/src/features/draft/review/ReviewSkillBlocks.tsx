@@ -1,8 +1,9 @@
 import './reviewSkills.css';
 import { ResourceImage } from '@/shared/ui/ResourceImage';
 import { TaskDescription } from '@/shared/ui/TaskDescription';
+import { durationLabel, type DurationEstimate } from '../result/skillOrder';
 export type ReviewResource = { id: string; title: string; provider?: string; image?: string; url?: string; cost?: number | null; knowledge?: string; competencySummary?: string[]; content?: string };
-export type ReviewMaterials = { recommendations: { skills: { name: string; courses: ReviewResource[]; books: ReviewResource[] }[] } | null; choices: Record<string, { course: string | null; courses?: string[]; books: string[]; enabled?: boolean }>; skillOrder?: string[]; skillDetails?: { name: string; application: string; competencySummary?: string[] }[]; durationEstimates?: Record<string, { weeks?: number }> };
+export type ReviewMaterials = { recommendations: { skills: { name: string; courses: ReviewResource[]; books: ReviewResource[] }[] } | null; choices: Record<string, { course: string | null; courses?: string[]; books: string[]; enabled?: boolean }>; skillOrder?: string[]; skillDetails?: { name: string; application: string; competencySummary?: string[] }[]; durationEstimates?: Record<string, DurationEstimate> };
 type Act = { id: string; title: string; skill: string; how: string; hours: number; res?: string | null };
 export function ReviewSkillBlocks({ materials, acts, selectedIds, busy, onToggle, onPropose, confirmed = false, onSubmit, onOpenResource, currentSkillNames = [], alternatives, onPick, generatingSkill }: { generatingSkill?: string | null; alternatives?: Record<string, { proposalId: string; task: Act }[]>; onPick?: (skill: string, proposalId: string) => void; materials: ReviewMaterials; acts: Act[]; selectedIds: string[]; busy: boolean; onToggle?: (id: string) => void; onPropose?: (skill: string) => void; confirmed?: boolean; onSubmit?: (skill: string) => void; onOpenResource?: (skill: string, resourceId: string) => void; currentSkillNames?: string[] }) {
   const skills = materials.recommendations?.skills || [];
@@ -15,7 +16,7 @@ export function ReviewSkillBlocks({ materials, acts, selectedIds, busy, onToggle
     const tasks = acts.filter(a => a.skill === name && !a.res);
     const latest = alternatives?.[name]?.filter(item => !tasks.some(task => task.id === item.task.id)).slice(-1) || [];
     return <details open className={`card review-skill-block${currentSkillNames.includes(name) ? ' is-current-week' : ''}`} key={name}>
-      <summary><span className="review-skill-number">{index + 1}</span><h2>{name}</h2>{materials.durationEstimates?.[name]?.weeks != null && <span className="tag">예상 {materials.durationEstimates[name].weeks}주</span>}<span className="review-skill-toggle-more">펼치기</span><span className="review-skill-toggle-less">접기</span></summary>
+      <summary><span className="review-skill-number">{index + 1}</span><h2>{name}</h2>{materials.durationEstimates?.[name]?.weeks != null && <span className="tag">{durationLabel(materials.durationEstimates[name])}</span>}<span className="review-skill-toggle-more">펼치기</span><span className="review-skill-toggle-less">접기</span></summary>
       <div className="review-combined-learning"><div className="review-resource-rows">
         {rows.length ? rows.map(resource => {
           const kind = skill.books.includes(resource) ? '도서' : '강좌';

@@ -90,3 +90,113 @@ describe('자료 기준 기간', () => {
     expect(plan.acts.map(act => [act.skill, act.wFrom, act.wTo])).toEqual([['S', 1, 5], ['T', 6, 13]]);
   });
 });
+
+function sharedOption(): OptionDef {
+  const rows = [['RAG', 'shared', 6.9], ['ETL', 'etl', 8.7], ['Web', 'shared', 6.9], ['MLOps', 'mlops', 8.7]] as const;
+  return {...def, materialSchedule: [], acts: rows.map(([skill, res], i) => ({id: `material-${i}`, skill, res, stage: 2, title: res})),
+    learningReport: {
+      recommendations: {id: 'rec', skills: rows.map(([name, id, hours]) => ({name, courses: [{id, title: id, hours}], books: [{id: 'book', title: 'book', hours: 12}]}))},
+      choices: Object.fromEntries(rows.map(([name, course]) => [name, {course, books: []}])),
+      skillOrder: rows.map(([name]) => name),
+    }};
+}
+
+describe('공유 강좌의 실제 일정과 전체 기간', () => {
+  it('재현 사례는 5주이며 비인접 공유 강좌는 같은 구간과 별도 ID를 유지한다', () => {
+    const input = sharedOption(), before = structuredClone(input);
+    const plan = buildPlan(input, {hours: 6}, 'Goal');
+    expect(plan.weeks).toBe(5);
+    expect(plan.totalH).toBe(24.3);
+    expect(plan.acts.filter(a => a.res === 'shared').map(a => [a.id, a.wFrom, a.wTo])).toEqual([['material-0', 1, 2], ['material-2', 1, 2]]);
+    expect(plan.def.learningReport?.durationEstimates?.Web.addedWeeks).toBe(0);
+    expect(input).toEqual(before);
+  });
+  it('과제 시간은 합계 시간에만 남고 자료 주차를 늘리지 않는다', () => {
+    const input = sharedOption();
+    input.acts.push({id: 'task', skill: 'Web', stage: 3, title: 'Task', hours: 100});
+    const plan = buildPlan(input, {hours: 6}, 'Goal');
+    expect(plan.weeks).toBe(5); expect(plan.totalH).toBe(124.3);
+    expect(plan.durationBasis).toBe('materials-only');
+    expect(plan.acts.at(-1)).toMatchObject({id: 'task', wFrom: 1, wTo: 2});
+  });
+  it('주당시간·순서·제외를 바꾸면 전역 일정을 다시 계산한다', () => {
+    const input = sharedOption();
+    expect(buildPlan(input, {hours: 12}, '').weeks).toBe(3);
+    input.learningReport!.skillOrder = ['ETL', 'Web', 'MLOps', 'RAG'];
+    const reordered = buildPlan(input, {hours: 6}, '');
+    expect(reordered.def.learningReport!.durationEstimates!.RAG.addedWeeks).toBe(0);
+    expect(reordered.acts.find(a => a.skill === 'RAG')?.wFrom).toBe(2);
+    input.learningReport!.choices.Web.enabled = false;
+    const excluded = buildPlan(input, {hours: 6}, '');
+    expect(excluded.acts.some(a => a.skill === 'Web')).toBe(false);
+    expect(excluded.def.learningReport!.durationEstimates!.RAG.addedWeeks).toBe(2);
+  });
+  it('도서는 1주 작업량을 추가하고 공유 강좌만 있는 후속 스킬은 미래 슬롯을 만들지 않는다', () => {
+    const input = sharedOption();
+    input.learningReport!.choices.RAG.books = ['book'];
+    input.acts.push({id: 'book-act', skill: 'RAG', stage: 2, title: 'Book', res: 'book', hours: 12});
+    const plan = buildPlan(input, {hours: 6}, '');
+    expect(plan.weeks).toBe(6); expect(plan.totalH).toBe(36.3);
+    expect(plan.acts.find(a => a.skill === 'Web')).toMatchObject({wFrom: 1, wTo: 2});
+    expect(plan.acts.every(a => a.wFrom >= 1 && a.wFrom <= a.wTo && a.wTo <= plan.weeks)).toBe(true);
+  });
+  it('짧은 독립 강좌는 합산 후 한번만 올리고 소수점 경계도 보존한다', () => {
+    const input = sharedOption();
+    input.learningReport!.recommendations.skills.forEach((row, i) => {row.courses[0] = {id: String(i), title: 'short', hours: 0.1}; input.learningReport!.choices[row.name].course = String(i); input.acts[i].res = String(i);});
+    expect(buildPlan(input, {hours: 0.4}, '').weeks).toBe(1);
+  });
+  it('비인접 스킬의 같은 도서는 시간과 기간을 한 번만 더하고 활동 ID는 유지한다', () => {
+    const input = sharedOption();
+    for (const name of ['RAG', 'Web']) {
+      input.learningReport!.choices[name].books = ['book'];
+      input.acts.push({id: `book-${name}`, skill: name, stage: 2, title: 'Book', res: 'book', hours: 12});
+    }
+    const before = structuredClone(input), plan = buildPlan(input, {hours: 6}, '');
+    expect(input).toEqual(before);
+    expect(plan.weeks).toBe(6); expect(plan.totalH).toBe(36.3);
+    expect(plan.acts.filter(a => a.res === 'book').map(a => [a.id, a.wFrom, a.wTo, a.resourceWindow])).toEqual([
+      ['book-RAG', 2, 3, {from: 2, to: 3}], ['book-Web', 2, 3, {from: 2, to: 3}],
+    ]);
+    expect(plan.def.learningReport!.durationEstimates!.Web).toMatchObject({bookWeeks: 0, addedWeeks: 0, totalWeeks: 6});
+  });
+  it('도서만 공유하는 스킬은 순서·제외·재선택·주당 시간 변경 후에도 고유 책당 1주다', () => {
+    const input = sharedOption(), report = input.learningReport!;
+    report.recommendations.skills.forEach(row => { row.courses = []; report.choices[row.name].course = null; });
+    input.acts = ['RAG', 'Web'].map(name => ({id: `book-${name}`, skill: name, stage: 2, title: 'Book', res: 'book', hours: 12}));
+    for (const name of ['RAG', 'Web']) report.choices[name].books = ['book'];
+    expect(buildPlan(input, {hours: 6}, '').weeks).toBe(1);
+    report.skillOrder.reverse();
+    expect(buildPlan(input, {hours: 6}, '').def.learningReport!.durationEstimates!.RAG.bookWeeks).toBe(0);
+    report.choices.Web.enabled = false;
+    expect(buildPlan(input, {hours: 6}, '').def.learningReport!.durationEstimates!.RAG.bookWeeks).toBe(1);
+    report.choices.RAG.books = [];
+    input.acts = [];
+    expect(buildPlan(input, {hours: 6}, '').weeks).toBe(0);
+    report.choices.RAG.books = ['book'];
+    expect(buildPlan(input, {hours: 12}, '').weeks).toBe(1);
+  });
+  it('제목이 같은 다른 ID의 도서는 각각 1주로 계산한다', () => {
+    const input = sharedOption(), report = input.learningReport!;
+    report.recommendations.skills.forEach(row => { row.courses = []; report.choices[row.name].course = null; });
+    report.recommendations.skills.find(row => row.name === 'Web')!.books.push({id: 'other-book', title: 'book', hours: 12});
+    report.choices.RAG.books = ['book']; report.choices.Web.books = ['other-book'];
+    input.acts = [];
+    expect(buildPlan(input, {hours: 6}, '').weeks).toBe(2);
+  });
+  it('시간 미확인과 수치 추정을 구분하고 알려진 시간 합계에 가정값을 넣지 않는다', () => {
+    const input = sharedOption();
+    input.learningReport!.recommendations.skills.forEach(row => row.courses[0].id === 'shared' ? row.courses[0].hours = null : row.courses[0].estimated = ['hours']);
+    const plan = buildPlan(input, {hours: 6}, '');
+    expect(plan.weeks).toBe(4); expect(plan.totalH).toBe(17.4);
+    expect(plan.totalHUnknown).toBe(true); expect(plan.totalHEstimated).toBe(true);
+    expect(plan.def.learningReport!.durationEstimates!.Web.unknownCourses).toEqual(['shared']);
+  });
+  it('자료 없는 과제는 자료 0주를 유지하며 임의의 미래 주차를 만들지 않는다', () => {
+    const input = sharedOption();
+    input.learningReport!.recommendations.skills.forEach(row => {row.courses = []; input.learningReport!.choices[row.name].course = null;});
+    input.acts = [{id: 'task', skill: 'Web', stage: 3, title: 'Task', hours: 100}];
+    const plan = buildPlan(input, {hours: 6}, '');
+    expect(plan.weeks).toBe(0); expect(plan.totalH).toBe(100);
+    expect(plan.acts[0]).toMatchObject({wFrom: 1, wTo: 1});
+  });
+});

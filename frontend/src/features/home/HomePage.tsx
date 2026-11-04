@@ -20,6 +20,7 @@ import { Icon } from '@/shared/ui/Icon';
 import { useCatalog } from '@/shared/state/catalog';
 import './homeSkills.css';
 import { GanttAll } from './Gantt';
+import { LearningSpace } from './LearningSpace';
 
 function DraftBox() {
   const go = useGo();
@@ -144,6 +145,7 @@ export function HomePage() {
           <p className="lead">이어서 작성하면 마지막으로 작성하던 단계부터 이어가요.</p>
           <DraftBox />
           <PastLink />
+          <LearningSpace />
         </>
       );
     return (
@@ -173,6 +175,7 @@ export function HomePage() {
             </div>
           ))}
         </div>
+        <LearningSpace />
       </>
     );
   }
@@ -205,6 +208,7 @@ export function HomePage() {
         </div>
       ) : null}
       <PastLink />
+      <LearningSpace />
     </>
   );
 }

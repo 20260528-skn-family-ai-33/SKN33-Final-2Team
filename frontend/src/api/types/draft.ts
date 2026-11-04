@@ -142,7 +142,14 @@ export type LearningSkillSelection = { name: string; enabled: boolean };
 export interface OptionDef {
   optionId?: string;
   promptProvenance?: { promptVersionId: string; agentId: string; storedPromptHash: string; effectivePromptHash: string; source: string };
-  materialSchedule?: { skill: string; weeks: number }[];
+  materialSchedule?: { skill: string; weeks: number; startWeek?: number | null; endWeek?: number | null; addedWeeks?: number; totalWeeks?: number }[];
+  learningReport?: {
+    recommendations: { id?: string; skills: { name: string; courses: MaterialResource[]; books: MaterialResource[] }[] };
+    choices: import('@/features/draft/result/skillOrder').Choices;
+    skillOrder: string[];
+    durationEstimates?: Record<string, import('@/features/draft/result/skillOrder').DurationEstimate>;
+    skillDetails?: {name: string; application: string; competencySummary?: string[]}[];
+  };
   learningSkills?: LearningSkill[];
   learningSkillsKey?: string;
   learningSkillSelection?: LearningSkillSelection[];
@@ -167,6 +174,8 @@ export interface OptionDef {
   [k: string]: unknown;
   displayTitle?: string;
 }
+
+export type MaterialResource = { id: string; title: string; hours?: number | null; estimated?: string[]; timeStatus?: string; [key: string]: unknown };
 
 export interface Gen {
   key: string;

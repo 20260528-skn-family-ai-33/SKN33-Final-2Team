@@ -8,7 +8,7 @@ from app.agents import roadmap as rm
 
 class CurrentWorkflowPromptTests(TestCase):
     def generate(self, depth=True):
-        handoff={'goal':'SQL 집계 검증','assessmentGenerationId':'g','selectedSkillsFixed':True,'skillOrder':['SQL'],'skillDetails':[{'name':'SQL','application':'집계 검증'}]}
+        handoff={'goal':'SQL 집계 검증','assessmentGenerationId':'g','selectedSkillsFixed':True,'skillNames':['SQL'],'skillOrder':['SQL'],'skillDetails':[{'name':'SQL','application':'집계 검증'}]}
         learning={'name':'SQL','application':'설계 검증'}
         if depth:learning.update(targetOutcome='집계 쿼리 비교 보고서',completionCriteria=['정합성 확인','대안 비교'])
         captured={}

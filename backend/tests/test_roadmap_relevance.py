@@ -14,7 +14,7 @@ class RoadmapRelevanceTests(TestCase):
             'skillDetails':[{'name':'SQL','application':'다중 테이블 조인 결과의 정합성 검증'},
                             {'name':'운영','application':'제외한 서버 운영'}]}
         original=deepcopy(handoff)
-        selection=SimpleNamespace()
+        selection=SimpleNamespace(skills=['SQL'])
         with patch.object(roadmap.catalog,'roadmap_selection',return_value=selection) as select, patch.object(roadmap.catalog_budget,'pack',return_value={}), patch.object(roadmap,'_cat',return_value={}):
             roadmap._catalog_payload('A1',{'handoff':handoff})
         texts=select.call_args.args[0]

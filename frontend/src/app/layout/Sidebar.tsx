@@ -10,7 +10,7 @@ import { draftActive, newComments, recs, useWs } from '@/shared/state/workspace'
 import { failToast } from '@/shared/lib/fail';
 import { AimStatus } from '@/shared/ui/conn';
 import { Icon } from '@/shared/ui/Icon';
-import { Brand, NavLink } from '@/shared/ui/sideParts';
+import { Brand, NavLink, SideToggle } from '@/shared/ui/sideParts';
 
 export function AiBox() {
   const { choice } = useAiMode();
@@ -148,6 +148,7 @@ export function Sidebar({ active }: { active: string }) {
           <Icon name="logout" />
           <span className="lbl">로그아웃</span>
         </button>
+        <SideToggle />
       </div>
     </>
   );

@@ -170,14 +170,11 @@ def save_resource_choices(t: Any, employee_id: int, project_id: str, generation_
     if current.get('resourceChoices')!=choices or current.get('skillOrder')!=list(order):
         for field in ('activityProposal','activityVersions','learningOutcomes','materialsSelectionKey'):
             current.pop(field,None)
-        current['durationEstimates']={name:estimate for name,estimate in (current.get('durationEstimates') or {}).items()
-            if name in choices and estimate.get('course')==choices[name].get('course') and sorted(estimate.get('books') or [])==sorted(choices[name].get('books') or [])}
+        current['durationEstimates']={}
     current['skillOrder'] = list(order)
     current['resourceChoices'] = deepcopy(choices)
-    from app.services.duration_proposals import calculate_durations
-    selected_option=((((raw.get('draft') or {}).get('gen') or {}).get('options') or {}).get(course) or {})
-    if current.get('project') and course:
-        current['durationEstimates']=calculate_durations(current['project'],recommendations,choices,list(order),selected_option.get('weeklyHours') or 4)
+    from app.services.material_plan import duration_estimates
+    current['durationEstimates']=duration_estimates(current,raw.get('draft') or {})
 
     if course:
         from app.services.activity_selection import materials_key
@@ -194,6 +191,10 @@ def save_duration_proposals(t: Any, employee_id: int, project_id: str, generatio
     current = scope_view(base, course, (((raw.get('draft') or {}).get('gen') or {}).get('options') or {}).get(course)) if isinstance(base, dict) else None
     if not isinstance(current, dict) or current.get('generationId') != generation_id or not current.get('completed') or (current.get('recommendations') or {}).get('id') != recommendation_id:
         raise StoreError('점검 또는 추천이 변경됐습니다. 다시 조회해 주세요.')
-    current['durationEstimates'] = {**current.get('durationEstimates', {}), **deepcopy(proposals)}
+    from app.services.material_plan import duration_estimates
+    expected = duration_estimates(current, raw.get('draft') or {})
+    if proposals != expected:
+        raise StoreError('선택 자료·순서 또는 주당시간이 변경됐습니다. 기간을 다시 계산해 주세요.')
+    current['durationEstimates'] = deepcopy(expected)
     _write(t, employee_id, project_id, merge_scope(base, current))
     return current
