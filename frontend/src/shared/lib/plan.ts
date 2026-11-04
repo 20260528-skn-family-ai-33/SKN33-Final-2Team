@@ -12,6 +12,10 @@ import { applyMaterialSchedule } from './materialSchedule';
 
 export const stageName = (n: number): string => D.stages.find((s) => s.n === n)?.name || '';
 
+export function planWeeklyHours(handoffHours?: number | null, optionHours?: number | null): number {
+  return handoffHours || optionHours || D.autoHours;
+}
+
 export function buildPlan(def: OptionDef, prm: Partial<PlanParams>, goal: string): PlanContent {
   const p: PlanParams = { start: 1, hours: 4, format: 'mixed', patch: {}, ...prm };
   const acts: Activity[] = def.acts

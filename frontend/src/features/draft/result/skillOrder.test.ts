@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { planWeeklyHours } from '@/shared/lib/plan';
 import { displayOrder, moveSkill, totalWeeks, currentWeeks, currentEstimates, durationLabel, DURATION_METHOD, type DurationEstimate } from './skillOrder';
 const choices = { A: { course: null, books: [] }, B: { course: null, books: [], enabled: false }, C: { course: null, books: [] } };
 describe('스킬 순서와 제외', () => {
@@ -40,6 +41,13 @@ describe('공유 자료 전체 기간과 스킬 표시 구간', () => {
  it('확인되지 않은 시간을 확정값처럼 표시하지 않는다', () => {
    expect(durationLabel({...estimates.Web, unknownCourses: ['shared']})).toContain('시간 미확인');
    expect(durationLabel({...estimates.Web, estimatedCourses: ['shared']})).toContain('추정 시간 포함');
+ });
+ it('저장된 입력이 50시간이어도 서버가 적용한 40시간의 기간을 표시한다', () => {
+   const draft = {prefs: {hours: 50}, handoff: {prefs: {weeklyHours: 40}}};
+   const serverEstimates = Object.fromEntries(Object.entries(estimates).map(([name, row]) => [name, {...row, weeklyHours: 40}]));
+   const hours = planWeeklyHours(draft.handoff.prefs.weeklyHours, 6);
+   expect(totalWeeks(order, choices, serverEstimates, hours)).toBe(3);
+   expect(totalWeeks(order, choices, serverEstimates, draft.prefs.hours)).toBeNull();
  });
  it('도서를 중복 계산한 v2 전체 캐시는 구형 합산 경로로 돌아가지 않는다', () => {
    const stale = Object.fromEntries(Object.entries(estimates).map(([name, row]) => [name, {...row, method: 'resource-hours-books/v2'}]));

@@ -1,9 +1,9 @@
 import { materialVersionKey } from './materialVersion';
+import { loadRecommendations, recommendationUrl, requestMaterials as request, type Resource, type Result } from './materialRequests';
 import { MaterialSkillTabs } from './MaterialSkillTabs';
 import { AssessmentResults } from './AssessmentResults';
 import { prepareRoadmaps } from '../prepareRoadmaps';
 import { useDraftWatch } from '../useDraftWatch';
-import { waitJob } from '@/api/jobs';
 import { CourseCostSummary } from '../materials/CourseCostSummary';
 import { flush } from '../draftSync';
 import { Fragment } from 'react';
@@ -11,6 +11,7 @@ import { ResourceImage } from '@/shared/ui/ResourceImage';
 import type { Prefs } from '@/api/types/draft';
 import { D } from '@/shared/constants/data';
 import { prefText } from '@/shared/lib/prefs';
+import { planWeeklyHours } from '@/shared/lib/plan';
 import { useEffect, useId, useImperativeHandle, useRef, useState, type Ref } from 'react';
 import { paths } from '@/app/paths';
 import { useGo } from '@/shared/hooks/useGo';
@@ -20,38 +21,17 @@ import { Stepper } from '../Stepper';
 import { genStart, startEdit, ResultEdit } from './legacyResult';
 import { displayOrder, moveSkill, currentWeeks, currentEstimates, durationLabel, totalWeeks, type Choices, type DurationEstimate } from './skillOrder';
 
-type Resource = { id: string; title: string; provider?: string; image?: string; url?: string; cost: number | null; why: string; knowledge: string; aiRecommended: boolean };
-type Skill = { name: string; courses: Resource[]; books: Resource[]; selectedCourse: string | null; selectedBooks: string[] };
-type Result = { courseId?: string | null; skillDetails?: { name: string; application: string }[]; generationId: string; recommendations: { id: string; skills: Skill[]; retrieval?:{matches?:{skill:string;resourceId:string}[]} } | null; choices: Choices; skillOrder?: string[]; durationEstimates?: Record<string, DurationEstimate> };
-async function request(path: string, init?: RequestInit): Promise<Result> {
-  const response = await fetch(path, { ...init, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', ...init?.headers } });
-  let body = await response.json().catch(() => null);
-  if(response.status===202 && body?.jobId)body=await waitJob<Result>(body.jobId);
-  if (!response.ok) throw new Error(body?.error?.message ?? '추천 자료를 읽지 못했어요.');
-  return body;
-}
 const durationFlights = new Map<string, Promise<Result>>();
-const recommendationFlights = new Map<string, Promise<Result>>();
-function loadRecommendations(key: string, path: string): Promise<Result> {
-  const pending = recommendationFlights.get(key);
-  if (pending) return pending;
-  // Persist genCur before reading the materials of a newly selected proposal version.
-  const work = flush().then(()=>request(path)).then(body => body.recommendations ? body : request(path, { method: 'POST', headers: { Prefer: 'respond-async' } }));
-  recommendationFlights.set(key, work);
-  void work.finally(() => { if (recommendationFlights.get(key) === work) recommendationFlights.delete(key); }).catch(() => {});
-  return work;
-}
 export function usePrepareMaterials() {
   const id=useWs(s=>s.draftId), generation=useWs(s=>s.draft.v2Assessment?.generationId);
   const optionsKey=useWs(s=>JSON.stringify(Object.entries(s.draft.gen?.options||{}).filter(([course])=>!s.draft.gen?.regenRun?.[course]).map(([course,option])=>[course,materialVersionKey(option)])));
   useEffect(()=>{
     if(!id||!generation)return;
     for(const [course,version] of JSON.parse(optionsKey) as [string,string][]) {
-      void loadRecommendations(`${id}:${generation}:${course}:${version}`,recommendationUrl(id,course)).catch(()=>{});
+      void loadRecommendations(id, generation, course, version).catch(()=>{});
     }
   },[id,generation,optionsKey]);
 }
-function recommendationUrl(id: string, course?: string | null, suffix = '') { return `/api/v2/drafts/${id}/recommendations${suffix}${course ? `?course=${encodeURIComponent(course)}` : ''}`; }
 function ResourceCard({ resource, kind, checked, disabled, onChange }: { resource: Resource; kind: 'course' | 'book'; checked: boolean; disabled?: boolean; onChange: () => void }) {
   return <article className={`v2-resource ${checked ? 'v2-resource-selected' : ''}`} role={kind === 'course' ? 'radio' : 'checkbox'} aria-checked={checked} aria-disabled={disabled} aria-label={resource.title} tabIndex={disabled ? -1 : 0}
     onClick={event => { if (!disabled && !(event.target as HTMLElement).closest('a,input,label')) onChange(); }}
@@ -99,7 +79,7 @@ function ResultSelection({ resourcesOnly = false, editorRef, onChoicesChanged, l
   const [choices, setChoices] = useState<Choices>({});
   const [order, setOrder] = useState<string[]>([]);
   const [storedEstimates, setEstimates] = useState<Record<string,DurationEstimate>>({});
-  const weeklyHours = Number(draft.prefs.hours) > 0 ? Number(draft.prefs.hours) : draft.gen?.options[course || '']?.weeklyHours || D.autoHours;
+  const weeklyHours = planWeeklyHours(draft.handoff?.prefs.weeklyHours, draft.gen?.options[course || '']?.weeklyHours);
   const estimates = currentEstimates(order, choices, storedEstimates, weeklyHours);
   const [dragging, setDragging] = useState<string | null>(null);
   const [activeSkill,setActiveSkill]=useState('');
@@ -110,15 +90,10 @@ function ResultSelection({ resourcesOnly = false, editorRef, onChoicesChanged, l
   const [estimating, setEstimating] = useState(false);
   const savedSelection = useRef('');
   const attemptedDurations = useRef(new Set<string>());
-  useImperativeHandle(editorRef, () => ({ save, saveForVersion: async () => {
-    if(!result?.recommendations)return true;
-    if(savedSelection.current===JSON.stringify([choices,order,weeklyHours]))return true;
-    return save();
-  } }));
   useEffect(() => {
     if (!id) return;
     let active = true;
-    void loadRecommendations(`${id}:${generation}:${course || 'base'}:${version}:${weeklyHours}`, recommendationUrl(id, course)).then(body => {
+    void loadRecommendations(id, generation, course, version).then(body => {
       if (active) { setResult(body); setChoices(body.choices); setOrder(body.skillOrder ?? body.recommendations?.skills.map(s => s.name) ?? []); setEstimates(body.durationEstimates ?? {}); savedSelection.current=JSON.stringify([body.choices,body.skillOrder ?? body.recommendations?.skills.map(s=>s.name) ?? [],weeklyHours]); }
     }).catch(e => { if (active) setError(e instanceof Error ? e.message : '추천을 읽지 못했어요.'); });
     return () => { active = false; };
@@ -144,6 +119,11 @@ function ResultSelection({ resourcesOnly = false, editorRef, onChoicesChanged, l
     } catch (e) { setError(e instanceof Error ? e.message : '선택을 저장하지 못했어요.'); return false; }
     finally { setSaving(false); }
   }
+  useImperativeHandle(editorRef, () => ({ save, saveForVersion: async () => {
+    if(!result?.recommendations)return true;
+    if(savedSelection.current===JSON.stringify([choices,order,weeklyHours]))return true;
+    return save();
+  } }));
   useEffect(() => {
     if (!id || !result?.recommendations) return;
     const needsEstimate = order.some(name => choices[name] && choices[name].enabled !== false && !currentEstimates(order, choices, storedEstimates, weeklyHours)[name]);
