@@ -269,7 +269,7 @@ class ClassifierRoutingTest(unittest.TestCase):
             result = reg._api(self.ctx, self.inp)
         self.assertEqual(result['evidenceStatus'], 'found')
         payload = remote.call_args.args[1]
-        self.assertEqual(payload['options'], {'num_ctx': 16384, 'temperature': 0})
+        self.assertEqual(payload['options'], {'num_gpu': -1, 'num_ctx': 16384, 'temperature': 0})
         self.assertIs(payload['think'], False)
 
     def test_malformed_model_json_is_error(self):

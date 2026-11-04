@@ -99,7 +99,7 @@
 
 실제 모델 모드는 로컬 RoBERTa로 질문을 먼저 4분류해요. `meta.classification`(선택)은 `{model, label, confidence, ms, usedHistory}`이며 `label`은 `범위 밖`·`사내 규정`·`사내 생활안내`·`수자원공사 정보`예요. 기존 `answer.kind`는 유지하고 가데이터 모드에는 이 메타데이터가 없어요. 범위 밖은 검색/LLM을 호출하지 않고, 규정·회사는 각각 해당 자료 검색과 근거 검사를 거쳐요. 모델·토크나이저·해시 문제는 기존 오류 형식의 `code=AI_CLASSIFIER`, `kind=classifier`, `retryable=false`로 알려요. LLM은 질문 유형을 재분류하지 않고 서버가 분류별 `answer.kind`를 구성해요. JSON 구조·없는 인용 ID·근거 없는 숫자 등의 실패는 기존 `AI_BAD_OUTPUT` 오류로 유지해요.
 
-`answer.topic`(선택)은 `regulation|company|life`, `answer.evidenceStatus`(선택)는 `found|partial|not_found|refused`예요. 규정·회사는 각각 ‘근거 찾음 / 근거 일부 찾음 / 근거 못 찾음 / 답변 불가’로 표시해요. `refused`는 제공하면 안 되는 요청 거절이며 오류가 아니에요. 규정은 `found→level=ok`, `partial→unclear`, `not_found→none`, `refused→refused`예요. 적용 대상 규정이 없으면 기존 `scope`와 `not_found`를 함께 써요. 회사는 기존 `kind=general, source=work`, 거절은 `level=refused`이고 `knowledgeSources=[]`예요.
+`answer.topic`(선택)은 `regulation|company|life`, `answer.evidenceStatus`(선택)는 `found|partial|not_found|refused`예요. 규정·회사는 각각 ‘근거 확인 / 근거 일부 확인 / 근거 확인 불가 / 답변 불가’로 표시해요. `refused`는 제공하면 안 되는 요청 거절이며 오류가 아니에요. 규정은 `found→level=ok`, `partial→unclear`, `not_found→none`, `refused→refused`예요. 적용 대상 규정이 없으면 기존 `scope`와 `not_found`를 함께 써요. 회사는 기존 `kind=general, source=work`, 거절은 `level=refused`이고 `knowledgeSources=[]`예요.
 
 사내 생활은 등록된 가상 홈페이지 메뉴의 안내 범위만 근거로 사용하고, `source=intranet`, 검증한 `intranet[]` 메뉴를 반환해요. `refused`이면 ‘사내 생활 답변 불가’, 나머지는 ‘사내 생활 안내’예요. 알려진 메뉴가 없으면 확인 불가 안내를 하며 제공 금지로 취급하지 않아요. 연결·시간 초과·형식 실패는 기존 작업 `failed` 응답을 유지하며 화면에는 ‘오류’로 표시해요. 범위 밖은 검색·LLM 호출이 없어요.
 

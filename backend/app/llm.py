@@ -159,6 +159,10 @@ def chat(provider: str, messages: list, role: str = 'default', json_mode: bool =
             payload['format'] = 'json'
         if S.ollama_num_ctx:
             payload['options'] = {'num_ctx': S.ollama_num_ctx}
+        if role == 'regulation':
+            # 챗봇 파인튜닝 모델의 GPU/VRAM 선택은 Ollama 서버에 맡긴다.
+            # -1은 자동 선택이며 모델에 남은 CPU 강제(num_gpu=0)도 덮어쓴다.
+            payload.setdefault('options', {})['num_gpu'] = -1
         if temperature is not None:
             payload.setdefault('options', {})['temperature'] = temperature
         if S.ollama_keep_alive:

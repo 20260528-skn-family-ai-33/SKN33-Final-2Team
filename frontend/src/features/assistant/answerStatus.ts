@@ -7,9 +7,9 @@ export function answerStatus(answer: AssistantAnswer): [string, string] {
   if (topic === 'life') return status === 'refused' ? ['사내 생활 답변 불가', 'warn'] : ['사내 생활 안내', ''];
   const prefix = topic === 'regulation' ? '규정' : '회사';
   const labels: Record<EvidenceStatus, [string, string]> = {
-    found: ['근거 찾음', 'acc'],
-    partial: ['근거 일부 찾음', 'warn'],
-    not_found: ['근거 못 찾음', 'warn'],
+    found: ['근거 확인', 'acc'],
+    partial: ['근거 일부 확인', 'warn'],
+    not_found: ['근거 확인 불가', 'warn'],
     refused: ['답변 불가', 'warn'],
   };
   const [label, style] = labels[status];

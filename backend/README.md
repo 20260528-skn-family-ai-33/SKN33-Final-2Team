@@ -72,6 +72,8 @@ docker compose up -d backend
 - API 문서: <http://localhost:8815/api/docs>
 - 설정은 맨 위의 `.env` 하나를 읽어요(`.env.example` 참고).
 
+챗봇 파인튜닝 모델(`growpath-regulation-4b` · `qwen35-4b-diagnosis-agent` · `role=regulation`)은 `options.num_gpu=-1`로 Ollama 실행 서버의 GPU·VRAM에 맞춰 자동 선택해요. 사용할 GPU가 없으면 서버가 CPU로 실행하며, 모델에 저장된 CPU 강제 설정도 요청 값으로 덮어써요. 같은 모델을 쓰는 안별 지원 조건 확인에도 적용돼요. GPU 드라이버·컨테이너 장치 노출은 **모델 실행 서버**에서 준비해야 해요. 실제 사용 여부는 서버의 `ollama ps` 또는 `/api/ps`의 `size_vram`으로 확인해요. [Ollama GPU 문서](https://docs.ollama.com/gpu), [자동 선택 옵션 원본](https://github.com/ollama/ollama/blob/main/api/types.go)을 참고해요.
+
 파이썬으로 직접 띄울 때(선택 · Python 3.12 · 이번 작업에서는 확인하지 않은 방법): 이 폴더에서 패키지를 설치하고, 맨 위 `.env`를 `GP5_ENV_FILE`로 알려 준 뒤 실행해요(앱은 기본으로 이 폴더의 `.env`를 읽어요). DB는 Docker의 `db` 서비스를 그대로 써요(`.env`의 `GP5_DB_PORT`). 도커의 `backend`와 같은 8815를 쓰므로 둘 중 하나만 켜요.
 
 ```bash
@@ -86,7 +88,7 @@ PowerShell에서는 `$env:GP5_ENV_FILE = '../.env'`를 먼저 실행한 뒤 `pyt
 
 분류 모델 연결 흐름·파일별 역할·실행 방법·검증 기록은 [챗봇 질문 분류 안내](classification.md)를 참고하세요.
 
-2026-11-03 챗봇은 RoBERTa만 질문을 분류하고, 답변 모델에는 근거 상태·요약·출처만 요청합니다. 규정·회사 답변은 근거 찾음/일부 찾음/못 찾음/제공 금지 거절을 구분하며, 연결·응답 검증 실패는 오류로 유지합니다. 사내 생활은 등록된 가상 홈페이지 안내 범위만 제공합니다. 출처 ID·숫자·회사 자료 범주 검사를 유지하며, 다른 에이전트의 JSON 계약은 바꾸지 않습니다.
+챗봇은 RoBERTa만 질문을 분류하고, 답변 모델에는 근거 상태·요약·출처만 요청합니다. 규정·회사 답변은 근거 확인/근거 일부 확인/근거 확인 불가/답변 불가를 구분하며, 답변 불가는 제공 금지 요청의 거절을 뜻합니다. 연결·응답 검증 실패는 오류로 유지합니다. 사내 생활은 등록된 가상 홈페이지 안내 범위만 제공합니다. 출처 ID·숫자·회사 자료 범주 검사를 유지하며, 다른 에이전트의 JSON 계약은 바꾸지 않습니다.
 
 ## 목표 후보 사전 준비
 
