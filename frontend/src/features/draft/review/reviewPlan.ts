@@ -9,7 +9,7 @@ export type ReviewProposal = {
   id: string; key: string; skillProposalIds?: Record<string, string>; skillSummaries?: Record<string, string[]>;
   option: ReviewOption; selectedIds: string[];
 };
-export type ReviewPlanState = { scope: string; plan: PlanContent | null };
+export type ReviewPlanState = { scope: string; plan: PlanContent | null; error?: string };
 
 /** 저장 시 compose_skill_selection → selection_option → build_plan과 같은 선택을 미리 계산한다. */
 export function reviewPlan(proposal: ReviewProposal, versions: ReviewProposal[], picks: Record<string, string>,

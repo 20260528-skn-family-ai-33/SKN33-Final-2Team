@@ -1,7 +1,7 @@
 /** AI 설명 전용 표시 보호. 저장 원문·사용자 요청·자료 원문에는 적용하지 않는다. */
 const amount = /(?:₩|\$)\s*\d|\d[\d,.]*\s*(?:만\s*)?(?:원|달러|USD|KRW)/i;
 const duration = /\d[\d,.]*\s*(?:주(?!당|제|문|차)|개월|달(?!성)|일(?!반|부|정|차))/;
-const aggregateHours = /(?:총|전체|합계|합산|총합|약)\s*\d[\d,.]*\s*시간(?!\s*(?:짜리|분량의\s*(?:강좌|강의|영상)|(?:강좌|강의|영상)))/;
+const aggregateHours = /(?:총|전체|합계|합산|총합)\s*\d[\d,.]*\s*시간|약\s*\d[\d,.]*\s*시간(?!\s*(?:짜리|분량의\s*(?:강좌|강의|영상)|(?:강좌|강의|영상)))/;
 const fallback = '기간·비용은 현재 선택 자료 기준의 계산값을 확인해 주세요.';
 
 export function planDescription(text: string | null | undefined): string {

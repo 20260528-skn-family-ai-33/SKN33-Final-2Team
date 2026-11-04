@@ -7,6 +7,9 @@ import { OptionSummary } from '@/features/draft/options/OptionSummary';
 import { Stats } from '@/shared/ui/parts';
 
 describe('계산값과 AI 설명 분리', () => {
+  it.each(['총 56시간 분량의 강좌로 구성했어요.', '전체 40시간짜리 강좌 묶음이에요.', '합계 30시간 강의를 골랐어요.'])('총계에는 개별 강좌 예외를 적용하지 않는다: %s', text => {
+    expect(planDescription(text)).toBe('기간·비용은 현재 선택 자료 기준의 계산값을 확인해 주세요.');
+  });
   it.each(['1~2주차에는 SQL 기초를 다져요.', '3일차 실습에서 API를 연결해요.', '약 2시간짜리 짧은 강좌를 골랐어요.', '약 2시간 분량의 강좌를 골랐어요.'])('개별 활동·강좌 설명은 보존한다: %s', text => {
     expect(planDescription(text)).toBe(text);
   });

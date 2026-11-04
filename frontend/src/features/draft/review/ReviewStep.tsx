@@ -25,6 +25,7 @@ export function ReviewStep() {
   const scope = useWs(reviewScope);
   const [review, setReview] = useState<ReviewPlanState | null>(null);
   const reviewPlan = review?.scope === scope ? review.plan : null;
+  const reviewError = review?.scope === scope ? review.error : undefined;
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -42,7 +43,7 @@ export function ReviewStep() {
     <button className="btn line" disabled={submitting} onClick={() => go(paths.newOptions)}>이전: 로드맵·자료 선택</button>
     <button className="btn pri" disabled={busy || submitting || !ready} onClick={() => void submit()}>확정하기</button>
   </>}>
-    {assessment && (reviewPlan ? <Stats pl={reviewPlan} bare periodLabel="자료 학습 예상 기간" /> : <p role="status">검토할 자료와 선택한 과제 시간을 계산 중…</p>)}
+    {assessment && (reviewPlan ? <Stats pl={reviewPlan} bare periodLabel="자료 학습 예상 기간" /> : <p role="status">{reviewError ? '검토 시간을 계산하지 못했어요. 아래에서 다시 불러와 주세요.' : '검토할 자료와 선택한 과제 시간을 계산 중…'}</p>)}
     {assessment ? <DeliverableSelection ref={deliverables} onReadyChange={setReady} onBusyChange={setBusy} onPlanChange={setReview} /> : <p role="status">최종 검토 결과를 불러오는 중…</p>}
   </Page></>;
   const o = (g && g.options[pl.opt]) || pl.def;
@@ -67,7 +68,7 @@ export function ReviewStep() {
         <div className="card">
           <p style={{ fontWeight: 650 }}>{pl.goal}</p>
           <div style={{ marginTop: 16 }}>
-            {assessment ? reviewPlan ? <Stats pl={reviewPlan} bare periodLabel="자료 학습 예상 기간" /> : <p role="status">검토할 자료와 선택한 과제 시간을 계산 중…</p> : <Stats pl={pl} bare periodLabel="기간" />}
+            {assessment ? reviewPlan ? <Stats pl={reviewPlan} bare periodLabel="자료 학습 예상 기간" /> : <p role="status">{reviewError ? '검토 시간을 계산하지 못했어요. 아래에서 다시 불러와 주세요.' : '검토할 자료와 선택한 과제 시간을 계산 중…'}</p> : <Stats pl={pl} bare periodLabel="기간" />}
           </div>
         </div>
         {assessment && <DeliverableSelection ref={deliverables} onReadyChange={setReady} onBusyChange={setBusy} onPlanChange={setReview} />}

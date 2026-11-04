@@ -99,13 +99,13 @@ function ScopedDeliverableSelection({ ref, onReadyChange, onBusyChange, onPlanCh
     return () => { active = false; };
   }, [id, course, dependency, scope, attempt]);
   useEffect(() => {
-    if (!loading && !busy && chosen && versions.length && reviewScope(ws()) === scope) {
+    if (!loading && !busy && !preview.error && chosen && versions.length && reviewScope(ws()) === scope) {
       reviewTasks.remember(scope, 'picks', {versions, chosen, skillPicks});
     }
-  }, [scope, loading, busy, versions, chosen, skillPicks]);
+  }, [scope, loading, busy, versions, chosen, skillPicks, preview.error]);
   useEffect(() => {
-    onPlanChange({ scope, plan: preview.value?.plan || null });
-  }, [scope, preview, onPlanChange]);
+    onPlanChange({ scope, plan: preview.value?.plan || null, error: preview.error || error });
+  }, [scope, preview, error, onPlanChange]);
   useEffect(() => onReadyChange(!!proposal?.selectedIds.length && !!preview.value && !loading), [proposal, preview, loading, onReadyChange]);
   useEffect(() => onBusyChange(busy || loading), [busy, loading, onBusyChange]);
   useImperativeHandle(ref, () => ({ save: async () => {
@@ -174,8 +174,7 @@ function ScopedDeliverableSelection({ ref, onReadyChange, onBusyChange, onPlanCh
     <h2>산출물 제안</h2>
     <p className="small muted">선택한 강좌·도서를 바탕으로 스킬별 산출물을 제안받아요. 기본으로 모두 선택되며 필요 없는 항목만 제외할 수 있어요.</p>
     {(loading || busy) && <p className="review-generation-status" role="status"><span className="review-proposal-spinner" aria-hidden="true" />{loading ? '최종 검토 결과 생성 중… 선택한 자료를 바탕으로 역량과 산출물을 준비하고 있어요.' : '해당 스킬의 과제를 다시 제안하고 있어요.'}</p>}
-    {error && <div><p className="err" role="alert">{error}</p><button type="button" className="btn line small" disabled={busy || loading} onClick={() => { setLoading(true); setError(''); setAttempt(n => n + 1); }}>다시 불러오기</button></div>}
-    {preview.error && <p className="err" role="alert">{preview.error}</p>}
+    {(error || preview.error) && <div><p className="err" role="alert">{error || preview.error}</p><button type="button" className="btn line small" disabled={busy || loading} onClick={() => { reviewTasks.forget(scope); setLoading(true); setError(''); setAttempt(n => n + 1); }}>다시 불러오기</button></div>}
     {materials && <ReviewSkillBlocks materials={{ ...materials, durationEstimates: preview.value?.plan.def.learningReport?.durationEstimates || materials.durationEstimates, skillDetails: (materials.skillOrder || materials.recommendations?.skills.map(s => s.name) || []).map(name => ({ name, application: '', competencySummary: proposal?.skillSummaries?.[name] || summaries?.[name] || materials.skillDetails?.find(s => s.name === name)?.competencySummary })) }} acts={preview.value?.acts || []} alternatives={alternatives} onPick={pick} selectedIds={proposal?.selectedIds || []} busy={busy || loading} generatingSkill={generatingSkill} onToggle={toggle} onPropose={name => void propose(proposal ? name : undefined)} />}
 
   </section>;
