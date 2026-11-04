@@ -2,7 +2,7 @@
    RoBERTa가 질문을 분류하고 LLM은 등록 자료를 근거로 답한다.
      규정·회사·사내 생활 질문 → 등록된 자료로 근거 답변
      범위 밖 → 검색·LLM 없이 종료. 가데이터 모드는 시연용 예시를 표시한다. */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { AssistantAnswer } from '@/api/endpoints/assistant';
 import type { Article } from '@/api/types/catalog';
 import { legacyToPath } from '@/app/paths';
@@ -18,7 +18,7 @@ import { ask, clearLog, closeAssistant, openAssistant, pick, retry, setInput, st
 import { answerStatus } from './answerStatus';
 
 const SUGS = ['교육비 지원을 받을 수 있나요?', '통근버스 시간표는 어디서 봐요?', '승진 기준이 궁금해요', '근무성적평정은 언제 하나요?', '수자원공사는 어떤 일을 하나요?', '회의실 예약은 어디서 하나요?'];
-/** 대화가 이만큼 길어지면 '새 대화'를 권한다(넘기는 양은 줄이지 않음) */
+/** 대화 기록이 이만큼 길어지면 '새 대화'를 권한다. */
 const LONG_TURNS = 10;
 
 const setLabel = () => regSet()?.label || '규정';
@@ -38,6 +38,30 @@ const srcLine = (arts: Article[]) => {
     })
     .join(' / ');
 };
+/** 이전 응답이나 모델이 덧붙인 출처 줄을 본문에서 분리한다. */
+const withoutSourceFooter = (summary: string) => summary.replace(/\n[ \t]*(?:출처|근거)[ \t]*[:：][\s\S]*$/, '').trimEnd();
+
+function regulationSummary(summary: string, arts: Article[]): string {
+  if (!arts.length) return summary;
+  const citationKey = (text: string) => text.replace(/[\s「」]/g, '');
+  const citations = new Set(arts.flatMap((a) => [a.no, `${regOf(a.reg)?.name || ''} ${a.no}`].map(citationKey)));
+  // 근거와 정확히 일치하는 괄호 인용만 지워 적용 조건이나 조항 번호를 묻는 답변을 보존한다.
+  return withoutSourceFooter(summary).replace(/[ \t]*[（(]([^()（）\n]+)[）)]/g, (full, citation: string) =>
+    citations.has(citationKey(citation)) ? '' : full,
+  );
+}
+
+function EvidenceDetails({ children }: { children: ReactNode }) {
+  return (
+    <>
+      <p className="small muted">자세한 근거는 아래 ‘근거 보기’에서 확인해 주세요.</p>
+      <details>
+        <summary><Icon name="right" />근거 보기</summary>
+        <div className="basis">{children}</div>
+      </details>
+    </>
+  );
+}
 /** 받침에 맞는 조사 (은/는) */
 const eun = (w: string) => {
   const c = String(w).charCodeAt(String(w).length - 1);
@@ -195,10 +219,8 @@ export function RegCard({ a, mlLabel, demo }: { a: AssistantAnswer; mlLabel?: st
     const links = a.links || [];
     const isKnowledge = Array.isArray(a.knowledgeSources);
     const isLife = a.topic === 'life';
-    const sources = [...new Set((a.knowledgeSources || []).map((s) => [s.documentTitle, s.location, s.asOf].filter(Boolean).join(' · ')))];
-    // 서버가 summary 끝에 붙인 출처는 별도 영역에 표시하고 본문에서는 중복을 없앤다.
-    const sourceStart = isKnowledge && sources.length ? summary.lastIndexOf('\n\n출처:') : -1;
-    const answerSummary = sourceStart >= 0 ? summary.slice(0, sourceStart).trimEnd() : summary;
+    const sources = a.knowledgeSources || [];
+    const answerSummary = sources.length ? withoutSourceFooter(summary) : summary;
     return (
       <div className="ans">
         <div className="who">
@@ -223,22 +245,19 @@ export function RegCard({ a, mlLabel, demo }: { a: AssistantAnswer; mlLabel?: st
         ) : (
           <p className="src">규정 근거가 아닌 일반 답변이에요. 기관 기준이 필요한 내용은 담당 부서에 확인해 주세요.</p>
         )}
-        {a.knowledgeSources?.length ? (
-          <details>
-            <summary><Icon name="right" />근거 보기</summary>
-            <div className="basis">
-              {a.knowledgeSources.map((item) => (
-                <div className="art" key={item.chunkId}>
-                  <b>{item.documentTitle}</b>
-                  <p className="src">{[item.location, item.asOf].filter(Boolean).join(' · ')}</p>
-                  {item.isVirtual ? <p className="src">가상 안내 자료 · 실제 운영 정보로 확정할 수 없어요.</p> : null}
-                  {item.excerpt ? <p>{item.excerpt}</p> : null}
-                  {item.textTruncated ? <p className="src">모델에 전달한 원문의 앞부분을 표시했어요.</p> : null}
-                  {item.sourceLimits ? <p className="src">자료 범위: {item.sourceLimits}</p> : null}
-                </div>
-              ))}
-            </div>
-          </details>
+        {sources.length ? (
+          <EvidenceDetails>
+            {sources.map((item) => (
+              <div className="art" key={item.chunkId}>
+                <b>{item.documentTitle}</b>
+                <p className="src">{[item.location, item.asOf].filter(Boolean).join(' · ')}</p>
+                {item.isVirtual ? <p className="src">가상 안내 자료 · 실제 운영 정보로 확정할 수 없어요.</p> : null}
+                {item.excerpt ? <p>{item.excerpt}</p> : null}
+                {item.textTruncated ? <p className="src">모델에 전달한 원문의 앞부분을 표시했어요.</p> : null}
+                {item.sourceLimits ? <p className="src">자료 범위: {item.sourceLimits}</p> : null}
+              </div>
+            ))}
+          </EvidenceDetails>
         ) : null}
       </div>
     );
@@ -253,25 +272,19 @@ export function RegCard({ a, mlLabel, demo }: { a: AssistantAnswer; mlLabel?: st
         규정 에이전트 <AnswerLabels mlLabel={mlLabel} label={statusLabel} style={statusStyle} />
       </div>
       <h4>답변 요약</h4>
-      <p className="sum">{summary}</p>
+      <p className="sum">{regulationSummary(summary, arts)}</p>
       {arts.length ? (
-        <details>
-          <summary>
-            <Icon name="right" />
-              근거 보기
-          </summary>
-          <div className="basis">
-            {arts.map((x) => (
-              <div className="art" key={x.id}>
-                <b>{artHead(x, base && x.id === base.id ? '기본 원칙' : '')}</b>
-                {x.text}
-              </div>
-            ))}
-            <p className="src">
-              {regSet()?.org || '한국수자원공사'} {srcLine(arts)}
-            </p>
-          </div>
-        </details>
+        <EvidenceDetails>
+          {arts.map((x) => (
+            <div className="art" key={x.id}>
+              <b>{artHead(x, base && x.id === base.id ? '기본 원칙' : '')}</b>
+              {x.text}
+            </div>
+          ))}
+          <p className="src">
+            {regSet()?.org || '한국수자원공사'} {srcLine(arts)}
+          </p>
+        </EvidenceDetails>
       ) : null}
     </div>
   );
@@ -312,6 +325,52 @@ function Bubble({ m, i }: { m: Msg; i: number }) {
       ) : (
         <div className="plain muted wait">등록된 자료에서 근거를 찾아 답변하고 있어요…</div>
       )}
+    </div>
+  );
+}
+
+function SuggestedQuestions({ running }: { running: boolean }) {
+  const listRef = useRef<HTMLDivElement>(null);
+  const [canGoBack, setCanGoBack] = useState(false);
+  const [canGoForward, setCanGoForward] = useState(false);
+
+  function updateArrows() {
+    const list = listRef.current;
+    if (!list) return;
+    setCanGoBack(list.scrollLeft > 1);
+    setCanGoForward(list.scrollWidth - list.clientWidth - list.scrollLeft > 1);
+  }
+
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const observer = new ResizeObserver(updateArrows);
+    observer.observe(list);
+    for (const chip of list.children) observer.observe(chip);
+    return () => observer.disconnect();
+  }, []);
+
+  function scroll(direction: -1 | 1) {
+    const list = listRef.current;
+    if (!list) return;
+    list.scrollBy({ left: direction * Math.max(1, list.clientWidth - 24) });
+  }
+
+  return (
+    <div className="sugs-row" role="group" aria-label="추천 질문">
+      <button type="button" className="sugs-arrow" aria-label="이전 추천 질문" aria-controls="regSuggestions" disabled={!canGoBack} onClick={() => scroll(-1)}>
+        <Icon name="left" />
+      </button>
+      <div className="sugs" id="regSuggestions" ref={listRef} onScroll={updateArrows}>
+        {SUGS.map((s) => (
+          <button type="button" className="chip" key={s} disabled={running} onClick={() => ask(s)}>
+            {s}
+          </button>
+        ))}
+      </div>
+      <button type="button" className="sugs-arrow" aria-label="다음 추천 질문" aria-controls="regSuggestions" disabled={!canGoForward} onClick={() => scroll(1)}>
+        <Icon name="right" />
+      </button>
     </div>
   );
 }
@@ -401,13 +460,7 @@ export function AssistantHost() {
           <p className="reg-long" id="regLong" hidden={turns < LONG_TURNS}>
             대화가 길어졌어요. 앞 대화를 모두 함께 보내서 답이 느려질 수 있고, 모델에 따라 앞부분을 놓칠 수 있어요. 주제가 바뀌었다면 ‘새 대화’로 시작해 보세요.
           </p>
-          <div className="sugs">
-            {SUGS.map((s) => (
-              <button className="chip" key={s} disabled={st.running} onClick={() => !st.running && ask(s)}>
-                {s}
-              </button>
-            ))}
-          </div>
+          <SuggestedQuestions running={st.running} />
           <form
             className="chat-in"
             id="regForm"

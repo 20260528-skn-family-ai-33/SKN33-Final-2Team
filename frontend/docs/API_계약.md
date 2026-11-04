@@ -113,17 +113,17 @@
 
 실제 모델과 가데이터 모두 `apply`·`more`·`missing`을 반환하지 않습니다. 실제 모델은 확인된 내용과 적용 조건, 부족한 근거를 `summary`에 담습니다. 가데이터는 추천 질문의 예시를 `meta.mode=mock`으로 반환합니다. 화면에는 ‘시연용 가데이터’를 표시합니다.
 
-`answer.topic`(선택)은 `regulation|company|life`, `answer.evidenceStatus`(선택)는 `found|partial|not_found|refused`예요. 규정·회사·생활 DB 답변은 `meta.classification.label` 옆에 ‘근거 확인 / 근거 일부 확인 / 근거 확인 불가’를 표시해요. 예: `사내 규정` `근거 확인`. 제공 금지 거절은 ‘답변 불가’, 범위 밖은 ‘범위 밖’, 연결·검증 실패는 ‘오류’라는 단일 결과 라벨이에요. 오류는 LLM 출력 상태가 아니에요. 규정은 `found→level=ok`, `partial→unclear`, `not_found→none`, `refused→refused`예요. 규정의 적용 대상은 검색한 원문에서 확인해요. 회사는 `kind=general, source=work`, 생활은 `kind=general, source=intranet`이고 거절·자료 부족은 `knowledgeSources=[]`예요.
+`answer.topic`(선택)은 `regulation|company|life`, `answer.evidenceStatus`(선택)는 `found|partial|not_found|refused`예요. 규정·회사·생활 DB 답변은 `meta.classification.label` 옆에 ‘근거 확인’ 또는 ‘근거 확인 불가’를 표시해요. `partial`도 인용 조항이나 문서가 있으면 ‘근거 확인’으로 표시하고, 확인하지 못한 부분은 본문에서 설명해요. 제공 금지 거절은 ‘답변 불가’, 범위 밖은 ‘범위 밖’, 연결·검증 실패는 ‘오류’라는 단일 결과 라벨이에요. 오류는 LLM 출력 상태가 아니에요. 규정은 `found→level=ok`, `partial→unclear`, `not_found→none`, `refused→refused`예요. 규정의 적용 대상은 검색한 원문에서 확인해요. 회사는 `kind=general, source=work`, 생활은 `kind=general, source=intranet`이고 거절·자료 부족은 `knowledgeSources=[]`예요.
 
 사내 생활은 `knowledge.documents.category=사내 생활안내`의 DB 원문을 검색해요. 회사·생활 답변은 실제 인용한 자료만 `knowledgeSources[]`로 반환하고 기존 출처 필드에 `excerpt`(원문 발췌)를 추가해요. 규정·회사·생활 모두 ‘근거 보기’에서 원문·출처를 확인해요. 생활 자료의 가상 여부(`isVirtual`)·제약(`sourceLimits`), 문서 위치·시점·해시·잘림 여부를 유지해요. DB 결과가 없을 때 고정 메뉴로 대체하지 않으며 `intranet[]` 메뉴 표시는 이전 응답 호환용으로 남아요. 범위 밖은 검색·LLM 호출이 없어요.
 
 규정·회사 검색 결과가 없어도 모델에 빈 근거 목록으로 제공 금지 요청 여부를 확인해요. 빈 근거로 `found`·`partial` 답변을 만드는 것은 허용하지 않아요.
 
-`history`의 기존 요청 형식은 유지해요. 서버는 연결된 대화의 첫 주제·최근 두 질문과 중복을 제거한 `a.summary`들을 두 메시지로 묶어 모델에 전달해요. 생활 안내처럼 `summary`가 비어 있으면 검증된 메뉴 위치·안내 범위로 요약을 구성해요. ‘그 규정에서 …’, ‘앞에서 설명한 내용을 내 상황에 적용하면 …’ 같은 긴 후속 질문도 요약을 분류·검색·답변에 활용해요. 이전 답변의 `kind`·`level`·실제 출처 ID는 모델 대화에 넣지 않아요. 규정 이름 없이 조항 번호를 물으면 서버는 직전 `basis`로 규정을 찾아 직접 요청한 조항을 우선 전달해요. 분류 단계에서 앞 대화 요약을 쓰지 않고 조항 참조 단계에서만 직전 규정을 사용했다면 `meta.classification.usedHistory=false`일 수 있어요.
+`history`의 요청 형식은 그대로예요. 화면은 답변을 받은 최근 5턴을 보내고, 서버는 그중 후속 질문과 이어진 질문 원문 및 답변 본문(`a.summary`)을 턴별로 사용해요. 예전 메뉴형 생활 안내에 본문이 없으면 화면에 표시했던 메뉴 정보를 사용해요. 이전 답변의 `kind`·`level`·실제 출처 ID는 모델 대화에 넣지 않아요. 규정 이름 없이 조항 번호를 물으면 서버는 직전 `basis`로 규정을 찾아 직접 요청한 조항을 우선 전달해요. 조항 참조 단계에서만 직전 규정을 사용했다면 `meta.classification.usedHistory=false`일 수 있어요.
 
 | 요청 | 쓰는 곳 |
 | --- | --- |
-| `POST /assistant/ask` | 직원 인증 후 본문 `{question, history: [{q, a: 답 요약}]}`을 처리. 결과 `{answer, reg, meta}`. 비로그인은 401, 직원 계정이 아니면 403 |
+| `POST /assistant/ask` | 직원 인증 후 본문 `{question, history: [{q, a}]}`을 처리. `history`는 최근 5턴까지 사용. 결과 `{answer, reg, meta}`. 비로그인은 401, 직원 계정이 아니면 403 |
 | `GET /jobs/{id}?wait=10` | 챗봇 작업은 요청한 직원만 조회. 응답은 `JobView` |
 | `POST /jobs/{id}/cancel` | 챗봇 작업은 요청한 직원만 취소 |
 

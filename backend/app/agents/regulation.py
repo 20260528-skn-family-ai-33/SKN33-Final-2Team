@@ -32,6 +32,7 @@ CONTEXT_REF = re.compile(
 ADDED_CONDITION = re.compile(r'도\s*(?:교육비\s*)?(?:지원|인정|적용|가능|신청|받을|받는)')
 NAMED_RULE = re.compile(r'\w+(?:규정|규칙|세칙)')
 NEW_TOPIC = re.compile(r'^(?:다른|새(?:로운)?)\s*(?:질문|주제)|^(?:주제|질문)\s*(?:를|을)?\s*바꿔')
+FOLLOW_HISTORY_LIMIT = 5
 DEMO_ANSWERS = (
     (r'교육비.*지원', 'regulation', '교육비 지원을 신청하기 전에 대상 과정과 승인 조건을 교육 담당 부서에 확인하는 예시예요.'),
     (r'통근\s*버스.*시간표', 'life', '시연 화면에서는 사내 포털의 ‘생활 → 통근버스’ 메뉴에서 시간표를 확인해요.'),
@@ -315,17 +316,18 @@ def _art_in(a: dict) -> dict:
             'text': a['text'][:ART_MAX] + (' …(뒤 생략)' if len(a['text']) > ART_MAX else '')}
 
 
-def _history_summary(turn: dict) -> str:
+def _history_answer(turn: dict) -> str:
     answer = turn['a']
     summary = answer.get('summary') or ''
     if not summary and answer.get('intranet'):
-        # 생활 안내는 모델 원문 대신 검증된 메뉴만 표시하므로 그 안내를 요약으로 쓴다.
+        # 이전 메뉴형 안내는 본문 대신 화면에 표시한 메뉴 정보를 전달한다.
         summary = ' / '.join(f"{item['menu']}: {item['covers']}" for item in D['intranet']
                              if item['id'] in answer['intranet'])
     return summary
 
 
 def _follow_history(q: str, hist: list, me: dict) -> list:
+    hist = hist[-FOLLOW_HISTORY_LIMIT:]
     if not hist or not _is_follow(q, hist[-1], me):
         return []
     start = len(hist) - 1
@@ -334,29 +336,22 @@ def _follow_history(q: str, hist: list, me: dict) -> list:
     return hist[start:]
 
 
-def _hist_msgs(h: list) -> list:
-    """이미 생성된 답변 요약으로 주제·최근 맥락을 압축한다. 출처 ID·옛 JSON은 넘기지 않는다."""
-    if not h:
-        return []
-    # 질문은 처음 주제·최근 맥락만, 답변은 이미 생성한 요약을 중복 없이 누적한다.
-    # 중간 답변의 적용 조건을 버리거나 요약용 모델을 추가 호출하지 않는다.
-    questions = list(dict.fromkeys(turn['q'] for turn in [h[0], *h[-2:]]))
-    summaries = list(dict.fromkeys(filter(None, (_history_summary(turn) for turn in h))))
-    return [{'role': 'user', 'content': '\n'.join(questions)},
-            {'role': 'assistant', 'content': '\n'.join(summaries)}]
+def _hist_msgs(history: list) -> list:
+    """질문과 화면에 표시한 답변을 턴별로 전달한다."""
+    messages = []
+    for turn in history:
+        messages.extend(({'role': 'user', 'content': turn['q']},
+                         {'role': 'assistant', 'content': _history_answer(turn)}))
+    return messages
 
 
 def _context_query(q: str, history: list, *, classify: bool = False) -> str:
     if not history:
         return q
-    messages = _hist_msgs(history)
-    if classify:
-        # 분류기는 128토큰 입력이므로 처음 주제와 최근 답변 요약을 짧게 전달한다.
-        context = f"{history[0]['q'][:60]} {_history_summary(history[-1])[:60]}"
-    else:
-        context = ' '.join(message['content'] for message in messages)
-    # 입력 길이 제한에서 현재 질문이 과거 요약 뒤로 잘리지 않게 먼저 둔다.
-    return f'현재 질문: {q}\n앞 대화 요약: {context}'
+    # 128토큰 분류기는 현재 질문에 이어 가장 최근 턴부터 읽는다.
+    turns = reversed(history) if classify else history
+    context = '\n'.join(f"질문: {turn['q']}\n답변: {_history_answer(turn)}" for turn in turns)
+    return f'현재 질문: {q}\n앞 대화:\n{context}'
 
 
 def _api(ctx: rt.Ctx, inp: dict) -> dict:
@@ -525,7 +520,7 @@ def scope_answer(a: dict, me: dict) -> dict:
 
 def answer(ctx: rt.Ctx, question: str, history: list, context: dict, sim: str | None = None,
            *, documents_only: bool = False) -> dict:
-    """history: 앞 대화 중 답을 받은 질문·답 [{q, a}] (대화 전체 · 10/14 사용자 결정)"""
+    """history는 답을 받은 질문·답 [{q, a}]이다. 이어 묻기에는 최대 5턴을 사용한다."""
     me = {'empGroup': ctx.me.get('empGroup')} if documents_only else ctx.me
     context = {} if documents_only else context
     inp = {'question': question, 'history': history or [], 'context': context, 'me': me,
