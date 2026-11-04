@@ -11,7 +11,7 @@ export function moveSkill(order: string[], source: string, target: string, choic
   return [...active, ...order.filter(name => choices[name]?.enabled === false)];
 }
 
-export const DURATION_METHOD = 'resource-hours-books/v2';
+export const DURATION_METHOD = 'resource-hours-books/v3';
 export type DurationEstimate = {
   method?: string; weeks?: number | null; basis?: string; course?: string | null; courses?: string[]; books?: string[];
   startWeek?: number | null; endWeek?: number | null; addedWeeks?: number; totalWeeks?: number;
@@ -38,7 +38,7 @@ export function currentWeeks(choice: SkillChoice, estimate?: DurationEstimate): 
 export function totalWeeks(order: string[], choices: Choices, estimates: Record<string,DurationEstimate>, weeklyHours?: number): number | null {
   const active=order.filter(name=>choices[name]?.enabled!==false);
   if (!active.length) return order.length ? 0 : null;
-  if (active.some(name => estimates[name]?.method === DURATION_METHOD)) {
+  if (active.some(name => estimates[name]?.method?.startsWith('resource-hours-books/'))) {
     const current = currentEstimates(order, choices, estimates, weeklyHours);
     return active.every(name => current[name] && currentWeeks(choices[name], current[name]) !== null) ? current[active[0]].totalWeeks ?? null : null;
   }

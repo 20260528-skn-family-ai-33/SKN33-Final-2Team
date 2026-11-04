@@ -9,7 +9,7 @@ from app.agents.resource_recommendations import (
     RecommendationError, validate_choices, validate_skill_order,
 )
 
-METHOD = 'resource-hours-books/v2'
+METHOD = 'resource-hours-books/v3'
 
 
 def positive(value):
@@ -40,9 +40,9 @@ def _ceil(value: Decimal) -> int:
 
 
 def resource_schedule(recommendations: dict, choices: dict, order: list[str], weekly_hours) -> dict:
-    """첫 참조에 강좌를 배정하고 이후 참조는 같은 구간을 사용한다.
+    """첫 참조에 자료를 배정하고 이후 참조는 같은 구간을 사용한다.
 
-    올림은 누적 작업량에만 적용한다. 도서는 선택 권당 1주이며, 주 중간에
+    올림은 누적 작업량에만 적용한다. 도서는 고유 ID당 1주이며, 주 중간에
     시작한 자료의 달력 구간은 그 작업량보다 길 수 있다.
     """
     weekly = positive(weekly_hours)
@@ -89,10 +89,12 @@ def resource_schedule(recommendations: dict, choices: dict, order: list[str], we
                                          hours=None if status == 'unknown' else hours, timeStatus=status)
             slots.append(course_slots[rid])
         course_added = _ceil(cursor / budget) - before
+        book_added = 0
         for rid in sorted(choice['books']):
-            slot = dict(allocate(budget), id=rid)
-            book_slots[(name, rid)] = slot
-            slots.append(slot)
+            if rid not in book_slots:
+                book_slots[rid] = dict(allocate(budget), id=rid)
+                book_added += 1
+            slots.append(book_slots[rid])
         start = min((slot['startWeek'] for slot in slots), default=None)
         end = max((slot['endWeek'] for slot in slots), default=None)
         unknown = [rid for rid in _courses(choice) if times[rid][1] == 'unknown']
@@ -103,8 +105,8 @@ def resource_schedule(recommendations: dict, choices: dict, order: list[str], we
         estimates[name] = {**deepcopy(context), 'weeks': end - start + 1 if slots else 0,
                            'startWeek': start, 'endWeek': end,
                            'addedWeeks': _ceil(cursor / budget) - before,
-                           'courseWeeks': course_added, 'bookWeeks': len(choice['books']),
-                           'basis': ' · '.join(filter(None, ['강좌 ID별 시간 1회 합산 후 전체 올림 + 도서 권당 1주', note])),
+                           'courseWeeks': course_added, 'bookWeeks': book_added,
+                           'basis': ' · '.join(filter(None, ['강좌 ID별 시간 1회 합산 후 전체 올림 + 도서 ID별 1주', note])),
                            'method': METHOD, 'scheduleKey': key,
                            'course': choice.get('course'), 'courses': _courses(choice),
                            'books': sorted(choice['books']), 'unknownCourses': unknown, 'estimatedCourses': estimated,
@@ -156,16 +158,19 @@ def apply_plan_schedule(plan: dict) -> dict:
     option['materialSchedule'] = schedule_rows(schedule['estimates'])
     plan['weeks'] = schedule['weeks']
     seen_courses = set()
+    seen_books = set()
     total_hours = Decimal(0)
     for activity in plan['acts']:
         name, rid = activity.get('skill'), activity.get('res')
-        slot = schedule['courses'].get(rid) or schedule['books'].get((name, rid))
+        resource_slot = schedule['courses'].get(rid) or schedule['books'].get(rid)
+        slot = resource_slot
         slot = slot or schedule['estimates'].get(name)
         if slot:
             activity['wFrom'] = slot['startWeek'] or max(1, plan['weeks'])
             activity['wTo'] = slot['endWeek'] or activity['wFrom']
-            if slot.get('timeStatus'):
+            if resource_slot:
                 activity['resourceWindow'] = {'from': slot['startWeek'], 'to': slot['endWeek']}
+            if slot.get('timeStatus'):
                 activity['hoursEstimated'] = slot['timeStatus'] != 'confirmed'
                 activity['timeStatus'] = slot['timeStatus']
                 if slot.get('hours') is not None:
@@ -175,6 +180,11 @@ def apply_plan_schedule(plan: dict) -> dict:
                 continue
             seen_courses.add(rid)
             hours = schedule['courses'][rid]['hours']
+        elif rid in schedule['books']:
+            if rid in seen_books:
+                continue
+            seen_books.add(rid)
+            hours = positive(activity.get('hours'))
         else:
             hours = positive(activity.get('hours'))
         if hours is not None:

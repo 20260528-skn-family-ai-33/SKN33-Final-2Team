@@ -123,6 +123,65 @@ class SuitabilityTests(unittest.TestCase):
         self.assertTrue(evidence.suitable(info, 'SQL'))
         self.assertEqual(info['suitability']['SQL']['requiredStack'], [])
 
+    def test_english_learning_units_are_not_business_ui_substrings(self):
+        selection = {'skills': [{'name': NLP, 'application': 'LLM 챗봇 구현'}]}
+        for text in ('Building a RAG chatbot with LangChain', 'LLM 앱 빌드 guide',
+                     'Linux 환경에서 LLM 모델 실행', 'LLM chatbot 구현 guide'):
+            with self.subTest(text=text):
+                row = course('nlp', [text], skills=[NLP], title='LLM 실습')
+                self.assertFalse(evidence._business.search(text))
+                profile = evidence.facts(row, {'goal': 'LLM 챗봇 구현'}, selection)['suitability'][NLP]
+                self.assertTrue(profile['suitable'])
+                self.assertEqual(profile['unitIndices'], [0])
+                # 같은 본문이 소개에서 확보된 경우에도 학습 근거를 유지한다.
+                row['curriculum']['items'] = []
+                row['content'] = text
+                self.assertTrue(evidence.suitable(evidence.facts(row, {'goal': 'LLM 챗봇 구현'}, selection), NLP))
+
+    def test_business_ui_is_not_nlp_merely_because_it_mentions_llm(self):
+        selection = {'skills': [{'name': NLP, 'application': 'LLM 챗봇 구현'}]}
+        for text in ('LLM 서비스 UI 디자인 실습', 'chatbot UX디자인 실습', 'LLM business 기획 실습'):
+            with self.subTest(text=text):
+                row = course('business', [text], skills=[NLP])
+                self.assertTrue(evidence._business.search(text))
+                self.assertFalse(evidence.suitable(evidence.facts(row, {'goal': 'LLM 챗봇 구현'}, selection), NLP))
+
+    def test_english_verbs_and_seasons_are_not_framework_conflicts(self):
+        selection = {'skills': [{'name': RAG, 'application': 'RAG chatbot 구현'}]}
+        for text in ('Build a RAG chatbot and express your results',
+                     'Build a RAG chatbot - spring semester', 'Build a RAG chatbot this spring'):
+            with self.subTest(text=text):
+                row = course('neutral', [text])
+                info = evidence.facts(row, {'goal': 'Python RAG chatbot 구현'}, selection)['suitability'][RAG]
+                self.assertTrue(info['suitable'])
+                self.assertEqual(info['conflictingStack'], [])
+        # 목표의 일반 영어 단어도 별도 프레임워크를 요구하는 조건으로 바꾸지 않는다.
+        row = course('python', ['FastAPI 서버 구현'], skills=[WEB])
+        selection = {'skills': [{'name': WEB, 'application': 'FastAPI 서버 구현'}]}
+        profile = evidence.facts(row, {'goal': 'FastAPI 서버 구현; express your results this spring'}, selection)['suitability'][WEB]
+        self.assertEqual(profile['requiredStack'], ['fastapi'])
+        self.assertTrue(profile['suitable'])
+
+    def test_explicit_spring_and_express_frameworks_still_conflict_with_python(self):
+        selection = {'skills': [{'name': RAG, 'application': 'RAG chatbot 구현'}]}
+        for text, runtime in (('Spring Boot RAG 구현', 'java'), ('Spring AI RAG 구현', 'java'),
+                              ('Spring REST API RAG 구현', 'java'), ('Java / Spring RAG 구현', 'java'),
+                              ('Express.js RAG 구현', 'javascript'), ('Express로 RAG API 구현', 'javascript'),
+                              ('Node.js / Express RAG 구현', 'javascript')):
+            with self.subTest(text=text):
+                row = course('framework', [text])
+                profile = evidence.facts(row, {'goal': 'Python RAG chatbot 구현'}, selection)['suitability'][RAG]
+                self.assertFalse(profile['suitable'])
+                self.assertEqual(profile['conflictingStack'], [runtime])
+        for text, name in (('Spring API 구현', 'spring'), ('Express API 구현', 'express')):
+            web_name = 'RESTful API 설계'
+            row = course('web', [text], skills=[web_name])
+            context = {'skills': [{'name': web_name, 'application': text}]}
+            profile = evidence.facts(row, {'goal': text}, context)['suitability'][web_name]
+            self.assertEqual(profile['requiredStack'], [name])
+            self.assertEqual(profile['missingStack'], [])
+            self.assertTrue(profile['suitable'])
+
     def test_nfd_korean_is_normalized_in_evidence_and_excerpts_without_source_mutation(self):
         title = unicodedata.normalize('NFD', 'RAG 문서 검색 챗봇 구현')
         row = course('nfd', [title])

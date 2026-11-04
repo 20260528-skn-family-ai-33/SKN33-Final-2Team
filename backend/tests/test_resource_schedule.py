@@ -58,6 +58,67 @@ class ResourceScheduleTests(TestCase):
         self.assertEqual(result['totalWeeks'], 1)
         self.assertEqual(result['courseWeeks'], 1)
 
+    def test_shared_book_is_one_week_even_for_nonadjacent_skills(self):
+        for name in ('RAG', 'Web'):
+            self.choices[name]['books'] = ['book']
+        rows = self.estimates(['RAG', 'ETL', 'Web', 'MLOps'])
+        self.assertEqual(rows['RAG']['totalWeeks'], 6)
+        self.assertEqual(rows['RAG']['bookWeeks'], 1)
+        self.assertEqual(rows['Web']['bookWeeks'], 0)
+        self.assertEqual(rows['Web']['addedWeeks'], 0)
+        self.assertEqual(rows['RAG']['resources'], rows['Web']['resources'])
+        self.assertEqual(sum(row['addedWeeks'] for row in rows.values()), 6)
+        before = deepcopy(self.saved)
+        preview = material_plan.preview(self.saved, self.draft)
+        self.assertEqual(preview['weeks'], 6)
+        self.assertEqual(preview['totalH'], 36.3)
+        books = [a for a in preview['acts'] if a.get('res') == 'book']
+        self.assertEqual(len(books), 2)
+        self.assertEqual([a['resourceWindow'] for a in books], [{'from': 2, 'to': 3}] * 2)
+        self.assertEqual(self.saved, before)
+        revision = dict(deepcopy(preview['def']), acts=[dict(a, key=a['id']) for a in preview['acts']])
+        rebuilt = material_plan.rebuild_revision(revision, preview, self.draft['handoff'])
+        revised = roadmap.build_plan(rebuilt, {'hours': 6, 'start': 2}, 'Goal')
+        self.assertEqual(revised['weeks'], 6)
+        self.assertEqual(revised['totalH'], 36.3)
+
+    def test_book_only_shared_selection_reorder_disable_and_reselect(self):
+        for row in self.rec['skills']:
+            row['courses'] = []
+            self.choices[row['name']]['course'] = None
+        self.choices['RAG']['books'] = ['book']
+        self.choices['Web']['books'] = ['book']
+        rows = self.estimates()
+        self.assertEqual(rows['RAG']['totalWeeks'], 1)
+        self.assertEqual(rows['Web']['bookWeeks'], 0)
+        reordered = self.estimates(list(reversed(self.order)))
+        self.assertEqual(reordered['Web']['bookWeeks'], 1)
+        self.assertEqual(reordered['RAG']['bookWeeks'], 0)
+        self.choices['RAG']['enabled'] = False
+        self.assertEqual(self.estimates()['Web']['bookWeeks'], 1)
+        self.choices['Web']['books'] = []
+        self.assertEqual(self.estimates()['Web']['totalWeeks'], 0)
+        self.choices['Web']['books'] = ['book']
+        self.assertEqual(self.estimates(weekly=12)['Web']['totalWeeks'], 1)
+        self.assertEqual(self.estimates(weekly=12)['Web']['resources'], [{'id': 'book', 'startWeek': 1, 'endWeek': 1}])
+
+    def test_different_book_ids_are_not_deduplicated_by_title(self):
+        for row in self.rec['skills']:
+            row['courses'] = []
+            self.choices[row['name']]['course'] = None
+        self.rec['skills'][1]['books'].append(dict(self.resources['book'], id='other-book'))
+        self.choices['RAG']['books'] = ['book']
+        self.choices['Web']['books'] = ['other-book']
+        self.assertEqual(self.estimates()['Web']['totalWeeks'], 2)
+
+    def test_previous_book_schedule_version_cannot_be_saved_as_current(self):
+        tx = Mock(); tx.one.return_value = {'draft_choices': {'v2Survey': self.saved, 'draft': self.draft}}
+        old = self.estimates()
+        for row in old.values(): row['method'] = 'resource-hours-books/v2'
+        with self.assertRaises(survey_store.StoreError):
+            survey_store.save_duration_proposals(tx, 1, 'p', 'g', 'r', old)
+        tx.run.assert_not_called()
+
     def test_reorder_disable_and_weekly_changes_invalidate_every_row(self):
         original = self.estimates()
         reorder = self.estimates(['ETL', 'Web', 'MLOps', 'RAG'])

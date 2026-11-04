@@ -145,6 +145,44 @@ describe('공유 강좌의 실제 일정과 전체 기간', () => {
     input.learningReport!.recommendations.skills.forEach((row, i) => {row.courses[0] = {id: String(i), title: 'short', hours: 0.1}; input.learningReport!.choices[row.name].course = String(i); input.acts[i].res = String(i);});
     expect(buildPlan(input, {hours: 0.4}, '').weeks).toBe(1);
   });
+  it('비인접 스킬의 같은 도서는 시간과 기간을 한 번만 더하고 활동 ID는 유지한다', () => {
+    const input = sharedOption();
+    for (const name of ['RAG', 'Web']) {
+      input.learningReport!.choices[name].books = ['book'];
+      input.acts.push({id: `book-${name}`, skill: name, stage: 2, title: 'Book', res: 'book', hours: 12});
+    }
+    const before = structuredClone(input), plan = buildPlan(input, {hours: 6}, '');
+    expect(input).toEqual(before);
+    expect(plan.weeks).toBe(6); expect(plan.totalH).toBe(36.3);
+    expect(plan.acts.filter(a => a.res === 'book').map(a => [a.id, a.wFrom, a.wTo, a.resourceWindow])).toEqual([
+      ['book-RAG', 2, 3, {from: 2, to: 3}], ['book-Web', 2, 3, {from: 2, to: 3}],
+    ]);
+    expect(plan.def.learningReport!.durationEstimates!.Web).toMatchObject({bookWeeks: 0, addedWeeks: 0, totalWeeks: 6});
+  });
+  it('도서만 공유하는 스킬은 순서·제외·재선택·주당 시간 변경 후에도 고유 책당 1주다', () => {
+    const input = sharedOption(), report = input.learningReport!;
+    report.recommendations.skills.forEach(row => { row.courses = []; report.choices[row.name].course = null; });
+    input.acts = ['RAG', 'Web'].map(name => ({id: `book-${name}`, skill: name, stage: 2, title: 'Book', res: 'book', hours: 12}));
+    for (const name of ['RAG', 'Web']) report.choices[name].books = ['book'];
+    expect(buildPlan(input, {hours: 6}, '').weeks).toBe(1);
+    report.skillOrder.reverse();
+    expect(buildPlan(input, {hours: 6}, '').def.learningReport!.durationEstimates!.RAG.bookWeeks).toBe(0);
+    report.choices.Web.enabled = false;
+    expect(buildPlan(input, {hours: 6}, '').def.learningReport!.durationEstimates!.RAG.bookWeeks).toBe(1);
+    report.choices.RAG.books = [];
+    input.acts = [];
+    expect(buildPlan(input, {hours: 6}, '').weeks).toBe(0);
+    report.choices.RAG.books = ['book'];
+    expect(buildPlan(input, {hours: 12}, '').weeks).toBe(1);
+  });
+  it('제목이 같은 다른 ID의 도서는 각각 1주로 계산한다', () => {
+    const input = sharedOption(), report = input.learningReport!;
+    report.recommendations.skills.forEach(row => { row.courses = []; report.choices[row.name].course = null; });
+    report.recommendations.skills.find(row => row.name === 'Web')!.books.push({id: 'other-book', title: 'book', hours: 12});
+    report.choices.RAG.books = ['book']; report.choices.Web.books = ['other-book'];
+    input.acts = [];
+    expect(buildPlan(input, {hours: 6}, '').weeks).toBe(2);
+  });
   it('시간 미확인과 수치 추정을 구분하고 알려진 시간 합계에 가정값을 넣지 않는다', () => {
     const input = sharedOption();
     input.learningReport!.recommendations.skills.forEach(row => row.courses[0].id === 'shared' ? row.courses[0].hours = null : row.courses[0].estimated = ['hours']);

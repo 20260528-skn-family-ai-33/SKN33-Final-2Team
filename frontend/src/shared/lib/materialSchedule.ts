@@ -54,14 +54,15 @@ export function applyMaterialSchedule(input: PlanContent): PlanContent {
       slots.push(courses.get(rid)!);
     }
     const courseWeeks = ceil(cursor / weekly) - before;
+    let bookWeeks = 0;
     for (const rid of [...choice.books].sort()) {
-      const slot = allocate(weekly, rid);
-      books.set(JSON.stringify([name, rid]), slot); slots.push(slot);
+      if (!books.has(rid)) { books.set(rid, allocate(weekly, rid)); bookWeeks += 1; }
+      slots.push(books.get(rid)!);
     }
     const startWeek = slots.length ? Math.min(...slots.map(slot => slot.startWeek)) : null;
     const endWeek = slots.length ? Math.max(...slots.map(slot => slot.endWeek)) : null;
     estimates[name] = {...context, weeks: startWeek == null || endWeek == null ? 0 : endWeek - startWeek + 1,
-      startWeek, endWeek, addedWeeks: ceil(cursor / weekly) - before, courseWeeks, bookWeeks: choice.books.length,
+      startWeek, endWeek, addedWeeks: ceil(cursor / weekly) - before, courseWeeks, bookWeeks,
       method: DURATION_METHOD, scheduleKey, course: choice.course, courses: courseIds(choice), books: [...choice.books].sort(),
       unknownCourses: courseIds(choice).filter(rid => times.get(rid)?.status === 'unknown'),
       estimatedCourses: courseIds(choice).filter(rid => times.get(rid)?.status === 'estimated')};
@@ -71,24 +72,29 @@ export function applyMaterialSchedule(input: PlanContent): PlanContent {
   report.durationEstimates = estimates;
   plan.def.materialSchedule = Object.entries(estimates).map(([skill, row]) => ({skill, weeks: row.weeks!, startWeek: row.startWeek, endWeek: row.endWeek, addedWeeks: row.addedWeeks, totalWeeks: plan.weeks}));
   const seen = new Set<string>();
+  const seenBooks = new Set<string>();
   let total = 0;
   for (const activity of plan.acts) {
     const rid = activity.res || '', name = activity.skill || '';
     const resource = courses.get(rid);
-    const slot = resource || books.get(JSON.stringify([name, rid])) || estimates[name];
+    const book = books.get(rid);
+    const slot = resource || book || estimates[name];
     if (slot) {
       activity.wFrom = slot.startWeek || Math.max(1, plan.weeks);
       activity.wTo = slot.endWeek || activity.wFrom;
     }
+    if (resource || book) activity.resourceWindow = {from: slot.startWeek!, to: slot.endWeek!};
     if (resource) {
-      activity.resourceWindow = {from: resource.startWeek, to: resource.endWeek};
       activity.timeStatus = resource.timeStatus;
       activity.hoursEstimated = resource.timeStatus !== 'confirmed';
       if (resource.hours != null) activity.hours = resource.hours;
       if (seen.has(rid)) continue;
       seen.add(rid);
       total += resource.hours || 0;
-    } else total += activity.hours;
+    } else if (!book || !seenBooks.has(rid)) {
+      if (book) seenBooks.add(rid);
+      total += activity.hours;
+    }
   }
   plan.totalH = clean(total);
   plan.totalHUnknown = [...courses.values()].some(row => row.timeStatus === 'unknown');

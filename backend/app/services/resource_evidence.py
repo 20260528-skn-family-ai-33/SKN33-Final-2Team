@@ -13,7 +13,7 @@ _generic = {'기초', '실무', '활용', '학습', '이해', '환경', '프로�
 _aliases = {
     'Python': ('python', '파이썬', 'asyncio'),
     'RAG': ('rag', '검색 증강', '검색증강', 'retrieval', 'langchain', '랭체인'),
-    '자연어': ('nlp', '자연어', 'llm', '언어 모델', '언어모델', '토큰화', '임베딩'),
+    '자연어': ('nlp', '자연어', 'llm', '언어 모델', '언어모델', '토큰화', '임베딩', 'chatbot', '챗봇'),
     'RESTful': ('rest', 'restful', 'api', 'fastapi'),
     '웹 프레임워크': ('fastapi', 'django', '장고', '프레임워크', 'framework'),
     'Docker': ('docker', '도커', '컨테이너', 'container'),
@@ -38,7 +38,7 @@ _log_word = r'(?:(?<![가-힣])|(?:운영|서버|배치|시스템|보안|이벤�
 _log_topic = re.compile(_log_word + r'|\b(?:logs?|logging)\b', re.I)
 _log_learning = re.compile(_log_word + r'|파싱|정규\s*표현|파일.{0,15}(?:읽|처리)|예외.{0,15}테스트|\b(?:logging|parsing|pytest|fixture|stderr|batch)\b', re.I)
 
-_build = re.compile(r'만들|구현|구축|개발|실습|연동|실행|구성|코드\s*작성|파싱|조회|\b(?:build\w*|implement\w*|develop\w*|integrat\w*|hands[- ]on|labs?|execut\w*)\b', re.I)
+_build = re.compile(r'만들|구현|구축|개발|실습|연동|실행|구성|빌드|코드\s*작성|파싱|조회|\b(?:build\w*|implement\w*|develop\w*|integrat\w*|hands[- ]on|labs?|execut\w*)\b', re.I)
 _operate = re.compile(r'배포|서빙|모니터링|롤백|복구|\b(?:deploy\w*|serving|monitor\w*|rollback|recover\w*)\b', re.I)
 _concept = re.compile(r'개념|원리|이론|구조|이해|설명|무엇|개요|소개|\b(?:concept\w*|theory|principle\w*|understand\w*|overview|introduct\w*)\b', re.I)
 _intro_only = re.compile(r'소개|개요|이론|무엇|\b(?:overview|introduct\w*|theory)\b', re.I)
@@ -49,14 +49,16 @@ _foundations = re.compile(r'문법|자료형|함수|조인|정규화|쿼리|토�
 _security = re.compile(r'보안|공격|권한|가드레일|신뢰\s*경계|레드\s*티밍|\b(?:security|attack\w*|guardrails?|red\s*team\w*|permission\w*)\b', re.I)
 _security_action = re.compile(r'검증|시험|진단|관찰|점검|지도|분석|실습|테스트|\b(?:test\w*|audit\w*|inspect\w*|map\w*)\b', re.I)
 _design = re.compile(r'설계|아키텍처|전략|\b(?:design|architect\w*|strateg\w*)\b', re.I)
-_business = re.compile(r'서비스\s*디자인|비즈니스|고객\s*여정|UX|UI|페르소나|아이데이션|시장|수익|\b(?:business|customer journey|ideation)\b', re.I)
+_business = re.compile(r'서비스\s*디자인|비즈니스|고객\s*여정|(?<![a-z0-9])(?:UX|UI)(?![a-z0-9])|페르소나|아이데이션|시장|수익|\b(?:business|customer journey|ideation)\b', re.I)
 _rag_objects = re.compile(r'\brag\b|검색\s*증강|챗봇|벡터|임베딩|색인|검색|재순위화|청크|지식\s*원본|\b(?:retriev\w*|embeddings?|vector\w*|chatbot\w*|indexing|rerank\w*|chunk\w*)\b', re.I)
 _nlp_objects = re.compile(r'토큰|컨텍스트|언어\s*모델|임베딩|자연어|프롬프트|\b(?:tokens?|context|embeddings?|nlp|prompts?|language models?)\b', re.I)
+_nlp_topics = re.compile(r'챗봇|\b(?:llms?|chatbots?)\b', re.I)
 
 # 명시한 구현 도구만 해당 스킬에 적용한다. SQL 이론 등에 목표의 모든 영문 단어를 요구하지 않는다.
 _stacks = {
     'fastapi': r'fastapi|패스트\s*API', 'django': r'django|장고', 'flask': r'flask|플라스크',
-    'spring': r'spring(?:\s*boot)?|스프링', 'express': r'express(?:\.js)?', 'nestjs': r'nest\.?js',
+    'spring': r'spring(?:[ .-]*(?:boot|framework|ai|mvc|webflux|security|data|batch|cloud))?|스프링',
+    'express': r'express(?:\.js)?|익스프레스', 'nestjs': r'nest\.?js',
     'python': r'python|파이썬', 'java': r'java|자바(?!스크립트)',
     'javascript': r'javascript|typescript|node\.?js|자바스크립트|타입스크립트',
     'aws': r'aws|아마존\s*웹', 'azure': r'azure|애저', 'gcp': r'gcp|google\s*cloud',
@@ -66,6 +68,24 @@ _stack_patterns = {name: re.compile(r'(?<![a-z0-9])(?:' + pattern + r')(?![a-z0-
 _web_stacks = {'fastapi', 'django', 'flask', 'spring', 'express', 'nestjs'}
 _runtime = {'fastapi': 'python', 'django': 'python', 'flask': 'python', 'spring': 'java',
             'express': 'javascript', 'nestjs': 'javascript'}
+_framework_after = re.compile(r'^[ \t]*(?:[/:-][ \t]*)?(?:(?:rest(?:ful)?|api|framework|server|middleware|router|routing|backend|web|rag)\b|으로|로|을|를|과|와|기반|기초|입문|설치|설정|활용|실습|구현|개발|서버|프레임워크)', re.I)
+_framework_before = re.compile(r'(?:\b(?:java|javascript|typescript|node\.?js|framework)|프레임워크|백엔드)[ \t]*(?:[/·:+-][ \t]*)?$', re.I)
+
+
+def _stack_names(text: str) -> set[str]:
+    """동사 express·계절 spring은 주변의 명시적 프레임워크 표현 없이 스택으로 단정하지 않는다."""
+    found = set()
+    for name, rx in _stack_patterns.items():
+        for match in rx.finditer(text):
+            if name in ('spring', 'express') and match.group().casefold() == name:
+                line = text[:match.start()].rsplit('\n', 1)[-1] + match.group() + text[match.end():].split('\n', 1)[0]
+                if (line.strip().casefold() != name
+                        and not _framework_after.search(text[match.end():])
+                        and not _framework_before.search(text[:match.start()])):
+                    continue
+            found.add(name)
+            break
+    return found
 
 
 def normalize(value: object) -> str:
@@ -104,8 +124,8 @@ def _stack_evidence(text: str, applied: list[str], project: dict, skill: dict, s
     if stage in ('conceptual', 'design', 'security'):
         return [], [], []
     context = normalize(project.get('goal')) + ' ' + _skill_context(skill)
-    requested = {name for name, rx in _stack_patterns.items() if rx.search(context)}
-    actual = {name for name, rx in _stack_patterns.items() if rx.search(text)}
+    requested = _stack_names(context)
+    actual = _stack_names(text)
     name = normalize(skill['name'])
     web_skill = bool(re.search(r'웹\s*프레임워크|RESTful|API|백엔드', name, re.I))
     programming = bool(re.search(r'Python|파이썬|프로그래밍', name, re.I))
@@ -115,7 +135,7 @@ def _stack_evidence(text: str, applied: list[str], project: dict, skill: dict, s
         required |= requested & {'python', 'java', 'javascript'}
     if cloud_skill:
         required |= requested & {'aws', 'azure', 'gcp'}
-    taught = {name for name, rx in _stack_patterns.items() if any(rx.search(value) for value in applied)}
+    taught = set().union(*(_stack_names(value) for value in applied))
     missing = required - taught
     conflicts = set()
     # RAG 구현은 다른 언어의 개념을 전이할 수 있으나 전용 구현을 동일한 실습으로 세지 않는다.
@@ -157,6 +177,8 @@ def _profile(skill: dict, project: dict, rows: list, descriptions: list[str], te
             return True
         if course_related and stage == 'security' and _security.search(value):
             return True
+        if course_related and re.search(r'자연어|NLP', name, re.I) and (_nlp_objects.search(value) or _nlp_topics.search(value)):
+            return True
         return bool(course_related and re.search(r'RAG', name, re.I) and _rag_objects.search(value))
 
     units = [(index, value) for index, _, value in rows if related(value)]
@@ -164,7 +186,7 @@ def _profile(skill: dict, project: dict, rows: list, descriptions: list[str], te
                         or (_discussion.search(normalize(row.get('section')) + ' ' + value)
                             and not _practice.search(value))}
     claims = [value.casefold() for value in descriptions if related(value.casefold())]
-    # 'LLM 서비스 디자인'은 언어 모델의 원리나 모델 서빙을 가르친다는 근거가 아니다.
+    # LLM·chatbot이라는 주제명만으로 UI·비즈니스 수업을 NLP 학습 근거로 바꾸지 않는다.
     if re.search(r'자연어|NLP', name, re.I):
         units = [(index, value) for index, value in units if not _business.search(value) or _nlp_objects.search(value)]
         claims = [value for value in claims if not _business.search(value) or _nlp_objects.search(value)]

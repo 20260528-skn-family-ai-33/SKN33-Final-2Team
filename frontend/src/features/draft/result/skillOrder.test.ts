@@ -41,6 +41,11 @@ describe('공유 자료 전체 기간과 스킬 표시 구간', () => {
    expect(durationLabel({...estimates.Web, unknownCourses: ['shared']})).toContain('시간 미확인');
    expect(durationLabel({...estimates.Web, estimatedCourses: ['shared']})).toContain('추정 시간 포함');
  });
+ it('도서를 중복 계산한 v2 전체 캐시는 구형 합산 경로로 돌아가지 않는다', () => {
+   const stale = Object.fromEntries(Object.entries(estimates).map(([name, row]) => [name, {...row, method: 'resource-hours-books/v2'}]));
+   expect(currentEstimates(order, choices, stale, 6)).toEqual({});
+   expect(totalWeeks(order, choices, stale, 6)).toBeNull();
+ });
 });
 
 describe('스킬 주차 합산', () => {
