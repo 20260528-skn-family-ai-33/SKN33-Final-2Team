@@ -219,6 +219,21 @@ class RegulationFollowUpTest(unittest.TestCase):
         self.assertNotIn('requested', model.call_args.args[2])
         self.assertEqual(model.call_args.kwargs['history'], [])
 
+    def test_korean_particles_do_not_inherit_regulation(self):
+        questions = ('자격증 취득비 지원 범위 기준이 뭐야?', '취업규칙에서 출장이 절차상 어떻게 처리돼?',
+                     '연봉 인상률이 기준보다 높으면?', '복무규정상 재택근무도 신청 가능한가요?',
+                     '여비규정에서 출장비 지급 기준이 어떻게 돼?')
+        for question in questions:
+            with self.subTest(question=question):
+                self.search.reset_mock()
+                result, model, inp = self.ask(question)
+                self.assertFalse(inp['_classification']['usedHistory'])
+                self.assertEqual(self.classify.call_args.args[0], question)
+                self.search.assert_called_once()
+                self.assertEqual(self.search.call_args.args[0], question)
+                self.assertEqual(model.call_args.kwargs['history'], [])
+                self.assertNotIn('edu-7', result['retrieved'])
+
     def test_no_previous_regulation_does_not_guess_article(self):
         for history in ([], [{'q': '다른 질문', 'a': {'summary': '앞 답변', 'basis': []}}],
                         [{'q': '다른 질문', 'a': {'summary': '앞 답변', 'basis': ['deleted-id']}}]):
@@ -233,6 +248,7 @@ class RegulationFollowUpTest(unittest.TestCase):
         self.assertEqual(result['evidenceStatus'], 'not_found')
         self.assertIn('인재개발규정', result['summary'])
         self.assertIn('제99조', result['summary'])
+        self.assertIn('담당 부서에 문의', result['summary'])
         self.assertEqual(result['basis'], [])
         self.assertEqual(model.call_args.args[2]['sources'], [])
         self.assert_summary_history(model)

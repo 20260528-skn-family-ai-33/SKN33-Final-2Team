@@ -1,7 +1,7 @@
 """규정 에이전트 · 사내 생활 도우미(API-09) / 안별 지원 조건 확인 (4차 gp-ai.js · 4차 묶음 5·7).
 
 실제 모드는 로컬 RoBERTa로 먼저 질문을 4분류하고, 규정 검색·LLM 답변으로 연결한다.
-가데이터 모드는 기존 키워드·고정 답을 유지하며 실제 분류 모델을 호출하지 않는다.
+가데이터 챗봇은 추천 질문에 시연용 답을 제공한다.
   regulation  규정·인사 제도 — 내 직원 구분의 등록 규정에 명시된 경우에만 근거와 함께. 없으면 답하지 않고 담당 부서 안내
   general     회사 정보는 실제 DB 원문, 사내 생활은 등록된 가상 홈페이지 메뉴 안내만 근거로 사용한다.
   out         범위 밖 — RoBERTa 분류 뒤 검색·LLM 없이 종료한다. 가데이터의 clarify 등 이전 응답은 보존한다.
@@ -24,13 +24,22 @@ HR_TERMS = re.compile(r'(승진|발령|성과급|상여)')
 OUT_HINT = re.compile(r'(주식|주가|코스피|코스닥|나스닥|비트코인|코인 시세|가상화폐|환율|날씨|기온|미세먼지|비가 와|눈이 와|야구|축구|농구|배구|골프 대회|경기 결과|스코어|월드컵|올림픽|로또|연예인|아이돌|드라마|예능)')
 FOLLOW = re.compile(r'^(그럼|그러면|그건|그거|그게|그때|그런데|근데|이건|이거|거기|그 ?다음|또|그리고|혹시|아까|방금)')
 CONTEXT_REF = re.compile(
-    r'(?:그|이|해당|위)\s*(?:규정|내용|기준|조건|경우|절차|방법|사업|제도|메뉴|설명|답변|부분)|'
+    r'(?<!\w)(?:그|이|해당|위)\s+(?:규정|내용|기준|조건|경우|절차|방법|사업|제도|메뉴|설명|답변|부분)|'
     r'^(?:그|해당)\s+(?:회사|기관|시설|식당|셔틀|주차장)|'
     r'(?:앞서|앞에서|이전(?:에)?|방금|아까)\s*(?:설명|말|답|안내|알려|내용|질문)|'
     r'(?:내|제)\s*(?:상황|경우)에|'
-    r'^(?:좀\s*)?더\s*(?:자세히|쉽게|구체적으로)|'
-    r'도\s*(?:교육비\s*)?(?:지원|인정|적용|가능|신청|받을|받는)')
+    r'^(?:좀\s*)?더\s*(?:자세히|쉽게|구체적으로)')
+ADDED_CONDITION = re.compile(r'도\s*(?:교육비\s*)?(?:지원|인정|적용|가능|신청|받을|받는)')
+NAMED_RULE = re.compile(r'\w+(?:규정|규칙|세칙)')
 NEW_TOPIC = re.compile(r'^(?:다른|새(?:로운)?)\s*(?:질문|주제)|^(?:주제|질문)\s*(?:를|을)?\s*바꿔')
+DEMO_ANSWERS = (
+    (r'교육비.*지원', 'regulation', '교육비 지원을 신청하기 전에 대상 과정과 승인 조건을 교육 담당 부서에 확인하는 예시예요.'),
+    (r'통근\s*버스.*시간표', 'life', '시연 화면에서는 사내 포털의 ‘생활 → 통근버스’ 메뉴에서 시간표를 확인해요.'),
+    (r'승진.*기준', 'regulation', '승진 기준을 알아볼 때 인사규정과 인사규정시행세칙을 함께 확인하는 예시예요.'),
+    (r'근무\s*성적\s*평정.*언제', 'regulation', '근무성적평정의 기준일을 인사규정시행세칙에서 확인하는 예시예요.'),
+    (r'수자원공사.*어떤 일', 'company', '수자원 관리와 수돗물 공급 업무를 회사 소개 자료에서 확인하는 예시예요.'),
+    (r'회의실.*예약', 'life', '시연 화면에서는 사내 포털의 ‘업무 지원 → 회의실 예약’ 메뉴에서 빈 시간대를 확인해요.'),
+)
 GENERAL = [
     (r'(로드맵|계획).*(기간|바꾸|수정|늘리|줄이)|수정 요청', {'source': 'app', 'summary': '로드맵은 내 로드맵의 ‘수정 요청’에서 바꿀 수 있어요.', 'apply': '주당 시간·기간·예산·학습 방식·자격증·일정 제약·시작 단계·관점·활동 빼기·바꾸기·추가를 여러 개 고르거나 요청을 문장으로 적으면, 로드맵을 쓴 관점의 에이전트가 수정안을 먼저 보여 주고 확정해야 로드맵이 바뀌어요.', 'links': [['roadmap', '내 로드맵']]}),
     (r'(사후|점검 결과|보고서)', {'source': 'app', 'summary': '로드맵을 마무리하려면 점검·보고서에서 사후 점검을 시작하세요.', 'apply': '사전 점검과 같은 문항에 다시 답하면 진단 에이전트가 결과 보고서를 만들어 드려요.', 'links': [['checks', '점검·보고서']]}),
@@ -103,7 +112,7 @@ NUM_RE = re.compile(r'(\d+(?:\.\d+)?)\s*(점|년|개월|일|시간|분|퍼센트
 
 
 def ans(**o) -> dict:
-    base = {'kind': 'general', 'level': 'general', 'source': '', 'summary': '', 'apply': '', 'more': [], 'basis': [], 'missing': [], 'intranet': [],
+    base = {'kind': 'general', 'level': 'general', 'source': '', 'summary': '', 'basis': [], 'intranet': [],
             'question': '', 'options': [], 'retrieved': []}
     base.update(o)
     return base
@@ -166,38 +175,6 @@ def nums_ok(txt: str, basis: list, extra=None) -> bool:
     return True
 
 
-def clean_option(s: str, allow: set[str]) -> str:
-    """되묻기 선택지는 질문만: 괄호 설명과 첫 물음 뒤 문장을 떼고, 질문·사용자 상황에 없던 숫자가 남으면 버린다(빈 문자열)"""
-    s = re.sub(r'\s*[(（][^)）]*[)）]', '', str(s)).strip()
-    m = re.match(r'^(.*?[?？])\s', s + ' ')
-    s = (m.group(1) if m else s).strip()
-    return '' if any(x.group(1) not in allow for x in NUM_RE.finditer(re.sub(r'(\d),(?=\d{3})', r'\1', s))) else s
-
-
-def _cites(s: str, i: str) -> bool:
-    """문장이 그 조항을 이름과 조 번호로 가리키는지(예: 「연봉규정」 제3조)"""
-    a = regstore.article(i) or {}
-    name = (regstore.reg_public(a.get('reg')) or {}).get('name') or ''
-    no = (a.get('no') or '').split(' ')[0]
-    # 규정 이름 바로 뒤의 조 번호만 본다(「연봉규정시행세칙」 제3조는 연봉규정 제3조가 아님) · '제3조의2'(다른 조)는 아니고 '제3조의 지급일'은 맞다
-    return bool(name and no and re.search('「?' + re.escape(name) + r'」?\s*' + re.escape(no) + r'(?!\d|의\d)', s))
-
-
-def check_more(more: list[str], basis: list[str], ids: list[str], extra: set[str]) -> tuple[list[str], list[str]]:
-    """'추가로 확인할 것' 문장 검사: 숫자는 근거(없으면 이번에 넘긴 조항 중 그 숫자가 있는 것을 근거에 더함)에 있어야 하고,
-    없으면 문장을 버린다. 이름·조 번호로 가리킨 조항도 근거에 넣는다 → (남은 문장, 늘어난 근거)"""
-    basis, kept = list(basis), []
-    for s in more:
-        basis += [i for i in ids if i not in basis and _cites(s, i)]
-        if not nums_ok(s, basis, extra):
-            add = next((i for i in ids if i not in basis and nums_ok(s, basis + [i], extra)), None)
-            if not add:
-                continue
-            basis.append(add)
-        kept.append(s)
-    return kept, basis
-
-
 def ctx_nums(context: dict) -> set[str]:
     """사용자 상황(직급·진행 중인 로드맵의 주당 시간·비용 등)에 있는 숫자는 조항 원문에 없어도 답에 써도 된다(예: '5급인 문시우 님은')"""
     return set(re.findall(r'\d+(?:\.\d+)?', re.sub(r'(\d),(?=\d{3})', r'\1', json.dumps(context or {}, ensure_ascii=False))))
@@ -214,6 +191,10 @@ def _is_follow(q: str, prev: dict | None, me: dict) -> bool:
     # 앞 내용을 명시적으로 가리키면 길이·가데이터 주제 키워드와 관계없이 이어 받는다.
     if CONTEXT_REF.search(q):
         return True
+    if NAMED_RULE.search(q):
+        return False
+    if ADDED_CONDITION.search(q):
+        return True
     return bool(prev) and not _topic(q, me) and not intranet_hits(q) and (
         bool(FOLLOW.search(q)) or (len(q) <= 16 and not re.search(r'규칙|세칙', q) and not REG_HINT.search(q) and not any(re.search(p, q, re.I) for p, _ in GENERAL)
                                     and not any(re.search(p, q) and ok(q) for p, ok, _ in AMBIG)))
@@ -224,6 +205,17 @@ def _mock_general(q: str) -> dict:
     base = hit or {'source': 'work', 'summary': '가데이터 모드라 이 질문에는 준비된 답이 없어요.',
                    'apply': '좌측 ‘AI 모델’에서 RunPod-Ollama나 OpenAI API를 쓰면 업무·학습 질문에도 답해요. 업무·사내 생활과 관계없는 질문에는 답하지 않아요.'}
     return ans(**copy.deepcopy(base))
+
+
+def _mock_documents(inp: dict) -> dict:
+    question = inp['question']
+    if OUT_HINT.search(question):
+        return ans(kind='out', level='out')
+    for pattern, topic, summary in DEMO_ANSWERS:
+        if re.search(pattern, question):
+            return ans(kind='regulation' if topic == 'regulation' else 'general', topic=topic,
+                       source={'regulation': '', 'company': 'work', 'life': 'intranet'}[topic], summary=summary)
+    return ans(summary='시연용 가데이터에 준비된 답변이 없어요. 화면의 추천 질문을 선택해 주세요.')
 
 
 def _prev_reg(prev: dict | None) -> str | None:
@@ -495,7 +487,8 @@ def _api_answer(ctx: rt.Ctx, inp: dict, label: str) -> dict:
     previous_ids = list((prev or {}).get('a', {}).get('basis') or [])
     ids = [value for value in rt.uniq(ref_ids + previous_ids + mix) if regstore.article(value)][:max(7, len(ref_ids))]
     if ref and not ref_ids:
-        return _empty_evidence_answer(ctx, 'regulation', inp, ref['note'], ids, history=history)
+        note = f"{ref['note']}. 규정명과 조 번호를 확인하거나 담당 부서에 문의해 주세요."
+        return _empty_evidence_answer(ctx, 'regulation', inp, note, ids, history=history)
     if not ids:
         return _empty_evidence_answer(ctx, 'regulation', inp, history=history)
     requested = {'where': ref['where'], 'focus': ref['focus'], 'note': ref['note']} if ref else None
@@ -531,11 +524,14 @@ def answer(ctx: rt.Ctx, question: str, history: list, context: dict, sim: str | 
     inp = {'question': question, 'history': history or [], 'context': context, 'me': me,
            'documents_only': documents_only}
     task = f"사내 생활 질문 분류·답변{f' (앞 대화 {len(history)}턴 포함)' if history else ''}"
-    a = rt.run(ctx, '규정 에이전트', task, inp, _mock, lambda i: _api(ctx, i), role='regulation', sim=sim, mock_delay=0.38,
+    mock = _mock_documents if documents_only else _mock
+    a = rt.run(ctx, '규정 에이전트', task, inp, mock, lambda i: _api(ctx, i), role='regulation', sim=sim, mock_delay=0.38,
                log_input={'question': question, 'context': context, 'history': history or []})
     if inp.get('_classification'):
         ctx.meta['classification'] = inp['_classification']
-    return scope_answer(a, me) if not documents_only and a['kind'] == 'regulation' and a.get('evidenceStatus') != 'refused' and not regstore.set_for(me.get('empGroup')) else a
+    if documents_only:
+        return a
+    return scope_answer(a, me) if a['kind'] == 'regulation' and a.get('evidenceStatus') != 'refused' and not regstore.set_for(me.get('empGroup')) else a
 
 
 def reg_context(me: dict, plans: list, drafting: dict | None) -> dict:

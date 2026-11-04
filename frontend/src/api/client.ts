@@ -27,8 +27,6 @@ export interface RequestOptions {
   /** 'Prefer: respond-async' — 오래 걸리는 작업은 202 {jobId} 로 바로 돌려받는다 */
   async?: boolean;
   signal?: AbortSignal;
-  /** 익명 챗봇 요청에는 로그인 쿠키를 보내지 않는다. */
-  anonymous?: boolean;
 }
 
 type Body = FormData | object | undefined;
@@ -44,7 +42,7 @@ export async function request<T>(method: string, path: string, body?: Body, opts
   if (opts.async) headers.Prefer = 'respond-async';
   let r: Response;
   try {
-    r = await fetch(API_BASE + path, { method, headers, body: data, credentials: opts.anonymous ? 'omit' : 'same-origin', cache: 'no-store', signal: opts.signal });
+    r = await fetch(API_BASE + path, { method, headers, body: data, credentials: 'same-origin', cache: 'no-store', signal: opts.signal });
   } catch (e) {
     if (e instanceof DOMException && e.name === 'AbortError') throw e;
     throw new ApiError(0, {

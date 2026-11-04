@@ -3,13 +3,6 @@ export type Choices = Record<string, SkillChoice>;
 export function displayOrder(order: string[], choices: Choices): string[] {
   return [...order.filter(name => choices[name]?.enabled !== false), ...order.filter(name => choices[name]?.enabled === false)];
 }
-export function moveSkill(order: string[], source: string, target: string, choices: Choices): string[] {
-  if (source === target || !order.includes(source) || !order.includes(target) || choices[source]?.enabled === false || choices[target]?.enabled === false) return order;
-  const active = order.filter(name => choices[name]?.enabled !== false);
-  const from = active.indexOf(source), to = active.indexOf(target);
-  active.splice(from, 1); active.splice(to, 0, source);
-  return [...active, ...order.filter(name => choices[name]?.enabled === false)];
-}
 
 export const DURATION_METHOD = 'resource-hours-books/v3';
 export type DurationEstimate = {

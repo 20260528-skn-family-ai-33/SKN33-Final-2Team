@@ -1,6 +1,6 @@
 /* 사내 생활 도우미 (API-09) — 작업(202 jobId)으로 돌고, 멈추면 작업을 취소한다.
    응답 모양은 backend/app/agents/regulation.py 의 ans() 기준 */
-import { enc, http } from '../client';
+import { http } from '../client';
 import type { RegBundle } from '../types/catalog';
 import type { JobStarted } from '../types/common';
 
@@ -35,13 +35,10 @@ export interface AssistantAnswer {
   /** general 일 때 intranet(사내 홈페이지 안내)·work(업무·학습)·app(사용법) */
   source?: string;
   summary: string;
-  apply: string;
-  more: string[];
   /** 근거 조항 id */
   basis: string[];
   /** 적용 대상 아님(scope)일 때 참고로 찾은 조항 id */
   ref?: string[];
-  missing: string[];
   /** 사내 홈페이지(가상) 메뉴 id (shared/constants/data.ts 의 D.intranet) */
   intranet: string[];
   question: string;
@@ -58,6 +55,7 @@ export interface AssistantResult {
   answer: AssistantAnswer;
   reg: RegBundle;
   meta?: {
+    mode?: string;
     ms?: number;
     loadMs?: number;
     classification?: { label: string; confidence?: number; model?: string; ms?: number; usedHistory?: boolean };
@@ -68,10 +66,9 @@ export interface AssistantResult {
 /** 앞 대화: 답을 받은 질문과 답(요약본)만 넘긴다 */
 export interface HistoryTurn {
   q: string;
-  a: Pick<AssistantAnswer, 'kind' | 'level' | 'source' | 'summary' | 'apply' | 'more' | 'basis' | 'missing' | 'intranet' | 'question' | 'options'>;
+  a: Pick<AssistantAnswer, 'kind' | 'level' | 'source' | 'summary' | 'basis' | 'intranet' | 'question' | 'options'>;
 }
 
 export const assistantApi = {
-  ask: (question: string, history: HistoryTurn[], signal?: AbortSignal) => http.post<JobStarted>('/assistant/ask', { question, history }, { async: true, signal, anonymous: true }),
-  cancelJob: (id: string) => http.post<{ status: string }>(`/assistant/jobs/${enc(id)}/cancel`, {}, { anonymous: true }),
+  ask: (question: string, history: HistoryTurn[], signal?: AbortSignal) => http.post<JobStarted>('/assistant/ask', { question, history }, { async: true, signal }),
 };

@@ -378,14 +378,26 @@ def generate_learning_outcomes(project_id:UUID,a:Account=Depends(require_employe
 @r.post('/api/v2/drafts/{project_id}/skills')
 @queued_generation
 def preview_skills(project_id: UUID, a: Account = Depends(require_employee)):
-    with generation_guard('draft', str(project_id)):
+    import json
+    def snapshot():
         personal = profile_input(profile.view(a.id) or {})
         with db.tx() as t:
             project = project_input(t, a.id, str(project_id))
         project.pop('selectedSkills', None)
         project.pop('details', None)  # 학습 여건과 스킬 추천은 독립된 입력이다.
+        return project, personal
+
+    project, personal = snapshot()
+    version = hashlib.sha256(json.dumps([project, personal], ensure_ascii=False,
+        sort_keys=True, separators=(',', ':')).encode('utf-8')).hexdigest()
+    # 문항 생성과 분리하며 동일 입력의 스킬 추천만 중복 방지한다.
+    with generation_guard('draft-skills', f'{project_id}:{version}'):
         ctx = runtime.context(a.id)
         if not ctx.live:
             raise ApiError(503, 'MODEL_REQUIRED', '스킬 추천에 사용할 모델을 연결해 주세요.')
         from app.learner_knowledge import from_profile, hr_context
-        return select_from_catalog(ctx, dict(project, learnerKnowledge=from_profile(personal), hrContext=hr_context(personal)))
+        result = select_from_catalog(ctx, dict(project, learnerKnowledge=from_profile(personal), hrContext=hr_context(personal)))
+        latest_project, latest_personal = snapshot()
+        if latest_project != project or latest_personal != personal:
+            raise ApiError(409, 'SKILL_INPUT_CHANGED', '추천 중 입력이나 개인 정보가 변경됐어요. 현재 내용으로 다시 추천받아 주세요.')
+        return result

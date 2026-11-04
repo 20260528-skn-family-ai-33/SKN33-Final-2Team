@@ -1,4 +1,4 @@
-"""익명 챗봇의 계정 분리·세 자료 범주·공개 작업 경계를 외부 연결 없이 검사한다."""
+"""직원 챗봇의 인증·가데이터·세 자료 범주를 외부 연결 없이 검사한다."""
 from __future__ import annotations
 
 from contextlib import contextmanager
@@ -20,121 +20,142 @@ from app.routers import work
 from app.services import profile
 
 
-class AnonymousChatbotTest(unittest.TestCase):
+class EmployeeChatbotTest(unittest.TestCase):
+    job_id = '00000000-0000-4000-8000-000000000001'
+
     def setUp(self):
         app = FastAPI()
         app.include_router(work.r)
         app.add_exception_handler(ApiError, api_error_handler)
         self.client = TestClient(app)
+        self.employee = auth.Account('employee', 42, '직원')
+        self.admin = auth.Account('admin', 1, '관리자')
 
-    def test_question_runs_without_login_profile_settings_or_roadmaps(self):
-        def start(kind, employee_id, ref, fn):
-            self.assertEqual((kind, employee_id), ('assistant', None))
-            result = fn(Mock())
-            self.assertEqual(result['answer']['summary'], '등록 자료 답변')
-            return '00000000-0000-4000-8000-000000000001'
+    def test_question_requires_employee_account(self):
+        for account, status in ((None, 401), (self.admin, 403)):
+            with (self.subTest(status=status),
+                  patch.object(auth, 'account_of', return_value=account),
+                  patch.object(jobs, 'start') as start):
+                response = self.client.post('/api/v1/assistant/ask', json={'question': '교육 규정'})
+                self.assertEqual(response.status_code, status)
+                start.assert_not_called()
 
-        with (patch.object(auth, 'account_of', side_effect=AssertionError('로그인 조회 금지')),
-              patch.object(profile, 'view', side_effect=AssertionError('회원 조회 금지')),
-              patch.object(rt, 'context', side_effect=AssertionError('개인 설정 조회 금지')),
-              patch.object(work.PL, 'records', side_effect=AssertionError('로드맵 조회 금지')),
-              patch.object(work.DR, 'current', side_effect=AssertionError('작성안 조회 금지')),
-              patch.object(work.REG, 'answer', return_value={'summary': '등록 자료 답변'}) as answer,
-              patch.object(work.regstore, 'bundle', return_value={}),
-              patch.object(jobs, 'start', side_effect=start)):
-            result = self.client.post('/api/v1/assistant/ask', json={'question': '교육 규정을 알려줘'},
-                                      headers={'Prefer': 'respond-async'})
-        self.assertEqual(result.status_code, 202)
-        ctx, _, _, context = answer.call_args.args
-        self.assertIsNone(ctx.employee_id)
-        self.assertEqual(ctx.me, {})
-        self.assertEqual(ctx.provider, 'ollama')
-        self.assertEqual(context, {})
-        self.assertTrue(answer.call_args.kwargs['documents_only'])
-
-    def test_empty_question_is_rejected_without_login(self):
-        with patch.object(jobs, 'start') as start:
-            result = self.client.post('/api/v1/assistant/ask', json={'question': ' '})
-        self.assertEqual(result.status_code, 400)
+    def test_authenticated_empty_question_is_rejected(self):
+        with (patch.object(auth, 'account_of', return_value=self.employee),
+              patch.object(jobs, 'start') as start):
+            response = self.client.post('/api/v1/assistant/ask', json={'question': ' '})
+        self.assertEqual(response.status_code, 400)
         start.assert_not_called()
 
-    def test_public_request_reaches_regulation_model_with_documents_and_no_profile(self):
-        stored = {}
-        def start(kind, employee_id, ref, fn):
-            stored.update(fn(Mock()))
-            return '00000000-0000-4000-8000-000000000001'
+    def test_employee_modes_reach_runtime_without_profile_or_roadmap(self):
         article = {'id': 'work-7', 'reg': 'work', 'group': '일반직', 'no': '제7조',
                    'title': '교육', 'chapter': '', 'text': '교육은 등록 원문을 따른다.'}
-        with (patch.object(auth, 'account_of', side_effect=AssertionError('로그인 조회 금지')),
-              patch.object(profile, 'view', side_effect=AssertionError('회원 조회 금지')),
-              patch.object(reg.question_classifier, 'classify', return_value={'label': '사내 규정'}),
-              patch.object(reg.llm, 'available', return_value=True), patch.object(rt, '_log'),
-              patch.object(regstore, 'search', return_value=[{'id': 'work-7'}]) as search,
-              patch.object(regstore, 'explicit_ref', return_value=None),
-              patch.object(regstore, 'article', return_value=article),
-              patch.object(regstore, 'reg_public', return_value={'name': '취업규칙'}),
-              patch.object(regstore, 'bundle', return_value={}),
-              patch.object(rt, 'llm_json', return_value={'status': 'found', 'summary': '등록 원문을 따라요.', 'sourceIds': ['S001']}) as model,
-              patch.object(jobs, 'start', side_effect=start)):
-            result = self.client.post('/api/v1/assistant/ask', json={'question': '교육 규정', 'name': '전달 금지'},
-                                      headers={'Prefer': 'respond-async'})
-        self.assertEqual(result.status_code, 202)
-        search.assert_called_once_with('교육 규정', 4, None, 'ollama', all_groups=True)
-        self.assertEqual(model.call_args.args[2]['user'], {})
-        self.assertEqual(model.call_args.args[2]['sources'][0]['appliesTo'], '일반직')
-        self.assertEqual(stored['answer']['evidenceStatus'], 'found')
-        self.assertEqual(stored['meta']['classification']['label'], '사내 규정')
+        for provider, demo in (('openai', False), ('ollama', False), ('ollama', True)):
+            stored = {}
 
-    def test_public_poll_and_cancel_use_anonymous_chatbot_scope(self):
-        jid = '00000000-0000-4000-8000-000000000001'
-        with patch.object(jobs, 'view', return_value={'status': 'running'}) as view:
-            result = self.client.get(f'/api/v1/assistant/jobs/{jid}?wait=1')
-        self.assertEqual(result.status_code, 200)
-        view.assert_called_once_with(jid, None, 1, anonymous_kind='assistant')
-        with patch.object(jobs, 'cancel', return_value='cancelled') as cancel:
-            result = self.client.post(f'/api/v1/assistant/jobs/{jid}/cancel')
-        self.assertEqual(result.status_code, 200)
-        cancel.assert_called_once_with(jid, None, anonymous_kind='assistant')
+            def start(kind, employee_id, ref, fn):
+                self.assertEqual((kind, employee_id), ('assistant', self.employee.id))
+                stored.update(fn(Mock()))
+                return self.job_id
 
-    def test_public_job_rejects_invalid_id(self):
-        result = self.client.get('/api/v1/assistant/jobs/not-a-uuid')
-        self.assertEqual(result.status_code, 422)
+            settings = {'ai_provider': provider, 'demo_mock': demo, 'reasoning': {provider: 'low'}}
+            with (self.subTest(provider=provider, demo=demo),
+                  patch.object(auth, 'account_of', return_value=self.employee),
+                  patch.object(rt.db, 'one', return_value=settings) as load_settings,
+                  patch.object(profile, 'view', side_effect=AssertionError('프로필 조회 금지')),
+                  patch.object(reg.question_classifier, 'classify', return_value={'label': '사내 규정'}) as classify,
+                  patch.object(reg.llm, 'available', return_value=True), patch.object(rt, '_log') as log,
+                  patch.object(regstore, 'search', return_value=[{'id': 'work-7'}]) as search,
+                  patch.object(regstore, 'explicit_ref', return_value=None),
+                  patch.object(regstore, 'article', return_value=article),
+                  patch.object(regstore, 'reg_public', return_value={'name': '취업규칙'}),
+                  patch.object(regstore, 'bundle', return_value={}),
+                  patch.object(rt, 'llm_json', return_value={'status': 'found', 'summary': '등록 원문을 따라요.', 'sourceIds': ['S001']}) as model,
+                  patch.object(jobs, 'start', side_effect=start)):
+                response = self.client.post('/api/v1/assistant/ask',
+                                            json={'question': '교육비 지원을 받을 수 있나요?', 'name': '전달 금지'},
+                                            headers={'Prefer': 'respond-async'})
+                self.assertEqual(response.status_code, 202)
+                self.assertEqual(response.json()['jobId'], self.job_id)
+                self.assertEqual(load_settings.call_args.kwargs['e'], self.employee.id)
+                self.assertEqual(log.call_args.args[0].employee_id, self.employee.id)
+                self.assertTrue({'apply', 'more', 'missing'}.isdisjoint(stored['answer']))
+                self.assertEqual(stored['meta']['mode'], 'mock' if demo else provider)
+                if demo:
+                    self.assertEqual(stored['answer']['topic'], 'regulation')
+                    self.assertTrue(stored['answer']['summary'])
+                    for dependency in (classify, search, model):
+                        dependency.assert_not_called()
+                else:
+                    search.assert_called_once_with('교육비 지원을 받을 수 있나요?', 4, None, provider, all_groups=True)
+                    ctx, _, payload = model.call_args.args
+                    self.assertEqual(ctx.reasoning, {provider: 'low'})
+                    self.assertEqual(payload['user'], {})
+                    self.assertEqual(payload['sources'][0]['appliesTo'], '일반직')
+                    self.assertEqual(stored['answer']['evidenceStatus'], 'found')
 
+    def test_job_view_and_cancel_allow_only_the_employee_owner(self):
+        url = f'/api/v1/jobs/{self.job_id}'
+        row = {'job_id': self.job_id, 'employee_id': self.employee.id, 'kind': 'assistant',
+               'status': 'running', 'progress': {}, 'result': None, 'error': None}
+        cases = ((self.employee, self.employee.id, 200),
+                 (auth.Account('employee', 43, '다른 직원'), self.employee.id, 404),
+                 (self.admin, self.employee.id, 404),
+                 (None, self.employee.id, 401),
+                 (self.employee, None, 404),
+                 (self.admin, None, 404))
 
-class PublicJobBoundaryTest(unittest.TestCase):
-    def row(self, **changes):
-        return dict(job_id='id', employee_id=None, kind='assistant', status='done', progress={},
-                    result={'answer': 'public'}, error=None, **changes)
+        for account, owner, status in cases:
+            row['employee_id'] = owner
+            transaction = Mock()
+            transaction.one.return_value = row
 
-    def test_public_poll_allows_only_anonymous_assistant_jobs(self):
-        for employee_id, kind in [(None, 'assistant'), (1, 'assistant'), (None, 'learning_generation'), (1, 'roadmap')]:
-            with self.subTest(employee_id=employee_id, kind=kind):
-                row = self.row()
-                row.update(employee_id=employee_id, kind=kind)
-                with patch.object(jobs.db, 'one', return_value=row):
-                    if employee_id is None and kind == 'assistant':
-                        self.assertEqual(jobs.view('id', None, anonymous_kind='assistant')['result'], row['result'])
-                    else:
-                        with self.assertRaises(ApiError) as error:
-                            jobs.view('id', None, anonymous_kind='assistant')
-                        self.assertEqual(error.exception.status, 404)
+            @contextmanager
+            def tx():
+                yield transaction
 
-    def test_public_cancel_cannot_touch_account_or_non_chatbot_jobs(self):
-        for employee_id, kind in [(None, 'assistant'), (1, 'assistant'), (None, 'roadmap')]:
-            with self.subTest(employee_id=employee_id, kind=kind):
-                transaction = Mock()
-                transaction.one.return_value = {'employee_id': employee_id, 'kind': kind, 'status': 'running'}
-                @contextmanager
-                def tx():
-                    yield transaction
-                with patch.object(jobs.db, 'tx', tx):
-                    if employee_id is None and kind == 'assistant':
-                        self.assertEqual(jobs.cancel('id', None, anonymous_kind='assistant'), 'cancelled')
-                        transaction.run.assert_called_once()
-                    else:
-                        with self.assertRaises(ApiError):
-                            jobs.cancel('id', None, anonymous_kind='assistant')
-                        transaction.run.assert_not_called()
+            with (self.subTest(account=account, owner=owner),
+                  patch.object(auth, 'account_of', return_value=account),
+                  patch.object(jobs.db, 'one', return_value=row),
+                  patch.object(jobs.db, 'tx', tx)):
+                self.assertEqual(self.client.get(url).status_code, status)
+                cancel = self.client.post(f'{url}/cancel')
+                self.assertEqual(cancel.status_code, status)
+                if status == 200:
+                    self.assertEqual(cancel.json()['status'], 'cancelled')
+                    transaction.run.assert_called_once()
+                else:
+                    transaction.run.assert_not_called()
+
+    def test_old_public_job_paths_are_removed(self):
+        url = f'/api/v1/assistant/jobs/{self.job_id}'
+        self.assertEqual(self.client.get(url).status_code, 404)
+        self.assertEqual(self.client.post(f'{url}/cancel').status_code, 404)
+
+    def test_demo_answers_cover_all_suggestions_and_unknown_questions(self):
+        suggestions = (
+            ('교육비 지원을 받을 수 있나요?', 'regulation'),
+            ('통근버스 시간표는 어디서 봐요?', 'life'),
+            ('승진 기준이 궁금해요', 'regulation'),
+            ('근무성적평정은 언제 하나요?', 'regulation'),
+            ('수자원공사는 어떤 일을 하나요?', 'company'),
+            ('회의실 예약은 어디서 하나요?', 'life'),
+        )
+        ctx = rt.Ctx(self.employee.id, demo=True)
+        with (patch.object(rt, '_log'), patch.object(rt.time, 'sleep'),
+              patch.object(reg.llm, 'embed', side_effect=AssertionError('유료 임베딩 호출 금지')),
+              patch.object(rt, 'llm_json', side_effect=AssertionError('모델 호출 금지'))):
+            for question, topic in suggestions:
+                with self.subTest(question=question):
+                    answer = reg.answer(ctx, question, [], {}, documents_only=True)
+                    self.assertEqual(answer['topic'], topic)
+                    self.assertTrue(answer['summary'])
+                    self.assertFalse(answer['basis'])
+                    self.assertTrue({'apply', 'more', 'missing'}.isdisjoint(answer))
+            unknown = reg.answer(ctx, '지사 주차장은 어디인가요?', [], {}, documents_only=True)
+            self.assertIn('준비된 답변이 없어요', unknown['summary'])
+            outside = reg.answer(ctx, '오늘 날씨 알려줘', [], {}, documents_only=True)
+            self.assertEqual(outside['kind'], 'out')
 
 
 class DocumentScopeTest(unittest.TestCase):
@@ -160,7 +181,7 @@ class DocumentScopeTest(unittest.TestCase):
             self.assertEqual(regstore.pool(None, '교육', all_groups=True), [arts['a'], arts['b']])
             self.assertEqual(regstore.pool(None, '국외근무', all_groups=True), list(arts.values()))
 
-    def test_anonymous_explicit_article_uses_registered_document_without_employee_group(self):
+    def test_documents_only_explicit_article_uses_registered_document_without_employee_group(self):
         info = {'key': 'work', 'name': '취업규칙'}
         data = {'sets': {'일반직': {'regs': [info]}}}
         with (patch.object(regstore, 'data', return_value=data),

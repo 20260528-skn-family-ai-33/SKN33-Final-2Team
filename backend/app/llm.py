@@ -159,6 +159,10 @@ def chat(provider: str, messages: list, role: str = 'default', json_mode: bool =
             payload['format'] = 'json'
         if S.ollama_num_ctx:
             payload['options'] = {'num_ctx': S.ollama_num_ctx}
+        if role == 'roadmap':
+            from .catalog_budget import OUTPUT_RESERVE, DEFAULT_CONTEXT
+            payload.setdefault('options', {})['num_predict'] = OUTPUT_RESERVE
+            payload['options'].setdefault('num_ctx', DEFAULT_CONTEXT)
         if role == 'regulation':
             # 챗봇 파인튜닝 모델의 GPU/VRAM 선택은 Ollama 서버에 맡긴다.
             # -1은 자동 선택이며 모델에 남은 CPU 강제(num_gpu=0)도 덮어쓴다.
@@ -185,6 +189,9 @@ def chat(provider: str, messages: list, role: str = 'default', json_mode: bool =
         payload['temperature'] = temperature
     if json_mode and S.openai_json:
         payload['response_format'] = {'type': 'json_object'}
+    if role == 'roadmap':
+        from .catalog_budget import OUTPUT_RESERVE
+        payload['max_completion_tokens'] = OUTPUT_RESERVE
     # .env 의 단계 목록은 OPENAI_MODEL 의 것이라 다른 비전 모델에는 보내지 않는다.
     # 목록에서 빠진 값(목록을 바꾼 뒤 남은 옛 선택)은 400 이 나므로 기본값으로 돌린다
     level = (mine if mine in S.openai_reasoning_levels else S.openai_reasoning) if model == S.openai_model else None

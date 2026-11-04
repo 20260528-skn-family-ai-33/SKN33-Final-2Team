@@ -1,0 +1,92 @@
+{
+  "artifacts": [
+    {
+      "path": "docs/01_요구사항_정의서/요구사항_정의서_33기_2팀.xlsx",
+      "sha256": "39b4b3b56a4dc7c7a6b682abeda037bd01b941747eb5f75fbb852fae0b381c2d",
+      "bytes": 132215,
+      "drive_url": "https://drive.google.com/file/d/1Kzv_qa8D6_3ZSddbo_IIcPsPNieaCcGD/view",
+      "basis_date": "2026-11-04",
+      "code_commit": "80cc597e56e56ff85bbc2c01e8b0ee2e5d8dd9a9"
+    },
+    {
+      "path": "docs/02_WBS/WBS_33기_2팀.xlsx",
+      "sha256": "cb6c53eb7dc10e3c5a4a109b2dcf8a8720ae248dc1e048fb0a3786f73cca7937",
+      "bytes": 64105,
+      "drive_url": "https://drive.google.com/file/d/1pgNlESKQp01VMze8cWLmJ4SyfepHqsek/view",
+      "basis_date": "2026-11-04",
+      "code_commit": "80cc597e56e56ff85bbc2c01e8b0ee2e5d8dd9a9"
+    },
+    {
+      "path": "docs/03_프로젝트_기획서/GrowPath_기획서_33기_2팀.docx",
+      "sha256": "b65939174075e681fb6021d444af0876a1d83752cd0993b3a65e87bfe315e156",
+      "bytes": 393337,
+      "drive_url": "https://drive.google.com/file/d/1pM5mKfXJ8lH4HLiS0aRLpp3iDeYy0MUc/view",
+      "basis_date": "2026-11-03",
+      "code_commit": "80cc597e56e56ff85bbc2c01e8b0ee2e5d8dd9a9"
+    },
+    {
+      "path": "docs/04_수집_데이터_보고서/수집_데이터_보고서_33기_2팀.docx",
+      "sha256": "9e48d87af61f0efe1fe1eda6b110309a1c9f7360f309c9d0268ddf78a4354fab",
+      "bytes": 894564,
+      "drive_url": "https://drive.google.com/file/d/1EkrTycoXmN4XYjQtKiR0UpgXFagbJ6b8/view",
+      "basis_date": "2026-11-03",
+      "code_commit": "80cc597e56e56ff85bbc2c01e8b0ee2e5d8dd9a9"
+    },
+    {
+      "path": "docs/05_화면_설계서/화면_설계서_33기_2팀.pdf",
+      "sha256": "13a984520c7ad0cdd5afcb40a955ee0a8c978c2afb6110f91f53865113f4b8a0",
+      "bytes": 16250611,
+      "drive_url": "https://drive.google.com/file/d/10KQ9YMOopJowKSaTKA6MrGVgUz4BL9mQ/view",
+      "basis_date": "2026-11-03",
+      "code_commit": "80cc597e56e56ff85bbc2c01e8b0ee2e5d8dd9a9"
+    },
+    {
+      "path": "docs/07_데이터베이스_저장소_설계/데이터베이스_저장소_설계_통합본.docx",
+      "sha256": "c017cd5003dfbfa7a0d3fb2fb401d2b3e654876457517cdc14f262fd24c237e1",
+      "bytes": 5497651,
+      "drive_url": "https://drive.google.com/file/d/1QoI-BKqickgVZQ6yQZvW-eR7hXQhzlht/view",
+      "basis_date": "2026-11-03",
+      "code_commit": "80cc597e56e56ff85bbc2c01e8b0ee2e5d8dd9a9"
+    },
+    {
+      "path": "docs/08_데이터_전처리_결과서/데이터_전처리_결과서_통합본.docx",
+      "sha256": "f9e02d12a55d8586bb8f20c592790513c21355f3d6eedefc7ddd72b5dc7bede2",
+      "bytes": 3621587,
+      "drive_url": "https://drive.google.com/file/d/1UJdY5QjMChedGc0dkF07hKrOlhOXEzdU/view",
+      "basis_date": "2026-11-03",
+      "code_commit": "80cc597e56e56ff85bbc2c01e8b0ee2e5d8dd9a9"
+    },
+    {
+      "path": "docs/09_벡터DB_구축_결과서/벡터DB·GraphDB 구축 결과서_33기_2팀.docx",
+      "sha256": "93119e78e01cb694366f28eea19c497c343df5ec61d1e1d501462e9421a7930e",
+      "bytes": 3618446,
+      "drive_url": "https://drive.google.com/file/d/1ODZL0rrutkYhLRLpD-pLUEM5-UJNuxnv/view",
+      "basis_date": "2026-11-03",
+      "code_commit": "80cc597e56e56ff85bbc2c01e8b0ee2e5d8dd9a9"
+    },
+    {
+      "path": "docs/10_학습한_ML_DL_모델보고서/학습한_ML_DL_모델보고서_33기_2팀.docx",
+      "sha256": "279241251eed8fa8c0063ed9faac443ebd92048e195c2029651b4980311e6fce",
+      "bytes": 594154,
+      "drive_url": "https://drive.google.com/file/d/1F0rkh3MZ0DPOUCVO1-1DgbM_8QCkPo_b/view",
+      "basis_date": "2026-11-03",
+      "code_commit": "80cc597e56e56ff85bbc2c01e8b0ee2e5d8dd9a9"
+    },
+    {
+      "path": "docs/11_머신러닝_딥러닝_학습결과서/머신러닝_딥러닝_학습결과서_33기_2팀.docx",
+      "sha256": "14a18e922f181396cd8215865ebb004c9757a055c7e133cf86c6ddb3be61dec2",
+      "bytes": 593874,
+      "drive_url": "https://drive.google.com/file/d/1WfgNa3pYP1i2FbFV5fWSc2fvIrOGqbs3/view",
+      "basis_date": "2026-11-03",
+      "code_commit": "80cc597e56e56ff85bbc2c01e8b0ee2e5d8dd9a9"
+    },
+    {
+      "path": "docs/12_AI_시스템_아키텍처/GrowPath_AI_시스템_아키텍처.pdf",
+      "sha256": "bc3f844816411a9cd956868349b74bed394b22e5fa297e0a44058db4acc6b659",
+      "bytes": 3134027,
+      "drive_url": "https://drive.google.com/file/d/1vzqDlfZE_T4KzbM_ohYnwERUtn66CU_T/view",
+      "basis_date": "2026-11-03",
+      "code_commit": "80cc597e56e56ff85bbc2c01e8b0ee2e5d8dd9a9"
+    }
+  ]
+}

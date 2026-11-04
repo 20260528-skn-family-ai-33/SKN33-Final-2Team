@@ -161,7 +161,7 @@ export function AppShell() {
           </div>
         </main>
       </div>
-      {booted && !admin ? <AssistantHost /> : null}
+      {booted && acct?.accountType === 'employee' ? <AssistantHost /> : null}
       {booted && acct && !admin ? <DraftNavGuard /> : null}
       <SheetHost />
       <ToastHost />

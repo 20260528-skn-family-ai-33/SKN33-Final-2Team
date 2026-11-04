@@ -6,10 +6,9 @@ import { trackName } from '@/shared/constants/data';
 import { paths } from '@/app/paths';
 import { SkillMap } from '@/features/skillmap/SkillMap';
 import { useGo } from '@/shared/hooks/useGo';
-import { useMe } from '@/shared/state/session';
-import { recs, useWs } from '@/shared/state/workspace';
+import { useWs } from '@/shared/state/workspace';
 import { Icon } from '@/shared/ui/Icon';
-import { Note, Page, Stats } from '@/shared/ui/parts';
+import { Page, Stats } from '@/shared/ui/parts';
 import { StagesView } from '@/shared/ui/StagesView';
 import { confirmReview } from './confirmReview';
 import { useKickSupport } from '../generation/GenerationStep';
@@ -27,8 +26,6 @@ export function ReviewStep() {
   const [submitting, setSubmitting] = useState(false);
   const pl = useWs((s) => s.draftPlan);
   const g = useWs((s) => s.draft.gen);
-  const active = useWs((s) => recs(s, 'active').length);
-  const me = useMe();
   useDraftWatch();
   useKickSupport();
   async function submit() {
@@ -44,7 +41,6 @@ export function ReviewStep() {
     {assessment ? <DeliverableSelection ref={deliverables} onReadyChange={setReady} onBusyChange={setBusy} onDurationChange={setMaterialWeeks} /> : <p role="status">최종 검토 결과를 불러오는 중…</p>}
   </Page></>;
   const o = (g && g.options[pl.opt]) || pl.def;
-  const sup = me?.mySupervisor;
   return (
     <>
       <Stepper cur="review" busy={submitting} />
@@ -83,11 +79,7 @@ export function ReviewStep() {
           </details>
           <SupNote />
         </div>
-        <Note>
-          확정은 내 학습 계획을 정하는 것이에요. 기관의 승인·결재가 아니에요.
-          {sup ? ` 확정하면 내 계획을 보는 부서장 ${sup.name} 님은 확정한 로드맵, 진행 상태, 결과 보고서를 볼 수 있어요.` : null}
-        </Note>
-        {active ? <Note>지금 진행 중인 로드맵 {active}개가 있어요.</Note> : null}
+
       </Page>
     </>
   );

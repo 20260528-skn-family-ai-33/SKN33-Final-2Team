@@ -15,6 +15,56 @@ class RecommendationTests(unittest.TestCase):
                             for kind, prefix in [('courses', 'course'), ('books', 'book')]})]}
     def recommend(self, raw=None, items=None):
         return recommend_resources(self.project, self.selection, self.items if items is None else items, lambda *_: self.raw() if raw is None else raw)
+    def test_only_current_course_policy_reaches_model_without_input_or_source_changes(self):
+        from app.agents.resource_instructions import instructions
+        for course in ('A1','A2','A3'):
+            before=copy.deepcopy((self.project,self.selection,self.items))
+            model=Mock(return_value={'skills':[{'name':'분석','courses':[],'books':[]}]})
+            recommend_resources(self.project,self.selection,self.items,model,course={'id':course})
+            system,payload=model.call_args.args
+            self.assertEqual(system,instructions({'id':course}))
+            expected={'project','skills','bookCatalog','learnerKnowledge','hrContext','course'}
+            if course=='A2':expected.add('crashStudyPlan')
+            self.assertEqual(set(payload),expected)
+            self.assertEqual(payload['course']['id'],course)
+            for other,label in (('A1','Free'),('A2','Crash'),('A3','Challenge')):
+                self.assertEqual(('[현재 코스 · '+label+']') in system,course==other)
+            self.assertEqual((self.project,self.selection,self.items),before)
+
+    def test_instruction_output_and_diagnostic_schemas_are_preserved(self):
+        import json
+        from app.agents.resource_instructions import COMMON
+        schema=json.loads(COMMON.split('JSON: ',1)[1])
+        self.assertEqual(set(schema),{'skills'})
+        self.assertEqual(set(schema['skills'][0]),{'name','courses','books'})
+        self.assertEqual(set(schema['skills'][0]['courses'][0]),{'key'})
+        diagnostic=json.loads(COMMON.split('courseDiagnostic 형식: ',1)[1].splitlines()[0])
+        self.assertEqual(set(diagnostic),{'reason','detail'})
+        self.assertEqual(set(diagnostic['reason'].split('|')),{'no_candidates','insufficient_evidence','stack_mismatch','scope_gap','longer_for_coverage'})
+
+    def test_only_exact_goal_duplicate_is_removed_from_model_copy(self):
+        from unittest.mock import patch
+        for desired in ('수질 데이터 분석', '  수질 데이터 분석  ', '수질 데이터 분석 심화', '수질  데이터 분석', None):
+            with self.subTest(desired=desired):
+                project=dict(self.project,desiredCompetencies=desired)
+                before=copy.deepcopy((project,self.selection,self.items))
+                model=Mock(return_value={'skills':[{'name':'분석','courses':[],'books':[]}]})
+                with patch('app.agents.resource_recommendations.candidate_pools', wraps=candidate_pools) as search:
+                    result=recommend_resources(project,self.selection,self.items,model)
+                system,payload=model.call_args.args
+                self.assertEqual(search.call_args.args[0]['desiredCompetencies'],desired)
+                self.assertEqual(payload['project']['goal'],project['goal'])
+                if isinstance(desired,str) and desired.strip()==project['goal'].strip():
+                    self.assertNotIn('desiredCompetencies',payload['project'])
+                else:
+                    self.assertIn('desiredCompetencies',payload['project'])
+                    self.assertEqual(payload['project']['desiredCompetencies'],desired)
+                self.assertIn('미제공 시 goal 기준',system)
+                self.assertEqual((project,self.selection,self.items),before)
+                self.assertEqual(result['skills'][0]['name'],'분석')
+                self.assertEqual(result['skills'][0]['courses'],[])
+                self.assertEqual(result['skills'][0]['books'],[])
+
     def test_top_recommendation_and_one_book_default(self):
         row=self.recommend()['skills'][0]
         self.assertEqual(row['selectedCourse'],'course0')

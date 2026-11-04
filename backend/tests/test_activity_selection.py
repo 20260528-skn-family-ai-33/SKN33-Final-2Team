@@ -137,3 +137,24 @@ class ActivityTests(unittest.TestCase):
   from app.services.activity_selection import SYSTEM
   for requirement in ['choices[스킬].course','만들 것:','필수 항목:','제출물:','평가 기준:','사후 점검과 역량 보고서','선택 도서는','재제안은 같은 스킬']:
    self.assertIn(requirement,SYSTEM)
+
+ def test_integrated_instructions_keep_payload_and_output_contract_all_courses(self):
+  import json
+  from app.services import activity_selection as activities
+  from app.services.activity_instructions import instructions,SCHEMA
+  for pid in ('A1','A2','A3'):
+   saved=deepcopy(self.saved);draft=deepcopy(self.draft)
+   draft['chosen']=pid;draft['gen']['options'][pid]={'id':pid}
+   before=deepcopy((saved,draft))
+   with patch.object(activities.catalog,'items',return_value={'c':{'id':'c','title':'자료','cost':0}}),patch.object(activities.RM,'finish_option',side_effect=lambda pid,raw,source:{**raw,'acts':[dict(a,id=str(i)) for i,a in enumerate(raw['acts'])]}):
+    _,expected=activities.learning_context(saved,draft)
+    key=activities.fingerprint(saved,draft)
+    def generate(system,payload):
+     self.assertEqual(system,instructions(pid));self.assertEqual(payload,expected)
+     self.assertEqual(json.loads(system.split('JSON: ',1)[1].split('\n[Challenge',1)[0]),SCHEMA)
+     self.assertEqual('[Challenge 과제]' in system,pid=='A3')
+     return {'acts':deepcopy(self.acts),'skillSummaries':{'S':['자료 이해','프로젝트 적용','결과 검증']}}
+    result=activities.propose(saved,draft,generate,'mock')
+    self.assertEqual(result['key'],key)
+    self.assertEqual(result['selectedIds'],['0','1'])
+   self.assertEqual((saved,draft),before)

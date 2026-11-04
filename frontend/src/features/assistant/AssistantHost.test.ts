@@ -7,10 +7,18 @@ import { RegCard } from './AssistantHost';
 
 const makeAnswer = (value: Partial<AssistantAnswer>): AssistantAnswer => ({
   kind: 'general', level: 'general', source: 'intranet', topic: 'life', summary: '',
-  apply: '', more: [], basis: [], missing: [], intranet: [], question: '', options: [], ...value,
+  basis: [], intranet: [], question: '', options: [], ...value,
 });
 
 describe('사내 생활 DB 근거 카드', () => {
+  it('시연 답변을 별도 라벨로 표시한다', () => {
+    const a = makeAnswer({ summary: '시연용 통근버스 안내예요.' });
+    const html = renderToStaticMarkup(createElement(MemoryRouter, null, createElement(RegCard, { a, demo: true })));
+    expect(html).toContain('시연용 가데이터');
+    expect(html).toContain(a.summary);
+    expect(html).not.toContain('근거 확인');
+  });
+
   it('DB 답변·출처·가상 여부와 자료 제약을 표시한다', () => {
     const answer = makeAnswer({
       kind: 'general', level: 'general', source: 'intranet', topic: 'life', evidenceStatus: 'found',

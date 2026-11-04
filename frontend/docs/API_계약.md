@@ -10,7 +10,7 @@
 | 항목 | 약속 | 화면 코드 |
 | --- | --- | --- |
 | 주소 | 모두 `/api/v1/...`. 화면과 같은 출처(개발: Vite 프록시, 배포: nginx·CloudFront 경로 분기) | `api/client.ts` `API_BASE` |
-| 로그인 | 회원 API는 HttpOnly 세션 쿠키를 사용. 익명 챗봇 질문·작업 조회·취소는 로그인 쿠키를 보내지 않음 | 기본 `credentials: 'same-origin'`, 챗봇은 `'omit'` |
+| 로그인 | 챗봇을 포함한 회원 API는 HttpOnly 세션 쿠키를 사용 | `credentials: 'same-origin'` |
 | 오류 | 2xx 가 아니면 본문 `{"error": {code, message, hint, retryable, kind, cause, raw}}`. `message`는 사용자 문구, `cause`·`hint`·`raw`는 "자세히 보기(운영자용)" | `ApiError`, `shared/state/ai.ts` `cause()` |
 | 오래 걸리는 작업 | 요청 머리에 `Prefer: respond-async`를 붙이면 `202 {jobId, status:'running'}`. 화면은 `GET /jobs/{id}?wait=10`(서버가 최대 10초 붙잡음)을 끝날 때까지 되풀이. 멈추기는 `POST /jobs/{id}/cancel` | `api/jobs.ts` |
 | 작업 결과 | `{jobId, kind, status: running·done·failed·cancelled, progress, result, error}`. 실패 원인은 `error`(위 오류와 같은 칸) | `JobView` |
@@ -105,27 +105,27 @@
 
 ### 사내 생활 도우미 — `assistant.ts`
 
-챗봇은 로그인 없이 서버의 Ollama 규정 모델 설정으로 실행해요. 회원 프로필·직급·부서·개인 로드맵·개인 AI 설정을 조회하지 않으며 모델의 사용자 상황은 빈 객체예요. 규정 검색은 전체 등록 자료를 대상으로 원문의 적용 대상을 전달하고, 사용자 조건은 질문·앞 대화에 직접 적힌 것만 사용해요. 로그인 화면에서도 챗봇을 열 수 있어요. 계정 정보가 포함될 수 있는 과거 대화는 새 브라우저 저장 키로 분리해 자동 전송하지 않아요.
+챗봇은 로그인한 직원의 계정별 AI 설정을 따릅니다. 직원 ID는 작업 소유권과 호출 기록에 사용합니다. 모델에는 빈 사용자 상황을 전달하고, 규정 원문의 적용 대상과 질문·앞 대화에 적힌 조건을 사용합니다. 브라우저 대화는 직원별로 분리합니다.
 
 수자원공사 정보로 분류되면 `knowledge.documents`·`knowledge.chunks`의 같은 범주·실제 자료만 벡터 검색해 답변 모델에 전달해요. 회사 답변은 `kind=general`, `source=work`이고 `summary`에 출처가 덧붙어요. 선택 필드 `answer.knowledgeSources[]`는 `{chunkId, documentId, documentTitle, sourceUrl, location, asOf, sourceLimits, isVirtual, textSha256, sourceFileSha256, textTruncated}`이며, 실제 인용한 검색 결과만 들어가요. `basis`는 규정 조항 전용으로 유지해요. 회사 자료에 맞는 근거가 없으면 `knowledgeSources=[]`와 확인 불가 안내예요. 다른 범주·가상 자료·없는 인용 ID·근거 없는 숫자는 허용하지 않아요.
 
 실제 모델 모드는 로컬 RoBERTa로 질문을 먼저 4분류해요. `meta.classification`(선택)은 `{model, label, confidence, ms, usedHistory}`이며 `label`은 `범위 밖`·`사내 규정`·`사내 생활안내`·`수자원공사 정보`예요. 기존 `answer.kind`는 유지하고 가데이터 모드에는 이 메타데이터가 없어요. 범위 밖은 검색/LLM을 호출하지 않고, 규정·회사는 각각 해당 자료 검색과 근거 검사를 거쳐요. 모델·토크나이저·해시 문제는 기존 오류 형식의 `code=AI_CLASSIFIER`, `kind=classifier`, `retryable=false`로 알려요. LLM은 질문 유형을 재분류하지 않고 서버가 분류별 `answer.kind`를 구성해요. JSON 구조·없는 인용 ID·근거 없는 숫자 등의 실패는 기존 `AI_BAD_OUTPUT` 오류로 유지해요.
 
-실제 모델 모드에서는 되묻기(`kind=clarify`·선택지)를 생성하지 않아요. 규정 답변 모델에는 근거 상태·요약·출처만 요청하며, 확인된 내용·적용 조건·부족한 근거는 요약에 담아요. ‘내 상황에 적용’(`apply`)·‘추가로 확인할 것’(`more`)·‘등록되지 않은 기준’(`missing`)은 별도 생성 항목으로 요청하지 않아요. 이 필드와 되묻기 카드 표시는 가데이터·이전 대화 호환을 위해 유지해요.
+실제 모델과 가데이터 모두 `apply`·`more`·`missing`을 반환하지 않습니다. 실제 모델은 확인된 내용과 적용 조건, 부족한 근거를 `summary`에 담습니다. 가데이터는 추천 질문의 예시를 `meta.mode=mock`으로 반환합니다. 화면에는 ‘시연용 가데이터’를 표시합니다.
 
-`answer.topic`(선택)은 `regulation|company|life`, `answer.evidenceStatus`(선택)는 `found|partial|not_found|refused`예요. 규정·회사·생활 DB 답변은 `meta.classification.label` 옆에 ‘근거 확인 / 근거 일부 확인 / 근거 확인 불가’를 표시해요. 예: `사내 규정` `근거 확인`. 제공 금지 거절은 ‘답변 불가’, 범위 밖은 ‘범위 밖’, 연결·검증 실패는 ‘오류’라는 단일 결과 라벨이에요. 오류는 LLM 출력 상태가 아니에요. 규정은 `found→level=ok`, `partial→unclear`, `not_found→none`, `refused→refused`예요. `scope`는 이전 응답 호환용이며 익명 챗봇은 개인 직원 구분으로 적용 여부를 판정하지 않아요. 회사는 `kind=general, source=work`, 생활은 `kind=general, source=intranet`이고 거절·자료 부족은 `knowledgeSources=[]`예요.
+`answer.topic`(선택)은 `regulation|company|life`, `answer.evidenceStatus`(선택)는 `found|partial|not_found|refused`예요. 규정·회사·생활 DB 답변은 `meta.classification.label` 옆에 ‘근거 확인 / 근거 일부 확인 / 근거 확인 불가’를 표시해요. 예: `사내 규정` `근거 확인`. 제공 금지 거절은 ‘답변 불가’, 범위 밖은 ‘범위 밖’, 연결·검증 실패는 ‘오류’라는 단일 결과 라벨이에요. 오류는 LLM 출력 상태가 아니에요. 규정은 `found→level=ok`, `partial→unclear`, `not_found→none`, `refused→refused`예요. 규정의 적용 대상은 검색한 원문에서 확인해요. 회사는 `kind=general, source=work`, 생활은 `kind=general, source=intranet`이고 거절·자료 부족은 `knowledgeSources=[]`예요.
 
 사내 생활은 `knowledge.documents.category=사내 생활안내`의 DB 원문을 검색해요. 회사·생활 답변은 실제 인용한 자료만 `knowledgeSources[]`로 반환하고 기존 출처 필드에 `excerpt`(원문 발췌)를 추가해요. 규정·회사·생활 모두 ‘근거 보기’에서 원문·출처를 확인해요. 생활 자료의 가상 여부(`isVirtual`)·제약(`sourceLimits`), 문서 위치·시점·해시·잘림 여부를 유지해요. DB 결과가 없을 때 고정 메뉴로 대체하지 않으며 `intranet[]` 메뉴 표시는 이전 응답 호환용으로 남아요. 범위 밖은 검색·LLM 호출이 없어요.
 
-규정·회사 검색 결과가 없어도 모델에 빈 근거 목록으로 제공 금지 요청 여부를 확인해요. 빈 근거로 `found`·`partial` 답변을 만드는 것은 허용하지 않아요. 이전 가데이터의 `topic=edu|support|travel` 같은 세부 주제는 회사 유형으로 취급하지 않고 `kind=regulation`을 기준으로 표시해요.
+규정·회사 검색 결과가 없어도 모델에 빈 근거 목록으로 제공 금지 요청 여부를 확인해요. 빈 근거로 `found`·`partial` 답변을 만드는 것은 허용하지 않아요.
 
 `history`의 기존 요청 형식은 유지해요. 서버는 연결된 대화의 첫 주제·최근 두 질문과 중복을 제거한 `a.summary`들을 두 메시지로 묶어 모델에 전달해요. 생활 안내처럼 `summary`가 비어 있으면 검증된 메뉴 위치·안내 범위로 요약을 구성해요. ‘그 규정에서 …’, ‘앞에서 설명한 내용을 내 상황에 적용하면 …’ 같은 긴 후속 질문도 요약을 분류·검색·답변에 활용해요. 이전 답변의 `kind`·`level`·실제 출처 ID는 모델 대화에 넣지 않아요. 규정 이름 없이 조항 번호를 물으면 서버는 직전 `basis`로 규정을 찾아 직접 요청한 조항을 우선 전달해요. 분류 단계에서 앞 대화 요약을 쓰지 않고 조항 참조 단계에서만 직전 규정을 사용했다면 `meta.classification.usedHistory=false`일 수 있어요.
 
 | 요청 | 쓰는 곳 |
 | --- | --- |
-| `POST /assistant/ask` (익명 작업) | 로그인·쿠키 없이 본문 `{question, history: [{q, a: 답 요약}]}` → 결과 `{answer, reg, meta}`. `answer.kind`: regulation(규정 `basis`) · general(회사·생활 DB 출처 `knowledgeSources`) · out(범위 밖). 예전 `intranet`·`links`·clarify는 이전 기록 표시용 |
-| `GET /assistant/jobs/{id}?wait=10` | 익명 챗봇 작업만 조회. 계정 소유·다른 종류 작업은 404. 반환 모양은 `JobView` |
-| `POST /assistant/jobs/{id}/cancel` | 익명 챗봇 작업만 취소. 다른 계정 API는 기존 로그인 정책 유지 |
+| `POST /assistant/ask` | 직원 인증 후 본문 `{question, history: [{q, a: 답 요약}]}`을 처리. 결과 `{answer, reg, meta}`. 비로그인은 401, 직원 계정이 아니면 403 |
+| `GET /jobs/{id}?wait=10` | 챗봇 작업은 요청한 직원만 조회. 응답은 `JobView` |
+| `POST /jobs/{id}/cancel` | 챗봇 작업은 요청한 직원만 취소 |
 
 ### 부서장 — `team.ts`
 

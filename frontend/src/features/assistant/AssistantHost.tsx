@@ -1,15 +1,14 @@
 /* 사내 생활 도우미 (우측 하단 · API-09 · 5차 gp-reg.js)
    RoBERTa가 질문을 분류하고 LLM은 등록 자료를 근거로 답한다.
-     규정 질문 → 내 직원 구분의 팀 DB 규정 근거 조항과 함께(규정에 없으면 답하지 않고 담당 부서 안내) · 맞는 규정 묶음이 없으면 '적용 대상 아님'
-     회사 질문 → 등록된 회사 자료로 답변 · 사내 생활 → 알려진 가상 홈페이지 안내
-     범위 밖 → 검색·LLM 없이 종료. 이전 대화·가데이터의 일반 답변과 되묻기 카드는 유지한다 */
+     규정·회사·사내 생활 질문 → 등록된 자료로 근거 답변
+     범위 밖 → 검색·LLM 없이 종료. 가데이터 모드는 시연용 예시를 표시한다. */
 import { useEffect, useRef } from 'react';
 import type { AssistantAnswer } from '@/api/endpoints/assistant';
 import type { Article } from '@/api/types/catalog';
 import { legacyToPath } from '@/app/paths';
 import { D } from '@/shared/constants/data';
 import { useGo } from '@/shared/hooks/useGo';
-import { article, missLabel, regOf, regSet } from '@/shared/lib/reg';
+import { article, regOf, regSet } from '@/shared/lib/reg';
 import { errText, type Cause } from '@/shared/state/ai';
 import { useCatalog } from '@/shared/state/catalog';
 import { toast } from '@/shared/state/ui';
@@ -39,17 +38,6 @@ const srcLine = (arts: Article[]) => {
     })
     .join(' / ');
 };
-const List = ({ h, arr }: { h: string; arr?: string[] }) =>
-  arr && arr.length ? (
-    <>
-      <h4>{h}</h4>
-      <ul>
-        {arr.map((m, i) => (
-          <li key={i}>{m}</li>
-        ))}
-      </ul>
-    </>
-  ) : null;
 /** 받침에 맞는 조사 (은/는) */
 const eun = (w: string) => {
   const c = String(w).charCodeAt(String(w).length - 1);
@@ -67,11 +55,21 @@ function AnswerLabels({ mlLabel, label, style }: { mlLabel?: string; label: stri
   );
 }
 
-export function RegCard({ a, mlLabel }: { a: AssistantAnswer; mlLabel?: string }) {
+export function RegCard({ a, mlLabel, demo }: { a: AssistantAnswer; mlLabel?: string; demo?: boolean }) {
   const go = useGo();
   useCatalog((s) => s.articles);
-  const { summary, apply, more } = a;
+  const { summary } = a;
   const [statusLabel, statusStyle] = answerStatus(a);
+  if (demo && a.kind !== 'out')
+    return (
+      <div className="ans">
+        <div className="who">
+          <Icon name="chat" />
+          사내 생활 도우미 <span className="tag line">시연용 가데이터</span>
+        </div>
+        <p className="sum">{summary}</p>
+      </div>
+    );
   if (a.evidenceStatus === 'refused')
     return (
       <div className="ans">
@@ -123,7 +121,6 @@ export function RegCard({ a, mlLabel }: { a: AssistantAnswer; mlLabel?: string }
         </div>
         <h4>답변 요약</h4>
         <p className="sum">{summary}</p>
-        {apply ? <p>{apply}</p> : null}
         {refs.length ? (
           <details>
             <summary>
@@ -210,8 +207,6 @@ export function RegCard({ a, mlLabel }: { a: AssistantAnswer; mlLabel?: string }
         </div>
         <h4>답변 요약</h4>
         <p className="sum">{answerSummary}</p>
-        {apply ? <p>{apply}</p> : null}
-        <List h="더 알아볼 것" arr={more} />
         {links.length ? (
           <p className="go">
             {links.map(([r, l]) => (
@@ -259,13 +254,6 @@ export function RegCard({ a, mlLabel }: { a: AssistantAnswer; mlLabel?: string }
       </div>
       <h4>답변 요약</h4>
       <p className="sum">{summary}</p>
-      {apply ? (
-        <>
-          <h4>내 상황에 적용</h4>
-          <p>{apply}</p>
-        </>
-      ) : null}
-      <List h="추가로 확인할 것" arr={more} />
       {arts.length ? (
         <details>
           <summary>
@@ -279,12 +267,6 @@ export function RegCard({ a, mlLabel }: { a: AssistantAnswer; mlLabel?: string }
                 {x.text}
               </div>
             ))}
-            {a.missing && a.missing.length ? (
-              <div className="art">
-                <b>등록되지 않은 기준</b>
-                {a.missing.map(missLabel).join(', ')} — 원문·별표가 등록되지 않아 내용은 답할 수 없어요.
-              </div>
-            ) : null}
             <p className="src">
               {regSet()?.org || '한국수자원공사'} {srcLine(arts)}
             </p>
@@ -300,7 +282,7 @@ function Bubble({ m, i }: { m: Msg; i: number }) {
   return (
     <div className="msg bot">
       {m.a ? (
-        <RegCard a={m.a} mlLabel={m.mlLabel} />
+        <RegCard a={m.a} mlLabel={m.mlLabel} demo={m.demo} />
       ) : m.fail ? (
         <div className="ans fail">
           <div className="who">
@@ -407,7 +389,7 @@ export function AssistantHost() {
         <div className="chat-b" id="regLog" aria-live="polite" ref={logRef}>
           <div className="msg bot">
             <div className="plain">
-              로그인 없이 규정·수자원공사 정보·사내 생활에 대해 물어보세요. 등록된 DB 자료에서 근거를 찾아 답하고, 회원 정보나 개인 로드맵은 조회하지 않아요.
+              규정·수자원공사 정보·사내 생활에 대해 물어보세요. 등록된 DB 자료에서 근거를 찾아 답해요.
               범위 밖 질문에는 답하지 않아요. 앞 이야기에 이어서 물어봐도 돼요.
             </div>
           </div>
