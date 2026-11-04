@@ -13,7 +13,7 @@ GrowPath는 개발·운영 직군 직원이 업무에 필요한 스킬을 고르
 | 과정 | SK네트웍스 Family AI 캠프 33기 최종 프로젝트 |
 | 팀 | 2팀 **부산별빛샌드** — 송지섭(PM), 신가을(APM), 오호민, 이준희, 김영석 |
 | 기간 | 2026.09.28 ~ 2026.11.20 |
-| 대상 | 한국수자원공사 공개 자료와 가상 조직을 바탕으로 한 개발·운영 직군 직원 |
+| 대상 | 한국수자원공사 공개 자료와 조직을 바탕으로 한 개발·운영 직군 가상 직원 |
 | 목적 | 업무 목표를 필요한 스킬과 학습 활동으로 구체화하고, 실행 기록과 사전·사후 점검으로 다음 학습 방향 정하기 |
 
 공개 규정·학습 자료와 데모 직원 데이터를 사용하는 교육 프로젝트입니다. 실제 기관의 인사 시스템·SSO와 연동된 운영 서비스는 아닙니다.
@@ -87,7 +87,7 @@ flowchart TB
 | OpenAI 생성 모드 | 화면에서 선택할 수 있는 대체 생성 경로. 사용할 모델은 서버 설정으로 지정합니다. |
 | `text-embedding-3-small` | 생성 모드와 공통으로 사용하는 1,536차원 검색 임베딩입니다. RunPod 모드도 검색에는 OpenAI 키가 필요합니다. |
 
-[분류 모델 연결](backend/classification.md) · [27B 모델 안내](fine_tunning/README.md) · [RunPod 연결·27B/4B 모델 준비](backend/RunPod_Ollama_연결_절차.md)
+[분류 모델 연결](backend/classification.md) · [27B 모델 안내](backend/models/fine_tunning/README.md) · [RunPod 연결·27B/4B 모델 준비](backend/RunPod_Ollama_연결_절차.md)
 
 ## 5. AI 에이전트
 
@@ -131,9 +131,8 @@ DB 백업·규정 원문·모델 가중치는 저장소 밖에서 전달합니�
 ```text
 frontend/          사용자·부서장·관리자 화면, API 연결, 비교용 테마
 backend/           참고 FastAPI 백엔드, AI 역할, 저장·권한 서비스
-└── models/        질문 분류 실행 파일과 Chatbot_classification 실험 자료
+└── models/        질문 분류 실행 파일·실험 자료, 27B 모델 안내
 database/          DB 코드·마이그레이션·전처리·검색·복원 도구
-fine_tunning/      최종 27B 모델 안내와 외부 가중치 링크
 team_db/           외부 백업·규정 원문을 넣는 위치와 준비 안내
 docs/              기획·설계·데이터·모델 산출물과 파일 manifest
 scripts/           빈 DB의 최초 백업 복원 스크립트
@@ -146,7 +145,7 @@ docker-compose.yml DB·초기 준비·API·화면 실행 구성
 
 [산출물 목록](docs/README.md)에서 요구사항·WBS·기획서·화면설계·수집/전처리·DB/벡터DB·모델·아키텍처 문서를 확인할 수 있습니다. [파일 manifest](docs/artifacts.manifest.json)는 반영 파일의 상대 경로·크기·SHA-256과 원본 링크를 연결합니다.
 
-README의 설명 기준은 **2026-11-04 main [`cb57afe`](https://github.com/20260528-skn-family-ai-33/SKN33-Final-2Team/tree/cb57afeaed1446f9b2ec1e65353927f3b3617985)**입니다. PR57·61의 학습 흐름, PR60의 비교 테마, PR66의 자료 추천과 공유 자료 일정 보정을 포함합니다. 산출물 본문은 **2026-11-03 main `80cc597` 기준 검토본**이며, WBS와 요구사항 정의서의 담당자는 11월 4일에 갱신했습니다. 화면설계서의 71개 그림은 2026-10-28 main `438b011` 당시 캡처입니다. 공식 제출 현황은 [산출물 관리 시트 2팀 탭](https://docs.google.com/spreadsheets/d/1EQeYN_FpKWzzxHUdtjG9WYaP9t43bvf-H5e1jGMTMEM/edit?gid=1029234216)을 따릅니다.
+README의 설명 기준은 **2026-11-04 main [`f8c2799`](https://github.com/20260528-skn-family-ai-33/SKN33-Final-2Team/tree/f8c27996dcc91b7dce9ac913dd79edb78b48a986)**입니다. PR57·61의 학습 흐름, PR60의 비교 테마, PR66의 자료 추천과 공유 일정 보정, PR70의 로드맵 생성 안정화를 포함합니다. 산출물 본문은 **2026-11-03 main `80cc597` 기준 검토본**이며, WBS와 요구사항 정의서의 담당자는 11월 4일에 갱신했습니다. 화면설계서의 71개 그림은 2026-10-28 main `438b011` 당시 캡처입니다. 공식 제출 현황은 [산출물 관리 시트 2팀 탭](https://docs.google.com/spreadsheets/d/1EQeYN_FpKWzzxHUdtjG9WYaP9t43bvf-H5e1jGMTMEM/edit?gid=1029234216)을 따릅니다.
 
 ## 10. 개발과 검증
 
