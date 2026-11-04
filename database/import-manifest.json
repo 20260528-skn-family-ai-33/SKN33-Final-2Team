@@ -83,10 +83,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "4aaae71530b8996a929686176f5fcabf37da44eb4bce2455854c390055742aae",
-      "bytes": 47898,
+      "sha256": "4b9f50c6e84af10c13c2e1b606f5412a0729e777e23812919912fe695133f68e",
+      "bytes": 48863,
       "handling": "adjusted",
-      "change_note": "Issue #35: supplementary course normalization, verified outline cache upgrade, timezone-stable evidence and regression checks (2026-10-30).",
+      "change_note": "Issue #83: books-only incremental collection (--only-new-books), under-covered skill book keywords searched first, KDC pre-filter before detail calls (2026-11-04).",
       "local_update_source": {
         "path": "README.md",
         "sha256": "e872d64ea58c53311d098dc1c769f5bc3232ad947d690054b75a0a0a20c6d8c6"
@@ -120,10 +120,10 @@
       "source_sha256": "f3c6661660777e2f9618d07b3649eceec758b11d1c7b902bd1c2beffcac7781e",
       "source_bytes": 2936,
       "source_kind": "source_commit_file",
-      "sha256": "cd340a8305f78fa4f9e94fd02d66f51835f6667e307d1f085f5095bf5ce8a6ee",
-      "bytes": 2944,
+      "sha256": "0dabed559b93d312f2c04ff4cfa0a1b0c37f11503fa6d4c972cd473118eb16db",
+      "bytes": 4175,
       "handling": "copied",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "change_note": "Issue #83: books-only incremental collection (--only-new-books), under-covered skill book keywords searched first, KDC pre-filter before detail calls (2026-11-04).",
       "local_update_source": {
         "path": "config/paths.yaml",
         "sha256": "cd340a8305f78fa4f9e94fd02d66f51835f6667e307d1f085f5095bf5ce8a6ee"
@@ -235,10 +235,10 @@
       "source_sha256": "625ab83498ba3c6cd966b86cf194da5b22dfd13b06bf771f925185fe6074a416",
       "source_bytes": 2713,
       "source_kind": "source_commit_file",
-      "sha256": "86ad1d6cc0680ce795e4fe02f44461bb42a4e173e9a78dcfff7b86c5c7514dfa",
-      "bytes": 3383,
+      "sha256": "40f03c407eb82a5f1cf401a51733302c09a5c5bff135383fba5dfde1342aab46",
+      "bytes": 3799,
       "handling": "copied",
-      "change_note": "PR #22 follow-up: incremental defaults, explicit reset and committed-change reporting; paid dry-run and operational guidance; deterministic ERD newline; free regressions.",
+      "change_note": "Issue #83: books-only incremental collection (--only-new-books), under-covered skill book keywords searched first, KDC pre-filter before detail calls (2026-11-04).",
       "local_update_source": {
         "path": "load_data.py",
         "sha256": "306f028a1e7623f95b2b8e4cf9f2ed36faa72a43891bc718bb8779dbcd356223"
@@ -774,10 +774,10 @@
       "source_sha256": "0432c150ef770fc7abbd9257e95ad88f34555d9dc102080826dd6d11ade3e6b1",
       "source_bytes": 41897,
       "source_kind": "source_commit_file",
-      "sha256": "7f54e67f3004e8fd9c56270cacff6a3e9eb75afd073bf68709ca6c27c6ea5e48",
-      "bytes": 48890,
+      "sha256": "5e76910df241c93c438f801e7684d260b4acf23eaa49141b486babfce0db13e9",
+      "bytes": 50870,
       "handling": "copied",
-      "change_note": "PR #22 follow-up: incremental defaults, explicit reset and committed-change reporting; paid dry-run and operational guidance; deterministic ERD newline; free regressions.",
+      "change_note": "Issue #83: books-only incremental collection (--only-new-books), under-covered skill book keywords searched first, KDC pre-filter before detail calls (2026-11-04).",
       "local_update_source": {
         "path": "src/database/ingestion/real_data_ingestor.py",
         "sha256": "7382ff2768333b8ddb77d2dc0322025351944c5acedc9036c8a33dec8920ca1b"
@@ -1149,10 +1149,10 @@
       "source_sha256": "fcf62e38edceec7298965eb8ec1ea7031b25dcb862798f3a40bf6a372934cd14",
       "source_bytes": 7583,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "1c28e57fedbd938b99aea930b13d2dd64cc18cf62e94cdcd1bdab37b59758b59",
-      "bytes": 7901,
+      "sha256": "7eb8c0309476c5fde1aab29b21181b537171e2dd1b230285b855fef2dc6f4710",
+      "bytes": 7995,
       "handling": "adjusted",
-      "change_note": "Issue #26 course-first publication: preserve latest #14/#15 main; time, outlines, UI and snapshot only.",
+      "change_note": "Issue #83: books-only incremental collection (--only-new-books), under-covered skill book keywords searched first, KDC pre-filter before detail calls (2026-11-04).",
       "local_update_source": {
         "path": "src/shared/catalog_scope.py",
         "sha256": "fcf62e38edceec7298965eb8ec1ea7031b25dcb862798f3a40bf6a372934cd14"
@@ -1249,10 +1249,10 @@
       "source_sha256": "2531e5882b559cf5c00b304f6847638f9121ab3a5911681498af953746ac6045",
       "source_bytes": 9909,
       "source_kind": "source_commit_file",
-      "sha256": "12e77bbd46d7eefb6737aadb178fdf228d07e18d201b3eba772aee57b1a807ae",
-      "bytes": 9983,
+      "sha256": "83caa52cd3a17ed733143d4047f64e076c87939abc74f83b84a264498bca8b80",
+      "bytes": 13290,
       "handling": "copied",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "change_note": "Issue #83: books-only incremental collection (--only-new-books), under-covered skill book keywords searched first, KDC pre-filter before detail calls (2026-11-04).",
       "local_update_source": {
         "path": "tests/test_catalog_expansion.py",
         "sha256": "12e77bbd46d7eefb6737aadb178fdf228d07e18d201b3eba772aee57b1a807ae"
@@ -1562,9 +1562,9 @@
       "source_bytes": null,
       "source_kind": "review_regression_test",
       "handling": "added",
-      "sha256": "c2cd03743f42c7d64c1dd1e67ec89f0318bd76f08624c475b5dbe90f0d0e828a",
-      "bytes": 8635,
-      "change_note": "PR #22 follow-up: incremental defaults, explicit reset and committed-change reporting; paid dry-run and operational guidance; deterministic ERD newline; free regressions."
+      "sha256": "ba1fa69b2b0fc1ad7443fd922b8b8d3f814ce72bb7e1dfe9f70e0c49886ce008",
+      "bytes": 14122,
+      "change_note": "Issue #83: books-only incremental collection (--only-new-books), under-covered skill book keywords searched first, KDC pre-filter before detail calls (2026-11-04)."
     },
     {
       "path": "database/src/database/migrations/023_direct_department_visibility.sql",

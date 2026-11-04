@@ -19,10 +19,13 @@ def main():
     parser.add_argument('--allow-partial',action='store_true',help='Allow successful categories to load when another source fails; reset mode leaves failed categories empty')
     parser.add_argument('--skip-embeddings',action='store_true',help='Defer paid embedding refresh; stale vectors remain blocked by RAG')
     parser.add_argument('--refresh-book-images',action='store_true',help='Only look up missing book covers by exact ISBN; no catalog or embedding refresh')
+    parser.add_argument('--only-new-books',action='store_true',help='Collect only books whose ISBN is not in public.books yet; other catalogs and saved books are not fetched or rewritten')
     parser.add_argument('--report',type=Path,help='Optional JSON execution report')
     args=parser.parse_args()
     if args.max_pages is not None and not 1<=args.max_pages<=1000:parser.error('--max-pages must be between 1 and 1000')
     if args.reset and args.refresh_book_images:parser.error('--reset cannot be combined with --refresh-book-images')
+    if args.only_new_books and (args.reset or args.refresh_book_images):
+        parser.error('--only-new-books cannot be combined with --reset or --refresh-book-images')
     logging.basicConfig(level=logging.INFO,format='[%(levelname)s] %(message)s')
     try:
         if args.refresh_book_images:
@@ -32,7 +35,8 @@ def main():
                 result=refresh_missing_book_images(RealDataIngestor(),conn,dry_run=args.dry_run)
         else:
             result=RealDataIngestor().execute_full_pipeline(dry_run=args.dry_run,max_pages=args.max_pages,
-                allow_partial=args.allow_partial,skip_embeddings=args.skip_embeddings,db_env=args.db_env,reset_catalog=args.reset)
+                allow_partial=args.allow_partial,skip_embeddings=args.skip_embeddings,db_env=args.db_env,reset_catalog=args.reset,
+                only_new_books=args.only_new_books)
     except PipelineExecutionError as exc:
         result=exc.report
     except Exception as exc:

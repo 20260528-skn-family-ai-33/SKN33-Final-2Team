@@ -146,3 +146,46 @@ class CatalogExpansionTests(TestCase):
         self.assertNotIn(('jobs','2'),usable)
         self.assertEqual(report['jobs']['excluded']['no_it_skill_evidence'],1)
         self.assertFalse(any('DELETE' in str(call) for call in conn.execute.call_args_list))
+
+    def test_saved_isbns_skip_record_and_detail_calls(self):
+        obj=ing()
+        docs=[{'doc':{'isbn13':'9788900000001','bookname':'SQL 실무','class_no':'005.75'}},
+              {'doc':{'isbn13':'9788900000002','bookname':'SQL 튜닝','class_no':'005.75'}}]
+        with patch.object(obj,'_key',return_value='test'), patch.object(obj,'_request',return_value={
+            'response':{'numFound':2,'docs':docs}}):
+            with patch.object(catalog_details,'enrich_books',side_effect=lambda _,rows: rows) as detail:
+                rows=obj.fetch_books_from_api(0,skip_isbns=frozenset({'9788900000001'}))
+        self.assertEqual([r['external_key'] for r in detail.call_args.args[1]],['9788900000002'])
+        self.assertEqual([r['external_key'] for r in rows],['9788900000002'])
+        self.assertEqual(obj.reports['library']['skipped_existing_isbns'],1)
+
+    def test_listed_kdc_outside_004_005_skips_only_doomed_detail_calls(self):
+        obj=ing()
+        docs=[{'doc':{'isbn13':'9788900000011','bookname':'SQL 소설','class_no':'813.7'}},
+              {'doc':{'isbn13':'9788900000012','bookname':'SQL 실무','class_no':' 005.75 '}},
+              {'doc':{'isbn13':'9788900000013','bookname':'SQL 입문'}}]
+        with patch.object(obj,'_key',return_value='test'), patch.object(obj,'_request',return_value={
+            'response':{'numFound':3,'docs':docs}}):
+            with patch.object(catalog_details,'enrich_books',side_effect=lambda _,rows: rows) as detail:
+                obj.fetch_books_from_api(0)
+        # A missing list class_no still gets detail: the detail record may carry 004/005.
+        self.assertEqual(sorted(r['external_key'] for r in detail.call_args.args[1]),['9788900000012','9788900000013'])
+        self.assertEqual(obj.reports['library']['detail_skipped_outside_kdc'],1)
+
+    def test_kdc_pre_filter_uses_the_catalog_scope_rule(self):
+        from src.shared.catalog_scope import BOOK_KDC, scope_reason
+        for code,allowed in (('004',True),('005.133',True),('004.73',True),('0045',False),('006.3',False),('813.6',False)):
+            with self.subTest(code=code):
+                self.assertEqual(bool(BOOK_KDC.fullmatch(code)),allowed)
+                fields={'isbn':'9788900000021','title':'SQL 데이터베이스 실무','description':'SQL 조인과 데이터베이스 설계를 실습하며 쿼리를 작성하고 성능을 분석하는 방법을 학습합니다.'}
+                reason=scope_reason('books',fields,'API_DATA4LIBRARY',{'list_record':{'class_no':code}})
+                self.assertEqual(reason=='scope_book_not_kdc_004_005',not allowed)
+
+    def test_short_skill_keywords_are_searched_before_broad_ones(self):
+        from src.shared.config_loader import get_paths_config
+        keywords=get_paths_config()['api']['ingestion']['book_keywords']
+        self.assertEqual(len(keywords),len(set(keywords)))
+        # The library list budget can run out on broad keywords, so #83 keywords go first.
+        for short in ('ETL','데이터 웨어하우스','운영체제','RESTful','레디스','멀티스레드','모의해킹','데이터 거버넌스'):
+            with self.subTest(keyword=short):
+                self.assertLess(keywords.index(short),keywords.index('컴퓨터 비전'))

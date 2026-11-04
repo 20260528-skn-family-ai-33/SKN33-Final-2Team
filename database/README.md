@@ -68,6 +68,8 @@ python scripts/correct_course_skills.py --help
 
 `python load_data.py --dry-run`은 **DB 저장·초기화·임베딩만 생략하며 수집 과정의 GPT 심사 비용은 발생한다.** `--reset --dry-run`도 초기화를 실행하지 않는다. 일반 적재와 dry-run 모두 합의된 API 사용 범위에서 실행한다. 강좌 보충 도구의 `--apply` 없는 무료 준비 검사, `check_workspace.py` 기본 검사와 구분한다.
 
+`python load_data.py --only-new-books`는 도서만 수집한다. `public.books`에 이미 있는 ISBN은 검색 결과에서 건너뛰어 상세 조회·AI 심사·재기록을 하지 않고, 강좌·자격증·직무·전공은 수집하지도 바꾸지도 않는다. 마지막 정리(자격증 상태 갱신, 전체 최종 검사, 누락 벡터 생성)는 일반 증분 갱신과 같이 실행한다. `--reset`·`--refresh-book-images`와 함께 쓸 수 없다. 정보나루 호출은 실행마다 `library.list_request_budget`(목록)과 `library.request_budget`(전체) 안에서만 하므로 `book_keywords`는 적힌 순서대로 검색된다. 목록의 분류번호가 KDC 004·005가 아닌 도서는 적재될 수 없으므로 상세를 조회하지 않는다. 예산이 모자라 남은 후보는 같은 명령을 다시 실행하면 저장된 ISBN을 건너뛰고 확인한다. 심사에서 제외된 도서는 저장되지 않아 다시 확인된다.
+
 `--reset` 초기화는 직원이 참조하는 직무·보유 자격·학력 전공의 행과 외부 원본 ID 연결을 보존한다. 재수집에서 통과하지 않은 보존 행은 `scope_excluded`로 두고 신규 추천에서 제외한다. 초기화 중 참조가 추가돼 누락되지 않도록 관련 직원 표의 쓰기를 잠근다. 초기화는 기존 로드맵의 자료 연결·스킬 매핑·벡터를 지우므로 최신 백업을 확인한 뒤 실행한다. 자동 전체 백업을 먼저 만들지만 초기화는 수집 전에 별도로 커밋된다. 이후 수집·적재가 실패해도 초기화가 자동 복구되지는 않는다. 성공·실패 보고의 `reset.removed_resource_associations`, `user_data_changed`, `backup`으로 실제 연결 삭제와 복구 경로를 확인한다. 라이브러리는 초기화 후 예외를 `PipelineExecutionError.report`로 전달하며 CLI의 `--report`에도 같은 내용을 저장한다.
 
 증분 갱신의 최종 검사는 이용 기간·출처 유효기간이 지난 자료의 추천 상태와 검색 인덱스만 정리한다. 기존 자료 행과 저장된 로드맵의 자료 연결은 보존한다. K-MOOC 날짜는 Unix 초·밀리초를 모두 해석한다. 강좌 추가 시 기존 NULL·공백 URL은 URL 중복 비교에서 제외하되 ID 중복 검사와 신규 URL 필수 검사는 유지한다. 이 보완에는 스키마 변경이나 새 마이그레이션이 필요하지 않다.
