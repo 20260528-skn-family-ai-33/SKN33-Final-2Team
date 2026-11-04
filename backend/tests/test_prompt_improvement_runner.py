@@ -59,6 +59,17 @@ class PromptCycleTests(TestCase):
                 with self.assertRaises(ImprovementError):runner.activate(self.snapshot,[approved],'prompt-improvement/2026-11')
             transaction.run.assert_not_called()
 
+    def test_append_only_candidate_cannot_bypass_proposal_validation(self):
+        approved = dict(self.change, systemPrompt=self.snapshot['A1']['systemPrompt'] + '\n추가 지침',
+                        baselineEvaluation=evaluation(0.5), candidateEvaluation=evaluation(0.6))
+        transaction = Mock()
+        transaction.one.return_value = None
+        with patch.object(runner.db, 'tx') as tx, patch.object(runner, 'current_prompts', return_value=self.snapshot):
+            tx.return_value.__enter__.return_value = transaction
+            with self.assertRaisesRegex(ImprovementError, '덧붙이지'):
+                runner.activate(self.snapshot, [approved], 'month')
+        transaction.run.assert_not_called()
+
     def test_activation_preserves_parent_and_uses_one_transaction_without_deleting_history(self):
         approved=dict(self.change,baselineEvaluation=evaluation(0.5),candidateEvaluation=evaluation(0.6))
         transaction=Mock()

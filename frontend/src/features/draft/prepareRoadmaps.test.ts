@@ -14,9 +14,9 @@ it('late response cannot overwrite changed inputs',async()=>{
  let finish!:(v:unknown)=>void;mocks.state.draft.v2Assessment.generationId='two';mocks.start.mockReturnValue(new Promise(r=>{finish=r;}));
  const work=prepareRoadmaps();await vi.waitFor(()=>expect(mocks.start).toHaveBeenCalledOnce());mocks.state.draft.goal='changed';finish({draft:{}});await work;expect(mocks.take).not.toHaveBeenCalled();
 });
-it('failed background generation does not silently retry when results mount',async()=>{
+it('failed background request can be retried without reloading',async()=>{
  mocks.state.draft.v2Assessment.generationId='failed';mocks.start.mockRejectedValue(new Error('failed'));
- await expect(prepareRoadmaps()).rejects.toThrow('failed');await expect(prepareRoadmaps()).rejects.toThrow('failed');expect(mocks.start).toHaveBeenCalledOnce();
+ await expect(prepareRoadmaps()).rejects.toThrow('failed');mocks.start.mockResolvedValue({draft:{}});await prepareRoadmaps();expect(mocks.start).toHaveBeenCalledTimes(2);expect(mocks.take).toHaveBeenCalledOnce();
 });
 
 it('already generated plans are reused without another POST',async()=>{

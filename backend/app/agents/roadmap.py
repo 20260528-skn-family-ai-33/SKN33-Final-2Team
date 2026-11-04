@@ -310,12 +310,17 @@ def _mock_regen(inp: dict) -> dict:
 
 
 def _catalog_payload(pid: str, payload: dict, system: str = '', extra_ids: list | None = None,
-                     context_limit: int = 16384) -> dict:
+                     context_limit: int = catalog_budget.DEFAULT_CONTEXT) -> dict:
     payload = copy.deepcopy(payload)
     handoff = payload['handoff']
-    texts = [handoff.get('goal') or '', handoff.get('projectSummary') or ''] + list(handoff.get('focus') or []) + list(handoff.get('gaps') or [])
+    # 확정 스킬의 단일 기준. 검색·검증용 원본 필드는 서버에 보존한다.
+    fixed_order = handoff.get('skillOrder') if handoff.get('selectedSkillsFixed') else None
+    skill_names = fixed_order or handoff.get('skillNames')
+    if fixed_order:
+        handoff['skillNames'] = list(fixed_order)
+    texts = [handoff.get('goal') or '', handoff.get('projectSummary') or ''] + list(fixed_order or handoff.get('focus') or []) + list(handoff.get('gaps') or [])
     # 같은 DB 태그라도 실제 적용 범위에 맞는 단원을 찾는다. 제외/비핵심 스킬은 검색에 섞지 않는다.
-    active = set(handoff.get('skillNames') or handoff.get('focus') or []) - set(handoff.get('excludedSkills') or [])
+    active = set(skill_names or handoff.get('focus') or []) - set(handoff.get('excludedSkills') or [])
     applications = [str(row.get('application') or '').strip()[:600] for row in handoff.get('skillDetails') or []
                     if row.get('name') in active and row.get('application')]
     texts += list(dict.fromkeys(applications))
@@ -350,7 +355,11 @@ def _catalog_payload(pid: str, payload: dict, system: str = '', extra_ids: list 
                                         'coreSkills': list(handoff['skillOrder']) if handoff.get('selectedSkillsFixed') else list(selection.skills),
                                         'taskSkillNote': 'coreSkills는 집중 학습할 핵심 스킬이다. 과제 skills는 핵심 스킬에 억지로 맞추지 말고 skillTags 중 실제 수행 내용에 맞는 이름을 1~3개 고른다. 보조 태그를 쓴다고 별도 학습 스킬이나 과제를 추가하지 않는다.',
                                         'planningNote': '선택한 핵심 스킬과 목표 범위에 집중한다. 기간 상한은 적용하지 않고 실제 자료 시간과 주당 시간으로 기간을 계산한다. 최종 강좌 선택은 목표와 목차·소개를 보고 판단한다.'})
-        return catalog_budget.pack(selection, system, roadmap_input.project(payload), context_limit)
+        if fixed_order:
+            # 모델 전달 직전에만 중복 목록 제외. 원본 저장·결과 검증은 영향 없음.
+            for field in ('focus', 'skillNames', 'domain'):
+                handoff.pop(field, None)
+        return catalog_budget.pack(selection, system, roadmap_input.project(payload, compact_assessment=True), context_limit)
     except catalog_candidates.UnavailableResourcesError as error:
         # 원본이 삭제돼도 기존 계획에 저장된 활동명과 자료 ID로 대상을 찾을 수 있다.
         titles = {a['res']: a['title'] for section in ('previous', 'current')
@@ -440,7 +449,7 @@ def _sys(pid: str, tpl: str, provenance: dict | None = None, evaluation_prompt: 
     if provenance is not None and rows[0].get('prompt_version_id'):
         provenance.update(promptVersionId=str(rows[0]['prompt_version_id']), agentId=TRACK_PROMPT_AGENTS[pid],
                           storedPromptHash=hashlib.sha256(rows[0]['system_prompt'].encode('utf-8')).hexdigest())
-    if pid == 'A1':
+    if pid == 'A1' and not text.startswith(('[통합 생성 계약 roadmap-generation/v1]', '[통합 수정 계약 roadmap-revision/v1]')):
         text += '\n[최신 Free Course 정책] 강좌는 0원만 허용한다. 도서는 가격·예산과 무관하게 유료·가격 미확인도 추천할 수 있다. 도서 비용은 표시하되 무료 강좌 제한에 포함하지 않는다.'
     return text.strip()
 
@@ -477,23 +486,22 @@ def option(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
         handoff['agentNotes'] = list(handoff.get('agentNotes') or []) + ['Crash Course는 우선순위 상위 3개 역량만 다룬다. 다른 역량을 추가하지 않는다.']
 
     def api(_):
-        extra = ('\n- 사용자가 요청(request)과 함께 이 관점의 안을 다시 만들어 달라고 했다. previous(지금 안)를 바탕으로 request를 반영해 고친다.\n'
-                 '  · request.removeActs의 활동은 빼고, request.replaceActs의 활동은 catalog의 다른 자료나 다른 실습 과제로 바꾼다. request.quick(빠른 요청)과 request.wish(바라는 점)도 반영한다.\n'
-                 '  · 요청과 관계없는 활동은 그대로 둬도 된다. 관점과 한도는 그대로 지킨다.\n'
-                 '  · summary에 바꾼 점을 한 문장으로 쓰고, 반영하지 못한 요청은 notes에 쓴다. JSON에 "summary":"...","notes":[] 를 더한다.') if inp.get('request') else \
-            ('\n- 사용자가 이 관점의 안을 다시 요청했다. previous와 활동 구성이 분명히 다르게 쓴다. 관점과 한도는 그대로 지킨다.' if inp.get('previous') else '')
+        extra = ('\n[재생성 요청] previous 기반 request 반영. request.removeActs 삭제, replaceActs는 catalog 다른 자료·실습으로 교체, quick·wish 반영. 무관한 활동 유지 가능, 관점·조건 유지. summary는 변경점 한 문장, notes는 미반영 요청·이유([] 가능). JSON에 summary·notes 추가.') if inp.get('request') else \
+            ('\n[재생성] previous와 명확히 다른 활동 구성, 관점·조건 유지.' if inp.get('previous') else '')
         prev_ids = [a.get('res') for a in ((inp.get('previous') or {}).get('acts') or [])]
         from app.learner_knowledge import POLICY
         provenance = {}
-        system = _sys(pid, R_SYS, provenance, inp.get('_evaluationPrompt')) + extra + POLICY + track_policy.challenge_guidance(pid, 'plan') + track_policy.PERIOD_GUIDANCE
-        if inp['handoff'].get('courseSkillSelection'):
-            from app.services.course_skills import CONTRACT, FIXED_SELECTION_CONTRACT
-            system += FIXED_SELECTION_CONTRACT if inp['handoff'].get('selectedSkillsFixed') else CONTRACT
-        if inp['handoff'].get('selectedSkillsFixed'):
-            system += '\n사용자가 선정한 skillOrder는 확정이다. 이 목록과 순서를 모두 유지하고 learningSkills에 반환한다. 관점 때문에 역량을 빼거나 더하지 않는다.'
+        system = _sys(pid, R_SYS, provenance, inp.get('_evaluationPrompt')) + extra
+        if not system.startswith('[통합 생성 계약 roadmap-generation/v1]'):
+            system += POLICY + track_policy.challenge_guidance(pid, 'plan') + track_policy.PERIOD_GUIDANCE
+            if inp['handoff'].get('courseSkillSelection'):
+                from app.services.course_skills import CONTRACT, FIXED_SELECTION_CONTRACT
+                system += FIXED_SELECTION_CONTRACT if inp['handoff'].get('selectedSkillsFixed') else CONTRACT
+            if inp['handoff'].get('selectedSkillsFixed'):
+                system += '\n사용자가 선정한 skillOrder는 확정이다. 이 목록과 순서를 모두 유지하고 learningSkills에 반환한다. 관점 때문에 역량을 빼거나 더하지 않는다.'
         payload = _catalog_payload(pid, {'handoff': inp['handoff'], 'skillTags': catalog.skill_names(),
                                         'previous': inp.get('previous'), 'previousLearningSkills': (inp.get('previousDef') or {}).get('learningSkills'), 'request': inp.get('request')}, system, prev_ids,
-                                   rt.S.ollama_num_ctx if ctx.mode == 'ollama' else 16384)
+                                   rt.S.ollama_num_ctx if ctx.mode == 'ollama' else catalog_budget.DEFAULT_CONTEXT)
         r = rt.llm_json(ctx, system, payload, role='roadmap')
         _validate_learning_acts(r,inp['handoff'])
         o = finish_option(pid, r, ctx.mode)
@@ -503,7 +511,7 @@ def option(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
                                         effectivePromptHash=hashlib.sha256(system.encode('utf-8')).hexdigest())
         if inp['handoff'].get('courseSkillSelection'):
             from app.services.course_skills import validate_recommendations, recommendation_key
-            allowed=set(payload['handoff']['skillNames'])
+            allowed=set(payload['handoff'].get('skillOrder') or payload['handoff'].get('skillNames') or [])
             try:
                 if inp['handoff'].get('selectedSkillsFixed'):
                     checked=validate_recommendations(r.get('learningSkills'),allowed,pid,require_depth=True,max_skills=5)
@@ -689,14 +697,18 @@ def revise(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
         if (handoff.get('prefs') or {}).get('certRes') in gone_resources:
             handoff['prefs'] = dict(handoff['prefs'], certRes=None)
         from app.learner_knowledge import POLICY
-        system = _sys(pid, REV_SYS, evaluation_prompt=inp.get('_evaluationPrompt')) + POLICY + track_policy.challenge_guidance(pid, 'tasks') + track_policy.PERIOD_GUIDANCE
+        system = _sys(pid, REV_SYS, evaluation_prompt=inp.get('_evaluationPrompt'))
+        integrated_revision = system.startswith('[통합 수정 계약 roadmap-revision/v1]')
+        if not integrated_revision:
+            system += POLICY + track_policy.challenge_guidance(pid, 'tasks') + track_policy.PERIOD_GUIDANCE
         current['learningSkills'] = (pl.get('def') or {}).get('learningSkills') or []
         if (pl.get('def') or {}).get('learningReport'):
             current['skillOrder'] = pl['def']['learningReport']['skillOrder']
-            system += '\n각 활동에 소속 skill을 skillOrder 중 정확히 하나로 반환한다. 유지 활동은 key와 skill을 보존한다. 추가·교체 활동도 실제 소속을 명시한다. 과제의 skills 태그 목록과 단일 소속 skill은 구분한다.'
+            if not integrated_revision:
+                system += '\n각 활동에 소속 skill을 skillOrder 중 정확히 하나로 반환한다. 유지 활동은 key와 skill을 보존한다. 추가·교체 활동도 실제 소속을 명시한다. 과제의 skills 태그 목록과 단일 소속 skill은 구분한다.'
         payload = _catalog_payload(pid, {'current': current, 'skillTargets': current['learningSkills'], 'handoff': handoff, 'changes': inp['changes'],
                                         'request': inp.get('request'), 'skillTags': catalog.skill_names()}, system, extra_ids,
-                                   rt.S.ollama_num_ctx if ctx.mode == 'ollama' else 16384)
+                                   rt.S.ollama_num_ctx if ctx.mode == 'ollama' else catalog_budget.DEFAULT_CONTEXT)
         r = rt.llm_json(ctx, system, payload, role='roadmap')
         _validate_learning_acts(r,inp['handoff'])
         o = finish_option(pid, r, ctx.mode, keep_key=True)

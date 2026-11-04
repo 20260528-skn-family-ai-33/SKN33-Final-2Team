@@ -37,7 +37,7 @@ class LearnerKnowledgeTests(unittest.TestCase):
         model=Mock(return_value={'skills':[{'name':'Python','reason':'비동기 적용 필요','application':'비동기 API 구현'}]})
         select_skills(project,['Python'],model)
         system,payload=model.call_args.args
-        self.assertIn('기초 따라하기를 기본 학습으로 다시 추천하지 않는다',system)
+        self.assertIn('설치·문법 입문·기초 따라하기의 기본 재추천 금지',system)
         self.assertEqual(payload['learnerKnowledge'],self.knowledge)
         self.assertEqual(payload['hrContext']['grade'],'대리')
     def test_resource_model_and_rag_share_knowledge(self):

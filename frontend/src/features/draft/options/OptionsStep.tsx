@@ -221,8 +221,7 @@ export function OptionsStep() {
   const [supportOpen, setSupportOpen] = useState(false);
   const [summariesOpen, setSummariesOpen] = useState(false);
   const [selecting,setSelecting]=useState(false);
-  const [materialsOpen,setMaterialsOpen]=useState(false);
-  const [materialsVisited,setMaterialsVisited]=useState(true);
+  const [materialsOpen,setMaterialsOpen]=useState(true);
   const [materialAttempt,setMaterialAttempt]=useState(0);
   const [preparation,reportPreparation]=useReducer(materialPreparation,initialMaterialPreparation);
   const materialPrepared=Object.fromEntries(Object.entries(preparation.courses).map(([course,value])=>[`${course}:${value.version}`,value.status]));
@@ -239,8 +238,10 @@ export function OptionsStep() {
   const toggleMaterialSection=useCallback((kind:'books'|'courses',open:boolean)=>setMaterialSections(old=>old[kind]===open?old:{...old,[kind]:open}),[]);
   const materialTabsId=useId();
   const materialPanel=useRef<HTMLElement|null>(null);
-  function openMaterials(){setMaterialsVisited(true);setMaterialsOpen(true);}
-  useEffect(()=>{if(materialsOpen)materialPanel.current?.scrollIntoView({behavior:'smooth',block:'start'});},[materialsOpen]);
+  function openMaterials(){
+    setMaterialsOpen(true);
+    requestAnimationFrame(()=>materialPanel.current?.scrollIntoView({behavior:'smooth',block:'start'}));
+  }
   const editors=useRef<Record<string,ResourceSelectionHandle|null>>({});
   const [totals,setTotals]=useState<Record<string,MaterialTotals>>({});
   const receiveTotals=useCallback((course:string,value:MaterialTotals)=>setTotals(old=>old[course]?.weeks===value.weeks&&old[course]?.amount===value.amount&&old[course]?.unknown===value.unknown?old:{...old,[course]:value}),[]);
@@ -426,7 +427,7 @@ export function OptionsStep() {
           <MaterialSkillTabs names={materialNames} active={activeMaterialSkill} onChange={setMaterialSkill} id={materialTabsId} panelId="material-comparison-panel"/>
           <div className="material-course-comparison" role="tabpanel" id="material-comparison-panel" aria-labelledby={`${materialTabsId}-tab-${materialNames.indexOf(activeMaterialSkill)}`}>{ps.map(p=><section className={`material-course-column${cur===p.opt?' is-selected':''}`} key={p.opt} aria-label={`${trackName(p.opt,p.name)} 자료`}>
             <header><h3>{trackName(p.opt,p.name)}</h3>{regenBusy(d,p.opt)?<span role="status"><span className="sp" aria-hidden="true"/> 이 코스의 로드맵을 다시 만드는 중…</span>:materialPrepared[`${p.opt}:${materialVersionKey(p.def)}`]!=='ready'?<span role="status">{materialPrepared[`${p.opt}:${materialVersionKey(p.def)}`]==='failed'?'이 코스의 자료 준비 실패':'이 코스의 자료 준비 중…'}</span>:null}<span hidden={regenBusy(d,p.opt)||materialPrepared[`${p.opt}:${materialVersionKey(p.def)}`]!=='ready'} title={totals[p.opt]?`예상 ${totals[p.opt].weeks??'미정'}주 · 선택 강좌 총계 ${totals[p.opt].amount.toLocaleString()}원${totals[p.opt].unknown?' + 가격 미확인':''}`:'자료 준비 중…'}>{totals[p.opt]?`${totals[p.opt].weeks===null?'주차 미정':`예상 ${totals[p.opt].weeks}주`} · 강좌 총계 ${totals[p.opt].amount.toLocaleString()}원${totals[p.opt].unknown?' + 가격 미확인':''}`:'자료 준비 중…'}</span></header>
-            {materialsVisited&&<ResourceSelection key={`${materialAttempt}:${p.opt}:${p.def.optionId||p.tagline}`} ref={value=>{editors.current[p.opt]=value;}} courseId={p.opt} skillFilter={activeMaterialSkill} sectionOpen={materialSections} onSectionToggle={toggleMaterialSection} locked={regenBusy(d,p.opt)||selecting} onTotals={receiveTotals} onPrepared={receivePrepared} onChoicesChanged={()=>updateWs(state=>invalidateMaterialChoices(state,p.opt))}/>}
+            <ResourceSelection key={`${materialAttempt}:${p.opt}:${p.def.optionId||p.tagline}`} ref={value=>{editors.current[p.opt]=value;}} courseId={p.opt} skillFilter={activeMaterialSkill} sectionOpen={materialSections} onSectionToggle={toggleMaterialSection} locked={regenBusy(d,p.opt)||selecting} onTotals={receiveTotals} onPrepared={receivePrepared} onChoicesChanged={()=>updateWs(state=>invalidateMaterialChoices(state,p.opt))}/>
           </section>)}</div>
           </div>
         </section>

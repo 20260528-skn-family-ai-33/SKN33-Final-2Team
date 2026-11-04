@@ -398,7 +398,7 @@ class CandidateBudgetTests(unittest.TestCase):
 
     def test_full_previous_plan_and_request_reduce_candidates_not_input(self):
         selection = self.selection(4)
-        payload = {'previous': {'text': 'x' * 37000}, 'request': {'wish': '유지해 주세요'}}
+        payload = {'previous': {'text': 'x' * ((budget.INPUT_TOKENS - 750) * 4)}, 'request': {'wish': '유지해 주세요'}}
         out = budget.pack(selection, 'system', payload)
         self.assertLess(len(out['catalog']), 32)
         self.assertEqual(out['previous'], payload['previous'])
@@ -408,7 +408,7 @@ class CandidateBudgetTests(unittest.TestCase):
     def test_required_overflow_fails_instead_of_silent_drop(self):
         selected = self.selection(4, list(resources(4))[:40])
         with self.assertRaises(ValueError):
-            budget.pack(selected, payload={'previous': 'x' * 37000})
+            budget.pack(selected, payload={'previous': 'x' * ((budget.INPUT_TOKENS - 750) * 4)})
 
     def test_required_33_expands_even_with_three_skills(self):
         required = list(resources(3))[:33]
@@ -418,7 +418,7 @@ class CandidateBudgetTests(unittest.TestCase):
 
     def test_base_prompt_overflow_and_small_context_are_errors(self):
         with self.assertRaises(ValueError):
-            budget.pack(self.selection(), system='x' * 45000)
+            budget.pack(self.selection(), system='x' * (budget.INPUT_TOKENS * 5))
         with self.assertRaises(ValueError):
             budget.pack(self.selection(), context_limit=4096)
 
