@@ -99,15 +99,19 @@
 
 실제 모델 모드는 로컬 RoBERTa로 질문을 먼저 4분류해요. `meta.classification`(선택)은 `{model, label, confidence, ms, usedHistory}`이며 `label`은 `범위 밖`·`사내 규정`·`사내 생활안내`·`수자원공사 정보`예요. 기존 `answer.kind`는 유지하고 가데이터 모드에는 이 메타데이터가 없어요. 범위 밖은 검색/LLM을 호출하지 않고, 규정·회사는 각각 해당 자료 검색과 근거 검사를 거쳐요. 모델·토크나이저·해시 문제는 기존 오류 형식의 `code=AI_CLASSIFIER`, `kind=classifier`, `retryable=false`로 알려요. LLM은 질문 유형을 재분류하지 않고 서버가 분류별 `answer.kind`를 구성해요. JSON 구조·없는 인용 ID·근거 없는 숫자 등의 실패는 기존 `AI_BAD_OUTPUT` 오류로 유지해요.
 
+실제 모델 모드에서는 되묻기(`kind=clarify`·선택지)를 생성하지 않아요. 규정 답변 모델에는 근거 상태·요약·출처만 요청하며, 확인된 내용·적용 조건·부족한 근거는 요약에 담아요. ‘내 상황에 적용’(`apply`)·‘추가로 확인할 것’(`more`)·‘등록되지 않은 기준’(`missing`)은 별도 생성 항목으로 요청하지 않아요. 이 필드와 되묻기 카드 표시는 가데이터·이전 대화 호환을 위해 유지해요.
+
 `answer.topic`(선택)은 `regulation|company|life`, `answer.evidenceStatus`(선택)는 `found|partial|not_found|refused`예요. 규정·회사는 각각 ‘근거 확인 / 근거 일부 확인 / 근거 확인 불가 / 답변 불가’로 표시해요. `refused`는 제공하면 안 되는 요청 거절이며 오류가 아니에요. 규정은 `found→level=ok`, `partial→unclear`, `not_found→none`, `refused→refused`예요. 적용 대상 규정이 없으면 기존 `scope`와 `not_found`를 함께 써요. 회사는 기존 `kind=general, source=work`, 거절은 `level=refused`이고 `knowledgeSources=[]`예요.
 
 사내 생활은 등록된 가상 홈페이지 메뉴의 안내 범위만 근거로 사용하고, `source=intranet`, 검증한 `intranet[]` 메뉴를 반환해요. `refused`이면 ‘사내 생활 답변 불가’, 나머지는 ‘사내 생활 안내’예요. 알려진 메뉴가 없으면 확인 불가 안내를 하며 제공 금지로 취급하지 않아요. 연결·시간 초과·형식 실패는 기존 작업 `failed` 응답을 유지하며 화면에는 ‘오류’로 표시해요. 범위 밖은 검색·LLM 호출이 없어요.
 
 규정·회사 검색 결과가 없어도 모델에 빈 근거 목록으로 제공 금지 요청 여부를 확인해요. 빈 근거로 `found`·`partial` 답변을 만드는 것은 허용하지 않아요. 이전 가데이터의 `topic=edu|support|travel` 같은 세부 주제는 회사 유형으로 취급하지 않고 `kind=regulation`을 기준으로 표시해요.
 
+`history`의 기존 요청 형식은 유지하되, 서버가 모델에 전달할 때는 질문과 `a.summary` 문장만 남겨요. 이전 답변의 `kind`·`level`·실제 출처 ID는 모델 대화에 넣지 않아요. 규정 이름 없이 조항 번호를 물으면 서버는 직전 `basis`로 규정을 찾아 직접 요청한 조항을 우선 전달해요. 이때 분류 단계에서 앞 질문을 쓰지 않았다면 `meta.classification.usedHistory=false`일 수 있어요.
+
 | 요청 | 쓰는 곳 |
 | --- | --- |
-| `POST /assistant/ask` (작업) | 본문 `{question, history: [{q, a: 답 요약}]}` → 결과 `{answer, reg, meta}`. `answer.kind`: regulation(근거 조항 `basis`) · general(사내 홈페이지 안내 `intranet` / 업무·학습 / 앱 사용법 `links`) · clarify(되묻기 `options`) · out(범위 밖) |
+| `POST /assistant/ask` (작업) | 본문 `{question, history: [{q, a: 답 요약}]}` → 결과 `{answer, reg, meta}`. 실제 모델의 `answer.kind`: regulation(근거 조항 `basis`) · general(회사 정보 / 사내 홈페이지 안내 `intranet`) · out(범위 밖). 가데이터·이전 대화 호환으로 general의 업무·학습 / 앱 사용법 `links`와 clarify(되묻기 `options`)도 유지 |
 
 ### 부서장 — `team.ts`
 

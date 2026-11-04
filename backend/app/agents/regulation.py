@@ -310,9 +310,10 @@ def _art_in(a: dict) -> dict:
 
 
 def _hist_msgs(h: list) -> list:
+    # 이전 JSON 형식·실제 출처 ID가 이번 응답 형식과 출처 별칭에 섞이지 않게 한다.
     out = []
     for t in h:
-        out += [{'role': 'user', 'content': t['q']}, {'role': 'assistant', 'content': json.dumps(t['a'], ensure_ascii=False)}]
+        out += [{'role': 'user', 'content': t['q']}, {'role': 'assistant', 'content': t['a'].get('summary') or ''}]
     return out
 
 
@@ -345,10 +346,13 @@ def _refused(topic: str) -> dict:
                **({'knowledgeSources': []} if topic == 'company' else {}))
 
 
-def _empty_evidence_answer(ctx: rt.Ctx, topic: str, inp: dict, note: str = '', retrieved: list | None = None) -> dict:
+def _empty_evidence_answer(ctx: rt.Ctx, topic: str, inp: dict, note: str = '', retrieved: list | None = None,
+                           history: list | None = None) -> dict:
     # 검색 자료가 없어도 제공 금지 요청과 단순 근거 부족은 구분해야 한다.
+    if history is None:
+        history = _hist_msgs(inp.get('history') or []) if inp.get('_classification', {}).get('usedHistory') else []
     result = grounded_answer.generate(ctx, topic, inp['question'], [], inp['context'],
-                                     history=_hist_msgs(inp.get('history') or []) if inp.get('_classification', {}).get('usedHistory') else [])
+                                     history=history)
     return _refused(topic) if result['status'] == 'refused' else _no_evidence(topic, retrieved, note)
 
 
@@ -418,7 +422,15 @@ def _api_answer(ctx: rt.Ctx, inp: dict, label: str) -> dict:
     q, me, hist = inp['question'], inp['me'], inp.get('history') or []
     group = me.get('empGroup')
     follow = inp.get('_classification', {}).get('usedHistory') and bool(hist)
+    ref = regstore.explicit_ref(q, group)
+    # 규정 이름이 없는 조항 질문은 일반 이어 묻기 판별과 별도로 직전 규정을 참조한다.
+    if ref is None and hist and regstore.REF_ART.search(q):
+        default_reg = _prev_reg(hist[-1])
+        if default_reg:
+            ref = regstore.explicit_ref(q, group, default_reg)
+            follow = follow or ref is not None
     prev = hist[-1] if follow else None
+    history = _hist_msgs(hist) if follow else []
     alone = regstore.search(q, 4, group, ctx.mode)
     joined = regstore.search(f"{prev['q']} {q}", 4, group, ctx.mode) if prev else []
     mix = []
@@ -427,17 +439,16 @@ def _api_answer(ctx: rt.Ctx, inp: dict, label: str) -> dict:
             mix.append(joined[index]['id'])
         if index < len(alone):
             mix.append(alone[index]['id'])
-    ref = regstore.explicit_ref(q, group, _prev_reg(prev))
     ref_ids = (ref or {}).get('ids') or []
     previous_ids = list((prev or {}).get('a', {}).get('basis') or [])
     ids = [value for value in rt.uniq(ref_ids + previous_ids + mix) if regstore.article(value)][:max(7, len(ref_ids))]
     if ref and not ref_ids:
-        return _empty_evidence_answer(ctx, 'regulation', inp, ref['note'], ids)
+        return _empty_evidence_answer(ctx, 'regulation', inp, ref['note'], ids, history=history)
     if not ids:
-        return _empty_evidence_answer(ctx, 'regulation', inp)
+        return _empty_evidence_answer(ctx, 'regulation', inp, history=history)
     requested = {'where': ref['where'], 'focus': ref['focus'], 'note': ref['note']} if ref else None
     result = grounded_answer.generate(ctx, 'regulation', q, [_art_in(regstore.article(value)) for value in ids],
-                                     inp['context'], history=_hist_msgs(hist) if follow else [], requested=requested)
+                                     inp['context'], history=history, requested=requested)
     if result['status'] == 'refused':
         return _refused('regulation')
     if result['status'] == 'not_found':
