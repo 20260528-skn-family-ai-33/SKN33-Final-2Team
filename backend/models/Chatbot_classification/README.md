@@ -18,7 +18,7 @@
 `split_data.py`와 `train_7model_ml.py`는 현재 작업 경로에 상대적인 파일을 사용한다. 실행할 때 이 폴더를 작업 경로로 둔다. 분할·학습 스크립트는 기존 데이터·결과를 덮어쓸 수 있으므로 재실행 전에 입력과 산출물을 별도 보존해야 한다.
 
 ```powershell
-cd models/Chatbot_classification
+cd backend/models/Chatbot_classification
 python split_data.py
 python train_7model_ml.py
 python train_5model_dl.py --help

@@ -1,2 +1,4 @@
 # Preserve tokenizer/config bytes and recognize their original CRLF endings.
 *.json -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+# Preserve the original bytes of the archived training and evaluation files.
+Chatbot_classification/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
