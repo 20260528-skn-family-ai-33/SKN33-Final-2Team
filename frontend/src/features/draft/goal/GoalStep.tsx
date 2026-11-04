@@ -15,6 +15,7 @@ import { me } from '@/shared/state/session';
 import { resolveGoalInput } from './goalInput';
 import { Icon } from '@/shared/ui/Icon';
 import { AgentRow, Note, OpsBox, Page, runSub } from '@/shared/ui/parts';
+import { Skeleton } from '@/shared/ui/Skeleton';
 import { DraftSaveError, draftCall, ensureDraft, pullDraft, takeDraft } from '../draftSync';
 import { docIdle, goalOk } from '../model';
 import { StaleNote } from '../stale';
@@ -78,7 +79,7 @@ function GoalSuggestions() {
         <div className="agents">
           <AgentRow st="run" name="새 목표 후보 생성 중" sub={runSub('default', '인사 정보와 업무 설명·프로젝트를 참고하고 있어요. 완성되면 새 후보 3개로 교체해요.')} />
         </div>
-        {list.length ? items : null}
+        {list.length ? items : <Skeleton kind="cards" />}
       </>
     );
   else if (g.status === 'failed') {

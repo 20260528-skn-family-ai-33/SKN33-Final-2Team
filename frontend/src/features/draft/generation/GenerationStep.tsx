@@ -15,6 +15,7 @@ import { onDataReset } from '@/shared/state/events';
 import { updateWs, useWs, ws } from '@/shared/state/workspace';
 import { Icon } from '@/shared/ui/Icon';
 import { AgentRow, FailPage, OpsBox, Page, via } from '@/shared/ui/parts';
+import { Skeleton } from '@/shared/ui/Skeleton';
 import { draftCall, takeDraft } from '../draftSync';
 import { startEdit, genStart } from '../result/ResultStep';
 import { Stepper } from '../Stepper';
@@ -308,6 +309,7 @@ export function GenerationStep() {
       >
         {h && <HandoffView h={h} />}
         {rows}
+        {!done && <Skeleton kind="columns" count={D.optionOrder.length} />}
       </Page>
     </>
   );
