@@ -1,3 +1,4 @@
+import { activityTime } from '@/shared/lib/resourceTime';
 import { sharedCourses } from './sharedCourses';
 import { trackName } from '@/shared/constants/data';
 /* 로드맵 일정(간트) 표시 (5차 ganttOne·ganttAll·gtStages·gtCard·gt-fold·설명 상자)
@@ -12,7 +13,6 @@ import { ActRow } from '@/features/roadmap/parts';
 import { openSheet } from '@/shared/state/ui';
 import { useCatalog } from '@/shared/state/catalog';
 import { useGo } from '@/shared/hooks/useGo';
-import { hrs } from '@/shared/lib/format';
 import { count, st } from '@/shared/lib/plan';
 import { Icon } from '@/shared/ui/Icon';
 import { addDays, axisAll, colsOne, dailyCols, confirmDay, dayGap, gtPos, md, planStart, planWeeks, weekNow, type GtCol } from './ganttCalc';
@@ -167,7 +167,7 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
                 const done = st(R.progress, a.id) === 'done';
                 const no = `${number}.${i + (materials.length ? 2 : 1)}`;
                 const w = when(activityFrom, activityTo);
-                const m = `${hrs(a.hours)} · ${done ? '완료' : '진행 중'}`;
+                const m = `${activityTime(a).text} · ${done ? '완료' : '진행 중'}`;
                 return (
                   <Row
                     key={a.id}

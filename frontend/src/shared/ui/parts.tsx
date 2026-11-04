@@ -8,6 +8,7 @@ import { resOf } from '@/shared/state/catalog';
 import { useGo } from '@/shared/hooks/useGo';
 import { Icon } from './Icon';
 import { ResourceImage } from './ResourceImage';
+import { MaterialBasis } from './MaterialBasis';
 
 export function Page(o: { back?: string; eyebrow?: ReactNode; title: ReactNode; lead?: ReactNode; children?: ReactNode; foot?: ReactNode }) {
   const go = useGo();
@@ -166,8 +167,8 @@ export const CostB = ({ c, unk }: { c: number; unk?: boolean }) => (
   </>
 );
 
-export const Stats = ({ pl, bare, periodLabel = '기간', periodWeeks }: { pl: Pick<PlanContent, 'weeks' | 'hours' | 'cost' | 'costUnknown'>; bare?: boolean; periodLabel?: string; periodWeeks?: number | null }) => (
-  <div className={`stats ${bare ? 'bare' : ''}`}>
+export const Stats = ({ pl, bare, periodLabel = pl.durationBasis === 'materials-only' ? '자료 학습 예상 기간' : '기간', periodWeeks }: { pl: Pick<PlanContent, 'weeks' | 'hours' | 'cost' | 'costUnknown' | 'materialHours' | 'taskHours' | 'totalHUnknown' | 'durationBasis'>; bare?: boolean; periodLabel?: string; periodWeeks?: number | null }) => (
+  <><div className={`stats ${bare ? 'bare' : ''}`}>
     <div>
       <small>{periodLabel}</small>
       <b>
@@ -189,6 +190,7 @@ export const Stats = ({ pl, bare, periodLabel = '기간', periodWeeks }: { pl: P
       </b>
     </div>
   </div>
+  {periodLabel === '자료 학습 예상 기간' && <MaterialBasis plan={pl} />}</>
 );
 
 /** 규칙으로 채운 값(시간·단계·형식)은 '추정'으로 표시한다(팀 DB에 값이 없음 · 2026-10-21 사용자 결정) */

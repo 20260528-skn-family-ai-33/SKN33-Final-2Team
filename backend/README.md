@@ -142,6 +142,27 @@ docker compose exec -e PYTHONPATH=/srv/growpath backend python tools/test_track_
 
 프롬프트를 되돌릴 때는 `prompt_versions`에서 이번 변경의 활성 버전·`parent_version_id`를 확인하고, 해당 agent_id의 현재 버전을 비활성화한 뒤 부모 버전을 한 트랜잭션에서 활성화합니다. **백엔드 코드도 해당 이전 정책을 사용하던 버전으로 함께 되돌립니다.** DB 연결 도입 전 버전은 구역 형식도 달라 호환되지 않습니다. 개인 로드맵 제목 데이터는 이 등록 도구가 변경하지 않습니다.
 
+### 자료 학습 기간과 도서 배정시간 (#72)
+
+스킬별 자료 선택이 있는 새 계획·명시적 수정안은 `duration_proposals.apply_plan_schedule`에서 선택 자료와 현재 주당 시간으로 계산한다. 같은 강좌·도서 ID는 한 번만 합산한다. 강좌 시간이 미확인이면 일정 계산용으로 1주를 배정하고 `timeStatus=unknown`을 유지한다. 도서는 고유 ID당 1주이며, 활동 `hours`에는 현재 주당 시간, `catalogHours`에는 카탈로그 참고값, `hoursAllocation=book-week`에는 배정 근거를 둔다. 실제 독서시간으로 표현하지 않는다.
+
+계획 JSON의 선택 필드 `materialHours`는 자료 배정시간, `taskHours`는 별도 과제 시간이다. `totalH`는 두 값의 합이고, `weeks`는 **자료 학습 예상 기간**이다. 화면에서 과제 제외와 도서 배정 규칙을 함께 표시한다. 주차 구간과 `전체 일정 +N주`는 각각 해당 스킬의 학습 구간과 그 스킬이 전체 일정에 더한 주 수다. 같은 자료를 공유하면 후자는 0주일 수 있다. 금액의 가격 미확인 상태·기간 상한 없음·Free 도서 예외는 유지한다.
+
+API 응답의 계획 JSON·버전 JSON과 `public.roadmap_steps.details`에 시간 근거를 함께 저장한다. 기존 열 추가는 없으며, 기존 확정 계획·진행·보고서는 일괄 재계산하지 않는다. 추가 필드가 없는 구형 계획은 기존 저장 시간과 근거 미기록 표시를 유지한다.
+
+생성·재생성·수정의 실행 지침과 신규 설치 템플릿에 `roadmap-display/v1`을 적용한다. AI 설명은 편성 근거를 서술하고 총기간·총금액은 계산하지 않는다. 이전 AI 설명에 남은 수치 문장은 화면의 해당 설명 필드에서만 숨긴다. 저장 원문·사용자 희망 조건·자료 원문·활동 설명을 숫자 치환하지 않는다. 원시 API의 이전 AI 설명 문자열을 직접 표시하는 다른 클라이언트는 같은 표시 보호가 필요하다. 자료 재준비 중에는 이전 안/주당 시간의 합계를 다시 표시하지 않는다.
+
+기존 DB는 `install_track_prompts.py`로 전문을 교체하지 않고, 아래 도구로 **현재 활성 지침에 표시 계약만 추가**할 수 있다. 기본 명령은 읽기 전용 점검이다. 실행 지침도 같은 계약을 보완하므로 코드 배포와 DB 반영 순서가 달라도 중복으로 붙지 않는다.
+
+```bash
+docker compose exec -T -e PYTHONPATH=/srv/growpath backend python tools/migrate_duration_prompts.py
+docker compose exec -T -e PYTHONPATH=/srv/growpath backend python tools/migrate_duration_prompts.py --apply > duration-prompts-72.json
+docker compose cp duration-prompts-72.json backend:/tmp/duration-prompts-72.json
+docker compose exec -T -e PYTHONPATH=/srv/growpath backend python tools/migrate_duration_prompts.py --rollback /tmp/duration-prompts-72.json
+```
+
+적용 기록은 UTF-8 JSON으로 보관한다(PowerShell 7 이상 권장). 세 코스를 한 트랜잭션으로 변경하고 버전 ID·부모 ID·전후 SHA-256을 남긴다. 동일 내용 재실행은 새 버전을 만들지 않는다. 복구 시 현재 버전·부모 원문 해시가 기록과 다르면 전체 복구를 중단한다. DB 프롬프트만 복구해도 현재 코드의 표시 계약은 남으므로 정책 전체를 되돌리려면 백엔드·프런트 코드도 함께 복구한다.
+
 
 ### Free Track 후속 경계 처리 (#38 / PR #41)
 

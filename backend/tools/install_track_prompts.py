@@ -44,7 +44,7 @@ def install():
             t.run('UPDATE public.prompt_versions SET is_active=false,deactivated_at=now() WHERE agent_id=:a AND is_active', a=agent)
             t.run('INSERT INTO public.prompt_versions(agent_id,version_num,system_prompt,is_active,parent_version_id,change_reason) VALUES(:a,:v,:p,true,:parent,:reason)',
                   a=agent, v=version, p=prompt, parent=parent,
-                  reason='이슈 #38: ' + values['name'] + ' 생성·수정 프롬프트 DB 연결. 기존 이력 보존.')
+                  reason=values['name'] + ' 통합 생성·수정 지침 및 #72 기간·비용 표시 계약 v1. 기존 이력 보존.')
             print(agent, 'version', version)
 
 

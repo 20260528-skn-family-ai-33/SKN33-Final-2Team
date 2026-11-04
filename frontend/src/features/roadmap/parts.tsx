@@ -1,10 +1,11 @@
+import { activityTime } from '@/shared/lib/resourceTime';
 /* 내 로드맵 공통 조각 (5차 actRow·commentAlert·repAlert·noPlan·planGuard·versions·pre-answers·post-start) */
 import type { ReactNode } from 'react';
 import { Navigate, useParams } from 'react-router';
 import type { Activity, Comment, PlanRecord } from '@/api/types/plan';
 import { newIdToPath, paths } from '@/app/paths';
 import { useGo } from '@/shared/hooks/useGo';
-import { hrs, won } from '@/shared/lib/format';
+import { won } from '@/shared/lib/format';
 import { actMeta, st } from '@/shared/lib/plan';
 import { ansLabel } from '@/shared/lib/prefs';
 import { useCatalog } from '@/shared/state/catalog';
@@ -27,7 +28,7 @@ export function ActRow({ a, R }: { a: Activity; R: PlanRecord }) {
         <span className="tx">
           {a.title}
           <small>
-            {actMeta(a)} · {hrs(a.hours)}
+            {actMeta(a)} · {activityTime(a).text}
             {memo ? ' · 메모 있음' : ''}
           </small>
         </span>

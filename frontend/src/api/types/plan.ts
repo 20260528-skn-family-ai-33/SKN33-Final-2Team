@@ -8,6 +8,9 @@ export interface Activity extends ActDef {
   hours: number;
   hoursEstimated?: boolean;
   hoursBasis?: string;
+  /** 카탈로그 원값은 보존하고 도서에는 주당 시간만큼 1주를 배정한다. */
+  catalogHours?: number | null;
+  hoursAllocation?: 'book-week';
   timeStatus?: string;
   resourceWindow?: { from: number; to: number };
   wFrom: number;
@@ -36,6 +39,8 @@ export interface PlanContent {
   format: string;
   acts: Activity[];
   totalH: number;
+  materialHours?: number;
+  taskHours?: number;
   totalHUnknown?: boolean;
   totalHEstimated?: boolean;
   durationBasis?: 'materials-only';

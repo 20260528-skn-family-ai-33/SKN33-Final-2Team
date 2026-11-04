@@ -159,7 +159,8 @@ def apply_plan_schedule(plan: dict) -> dict:
     plan['weeks'] = schedule['weeks']
     seen_courses = set()
     seen_books = set()
-    total_hours = Decimal(0)
+    material_hours = Decimal(0)
+    task_hours = Decimal(0)
     for activity in plan['acts']:
         name, rid = activity.get('skill'), activity.get('res')
         resource_slot = schedule['courses'].get(rid) or schedule['books'].get(rid)
@@ -175,21 +176,34 @@ def apply_plan_schedule(plan: dict) -> dict:
                 activity['timeStatus'] = slot['timeStatus']
                 if slot.get('hours') is not None:
                     activity['hours'] = slot['hours']
+                else:
+                    activity['hours'] = plan['hours']
+                    activity['hoursBasis'] = '강좌 시간 미확인: 일정 계산용으로 1주 배정'
+            if rid in schedule['books']:
+                # 카탈로그 참고 시간과 이 계획에서 배정한 시간은 서로 다른 값이다.
+                activity.setdefault('catalogHours', activity.get('hours'))
+                activity['hours'] = plan['hours']
+                activity['hoursAllocation'] = 'book-week'
+                activity['hoursEstimated'] = True
+                activity['hoursBasis'] = '도서 1권당 1주 배정(주당 학습시간 기준), 실제 독서시간 아님'
         if rid in schedule['courses']:
             if rid in seen_courses:
                 continue
             seen_courses.add(rid)
-            hours = schedule['courses'][rid]['hours']
+            hours = activity['hours']
         elif rid in schedule['books']:
             if rid in seen_books:
                 continue
             seen_books.add(rid)
-            hours = positive(activity.get('hours'))
+            hours = plan['hours']
         else:
-            hours = positive(activity.get('hours'))
+            task_hours += Decimal(str(positive(activity.get('hours')) or 0))
+            continue
         if hours is not None:
-            total_hours += Decimal(str(hours))
-    plan['totalH'] = float(total_hours)
+            material_hours += Decimal(str(hours))
+    plan['materialHours'] = float(material_hours)
+    plan['taskHours'] = float(task_hours)
+    plan['totalH'] = float(material_hours + task_hours)
     plan['totalHUnknown'] = any(row['timeStatus'] == 'unknown' for row in schedule['courses'].values())
     plan['totalHEstimated'] = any(activity.get('hoursEstimated') for activity in plan['acts'])
     plan['durationBasis'] = 'materials-only'

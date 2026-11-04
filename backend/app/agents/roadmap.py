@@ -115,6 +115,8 @@ def build_plan(d: dict, prm: dict, goal: str) -> dict:
             x['hoursEstimated'] = 'hours' in (r.get('estimated') or [])
             x['hoursBasis'] = r.get('timeNote') or ''
         x.update((p.get('patch') or {}).get(a['id']) or {})
+        if r and r.get('type') == 'book' and 'materialSchedule' in d:
+            x['catalogHours'] = r.get('hours')
         x['wFrom'] = math.floor(cum / hrs) + 1
         cum += x['hours']
         x['wTo'] = max(x['wFrom'], math.ceil(cum / hrs))
@@ -451,7 +453,8 @@ def _sys(pid: str, tpl: str, provenance: dict | None = None, evaluation_prompt: 
                           storedPromptHash=hashlib.sha256(rows[0]['system_prompt'].encode('utf-8')).hexdigest())
     if pid == 'A1' and not text.startswith(('[통합 생성 계약 roadmap-generation/v1]', '[통합 수정 계약 roadmap-revision/v1]')):
         text += '\n[최신 Free Course 정책] 강좌는 0원만 허용한다. 도서는 가격·예산과 무관하게 유료·가격 미확인도 추천할 수 있다. 도서 비용은 표시하되 무료 강좌 제한에 포함하지 않는다.'
-    return text.strip()
+    from app.agents.roadmap_display import with_display_contract
+    return with_display_contract(text.strip())
 
 
 def _track_catalog(pid: str, handoff: dict, extra_ids: list | None = None) -> list[dict]:

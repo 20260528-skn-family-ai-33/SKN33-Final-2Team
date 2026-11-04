@@ -73,7 +73,7 @@ export function applyMaterialSchedule(input: PlanContent): PlanContent {
   plan.def.materialSchedule = Object.entries(estimates).map(([skill, row]) => ({skill, weeks: row.weeks!, startWeek: row.startWeek, endWeek: row.endWeek, addedWeeks: row.addedWeeks, totalWeeks: plan.weeks}));
   const seen = new Set<string>();
   const seenBooks = new Set<string>();
-  let total = 0;
+  let materialHours = 0, taskHours = 0;
   for (const activity of plan.acts) {
     const rid = activity.res || '', name = activity.skill || '';
     const resource = courses.get(rid);
@@ -87,16 +87,27 @@ export function applyMaterialSchedule(input: PlanContent): PlanContent {
     if (resource) {
       activity.timeStatus = resource.timeStatus;
       activity.hoursEstimated = resource.timeStatus !== 'confirmed';
-      if (resource.hours != null) activity.hours = resource.hours;
+      activity.hours = resource.hours ?? weekly;
+      if (resource.hours == null) activity.hoursBasis = '강좌 시간 미확인: 일정 계산용으로 1주 배정';
       if (seen.has(rid)) continue;
       seen.add(rid);
-      total += resource.hours || 0;
-    } else if (!book || !seenBooks.has(rid)) {
-      if (book) seenBooks.add(rid);
-      total += activity.hours;
+      materialHours += activity.hours;
+    } else if (book) {
+      if (activity.catalogHours === undefined) activity.catalogHours = activity.hours;
+      activity.hours = weekly;
+      activity.hoursAllocation = 'book-week';
+      activity.hoursEstimated = true;
+      activity.hoursBasis = '도서 1권당 1주 배정(주당 학습시간 기준), 실제 독서시간 아님';
+      if (seenBooks.has(rid)) continue;
+      seenBooks.add(rid);
+      materialHours += weekly;
+    } else {
+      taskHours += positive(activity.hours) ? activity.hours : 0;
     }
   }
-  plan.totalH = clean(total);
+  plan.materialHours = clean(materialHours);
+  plan.taskHours = clean(taskHours);
+  plan.totalH = clean(materialHours + taskHours);
   plan.totalHUnknown = [...courses.values()].some(row => row.timeStatus === 'unknown');
   plan.totalHEstimated = plan.acts.some(activity => activity.hoursEstimated);
   plan.durationBasis = 'materials-only';

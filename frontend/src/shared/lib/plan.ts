@@ -1,3 +1,4 @@
+import { activityTime } from '@/shared/lib/resourceTime';
 /* 로드맵 계산 (화면 표시용 · 저장할 계획은 서버가 같은 규칙으로 다시 계산) — 5차 gp-parts.js 계산 부분을 옮김.
    부서장 화면도 같은 함수를 쓰도록 상태를 인자로 받는다(5차는 GP.asState 로 전역 S 를 바꿔 끼웠음) */
 import type { OptionDef, Prefs } from '@/api/types/draft';
@@ -39,6 +40,7 @@ export function buildPlan(def: OptionDef, prm: Partial<PlanParams>, goal: string
       // 과제가 다루는 스킬(에이전트가 고른 팀 DB 스킬 이름 · 10/23 · 스킬 지도에서 씀). 자료 활동은 자료에 붙은 스킬을 쓴다
       if (!a.res && a.skills && a.skills.length) x.skills = a.skills.slice();
       if (p.patch[a.id]) Object.assign(x, p.patch[a.id]);
+      if (r?.type === 'book' && def.materialSchedule) x.catalogHours = r.hours ?? null;
       return x;
     });
   const slots = new Map<string, [number, number]>();
@@ -94,7 +96,7 @@ export const curStage = (pl: PlanContent, progress?: Record<string, Progress>) =
 export const stageActs = (pl: PlanContent, n: number) => pl.acts.filter((a) => a.stage === n);
 export const recProgress = (R: PlanRecord | null | undefined) => (R && R.progress) || {};
 
-const actTx = (x: Activity) => `${x.title} · ${x.stage}단계 · ${hrs(x.hours)}`;
+const actTx = (x: Activity) => `${x.title} · ${x.stage}단계 · ${activityTime(x).text}`;
 
 export interface DiffItem {
   k: string;
@@ -132,7 +134,7 @@ export function diff(a: PlanContent, b: PlanContent, pd?: Pick<PendingRevision, 
   a.acts.forEach((y) => {
     if (!bm[y.id]) push('활동 제외', actTx(y), '—');
   });
-  if (a.weeks !== b.weeks) push('전체 기간', a.weeks + '주', b.weeks + '주');
+  if (a.weeks !== b.weeks) push(b.durationBasis === 'materials-only' ? '자료 학습 예상 기간' : '전체 기간', a.weeks + '주', b.weeks + '주');
   if (a.cost !== b.cost) push('예상 비용', won(a.cost), won(b.cost));
   return ch;
 }

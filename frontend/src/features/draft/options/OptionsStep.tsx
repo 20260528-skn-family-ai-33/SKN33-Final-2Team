@@ -1,3 +1,7 @@
+import { currentMaterialTotals } from './materialTotals';
+import { planDescription } from '@/shared/lib/planDescription';
+import { MaterialBasis } from '@/shared/ui/MaterialBasis';
+import { activityTime } from '@/shared/lib/resourceTime';
 import { invalidateDraft, invalidateMaterialChoices } from '../invalidation';
 import { materialPreparation, canRevealMaterials, initialMaterialPreparation, type MaterialStatus } from './materialPreparation';
 import './courseSkills.css';
@@ -18,7 +22,6 @@ import type { PlanContent } from '@/api/types/plan';
 import { paths } from '@/app/paths';
 import { D } from '@/shared/constants/data';
 import { useGo } from '@/shared/hooks/useGo';
-import { hrs } from '@/shared/lib/format';
 import { buildPlan, planWeeklyHours } from '@/shared/lib/plan';
 import { cause } from '@/shared/state/ai';
 import { setAt } from '@/shared/state/bind';
@@ -127,7 +130,7 @@ function RegenBody({ pl }: { pl: PlanContent }) {
               <span className="tx">
                 {a.title}
                 <small>
-                  {a.stage}단계 · {a.task ? '직접 수행 과제' : resOf(a.res)?.kind || '자료'} · {hrs(a.hours)}
+                  {a.stage}단계 · {a.task ? '직접 수행 과제' : resOf(a.res)?.kind || '자료'} · {activityTime(a).text}
                 </small>
               </span>
               <div className="mini-seg" role="radiogroup" aria-label={a.title}>
@@ -244,7 +247,7 @@ export function OptionsStep() {
   }
   const editors=useRef<Record<string,ResourceSelectionHandle|null>>({});
   const [totals,setTotals]=useState<Record<string,MaterialTotals>>({});
-  const receiveTotals=useCallback((course:string,value:MaterialTotals)=>setTotals(old=>old[course]?.weeks===value.weeks&&old[course]?.amount===value.amount&&old[course]?.unknown===value.unknown?old:{...old,[course]:value}),[]);
+  const receiveTotals=useCallback((course:string,value:MaterialTotals)=>setTotals(old=>old[course]?.weeks===value.weeks&&old[course]?.amount===value.amount&&old[course]?.unknown===value.unknown&&old[course]?.version===value.version&&old[course]?.weeklyHours===value.weeklyHours?old:{...old,[course]:value}),[]);
   async function changeVersion(course:string,direction:number){
     if(selecting)return;
     setSelecting(true);
@@ -271,6 +274,11 @@ export function OptionsStep() {
   const status=JSON.parse(generationStatus) as {unavailable:string[];generating:string[]};
   const readyToReveal=canRevealMaterials(preparation.courses,availableVersions,status.unavailable,status.generating);
   const comparisonVisible=preparation.scope===comparisonScope&&(readyToReveal||preparation.revealed);
+  const currentTotals = (p: PlanContent) => currentMaterialTotals(totals[p.opt], materialVersionKey(p.def), p.hours, !regenBusy(d,p.opt) && materialPrepared[`${p.opt}:${materialVersionKey(p.def)}`] === 'ready');
+  const materialSummary = (p: PlanContent) => {
+    const current = currentTotals(p);
+    return current ? `자료 학습 ${current.weeks === null ? '주차 산정 필요' : `예상 ${current.weeks}주`} · 강좌 총계 ${current.amount.toLocaleString()}원${current.unknown ? ' + 가격 미확인' : ''}` : '자료 준비 중…';
+  };
   useCatalog((s) => s.res);
   useDraftWatch();
   useKickSupport();
@@ -322,9 +330,9 @@ export function OptionsStep() {
         ) : null}
         {i > 0 ? (
           <>
-            {o.revSummary ? <span className="small rev">바꾼 점: {o.revSummary}</span> : null}
+            {o.revSummary ? <span className="small rev">바꾼 점: {planDescription(o.revSummary)}</span> : null}
             {o.revRequest ? <span className="small muted rev">요청: {o.revRequest}</span> : null}
-            {(o.revNotes || []).length ? <span className="small muted rev">반영하지 못한 것: {(o.revNotes || []).join(' ')}</span> : null}
+            {(o.revNotes || []).length ? <span className="small muted rev">반영하지 못한 것: {(o.revNotes || []).map(planDescription).join(' ')}</span> : null}
           </>
         ) : null}
       </>
@@ -339,7 +347,7 @@ export function OptionsStep() {
           <label><input type="radio" name="pick" value={p.opt} checked={cur === p.opt} disabled={selecting} onChange={() => selectCourse(p.opt)} /><b>{trackName(p.opt, p.name)}</b></label>
           <button type="button" className="course-regenerate" disabled={busy} onClick={() => void regenerateWithMaterials(p.opt)}>{busy ? '계획 생성 중…' : '해당 계획 다시 생성'}</button>
         </div>
-        <small className="course-tagline">{p.tagline}</small>
+        <small className="course-tagline">{planDescription(p.tagline)}</small>
         <OptionSummary id={`course-summary-${p.opt}`} reason={p.def.reason} pros={p.def.pros} expanded={summariesOpen} />
         <Ver p={p} />
         {err && !busy ? (
@@ -409,16 +417,17 @@ export function OptionsStep() {
               {ps.some(plan => (plan.def.reason || '').trim().length > 48 || plan.def.pros.length > 2 || plan.def.pros.some(value => value.length > 32)) && <tr><th /><th colSpan={3} style={{ textAlign: 'center', padding: '2px 8px 7px', fontWeight: 400 }}><button type="button" className="course-more" aria-expanded={summariesOpen} aria-controls={ps.map(plan => `course-summary-${plan.opt}`).join(' ')} onClick={() => setSummariesOpen(open => !open)}>{summariesOpen ? '접기' : '더보기'}</button></th></tr>}
             </thead>
             <tbody>
-              {row('예상 기간(주당)', (p) => (
-                <><span className="numv">{totals[p.opt]?.weeks ?? p.weeks}주</span> · 주 {p.hours}시간</>
+              {row('자료 학습 예상 기간', (p) => (
+                <><span className="numv">{currentTotals(p)?.weeks == null ? '산정 필요' : `${currentTotals(p)!.weeks}주`}</span> · 주 {p.hours}시간</>
               ))}
-              {row('예상 금액',p=><span>{totals[p.opt]?`${totals[p.opt].amount.toLocaleString()}원${totals[p.opt].unknown?' + 가격 미확인':''}`:'자료 선택 후 계산'}<small className="muted"> · 선택 강좌 기준</small></span>)}
+              {row('예상 금액',p=><span>{currentTotals(p)?`${currentTotals(p)!.amount.toLocaleString()}원${currentTotals(p)!.unknown?' + 가격 미확인':''}`:'자료 선택 후 계산'}<small className="muted"> · 선택 강좌 기준</small></span>)}
               <tr><td className="k">학습 자료</td><td colSpan={3} className="material-expand-cell"><button type="button" className={`btn line small material-expand${materialsOpen?' is-open':''}`} aria-expanded={materialsOpen} aria-controls="roadmap-material-comparison" disabled={selecting} onClick={()=>materialsOpen?setMaterialsOpen(false):openMaterials()}><Icon name="book"/>{materialsOpen?'자료 비교 접기':'자료 비교하기'}</button></td></tr>
               <tr><td className="k"><button className="link" aria-expanded={supportOpen} onClick={() => setSupportOpen(open => !open)}>지원 조건 {supportOpen ? '접기' : '보기'}</button></td>
                 {D.optionOrder.map(id => { const p = ps.find(plan => plan.opt === id); return <td key={id} data-col={id} className={p ? colCls(p) : undefined}>{p && supportOpen && <SupCell o={p.def} />}</td>; })}
               </tr>
             </tbody>
           </table>
+          <MaterialBasis />
         </div>
         <section id="roadmap-material-comparison" ref={materialPanel} className="roadmap-material-panel full-width-materials" hidden={!materialsOpen} aria-label="스킬별 학습 자료 비교">
           <header className="roadmap-material-header"><div><span>학습 자료</span><h2>스킬별 자료 비교</h2></div><button type="button" className="btn line small" disabled={selecting} onClick={()=>setMaterialsOpen(false)}>접기 <Icon name="x"/></button></header>
@@ -426,7 +435,7 @@ export function OptionsStep() {
           <div hidden={!comparisonVisible}>
           <MaterialSkillTabs names={materialNames} active={activeMaterialSkill} onChange={setMaterialSkill} id={materialTabsId} panelId="material-comparison-panel"/>
           <div className="material-course-comparison" role="tabpanel" id="material-comparison-panel" aria-labelledby={`${materialTabsId}-tab-${materialNames.indexOf(activeMaterialSkill)}`}>{ps.map(p=><section className={`material-course-column${cur===p.opt?' is-selected':''}`} key={p.opt} aria-label={`${trackName(p.opt,p.name)} 자료`}>
-            <header><h3>{trackName(p.opt,p.name)}</h3>{regenBusy(d,p.opt)?<span role="status"><span className="sp" aria-hidden="true"/> 이 코스의 로드맵을 다시 만드는 중…</span>:materialPrepared[`${p.opt}:${materialVersionKey(p.def)}`]!=='ready'?<span role="status">{materialPrepared[`${p.opt}:${materialVersionKey(p.def)}`]==='failed'?'이 코스의 자료 준비 실패':'이 코스의 자료 준비 중…'}</span>:null}<span hidden={regenBusy(d,p.opt)||materialPrepared[`${p.opt}:${materialVersionKey(p.def)}`]!=='ready'} title={totals[p.opt]?`예상 ${totals[p.opt].weeks??'미정'}주 · 선택 강좌 총계 ${totals[p.opt].amount.toLocaleString()}원${totals[p.opt].unknown?' + 가격 미확인':''}`:'자료 준비 중…'}>{totals[p.opt]?`${totals[p.opt].weeks===null?'주차 미정':`예상 ${totals[p.opt].weeks}주`} · 강좌 총계 ${totals[p.opt].amount.toLocaleString()}원${totals[p.opt].unknown?' + 가격 미확인':''}`:'자료 준비 중…'}</span></header>
+            <header><h3>{trackName(p.opt,p.name)}</h3>{regenBusy(d,p.opt)?<span role="status"><span className="sp" aria-hidden="true"/> 이 코스의 로드맵을 다시 만드는 중…</span>:materialPrepared[`${p.opt}:${materialVersionKey(p.def)}`]!=='ready'?<span role="status">{materialPrepared[`${p.opt}:${materialVersionKey(p.def)}`]==='failed'?'이 코스의 자료 준비 실패':'이 코스의 자료 준비 중…'}</span>:null}<span hidden={regenBusy(d,p.opt)||materialPrepared[`${p.opt}:${materialVersionKey(p.def)}`]!=='ready'} title={materialSummary(p)}>{materialSummary(p)}</span></header>
             <ResourceSelection key={`${materialAttempt}:${p.opt}:${p.def.optionId||p.tagline}`} ref={value=>{editors.current[p.opt]=value;}} courseId={p.opt} skillFilter={activeMaterialSkill} sectionOpen={materialSections} onSectionToggle={toggleMaterialSection} locked={regenBusy(d,p.opt)||selecting} onTotals={receiveTotals} onPrepared={receivePrepared} onChoicesChanged={()=>updateWs(state=>invalidateMaterialChoices(state,p.opt))}/>
           </section>)}</div>
           </div>
