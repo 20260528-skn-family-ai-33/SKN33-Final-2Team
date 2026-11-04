@@ -83,10 +83,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "4b9f50c6e84af10c13c2e1b606f5412a0729e777e23812919912fe695133f68e",
-      "bytes": 48863,
+      "sha256": "5f56fec9421e454c9bea7cf6a4b80f3d415d64e72c8ef851c8564a31ec14026f",
+      "bytes": 50391,
       "handling": "adjusted",
-      "change_note": "Issue #83: books-only incremental collection (--only-new-books), under-covered skill book keywords searched first, KDC pre-filter before detail calls (2026-11-04).",
+      "change_note": "Issue #83: new-books-only ingestion, verified shared backup and artifact synchronization (2026-11-04).",
       "local_update_source": {
         "path": "README.md",
         "sha256": "e872d64ea58c53311d098dc1c769f5bc3232ad947d690054b75a0a0a20c6d8c6"
@@ -98,10 +98,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "a7c61ac147269c2c70cffa9e7733a2c0fa43496c743f95d67b1998f7ff70b55e",
-      "bytes": 10484,
+      "sha256": "e8bbfb9a3e2c850cc436b7cc2b9ac1a5eb9acc2456cefd7ab72fa8c704a38389",
+      "bytes": 9018,
       "handling": "adjusted",
-      "change_note": "Issue #35: supplementary course normalization, verified outline cache upgrade, timezone-stable evidence and regression checks (2026-10-30)."
+      "change_note": "Issue #83: new-books-only ingestion, verified shared backup and artifact synchronization (2026-11-04)."
     },
     {
       "path": "database/assets.manifest.json",
@@ -109,10 +109,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "7205d57fdd217e627c377fd04447df94480f4d2b4c8995e9c7c9f898e6ef74e6",
-      "bytes": 26518,
+      "sha256": "f6cd41c2455477fbf8c77ef2045732ece78aebfcb31561a045bea97db32d4484",
+      "bytes": 26513,
       "handling": "adjusted",
-      "change_note": "Issue #27 final DB quality: deterministic profile ordering, evidence-preserving curriculum titles, DevOps link recognition and verified current backup metadata (2026-10-29)."
+      "change_note": "Issue #83: new-books-only ingestion, verified shared backup and artifact synchronization (2026-11-04)."
     },
     {
       "source_path": "database/config/paths.yaml",
@@ -120,10 +120,10 @@
       "source_sha256": "f3c6661660777e2f9618d07b3649eceec758b11d1c7b902bd1c2beffcac7781e",
       "source_bytes": 2936,
       "source_kind": "source_commit_file",
-      "sha256": "0dabed559b93d312f2c04ff4cfa0a1b0c37f11503fa6d4c972cd473118eb16db",
-      "bytes": 4175,
+      "sha256": "1a271aedc2ff04c4f9f9014e9fd6112e5ea2d4c133a29a43ed0430b8211afbd4",
+      "bytes": 4513,
       "handling": "copied",
-      "change_note": "Issue #83: books-only incremental collection (--only-new-books), under-covered skill book keywords searched first, KDC pre-filter before detail calls (2026-11-04).",
+      "change_note": "Issue #83: books-only incremental collection (--only-new-books) that validates and embeds only new books and skips whole-catalog cleanup; under-covered skill book keywords first; KDC pre-filter before detail calls (2026-11-04).",
       "local_update_source": {
         "path": "config/paths.yaml",
         "sha256": "cd340a8305f78fa4f9e94fd02d66f51835f6667e307d1f085f5095bf5ce8a6ee"
@@ -175,10 +175,10 @@
       "source_sha256": "59e13c3fd7bdde78922da1df1c242b08838925e9c3a5e19d8333070d46726420",
       "source_bytes": 59668,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "a28d26b0159fd5c48edad49a44696281510de2ff9acba938b8190a89d41bfd09",
-      "bytes": 82013,
+      "sha256": "f9508f285eba1383f2530dd0c4a57d22f3cd880c6f16e52a2def159596518702",
+      "bytes": 74040,
       "handling": "adjusted",
-      "change_note": "Issue #27 final DB quality: deterministic profile ordering, evidence-preserving curriculum titles, DevOps link recognition and verified current backup metadata (2026-10-29).",
+      "change_note": "Issue #83: new-books-only ingestion, verified shared backup and artifact synchronization (2026-11-04).",
       "local_update_source": {
         "path": "data/exports/growpath_latest.manifest.json",
         "sha256": "59e13c3fd7bdde78922da1df1c242b08838925e9c3a5e19d8333070d46726420"
@@ -714,10 +714,10 @@
       "source_sha256": "e568b5447a02f5a1d944397d03cf044d0a4a1f53c8a22131a82868035d3c299f",
       "source_bytes": 4885,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "5205cfe0c821908ed6371e1cff59fed2b8e417a84d76a496ffd75aa4b62c128f",
-      "bytes": 5427,
+      "sha256": "89ee1aabe98ac355e404a1cbaa4301a508803f45516b986c215198ee4f5642ae",
+      "bytes": 7806,
       "handling": "adjusted",
-      "change_note": "Issue #26 course-first publication: preserve latest #14/#15 main; time, outlines, UI and snapshot only.",
+      "change_note": "Issue #83: books-only incremental collection (--only-new-books) that validates and embeds only new books and skips whole-catalog cleanup; under-covered skill book keywords first; KDC pre-filter before detail calls (2026-11-04).",
       "local_update_source": {
         "path": "src/database/ingestion/catalog_finalization.py",
         "sha256": "e568b5447a02f5a1d944397d03cf044d0a4a1f53c8a22131a82868035d3c299f"
@@ -774,10 +774,10 @@
       "source_sha256": "0432c150ef770fc7abbd9257e95ad88f34555d9dc102080826dd6d11ade3e6b1",
       "source_bytes": 41897,
       "source_kind": "source_commit_file",
-      "sha256": "5e76910df241c93c438f801e7684d260b4acf23eaa49141b486babfce0db13e9",
-      "bytes": 50870,
+      "sha256": "c4e2774f6e48c977c5410bc9c7a8e6f1a1b7279f7684de9f00fa22899a4aedb4",
+      "bytes": 52108,
       "handling": "copied",
-      "change_note": "Issue #83: books-only incremental collection (--only-new-books), under-covered skill book keywords searched first, KDC pre-filter before detail calls (2026-11-04).",
+      "change_note": "Issue #83: books-only incremental collection (--only-new-books) that validates and embeds only new books and skips whole-catalog cleanup; under-covered skill book keywords first; KDC pre-filter before detail calls (2026-11-04).",
       "local_update_source": {
         "path": "src/database/ingestion/real_data_ingestor.py",
         "sha256": "7382ff2768333b8ddb77d2dc0322025351944c5acedc9036c8a33dec8920ca1b"
@@ -1204,10 +1204,10 @@
       "source_sha256": "f74d89de9acbc9e801fc448cceac30d2abd1099c33199e628cca21ffaeaefef6",
       "source_bytes": 8507,
       "source_kind": "source_commit_file",
-      "sha256": "2148be6dd4294d210b611dc48150cff3e6db11f02130be12e7c1dbd8f2df96ec",
-      "bytes": 12918,
+      "sha256": "0d89f1a53cecd679a91502ca6bc3c348c778a71d23afc8e3152474773a8dfc98",
+      "bytes": 13125,
       "handling": "adjusted",
-      "change_note": "Issue #27 final DB quality: deterministic profile ordering, evidence-preserving curriculum titles, DevOps link recognition and verified current backup metadata (2026-10-29).",
+      "change_note": "Issue #83: preserve new-books-only isolation; recognize explicit SQL tuning in body evidence, reject NoSQL/PLSQL and title-only false positives; verified book expansion 2026-11-04.",
       "local_update_source": {
         "path": "src/shared/skill_matching.py",
         "sha256": "2341cc2a5051e79337d9a9dab04e1ec9b4f3438e0892d0a2a2182125936433e6"
@@ -1249,10 +1249,10 @@
       "source_sha256": "2531e5882b559cf5c00b304f6847638f9121ab3a5911681498af953746ac6045",
       "source_bytes": 9909,
       "source_kind": "source_commit_file",
-      "sha256": "83caa52cd3a17ed733143d4047f64e076c87939abc74f83b84a264498bca8b80",
-      "bytes": 13290,
+      "sha256": "4acfa577e9238c58852b489f70af6da34ebcbe27a1b3530eb511d000930d20ac",
+      "bytes": 15507,
       "handling": "copied",
-      "change_note": "Issue #83: books-only incremental collection (--only-new-books), under-covered skill book keywords searched first, KDC pre-filter before detail calls (2026-11-04).",
+      "change_note": "Issue #83: preserve new-books-only isolation; recognize explicit SQL tuning in body evidence, reject NoSQL/PLSQL and title-only false positives; verified book expansion 2026-11-04.",
       "local_update_source": {
         "path": "tests/test_catalog_expansion.py",
         "sha256": "12e77bbd46d7eefb6737aadb178fdf228d07e18d201b3eba772aee57b1a807ae"
@@ -1446,10 +1446,10 @@
       "source_sha256": "f5260d82fdb90d1b6f3309f4cb3f6062034be533133406f25cf5060a27b90b2b",
       "source_bytes": 166111,
       "source_kind": "user_delivered_external_erd",
-      "sha256": "7804652205a004bf879798a5cbb1b77338014f804b0bafe740d03f78f152c969",
-      "bytes": 182136,
+      "sha256": "b98327a083a6af87cbb0086f00b8ccebcfbfaa5b323f81728fd8dc33d77be82e",
+      "bytes": 182159,
       "handling": "adjusted",
-      "change_note": "Issue #27 final DB quality: deterministic profile ordering, evidence-preserving curriculum titles, DevOps link recognition and verified current backup metadata (2026-10-29).",
+      "change_note": "Issue #83: new-books-only ingestion, verified shared backup and artifact synchronization (2026-11-04).",
       "local_update_source": {
         "path": "docs/ERD_최종.html",
         "sha256": "68cd694ae64009304fa7f663861a80e9f93d3a8f67ef84e479971e4f709c66f2"
@@ -1562,9 +1562,9 @@
       "source_bytes": null,
       "source_kind": "review_regression_test",
       "handling": "added",
-      "sha256": "ba1fa69b2b0fc1ad7443fd922b8b8d3f814ce72bb7e1dfe9f70e0c49886ce008",
-      "bytes": 14122,
-      "change_note": "Issue #83: books-only incremental collection (--only-new-books), under-covered skill book keywords searched first, KDC pre-filter before detail calls (2026-11-04)."
+      "sha256": "9bde92e33e143939c3c4074230dba7a35c5e163fe5ca5451f77832cf3f76616e",
+      "bytes": 19164,
+      "change_note": "Issue #83: books-only incremental collection (--only-new-books) that validates and embeds only new books and skips whole-catalog cleanup; under-covered skill book keywords first; KDC pre-filter before detail calls (2026-11-04)."
     },
     {
       "path": "database/src/database/migrations/023_direct_department_visibility.sql",

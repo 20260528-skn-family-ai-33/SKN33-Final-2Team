@@ -181,8 +181,9 @@ class RealDataIngestor:
                         if self._library_list_requests >= list_budget:
                             raise SourceError('LIBRARY_LIST_BUDGET_REACHED')
                         self._library_list_requests += 1
+                    # 0 removes this loader's own cap; the provider's daily quota still stops the run.
                     budget = int(self.config['library'].get('request_budget', 400))
-                    if self._library_requests >= budget:
+                    if budget and self._library_requests >= budget:
                         self.reports['library_budget'] = {'status':'INCOMPLETE', 'limit_reached':True,
                             'network_requests':self._library_requests,'budget':budget}
                         raise SourceError('LIBRARY_REQUEST_BUDGET_REACHED')
@@ -560,7 +561,9 @@ class RealDataIngestor:
                 'collection_complete':not failures and not any(r.get('page_limit_reached') or r.get('limit_reached') or r.get('status') in ('FAILED','INCOMPLETE') or r.get('failed',0)>0 or r.get('detail_failed',0)>0 for r in self.reports.values())
                     and not any(r['limit_reached'] for r in self.selection_reports.values())}
 
-    def apply(self,conn,batch,*,embed=True,embedding_client=None,allow_partial=False):
+    def apply(self,conn,batch,*,embed=True,embedding_client=None,allow_partial=False,only_new_books=False):
+        if only_new_books and set(batch['rows'])-{'books'}:
+            raise ValueError('새 도서만 적재할 때는 도서 외 자료를 함께 적재할 수 없습니다.')
         if batch['failures'] and not allow_partial:
             raise ValueError('API 수집 실패 또는 매칭 자료 없음: '+', '.join(batch['failures'])+'. 기존 DB는 변경하지 않았습니다.')
         # Recompute scope and skill evidence on writes; never trust a supplied batch.
@@ -607,7 +610,7 @@ class RealDataIngestor:
                     WHERE s.resource_type='certifications' AND s.source='API_MS_CERT'
                       AND s.external_key=%s AND s.entity_key=c.cert_id::text""",
                     (notice['status'], notice['uid']))
-            stats={}
+            stats={};written_books=[]
             for kind in KINDS:
                 # A narrowed batch (e.g. new books only) leaves the other catalogs untouched.
                 source_records=batch['rows'].get(kind,[])
@@ -650,6 +653,8 @@ class RealDataIngestor:
                         counts['withheld_retired_or_retiring'] = counts.get('withheld_retired_or_retiring', 0) + 1
                         continue
                     if entity_id in used:raise ValueError('API 원본 ID 충돌을 발견했습니다. 적재를 중단합니다.')
+                    if only_new_books and entity_id in old_ids:
+                        raise ValueError('이미 저장된 도서가 신규 도서 적재에 포함됐습니다. 기존 도서는 바꾸지 않고 중단합니다.')
                     used.add(entity_id)
                     fields[pk]=entity_id
                     fields['last_batch_updated']=datetime.now(timezone.utc)
@@ -670,17 +675,25 @@ class RealDataIngestor:
                         (kind,*key,str(entity_id),Jsonb(record['raw']),Jsonb(record['matches']),record['fetched_at']))
                     counts['updated' if entity_id in old_ids else 'inserted']+=1
                     counts['mapping_links']+=len(record['matches'])
+                    if kind=='books':written_books.append(entity_id)
                 stats[kind]=counts
-            certification_status_changes=catalog_details.refresh_certification_status(conn)
-            from src.database.ingestion.catalog_finalization import finalize_catalog
-            vector_result,validation=finalize_catalog(conn,embed=embed,embedding_client=embedding_client)
+            if only_new_books:
+                # Whole-catalog normalization would also touch courses and certifications; check new books only.
+                from src.database.ingestion.catalog_finalization import finalize_new_books
+                certification_status_changes={}
+                vector_result,validation=finalize_new_books(conn,written_books,embed=embed,embedding_client=embedding_client)
+            else:
+                certification_status_changes=catalog_details.refresh_certification_status(conn)
+                from src.database.ingestion.catalog_finalization import finalize_catalog
+                vector_result,validation=finalize_catalog(conn,embed=embed,embedding_client=embedding_client)
             return {'status':'PARTIAL' if batch['failures'] or not batch.get('collection_complete',False) else 'SUCCESS','tables':stats,
                     'sources':batch['sources'],'skipped':batch['failures'], 'vectors':vector_result,
                     'validation':validation,'certification_status_changes':certification_status_changes,
                     'quality':batch.get('quality',{}),'selection':batch.get('selection',{}),'collection_complete':batch.get('collection_complete',False),
                     'skills_changed':False,'regulations_changed':False,
                     'user_data_changed':validation['removed_rows']['removed_resource_associations']>0,
-                    'vector_scope':'six-resource canonical vector index with source FKs; stable source IDs preserved',
+                    'vector_scope':'new books only; other catalogs unchanged' if only_new_books else
+                        'six-resource canonical vector index with source FKs; stable source IDs preserved',
                     'database_changes':True,'original_embedding_columns_changed':False}
 
     def execute_full_pipeline(self,*,dry_run=False,max_pages=None,allow_partial=False,skip_embeddings=False,db_env='SUPABASE_DB_URL',reset_catalog=False,only_new_books=False):
@@ -743,7 +756,8 @@ class RealDataIngestor:
                         'unresolved_rule_names':batch['unresolved_rule_names'],
                         'skill_coverage':dict(Counter(sid for rows in batch['rows'].values() for r in rows for sid in r['matches']))})
             with deployment.connect(db_env) as conn:
-                result=self.apply(conn,batch,embed=not skip_embeddings,allow_partial=allow_partial)
+                result=self.apply(conn,batch,embed=not skip_embeddings,allow_partial=allow_partial,
+                                  only_new_books=only_new_books)
                 # Tests call apply() in a rollback transaction and do not touch sequences.
                 if 'certifications' in result['tables']:
                     seq=conn.execute("SELECT pg_get_serial_sequence('public.certifications','cert_id') AS name").fetchone()['name']

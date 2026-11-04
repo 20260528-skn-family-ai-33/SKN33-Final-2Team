@@ -108,6 +108,21 @@ class CatalogExpansionTests(TestCase):
                 obj._request('https://data4library.kr/api/srchBooks',{'keyword':'SQL'})
         self.assertEqual(obj.client.get.call_count,2)
 
+    def test_zero_library_budget_means_no_loader_cap(self):
+        from unittest.mock import MagicMock
+        obj=ing();obj.config['library']['request_budget']=0
+        obj.client=MagicMock()
+        obj.client.get.return_value=MagicMock(status_code=200,json=lambda:{'response':{'detail':[]}})
+        with patch.object(obj,'_library_cache_read',return_value=None),patch.object(obj,'_library_cache_write'):
+            for _ in range(450):
+                obj._request('https://data4library.kr/api/srchDtlList',{'isbn13':'9788900000001'})
+        self.assertEqual(obj.client.get.call_count,450)
+        self.assertNotIn('library_budget',obj.reports)
+
+    def test_configured_library_budget_has_no_cap(self):
+        from src.shared.config_loader import get_paths_config
+        self.assertEqual(get_paths_config()['api']['library']['request_budget'],0)
+
     def test_kmooc_unix_seconds_are_valid_dates(self):
         from src.shared.catalog_eligibility import timestamp
         now=datetime.now(timezone.utc).replace(microsecond=0)
@@ -125,6 +140,20 @@ class CatalogExpansionTests(TestCase):
     def test_latin_terms_adjacent_to_korean_are_recognized(self):
         self.assertIn(1,ing().matcher.match('SQL기초부터 PostgreSQL실습까지'))
         self.assertFalse(ing().matcher.match('nosqlstorage'))
+
+    def test_sql_tuning_requires_specific_body_evidence(self):
+        from src.shared.catalog_scope import scoped_matches
+        matcher = SkillMatcher([{'skill_id':2, 'name':'SQL 쿼리 튜닝 & 인덱스 최적화'}])
+        for description in ('오라클 SQL 튜닝을 실습합니다.', 'SQL 성능 최적화 기법을 다룹니다.',
+                            'SQL 문을 분석하고 튜닝하는 과정을 설명합니다.', 'SQL튜닝을 연습합니다.'):
+            with self.subTest(description=description):
+                self.assertIn(2, scoped_matches(matcher, {'title':'데이터베이스 실습', 'description':description}))
+        for description in ('NoSQL 튜닝과 클러스터 운영을 실습합니다.',
+                            'PL/SQL 기초 문법과 저장 프로시저를 학습합니다.',
+                            'PL/SQL 튜닝과 프로시저 관리를 학습합니다.',
+                            'SELECT와 조인 기초를 연습합니다.', ''):
+            with self.subTest(description=description):
+                self.assertNotIn(2, scoped_matches(matcher, {'title':'SQL 튜닝', 'description':description}))
 
     def test_legacy_non_it_rows_are_excluded_without_deleting_them(self):
         from unittest.mock import MagicMock
@@ -186,6 +215,7 @@ class CatalogExpansionTests(TestCase):
         keywords=get_paths_config()['api']['ingestion']['book_keywords']
         self.assertEqual(len(keywords),len(set(keywords)))
         # The library list budget can run out on broad keywords, so #83 keywords go first.
-        for short in ('ETL','데이터 웨어하우스','운영체제','RESTful','레디스','멀티스레드','모의해킹','데이터 거버넌스'):
+        for short in ('SQL 튜닝','SQL 최적화','쿼리 튜닝','도커','Docker','시스템 프로그래밍','POSIX','시스템 보안','리눅스 보안',
+                      'ETL','데이터 웨어하우스','운영체제','RESTful','레디스','멀티스레드','모의해킹','데이터 거버넌스'):
             with self.subTest(keyword=short):
                 self.assertLess(keywords.index(short),keywords.index('컴퓨터 비전'))

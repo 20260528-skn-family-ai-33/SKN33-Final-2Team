@@ -1,12 +1,14 @@
-# 외부 DB 자료와 복원 · 2026-10-29
+# 외부 DB 자료와 복원 · 2026-11-04
 
-최신 공유본은 `growpath_latest.dump`와 같은 위치의 `growpath_latest.manifest.json`이다. 덤프 SHA-256 `e27fb83895f4080cbf8838765de577c360007d6b95cc8c2cc0c92b9979dd3ea7`, 38,402,877바이트다. 강좌 시간·커리큘럼(025·026), 가상 직원 100명의 이름·표시 문구 정리와 기존 업무/경험, 팀원 5명 및 실제 목표 후보 315개(105명×3개)를 포함한다. 개인 입력을 제외했던 직원의 업무·경력·프로젝트는 추가하지 않고 기존 소속·직무·보유 자격으로 후보 3개를 생성했다. 데이터의 가상 출처 기록은 내부에 보존한다.
+현재 공유본은 [growpath_latest.dump](https://drive.google.com/file/d/1hqEq-TSZhkPny9uOll9H_SdM8R5FU9GT/view?usp=drivesdk)와 [growpath_latest.manifest.json](https://drive.google.com/file/d/1ryFpLp9AgVN3b4TY5CpLxmsmhp7JDnXG/view?usp=drivesdk)이다. 기존 Drive 파일 ID와 공유 위치를 유지했다. 덤프 SHA-256 `e166efe51e34883d82997f24f5c182e9bffb0229253ee2633df487eb9321f968`, 42,892,937바이트이며 업로드 후 두 파일을 다시 내려받아 원본 해시와 일치함을 확인했다.
 
-[공유 폴더](https://drive.google.com/drive/folders/1DyJ67R5bYMEwKF-PChdOcxGF8TCNtPsx)에서 두 파일을 받는다. 기존 링크와 공유 권한을 유지했으며 업로드 후 다시 내려받아 두 파일의 SHA-256을 대조했다. [외부 자료 manifest](assets.manifest.json)와 [현재 백업 manifest](data/exports/growpath_latest.manifest.json) 및 [최종 품질 점검](data/exports/final_quality_20261029.manifest.json)에 버전·검증을 연결했다. 원문·개인 입력·덤프·비밀키는 Git에 넣지 않는다.
+도서는 **334→849권(+515권)**, 도서 스킬 연결은 636건 추가했다. 36개 스킬 모두 연결 도서가 3권 이상이다. 신규 도서의 출처·벡터·앱 메타데이터도 포함한다. 최신 Drive 백업(교체 전 SHA-256 `218533512a098a21b95f79ce0d63a00cfacb727504976833d3266e38f0ca054b`)을 기준으로 추가했으며 기존 직원 105명·프롬프트·로드맵·기타 모든 행을 보존했다. 오래된 도서 검증 DB 전체로 공유본을 덮지 않았다.
+
+전체 **78표·29,246행**을 새 격리 DB에 복원해 전 행 지문, 함수, 열·제약조건 및 시퀀스를 대조했다. 기본 복원 도구의 `inventory`는 기준 53표·25,102행이고 `app_ext`를 포함한 전체 지문은 `all_schema_table_fingerprints`에 있다. 스키마 변경은 없으며 ERD는 행 수만 갱신했다. 로컬 앱 DB는 변경하지 않았다.
 
 ## 새 DB 복원
 
-Python 3.12, PostgreSQL 17, pgvector가 필요하다. 최종 백업·독립 복원은 PostgreSQL 17.10·pgvector 0.8.2 Linux 컨테이너에서 검사했다. 앞선 Windows 17.11 검사와 구분한다. 설치는 [README](README.md)를 따른다. 가상환경을 활성화한 뒤 `database/`에서 실행한다.
+PostgreSQL 17·pgvector, Python 3.12와 [README](README.md)의 의존성이 필요하다. 검증 서버는 PostgreSQL 17.11 (Debian 17.11-1.pgdg12+2)이다. `database/`에서 다음을 실행한다.
 
 ```powershell
 python scripts/restore_db.py restore --archive "<외부 백업 폴더>/growpath_latest.dump" --initialize --write-config --port 55435 --pg-bin "C:/실제_PostgreSQL_설치/bin"
@@ -15,18 +17,15 @@ python scripts/db.py verify
 python -m src.database.vectors.resource_vectors status
 ```
 
-비밀번호는 출력되지 않는 터미널 입력을 사용한다. 기존 DB·데이터 디렉터리·`.env.local`은 덮어쓰지 않는다. 기존 서버라면 `--initialize`를 생략하고 비어 있는 새 DB 이름을 지정한다. 포트가 사용 중이면 점유자를 먼저 확인한다. 설치 바이너리와 서버 확장은 별도로 준비한다. 복원에는 OpenAI 키나 유료 API 호출이 필요 없다.
+기존 서버라면 `--initialize`를 생략하고 비어 있는 새 DB 이름을 지정한다. 기존 DB·환경설정을 바로 덮지 않는다. **public만 선택하지 말고 app_ext를 포함한 전체 덤프를 복원**한다. DB 준비가 필요할 때는 `backend/tools/setup_db.py --supplement-only --keep-team-passwords`로 기존 암호를 보존한다. 복원에는 유료 API 호출이 필요 없다. 수신 PC 복원·앱 배포는 아직 검증하지 않았다.
 
-이번 전체 덤프는 기준 스키마 **53표·22,727행**과 기존 앱 보조 스키마 `app_ext` **25표·840행**, 합계 **78표·23,567행**이다. 기준 표 구조는 유지하고 정적 ERD의 건수는 현재 기준 53표·22,727행으로 맞췄다. `inventory`는 기존 복원 도구와 호환되는 기준 53표이며, 전체 78표 지문은 manifest의 `all_schema_table_fingerprints`에 따로 기록한다. 기본 복원 도구는 기준 inventory를 대조하고, 작성 PC의 이번 추가 검사는 전체 78표와 실제 로그인 API까지 검증했다.
+LLM 입력에 스킬별 적합 도서 최소 3권을 우선 확보하는 코드는 #76의 별도 변경이다. 실제로 3권 미만이면 가능한 수와 부족 정보를 전달하며, 최종 추천 수를 강제로 늘리지 않는다. DB 파일만 바꿔서는 이 후보 구성 코드가 배포되지 않는다. 도서 추가 수집 경로는 #83이며 기존 ISBN·강좌·직원·로드맵을 수정하지 않는다.
 
-목표 후보는 `public.employee_recommended_prompts`, 이유·근거는 `app_ext.goal_suggestion_meta`, 입력 해시·상태는 `app_ext.goal_suggestion_runs`에 있다. `public`만 복원하면 사전 로딩 상태가 누락되므로 **전체 덤프를 복원한다**. 이번 최종 백업 복원본에서는 105명의 원래 생성 입력·목표 조회·갱신 필요 판정을 검사해 기존 후보 재사용과 추가 생성 0회를 확인했다. 로그인·세션을 포함한 실제 API 흐름은 별도 35개 검사로 확인했다. 105명 전체 로그인 검사는 앞선 natural105 checkpoint의 기록이다. 로그인의 변경 검사는 제거했으며 홈페이지 저장 성공 뒤 관련 직원만 갱신한다. SQL 직접 수정 후에는 후보를 명시적으로 다시 만든다. 새 업무/프로젝트 저장 계약과 자동 갱신에는 PR #29의 백엔드·프런트 배포도 필요하다.
+013~020 원본 SQL이 없어 구판 DB에 일부 SQL만 적용하는 대신 전체 백업을 새 DB로 복원한다. 비밀키·원문·덤프·개인정보는 Git에 올리지 않고 [외부 자료 manifest](assets.manifest.json)에 해시와 공유 링크만 연결한다. 이전 Drive 파일 쌍은 작성 PC에 보관했으며, 되돌릴 때는 이전 검증 백업을 새 DB에 복원하고 그 이후 사용자 입력을 대조한 뒤 연결을 전환한다.
 
-세 Track 활성 프롬프트는 Free `agent_certified v3`, Fast `agent_fasttrack v4`, Challenge `agent_practical v3`이며 PR #41 정책과 PR #29의 프로젝트 경험 안내를 포함한다. 최신 앱의 `app_ext.user_settings.reasoning` 열도 포함한다. 전체 백업 수신자는 Track 프롬프트 설치·목표 재생성·임베딩을 다시 실행할 필요가 없다.
+## 이전 검증 기록 · 2026-10-29~30
 
-앱 추가 준비가 필요하면 `backend/tools/setup_db.py --supplement-only --keep-team-passwords`를 사용해 기존 직원 암호를 보존한다. 준비 도구는 저장된 목표 생성 상태가 있으면 초기 가데이터 후보로 덮지 않는다. API 키·직원 사번/암호·관리자 계정 설정은 저장소 밖에서 관리한다. 수신 PC의 실제 실행·배포는 아직 검증하지 않았다.
-
-013~020 원본 SQL이 없어 빈 DB를 SQL만으로 재구성하거나 구판 10/21 DB에 021·022만 적용하는 방식은 지원하지 않는다. 최신 백업의 001~026 이력을 검증하고 이미 적용한 SQL의 바이트·해시를 바꾸지 않는다. 024의 조회 정책은 본인 또는 같은 기관·같은 부서의 부서장에게만 허용하며 부서 상하 관계는 사용하지 않는다.
-
+아래 내용은 당시 백업·검사 기록이다. 현재 파일 해시·행 수·프롬프트 상태·배포 순서는 위 최신 안내를 기준으로 한다.
 
 ## 10/29 최종 보정과 적용 순서
 

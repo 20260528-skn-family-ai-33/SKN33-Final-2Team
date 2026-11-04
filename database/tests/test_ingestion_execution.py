@@ -116,6 +116,7 @@ class IngestionExecutionTests(unittest.TestCase):
         self.assertIsNone(self.collect.call_args.kwargs['kinds'])
         self.assertEqual(self.collect.call_args.kwargs['skip_isbns'], frozenset())
         self.assertEqual(result['collection_scope'], 'all_catalogs')
+        self.assertFalse(self.apply.call_args.kwargs['only_new_books'])
         self.assertFalse(any('public.books' in call.args[0] for call in self.conn.execute.call_args_list))
 
     def test_only_new_books_collects_books_without_saved_isbns(self):
@@ -129,6 +130,7 @@ class IngestionExecutionTests(unittest.TestCase):
         self.assertEqual(self.collect.call_args.kwargs['skip_isbns'], frozenset({'9788900000001'}))
         self.assertEqual(result['collection_scope'], 'new_books_only')
         self.apply.assert_called_once()
+        self.assertTrue(self.apply.call_args.kwargs['only_new_books'])
         self.backup.assert_not_called()
         self.reset.assert_not_called()
 
@@ -157,10 +159,8 @@ class NarrowedCatalogTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             ing.collect(SKILLS, kinds=('videos',))
 
-    def test_books_only_batch_writes_books_and_leaves_other_catalogs_untouched(self):
-        ing = RealDataIngestor(config={'ingestion': {}}, ai_client=client())
-        statements = []
-
+    @staticmethod
+    def connection(statements, saved_books=()):
         class Connection:
             @contextmanager
             def transaction(self):
@@ -169,21 +169,103 @@ class NarrowedCatalogTests(unittest.TestCase):
             def execute(self, sql, params=None):
                 statements.append(sql)
                 result = MagicMock()
-                result.fetchall.return_value = SKILLS if 'public.skill_tags' in sql else []
+                result.fetchall.return_value = (SKILLS if 'public.skill_tags' in sql else
+                    [{'isbn': isbn, 'title': '저장된 도서'} for isbn in saved_books] if 'FROM public.books' in sql else [])
                 result.fetchone.return_value = {'id': 'present'} if 'to_regclass' in sql else None
                 return result
+        return Connection()
 
+    def test_new_books_batch_skips_whole_catalog_cleanup_and_checks_only_new_books(self):
+        ing = RealDataIngestor(config={'ingestion': {}}, ai_client=client())
+        statements = []
         validation = {'removed_rows': {'removed_resource_associations': 0}}
-        with patch('src.database.ingestion.catalog_finalization.finalize_catalog', return_value=({}, validation)):
-            result = ing.apply(Connection(), {'failures': {}, 'rows': {'books': [row()]},
-                                              'skill_identity': SKILLS, 'sources': {}})
+        with patch('src.database.ingestion.catalog_finalization.finalize_catalog',
+                   side_effect=AssertionError('whole-catalog cleanup')), \
+             patch('src.database.ingestion.catalog_details.refresh_certification_status',
+                   side_effect=AssertionError('certification refresh')), \
+             patch('src.database.ingestion.catalog_finalization.finalize_new_books',
+                   return_value=({}, validation)) as new_books:
+            result = ing.apply(self.connection(statements), {'failures': {}, 'rows': {'books': [row()]},
+                               'skill_identity': SKILLS, 'sources': {}}, only_new_books=True)
+        self.assertEqual(new_books.call_args.args[1], ['9791191234567'])
+        self.assertTrue(new_books.call_args.kwargs['embed'])
         self.assertEqual(set(result['tables']), {'books'})
         self.assertEqual(result['tables']['books']['inserted'], 1)
+        self.assertEqual(result['certification_status_changes'], {})
         writes = [s for s in statements if s.lstrip().upper().startswith(('INSERT', 'UPDATE', 'DELETE', 'LOCK'))]
         self.assertTrue(any('public.books' in s for s in writes))
         for other in ('courses', 'certifications', 'jobs', 'majors'):
             with self.subTest(catalog=other):
-                self.assertFalse(any(f'public.{other}' in s for s in writes))
+                self.assertFalse(any(f'public.{other}' in s for s in statements))
+
+    def test_new_books_batch_never_rewrites_a_saved_book_or_other_catalogs(self):
+        ing = RealDataIngestor(config={'ingestion': {}}, ai_client=client())
+        statements = []
+        with self.assertRaisesRegex(ValueError, '이미 저장된 도서'):
+            ing.apply(self.connection(statements, saved_books=['9791191234567']),
+                      {'failures': {}, 'rows': {'books': [row()]}, 'skill_identity': SKILLS, 'sources': {}},
+                      only_new_books=True)
+        self.assertFalse(any(s.lstrip().upper().startswith('INSERT') for s in statements))
+        with self.assertRaisesRegex(ValueError, '도서 외 자료'):
+            ing.apply(self.connection([]), {'failures': {}, 'rows': {'books': [], 'courses': []},
+                      'skill_identity': SKILLS, 'sources': {}}, only_new_books=True)
+
+
+class NewBookFinalizationTests(unittest.TestCase):
+    def setUp(self):
+        from src.database.ingestion import catalog_finalization
+        self.module = catalog_finalization
+        self.statements = []
+        good = row()['fields']
+        books = {'9788900000001': good, '9788900000002': {**good, 'isbn': '9788900000002'}}
+        statements = self.statements
+
+        class Connection:
+            def execute(self, sql, params=None):
+                statements.append(sql)
+                result = MagicMock()
+                if 'public.skill_tags' in sql:
+                    result.fetchall.return_value = SKILLS
+                elif 'FROM public.books t WHERE isbn' in sql:
+                    result.fetchone.return_value = {'fields': books[params[0]]}
+                elif 'FROM public.book_skills WHERE isbn' in sql:
+                    result.fetchall.return_value = [{'skill_id': 1}]
+                return result
+        self.conn = Connection()
+        self.eligible = self.enterContext(patch.object(catalog_finalization, 'eligible_keys',
+                                                       return_value=({('books', '9788900000001')}, {})))
+        self.embed = self.enterContext(patch.object(catalog_finalization.resource_vectors, 'embed',
+                                                    return_value={'embedded_count': 1}))
+        self.plan = self.enterContext(patch.object(catalog_finalization.resource_vectors, 'plan',
+                                                   return_value={'pending_count': 0}))
+
+    def test_only_new_usable_books_are_embedded_and_unusable_new_books_are_excluded(self):
+        result, validation = self.module.finalize_new_books(self.conn, ['9788900000002', '9788900000001'])
+        self.assertEqual(self.embed.call_args.kwargs['resource_types'], ['books'])
+        self.assertEqual(self.embed.call_args.kwargs['resource_ids'], ['9788900000001'])
+        self.assertEqual((validation['books_ready'], validation['unusable_rows_excluded']), (1, 1))
+        self.assertTrue(validation['vectors_verified'])
+        writes = [s for s in self.statements if s.lstrip().upper().startswith(('INSERT', 'UPDATE', 'DELETE'))]
+        self.assertEqual(len(writes), 2)
+        self.assertTrue(all('book' in s for s in writes))
+        for other in ('courses', 'certifications', 'jobs', 'majors'):
+            self.assertFalse(any(f'public.{other}' in s for s in self.statements))
+
+    def test_missing_new_book_vector_fails_the_load(self):
+        self.plan.return_value = {'pending_count': 1}
+        with self.assertRaisesRegex(ValueError, '벡터'):
+            self.module.finalize_new_books(self.conn, ['9788900000001'])
+
+    def test_nothing_new_makes_no_paid_call(self):
+        result, validation = self.module.finalize_new_books(self.conn, [])
+        self.embed.assert_not_called()
+        self.eligible.assert_not_called()
+        self.assertFalse(result['embedding_api_called'])
+        self.assertEqual(validation['books_checked'], 0)
+        result, validation = self.module.finalize_new_books(self.conn, ['9788900000001'], embed=False)
+        self.embed.assert_not_called()
+        self.assertEqual(validation['books_ready'], 1)
+        self.assertFalse(validation['vectors_verified'])
 
 
 class IngestionCliTests(unittest.TestCase):
