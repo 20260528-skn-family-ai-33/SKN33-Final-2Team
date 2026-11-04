@@ -31,6 +31,24 @@ class SkillSelectionTests(unittest.TestCase):
         self.assertEqual(payload['availableSkills'], self.tags)
         self.assertEqual(payload['maxSkills'], 5)
 
+    def test_only_exact_duplicate_desired_competencies_is_omitted_without_mutation(self):
+        from copy import deepcopy
+        for desired in ('문서 검색 프로젝트', '  문서 검색 프로젝트  ', '문서 검색 프로젝트 심화', '문서  검색 프로젝트', None):
+            with self.subTest(desired=desired):
+                project = dict(self.project, desiredCompetencies=desired)
+                before = deepcopy(project)
+                generate = Mock(return_value={'skills': [self.row(self.tags[0])]})
+                result = select_skills(project, self.tags, generate)
+                system, payload = generate.call_args.args
+                if isinstance(desired, str) and desired.strip() == project['goal'].strip():
+                    self.assertNotIn('desiredCompetencies', payload)
+                else:
+                    self.assertIn('desiredCompetencies', payload)
+                    self.assertEqual(payload['desiredCompetencies'], desired)
+                self.assertEqual(project, before)
+                self.assertEqual(result, {'skills': [self.row(self.tags[0])]})
+                self.assertIn('미제공 시 goal 기준', system)
+
     def test_zero_or_more_than_five_is_rejected_without_silent_truncation(self):
         for count in (0, 6):
             with self.subTest(count=count), self.assertRaises(SelectionError):

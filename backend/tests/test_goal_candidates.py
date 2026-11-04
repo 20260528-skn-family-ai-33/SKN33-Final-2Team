@@ -39,6 +39,38 @@ class GoalCandidateContractTests(unittest.TestCase):
         self.assertNotIn('code', inp)
         self.assertEqual([row['period'] for row in inp['evaluations']], ['2026'])
 
+    def test_model_receives_one_complete_profile_without_derived_duplicates(self):
+        from copy import deepcopy
+        person = dict(self.person, tech=['Python', 'SQL'], learning=['API 교육'],
+                      profile={'workDesc': '업무 API 운영', 'expSummary': '서비스 개선', 'devYears': 3},
+                      evals=[{'period': '2025', 'grade': 'A', 'consent': False},
+                             {'period': '2026', 'grade': 'B', 'score': '40/50', 'consent': True}])
+        self.inp = goals.goal_input(person)
+        before = deepcopy(self.inp)
+        result, model = self.call()
+        payload = model.call_args.args[2]
+        self.assertEqual(set(payload), {'profile', 'areas', 'avoid', 'availableBasis'})
+        self.assertEqual(payload['profile'], before['profile'])
+        self.assertEqual(payload['profile']['techStack'], ['Python', 'SQL'])
+        self.assertEqual(payload['profile']['learning'], ['API 교육'])
+        self.assertEqual(payload['profile']['evaluations'], [{'period': '2026', 'result': 'B, 40/50'}])
+        self.assertEqual(self.inp, before)
+        self.assertEqual(model.call_args.args[1], goals.G_SYS)
+        self.assertEqual(set(result), {'candidates', 'note'})
+        self.assertTrue(all(set(row) == {'goal', 'why', 'basis'} for row in result['candidates']))
+
+    def test_avoid_is_forwarded_and_repeated_goal_is_rejected(self):
+        self.inp['avoid'] = [self.output['candidates'][0]['goal']]
+        with patch.object(goals.rt, 'llm_json', return_value=self.output) as model:
+            with self.assertRaises(LlmError): goals._api(SimpleNamespace(), self.inp)
+        self.assertEqual(model.call_args.args[2]['avoid'], self.inp['avoid'])
+
+    def test_prompt_version_changes_only_goal_candidate_cache_signature(self):
+        from app.services import goals as store
+        original = store._hash(self.inp)
+        with patch.object(goals, 'PROMPT_VERSION', 'next-version'):
+            self.assertNotEqual(original, store._hash(self.inp))
+
     def test_identity_only_or_unprovided_context_is_not_a_model_basis(self):
         self.assertFalse(goals.profile_enough({'name': '이름', 'code': '123'}))
         self.assertFalse(goals.profile_enough({'job': '해당 없음', 'dept': '미지정'}))

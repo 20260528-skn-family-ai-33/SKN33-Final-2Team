@@ -135,8 +135,10 @@ class SkillIdentityTests(unittest.TestCase):
              'skillDetails': [{'name': name, 'application': f'SQL {name}'} for name in names]}
         with patch.object(catalog, 'items', return_value=resources(5)), patch.object(budget, 'tokens', return_value=1):
             out = rm._catalog_payload('A2', {'handoff': h})
-        for key in ('skillNames', 'skillOrder', 'coreSkills', 'focus'):
-            self.assertEqual(out['handoff'][key], order)
+        self.assertEqual(out['handoff']['skillOrder'], order)
+        self.assertEqual(out['handoff']['coreSkills'], order)
+        for key in ('skillNames', 'focus', 'domain'):
+            self.assertNotIn(key, out['handoff'])
         self.assertEqual([r['name'] for r in out['handoff']['skillDetails']], order)
         self.assertEqual(out['trackGuidance']['coreSkills'], order)
         self.assertEqual(out['trackGuidance']['maxCoreSkills'], 5)
@@ -197,9 +199,9 @@ class SkillIdentityTests(unittest.TestCase):
             self.assertEqual(payload['handoff']['skillOrder'], ['SQL 현재 이름'])
             self.assertEqual(payload['handoff']['skillDetails'], [{'name': 'SQL 현재 이름'}])
             self.assertEqual(payload['handoff']['inferredSkillNames'], ['SQL 현재 이름'])
-            self.assertEqual(payload['handoff']['assessment']['groups'], [])
-            self.assertEqual(payload['handoff']['assessment']['unmatchedGroups'][0]['priorSkill'], 'SQL 옛 이름')
-            self.assertEqual(payload['handoff']['assessment']['unmatchedGroups'][0]['surveys'][0]['rating'], 3)
+            self.assertEqual(payload['handoff']['assessment']['skills'], [])
+            self.assertEqual(payload['handoff']['assessment']['unmatchedSkills'][0]['priorSkill'], 'SQL 옛 이름')
+            self.assertEqual(payload['handoff']['assessment']['unmatchedSkills'][0]['surveys'][0]['selfRating'], 3)
             return {'acts': [{'stage': 2, 'res': 'sql'}],
                     'learningSkills': [{'name': 'SQL 현재 이름', 'application': '조회 결과 대조',
                                         'targetOutcome': '조인 오류 비교표', 'completionCriteria': ['입력 행 비교', '출력 키 대조']}]}
@@ -242,7 +244,7 @@ class RealTokenizerBudgetTests(unittest.TestCase):
                 with self.subTest(pid=pid):
                     system = rm.R_SYS.format(id=pid, name='검사 관점', rules=rm.PERSPECTIVE_RULES[pid])
                     out = rm._catalog_payload(pid, {'handoff': h, 'skillTags': h['skillNames']}, system)
-                    self.assertLessEqual(budget.tokens(system) + budget.tokens(out) + budget.FRAMING_RESERVE, 10000)
+                    self.assertLessEqual(budget.tokens(system) + budget.tokens(out) + budget.FRAMING_RESERVE, budget.INPUT_TOKENS)
                     self.assertGreaterEqual(len(out['catalog']), 15)
                     self.assertEqual(out['catalogCounts']['sent'], len(out['catalog']))
                     self.assertTrue(all(count >= 2 for count in out['catalogCounts']['perSkill'].values()))
@@ -271,10 +273,10 @@ class RealTokenizerBudgetTests(unittest.TestCase):
             self.assertEqual(kwargs['role'], 'roadmap')
             self.assertEqual(payload['handoff']['skillOrder'], names)
             self.assertEqual([r['name'] for r in payload['handoff']['skillDetails']], names)
-            self.assertEqual(len(payload['handoff']['assessment']['groups']), 5)
-            self.assertTrue(payload['handoff']['assessment']['groups'][0]['quizzes'][0]['correct'])
+            self.assertEqual(len(payload['handoff']['assessment']['skills']), 5)
+            self.assertEqual(payload['handoff']['assessment']['skills'][0]['quizzes'][0]['result'], 'correct')
             self.assertEqual(payload['skillTags'], names + ['Docker'])
-            self.assertLessEqual(budget.tokens(system) + budget.tokens(payload) + budget.FRAMING_RESERVE, 10000)
+            self.assertLessEqual(budget.tokens(system) + budget.tokens(payload) + budget.FRAMING_RESERVE, budget.INPUT_TOKENS)
             return {'acts': [{'stage': 2, 'res': '0-29', 'title': 'SQL 결과 검증'}],
                     'learningSkills': [{'name': name, 'application': 'SQL 결과 대조', 'targetOutcome': '오류 재현 보고서',
                                         'completionCriteria': ['입출력 키 대조', '오류 재현 근거']} for name in names]}

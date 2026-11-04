@@ -50,6 +50,21 @@ class PromptImprovementTests(TestCase):
             with self.assertRaises(ImprovementError):
                 run(SimpleNamespace(mode='openai'), self.prompts, self.events)
 
+    def test_append_only_generation_and_revision_are_rejected(self):
+        for prompt in (
+            self.prompts['A1']['systemPrompt'] + '\n추가 지침',
+            '### GENERATION\n목표에 맞는 계획\n추가 지침\n### REVISION\n수정 본문 교체',
+        ):
+            output = deepcopy(self.output)
+            output['changes'][0]['systemPrompt'] = prompt
+            with self.subTest(prompt=prompt), self.assertRaisesRegex(ImprovementError, '덧붙이지'):
+                propose(self.prompts, self.events, 30, Mock(return_value=output))
+
+    def test_full_replacement_preserves_unchanged_section(self):
+        result = propose(self.prompts, self.events, 30, Mock(return_value=self.output))
+        self.assertEqual(result['changes'][0]['systemPrompt'], self.output['changes'][0]['systemPrompt'])
+        self.assertEqual(self.prompts['A1']['systemPrompt'], '### GENERATION\n목표에 맞는 계획\n### REVISION\n기존 정책 유지')
+
     def test_no_change_does_not_request_evaluation_or_application(self):
         result = propose(self.prompts, self.events, 30, Mock(return_value={'note': '근거 부족', 'changes': []}))
         self.assertEqual(result['status'], 'no_change')

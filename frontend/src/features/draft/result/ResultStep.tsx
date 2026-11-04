@@ -6,11 +6,7 @@ import { prepareRoadmaps } from '../prepareRoadmaps';
 import { useDraftWatch } from '../useDraftWatch';
 import { CourseCostSummary } from '../materials/CourseCostSummary';
 import { flush } from '../draftSync';
-import { Fragment } from 'react';
 import { ResourceImage } from '@/shared/ui/ResourceImage';
-import type { Prefs } from '@/api/types/draft';
-import { D } from '@/shared/constants/data';
-import { prefText } from '@/shared/lib/prefs';
 import { planWeeklyHours } from '@/shared/lib/plan';
 import { useEffect, useId, useImperativeHandle, useRef, useState, type Ref } from 'react';
 import { paths } from '@/app/paths';
@@ -19,7 +15,7 @@ import { useWs } from '@/shared/state/workspace';
 import { Page } from '@/shared/ui/parts';
 import { Stepper } from '../Stepper';
 import { genStart, startEdit, ResultEdit } from './legacyResult';
-import { displayOrder, moveSkill, currentWeeks, currentEstimates, durationLabel, totalWeeks, type Choices, type DurationEstimate } from './skillOrder';
+import { displayOrder, currentWeeks, currentEstimates, durationLabel, totalWeeks, type Choices, type DurationEstimate } from './skillOrder';
 
 const durationFlights = new Map<string, Promise<Result>>();
 export function usePrepareMaterials() {
@@ -66,14 +62,13 @@ export function ResultStep() {
       {error&&<p role="alert">{error} 다음 버튼으로 다시 시도할 수 있어요.</p>}
     </Page></>;
 }
-export function ResourceSelection({ ref, onChoicesChanged, locked, courseId, onTotals, onPrepared, skillFilter, sectionOpen, onSectionToggle }: { ref?: Ref<ResourceSelectionHandle>; onChoicesChanged?: () => void; locked?: boolean; courseId?: string; onTotals?: (course:string,totals:MaterialTotals)=>void; onPrepared?:(course:string,state:'ready'|'pending'|'failed',version:string)=>void; skillFilter?:string; sectionOpen?:{books:boolean;courses:boolean}; onSectionToggle?:(kind:'books'|'courses',open:boolean)=>void }) { const scope=useWs(s=>JSON.stringify([s.owner,s.draftId,s.draft.v2Assessment?.generationId,courseId||s.draft.chosen,materialVersionKey(s.draft.gen?.options[courseId||s.draft.chosen||''])])); return <ResultSelection key={scope} resourcesOnly editorRef={ref} onChoicesChanged={onChoicesChanged} locked={locked} courseId={courseId} onTotals={onTotals} onPrepared={onPrepared} skillFilter={skillFilter} sectionOpen={sectionOpen} onSectionToggle={onSectionToggle} />; }
-function ResultSelection({ resourcesOnly = false, editorRef, onChoicesChanged, locked = false, courseId, onTotals, onPrepared, skillFilter, sectionOpen, onSectionToggle }: { resourcesOnly?: boolean; editorRef?: Ref<ResourceSelectionHandle>; onChoicesChanged?: () => void; locked?: boolean; courseId?:string; onTotals?:(course:string,totals:MaterialTotals)=>void; onPrepared?:(course:string,state:'ready'|'pending'|'failed',version:string)=>void; skillFilter?:string; sectionOpen?:{books:boolean;courses:boolean}; onSectionToggle?:(kind:'books'|'courses',open:boolean)=>void }) {
+export function ResourceSelection({ ref, onChoicesChanged, locked, courseId, onTotals, onPrepared, skillFilter, sectionOpen, onSectionToggle }: { ref?: Ref<ResourceSelectionHandle>; onChoicesChanged?: () => void; locked?: boolean; courseId?: string; onTotals?: (course:string,totals:MaterialTotals)=>void; onPrepared?:(course:string,state:'ready'|'pending'|'failed',version:string)=>void; skillFilter?:string; sectionOpen?:{books:boolean;courses:boolean}; onSectionToggle?:(kind:'books'|'courses',open:boolean)=>void }) { const scope=useWs(s=>JSON.stringify([s.owner,s.draftId,s.draft.v2Assessment?.generationId,courseId||s.draft.chosen,materialVersionKey(s.draft.gen?.options[courseId||s.draft.chosen||''])])); return <ResultSelection key={scope} editorRef={ref} onChoicesChanged={onChoicesChanged} locked={locked} courseId={courseId} onTotals={onTotals} onPrepared={onPrepared} skillFilter={skillFilter} sectionOpen={sectionOpen} onSectionToggle={onSectionToggle} />; }
+function ResultSelection({ editorRef, onChoicesChanged, locked = false, courseId, onTotals, onPrepared, skillFilter, sectionOpen, onSectionToggle }: { editorRef?: Ref<ResourceSelectionHandle>; onChoicesChanged?: () => void; locked?: boolean; courseId?:string; onTotals?:(course:string,totals:MaterialTotals)=>void; onPrepared?:(course:string,state:'ready'|'pending'|'failed',version:string)=>void; skillFilter?:string; sectionOpen?:{books:boolean;courses:boolean}; onSectionToggle?:(kind:'books'|'courses',open:boolean)=>void }) {
   const id = useWs(s => s.draftId);
   const draft = useWs(s => s.draft);
-  const course = courseId || (resourcesOnly ? draft.chosen : undefined);
+  const course = courseId || draft.chosen;
   const version = materialVersionKey(draft.gen?.options[course || '']);
   const generation = useWs(s => s.draft.v2Assessment?.generationId);
-  const go = useGo();
   const [storedResult, setResult] = useState<Result | null>(null);
   const result = storedResult && (storedResult.courseId ?? null) === (course ?? null) ? storedResult : null;
   const [choices, setChoices] = useState<Choices>({});
@@ -81,7 +76,6 @@ function ResultSelection({ resourcesOnly = false, editorRef, onChoicesChanged, l
   const [storedEstimates, setEstimates] = useState<Record<string,DurationEstimate>>({});
   const weeklyHours = planWeeklyHours(draft.handoff?.prefs.weeklyHours, draft.gen?.options[course || '']?.weeklyHours);
   const estimates = currentEstimates(order, choices, storedEstimates, weeklyHours);
-  const [dragging, setDragging] = useState<string | null>(null);
   const [activeSkill,setActiveSkill]=useState('');
   const tabsId=useId();
   const [error, setError] = useState('');
@@ -168,34 +162,14 @@ function ResultSelection({ resourcesOnly = false, editorRef, onChoicesChanged, l
   const materialNames=displayOrder(order,choices).filter(name=>result?.recommendations?.skills.some(skill=>skill.name===name));
   const shownSkill=skillFilter || (materialNames.includes(activeSkill)?activeSkill:materialNames[0]);
   const content = <>
-    {!resourcesOnly && <div className="card preview"><h2>로드맵 세부 사항</h2><dl className="kv"><dt>학습 목표</dt><dd>{draft.goal}</dd>
-      {draft.diag?.outcome && <><dt>만들 결과물</dt><dd>{draft.diag.outcome}</dd></>}
-    </dl>
-      <h3>프로젝트 요약</h3><p className="small" style={{ whiteSpace: 'pre-wrap' }}>{draft.doc?.summary?.trim() || '첨부한 프로젝트 기획서가 없어요.'}</p>
-      <h3>입력한 세부 사항</h3><dl className="kv">{D.detailFields.map(([key, label]) => <Fragment key={key}><dt>{label}</dt><dd>{prefText(key as keyof Prefs, draft.prefs)}</dd></Fragment>)}</dl>
-    </div>}
-    <div className="v2-skill-summary"><h2>{resourcesOnly ? '도서·강좌 선택' : '익히게 될 지식 역량'}</h2>
+    <div className="v2-skill-summary"><h2>도서·강좌 선택</h2>
       <div><b aria-live="polite">총 예상 {total === null ? `주차 산정 필요${missingCount ? ` (${missingCount}개)` : ''}` : `${total}주`}</b>
         {Object.values(estimates).some(row => row.unknownCourses?.length) ? <span className="small muted">시간 미확인 강좌는 각 1주로 가정</span> : Object.values(estimates).some(row => row.estimatedCourses?.length) && <span className="small muted">추정 시간 포함</span>}
         {estimating && <span className="small muted" role="status"><span className="sp" aria-hidden="true" /> 주차 계산 중…</span>}</div>
     </div>
-    {!resourcesOnly && result?.recommendations && <div className="v2-skill-sort" aria-label="스킬 순서 변경">{displayOrder(order, choices).map(name => {
-      const selected = choices[name];
-      const excluded = selected?.enabled === false;
-      const weeks = selected ? currentWeeks(selected, estimates[name]) : null;
-      return <div key={name} className={`v2-sort-item${excluded ? ' v2-skill-excluded' : ''}`}
-        draggable={!busy && !saving && !excluded}
-        onDragStart={event => { setDragging(name); event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', name); }}
-        onDragEnd={() => setDragging(null)}
-        onDragOver={event => { if (dragging && !excluded && !busy) event.preventDefault(); }}
-        onDrop={event => { event.preventDefault(); if (dragging && !busy) setOrder(old => moveSkill(old, dragging, name, choices)); setDragging(null); }}>
-        <div className="v2-sort-description"><b>{name}</b>{result.skillDetails?.find(skill => skill.name === name)?.application && <p className="small muted">{result.skillDetails.find(skill => skill.name === name)!.application}</p>}</div><span className="small muted">{excluded ? '미선택' : weeks === null ? '주차 계산 중' : durationLabel(estimates[name])}</span>
-        <button className="btn line small" disabled={busy || saving} onClick={() => setChoices(old => ({ ...old, [name]: { ...selected, enabled: excluded } }))}>{excluded ? '다시 포함' : '제외'}</button>
-      </div>;
-    })}</div>}
     {error && <div><p className="err" role="alert">{error}</p>{!result?.recommendations && <button className="btn line" disabled={busy} onClick={() => void generate()}>다시 시도하기</button>}</div>}
-    {busy ? resourcesOnly && <div className="loading" role="status"><span className="sp" aria-hidden="true" />자료를 확인하고 추천을 정리하고 있어요.</div>
-      : result?.recommendations ? resourcesOnly ? <>{!skillFilter&&<MaterialSkillTabs names={materialNames} active={shownSkill} onChange={setActiveSkill} id={tabsId}/>}<div className="v2-skills-board">{materialNames.map((name,skillIndex) => {
+    {busy ? <div className="loading" role="status"><span className="sp" aria-hidden="true" />자료를 확인하고 추천을 정리하고 있어요.</div>
+      : result?.recommendations ? <>{!skillFilter&&<MaterialSkillTabs names={materialNames} active={shownSkill} onChange={setActiveSkill} id={tabsId}/>}<div className="v2-skills-board">{materialNames.map((name,skillIndex) => {
         const skill = result.recommendations!.skills.find(s => s.name === name)!;
         const selected = choices[skill.name] ?? { course: skill.selectedCourse, books: skill.selectedBooks };
         const excluded = selected.enabled === false;
@@ -208,17 +182,16 @@ function ResultSelection({ resourcesOnly = false, editorRef, onChoicesChanged, l
           {skill.courses.some(resource => course !== 'A1' || resource.cost === 0) ? <div className="v2-resource-grid">{skill.courses.filter(resource => course !== 'A1' || resource.cost === 0).map(resource => <ResourceCard key={resource.id} resource={resource} kind="course" checked={selected.course === resource.id} disabled={locked || busy || excluded} onChange={() => { onChoicesChanged?.(); setChoices(old => ({ ...old, [skill.name]: { ...selected, course: resource.id } })); }} />)}</div> : <p className="small muted">프로젝트에 맞는 강좌를 찾지 못했어요.</p>}
           </details>
         </section>;
-      })}{skillFilter&&!materialNames.includes(skillFilter)&&<p className="small muted">이 코스에는 해당 스킬의 추천 자료가 없어요.</p>}</div></> : null : resourcesOnly && !error && <div className="loading" role="status"><span className="sp" aria-hidden="true" />추천 자료를 준비하고 있어요.</div>}
+      })}{skillFilter&&!materialNames.includes(skillFilter)&&<p className="small muted">이 코스에는 해당 스킬의 추천 자료가 없어요.</p>}</div></> : !error && <div className="loading" role="status"><span className="sp" aria-hidden="true" />추천 자료를 준비하고 있어요.</div>}
     <style>{`
       .v2-skill-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
       .v2-skill-summary>div,.v2-skill-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
       .v2-skills-board{display:grid;gap:16px;margin-top:20px}
-      .v2-skills-board>.v2-skill{min-width:0;margin:0;padding:20px}.v2-skill-heading{display:flex;justify-content:space-between;gap:12px}.v2-skill-sort{display:grid;gap:8px;padding:8px 0 14px}.v2-sort-item{min-width:0;border:1px solid var(--line,#ddd);border-radius:12px;padding:12px 16px;display:flex;align-items:center;gap:12px;background:var(--card,#fff)}.v2-sort-description{flex:1;min-width:0;overflow-wrap:anywhere}.v2-sort-description p{margin:4px 0 0}.v2-sort-item[draggable=true]{cursor:grab}.v2-sort-item b{font-size:13px}.v2-sort-item .btn{flex-shrink:0;padding:3px 8px;min-height:0;font-size:11px}
+      .v2-skills-board>.v2-skill{min-width:0;margin:0;padding:20px}.v2-skill-heading{display:flex;justify-content:space-between;gap:12px}
       .v2-skill-heading h2{font-size:17px;margin:0 0 8px;overflow-wrap:anywhere}
       .v2-skill-tools{font-size:12px}.v2-skill-tools .btn{padding:4px 7px;min-height:0;font-size:12px}
       .v2-skill-tools b{width:100%;margin-bottom:4px}.v2-skill h3{font-size:14px;margin:18px 0 8px}
       .v2-skill-excluded{filter:grayscale(1);background:#f0f0f0;opacity:.7}
-      .v2-skill-tools button[draggable=true]{cursor:grab}
       .v2-resource-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
       .v2-resource{cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:16px;border:1px solid var(--line,#ddd);border-radius:10px;padding:9px;background:var(--card,#fff)}
       .v2-resource-image{width:52px;height:64px;object-fit:contain;flex-shrink:0;border-radius:4px}.v2-resource[aria-disabled=true]{cursor:default}.v2-resource:focus-visible{outline:2px solid var(--acc,#138575);outline-offset:2px}.v2-resource-selected{border-color:var(--acc,#138575)}
@@ -237,10 +210,6 @@ function ResultSelection({ resourcesOnly = false, editorRef, onChoicesChanged, l
     `}</style>
   </>;
   if (courseId) return <div className="course-material-editor" onClick={event=>event.stopPropagation()}>{content}</div>;
-  if (resourcesOnly) return <div className="materials-with-cost"><div>{content}</div><CourseCostSummary skills={result?.recommendations?.skills || []} choices={choices} order={order} /></div>;
-  return <><Stepper cur="result" /><Page title="이런 로드맵이 만들어질 예정이에요" lead="학습할 스킬의 순서와 포함 여부를 정해 주세요. 도서·강좌는 검토·확정에서 선택합니다."
-    foot={<><button className="btn line" disabled={busy} onClick={() => go(paths.newQuiz)}>이전: 역량 테스트</button>
-      <button className="btn pri" disabled={busy || saving || !result?.recommendations} onClick={() => void (async () => { if (await save()) await genStart(go); })()}>로드맵 계획하기</button></>}>{content}</Page></>;
+  return <div className="materials-with-cost"><div>{content}</div><CourseCostSummary skills={result?.recommendations?.skills || []} choices={choices} order={order} /></div>;
 }
-// 로드맵 3안 생성 연결은 다음 단계에서 기존 호출 계약과 함께 교체한다.
 export { genStart, startEdit, ResultEdit };

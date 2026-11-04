@@ -43,7 +43,7 @@ def activate(expected: dict, approved: list[dict], period_key: str) -> dict:
             verdict = evaluate_gate(row.get('baselineEvaluation'), row.get('candidateEvaluation'))
             if not verdict['approved']:
                 raise agent.ImprovementError('비교 평가를 통과한 프롬프트만 적용합니다.')
-            text = agent._prompt_text(row.get('systemPrompt'))
+            text = agent.replacement_text(expected[course]['systemPrompt'], row.get('systemPrompt'))
             if text == expected[course]['systemPrompt']:
                 raise agent.ImprovementError('기존과 동일한 프롬프트입니다.')
             seen.add(course)

@@ -1,17 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { planWeeklyHours } from '@/shared/lib/plan';
-import { displayOrder, moveSkill, totalWeeks, currentWeeks, currentEstimates, durationLabel, DURATION_METHOD, type DurationEstimate } from './skillOrder';
+import { displayOrder, totalWeeks, currentWeeks, currentEstimates, durationLabel, DURATION_METHOD, type DurationEstimate } from './skillOrder';
 const choices = { A: { course: null, books: [] }, B: { course: null, books: [], enabled: false }, C: { course: null, books: [] } };
 describe('스킬 순서와 제외', () => {
  it('제외한 스킬은 삭제하지 않고 아래로 표시한다', () => expect(displayOrder(['A','B','C'], choices)).toEqual(['A','C','B']));
- it('선택 스킬의 순서만 바꾸고 자료 선택은 유지한다', () => {
-   expect(moveSkill(['A','B','C'], 'C', 'A', choices)).toEqual(['C','A','B']);
-   expect(choices.B.enabled).toBe(false);
- });
- it('자료 ID나 제외 스킬을 드래그해 순서를 바꿀 수 없다', () => {
-   expect(moveSkill(['A','B','C'], 'B', 'A', choices)).toEqual(['A','B','C']);
-   expect(moveSkill(['A','B','C'], 'resource', 'A', choices)).toEqual(['A','B','C']);
- });
+
 });
 
 describe('공유 자료 전체 기간과 스킬 표시 구간', () => {

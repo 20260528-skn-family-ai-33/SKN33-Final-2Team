@@ -15,9 +15,10 @@ TOKENIZER_SHA256 = '0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229
 TOKENIZER_URL = f'https://huggingface.co/Qwen/Qwen3.8-27B/resolve/{TOKENIZER_REVISION}/tokenizer.json'
 CATALOG_TOKENS = 5000
 EXPANDED_CATALOG_TOKENS = 6000
-INPUT_TOKENS = 10000
+INPUT_TOKENS = 12000
 OUTPUT_RESERVE = 4096
-CONTEXT_RESERVE = 2048
+# 입력에는 FRAMING_RESERVE 포함. 16K에서 출력 4096을 유지한 나머지 여유.
+CONTEXT_RESERVE = 288
 FRAMING_RESERVE = 128
 GUIDE = ('catalog의 생략된 필드는 catalogDefaults를 따른다. skills는 catalogSkillMap의 스킬 코드다. '
          'curriculum은 [저장된 단원의 0부터 시작하는 위치, 원문 발췌] 쌍의 배열이다. '

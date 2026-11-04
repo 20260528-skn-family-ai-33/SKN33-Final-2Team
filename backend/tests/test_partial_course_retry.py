@@ -13,8 +13,9 @@ class PartialCourseRetryTests(unittest.TestCase):
 
     def run_retry(self,w,fail=False):
         def mutate(employee,draft,fn):fn(Mock(),w);return w
-        def start(kind,employee,key,fn):
-            fn(Mock())
+        def start(kind,employee,key,fn,*,before_start):
+            before_start('mock-job')
+            fn(Mock(job_id='mock-job'))
             return 'mock-job'
         with patch.object(drafts,'_mutate',side_effect=mutate),patch.object(drafts.jobs,'start',side_effect=start),patch.object(drafts.rt,'context',return_value=Mock(provider='openai',fail_sim={})),patch.object(drafts.RM,'option',side_effect=AgentError('실패') if fail else None,return_value={'id':'A2','acts':[]}),patch.object(drafts,'_maybe_support'):
             return drafts._run_option(1,'draft','A2')

@@ -58,6 +58,7 @@ def main() -> None:
             assert len({row['id'] for row in rows}) == len(rows)
             if pid == 'A1':
                 assert all(records[row['id']].get('type') == 'book' or row['cost'] == 0 for row in rows)
+            # 기간은 모든 코스의 참고 입력이며 후보 생성 시 상한으로 바꾸지 않는다.
             assert 'maxWeeks' not in payload.get('trackGuidance', {})
             assert payload['handoff']['prefs']['deadlineWeeks'] == 12
             assert handoff['prefs']['deadlineWeeks'] == 12
