@@ -15,10 +15,11 @@ TOKENIZER_SHA256 = '0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229
 TOKENIZER_URL = f'https://huggingface.co/Qwen/Qwen3.8-27B/resolve/{TOKENIZER_REVISION}/tokenizer.json'
 CATALOG_TOKENS = 5000
 EXPANDED_CATALOG_TOKENS = 6000
-INPUT_TOKENS = 12000
-OUTPUT_RESERVE = 4096
-# 입력에는 FRAMING_RESERVE 포함. 16K에서 출력 4096을 유지한 나머지 여유.
-CONTEXT_RESERVE = 288
+INPUT_TOKENS = 11000
+OUTPUT_RESERVE = 7000
+# 입력에는 FRAMING_RESERVE 포함. 입력 11K·출력 7K와 안전 여유를 위한 20K 기준.
+CONTEXT_RESERVE = 1024
+DEFAULT_CONTEXT = 20480
 FRAMING_RESERVE = 128
 GUIDE = ('catalog의 생략된 필드는 catalogDefaults를 따른다. skills는 catalogSkillMap의 스킬 코드다. '
          'curriculum은 [저장된 단원의 0부터 시작하는 위치, 원문 발췌] 쌍의 배열이다. '
@@ -80,13 +81,13 @@ def _compact(entries: list[dict], selection: candidates.Selection) -> list[dict]
 
 
 def pack(selection: candidates.Selection, system: str = '', payload: dict | None = None,
-         context_limit: int = 16384) -> dict:
+         context_limit: int = DEFAULT_CONTEXT) -> dict:
     """32개가 기본. 스킬 4~5개 또는 필수 자료가 많은 경우에만 40개를 먼저 검토한다.
 
     OpenAI에서도 같은 입력 비용 정책을 사용하지만 Qwen 계산값이 OpenAI의 과금 토큰 수는 아니다.
     요청 본문과 시스템 지시는 자르지 않는다. 필수 자료가 안 들어가면 명시적으로 실패한다.
     """
-    limit = min(INPUT_TOKENS, min(context_limit or 16384, 16384) - OUTPUT_RESERVE - CONTEXT_RESERVE)
+    limit = min(INPUT_TOKENS, (context_limit or DEFAULT_CONTEXT) - OUTPUT_RESERVE - CONTEXT_RESERVE)
     base = deepcopy(payload or {})
     base.update(catalog=[], catalogSkillMap={f'S{i + 1}': s for i, s in enumerate(selection.skills)},
                 catalogPolicy=GUIDE, catalogExcluded=selection.excluded,

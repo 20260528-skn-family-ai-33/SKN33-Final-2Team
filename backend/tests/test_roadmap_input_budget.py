@@ -305,11 +305,11 @@ class RealTokenizerBudgetTests(unittest.TestCase):
         required = ['0-29', '4-29']
         selection = candidates.select(rows, [f'skill-{i}' for i in range(5)], ['SQL'], 'A3', required)
         # 문맥을 줄이면 출력·문맥 여유를 먼저 빼고 남는 입력에 맞춘다.
-        out = budget.pack(selection, 'system', {'request': '의미 있는 검증 조건을 유지한다.'}, context_limit=11000)
+        out = budget.pack(selection, 'system', {'request': '의미 있는 검증 조건을 유지한다.'}, context_limit=19000)
         self.assertTrue(set(required).issubset({r['id'] for r in out['catalog']}))
         self.assertTrue(all(out['catalogCounts']['perSkill'].values()))
         self.assertLessEqual(budget.tokens('system') + budget.tokens(out) + budget.FRAMING_RESERVE,
-                             11000 - budget.OUTPUT_RESERVE - budget.CONTEXT_RESERVE)
+                             19000 - budget.OUTPUT_RESERVE - budget.CONTEXT_RESERVE)
         self.assertEqual(selection.required, required)
 
 

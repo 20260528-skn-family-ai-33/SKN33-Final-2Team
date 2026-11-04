@@ -310,7 +310,7 @@ def _mock_regen(inp: dict) -> dict:
 
 
 def _catalog_payload(pid: str, payload: dict, system: str = '', extra_ids: list | None = None,
-                     context_limit: int = 16384) -> dict:
+                     context_limit: int = catalog_budget.DEFAULT_CONTEXT) -> dict:
     payload = copy.deepcopy(payload)
     handoff = payload['handoff']
     # 확정 스킬의 단일 기준. 검색·검증용 원본 필드는 서버에 보존한다.
@@ -501,7 +501,7 @@ def option(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
                 system += '\n사용자가 선정한 skillOrder는 확정이다. 이 목록과 순서를 모두 유지하고 learningSkills에 반환한다. 관점 때문에 역량을 빼거나 더하지 않는다.'
         payload = _catalog_payload(pid, {'handoff': inp['handoff'], 'skillTags': catalog.skill_names(),
                                         'previous': inp.get('previous'), 'previousLearningSkills': (inp.get('previousDef') or {}).get('learningSkills'), 'request': inp.get('request')}, system, prev_ids,
-                                   rt.S.ollama_num_ctx if ctx.mode == 'ollama' else 16384)
+                                   rt.S.ollama_num_ctx if ctx.mode == 'ollama' else catalog_budget.DEFAULT_CONTEXT)
         r = rt.llm_json(ctx, system, payload, role='roadmap')
         _validate_learning_acts(r,inp['handoff'])
         o = finish_option(pid, r, ctx.mode)
@@ -708,7 +708,7 @@ def revise(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
                 system += '\n각 활동에 소속 skill을 skillOrder 중 정확히 하나로 반환한다. 유지 활동은 key와 skill을 보존한다. 추가·교체 활동도 실제 소속을 명시한다. 과제의 skills 태그 목록과 단일 소속 skill은 구분한다.'
         payload = _catalog_payload(pid, {'current': current, 'skillTargets': current['learningSkills'], 'handoff': handoff, 'changes': inp['changes'],
                                         'request': inp.get('request'), 'skillTags': catalog.skill_names()}, system, extra_ids,
-                                   rt.S.ollama_num_ctx if ctx.mode == 'ollama' else 16384)
+                                   rt.S.ollama_num_ctx if ctx.mode == 'ollama' else catalog_budget.DEFAULT_CONTEXT)
         r = rt.llm_json(ctx, system, payload, role='roadmap')
         _validate_learning_acts(r,inp['handoff'])
         o = finish_option(pid, r, ctx.mode, keep_key=True)

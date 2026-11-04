@@ -113,10 +113,11 @@ def matrix(case):
 
 
 class Issue67ScenarioTests(unittest.TestCase):
-    def test_twelve_thousand_input_retains_output_within_sixteen_k_context(self):
-        self.assertEqual(budget.INPUT_TOKENS,12000)
-        self.assertEqual(budget.OUTPUT_RESERVE,4096)
-        self.assertEqual(budget.INPUT_TOKENS+budget.OUTPUT_RESERVE+budget.CONTEXT_RESERVE,16384)
+    def test_eleven_k_input_and_seven_k_output_fit_twenty_k_context(self):
+        self.assertEqual(budget.INPUT_TOKENS,11000)
+        self.assertEqual(budget.OUTPUT_RESERVE,7000)
+        self.assertLessEqual(budget.INPUT_TOKENS+budget.OUTPUT_RESERVE+budget.CONTEXT_RESERVE,budget.DEFAULT_CONTEXT)
+        self.assertEqual(budget.DEFAULT_CONTEXT,20480)
 
     def test_synthetic_project_and_saved_answers_survive_compaction(self):
         self.assertGreaterEqual(len(PROJECT),3000)
@@ -147,6 +148,6 @@ if __name__=='__main__':
         for count in range(1,6):
             packet=scenario(count,long_summary)
             for row in matrix(packet):row['summaryMode']='long' if long_summary else 'structured';rows.append(row)
-    out={'mockOnly':True,'projectChars':len(PROJECT),'tokenizer':'fixed Qwen; runtime JSON serialization; framing reserve 128','rows':rows}
+    out={'mockOnly':True,'inputLimit':budget.INPUT_TOKENS,'outputLimit':budget.OUTPUT_RESERVE,'defaultContext':budget.DEFAULT_CONTEXT,'contextReserve':budget.CONTEXT_RESERVE,'projectChars':len(PROJECT),'tokenizer':'fixed Qwen; runtime JSON serialization; framing reserve 128','rows':rows}
     Path(args.output).write_text(json.dumps(out,ensure_ascii=False,indent=2),encoding='utf-8')
     print(json.dumps({'cases':len(rows),'projectChars':len(PROJECT),'maxTokens':max(r['totalTokens'] for r in rows),'minCandidates':min(r['catalogCount'] for r in rows),'maxCandidates':max(r['catalogCount'] for r in rows)}))
