@@ -1,6 +1,6 @@
 /* 완료 알림(#82) — 상단 띠의 알림 버튼과 목록 창. 직원 계정(부서장 포함)에서만 보인다.
    30초마다(창이 보일 때만)·화면을 옮길 때·창을 열 때 새로 받는다. 누르면 읽음으로 바꾸고 그 로드맵·보고서 화면으로 간다.
-   서버 동기화(직원별 캐시·늦은 응답 버리기·대상 기록만 받기)는 notificationActions.ts */
+   서버 동기화(직원별 캐시·다른 로그인의 늦은 응답 버리기·없는 대상 기록만 받기)는 notificationActions.ts */
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router';
@@ -10,7 +10,7 @@ import { useGo } from '@/shared/hooks/useGo';
 import { failToast } from '@/shared/lib/fail';
 import { useMe } from '@/shared/state/session';
 import { Icon } from '@/shared/ui/Icon';
-import { markRead, notificationKey, refreshTarget, stillSignedIn } from './notificationActions';
+import { currentSignIn, markRead, notificationKey, refreshTarget, stillSignedIn } from './notificationActions';
 import { notificationSub, notificationTarget, notificationTime, notificationTitle } from './notificationView';
 
 const POLL_MS = 30_000;
@@ -46,37 +46,41 @@ export function NotificationBell() {
   }, [open]);
 
   const openItem = async (n: AppNotification) => {
-    // 누른 직원(owner)이 기다리는 사이 로그아웃·다른 계정 로그인이 되면 응답을 넣지도, 이동하지도 않는다(PR #84 리뷰 P1)
+    // 누른 로그인(t)이 기다리는 사이 로그아웃·다른 로그인(같은 직원의 재로그인 포함)이 되면 응답을 넣지도, 이동하지도 않는다(PR #84 리뷰 P1·P3)
+    const t = currentSignIn();
     setOpen(false);
+    if (!t) return;
     if (!n.read) {
       try {
-        await markRead(qc, owner, n.id);
+        await markRead(qc, t, n.id);
       } catch (err) {
         // 읽음 저장에 실패해도 보려던 화면으로는 간다(알림은 읽지 않은 채로 남는다)
-        if (stillSignedIn(owner)) failToast(err, '알림을 읽음으로 바꾸지 못했어요');
+        if (stillSignedIn(t)) failToast(err, '알림을 읽음으로 바꾸지 못했어요');
       }
     }
-    if (!stillSignedIn(owner)) return;
+    if (!stillSignedIn(t)) return;
     if (n.audience === 'head') {
       // 직원 기록을 새로 받기 시작한 뒤 기다리지 않고 바로 옮긴다. 기다리면 지금 보고 있는 옛 보고서 화면이 새 기록(옛 보고서가
       // 지워진)으로 먼저 다시 그려져 직원 목록으로 튕긴다. 옮긴 화면은 받는 동안 '불러오는 중'을 보여 준다(TeamPages)
-      void refreshTarget(qc, owner, n);
+      void refreshTarget(qc, t, n);
       go(notificationTarget(n));
       return;
     }
     try {
-      await refreshTarget(qc, owner, n);
+      await refreshTarget(qc, t, n);
     } catch (err) {
-      if (stillSignedIn(owner)) failToast(err, '최신 기록을 불러오지 못했어요');
+      if (stillSignedIn(t)) failToast(err, '최신 기록을 불러오지 못했어요');
     }
-    if (stillSignedIn(owner)) go(notificationTarget(n));
+    if (stillSignedIn(t)) go(notificationTarget(n));
   };
 
   const readAll = async () => {
+    const t = currentSignIn();
+    if (!t) return;
     try {
-      await markRead(qc, owner);
+      await markRead(qc, t);
     } catch (err) {
-      if (stillSignedIn(owner)) failToast(err, '알림을 모두 읽음으로 바꾸지 못했어요');
+      if (stillSignedIn(t)) failToast(err, '알림을 모두 읽음으로 바꾸지 못했어요');
     }
   };
 
