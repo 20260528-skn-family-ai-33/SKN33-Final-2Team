@@ -47,7 +47,7 @@ class EmployeeChatbotTest(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         start.assert_not_called()
 
-    def test_employee_modes_reach_runtime_without_profile_or_roadmap(self):
+    def test_employee_modes_use_authenticated_group_without_loading_full_profile(self):
         article = {'id': 'work-7', 'reg': 'work', 'group': '일반직', 'no': '제7조',
                    'title': '교육', 'chapter': '', 'text': '교육은 등록 원문을 따른다.'}
         for provider, demo in (('openai', False), ('ollama', False), ('ollama', True)):
@@ -62,6 +62,7 @@ class EmployeeChatbotTest(unittest.TestCase):
             with (self.subTest(provider=provider, demo=demo),
                   patch.object(auth, 'account_of', return_value=self.employee),
                   patch.object(rt.db, 'one', return_value=settings) as load_settings,
+                  patch.object(profile, 'employee_group', return_value='일반직') as load_group,
                   patch.object(profile, 'view', side_effect=AssertionError('프로필 조회 금지')),
                   patch.object(reg.question_classifier, 'classify', return_value={'label': '사내 규정'}) as classify,
                   patch.object(reg.llm, 'available', return_value=True), patch.object(rt, '_log') as log,
@@ -73,11 +74,12 @@ class EmployeeChatbotTest(unittest.TestCase):
                   patch.object(rt, 'llm_json', return_value={'status': 'found', 'summary': '등록 원문을 따라요.', 'sourceIds': ['S001']}) as model,
                   patch.object(jobs, 'start', side_effect=start)):
                 response = self.client.post('/api/v1/assistant/ask',
-                                            json={'question': '교육비 지원을 받을 수 있나요?', 'name': '전달 금지'},
+                                            json={'question': '교육비 지원을 받을 수 있나요?', 'empGroup': '실무직'},
                                             headers={'Prefer': 'respond-async'})
                 self.assertEqual(response.status_code, 202)
                 self.assertEqual(response.json()['jobId'], self.job_id)
                 self.assertEqual(load_settings.call_args.kwargs['e'], self.employee.id)
+                load_group.assert_called_once_with(self.employee.id)
                 self.assertEqual(log.call_args.args[0].employee_id, self.employee.id)
                 self.assertTrue({'apply', 'more', 'missing'}.isdisjoint(stored['answer']))
                 self.assertEqual(stored['meta']['mode'], 'mock' if demo else provider)
@@ -87,7 +89,7 @@ class EmployeeChatbotTest(unittest.TestCase):
                     for dependency in (classify, search, model):
                         dependency.assert_not_called()
                 else:
-                    search.assert_called_once_with('교육비 지원을 받을 수 있나요?', 4, None, provider, all_groups=True)
+                    search.assert_called_once_with('교육비 지원을 받을 수 있나요?', 4, '일반직', provider)
                     ctx, _, payload = model.call_args.args
                     self.assertEqual(ctx.reasoning, {provider: 'low'})
                     self.assertEqual(payload['user'], {})
@@ -162,7 +164,7 @@ class DocumentScopeTest(unittest.TestCase):
     def test_documents_only_discards_even_a_supplied_profile_context(self):
         ctx = rt.Ctx(employee_id=1, me={'name': 'private', 'empGroup': '실무직', 'grade': '4급'})
         def run(ctx, agent, task, inp, *args, **kwargs):
-            self.assertEqual(inp['me'], {})
+            self.assertEqual(inp['me'], {'empGroup': '실무직'})
             self.assertEqual(inp['context'], {})
             self.assertTrue(inp['documents_only'])
             self.assertNotIn('private', str(kwargs['log_input']))
@@ -172,24 +174,51 @@ class DocumentScopeTest(unittest.TestCase):
         self.assertEqual(result['summary'], '원문 안내')
         group.assert_not_called()
 
-    def test_all_groups_is_explicit_and_preserves_existing_employee_search(self):
+    def test_regulation_question_without_employee_group_skips_search(self):
+        ctx = rt.Ctx(employee_id=42)
+        inp = {'question': '교육비 지원 조건', 'me': {}, 'context': {}, 'documents_only': True}
+        with (patch.object(regstore, 'search') as search,
+              patch.object(regstore, 'explicit_ref') as explicit_ref,
+              patch.object(reg.grounded_answer, 'generate', return_value={'status': 'not_found'})):
+            answer = reg._api_answer(ctx, inp, '사내 규정')
+        search.assert_not_called()
+        explicit_ref.assert_not_called()
+        self.assertEqual(answer['evidenceStatus'], 'not_found')
+        self.assertIn('직원 구분', answer['summary'])
+
+    def test_pool_uses_employee_group_by_default_and_filters_overseas(self):
         arts = {'a': {'group': '일반직', 'overseas': False}, 'b': {'group': '실무직', 'overseas': False},
                 'c': {'group': '일반직', 'overseas': True}}
         with patch.object(regstore, 'data', return_value={'arts': arts}):
             self.assertEqual(regstore.pool(None, '교육'), [])
             self.assertEqual(regstore.pool('일반직', '교육'), [arts['a']])
-            self.assertEqual(regstore.pool(None, '교육', all_groups=True), [arts['a'], arts['b']])
-            self.assertEqual(regstore.pool(None, '국외근무', all_groups=True), list(arts.values()))
+            self.assertEqual(regstore.pool('일반직', '국외근무'), [arts['a'], arts['c']])
+            self.assertEqual(regstore.pool('일반직', '교육', all_groups=True), [arts['a'], arts['b']])
 
-    def test_documents_only_explicit_article_uses_registered_document_without_employee_group(self):
-        info = {'key': 'work', 'name': '취업규칙'}
-        data = {'sets': {'일반직': {'regs': [info]}}}
-        with (patch.object(regstore, 'data', return_value=data),
-              patch.object(regstore, 'find_article', return_value=['article']),
-              patch.object(regstore, 'article', return_value={'text': '원문'})):
+    def test_search_excludes_another_employee_group(self):
+        article = {'id': 'a', 'group': '실무직', 'overseas': False, 'type': 'article',
+                   'title': '교육', 'no': '제1조', 'text': '교육 신청 기준'}
+        with patch.object(regstore, 'data', return_value={'arts': {'a': article}}):
+            self.assertEqual([hit['id'] for hit in regstore.search('교육', 4, '실무직', 'mock')], ['a'])
+            self.assertEqual(regstore.search('교육', 4, '일반직', 'mock'), [])
+            with (patch.object(regstore.llm, 'embed', return_value=[[1.0]]),
+                  patch.object(regstore, 'ensure_vectors'),
+                  patch.object(regstore.db, 'all_', return_value=[{'rag_chunk_id': 'a', 'score': 1}]) as query):
+                self.assertEqual(regstore.search('교육', 4, '일반직', 'ollama'), [])
+                query.assert_not_called()
+                self.assertEqual(regstore.search('교육', 4, '실무직', 'ollama'), [{'id': 'a', 'score': 1.0}])
+                self.assertEqual(query.call_args.kwargs['i'], ['a'])
+
+    def test_explicit_article_uses_only_the_employee_groups_copy_of_a_document(self):
+        general = {'key': 'general', 'name': '취업규칙'}
+        practice = {'key': 'practice', 'name': '취업규칙'}
+        arts = {key: {'id': key, 'reg': key, 'type': 'article', 'no': '제7조', 'text': key}
+                for key in ('general', 'practice')}
+        data = {'sets': {'일반직': {'regs': [general]}, '실무직': {'regs': [practice]}}, 'arts': arts}
+        with patch.object(regstore, 'data', return_value=data):
             self.assertIsNone(regstore.explicit_ref('취업규칙 제7조', None))
-            found = regstore.explicit_ref('취업규칙 제7조', None, all_groups=True)
-        self.assertEqual(found['ids'], ['article'])
+            found = regstore.explicit_ref('취업규칙 제7조', '실무직')
+        self.assertEqual(found['ids'], ['practice'])
 
     def test_life_search_uses_its_category_and_keeps_virtual_sources(self):
         with (patch.object(knowledge.llm, 'embed_model', return_value=knowledge.MODEL),

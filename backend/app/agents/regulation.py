@@ -248,7 +248,7 @@ def _ref_answer(ref: dict, me: dict) -> dict:
 def _mock(inp: dict) -> dict:
     q, me, hist = inp['question'], inp['me'], inp.get('history') or []
     group = me.get('empGroup')
-    hits = regstore.keyword_search(q, 3, group)
+    hits = regstore.keyword_search(q, 3, group, all_groups=False)
     prev = hist[-1] if hist else None
     if OUT_HINT.search(q):
         return ans(kind='out', level='out')
@@ -464,19 +464,21 @@ def _api_answer(ctx: rt.Ctx, inp: dict, label: str) -> dict:
     q, me, hist = inp['question'], inp['me'], inp.get('history') or []
     group = me.get('empGroup')
     follow_history = inp.get('_history') or []
-    scope = {'all_groups': True} if inp.get('documents_only') else {}
-    ref = regstore.explicit_ref(q, group, **scope)
+    documents_only = inp.get('documents_only')
+    if documents_only and not group:
+        return _empty_evidence_answer(ctx, 'regulation', inp, '로그인한 직원의 직원 구분을 확인할 수 없어 적용 규정을 찾지 못했어요.')
+    ref = regstore.explicit_ref(q, group)
     # 규정 이름이 없는 조항 질문은 일반 이어 묻기 판별과 별도로 직전 규정을 참조한다.
     if ref is None and hist and regstore.REF_ART.search(q):
         default_reg = _prev_reg(hist[-1])
         if default_reg:
-            ref = regstore.explicit_ref(q, group, default_reg, **scope)
+            ref = regstore.explicit_ref(q, group, default_reg)
             if ref is not None and not follow_history:
                 follow_history = [hist[-1]]
     prev = follow_history[-1] if follow_history else None
     history = _hist_msgs(follow_history)
-    alone = regstore.search(q, 4, group, ctx.mode, **scope)
-    joined = regstore.search(_context_query(q, follow_history), 4, group, ctx.mode, **scope) if prev else []
+    alone = regstore.search(q, 4, group, ctx.mode)
+    joined = regstore.search(_context_query(q, follow_history), 4, group, ctx.mode) if prev else []
     mix = []
     for index in range(max(len(alone), len(joined))):
         if index < len(joined):
@@ -485,12 +487,17 @@ def _api_answer(ctx: rt.Ctx, inp: dict, label: str) -> dict:
             mix.append(alone[index]['id'])
     ref_ids = (ref or {}).get('ids') or []
     previous_ids = list((prev or {}).get('a', {}).get('basis') or [])
+    if documents_only:
+        # 브라우저에서 전달한 이전 근거는 현재 직원 구분에서 다시 확인한다.
+        previous_ids = [aid for aid in previous_ids if (source := regstore.article(aid)) and source.get('group') == group]
     ids = [value for value in rt.uniq(ref_ids + previous_ids + mix) if regstore.article(value)][:max(7, len(ref_ids))]
     if ref and not ref_ids:
         note = f"{ref['note']}. 규정명과 조 번호를 확인하거나 담당 부서에 문의해 주세요."
         return _empty_evidence_answer(ctx, 'regulation', inp, note, ids, history=history)
     if not ids:
         return _empty_evidence_answer(ctx, 'regulation', inp, history=history)
+    if documents_only:
+        ids += regstore.referenced_paragraphs(ids, limit=min(3, 7 - len(ids)))
     requested = {'where': ref['where'], 'focus': ref['focus'], 'note': ref['note']} if ref else None
     result = grounded_answer.generate(ctx, 'regulation', q, [_art_in(regstore.article(value)) for value in ids],
                                      inp['context'], history=history, requested=requested)
@@ -519,7 +526,7 @@ def scope_answer(a: dict, me: dict) -> dict:
 def answer(ctx: rt.Ctx, question: str, history: list, context: dict, sim: str | None = None,
            *, documents_only: bool = False) -> dict:
     """history: 앞 대화 중 답을 받은 질문·답 [{q, a}] (대화 전체 · 10/14 사용자 결정)"""
-    me = {} if documents_only else ctx.me
+    me = {'empGroup': ctx.me.get('empGroup')} if documents_only else ctx.me
     context = {} if documents_only else context
     inp = {'question': question, 'history': history or [], 'context': context, 'me': me,
            'documents_only': documents_only}
@@ -593,7 +600,8 @@ def support(ctx: rt.Ctx, plans: list[dict], context: dict, sim: str | None = Non
         return {x['pid']: support_scope(me) for x in plans}
 
     def api(_):
-        hits = regstore.search(SUP_QUERY.get(me.get('empGroup'), SUP_QUERY['일반직']), 6, me.get('empGroup'), ctx.mode)
+        hits = regstore.search(SUP_QUERY.get(me.get('empGroup'), SUP_QUERY['일반직']), 6, me.get('empGroup'), ctx.mode,
+                               all_groups=False)
         arts = [regstore.article(h['id']) for h in hits if regstore.article(h['id'])]
         ids = [a['id'] for a in arts]
         r = rt.llm_json(ctx, SUP_SYS, {'plans': plans, 'user': context, 'articles': [_art_in(a) for a in arts]}, role='regulation')

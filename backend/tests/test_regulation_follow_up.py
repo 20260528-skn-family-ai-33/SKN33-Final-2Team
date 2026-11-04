@@ -72,6 +72,27 @@ class RegulationFollowUpTest(unittest.TestCase):
                 self.assertEqual(payload['sources'][0]['no'], '제9조')
                 self.assert_summary_history(model)
 
+    def test_chatbot_includes_directly_referenced_paragraphs_without_replacing_search_hits(self):
+        for aid, key, no, text in (
+            ('edu-24-5', 'edu', '제24조 제5항', '제1항부터 제4항까지의 규정에도 불구하고 조정할 수 있다.'),
+            ('edu-24-1', 'edu', '제24조 제1항', '위탁교육 경비의 지급기준은 따로 정한다.'),
+            ('edu-24-4', 'edu', '제24조 제4항', '예산 범위에서 지급한다.'),
+            ('edu-24-6', 'edu', '제24조 제6항', '별도 확인한다.'),
+            ('work-24-1', 'work', '제24조 제1항', '다른 규정의 같은 번호다.'),
+        ):
+            self.articles[aid] = {'id': aid, 'reg': key, 'no': no, 'text': text, 'title': '',
+                                  'chapter': '', 'type': 'paragraph', 'path': ''}
+        self.search.return_value = [{'id': 'edu-24-5'}, {'id': 'edu-9'}]
+        with (patch.object(rt, '_log'), patch.object(rt, 'llm_json', return_value={
+            'status': 'partial', 'summary': '지급기준은 따로 확인해야 해요.', 'sourceIds': ['S003'],
+        }) as model):
+            answer = reg.answer(self.ctx, '교육비 지원 신청 조건이 궁금해요', [], {}, documents_only=True)
+        self.assertEqual(answer['retrieved'], ['edu-24-5', 'edu-9', 'edu-24-1', 'edu-24-4'])
+        self.assertEqual(answer['basis'], ['edu-24-1'])
+        self.assertEqual(answer['evidenceStatus'], 'partial')
+        self.assertEqual(model.call_args.args[2]['sources'][2]['no'], '제24조 제1항')
+        self.assertEqual(reg.regstore.referenced_paragraphs(['edu-24-5'], limit=1), ['edu-24-1'])
+
     def test_reference_follow_up_also_passes_summary_to_classifier(self):
         _, model, inp = self.ask('그 규정 제9조 내용을 알려줘')
         self.assertIn('인재개발규정 제7조', self.classify.call_args.args[0])

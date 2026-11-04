@@ -156,7 +156,7 @@ def bundle(ids) -> dict:
 
 
 def pool(group: str | None, query: str, *, all_groups: bool = False) -> list[dict]:
-    """검색 대상: 내 직원 구분의 규정 청크(국외근무 규정은 국외근무 질문에만). 묶음이 없으면 빈 목록"""
+    """기본은 해당 직원 구분의 청크. 국외근무 규정은 국외근무 질문에만 포함한다."""
     os_ = bool(OVERSEAS.search(query or ''))
     return [a for a in data()['arts'].values() if (all_groups or a['group'] == group) and (os_ or not a['overseas'])]
 
@@ -254,11 +254,15 @@ def search(query: str, k: int, group: str | None, mode: str, *, all_groups: bool
     return keyword_search(query, k, group, all_groups=all_groups)
 
 
-def find_article(reg_name: str, label: str, paragraph: str = '') -> list[str]:
+def find_article(reg_name: str, label: str, paragraph: str = '', *, reg_key: str | None = None) -> list[str]:
     """(규정 이름, 조 번호[, 항]) → 청크 id 목록. 조항 청크가 있으면 그것, 항으로 나뉜 조항이면 그 항 청크들.
     가데이터 고정 답의 근거를 팀 DB 청크에 잇는 데 쓴다"""
-    keyn = re.sub(r'\s', '', reg_name)
-    mine = [a for a in data()['arts'].values() if re.sub(r'\s', '', (data()['regs'].get(a['reg']) or {}).get('name', '')) == keyn]
+    keyn = _norm(reg_name)
+    store = data()
+    if reg_key is not None:
+        mine = [a for a in store['arts'].values() if a['reg'] == reg_key]
+    else:
+        mine = [a for a in store['arts'].values() if _norm((store['regs'].get(a['reg']) or {}).get('name')) == keyn]
     whole = [a['id'] for a in mine if a['no'] == label and a['type'] in ('article', 'supplement_article')]
     if whole:
         return whole[:1]
@@ -272,6 +276,43 @@ CIRCLED = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳'
 REF_ART = re.compile(r'제?\s*(\d+)\s*조(?:\s*의\s*(\d+))?')
 REF_PARA = re.compile(r'(?:제\s*)?(\d+)\s*항')
 REF_ITEM = re.compile(r'(?:제\s*)?(\d+)\s*호')
+PARAGRAPH_RANGE = re.compile(
+    r'(?:(제\s*\d+\s*조(?:\s*의\s*\d+)?)\s*)?'
+    r'제\s*(\d{1,3})\s*항(?:\s*(?:부터|내지|[~～])\s*제\s*(\d{1,3})\s*항)?'
+)
+
+
+def referenced_paragraphs(ids: list[str], *, limit: int) -> list[str]:
+    """검색된 항이 직접 가리키는 같은 규정·같은 조의 활성 항을 보충한다."""
+    if limit <= 0:
+        return []
+    seen = set(ids)
+    extra = []
+    for aid in ids:
+        source = article(aid)
+        if not source or source.get('type') != 'paragraph':
+            continue
+        label, _, paragraph = source['no'].partition(' ')
+        if not REF_ART.fullmatch(label) or not REF_PARA.fullmatch(paragraph):
+            continue
+        ranges = [(int(first), int(last or first)) for clause, first, last in
+                  PARAGRAPH_RANGE.findall(source['text']) if not clause or _norm(clause) == label]
+        if not ranges:
+            continue
+        matches = []
+        for candidate in data()['arts'].values():
+            if candidate['id'] in seen or candidate['reg'] != source['reg'] or candidate.get('type') != 'paragraph':
+                continue
+            prefix, _, suffix = candidate['no'].partition(' ')
+            number = REF_PARA.fullmatch(suffix)
+            if prefix == label and number and any(first <= int(number[1]) <= last for first, last in ranges):
+                matches.append((int(number[1]), candidate['id']))
+        for _, candidate_id in sorted(matches):
+            extra.append(candidate_id)
+            seen.add(candidate_id)
+            if len(extra) == limit:
+                return extra
+    return extra
 
 
 def _norm(s: str | None) -> str:
@@ -316,9 +357,9 @@ def explicit_ref(query: str, group: str | None, default_reg: str | None = None, 
     reg = named[0] if named else next((r for r in regs if r['key'] == default_reg), None) if default_reg else None
     if not reg:
         return None
-    ids = find_article(reg['name'], label, f'제{para}항' if para else '')
+    ids = find_article(reg['name'], label, f'제{para}항' if para else '', reg_key=reg['key'])
     if para and not ids:
-        ids = find_article(reg['name'], label)
+        ids = find_article(reg['name'], label, reg_key=reg['key'])
     out = {'reg': reg, 'label': label, 'para': para, 'item': item, 'ids': ids[:6], 'where': label, 'focus': None, 'note': ''}
     if not ids:
         out['note'] = f"「{reg['name']}」에서 {label}를 찾지 못했어요"
