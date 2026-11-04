@@ -1,7 +1,7 @@
 /* 1. 목표·기획서 (5차 scr['new-goal'] · P.goalField·goalSug·projectField·docBox)
    기획서 읽기: 파일을 서버에 올리면 서버가 글자를 꺼내고(API-20) 이미지 보기·요약을 작업으로 이어 한다(API-21).
    요약은 화면에서 고칠 수 있고, 요약만 문항·진단·로드맵 에이전트에게 넘긴다. 실패하면 '다시 시도'를 눌러야만 다시 읽는다 */
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { draftsApi } from '@/api/endpoints/drafts';
 import { paths } from '@/app/paths';
 import { useGo } from '@/shared/hooks/useGo';
@@ -203,15 +203,37 @@ async function docAgain(skipImages: boolean): Promise<void> {
 
 function DocBox() {
   const doc = useWs((s) => s.draft.doc);
-  if (!doc) return null;
-  if (doc.status === 'reading')
+  const uploading = useGoalStore((s) => s.docUploading);
+  const status = uploading ? 'reading' : doc?.status;
+  /* 요약은 이 화면에 보여 주지 않으므로, 이 화면에서 기다리다 끝나면 알림으로도 한 번 알린다 */
+  const prev = useRef(status);
+  useEffect(() => {
+    if (prev.current === 'reading' && status === 'ok') toast('기획서 요약을 마쳤어요. 다음 단계로 넘어갈 수 있어요');
+    prev.current = status;
+  }, [status]);
+  if (uploading || doc?.status === 'reading') {
+    const step = doc?.status === 'reading' ? doc.step : 'extract';
     return (
       <div className="docbox">
         <div className="agents">
-          <AgentRow st="run" name="진단 에이전트 · 기획서 읽기" sub={runSub(doc.step === 'vision' ? 'vision' : 'default', DOC_STEP[doc.step || ''] || DOC_STEP.extract)} />
+          <AgentRow st="run" name="진단 에이전트 · 기획서 읽기" sub={runSub(step === 'vision' ? 'vision' : 'default', DOC_STEP[step || ''] || DOC_STEP.extract)} />
         </div>
       </div>
     );
+  }
+  if (!doc) return null;
+  if (doc.status === 'ok') {
+    const summarized = !!doc.summary?.trim();
+    return (
+      <div className="docbox ok" role="status">
+        <p className="db-h">
+          <Icon name="check" />
+          <b>{summarized ? '기획서 요약 완료' : '기획서 읽기 완료'}</b>
+        </p>
+        <p className="small">{summarized ? '요약은 다음 단계(세부 사항)에서 확인하고 고칠 수 있어요.' : '요약할 내용을 찾지 못했어요. 목표만으로 진행해요.'}</p>
+      </div>
+    );
+  }
   if (doc.status === 'fail') {
     const c = cause(doc.fail?.cause || {});
     const visionFail = doc.step === 'vision';
@@ -248,6 +270,8 @@ async function uploadProject(file: File): Promise<void> {
       s.draft.doc = null;
     });
     useGoalStore.setState({ docErr: { name: file.name, cause: cause(err instanceof DraftSaveError ? err.original : err) } });
+  } finally {
+    useGoalStore.setState({ docUploading: false });
   }
 }
 
@@ -296,6 +320,7 @@ function ProjectField() {
             if (!file) return;
             setAt('draft.project', { name: file.name, size: file.size });
             updateWs((s) => void (s.draft.doc = { name: file.name, status: 'reading', step: 'extract' }));
+            useGoalStore.setState({ docUploading: true });
             void uploadProject(file);
           }}
         />
@@ -316,13 +341,14 @@ export function GoalStep() {
   const d = useWs((s) => s.draft);
   const firstGoal = useGoalStore((s) => s.gs && s.gs.owner && s.gs.owner === me()?.id ? s.gs.candidates[0]?.goal?.trim() ?? '' : '');
   const effectiveGoal = resolveGoalInput(d.goal, firstGoal);
-  const ok = goalOk({ ...d, goal: effectiveGoal }) && docIdle(d);
+  const uploading = useGoalStore((s) => s.docUploading);
+  const ok = goalOk({ ...d, goal: effectiveGoal }) && docIdle(d) && !uploading;
   const proceed = () => {
     const current = ws().draft;
-    const state = useGoalStore.getState().gs;
+    const { gs: state, docUploading } = useGoalStore.getState();
     const first = state && state.owner && state.owner === me()?.id ? state.candidates[0]?.goal : '';
     const goal = resolveGoalInput(current.goal, first);
-    if (!goalOk({ ...current, goal }) || !docIdle(current)) return;
+    if (!goalOk({ ...current, goal }) || !docIdle(current) || docUploading) return;
     if (!current.goal.trim()) setAt('draft.goal', goal);
     go(paths.newDetails);
   };

@@ -14,9 +14,11 @@ interface S {
   gs: GoalState | null;
   /** 기획서 글자 꺼내기 실패: 서버에 기획서가 저장되지 않아 화면에만 안내를 둔다 */
   docErr: { name: string; cause: Cause } | null;
+  /** 기획서 파일을 올리는 중: 서버가 아직 기획서를 몰라 상태 다시 읽기가 '읽는 중'을 지울 수 있어 화면에서 따로 기억한다 */
+  docUploading: boolean;
 }
 
-export const useGoalStore = create<S>(() => ({ gs: null, docErr: null }));
+export const useGoalStore = create<S>(() => ({ gs: null, docErr: null, docUploading: false }));
 let tok = 0;
 
 export async function loadGoals(ensure = true): Promise<void> {
@@ -66,7 +68,7 @@ export async function regenGoals(): Promise<void> {
 
 onDataReset(() => {
   ++tok;
-  useGoalStore.setState({ gs: null, docErr: null });
+  useGoalStore.setState({ gs: null, docErr: null, docUploading: false });
 });
 
 /** 내 정보가 바뀌면 화면에 둔 후보를 비운다(서버가 새로 만들므로 다음 방문 때 다시 읽음) */
