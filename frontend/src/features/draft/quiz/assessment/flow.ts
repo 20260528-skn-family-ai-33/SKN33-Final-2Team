@@ -1,6 +1,6 @@
 export type Question = { id: string; text?: string; q?: string; options?: string[]; answer?: number; explain?: string };
 export type Group = { skill: string; title: string; surveys: Question[]; quizzes: Question[] };
-export type Survey = { generationId: string; groups: Group[]; questionCount: number };
+export type Survey = { generationId: string; groups: Group[]; questionCount: number; quizStatus?: 'pending' | 'ready' | 'failed' | 'interrupted' };
 export type Answers = Record<string, number>;
 export type Phase = 'surveys' | 'quizzes';
 export function complete(survey: Survey, answers: Answers, phase: Phase): boolean {

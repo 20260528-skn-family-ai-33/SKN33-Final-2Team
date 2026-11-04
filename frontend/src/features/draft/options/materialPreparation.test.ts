@@ -40,3 +40,8 @@ it('no successful materials must not be presented as ready',()=>{
  let state=initialMaterialPreparation;for(const course of Object.keys(versions))state=report(state,course,'failed');
  expect(state.revealed).toBe(false);
 });
+it('새로고침 후에도 한 코스 재생성이 나머지 두 코스 자료를 숨기지 않는다',()=>{
+ const partial={A1:{version:'free1',status:'ready' as const},A3:{version:'challenge1',status:'ready' as const}};
+ expect(canRevealMaterials(partial,versions,[],['A2'])).toBe(true);
+ expect(canRevealMaterials(partial,{A1:'free1',A3:'challenge1'},[],['A2'])).toBe(false);
+});

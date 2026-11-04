@@ -3,11 +3,11 @@ import { complete, type Answers, type Phase, type Survey } from './flow';
 import './style.css';
 
 export type SurveyFlowHandle = { randomize: () => void };
-type Props = { ref?: Ref<SurveyFlowHandle>; survey: Survey; initialAnswers?: Answers; initialCompleted?: boolean; review?: boolean; initialPhase?: Phase; onProgress?: (answers: Answers, phase: Phase) => void; onContinue?: () => void;
+type Props = { onRetry?: () => void; ref?: Ref<SurveyFlowHandle>; survey: Survey; initialAnswers?: Answers; initialCompleted?: boolean; review?: boolean; initialPhase?: Phase; onProgress?: (answers: Answers, phase: Phase) => void; onContinue?: () => void;
   onSave: (answers: Answers, finished: boolean) => Promise<void> };
 const scale = ['전혀 아니다', '아니다', '보통이다', '그렇다', '매우 그렇다'];
 
-export function SurveyFlow({ ref, survey, initialAnswers = {}, initialCompleted = false, review = false, initialPhase, onProgress, onContinue, onSave }: Props) {
+export function SurveyFlow({ onRetry, ref, survey, initialAnswers = {}, initialCompleted = false, review = false, initialPhase, onProgress, onContinue, onSave }: Props) {
   const [answers, setAnswers] = useState<Answers>(initialAnswers);
   const [phase, setPhase] = useState<Phase>(initialPhase || (!initialCompleted && complete(survey, initialAnswers, 'surveys') ? 'quizzes' : 'surveys'));
   const [error, setError] = useState('');
@@ -55,6 +55,8 @@ export function SurveyFlow({ ref, survey, initialAnswers = {}, initialCompleted 
       <button type="button" disabled={saving} aria-current={phase === 'quizzes' ? 'step' : undefined} onClick={() => navigate('quizzes')}>2. 퀴즈</button></nav>
     <h2>{phase === 'surveys' ? '지금의 나를 살펴볼까요?' : '배울 내용을 확인해 볼까요?'}</h2>
     <p>{review ? '저장한 응답을 확인하는 화면입니다. 답변은 변경할 수 없어요.' : phase === 'surveys' ? '각 문장에 나에게 맞는 정도를 선택해 주세요.' : '각 문항에서 가장 적절한 답을 하나 골라 주세요.'}</p>
+    {phase==='quizzes' && survey.quizStatus==='pending' && <p role="status"><span className="sp" aria-hidden="true" /> 퀴즈를 준비하고 있어요.</p>}
+    {phase==='quizzes' && survey.quizStatus==='failed' && <p role="alert">퀴즈 준비를 완료하지 못했어요. 설문 응답은 유지됩니다. <button onClick={onRetry}>퀴즈 다시 준비</button></p>}
     <p className="muted" role="status">답한 문항 {answered} / {questions.length} · 전체 {survey.questionCount}문항</p>
     {survey.groups.map(group => <section key={group.skill}>
       <h2>{group.title}</h2><p className="muted">확인할 역량: {group.skill}</p>
@@ -80,7 +82,7 @@ export function SurveyFlow({ ref, survey, initialAnswers = {}, initialCompleted 
     </section>)}
     {error && <p role="alert" className="error">{error}</p>}
     {!review&&<footer>{phase === 'quizzes' && <button disabled={saving} onClick={() => navigate('surveys')}>이전: 설문</button>}
-      <button className="primary" disabled={saving} onClick={() => void next()}>
+      <button className="primary" disabled={saving || (phase==='quizzes' && (survey.quizStatus==='pending' || survey.quizStatus==='failed'))} onClick={() => void next()}>
         {saving ? '저장 중…' : phase === 'surveys' ? '다음: 퀴즈' : '역량 테스트 완료'}
       </button></footer>}
   </div>;

@@ -1,4 +1,4 @@
-import { loadSurvey, SurveyRequestError, type Stored } from './surveyRequest';
+import { loadSurvey, request, SurveyRequestError, type Stored } from './surveyRequest';
 import { prepareRoadmaps } from '../prepareRoadmaps';
 import { sameJ } from '@/shared/lib/format';
 import { useEffect, useRef, useState } from 'react';
@@ -14,6 +14,7 @@ import { Stepper } from '../Stepper';
 import { SurveyFlow, type SurveyFlowHandle } from './assessment/SurveyFlow';
 
 export function QuizStep() {
+  const recoveries = useRef<Record<string,number>>({});
   const surveyRef = useRef<SurveyFlowHandle>(null);
   const owner = useWs(s => s.owner);
   const id = useWs(s => s.draftId);
@@ -42,6 +43,24 @@ export function QuizStep() {
       .catch(e => { if (active) setLoaded({ key: requestKey, survey: null, error: e instanceof Error ? e.message : '문항을 불러오지 못했어요.' }); });
     return () => { active = false; };
   }, [owner, id, inputKey, requestKey]);
+  useEffect(() => {
+    if (!id || !survey || survey.quizStatus !== 'pending') return;
+    let active=true;
+    const poll=setInterval(() => {
+      void request(`/api/v2/drafts/${id}/survey`).then(result => {
+        if (active && result && result.generationId===survey.generationId && ws().owner===owner && ws().draftId===id && inputSignature(ws().draft)===inputKey)
+          {
+            if(result.quizStatus==='interrupted' && (recoveries.current[result.generationId]||0)<2){
+              recoveries.current[result.generationId]=(recoveries.current[result.generationId]||0)+1;
+              setAttempt(n=>n+1);return;
+            }
+            if(result.quizStatus==='interrupted')result.quizStatus='failed';
+            setLoaded(old => old?.survey?.quizStatus==='ready' ? old : {key:requestKey,survey:result,error:''});
+          }
+      }).catch(() => {});
+    },1000);
+    return () => {active=false;clearInterval(poll);};
+  },[id,owner,inputKey,requestKey,survey]);
   return <><Stepper cur="quiz" busy={saving} /><Page title={<span style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>역량 테스트
     <button type="button" className="btn line" style={{ fontSize: 12, padding: '5px 10px', minHeight: 0 }} disabled={!survey || survey.completed} onClick={() => surveyRef.current?.randomize()}>test용으로 삭제예정 · 무작위 선택</button>
   </span>}
@@ -50,7 +69,7 @@ export function QuizStep() {
       <button className="btn line" onClick={() => go(paths.newDetailsCheck)}>입력 내용 확인</button>
       <button className="btn pri" onClick={() => setAttempt(n => n + 1)}>다시 시도하기</button></div></div>
       : survey ? <SurveyFlow ref={surveyRef} key={survey.generationId} survey={survey} initialAnswers={survey.completed ? survey.answers : pending?.answers || survey.answers} initialPhase={survey.completed ? undefined : pending?.phase} initialCompleted={survey.completed}
-        onProgress={(answers, phase) => {
+        onRetry={() => setAttempt(n => n + 1)} onProgress={(answers, phase) => {
           if (!id || !surveyScopeCurrent({owner,id,inputKey,generationId:survey.generationId})) return;
           rememberAnswers(memoryKey, answers, phase);
           if (!sameJ(answers, survey.answers)) updateWs(s => invalidateDraft(s, 'answers'));

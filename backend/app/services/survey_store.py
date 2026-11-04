@@ -42,9 +42,9 @@ def _write(t: Any, employee_id: int, project_id: str, value: dict, *, reset_draf
 
 
 def save_generated(t: Any, employee_id: int, project_id: str, project: dict,
-                   selection: dict, profile: dict, result: dict, *, replace_generation_id: str | None = None) -> dict:
+                   selection: dict, profile: dict, result: dict, *, replace_generation_id: str | None = None, phase: str | None = None) -> dict:
     """모델 호출 후 짧은 트랜잭션에서 실행한다. 기존 V_2 설문을 덮어쓰지 않는다."""
-    checked = generate_survey(project, selection, profile, lambda *_: result)
+    checked = generate_survey(project, selection, profile, lambda *_: result, phase=phase)
     raw = _owned(t, employee_id, project_id, lock=True)
     existing = raw.get(KEY)
     if existing is not None and (not replace_generation_id or not isinstance(existing, dict) or existing.get('generationId') != replace_generation_id):
@@ -55,6 +55,9 @@ def save_generated(t: Any, employee_id: int, project_id: str, project: dict,
     value = {'version': 1, 'generationId': str(uuid4()), 'project': snapshot,
              'selection': deepcopy(selection), 'profile': deepcopy(profile),
              'survey': checked, 'answers': {}, 'completed': False}
+    if phase == "surveys":
+        value["quizStatus"] = "pending"
+        value["survey"]["questionCount"] *= 2
     reset=None
     if isinstance(raw.get('draft'),dict):
         from app.services.drafts import clear_from
@@ -79,6 +82,8 @@ def save_answers(t: Any, employee_id: int, project_id: str, generation_id: str,
     value = deepcopy(raw.get(KEY))
     if not isinstance(value, dict) or value.get('version') != 1 or value.get('generationId') != generation_id:
         raise StoreError('문항이 변경되었거나 없습니다. 다시 조회해 주세요.')
+    if complete and value.get('quizStatus') in ('pending', 'failed'):
+        raise StoreError('퀴즈 준비 후 역량 테스트를 완료해 주세요.')
     if value.get('completed'):
         if complete and answers == value.get('answers'):
             return value
@@ -122,7 +127,8 @@ def public_view(value: dict) -> dict:
             for key in ('concept', 'questionType', 'difficulty'):
                 question.pop(key, None)
     return {'generationId': value['generationId'], **survey,
-            'answers': deepcopy(value['answers']), 'completed': value['completed']}
+            'answers': deepcopy(value['answers']), 'completed': value['completed'],
+            **({'quizStatus':value['quizStatus']} if 'quizStatus' in value else {})}
 
 def save_recommendations(t: Any, employee_id: int, project_id: str, generation_id: str, result: dict, *, course: str | None = None, replace: bool = False) -> dict:
     raw = _owned(t, employee_id, project_id, lock=True)

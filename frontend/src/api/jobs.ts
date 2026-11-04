@@ -16,13 +16,30 @@ export function abortError(message = '사용자가 멈췄어요'): DOMException 
 export const isAbort = (e: unknown): boolean => e instanceof DOMException && e.name === 'AbortError';
 
 export async function waitJob<T = Record<string, unknown>>(id: string, opts: WaitOptions = {}): Promise<T> {
+  let recoveries=0;
+  let disconnectedAt=0;
   for (;;) {
-    const v = await http.get<JobView>(`/jobs/${enc(id)}?wait=10`, { signal: opts.signal });
+    let v: JobView;
+    try { v=await http.get<JobView>(`/jobs/${enc(id)}?wait=10`, { signal: opts.signal }); disconnectedAt=0; }
+    catch(error){
+      if(isAbort(error))throw error;
+      if(error instanceof ApiError && [0,502,503,504].includes(error.status)){
+        disconnectedAt ||= Date.now();
+        if(Date.now()-disconnectedAt<60000){await new Promise(resolve=>setTimeout(resolve,800));continue;}
+      }
+      throw error;
+    }
+    const redirect=v.progress?.redirectJobId;
+    if(typeof redirect==='string'){id=redirect;continue;}
     opts.onProgress?.(v);
     if (v.status === 'running' || v.status === 'queued') continue;
     if (v.status === 'done') return (v.result || {}) as T;
     if (v.status === 'cancelled') throw abortError();
     const e = v.error || {};
+    if(e.code==='JOB_INTERRUPTED' && v.progress?._resume && recoveries<2){
+      const next=await http.post<{jobId:string}>(`/jobs/${enc(id)}/resume`,{}, {signal:opts.signal});
+      id=next.jobId;recoveries++;continue;
+    }
     throw new ApiError(502, { code: e.code, kind: e.kind, message: e.user, cause: e.text, hint: e.hint, raw: e.raw, retryable: e.retryable });
   }
 }

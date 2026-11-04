@@ -504,6 +504,7 @@ def doc_summary_start(employee_id: int, draft_id: str, skip_images: bool = False
         _set_doc(employee_id, draft_id, dict(doc, status='ok', step='done', summary=s['text'], source=ctx.mode, fail=None))
         return {'ok': True}
     _set_doc(employee_id, draft_id, {'status': 'reading', 'fail': None, 'jobId': None})
+    work._resume = {'operation':'drafts.doc_summary_start','kwargs':{'employee_id':employee_id,'draft_id':draft_id,'skip_images':skip_images}}
     jid = jobs.start('doc-summary', employee_id, draft_id, work)
 
     def note_job(t, w):
@@ -576,6 +577,7 @@ def assessment_start(employee_id: int, draft_id: str) -> str | None:
         w['draft']['quizFail'] = None
         w['draft']['quizRun'] = {'key': key, 'jobId': None}
     _mutate(employee_id, draft_id, mark)
+    work._resume = {'operation':'drafts.assessment_start','kwargs':{'employee_id':employee_id,'draft_id':draft_id}}
     jid = jobs.start('assessment', employee_id, draft_id, work)
 
     def note_job(t, w):
@@ -636,6 +638,7 @@ def diagnosis_start(employee_id: int, draft_id: str) -> str | None:
         w['draft']['diagFail'] = None
         w['draft']['diagRun'] = {'key': key, 'jobId': None}
     _mutate(employee_id, draft_id, mark)
+    work._resume = {'operation':'drafts.diagnosis_start','kwargs':{'employee_id':employee_id,'draft_id':draft_id}}
     jid = jobs.start('diagnosis', employee_id, draft_id, work)
 
     def note_job(t, w):
@@ -809,12 +812,16 @@ def _run_option(employee_id: int, draft_id: str, pid: str, *, expected_key: str 
                 current['missing'] = [name for name in current['missing'] if name != pid]
             if not any(x['st'] == 'run' for x in rows) and all(x['st'] == 'ok' for x in rows) and (not d2.get('gen') or d2['gen'].get('key') != key):
                 d2['gen'] = {'key': key, 'options': {x: r['rows'][x]['out'] for x in D['optionOrder']}, 'missing': []}
-        _mutate(employee_id, draft_id, save)
+        updated = _mutate(employee_id, draft_id, save)
+        if updated.get("v2Survey"):
+            from app.services.material_preparation import prepare as prepare_materials
+            prepare_materials(employee_id,draft_id)
         _maybe_support(employee_id, draft_id)
         if err:
             raise AgentError(err['raw'] or err['text'])
         return {'pid': pid}
     try:
+        work._resume = {'operation':'drafts.option_retry','kwargs':{'employee_id':employee_id,'draft_id':draft_id,'pid':pid},'inputKey':expected_key}
         return jobs.start('option', employee_id, f'{draft_id}:{pid}', work, before_start=mark)
     except Exception:
         if info:
@@ -851,6 +858,9 @@ def accept_partial(employee_id: int, draft_id: str) -> dict:
         d['chosen'] = None
         w['draftPlan'] = None
     w = _mutate(employee_id, draft_id, fn)
+    if w.get("v2Survey"):
+        from app.services.material_preparation import prepare as prepare_materials
+        prepare_materials(employee_id,draft_id)
     _maybe_support(employee_id, draft_id)
     return present(w, draft_id)
 
@@ -927,6 +937,7 @@ def _maybe_support(employee_id: int, draft_id: str, force: list | None = None) -
                 _sup_busy.discard(draft_id)
             # 확인하는 동안 다시 만든 안이 생겼으면 그 안도 확인
             _maybe_support(employee_id, draft_id)
+    work._resume = {'operation':'drafts._maybe_support','kwargs':{'employee_id':employee_id,'draft_id':draft_id,'force':force}}
     return jobs.start('support', employee_id, draft_id, work)
 
 
@@ -1003,9 +1014,13 @@ def regenerate(employee_id: int, draft_id: str, pid: str, req: dict | None) -> d
             (g.get('regenRun') or {}).pop(pid, None)
             if w.get('draftPlan') and w['draftPlan'].get('opt') == pid:
                 w['draftPlan'] = None
-        _mutate(employee_id, draft_id, ok)
+        updated = _mutate(employee_id, draft_id, ok)
+        if updated.get("v2Survey"):
+            from app.services.material_preparation import prepare as prepare_materials
+            prepare_materials(employee_id,draft_id,[pid])
         _maybe_support(employee_id, draft_id)
         return {'pid': pid, 'version': info['variant'] + 1}
+    work._resume = {'operation':'drafts.regenerate','kwargs':{'employee_id':employee_id,'draft_id':draft_id,'pid':pid,'req':req}}
     jid = jobs.start('regenerate', employee_id, f'{draft_id}:{pid}', work)
 
     def note_job(t, w):
@@ -1093,4 +1108,6 @@ def confirm(employee_id: int, draft_id: str) -> dict:
               w=db.J({'gp5': 1, 'confirmed': True, 'roadmapId': roadmap_id}), p=draft_id)
     with _img_lock:
         _images.pop(draft_id, None)
+    from app.services.post_quiz import prepare as prepare_post_quiz
+    prepare_post_quiz(employee_id,roadmap_id,plan)
     return {'planId': roadmap_id, 'version': 1, 'selection': plan['selection'], 'sharedWith': PL.shared_with(employee_id)}

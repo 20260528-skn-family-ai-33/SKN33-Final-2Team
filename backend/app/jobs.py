@@ -1,7 +1,7 @@
 """오래 걸리는 에이전트 호출을 작업으로 돌린다 (설계서 v1.7 6.2 '오래 걸리는 작업').
 
 - 작업은 app_ext.jobs 에 남는다. 화면을 떠나거나 새로 고쳐도 서버가 이어서 처리하고, 화면은 작업 ID로 결과를 받아 간다.
-- 실행은 이 서버 프로세스 안의 스레드 풀(5차 목업 범위). 서버가 다시 켜지면 돌던 작업은 '끊김'으로 실패 처리한다(자동 재시도 없음).
+- 실행은 이 서버 프로세스 안의 스레드 풀(5차 목업 범위). 서버가 다시 켜지면 돌던 작업은 '끊김'으로 실패 처리한다(복구 정보가 있는 작업은 같은 입력으로 다시 준비).
 - 결과를 업무 표(작성 중 로드맵 등)에 쓰는 일은 작업 함수 안에서 한다. 작업 표에는 화면에 돌려줄 값만 남긴다.
   나중에 LangGraph 로 옮길 때는 작업 함수 하나가 그래프 하나(또는 노드)에 대응한다.
 """
@@ -34,11 +34,19 @@ class JobCtx:
 def start(kind: str, employee_id: int | None, ref: str, fn: Callable[[JobCtx], Any], progress: dict | None = None,
           *, before_start: Callable[[str], None] | None = None) -> str:
     owner = None
+    progress=dict(progress or {})
+    descriptor=getattr(fn,'_resume',None)
+    if isinstance(descriptor,dict):progress['_resume']=descriptor
     try:
         with db.tx() as t:
             jid = str(t.val("INSERT INTO app_ext.jobs(employee_id, kind, ref, status, progress) VALUES(:e, :k, :r, 'running', :p) RETURNING job_id",
                             e=employee_id, k=kind, r=ref, p=db.J(progress or {})))
-            if kind == 'learning_generation':
+            from .services.job_recovery import parent_job
+            parent=parent_job.get()
+            if parent:
+                updated=t.run("UPDATE app_ext.jobs SET progress=coalesce(progress,'{}'::jsonb)||jsonb_build_object('redirectJobId',CAST(:n AS text)) WHERE job_id=CAST(:j AS uuid) AND employee_id=:e AND status='failed' AND error->>'code'='JOB_INTERRUPTED'",n=jid,j=parent,e=employee_id)
+                if updated!=1:raise ApiError(409,'RECOVERY_CANCELLED','중단 작업의 상태가 변경됐어요.')
+            if kind == 'learning_generation' or isinstance(descriptor,dict):
                 from .services.generation_lock import generation_guard
                 owner = generation_guard('job', jid)
                 owner.__enter__()
@@ -48,7 +56,7 @@ def start(kind: str, employee_id: int | None, ref: str, fn: Callable[[JobCtx], A
         raise
 
     def perform() -> None:
-        if kind == 'learning_generation' and db.val('SELECT status FROM app_ext.jobs WHERE job_id = CAST(:j AS uuid)', j=jid) != 'running':
+        if (kind == 'learning_generation' or isinstance(descriptor,dict)) and db.val('SELECT status FROM app_ext.jobs WHERE job_id = CAST(:j AS uuid)', j=jid) != 'running':
             return
         ctx = JobCtx(jid)
         status, result, error = 'done', None, None
@@ -113,10 +121,10 @@ def cancel(job_id: str, employee_id: int | None) -> str:
 def mark_lost() -> int:
     """학습 생성은 세션 소유자를 확인해 다른 서버의 살아 있는 작업을 보존한다."""
     from .services.generation_lock import lock_key
-    err = cause('서버가 다시 시작돼 진행 중이던 작업이 끊겼어요')
+    err = lost_cause()
     with db.tx() as t:
-        count = t.run("UPDATE app_ext.jobs SET status = 'failed', error = :e, updated_at = now() WHERE status = 'running' AND kind <> 'learning_generation'", e=db.J(err))
-        pending = t.all("SELECT job_id FROM app_ext.jobs WHERE status = 'running' AND kind = 'learning_generation' FOR UPDATE SKIP LOCKED")
+        count = t.run("UPDATE app_ext.jobs SET status = 'failed', error = :e, updated_at = now() WHERE status = 'running' AND kind <> 'learning_generation' AND NOT (coalesce(progress,'{}'::jsonb) ? '_resume')", e=db.J(err))
+        pending = t.all("SELECT job_id FROM app_ext.jobs WHERE status = 'running' AND (kind = 'learning_generation' OR coalesce(progress,'{}'::jsonb) ? '_resume') FOR UPDATE SKIP LOCKED")
         for row in pending:
             key = lock_key('job', str(row['job_id']))
             if t.val('SELECT pg_try_advisory_xact_lock(:key)', key=key):
@@ -126,7 +134,7 @@ def mark_lost() -> int:
 
 def lost_cause() -> dict:
     """끊긴 작업(서버를 다시 켜서 작업 표에서 running 이 아님)을 화면에 보여 줄 원인"""
-    return cause('서버가 다시 시작돼 진행 중이던 작업이 끊겼어요')
+    return dict(cause('서버가 다시 시작돼 진행 중이던 작업이 끊겼어요'),code='JOB_INTERRUPTED',retryable=True)
 
 
 def alive(job_ids: list, t: db.Tx | None = None) -> set[str]:

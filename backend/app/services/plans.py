@@ -167,6 +167,7 @@ def post_deep_start(employee_id: int, roadmap_id: str) -> str | None:
             t.run('UPDATE app_ext.post_checks SET deep = :d, updated_at = now() WHERE roadmap_id = :r',
                   d=db.J({'status': 'ready', 'quiz': out['deep'], 'notes': out.get('notes') or [], 'mcq': {}, 'essay': {}}), r=row['roadmap_id'])
         return {'ok': True}
+    work._resume = {'operation':'plans.post_deep_start','kwargs':{'employee_id':employee_id,'roadmap_id':roadmap_id}}
     jid = jobs.start('post-deep', employee_id, roadmap_id, work)
     with db.tx() as t:
         t.run("""UPDATE app_ext.post_checks SET deep = jsonb_set(deep, '{jobId}', to_jsonb(CAST(:j AS text)))
@@ -411,6 +412,7 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
         if not to['def'].get('support'):
             revision_support(employee_id, roadmap_id, rev_id)
         return {'revisionId': rev_id}
+    work._resume = {'operation':'plans.revise_start','kwargs':{'employee_id':employee_id,'roadmap_id':roadmap_id,'body':body}}
     jid = jobs.start('revision', employee_id, roadmap_id, work)
     with db.tx() as t:
         t.run('UPDATE app_ext.roadmap_revisions SET job_id = CAST(:j AS uuid) WHERE revision_id = CAST(:i AS uuid)', j=jid, i=rev_id)
@@ -453,6 +455,7 @@ def revision_support(employee_id: int, roadmap_id: str, rev_id: str) -> str | No
         if err:
             raise AgentError(err['raw'] or err['text'])
         return {'ok': True}
+    work._resume = {'operation':'plans.revision_support','kwargs':{'employee_id':employee_id,'roadmap_id':roadmap_id,'rev_id':rev_id}}
     return jobs.start('revision-support', employee_id, roadmap_id, work)
 
 
@@ -733,6 +736,7 @@ def report_start(employee_id: int, roadmap_id: str) -> str:
             t.run('UPDATE public.diagnostic_rounds SET post_completed_at = now() WHERE diagnostic_round_id = :d', d=row['diagnostic_round_id'])
             t.run('UPDATE app_ext.post_checks SET running = false, fail = NULL WHERE roadmap_id = :r', r=row['roadmap_id'])
         return {'reportId': rep_id}
+    work._resume = {'operation':'plans.report_start','kwargs':{'employee_id':employee_id,'roadmap_id':roadmap_id}}
     jid = jobs.start('report', employee_id, roadmap_id, work)
     with db.tx() as t:
         t.run('UPDATE app_ext.post_checks SET job_id = CAST(:j AS uuid) WHERE roadmap_id = :r', j=jid, r=row['roadmap_id'])
