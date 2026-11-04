@@ -47,4 +47,5 @@ POLICIES = {
 
 
 def revision(course):
-    return COMMON.replace('{course}', course).replace('{policy}', POLICIES[course]).strip()
+    from app.agents.roadmap_display import with_display_contract
+    return with_display_contract(COMMON.replace('{course}', course).replace('{policy}', POLICIES[course]).strip())

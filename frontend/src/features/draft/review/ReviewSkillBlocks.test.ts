@@ -30,7 +30,7 @@ describe('수정 후 스킬별 자료 상세', () => {
   });
   it('공유 강좌의 실제 구간과 추가 0주를 구분하며 미확인 시간을 표시한다', () => {
     const html = render(undefined, [], {method: DURATION_METHOD, weeks: 2, startWeek: 1, endWeek: 2, addedWeeks: 0, totalWeeks: 5, unknownCourses: ['one']});
-    expect(html).toContain('1–2주차 · 추가 0주 · 시간 미확인');
+    expect(html).toContain('1–2주차 · 전체 일정 +0주 · 시간 미확인');
     expect(html).not.toContain('예상 2주');
   });
 });

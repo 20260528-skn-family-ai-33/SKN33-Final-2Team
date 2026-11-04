@@ -1,3 +1,4 @@
+import { activityTime } from '@/shared/lib/resourceTime';
 /* 실행 기록 창 (5차 rec-open·rec-save · P.recBody·recRes)
    진행 상태는 이 창에서만 바꾼다(홈·내 로드맵 활동 줄은 보여 주기만 · 10/23). 저장하기를 눌러야 반영된다.
    자료 상자(10/23 사용자 결정): 그림을 크게, 버튼 두 개 — '원본 열기'(새 탭) + '자료 정보'(앱 안 자료 상세) */
@@ -8,7 +9,6 @@ import type { Resource } from '@/api/types/catalog';
 import { paths } from '@/app/paths';
 import { useGo } from '@/shared/hooks/useGo';
 import { failToast } from '@/shared/lib/fail';
-import { hrs } from '@/shared/lib/format';
 import { st, stageName } from '@/shared/lib/plan';
 import { setAt, useAt } from '@/shared/state/bind';
 import { resOf } from '@/shared/state/catalog';
@@ -71,7 +71,7 @@ function RecBody({ pid, id }: { pid: string; id: string }) {
   return (
     <>
       <p className="small muted">
-        {a.skill || `${a.stage}단계 ${stageName(a.stage)}`} · {a.wFrom === a.wTo ? a.wFrom : a.wFrom + '~' + a.wTo}주차 · {hrs(a.hours)}
+        {a.skill || `${a.stage}단계 ${stageName(a.stage)}`} · {a.wFrom === a.wTo ? a.wFrom : a.wFrom + '~' + a.wTo}주차 · {activityTime(a).text}
       </p>
       <p style={{ fontWeight: 650, fontSize: 17, margin: '4px 0 14px' }}>{a.title}</p>
       {(a.task || !a.res) ? (

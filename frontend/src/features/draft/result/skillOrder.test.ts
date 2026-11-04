@@ -18,7 +18,7 @@ describe('공유 자료 전체 기간과 스킬 표시 구간', () => {
  }]));
  it('겹치는 표시 구간 6주를 더하지 않고 실제 전체 3주를 사용한다', () => {
    expect(totalWeeks(order, choices, estimates, 6)).toBe(3);
-   expect(durationLabel(estimates.Web)).toBe('1–2주차 · 추가 0주');
+   expect(durationLabel(estimates.Web)).toBe('1–2주차 · 전체 일정 +0주');
  });
  it('공유 강좌 첫 참조를 바꾸는 순서·제외·선택 변경은 전체 캐시를 무효화한다', () => {
    expect(currentEstimates(['Web', 'ETL', 'RAG'], choices, estimates, 6)).toEqual({});

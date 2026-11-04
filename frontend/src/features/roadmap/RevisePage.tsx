@@ -1,3 +1,6 @@
+import { planDescription } from '@/shared/lib/planDescription';
+import { Stats } from '@/shared/ui/parts';
+import { activityTime } from '@/shared/lib/resourceTime';
 import { trackName } from '@/shared/constants/data';
 /* 수정 요청 (10/14 · 5차 scr.revise · P.revForm·revCtl·revRow·goalRow·diffView)
    여러 항목을 함께 골라도 된다. 고른 항목과 요청 내용을 관점 에이전트가 함께 보고 수정안을 먼저 보여 준다. 확정하기 전까지 지금 로드맵은 그대로 */
@@ -8,7 +11,7 @@ import { CertPicker } from '@/features/draft/details/CertPicker';
 import { RevSupView } from '@/features/draft/options/support';
 import { D } from '@/shared/constants/data';
 import { useGo } from '@/shared/hooks/useGo';
-import { clone, hrs } from '@/shared/lib/format';
+import { clone } from '@/shared/lib/format';
 import { actMeta, diff, st, stageName } from '@/shared/lib/plan';
 import { certNameOf, prefText } from '@/shared/lib/prefs';
 import { ai, cause, errText, PROV } from '@/shared/state/ai';
@@ -35,9 +38,10 @@ export function DiffView({ pd }: { pd: PendingRevision }) {
       {pd.summary ? (
         <p className="rv-sum">
           <Icon name="spark" />
-          <span>{pd.summary}</span>
+          <span>{planDescription(pd.summary)}</span>
         </p>
       ) : null}
+      {pd.to.durationBasis === 'materials-only' && <Stats pl={pd.to} bare />}
       <div className="diff">
         {ch.length ? (
           ch.map((c, i) => (
@@ -64,7 +68,7 @@ export function DiffView({ pd }: { pd: PendingRevision }) {
             <b>요청 중 반영하지 못한 것</b>
             <ul className="plain-list">
               {pd.notes.map((t, i) => (
-                <li key={i}>{t}</li>
+                <li key={i}>{planDescription(t)}</li>
               ))}
             </ul>
           </div>
@@ -124,7 +128,7 @@ function RevCtl({ k, R }: { k: string; R: PlanRecord }) {
           <span className="tx">
             {a.title}
             <small>
-              {a.stage}단계 · {actMeta(a)} · {hrs(a.hours)}
+              {a.stage}단계 · {actMeta(a)} · {activityTime(a).text}
               {st(R.progress, a.id) === 'done' ? ' · 완료' : ''}
             </small>
           </span>
