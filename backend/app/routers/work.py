@@ -372,23 +372,30 @@ def api_skill_map(a: Account = Depends(require_account)):
 
 # ── 사내 생활 도우미 (API-09) ──
 @r.post('/assistant/ask')
-def api_ask(request: Request, body: dict, a: Account = Depends(require_employee)):
+def api_ask(request: Request, body: dict):
     q = str(body.get('question') or '').strip()
     if not q:
         raise ApiError(400, 'EMPTY_QUESTION', '질문을 적어 주세요')
     hist = body.get('history') or []
 
     def work(job: jobs.JobCtx):
-        ctx = rt.context(a.id)
-        brief = [{'goal': x['plan']['goal'], 'name': x['plan']['name'], 'weeklyHours': x['plan']['hours'], 'costWon': x['plan']['cost']}
-                 for x in PL.records(a.id, statuses=('active',)).values()]
-        dp = DR.current(a.id).get('draftPlan')
-        context = REG.reg_context(ctx.me, brief, {'name': dp['name'], 'weeklyHours': dp['hours'], 'costWon': dp['cost']} if dp else None)
-        ans = REG.answer(ctx, q, hist, context, sim=rt.sim_once(ctx, 'reg', q))
+        # 계정·세션·개인 설정을 조회하지 않고 서버의 Ollama 규정 모델을 사용한다.
+        ctx = rt.Ctx(employee_id=None)
+        ans = REG.answer(ctx, q, hist, {}, documents_only=True)
         ids = list(ans.get('basis') or []) + list(ans.get('ref') or [])
         return {'answer': ans, 'reg': regstore.bundle(ids), 'meta': ctx.meta}
-    jid = jobs.start('assistant', a.id, q[:120], work)
-    return job_response(request, jid, a.id)
+    jid = jobs.start('assistant', None, q[:120], work)
+    return job_response(request, jid, None)
+
+
+@r.get('/assistant/jobs/{job_id}')
+def api_assistant_job(job_id: uuid.UUID, wait: float = 0):
+    return jobs.view(str(job_id), None, wait, anonymous_kind='assistant')
+
+
+@r.post('/assistant/jobs/{job_id}/cancel')
+def api_assistant_cancel(job_id: uuid.UUID):
+    return {'status': jobs.cancel(str(job_id), None, anonymous_kind='assistant')}
 
 
 @r.post('/regulations/lookup')

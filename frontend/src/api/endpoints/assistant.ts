@@ -1,6 +1,6 @@
 /* 사내 생활 도우미 (API-09) — 작업(202 jobId)으로 돌고, 멈추면 작업을 취소한다.
    응답 모양은 backend/app/agents/regulation.py 의 ans() 기준 */
-import { http } from '../client';
+import { enc, http } from '../client';
 import type { RegBundle } from '../types/catalog';
 import type { JobStarted } from '../types/common';
 
@@ -9,7 +9,7 @@ export type AnswerKind = 'regulation' | 'general' | 'clarify' | 'out';
 export type AnswerLevel = 'ok' | 'missing' | 'unclear' | 'none' | 'scope' | 'general' | 'clarify' | 'out' | 'refused';
 export type EvidenceStatus = 'found' | 'partial' | 'not_found' | 'refused';
 
-/** 회사 정보 답변이 실제로 인용한 DB 원문 출처. 규정 조항 basis와 구분한다. */
+/** 회사·생활 답변이 실제로 인용한 DB 원문 출처. 규정 조항 basis와 구분한다. */
 export interface CompanyKnowledgeSource {
   chunkId: string;
   documentId: string;
@@ -22,6 +22,8 @@ export interface CompanyKnowledgeSource {
   textSha256: string;
   sourceFileSha256: string | null;
   textTruncated: boolean;
+  /** 회사·생활 카드에서 펼쳐 보는 DB 원문 발췌. */
+  excerpt?: string;
 }
 
 export interface AssistantAnswer {
@@ -55,7 +57,12 @@ export interface AssistantAnswer {
 export interface AssistantResult {
   answer: AssistantAnswer;
   reg: RegBundle;
-  meta?: { ms?: number; loadMs?: number; [k: string]: unknown };
+  meta?: {
+    ms?: number;
+    loadMs?: number;
+    classification?: { label: string; confidence?: number; model?: string; ms?: number; usedHistory?: boolean };
+    [k: string]: unknown;
+  };
 }
 
 /** 앞 대화: 답을 받은 질문과 답(요약본)만 넘긴다 */
@@ -65,5 +72,6 @@ export interface HistoryTurn {
 }
 
 export const assistantApi = {
-  ask: (question: string, history: HistoryTurn[], signal?: AbortSignal) => http.post<JobStarted>('/assistant/ask', { question, history }, { async: true, signal }),
+  ask: (question: string, history: HistoryTurn[], signal?: AbortSignal) => http.post<JobStarted>('/assistant/ask', { question, history }, { async: true, signal, anonymous: true }),
+  cancelJob: (id: string) => http.post<{ status: string }>(`/assistant/jobs/${enc(id)}/cancel`, {}, { anonymous: true }),
 };

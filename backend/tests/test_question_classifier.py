@@ -89,6 +89,7 @@ class ClassifierRoutingTest(unittest.TestCase):
         for target, name, value in [
             (classifier, 'classify', {'label': '사내 규정', 'confidence': 0.9}),
             (reg.llm, 'available', True), (reg.knowledge, 'search_company', []),
+            (reg.knowledge, 'search_life', []),
             (reg.regstore, 'search', [{'id': 'reg-1'}]), (reg.regstore, 'explicit_ref', None),
             (reg.regstore, 'reg_public', {'name': '취업규칙'}),
         ]:
@@ -189,19 +190,31 @@ class ClassifierRoutingTest(unittest.TestCase):
         self.assertEqual(result['evidenceStatus'], 'not_found')
         self.assertIn('요청한 조항', result['summary'])
 
-    def test_life_returns_only_registered_menu_and_skips_vectors(self):
-        result, model = self.route('사내 생활안내', self.response(summary='오늘 식대는 999원이에요.'))
+    def test_life_returns_db_evidence_and_skips_regulation_search(self):
+        self.search_life.return_value = [self.company_hit(category=reg.knowledge.LIFE_CATEGORY, is_virtual=True)]
+        result, model = self.route('사내 생활안내', self.response(summary='등록된 생활 안내예요.'))
         self.assertEqual(result['source'], 'intranet')
-        self.assertEqual(result['intranet'], [reg.D['intranet'][0]['id']])
-        self.assertNotIn('999', str(result))
+        self.assertEqual(result['intranet'], [])
+        self.assertEqual(result['knowledgeSources'][0]['chunkId'], 'company-1')
+        self.assertTrue(result['knowledgeSources'][0]['isVirtual'])
+        self.assertEqual(result['knowledgeSources'][0]['excerpt'], self.company_hit()['chunk_text'])
         self.search.assert_not_called()
         self.search_company.assert_not_called()
+        self.search_life.assert_called_once()
         self.assertEqual(model.call_args.args[2]['topic'], 'life')
 
     def test_life_unknown_is_guidance_not_refusal(self):
         result, _ = self.route('사내 생활안내', self.response(status='not_found'))
         self.assertEqual(result['evidenceStatus'], 'not_found')
         self.assertEqual(result['intranet'], [])
+
+    def test_life_db_supports_all_four_evidence_states(self):
+        self.search_life.return_value = [self.company_hit(category=reg.knowledge.LIFE_CATEGORY, is_virtual=True)]
+        for status in ('found', 'partial', 'not_found', 'refused'):
+            with self.subTest(status=status):
+                result, _ = self.route('사내 생활안내', self.response(status, summary='등록된 생활 안내예요.'))
+                self.assertEqual(result['evidenceStatus'], status)
+                self.assertEqual(len(result['knowledgeSources']), 1 if status in ('found', 'partial') else 0)
 
     def test_life_refusal_is_distinct_and_does_not_echo_sensitive_output(self):
         result, _ = self.route('사내 생활안내', self.response(status='refused', summary='sensitive-secret'))

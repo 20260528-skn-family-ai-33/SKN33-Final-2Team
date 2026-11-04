@@ -4,15 +4,16 @@
    · 답을 쓰는 동안: 입력창은 그대로 쓸 수 있고 보내기 자리에 '멈추기'가 나온다. 써 둔 질문은 지우지 않는다 */
 import { create } from 'zustand';
 import { assistantApi, type AssistantAnswer, type AssistantResult, type HistoryTurn } from '@/api/endpoints/assistant';
-import { cancelJob, isAbort, waitJob } from '@/api/jobs';
-import { cause, noteResult, type Cause } from '@/shared/state/ai';
+import { waitJob } from '@/api/jobs';
+import { cause, type Cause } from '@/shared/state/ai';
 import { mergeReg } from '@/shared/state/catalog';
 import { onDataReset } from '@/shared/state/events';
 
 /** 말풍선: {me, t} 내 질문 · {q, a} 답 · {q, wait} 답 쓰는 중 · {q, fail} 실패 · {q, stop, cut} 멈춤(cut: 새로 고쳐 끊김) */
-export type Msg = { me: true; t: string } | { q: string; a?: AssistantAnswer; wait?: boolean; fail?: Cause; stop?: boolean; cut?: boolean; me?: undefined };
+export type Msg = { me: true; t: string } | { q: string; a?: AssistantAnswer; mlLabel?: string; wait?: boolean; fail?: Cause; stop?: boolean; cut?: boolean; me?: undefined };
 
-const LOG_KEY = 'growpath.reglog';
+// 계정 정보를 포함할 수 있는 과거 대화는 익명 챗봇에 자동으로 전달하지 않는다.
+const LOG_KEY = 'growpath.reglog.documents';
 const DRAFT_KEY = 'growpath.regdraft';
 const OPEN_KEY = 'growpath.regopen';
 const ss = {
@@ -107,23 +108,23 @@ async function answer(q: string, i: number): Promise<void> {
   setLog(log);
   useAssistant.setState({ running: true });
   let a: AssistantAnswer | null = null;
+  let mlLabel: string | undefined;
   let err: unknown = null;
   try {
     const j = await assistantApi.ask(q, historyBefore(i), ctrl.signal);
     if (run && run.ctrl === ctrl) run.job = j.jobId;
-    const out = await waitJob<AssistantResult>(j.jobId, { signal: ctrl.signal });
+    const out = await waitJob<AssistantResult>(j.jobId, { signal: ctrl.signal, pathPrefix: '/assistant/jobs' });
     mergeReg(out.reg);
     a = out.answer;
-    noteResult(null, out.meta);
+    mlLabel = out.meta?.classification?.label;
   } catch (e) {
     err = e;
-    if (!isAbort(e)) noteResult(cause(e));
   }
   /* 멈췄거나 새 대화를 시작했으면 늦게 온 답은 버린다 */
   if (ctrl.signal.aborted || !run || run.ctrl !== ctrl) return;
   run = null;
   const next = get().log.slice();
-  next[i] = err ? { q, fail: cause(err) } : { q, a: a as AssistantAnswer };
+  next[i] = err ? { q, fail: cause(err) } : { q, a: a as AssistantAnswer, mlLabel };
   setLog(next);
   useAssistant.setState({ running: false, hint: '', fresh: !get().open });
 }
@@ -147,7 +148,7 @@ export function stop(): void {
   const { i, ctrl, job } = run;
   run = null;
   ctrl.abort();
-  if (job) cancelJob(job).catch(() => {});
+  if (job) assistantApi.cancelJob(job).catch(() => {});
   const log = get().log.slice();
   const m = log[i];
   if (m && !m.me) log[i] = { q: m.q, stop: true };
@@ -179,7 +180,7 @@ export function pick(q: string): void {
 export function clearLog(): void {
   if (run) {
     run.ctrl.abort();
-    if (run.job) cancelJob(run.job).catch(() => {});
+    if (run.job) assistantApi.cancelJob(run.job).catch(() => {});
     run = null;
   }
   setLog([]);

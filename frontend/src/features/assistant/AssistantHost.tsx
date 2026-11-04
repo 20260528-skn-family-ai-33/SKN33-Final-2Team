@@ -10,7 +10,7 @@ import { legacyToPath } from '@/app/paths';
 import { D } from '@/shared/constants/data';
 import { useGo } from '@/shared/hooks/useGo';
 import { article, missLabel, regOf, regSet } from '@/shared/lib/reg';
-import { ai, errText, type Cause } from '@/shared/state/ai';
+import { errText, type Cause } from '@/shared/state/ai';
 import { useCatalog } from '@/shared/state/catalog';
 import { toast } from '@/shared/state/ui';
 import { Icon } from '@/shared/ui/Icon';
@@ -56,7 +56,18 @@ const eun = (w: string) => {
   return c >= 0xac00 && c <= 0xd7a3 ? ((c - 0xac00) % 28 ? '은' : '는') : '은(는)';
 };
 
-export function RegCard({ a }: { a: AssistantAnswer }) {
+function AnswerLabels({ mlLabel, label, style }: { mlLabel?: string; label: string; style: string }) {
+  if (!mlLabel) return <span className={`tag ${style}`}>{label}</span>;
+  const evidence = label.replace(/^(규정|회사|사내 생활) /, '');
+  return (
+    <span className="answer-tags">
+      <span className="tag line" title="ML 질문 분류">{mlLabel}</span>
+      <span className={`tag ${style}`} title="LLM 근거 상태">{evidence}</span>
+    </span>
+  );
+}
+
+export function RegCard({ a, mlLabel }: { a: AssistantAnswer; mlLabel?: string }) {
   const go = useGo();
   useCatalog((s) => s.articles);
   const { summary, apply, more } = a;
@@ -108,7 +119,7 @@ export function RegCard({ a }: { a: AssistantAnswer }) {
       <div className="ans">
         <div className="who">
           <Icon name="scale" />
-          규정 에이전트 <span className={`tag ${statusStyle}`}>{statusLabel}</span>
+          규정 에이전트 <AnswerLabels mlLabel={mlLabel} label={statusLabel} style={statusStyle} />
         </div>
         <h4>답변 요약</h4>
         <p className="sum">{summary}</p>
@@ -139,21 +150,21 @@ export function RegCard({ a }: { a: AssistantAnswer }) {
       <div className="ans">
         <div className="who">
           <Icon name="scale" />
-          규정 에이전트 <span className={`tag ${statusStyle}`}>{statusLabel}</span>
+          규정 에이전트 <AnswerLabels mlLabel={mlLabel} label={statusLabel} style={statusStyle} />
         </div>
         <p className="sum">{summary || `등록된 ${setLabel()}에 이 내용이 명시돼 있지 않아 답하지 않아요.`}</p>
         <p>인사 제도에 관한 내용은 인사 담당 부서(인재경영실)에 문의해 주세요.</p>
         <p className="src">등록된 규정 원문에 있는 내용에만 답해요. 짐작이나 다른 기관 사례로 답하지 않아요.</p>
       </div>
     );
-  if (a.kind === 'general' && a.source === 'intranet') {
+  if (a.kind === 'general' && a.source === 'intranet' && !Array.isArray(a.knowledgeSources)) {
     /* 사내 생활: 가상 사내 홈페이지 메뉴 안내만 보여 준다(구체적인 값은 지어내지 않음) */
     const items = (a.intranet || []).map((id) => D.intranet.find((x) => x.id === id)).filter(Boolean) as typeof D.intranet;
     return (
       <div className="ans">
         <div className="who">
           <Icon name="chat" />
-          사내 생활 도우미 <span className="tag">{statusLabel}</span>
+          사내 생활 도우미 <AnswerLabels mlLabel={mlLabel} label={statusLabel} style={statusStyle} />
         </div>
         {items.length ? (
           <>
@@ -185,16 +196,17 @@ export function RegCard({ a }: { a: AssistantAnswer }) {
   if (a.kind === 'general') {
     /* 일반 답변 카드: 규정 근거 없이 요약 → 설명 → 더 볼 것 → 바로 가기(서버가 5차 화면 ID 로 줌) */
     const links = a.links || [];
-    const isCompany = a.source === 'work' && Array.isArray(a.knowledgeSources);
+    const isKnowledge = Array.isArray(a.knowledgeSources);
+    const isLife = a.topic === 'life';
     const sources = [...new Set((a.knowledgeSources || []).map((s) => [s.documentTitle, s.location, s.asOf].filter(Boolean).join(' · ')))];
     // 서버가 summary 끝에 붙인 출처는 별도 영역에 표시하고 본문에서는 중복을 없앤다.
-    const sourceStart = isCompany && sources.length ? summary.lastIndexOf('\n\n출처:') : -1;
+    const sourceStart = isKnowledge && sources.length ? summary.lastIndexOf('\n\n출처:') : -1;
     const answerSummary = sourceStart >= 0 ? summary.slice(0, sourceStart).trimEnd() : summary;
     return (
       <div className="ans">
         <div className="who">
           <Icon name="chat" />
-          사내 생활 도우미 <span className={`tag ${isCompany ? statusStyle : ''}`}>{isCompany ? statusLabel : a.source === 'app' ? '사용법 안내' : '일반 답변'}</span>
+          사내 생활 도우미 <AnswerLabels mlLabel={mlLabel} label={isKnowledge ? statusLabel : a.source === 'app' ? '사용법 안내' : '일반 답변'} style={isKnowledge ? statusStyle : ''} />
         </div>
         <h4>답변 요약</h4>
         <p className="sum">{answerSummary}</p>
@@ -209,15 +221,30 @@ export function RegCard({ a }: { a: AssistantAnswer }) {
             ))}
           </p>
         ) : null}
-        {isCompany ? (
-          sources.length ? (
-            <p className="company-sources">출처: {sources.join(' / ')}</p>
-          ) : (
-            <p className="src">등록된 회사 자료에서 답변 근거를 확인하지 못했어요. 정확한 내용은 담당 부서에 확인해 주세요.</p>
-          )
+        {isKnowledge ? (
+          !sources.length ? (
+            <p className="src">등록된 {isLife ? '사내 생활' : '회사'} 자료에서 답변 근거를 확인하지 못했어요. 정확한 내용은 담당 부서에 확인해 주세요.</p>
+          ) : null
         ) : (
           <p className="src">규정 근거가 아닌 일반 답변이에요. 기관 기준이 필요한 내용은 담당 부서에 확인해 주세요.</p>
         )}
+        {a.knowledgeSources?.length ? (
+          <details>
+            <summary><Icon name="right" />근거 보기</summary>
+            <div className="basis">
+              {a.knowledgeSources.map((item) => (
+                <div className="art" key={item.chunkId}>
+                  <b>{item.documentTitle}</b>
+                  <p className="src">{[item.location, item.asOf].filter(Boolean).join(' · ')}</p>
+                  {item.isVirtual ? <p className="src">가상 안내 자료 · 실제 운영 정보로 확정할 수 없어요.</p> : null}
+                  {item.excerpt ? <p>{item.excerpt}</p> : null}
+                  {item.textTruncated ? <p className="src">모델에 전달한 원문의 앞부분을 표시했어요.</p> : null}
+                  {item.sourceLimits ? <p className="src">자료 범위: {item.sourceLimits}</p> : null}
+                </div>
+              ))}
+            </div>
+          </details>
+        ) : null}
       </div>
     );
   }
@@ -228,7 +255,7 @@ export function RegCard({ a }: { a: AssistantAnswer }) {
     <div className="ans">
       <div className="who">
         <Icon name="scale" />
-        규정 에이전트 <span className={`tag ${statusStyle}`}>{statusLabel}</span>
+        규정 에이전트 <AnswerLabels mlLabel={mlLabel} label={statusLabel} style={statusStyle} />
       </div>
       <h4>답변 요약</h4>
       <p className="sum">{summary}</p>
@@ -243,7 +270,7 @@ export function RegCard({ a }: { a: AssistantAnswer }) {
         <details>
           <summary>
             <Icon name="right" />
-            규정 근거 보기
+              근거 보기
           </summary>
           <div className="basis">
             {arts.map((x) => (
@@ -273,7 +300,7 @@ function Bubble({ m, i }: { m: Msg; i: number }) {
   return (
     <div className="msg bot">
       {m.a ? (
-        <RegCard a={m.a} />
+        <RegCard a={m.a} mlLabel={m.mlLabel} />
       ) : m.fail ? (
         <div className="ans fail">
           <div className="who">
@@ -301,7 +328,7 @@ function Bubble({ m, i }: { m: Msg; i: number }) {
           </p>
         </div>
       ) : (
-        <div className="plain muted wait">{ai.live() ? '답을 쓰고 있어요. 규정 질문이면 원문도 찾아볼게요…' : '답변을 찾고 있어요…'}</div>
+        <div className="plain muted wait">등록된 자료에서 근거를 찾아 답변하고 있어요…</div>
       )}
     </div>
   );
@@ -339,7 +366,7 @@ export function AssistantHost() {
           </span>
           <div>
             <b>사내 생활 도우미</b>
-            <small id="regSub">규정·수자원공사 정보는 등록 자료를 근거로, 사내 생활은 알려진 안내만 답해요</small>
+            <small id="regSub">규정·회사 정보·사내 생활 DB 자료를 근거로 답해요</small>
           </div>
           <button
             className="btn ghost sm reg-new"
@@ -380,7 +407,7 @@ export function AssistantHost() {
         <div className="chat-b" id="regLog" aria-live="polite" ref={logRef}>
           <div className="msg bot">
             <div className="plain">
-              규정·수자원공사 정보·사내 생활에 대해 물어보세요. 규정과 회사 정보는 등록 자료의 근거를 찾아 답하고, 사내 생활은 알려진 사내 홈페이지(가상) 메뉴로 안내해 드려요.
+              로그인 없이 규정·수자원공사 정보·사내 생활에 대해 물어보세요. 등록된 DB 자료에서 근거를 찾아 답하고, 회원 정보나 개인 로드맵은 조회하지 않아요.
               범위 밖 질문에는 답하지 않아요. 앞 이야기에 이어서 물어봐도 돼요.
             </div>
           </div>

@@ -86,12 +86,13 @@ def start(kind: str, employee_id: int | None, ref: str, fn: Callable[[JobCtx], A
     return jid
 
 
-def view(job_id: str, employee_id: int | None, wait: float = 0) -> dict:
+def view(job_id: str, employee_id: int | None, wait: float = 0, *, anonymous_kind: str | None = None) -> dict:
     """작업 상태. wait 초 동안 끝나기를 기다린다(최대 15초). 다른 사람의 작업은 보이지 않는다"""
     deadline = time.time() + max(0.0, min(wait, WAIT_MAX_S))
     while True:
         j = db.one('SELECT job_id, employee_id, kind, ref, status, progress, result, error FROM app_ext.jobs WHERE job_id = CAST(:j AS uuid)', j=job_id)
-        if not j or (employee_id is not None and j['employee_id'] not in (None, employee_id)):
+        if (not j or (employee_id is not None and j['employee_id'] not in (None, employee_id))
+                or (anonymous_kind is not None and (j['employee_id'] is not None or j['kind'] != anonymous_kind))):
             raise ApiError(404, 'JOB_NOT_FOUND', '작업을 찾을 수 없어요')
         if j['status'] != 'running' or time.time() >= deadline:
             return {'jobId': str(j['job_id']), 'kind': j['kind'], 'status': j['status'], 'progress': j['progress'],
@@ -99,10 +100,11 @@ def view(job_id: str, employee_id: int | None, wait: float = 0) -> dict:
         time.sleep(0.25)
 
 
-def cancel(job_id: str, employee_id: int | None) -> str:
+def cancel(job_id: str, employee_id: int | None, *, anonymous_kind: str | None = None) -> str:
     with db.tx() as t:
-        j = t.one('SELECT employee_id, status FROM app_ext.jobs WHERE job_id = CAST(:j AS uuid) FOR UPDATE', j=job_id)
-        if not j or (employee_id is not None and j['employee_id'] not in (None, employee_id)):
+        j = t.one('SELECT employee_id, kind, status FROM app_ext.jobs WHERE job_id = CAST(:j AS uuid) FOR UPDATE', j=job_id)
+        if (not j or (employee_id is not None and j['employee_id'] not in (None, employee_id))
+                or (anonymous_kind is not None and (j['employee_id'] is not None or j['kind'] != anonymous_kind))):
             raise ApiError(404, 'JOB_NOT_FOUND', '작업을 찾을 수 없어요')
         if j['status'] == 'running':
             t.run("UPDATE app_ext.jobs SET status = 'cancelled', updated_at = now() WHERE job_id = CAST(:j AS uuid)", j=job_id)

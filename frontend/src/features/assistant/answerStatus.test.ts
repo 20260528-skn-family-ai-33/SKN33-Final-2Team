@@ -6,6 +6,11 @@ const makeAnswer = (value: Partial<AssistantAnswer>) => ({ kind: 'general', leve
 
 describe('답변 근거 상태와 제공 금지 거절', () => {
   const states: [EvidenceStatus, string][] = [['found', '근거 확인'], ['partial', '근거 일부 확인'], ['not_found', '근거 확인 불가'], ['refused', '답변 불가']];
+  for (const [status, label] of states) {
+    it(`사내 생활 DB: ${status}`, () => {
+      expect(answerStatus(makeAnswer({ topic: 'life', evidenceStatus: status, knowledgeSources: [] }))[0]).toBe(`사내 생활 ${label}`);
+    });
+  }
   for (const topic of ['regulation', 'company'] as const) {
     for (const [status, label] of states) {
       it(`${topic}: ${status}`, () => {

@@ -12,7 +12,7 @@ def wants_async(request: Request) -> bool:
     return 'respond-async' in (request.headers.get('prefer') or '').lower()
 
 
-def job_response(request: Request, job_id: str | None, employee_id: int, done: dict | None = None, timeout: float = 600):
+def job_response(request: Request, job_id: str | None, employee_id: int | None, done: dict | None = None, timeout: float = 600):
     """오래 걸리는 작업: 'Prefer: respond-async' 면 202 {jobId}, 아니면 끝날 때까지 기다렸다가 결과(설계서 6.2)"""
     if not job_id:
         return done or {'ok': True}

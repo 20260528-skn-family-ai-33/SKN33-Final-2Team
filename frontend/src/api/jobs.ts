@@ -7,6 +7,8 @@ import type { JobView } from './types/common';
 export interface WaitOptions {
   signal?: AbortSignal;
   onProgress?: (v: JobView) => void;
+  /** 계정 작업과 익명 챗봇 작업의 조회 경로를 분리한다. */
+  pathPrefix?: '/jobs' | '/assistant/jobs';
 }
 
 export function abortError(message = '사용자가 멈췄어요'): DOMException {
@@ -17,7 +19,10 @@ export const isAbort = (e: unknown): boolean => e instanceof DOMException && e.n
 
 export async function waitJob<T = Record<string, unknown>>(id: string, opts: WaitOptions = {}): Promise<T> {
   for (;;) {
-    const v = await http.get<JobView>(`/jobs/${enc(id)}?wait=10`, { signal: opts.signal });
+    const v = await http.get<JobView>(`${opts.pathPrefix || '/jobs'}/${enc(id)}?wait=10`, {
+      signal: opts.signal,
+      anonymous: opts.pathPrefix === '/assistant/jobs',
+    });
     opts.onProgress?.(v);
     if (v.status === 'running' || v.status === 'queued') continue;
     if (v.status === 'done') return (v.result || {}) as T;

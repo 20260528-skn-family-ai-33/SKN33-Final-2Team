@@ -36,12 +36,12 @@ SIM_ERR = {
 }
 _tries: dict[tuple, int] = {}
 _tries_lock = threading.Lock()
-_logs: dict[int, deque] = {}
+_logs: dict[int | None, deque] = {}
 
 
 @dataclass
 class Ctx:
-    employee_id: int
+    employee_id: int | None
     provider: str = 'ollama'
     demo: bool = False
     fail_sim: dict = field(default_factory=dict)
