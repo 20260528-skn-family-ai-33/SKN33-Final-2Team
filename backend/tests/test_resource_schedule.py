@@ -71,7 +71,7 @@ class ResourceScheduleTests(TestCase):
         before = deepcopy(self.saved)
         preview = material_plan.preview(self.saved, self.draft)
         self.assertEqual(preview['weeks'], 6)
-        self.assertEqual(preview['totalH'], 36.3)
+        self.assertEqual(preview['totalH'], 30.3)
         books = [a for a in preview['acts'] if a.get('res') == 'book']
         self.assertEqual(len(books), 2)
         self.assertEqual([a['resourceWindow'] for a in books], [{'from': 2, 'to': 3}] * 2)
@@ -80,7 +80,7 @@ class ResourceScheduleTests(TestCase):
         rebuilt = material_plan.rebuild_revision(revision, preview, self.draft['handoff'])
         revised = roadmap.build_plan(rebuilt, {'hours': 6, 'start': 2}, 'Goal')
         self.assertEqual(revised['weeks'], 6)
-        self.assertEqual(revised['totalH'], 36.3)
+        self.assertEqual(revised['totalH'], 30.3)
 
     def test_book_only_shared_selection_reorder_disable_and_reselect(self):
         for row in self.rec['skills']:

@@ -4,28 +4,31 @@
    · 답을 쓰는 동안: 입력창은 그대로 쓸 수 있고 보내기 자리에 '멈추기'가 나온다. 써 둔 질문은 지우지 않는다 */
 import { create } from 'zustand';
 import { assistantApi, type AssistantAnswer, type AssistantResult, type HistoryTurn } from '@/api/endpoints/assistant';
-import { cancelJob, isAbort, waitJob } from '@/api/jobs';
-import { cause, noteResult, type Cause } from '@/shared/state/ai';
+import { cancelJob, waitJob } from '@/api/jobs';
+import { cause, type Cause } from '@/shared/state/ai';
 import { mergeReg } from '@/shared/state/catalog';
 import { onDataReset } from '@/shared/state/events';
+import { meOf, useSession } from '@/shared/state/session';
 
 /** 말풍선: {me, t} 내 질문 · {q, a} 답 · {q, wait} 답 쓰는 중 · {q, fail} 실패 · {q, stop, cut} 멈춤(cut: 새로 고쳐 끊김) */
-export type Msg = { me: true; t: string } | { q: string; a?: AssistantAnswer; wait?: boolean; fail?: Cause; stop?: boolean; cut?: boolean; me?: undefined };
+export type Msg = { me: true; t: string } | { q: string; a?: AssistantAnswer; mlLabel?: string; demo?: boolean; wait?: boolean; fail?: Cause; stop?: boolean; cut?: boolean; me?: undefined };
 
-const LOG_KEY = 'growpath.reglog';
-const DRAFT_KEY = 'growpath.regdraft';
-const OPEN_KEY = 'growpath.regopen';
+const LOG_KEY = 'log';
+const DRAFT_KEY = 'draft';
+const OPEN_KEY = 'open';
+let employeeId = meOf(useSession.getState().account)?.id;
+const storageKey = (k: string) => `growpath.assistant.${employeeId}.${k}`;
 const ss = {
   get(k: string) {
     try {
-      return sessionStorage.getItem(k);
+      return employeeId === undefined ? null : sessionStorage.getItem(storageKey(k));
     } catch {
       return null;
     }
   },
   set(k: string, v: string) {
     try {
-      sessionStorage.setItem(k, v);
+      if (employeeId !== undefined) sessionStorage.setItem(storageKey(k), v);
     } catch {
       /* 저장 불가 환경은 메모리만 */
     }
@@ -53,7 +56,7 @@ interface S {
   fresh: boolean;
 }
 
-export const useAssistant = create<S>(() => ({
+const initialState = (): S => ({
   open: ss.get(OPEN_KEY) === '1',
   log: load(),
   input: ss.get(DRAFT_KEY) || '',
@@ -61,7 +64,9 @@ export const useAssistant = create<S>(() => ({
   confirm: false,
   running: false,
   fresh: false,
-}));
+});
+
+export const useAssistant = create<S>(initialState);
 
 const get = () => useAssistant.getState();
 const setLog = (log: Msg[]) => {
@@ -72,15 +77,24 @@ const setLog = (log: Msg[]) => {
 /* 지금 답을 쓰는 중인 말풍선 */
 let run: { i: number; ctrl: AbortController; job: string | null } | null = null;
 
+useSession.subscribe(({ account }) => {
+  const nextEmployeeId = meOf(account)?.id;
+  if (employeeId === nextEmployeeId) return;
+  run?.ctrl.abort();
+  run = null;
+  ss.set(LOG_KEY, '[]');
+  ss.set(DRAFT_KEY, '');
+  ss.set(OPEN_KEY, '0');
+  employeeId = nextEmployeeId;
+  useAssistant.setState(initialState());
+});
+
 const brief = (a: AssistantAnswer): HistoryTurn['a'] => ({
   kind: a.kind,
   level: a.level,
   source: a.source || '',
   summary: a.summary,
-  apply: a.apply,
-  more: a.more || [],
   basis: a.basis || [],
-  missing: a.missing || [],
   intranet: a.intranet || [],
   question: a.question || '',
   options: a.options || [],
@@ -107,23 +121,27 @@ async function answer(q: string, i: number): Promise<void> {
   setLog(log);
   useAssistant.setState({ running: true });
   let a: AssistantAnswer | null = null;
+  let mlLabel: string | undefined;
+  let demo = false;
   let err: unknown = null;
   try {
     const j = await assistantApi.ask(q, historyBefore(i), ctrl.signal);
-    if (run && run.ctrl === ctrl) run.job = j.jobId;
+    if (run?.ctrl !== ctrl) return;
+    run.job = j.jobId;
     const out = await waitJob<AssistantResult>(j.jobId, { signal: ctrl.signal });
+    if (run?.ctrl !== ctrl) return;
     mergeReg(out.reg);
     a = out.answer;
-    noteResult(null, out.meta);
+    mlLabel = out.meta?.classification?.label;
+    demo = out.meta?.mode === 'mock';
   } catch (e) {
     err = e;
-    if (!isAbort(e)) noteResult(cause(e));
   }
   /* 멈췄거나 새 대화를 시작했으면 늦게 온 답은 버린다 */
   if (ctrl.signal.aborted || !run || run.ctrl !== ctrl) return;
   run = null;
   const next = get().log.slice();
-  next[i] = err ? { q, fail: cause(err) } : { q, a: a as AssistantAnswer };
+  next[i] = err ? { q, fail: cause(err) } : { q, a: a as AssistantAnswer, mlLabel, demo };
   setLog(next);
   useAssistant.setState({ running: false, hint: '', fresh: !get().open });
 }
@@ -131,7 +149,7 @@ async function answer(q: string, i: number): Promise<void> {
 /** 보내기. 답을 쓰는 중이면 보내지 않고 입력창에 남겨 둔다(지우지 않음) */
 export function ask(q: string): boolean {
   q = String(q || '').trim();
-  if (!q) return false;
+  if (!q || employeeId === undefined) return false;
   if (run) {
     setHint('지금 앞 질문의 답을 쓰고 있어요. 다 쓰면 보낼 수 있어요. 멈추려면 ■를 누르세요.');
     return false;

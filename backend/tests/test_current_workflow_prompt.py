@@ -36,7 +36,8 @@ class CurrentWorkflowPromptTests(TestCase):
         text='[통합 생성 계약 roadmap-generation/v1]\n무료 정책'
         full='### GENERATION\n'+text+'\n### REVISION\n기존 수정 지침'
         with patch.object(rm.db,'all_',return_value=[{'system_prompt':full}]):
-            self.assertEqual(rm._sys('A1',rm.R_SYS),text)
+            self.assertTrue(rm._sys('A1',rm.R_SYS).startswith(text))
+            self.assertNotIn('최신 Free Course 정책',rm._sys('A1',rm.R_SYS))
             self.assertIn('최신 Free Course 정책',rm._sys('A1',rm.REV_SYS))
 
     def test_integrated_prompt_schemas_keep_track_specific_output_contract(self):

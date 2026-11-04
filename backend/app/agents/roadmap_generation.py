@@ -44,4 +44,5 @@ SCHEMA = '{"displayTitle":"...","tagline":"...","reason":"...","pros":["..."],"c
 
 def generation(course):
     depth = ',"targetOutcome":"산출물 목표","completionCriteria":["기준1","기준2"]' if course == 'A3' else ''
-    return COMMON.replace('{course}', course).replace('{policy}', POLICIES[course]).replace('{schema}', SCHEMA.replace('DEPTH', depth)).strip()
+    from app.agents.roadmap_display import with_display_contract
+    return with_display_contract(COMMON.replace('{course}', course).replace('{policy}', POLICIES[course]).replace('{schema}', SCHEMA.replace('DEPTH', depth)).strip())

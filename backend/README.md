@@ -21,8 +21,8 @@
 | `tools/setup_db.py` | 시연 비밀번호가 비면 관리자 계정·팀 시험 비밀번호 단계를 건너뜀 | 비밀번호는 저장소 밖에서 정해요 |
 | `app/admin_io/hr.py` | 시연 비밀번호가 비어 있으면 새 직원 추가를 막고 안내 | 빈 비밀번호로 계정이 생기지 않게 |
 | `app/llm.py`, `app/regstore.py`, `app/agents/regulation.py`, `app/routers/admin.py`·`account.py`, `app/config.py`, `app/errors.py` | 규정 검색 임베딩을 RunPod-Ollama·OpenAI 모드 모두 OpenAI `text-embedding-3-small`(`OPENAI_EMBED_MODEL`)로 통일하고 `OLLAMA_EMBED_MODEL`을 없앰. OpenAI 키가 없으면 키워드로 바꾸지 않고 오류로 알림(가데이터만 키워드). 관리자 색인 만들기는 모드를 고르지 않음(받은 `provider`는 무시 · 색인 만들기는 뒤에 아래 '규정 원문 PDF' 줄에서 없앰) | 팀 합의(2026-10-26): 팀 DB 벡터가 그 모델로 만들어져 있음. 원본은 모드별 임베딩이라 Ollama 모드가 키워드 검색으로 떨어져 조항을 못 찾는 일이 있었음 |
-| `app/agents/regulation.py`(`REG_SYS`) | 되묻기(`clarify`) 조건을 넓힘: 규정 질문의 뜻이 여러 가지로 읽히고 찾은 조항이 그중 일부 뜻에만 답하면 되묻기. 뜻이 분명하거나 되물은 뒤 고른 질문이면 되묻지 않음 | 원본은 '유형이 애매할 때만' 되물어서, 뜻이 갈리는 규정 질문을 모델마다 한 뜻으로 답하거나 '확인 불가'로 둠(2026-10-26 '근로 시작일' 질문) |
-| `app/agents/regulation.py`(`clean_option`·`check_more`) | 되묻기 선택지는 질문만 남김(괄호 설명·첫 물음 뒤 문장을 떼고, 질문·사용자 상황에 없던 숫자가 남으면 그 선택지를 버림). '추가로 확인할 것'(more) 문장도 숫자 검사: 근거에 없는 숫자면 이번에 넘긴 조항 중 그 숫자가 있는 조항을 근거에 더하고, 없으면 문장을 버림. 규정 이름+조 번호로 가리킨 조항도 근거에 넣음. 지시문에도 같은 규칙을 적음 | 원본은 요약·적용 문장만 숫자를 검사해서, 선택지·more에 확인 안 된 숫자가 들어가거나 more에 쓴 조항이 '규정 근거 보기'에 빠짐(2026-10-26 '급여 지급일 21일' · '별표 1에 1일') |
+| `app/agents/regulation.py`, `app/agents/grounded_answer.py` | 현재 실제 모델 모드는 사용자 요청에 따라 되묻기(`clarify`)를 생성하지 않음. RoBERTa가 질문 유형을 결정하고 LLM은 근거 상태·요약·출처만 생성 | 2026-10-26에는 `REG_SYS`의 되묻기 조건을 넓혔으나 이후 흐름으로 대체됨. 가데이터의 고정 되묻기와 이전 대화 표시는 호환 유지. 현재 기준은 [챗봇 질문 분류 안내](classification.md#답변-상태와-오류-2026-11-03-사용자-요청-반영) |
+| `app/agents/regulation.py`(규정 답변 검증) | 현재 실제 모델 답변은 인용 출처와 요약의 숫자를 검사하고, 검증 실패는 오류로 표시. 확인된 일부 내용만 답하는 `partial` 상태와 구분 | 2026-10-26의 선택지 정리(`clean_option`)·추가 안내 검사(`check_more`)는 과거 구현 이력이며 현재 실제 모델 답변 경로에서는 사용하지 않음 |
 | `app/agents/runtime.py`, `app/routers/account.py`, `app/services/goals.py` | '에이전트 동작 보기'(`GET /ai/log`)가 본인 호출 대신 모든 계정의 호출을 줌(직원·관리자 계정 모두). 기록마다 누구의 일인지(`employee`)와 관리자 화면에서 시작했는지(`by`)를 붙이고, 시각은 설정 시간대(`GP5_DB_TIMEZONE`)로 적음 | 시연·디버그 전용 기능이라 누가 호출했든 다 보이게(2026-10-26 사용자 결정 · 운영에서는 아무도 쓰지 않음 → B-1로 꺼야 함) · 컨테이너 시계가 UTC라 기록 시각이 9시간 어긋났음 |
 | `app/routers/admin.py`, `app/services/goals.py` | 관리자 목표 후보 다시 만들기에 모델 고르기(`mode`: `ollama`·`openai` 추가 · 이번 작업에만 쓰고 직원이 고른 AI 모드는 바꾸지 않음)와 직원 고르기(`employeeIds` · 새 `GET /admin/goal-suggestions/employees`) 추가 | 관리자가 모델을 정해 일괄로, 또는 몇 명만 골라 다시 만들 수 있게(2026-10-26 사용자 요청) · 원본은 가데이터 / 각 직원의 모드 두 가지로 재직 직원 전체만 |
 | `app/errors.py` | Ollama 401·403을 '키 문제(auth)'로 분류하고 `OLLAMA_API_KEY` 넣는 법을 조치로 안내(원본은 '잠시 뒤 다시 시도') | Pod 앞 nginx가 키를 확인하는 구성(RunPod Pod 연결 절차는 [RunPod_Ollama_연결_절차.md](RunPod_Ollama_연결_절차.md))에서 원인이 바로 보이게 (2026-10-26) |
@@ -72,6 +72,8 @@ docker compose up -d backend
 - API 문서: <http://localhost:8815/api/docs>
 - 설정은 맨 위의 `.env` 하나를 읽어요(`.env.example` 참고).
 
+챗봇 파인튜닝 모델(`growpath-regulation-4b` · `qwen35-4b-diagnosis-agent` · `role=regulation`)은 `options.num_gpu=-1`로 Ollama 실행 서버의 GPU·VRAM에 맞춰 자동 선택해요. 사용할 GPU가 없으면 서버가 CPU로 실행하며, 모델에 저장된 CPU 강제 설정도 요청 값으로 덮어써요. 같은 모델을 쓰는 안별 지원 조건 확인에도 적용돼요. GPU 드라이버·컨테이너 장치 노출은 **모델 실행 서버**에서 준비해야 해요. 실제 사용 여부는 서버의 `ollama ps` 또는 `/api/ps`의 `size_vram`으로 확인해요. [Ollama GPU 문서](https://docs.ollama.com/gpu), [자동 선택 옵션 원본](https://github.com/ollama/ollama/blob/main/api/types.go)을 참고해요.
+
 파이썬으로 직접 띄울 때(선택 · Python 3.12 · 이번 작업에서는 전체 서버 시작을 확인하지 않은 방법): 이 폴더에서 패키지를 설치하고, 맨 위 `.env`를 `GP5_ENV_FILE`로 알려 준 뒤 **토크나이저 설치 → 서버 실행** 순서로 진행해요(앱은 기본으로 이 폴더의 `.env`를 읽어요). DB는 Docker의 `db` 서비스를 그대로 써요(`.env`의 `GP5_DB_PORT`). 도커의 `backend`와 같은 8815를 쓰므로 둘 중 하나만 켜요.
 
 ```bash
@@ -92,6 +94,10 @@ python -m uvicorn app.main:app --port 8815
 최초 설치·Docker 이미지 빌드는 HuggingFace 다운로드가 필요합니다. 차단된 환경은 접속 가능한 환경에서 만든 백엔드 이미지를 `docker save`/`docker load`로 전달하고 해당 이미지를 사용하도록 Compose를 지정하거나, 호스트 실행용 고정 토크나이저 파일을 전달받아 `ROADMAP_TOKENIZER_PATH`를 지정합니다. 파일은 아래 후보 선정 절의 고정 SHA-256과 일치해야 합니다. 이미 올바른 파일이 있으면 설치기는 다운로드 없이 해시만 확인합니다. 팀원 PC에서의 빌드는 별도 확인이 필요합니다.
 
 분류 모델 연결 흐름·파일별 역할·실행 방법·검증 기록은 [챗봇 질문 분류 안내](classification.md)를 참고하세요.
+
+로그인한 직원의 챗봇은 로드맵과 같은 계정별 AI 설정을 따릅니다. 실제 모드는 규정·회사 정보·사내 생활 DB만 답변 근거로 검색하고, 시연 모드는 추천 질문에 가데이터 예시를 제공합니다. 실제 모드에서는 RoBERTa가 질문을 분류하고 답변 모델은 근거 상태·요약·출처를 반환합니다. 화면에서 근거 원문과 생활 자료의 가상 여부를 확인할 수 있습니다. 결과 조회·취소는 요청한 직원에게만 허용합니다. 자세한 동작은 [분류 안내](classification.md)를 참고하세요.
+
+실제 모델 모드의 되묻기는 삭제했습니다. 규정 답변의 확인된 내용·적용 조건·부족한 근거는 요약에 담으며, ‘내 상황에 적용’(`apply`)·‘추가로 확인할 것’(`more`)·‘등록되지 않은 기준’(`missing`)을 별도 생성 항목으로 요청하지 않습니다. 해당 필드와 되묻기 카드 표시는 가데이터·이전 대화 호환을 위해 유지합니다. `근거 일부 확인`은 일부 내용을 유효한 출처로 확인했다는 뜻이며, 잘못된 숫자·출처를 허용하는 상태가 아닙니다.
 
 ## 목표 후보 사전 준비
 
@@ -141,6 +147,29 @@ docker compose exec -e PYTHONPATH=/srv/growpath backend python tools/test_track_
 등록 도구는 이전 활성 버전을 비활성화하고 부모 버전에 연결한 새 버전을 트랜잭션으로 활성화합니다. 같은 내용으로 재실행하면 새 버전을 만들지 않습니다. Free Course의 강좌는 비용이 0으로 확인된 자료만 전달하고, 유료·비용 미확인 강좌를 반환하면 서버에서도 거부합니다. 도서는 가격과 관계없이 허용하며, 기존 DB 활성 프롬프트 뒤에 이 도서 예외 정책을 덧붙입니다. 실제 AI 생성 품질 검증은 별도입니다.
 
 프롬프트를 되돌릴 때는 `prompt_versions`에서 이번 변경의 활성 버전·`parent_version_id`를 확인하고, 해당 agent_id의 현재 버전을 비활성화한 뒤 부모 버전을 한 트랜잭션에서 활성화합니다. **백엔드 코드도 해당 이전 정책을 사용하던 버전으로 함께 되돌립니다.** DB 연결 도입 전 버전은 구역 형식도 달라 호환되지 않습니다. 개인 로드맵 제목 데이터는 이 등록 도구가 변경하지 않습니다.
+
+### 자료 학습 기간과 도서 배정시간 (#72)
+
+스킬별 자료 선택이 있는 새 계획·명시적 수정안은 `duration_proposals.apply_plan_schedule`에서 선택 자료와 현재 주당 시간으로 계산한다. 같은 강좌·도서 ID는 한 번만 합산한다. 강좌 시간이 미확인이면 일정 계산용으로 1주를 배정하고 `timeStatus=unknown`을 유지한다. 도서는 고유 ID당 1주이며, 활동 `hours`에는 현재 주당 시간, `catalogHours`에는 카탈로그 참고값, `hoursAllocation=book-week`에는 배정 근거를 둔다. 실제 독서시간으로 표현하지 않는다.
+
+계획 JSON의 선택 필드 `materialHours`는 자료 배정시간, `taskHours`는 자료 연결이 없는 과제 시간, `otherMaterialHours`는 자격증 등 자료 일정에 포함되지 않은 기타 자료 시간이다. 같은 기타 자료 ID도 한 번만 합산한다. `totalH`는 세 값의 합이고, `weeks`는 **자료 학습 예상 기간**이다. 과제·기타 자료는 기간에서 제외하고 별도로 표시한다. 주차 구간과 `전체 일정 +N주`는 각각 해당 스킬의 학습 구간과 그 스킬이 전체 일정에 더한 주 수다. 같은 자료를 공유하면 후자는 0주일 수 있다. 금액의 가격 미확인 상태·기간 상한 없음·Free 도서 예외는 유지한다.
+
+확정 전 검토는 현재 자료 선택·주당 시간·산출물 제안 버전·선택 ID로 프런트 `reviewPlan`을 계산해 상단과 자료 카드에서 함께 사용한다. 해제한 과제는 재선택할 수 있도록 카드에 남지만 합계에서 제외한다. 다른 제안의 과제를 고르면 그 과제로 교체해 계산한다. 준비 중·입력 불일치 시 0시간이나 이전 입력의 합계를 확정값처럼 표시하지 않는다. 저장 시 서버는 기존 `compose_skill_selection → selection_option → build_plan` 경로로 다시 계산한다. 화면 계산을 위한 추가 LLM 호출·클릭별 DB 저장은 없다.
+
+API 응답의 계획 JSON·버전 JSON과 `public.roadmap_steps.details`에 시간 근거를 함께 저장한다. 기존 열 추가는 없으며, 기존 확정 계획·진행·보고서는 일괄 재계산하지 않는다. 추가 필드가 없는 구형 계획은 기존 저장 시간과 근거 미기록 표시를 유지한다.
+
+생성·재생성·수정의 실행 지침과 신규 설치 템플릿에 `roadmap-display/v1`을 적용한다. AI 설명은 편성 근거를 서술하고 총기간·총금액은 계산하지 않는다. 이전 AI 설명에 남은 수치 문장은 화면의 해당 설명 필드에서만 숨긴다. 저장 원문·사용자 희망 조건·자료 원문·활동 설명을 숫자 치환하지 않는다. 원시 API의 이전 AI 설명 문자열을 직접 표시하는 다른 클라이언트는 같은 표시 보호가 필요하다. 자료 재준비 중에는 이전 안/주당 시간의 합계를 다시 표시하지 않는다.
+
+기존 DB는 `install_track_prompts.py`로 전문을 교체하지 않고, 아래 도구로 **현재 활성 지침에 표시 계약만 추가**할 수 있다. 기본 명령은 읽기 전용 점검이다. 실행 지침도 같은 계약을 보완하므로 코드 배포와 DB 반영 순서가 달라도 중복으로 붙지 않는다.
+
+```bash
+docker compose exec -T -e PYTHONPATH=/srv/growpath backend python tools/migrate_duration_prompts.py
+docker compose exec -T -e PYTHONPATH=/srv/growpath backend python tools/migrate_duration_prompts.py --apply > duration-prompts-72.json
+docker compose cp duration-prompts-72.json backend:/tmp/duration-prompts-72.json
+docker compose exec -T -e PYTHONPATH=/srv/growpath backend python tools/migrate_duration_prompts.py --rollback /tmp/duration-prompts-72.json
+```
+
+적용 기록은 UTF-8 JSON으로 보관한다(PowerShell 7 이상 권장). 세 코스를 한 트랜잭션으로 변경하고 버전 ID·부모 ID·전후 SHA-256을 남긴다. 동일 내용 재실행은 새 버전을 만들지 않는다. 복구 시 현재 버전·부모 원문 해시가 기록과 다르면 전체 복구를 중단한다. DB 프롬프트만 복구해도 현재 코드의 표시 계약은 남으므로 정책 전체를 되돌리려면 백엔드·프런트 코드도 함께 복구한다.
 
 
 ### Free Track 후속 경계 처리 (#38 / PR #41)

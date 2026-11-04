@@ -69,6 +69,20 @@ class OllamaThinkTest(unittest.TestCase):
     def test_vision_model_ignores_the_choice(self):
         self.assertIs(self.think('xhigh', role='vision'), False)
 
+    def test_only_chatbot_model_requests_automatic_gpu_selection(self):
+        for role in ('default', 'roadmap', 'regulation', 'vision'):
+            with self.subTest(role=role):
+                llm.chat('ollama', MSGS, role=role)
+                if role == 'regulation':
+                    self.assertEqual(self.sent[-1]['options']['num_gpu'], -1)
+                else:
+                    self.assertNotIn('num_gpu', self.sent[-1].get('options', {}))
+
+    def test_chatbot_gpu_selection_preserves_context_and_temperature(self):
+        with patch.object(llm, 'S', dataclasses.replace(llm.S, ollama_num_ctx=16384)):
+            llm.chat('ollama', MSGS, role='regulation', temperature=0)
+            self.assertEqual(self.sent[-1]['options'], {'num_gpu': -1, 'num_ctx': 16384, 'temperature': 0})
+
 
 class OpenAiReasoningTest(unittest.TestCase):
     def setUp(self):
@@ -94,6 +108,8 @@ class OpenAiReasoningTest(unittest.TestCase):
     def test_level_in_the_list_is_sent(self):
         self.assertEqual(self.effort('low'), 'low')
         self.assertEqual(self.effort('xhigh', role='regulation'), 'xhigh')
+        self.assertNotIn('options', self.sent[-1])
+        self.assertNotIn('num_gpu', self.sent[-1])
 
     def test_level_not_in_the_list_falls_back(self):
         self.assertEqual(self.effort('max'), '(없음)')

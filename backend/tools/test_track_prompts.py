@@ -10,8 +10,8 @@ class TrackPromptTests(unittest.TestCase):
         prompt = '### GENERATION\nDB active generation\n### REVISION\nDB active revision'
         for pid in ('A1', 'A2', 'A3'):
             with patch.object(rm.db, 'all_', return_value=[{'system_prompt': prompt}]):
-                self.assertEqual(rm._sys(pid, rm.R_SYS).split('\n[최신 Free Course 정책]')[0], 'DB active generation')
-                self.assertEqual(rm._sys(pid, rm.REV_SYS).split('\n[최신 Free Course 정책]')[0], 'DB active revision')
+                self.assertEqual(rm._sys(pid, rm.R_SYS).split('\n[최신 Free Course 정책]')[0].split('\n\n[기간·비용 표시 계약')[0], 'DB active generation')
+                self.assertEqual(rm._sys(pid, rm.REV_SYS).split('\n[최신 Free Course 정책]')[0].split('\n\n[기간·비용 표시 계약')[0], 'DB active revision')
 
     def test_db_generation_and_revision_are_selected(self):
         prompt = '### GENERATION\nDB generation\n### REVISION\nDB revision'

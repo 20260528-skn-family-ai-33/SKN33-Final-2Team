@@ -1,3 +1,5 @@
+import { MaterialBasis } from '@/shared/ui/MaterialBasis';
+import { hrs } from '@/shared/lib/format';
 import { materialVersionKey } from './materialVersion';
 import { loadRecommendations, recommendationUrl, requestMaterials as request, type Resource, type Result } from './materialRequests';
 import { MaterialSkillTabs } from './MaterialSkillTabs';
@@ -28,7 +30,7 @@ export function usePrepareMaterials() {
     }
   },[id,generation,optionsKey]);
 }
-function ResourceCard({ resource, kind, checked, disabled, onChange }: { resource: Resource; kind: 'course' | 'book'; checked: boolean; disabled?: boolean; onChange: () => void }) {
+function ResourceCard({ resource, kind, checked, disabled, onChange, weeklyHours }: { resource: Resource; kind: 'course' | 'book'; weeklyHours: number; checked: boolean; disabled?: boolean; onChange: () => void }) {
   return <article className={`v2-resource ${checked ? 'v2-resource-selected' : ''}`} role={kind === 'course' ? 'radio' : 'checkbox'} aria-checked={checked} aria-disabled={disabled} aria-label={resource.title} tabIndex={disabled ? -1 : 0}
     onClick={event => { if (!disabled && !(event.target as HTMLElement).closest('a,input,label')) onChange(); }}
     onKeyDown={event => { if (event.target === event.currentTarget && !disabled && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onChange(); } }}>
@@ -38,13 +40,13 @@ function ResourceCard({ resource, kind, checked, disabled, onChange }: { resourc
       <span><b title={resource.title}>{resource.title}</b>{resource.aiRecommended && <span className="tag acc">AI 추천</span>}</span>
     </label>
     <div className="v2-resource-meta"><span>{resource.provider || '출처 미확인'} · {resource.cost == null ? '가격 미확인' : resource.cost === 0 ? '무료' : `${Number(resource.cost).toLocaleString()}원`}</span>
-    </div></div>
+    <span>{kind === 'book' ? `도서 1주 배정 · ${hrs(weeklyHours)}` : resource.hours && resource.hours > 0 && resource.timeStatus !== 'unknown' ? `${hrs(resource.hours)}${resource.timeStatus === 'estimated' || resource.estimated?.includes('hours') ? ' (추정)' : ''}` : '시간 미확인 · 일정 1주 가정'}</span></div></div>
     {resource.url && <a className="v2-resource-link" href={resource.url} draggable={false} target="_blank" rel="noreferrer" aria-label={`${resource.title} 바로가기`}>바로가기 ↗</a>}
   </article>;
 
 }
 export type ResourceSelectionHandle = { save: () => Promise<boolean>; saveForVersion: () => Promise<boolean> };
-export type MaterialTotals = { weeks: number | null; amount: number; unknown: boolean };
+export type MaterialTotals = { weeks: number | null; amount: number; unknown: boolean; version: string; weeklyHours: number };
 export function ResultStep() {
   usePrepareMaterials();
   const d = useWs(s => s.draft);
@@ -146,7 +148,7 @@ function ResultSelection({ editorRef, onChoicesChanged, locked = false, courseId
   const selectedCourses=new Map((result?.recommendations?.skills||[]).flatMap(skill=>skill.courses.filter(resource=>choices[skill.name]?.enabled!==false && choices[skill.name]?.course===resource.id)).map(resource=>[resource.id,resource]));
   const amount=[...selectedCourses.values()].reduce((sum,resource)=>sum+(resource.cost||0),0);
   const unknown=[...selectedCourses.values()].some(resource=>resource.cost==null);
-  useEffect(()=>{if(course && result?.recommendations)onTotals?.(course,{weeks:total,amount,unknown});},[course,total,amount,unknown,onTotals,result?.recommendations]);
+  useEffect(()=>{if(course && result?.recommendations)onTotals?.(course,{weeks:total,amount,unknown,version,weeklyHours});},[course,total,amount,unknown,version,weeklyHours,onTotals,result?.recommendations]);
   useEffect(()=>{if(course)onPrepared?.(course,result?.recommendations?'ready':error?'failed':'pending',version);},[course,version,result?.recommendations,error,onPrepared]);
   const activeNames = order.filter(name => choices[name]?.enabled !== false);
   const missingCount = activeNames.filter(name => !choices[name] || currentWeeks(choices[name], estimates[name]) === null).length;
@@ -163,10 +165,11 @@ function ResultSelection({ editorRef, onChoicesChanged, locked = false, courseId
   const shownSkill=skillFilter || (materialNames.includes(activeSkill)?activeSkill:materialNames[0]);
   const content = <>
     <div className="v2-skill-summary"><h2>도서·강좌 선택</h2>
-      <div><b aria-live="polite">총 예상 {total === null ? `주차 산정 필요${missingCount ? ` (${missingCount}개)` : ''}` : `${total}주`}</b>
+      <div><b aria-live="polite">자료 학습 예상 기간 {total === null ? `주차 산정 필요${missingCount ? ` (${missingCount}개)` : ''}` : `${total}주`}</b>
         {Object.values(estimates).some(row => row.unknownCourses?.length) ? <span className="small muted">시간 미확인 강좌는 각 1주로 가정</span> : Object.values(estimates).some(row => row.estimatedCourses?.length) && <span className="small muted">추정 시간 포함</span>}
         {estimating && <span className="small muted" role="status"><span className="sp" aria-hidden="true" /> 주차 계산 중…</span>}</div>
     </div>
+    {!courseId && <MaterialBasis />}
     {error && <div><p className="err" role="alert">{error}</p>{!result?.recommendations && <button className="btn line" disabled={busy} onClick={() => void generate()}>다시 시도하기</button>}</div>}
     {busy ? <div className="loading" role="status"><span className="sp" aria-hidden="true" />자료를 확인하고 추천을 정리하고 있어요.</div>
       : result?.recommendations ? <>{!skillFilter&&<MaterialSkillTabs names={materialNames} active={shownSkill} onChange={setActiveSkill} id={tabsId}/>}<div className="v2-skills-board">{materialNames.map((name,skillIndex) => {
@@ -177,9 +180,9 @@ function ResultSelection({ editorRef, onChoicesChanged, locked = false, courseId
         return <section className={`card v2-skill${excluded ? ' v2-skill-excluded' : ''}`} key={skill.name} data-skill={skill.name} role={skillFilter?'region':'tabpanel'} id={`${tabsId}-panel-${skillIndex}`} aria-labelledby={skillFilter?undefined:`${tabsId}-tab-${skillIndex}`} aria-label={skillFilter?skill.name:undefined} hidden={skill.name!==shownSkill}>
           {!skillFilter&&<div className="v2-skill-heading"><h2>{skill.name}</h2><span className="small muted">{excluded ? '미선택' : weeks === null ? '주차 계산 중' : durationLabel(estimates[skill.name])}</span></div>}
           <details className="material-kind material-kind-books" open={sectionOpen?.books??true} onToggle={event=>{if(sectionOpen&&event.currentTarget.open!==sectionOpen.books)onSectionToggle?.('books',event.currentTarget.open);}}><summary><span>도서</span><small>선택 {selected.books.length} / 최대 3권</small><span className="material-kind-chevron" aria-hidden="true">⌄</span></summary>
-          {skill.books.length ? <div className="v2-resource-grid">{skill.books.map(resource => <ResourceCard key={resource.id} resource={resource} kind="book" checked={selected.books.includes(resource.id)} disabled={locked || busy || excluded || (!selected.books.includes(resource.id) && selected.books.length >= 3)} onChange={() => selectBook(skill.name, resource.id)} />)}</div> : <p className="small muted">{result.recommendations?.retrieval?.matches?.some(match=>match.skill===skill.name&&match.resourceId.startsWith('book_'))?'도서 후보는 있지만 이번 추천에서는 선정되지 않았어요.':'이 스킬에 추천할 도서가 없어요.'}</p>}
+          {skill.books.length ? <div className="v2-resource-grid">{skill.books.map(resource => <ResourceCard key={resource.id} resource={resource} weeklyHours={weeklyHours} kind="book" checked={selected.books.includes(resource.id)} disabled={locked || busy || excluded || (!selected.books.includes(resource.id) && selected.books.length >= 3)} onChange={() => selectBook(skill.name, resource.id)} />)}</div> : <p className="small muted">{result.recommendations?.retrieval?.matches?.some(match=>match.skill===skill.name&&match.resourceId.startsWith('book_'))?'도서 후보는 있지만 이번 추천에서는 선정되지 않았어요.':'이 스킬에 추천할 도서가 없어요.'}</p>}
           </details><details className="material-kind material-kind-courses" open={sectionOpen?.courses??true} onToggle={event=>{if(sectionOpen&&event.currentTarget.open!==sectionOpen.courses)onSectionToggle?.('courses',event.currentTarget.open);}}><summary><span>강좌</span><small>{selected.course?'1개 선택됨':'1개 선택'}</small><span className="material-kind-chevron" aria-hidden="true">⌄</span></summary>
-          {skill.courses.some(resource => course !== 'A1' || resource.cost === 0) ? <div className="v2-resource-grid">{skill.courses.filter(resource => course !== 'A1' || resource.cost === 0).map(resource => <ResourceCard key={resource.id} resource={resource} kind="course" checked={selected.course === resource.id} disabled={locked || busy || excluded} onChange={() => { onChoicesChanged?.(); setChoices(old => ({ ...old, [skill.name]: { ...selected, course: resource.id } })); }} />)}</div> : <p className="small muted">프로젝트에 맞는 강좌를 찾지 못했어요.</p>}
+          {skill.courses.some(resource => course !== 'A1' || resource.cost === 0) ? <div className="v2-resource-grid">{skill.courses.filter(resource => course !== 'A1' || resource.cost === 0).map(resource => <ResourceCard key={resource.id} resource={resource} weeklyHours={weeklyHours} kind="course" checked={selected.course === resource.id} disabled={locked || busy || excluded} onChange={() => { onChoicesChanged?.(); setChoices(old => ({ ...old, [skill.name]: { ...selected, course: resource.id } })); }} />)}</div> : <p className="small muted">프로젝트에 맞는 강좌를 찾지 못했어요.</p>}
           </details>
         </section>;
       })}{skillFilter&&!materialNames.includes(skillFilter)&&<p className="small muted">이 코스에는 해당 스킬의 추천 자료가 없어요.</p>}</div></> : !error && <div className="loading" role="status"><span className="sp" aria-hidden="true" />추천 자료를 준비하고 있어요.</div>}

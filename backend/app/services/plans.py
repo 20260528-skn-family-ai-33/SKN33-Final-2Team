@@ -48,7 +48,8 @@ def _write_steps(t: db.Tx, roadmap_id: str, plan: dict) -> None:
                        VALUES(CAST(:r AS uuid), :o, :t, :a, :du, :c, :done, :d) RETURNING step_id""",
                     r=roadmap_id, o=i, t=a['title'], a=a.get('how') or (res['title'] if res else None), du=f"{course_time.display_hours(a['hours'])} · {a['wFrom']}~{a['wTo']}주차",
                     c=0 if plan.get('opt') == 'A1' and a.get('res') else res['cost'] if res and res['cost'] is not None else None, done=a['id'] in done,
-                    d=db.J({k: a.get(k) for k in ('id', 'stage', 'res', 'task', 'hours', 'wFrom', 'wTo', 'skills', 'skill')}))  # skills: 과제가 다루는 스킬 이름(10/23)
+                    d=db.J({k: a.get(k) for k in ('id', 'stage', 'res', 'task', 'hours', 'wFrom', 'wTo', 'skills', 'skill',
+                                                'hoursEstimated', 'hoursBasis', 'timeStatus', 'hoursAllocation', 'catalogHours')}))
         if res and res['type'] in ('course', 'book', 'cert'):
             col = {'course': 'course_id', 'book': 'isbn', 'cert': 'certification_id'}[res['type']]
             val = a['res'] if res['type'] == 'course' else a['res'].replace('book_', '', 1) if res['type'] == 'book' else int(a['res'].replace('cert_', '', 1))

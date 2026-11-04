@@ -5,10 +5,11 @@ import type { RegBundle } from '../types/catalog';
 import type { JobStarted } from '../types/common';
 
 export type AnswerKind = 'regulation' | 'general' | 'clarify' | 'out';
-/** regulation: ok·missing·unclear·none·scope · general: general · clarify · out */
-export type AnswerLevel = 'ok' | 'missing' | 'unclear' | 'none' | 'scope' | 'general' | 'clarify' | 'out';
+/** 근거 상태·제공 금지 거절. 기존 대화의 missing·scope·clarify 등도 유지한다. */
+export type AnswerLevel = 'ok' | 'missing' | 'unclear' | 'none' | 'scope' | 'general' | 'clarify' | 'out' | 'refused';
+export type EvidenceStatus = 'found' | 'partial' | 'not_found' | 'refused';
 
-/** 회사 정보 답변이 실제로 인용한 DB 원문 출처. 규정 조항 basis와 구분한다. */
+/** 회사·생활 답변이 실제로 인용한 DB 원문 출처. 규정 조항 basis와 구분한다. */
 export interface CompanyKnowledgeSource {
   chunkId: string;
   documentId: string;
@@ -21,21 +22,23 @@ export interface CompanyKnowledgeSource {
   textSha256: string;
   sourceFileSha256: string | null;
   textTruncated: boolean;
+  /** 회사·생활 카드에서 펼쳐 보는 DB 원문 발췌. */
+  excerpt?: string;
 }
 
 export interface AssistantAnswer {
   kind: AnswerKind;
   level: AnswerLevel;
+  topic?: 'regulation' | 'company' | 'life';
+  /** refused는 제공 금지 요청의 거절이다. 연결·형식 오류는 기존 실패 응답으로 구분한다. */
+  evidenceStatus?: EvidenceStatus;
   /** general 일 때 intranet(사내 홈페이지 안내)·work(업무·학습)·app(사용법) */
   source?: string;
   summary: string;
-  apply: string;
-  more: string[];
   /** 근거 조항 id */
   basis: string[];
   /** 적용 대상 아님(scope)일 때 참고로 찾은 조항 id */
   ref?: string[];
-  missing: string[];
   /** 사내 홈페이지(가상) 메뉴 id (shared/constants/data.ts 의 D.intranet) */
   intranet: string[];
   question: string;
@@ -51,13 +54,19 @@ export interface AssistantAnswer {
 export interface AssistantResult {
   answer: AssistantAnswer;
   reg: RegBundle;
-  meta?: { ms?: number; loadMs?: number; [k: string]: unknown };
+  meta?: {
+    mode?: string;
+    ms?: number;
+    loadMs?: number;
+    classification?: { label: string; confidence?: number; model?: string; ms?: number; usedHistory?: boolean };
+    [k: string]: unknown;
+  };
 }
 
 /** 앞 대화: 답을 받은 질문과 답(요약본)만 넘긴다 */
 export interface HistoryTurn {
   q: string;
-  a: Pick<AssistantAnswer, 'kind' | 'level' | 'source' | 'summary' | 'apply' | 'more' | 'basis' | 'missing' | 'intranet' | 'question' | 'options'>;
+  a: Pick<AssistantAnswer, 'kind' | 'level' | 'source' | 'summary' | 'basis' | 'intranet' | 'question' | 'options'>;
 }
 
 export const assistantApi = {

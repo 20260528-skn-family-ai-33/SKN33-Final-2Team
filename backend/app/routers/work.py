@@ -385,12 +385,8 @@ def api_ask(request: Request, body: dict, a: Account = Depends(require_employee)
     hist = body.get('history') or []
 
     def work(job: jobs.JobCtx):
-        ctx = rt.context(a.id)
-        brief = [{'goal': x['plan']['goal'], 'name': x['plan']['name'], 'weeklyHours': x['plan']['hours'], 'costWon': x['plan']['cost']}
-                 for x in PL.records(a.id, statuses=('active',)).values()]
-        dp = DR.current(a.id).get('draftPlan')
-        context = REG.reg_context(ctx.me, brief, {'name': dp['name'], 'weeklyHours': dp['hours'], 'costWon': dp['cost']} if dp else None)
-        ans = REG.answer(ctx, q, hist, context, sim=rt.sim_once(ctx, 'reg', q))
+        ctx = rt.context(a.id, me={})
+        ans = REG.answer(ctx, q, hist, {}, sim=rt.sim_once(ctx, 'reg', q), documents_only=True)
         ids = list(ans.get('basis') or []) + list(ans.get('ref') or [])
         return {'answer': ans, 'reg': regstore.bundle(ids), 'meta': ctx.meta}
     jid = jobs.start('assistant', a.id, q[:120], work)

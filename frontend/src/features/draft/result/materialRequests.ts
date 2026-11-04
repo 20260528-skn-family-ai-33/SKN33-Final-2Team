@@ -2,7 +2,7 @@ import { waitJob } from '@/api/jobs';
 import { flush } from '../draftSync';
 import type { Choices, DurationEstimate } from './skillOrder';
 
-export type Resource = { id: string; title: string; provider?: string; image?: string; url?: string; cost: number | null; why: string; knowledge: string; aiRecommended: boolean };
+export type Resource = { id: string; title: string; provider?: string; image?: string; url?: string; cost: number | null; hours?: number | null; timeStatus?: string; estimated?: string[]; why: string; knowledge: string; aiRecommended: boolean };
 type Skill = { name: string; courses: Resource[]; books: Resource[]; selectedCourse: string | null; selectedBooks: string[] };
 export type Result = { preparingJobId?: string | null; courseId?: string | null; skillDetails?: { name: string; application: string }[]; generationId: string; recommendations: { id: string; skills: Skill[]; retrieval?: { matches?: { skill: string; resourceId: string }[] } } | null; choices: Choices; skillOrder?: string[]; durationEstimates?: Record<string, DurationEstimate> };
 

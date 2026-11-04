@@ -19,7 +19,11 @@ export function resourceTime(r: Resource | null | undefined): string {
 }
 
 /** Historical plans keep their own hours; today's catalog cannot prove the old basis. */
-export function activityTime(a: Pick<Activity, 'hours' | 'hoursEstimated' | 'hoursBasis' | 'res'>): { text: string; title: string } {
+export function activityTime(a: Pick<Activity, 'hours' | 'hoursEstimated' | 'hoursBasis' | 'res' | 'hoursAllocation' | 'catalogHours'>): { text: string; title: string } {
+  if (a.hoursAllocation === 'book-week') return {
+    text: `도서 1주 배정 · ${roundedDuration(a.hours)}`,
+    title: `${a.hoursBasis || '실제 독서시간이 아닌 계획 배정시간입니다.'}${a.catalogHours != null ? ` 카탈로그 참고: ${roundedDuration(a.catalogHours)}` : ''}`,
+  };
   const unknown = Boolean(a.res) && a.hoursEstimated === undefined;
   const suffix = a.hoursEstimated ? ' (추정)' : unknown ? ' (추정 여부 미기록)' : '';
   return {
