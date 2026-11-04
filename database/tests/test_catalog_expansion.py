@@ -108,20 +108,10 @@ class CatalogExpansionTests(TestCase):
                 obj._request('https://data4library.kr/api/srchBooks',{'keyword':'SQL'})
         self.assertEqual(obj.client.get.call_count,2)
 
-    def test_zero_library_budget_means_no_loader_cap(self):
-        from unittest.mock import MagicMock
-        obj=ing();obj.config['library']['request_budget']=0
-        obj.client=MagicMock()
-        obj.client.get.return_value=MagicMock(status_code=200,json=lambda:{'response':{'detail':[]}})
-        with patch.object(obj,'_library_cache_read',return_value=None),patch.object(obj,'_library_cache_write'):
-            for _ in range(450):
-                obj._request('https://data4library.kr/api/srchDtlList',{'isbn13':'9788900000001'})
-        self.assertEqual(obj.client.get.call_count,450)
-        self.assertNotIn('library_budget',obj.reports)
 
-    def test_configured_library_budget_has_no_cap(self):
+    def test_configured_library_budget_keeps_existing_cap(self):
         from src.shared.config_loader import get_paths_config
-        self.assertEqual(get_paths_config()['api']['library']['request_budget'],0)
+        self.assertEqual(get_paths_config()['api']['library']['request_budget'],400)
 
     def test_kmooc_unix_seconds_are_valid_dates(self):
         from src.shared.catalog_eligibility import timestamp
@@ -176,17 +166,6 @@ class CatalogExpansionTests(TestCase):
         self.assertEqual(report['jobs']['excluded']['no_it_skill_evidence'],1)
         self.assertFalse(any('DELETE' in str(call) for call in conn.execute.call_args_list))
 
-    def test_saved_isbns_skip_record_and_detail_calls(self):
-        obj=ing()
-        docs=[{'doc':{'isbn13':'9788900000001','bookname':'SQL 실무','class_no':'005.75'}},
-              {'doc':{'isbn13':'9788900000002','bookname':'SQL 튜닝','class_no':'005.75'}}]
-        with patch.object(obj,'_key',return_value='test'), patch.object(obj,'_request',return_value={
-            'response':{'numFound':2,'docs':docs}}):
-            with patch.object(catalog_details,'enrich_books',side_effect=lambda _,rows: rows) as detail:
-                rows=obj.fetch_books_from_api(0,skip_isbns=frozenset({'9788900000001'}))
-        self.assertEqual([r['external_key'] for r in detail.call_args.args[1]],['9788900000002'])
-        self.assertEqual([r['external_key'] for r in rows],['9788900000002'])
-        self.assertEqual(obj.reports['library']['skipped_existing_isbns'],1)
 
     def test_listed_kdc_outside_004_005_skips_only_doomed_detail_calls(self):
         obj=ing()

@@ -1,5 +1,5 @@
 """Execution defaults and committed-reset reports; all external clients are mocked."""
-from contextlib import contextmanager, redirect_stderr, redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 import json
 from pathlib import Path
@@ -20,7 +20,6 @@ class IngestionExecutionTests(unittest.TestCase):
         context = MagicMock()
         context.__enter__.return_value.info.host = '127.0.0.1'
         context.__enter__.return_value.execute.return_value.fetchall.return_value = SKILLS
-        self.conn = context.__enter__.return_value
         self.enterContext(patch('src.database.deployment.connect', return_value=context))
         self.enterContext(patch('src.database.local_runtime.server_data_directory', return_value=DATA))
         self.backup = self.enterContext(patch('src.database.local_runtime.backup', return_value={'backup': 'mock-reset.dump'}))
@@ -111,180 +110,15 @@ class IngestionExecutionTests(unittest.TestCase):
         self.reset.assert_not_called()
         self.apply.assert_not_called()
 
-    def test_default_run_still_collects_every_catalog(self):
-        result = self.ing.execute_full_pipeline()
-        self.assertIsNone(self.collect.call_args.kwargs['kinds'])
-        self.assertEqual(self.collect.call_args.kwargs['skip_isbns'], frozenset())
-        self.assertEqual(result['collection_scope'], 'all_catalogs')
-        self.assertFalse(self.apply.call_args.kwargs['only_new_books'])
-        self.assertFalse(any('public.books' in call.args[0] for call in self.conn.execute.call_args_list))
-
-    def test_only_new_books_collects_books_without_saved_isbns(self):
-        def query(sql, *args):
-            result = MagicMock()
-            result.fetchall.return_value = [{'isbn': '9788900000001'}] if 'public.books' in sql else SKILLS
-            return result
-        self.conn.execute.side_effect = query
-        result = self.ing.execute_full_pipeline(only_new_books=True)
-        self.assertEqual(self.collect.call_args.kwargs['kinds'], ('books',))
-        self.assertEqual(self.collect.call_args.kwargs['skip_isbns'], frozenset({'9788900000001'}))
-        self.assertEqual(result['collection_scope'], 'new_books_only')
-        self.apply.assert_called_once()
-        self.assertTrue(self.apply.call_args.kwargs['only_new_books'])
-        self.backup.assert_not_called()
-        self.reset.assert_not_called()
-
-    def test_only_new_books_rejects_reset_before_any_change(self):
-        with self.assertRaisesRegex(ValueError, '--reset'):
-            self.ing.execute_full_pipeline(only_new_books=True, reset_catalog=True)
-        self.conn.execute.assert_not_called()
-        for step in (self.backup, self.reset, self.collect, self.apply):
-            step.assert_not_called()
-
-
-class NarrowedCatalogTests(unittest.TestCase):
-    def test_books_only_collection_never_calls_other_sources(self):
-        ing = RealDataIngestor(config={'ingestion': {}}, ai_client=client())
-        others = {kind: self.enterContext(patch.object(ing, f'fetch_{kind}_from_api'))
-                  for kind in ('courses', 'certifications', 'jobs', 'majors')}
-        books = self.enterContext(patch.object(ing, 'fetch_books_from_api', return_value=[row()]))
-        self.enterContext(patch('src.database.ingestion.catalog_details.finalize',
-                                side_effect=lambda _, kind, rows: rows))
-        batch = ing.collect(SKILLS, kinds=('books',), skip_isbns=frozenset({'9788900000001'}))
-        self.assertEqual(set(batch['rows']), {'books'})
-        self.assertEqual(len(batch['rows']['books']), 1)
-        self.assertEqual(books.call_args.kwargs['skip_isbns'], frozenset({'9788900000001'}))
-        for fetch in others.values():
-            fetch.assert_not_called()
-        with self.assertRaises(ValueError):
-            ing.collect(SKILLS, kinds=('videos',))
-
-    @staticmethod
-    def connection(statements, saved_books=()):
-        class Connection:
-            @contextmanager
-            def transaction(self):
-                yield
-
-            def execute(self, sql, params=None):
-                statements.append(sql)
-                result = MagicMock()
-                result.fetchall.return_value = (SKILLS if 'public.skill_tags' in sql else
-                    [{'isbn': isbn, 'title': '저장된 도서'} for isbn in saved_books] if 'FROM public.books' in sql else [])
-                result.fetchone.return_value = {'id': 'present'} if 'to_regclass' in sql else None
-                return result
-        return Connection()
-
-    def test_new_books_batch_skips_whole_catalog_cleanup_and_checks_only_new_books(self):
-        ing = RealDataIngestor(config={'ingestion': {}}, ai_client=client())
-        statements = []
-        validation = {'removed_rows': {'removed_resource_associations': 0}}
-        with patch('src.database.ingestion.catalog_finalization.finalize_catalog',
-                   side_effect=AssertionError('whole-catalog cleanup')), \
-             patch('src.database.ingestion.catalog_details.refresh_certification_status',
-                   side_effect=AssertionError('certification refresh')), \
-             patch('src.database.ingestion.catalog_finalization.finalize_new_books',
-                   return_value=({}, validation)) as new_books:
-            result = ing.apply(self.connection(statements), {'failures': {}, 'rows': {'books': [row()]},
-                               'skill_identity': SKILLS, 'sources': {}}, only_new_books=True)
-        self.assertEqual(new_books.call_args.args[1], ['9791191234567'])
-        self.assertTrue(new_books.call_args.kwargs['embed'])
-        self.assertEqual(set(result['tables']), {'books'})
-        self.assertEqual(result['tables']['books']['inserted'], 1)
-        self.assertEqual(result['certification_status_changes'], {})
-        writes = [s for s in statements if s.lstrip().upper().startswith(('INSERT', 'UPDATE', 'DELETE', 'LOCK'))]
-        self.assertTrue(any('public.books' in s for s in writes))
-        for other in ('courses', 'certifications', 'jobs', 'majors'):
-            with self.subTest(catalog=other):
-                self.assertFalse(any(f'public.{other}' in s for s in statements))
-
-    def test_new_books_batch_never_rewrites_a_saved_book_or_other_catalogs(self):
-        ing = RealDataIngestor(config={'ingestion': {}}, ai_client=client())
-        statements = []
-        with self.assertRaisesRegex(ValueError, '이미 저장된 도서'):
-            ing.apply(self.connection(statements, saved_books=['9791191234567']),
-                      {'failures': {}, 'rows': {'books': [row()]}, 'skill_identity': SKILLS, 'sources': {}},
-                      only_new_books=True)
-        self.assertFalse(any(s.lstrip().upper().startswith('INSERT') for s in statements))
-        with self.assertRaisesRegex(ValueError, '도서 외 자료'):
-            ing.apply(self.connection([]), {'failures': {}, 'rows': {'books': [], 'courses': []},
-                      'skill_identity': SKILLS, 'sources': {}}, only_new_books=True)
-
-
-class NewBookFinalizationTests(unittest.TestCase):
-    def setUp(self):
-        from src.database.ingestion import catalog_finalization
-        self.module = catalog_finalization
-        self.statements = []
-        good = row()['fields']
-        books = {'9788900000001': good, '9788900000002': {**good, 'isbn': '9788900000002'}}
-        statements = self.statements
-
-        class Connection:
-            def execute(self, sql, params=None):
-                statements.append(sql)
-                result = MagicMock()
-                if 'public.skill_tags' in sql:
-                    result.fetchall.return_value = SKILLS
-                elif 'FROM public.books t WHERE isbn' in sql:
-                    result.fetchone.return_value = {'fields': books[params[0]]}
-                elif 'FROM public.book_skills WHERE isbn' in sql:
-                    result.fetchall.return_value = [{'skill_id': 1}]
-                return result
-        self.conn = Connection()
-        self.eligible = self.enterContext(patch.object(catalog_finalization, 'eligible_keys',
-                                                       return_value=({('books', '9788900000001')}, {})))
-        self.embed = self.enterContext(patch.object(catalog_finalization.resource_vectors, 'embed',
-                                                    return_value={'embedded_count': 1}))
-        self.plan = self.enterContext(patch.object(catalog_finalization.resource_vectors, 'plan',
-                                                   return_value={'pending_count': 0}))
-
-    def test_only_new_usable_books_are_embedded_and_unusable_new_books_are_excluded(self):
-        result, validation = self.module.finalize_new_books(self.conn, ['9788900000002', '9788900000001'])
-        self.assertEqual(self.embed.call_args.kwargs['resource_types'], ['books'])
-        self.assertEqual(self.embed.call_args.kwargs['resource_ids'], ['9788900000001'])
-        self.assertEqual((validation['books_ready'], validation['unusable_rows_excluded']), (1, 1))
-        self.assertTrue(validation['vectors_verified'])
-        writes = [s for s in self.statements if s.lstrip().upper().startswith(('INSERT', 'UPDATE', 'DELETE'))]
-        self.assertEqual(len(writes), 2)
-        self.assertTrue(all('book' in s for s in writes))
-        for other in ('courses', 'certifications', 'jobs', 'majors'):
-            self.assertFalse(any(f'public.{other}' in s for s in self.statements))
-
-    def test_missing_new_book_vector_fails_the_load(self):
-        self.plan.return_value = {'pending_count': 1}
-        with self.assertRaisesRegex(ValueError, '벡터'):
-            self.module.finalize_new_books(self.conn, ['9788900000001'])
-
-    def test_nothing_new_makes_no_paid_call(self):
-        result, validation = self.module.finalize_new_books(self.conn, [])
-        self.embed.assert_not_called()
-        self.eligible.assert_not_called()
-        self.assertFalse(result['embedding_api_called'])
-        self.assertEqual(validation['books_checked'], 0)
-        result, validation = self.module.finalize_new_books(self.conn, ['9788900000001'], embed=False)
-        self.embed.assert_not_called()
-        self.assertEqual(validation['books_ready'], 1)
-        self.assertFalse(validation['vectors_verified'])
-
 
 class IngestionCliTests(unittest.TestCase):
-    def test_only_new_books_flag_reaches_pipeline_and_rejects_conflicts(self):
-        for suffix, expected in (([], False), (['--only-new-books', '--dry-run'], True)):
-            with self.subTest(args=suffix), patch.object(sys, 'argv', ['load_data.py'] + suffix), \
-                 patch.object(load_data, 'RealDataIngestor') as constructor, redirect_stdout(StringIO()):
-                constructor.return_value.execute_full_pipeline.return_value = {'status': 'READY'}
-                self.assertEqual(load_data.main(), 0)
-                kwargs = constructor.return_value.execute_full_pipeline.call_args.kwargs
-                self.assertEqual(kwargs['only_new_books'], expected)
-                self.assertFalse(kwargs['reset_catalog'])
-        for suffix in (['--only-new-books', '--reset'], ['--only-new-books', '--refresh-book-images']):
-            with self.subTest(args=suffix), patch.object(sys, 'argv', ['load_data.py'] + suffix), \
-                 patch.object(load_data, 'RealDataIngestor') as constructor, redirect_stderr(StringIO()):
-                with self.assertRaises(SystemExit) as caught:
-                    load_data.main()
-                self.assertEqual(caught.exception.code, 2)
-                constructor.assert_not_called()
+    def test_removed_book_mode_fails_before_collection_or_paid_client(self):
+        with patch.object(sys, 'argv', ['load_data.py', '--only-new-books']), \
+             patch.object(load_data, 'RealDataIngestor') as constructor, redirect_stderr(StringIO()):
+            with self.assertRaises(SystemExit) as caught:
+                load_data.main()
+        self.assertEqual(caught.exception.code, 2)
+        constructor.assert_not_called()
 
     def test_default_incremental_alias_and_explicit_reset(self):
         for suffix, expected in (([], False), (['--incremental'], False), (['--reset'], True)):

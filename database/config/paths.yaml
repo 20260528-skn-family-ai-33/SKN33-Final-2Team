@@ -14,8 +14,7 @@ api:
     max_pages: 10
     search_fields: ["title", "keyword"]
     list_request_budget: 100  # 나머지 호출 예산은 상세·소장 확인에 사용
-    # 0은 이 코드의 전체 호출 제한 없음(#83). 정보나루 일일 한도에 걸리면 그때까지 확보한 도서는 유지.
-    request_budget: 0
+    request_budget: 400  # 캐시 적중 제외. 한도 도달 시 정상 확보한 도서는 유지.
     # 실제 적재·추천은 catalog_scope.py에서 KDC 004/005 및 국내 출판·한국어 상세를 강제합니다.
     kdc_code: "004"
     page_size: 50

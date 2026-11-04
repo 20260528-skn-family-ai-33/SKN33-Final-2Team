@@ -83,10 +83,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "5f56fec9421e454c9bea7cf6a4b80f3d415d64e72c8ef851c8564a31ec14026f",
-      "bytes": 50391,
+      "sha256": "bd30905eec13aaf3d2e47e3ce7942c5e458adf6ce93592cfa23625e4ec09d3cc",
+      "bytes": 50008,
       "handling": "adjusted",
-      "change_note": "Issue #83: new-books-only ingestion, verified shared backup and artifact synchronization (2026-11-04).",
+      "change_note": "Issue #83: remove the unneeded book-only mode; retain shared backup and LLM candidates, keep the existing request budget (2026-11-04).",
       "local_update_source": {
         "path": "README.md",
         "sha256": "e872d64ea58c53311d098dc1c769f5bc3232ad947d690054b75a0a0a20c6d8c6"
@@ -98,10 +98,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "e8bbfb9a3e2c850cc436b7cc2b9ac1a5eb9acc2456cefd7ab72fa8c704a38389",
-      "bytes": 9018,
+      "sha256": "cf56ea7e881e82322df42776c1f5c811b6b4cf0e8854f0409df4752594212c0e",
+      "bytes": 9150,
       "handling": "adjusted",
-      "change_note": "Issue #83: new-books-only ingestion, verified shared backup and artifact synchronization (2026-11-04)."
+      "change_note": "Issue #83: remove the unneeded book-only mode; retain shared backup and LLM candidates, keep the existing request budget (2026-11-04)."
     },
     {
       "path": "database/assets.manifest.json",
@@ -120,10 +120,10 @@
       "source_sha256": "f3c6661660777e2f9618d07b3649eceec758b11d1c7b902bd1c2beffcac7781e",
       "source_bytes": 2936,
       "source_kind": "source_commit_file",
-      "sha256": "1a271aedc2ff04c4f9f9014e9fd6112e5ea2d4c133a29a43ed0430b8211afbd4",
-      "bytes": 4513,
+      "sha256": "53ce9fd06d71e7cd8c46e057230aafc8460d732f87d4386e04a3d72ed5c4b08b",
+      "bytes": 4452,
       "handling": "copied",
-      "change_note": "Issue #83: books-only incremental collection (--only-new-books) that validates and embeds only new books and skips whole-catalog cleanup; under-covered skill book keywords first; KDC pre-filter before detail calls (2026-11-04).",
+      "change_note": "Issue #83: remove the unneeded book-only mode; retain shared backup and LLM candidates, keep the existing request budget (2026-11-04).",
       "local_update_source": {
         "path": "config/paths.yaml",
         "sha256": "cd340a8305f78fa4f9e94fd02d66f51835f6667e307d1f085f5095bf5ce8a6ee"
@@ -235,10 +235,10 @@
       "source_sha256": "625ab83498ba3c6cd966b86cf194da5b22dfd13b06bf771f925185fe6074a416",
       "source_bytes": 2713,
       "source_kind": "source_commit_file",
-      "sha256": "40f03c407eb82a5f1cf401a51733302c09a5c5bff135383fba5dfde1342aab46",
-      "bytes": 3799,
+      "sha256": "86ad1d6cc0680ce795e4fe02f44461bb42a4e173e9a78dcfff7b86c5c7514dfa",
+      "bytes": 3383,
       "handling": "copied",
-      "change_note": "Issue #83: books-only incremental collection (--only-new-books), under-covered skill book keywords searched first, KDC pre-filter before detail calls (2026-11-04).",
+      "change_note": "Issue #83: remove the unneeded book-only mode; retain shared backup and LLM candidates, keep the existing request budget (2026-11-04).",
       "local_update_source": {
         "path": "load_data.py",
         "sha256": "306f028a1e7623f95b2b8e4cf9f2ed36faa72a43891bc718bb8779dbcd356223"
@@ -714,10 +714,10 @@
       "source_sha256": "e568b5447a02f5a1d944397d03cf044d0a4a1f53c8a22131a82868035d3c299f",
       "source_bytes": 4885,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "89ee1aabe98ac355e404a1cbaa4301a508803f45516b986c215198ee4f5642ae",
-      "bytes": 7806,
+      "sha256": "5205cfe0c821908ed6371e1cff59fed2b8e417a84d76a496ffd75aa4b62c128f",
+      "bytes": 5427,
       "handling": "adjusted",
-      "change_note": "Issue #83: books-only incremental collection (--only-new-books) that validates and embeds only new books and skips whole-catalog cleanup; under-covered skill book keywords first; KDC pre-filter before detail calls (2026-11-04).",
+      "change_note": "Issue #83: remove the unneeded book-only mode; retain shared backup and LLM candidates, keep the existing request budget (2026-11-04).",
       "local_update_source": {
         "path": "src/database/ingestion/catalog_finalization.py",
         "sha256": "e568b5447a02f5a1d944397d03cf044d0a4a1f53c8a22131a82868035d3c299f"
@@ -774,10 +774,10 @@
       "source_sha256": "0432c150ef770fc7abbd9257e95ad88f34555d9dc102080826dd6d11ade3e6b1",
       "source_bytes": 41897,
       "source_kind": "source_commit_file",
-      "sha256": "c4e2774f6e48c977c5410bc9c7a8e6f1a1b7279f7684de9f00fa22899a4aedb4",
-      "bytes": 52108,
+      "sha256": "e0f0e0855a6007bc0161a0440dc5e5c7c931cb20149a5d433bdb341d8b8ff180",
+      "bytes": 49388,
       "handling": "copied",
-      "change_note": "Issue #83: books-only incremental collection (--only-new-books) that validates and embeds only new books and skips whole-catalog cleanup; under-covered skill book keywords first; KDC pre-filter before detail calls (2026-11-04).",
+      "change_note": "Issue #83: remove the unneeded book-only mode; retain shared backup and LLM candidates, keep the existing request budget (2026-11-04).",
       "local_update_source": {
         "path": "src/database/ingestion/real_data_ingestor.py",
         "sha256": "7382ff2768333b8ddb77d2dc0322025351944c5acedc9036c8a33dec8920ca1b"
@@ -1249,10 +1249,10 @@
       "source_sha256": "2531e5882b559cf5c00b304f6847638f9121ab3a5911681498af953746ac6045",
       "source_bytes": 9909,
       "source_kind": "source_commit_file",
-      "sha256": "4acfa577e9238c58852b489f70af6da34ebcbe27a1b3530eb511d000930d20ac",
-      "bytes": 15507,
+      "sha256": "76d045f9bf4020a8ff8cba8fbea3d2e9eb28440f7534cb7cbf77620757d3063f",
+      "bytes": 13974,
       "handling": "copied",
-      "change_note": "Issue #83: preserve new-books-only isolation; recognize explicit SQL tuning in body evidence, reject NoSQL/PLSQL and title-only false positives; verified book expansion 2026-11-04.",
+      "change_note": "Issue #83: remove the unneeded book-only mode; retain shared backup and LLM candidates, keep the existing request budget (2026-11-04).",
       "local_update_source": {
         "path": "tests/test_catalog_expansion.py",
         "sha256": "12e77bbd46d7eefb6737aadb178fdf228d07e18d201b3eba772aee57b1a807ae"
@@ -1562,9 +1562,9 @@
       "source_bytes": null,
       "source_kind": "review_regression_test",
       "handling": "added",
-      "sha256": "9bde92e33e143939c3c4074230dba7a35c5e163fe5ca5451f77832cf3f76616e",
-      "bytes": 19164,
-      "change_note": "Issue #83: books-only incremental collection (--only-new-books) that validates and embeds only new books and skips whole-catalog cleanup; under-covered skill book keywords first; KDC pre-filter before detail calls (2026-11-04)."
+      "sha256": "2e46f2cccca7f1c82af04ee865ccdf0afcebc03b0559b321b74581b6c3416d8b",
+      "bytes": 9077,
+      "change_note": "Issue #83: remove the unneeded book-only mode; retain shared backup and LLM candidates, keep the existing request budget (2026-11-04)."
     },
     {
       "path": "database/src/database/migrations/023_direct_department_visibility.sql",

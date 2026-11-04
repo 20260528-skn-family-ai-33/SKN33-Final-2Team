@@ -73,37 +73,3 @@ def finalize_catalog(conn, *, embed=True, embedding_client=None):
             raise ValueError('적재 최종 검사 실패: 누락·오래된 벡터')
     return result,{'passed':True,'catalogs':counts,'skill_links':link_count,'api_descriptions_copied':copied,
                    'unusable_rows_excluded':excluded,'removed_rows':deleted,'vectors_verified':embed}
-
-
-def finalize_new_books(conn, isbns, *, embed=True, embedding_client=None):
-    """New-books-only ingestion: check and index just the books inserted now.
-
-    Other catalogs and previously saved books are neither normalized, unlinked nor re-embedded.
-    """
-    isbns=sorted(set(isbns))
-    matcher=SkillMatcher(conn.execute('SELECT skill_id,name,category FROM public.skill_tags ORDER BY skill_id').fetchall())
-    allowed,_=eligible_keys(conn) if isbns else (set(),{})
-    ready,excluded,link_count=[],0,0
-    for isbn in isbns:
-        fields=conn.execute("SELECT to_jsonb(t)-'embedding' AS fields FROM public.books t WHERE isbn=%s",(isbn,)).fetchone()['fields']
-        links={r['skill_id'] for r in conn.execute('SELECT skill_id FROM public.book_skills WHERE isbn=%s',(isbn,)).fetchall()}
-        usable=(('books',isbn) in allowed and fields.get('content_status')=='ready' and bool(links)
-                and links<=set(scoped_matches(matcher,fields)) and bool(str(fields.get('description') or '').strip()))
-        if usable:
-            ready.append(isbn);link_count+=len(links);continue
-        # Same outcome as the full finalization for an unusable row, limited to this new book.
-        conn.execute('DELETE FROM public.book_skills WHERE isbn=%s',(isbn,))
-        conn.execute("UPDATE public.books SET content_status='scope_excluded' WHERE isbn=%s",(isbn,))
-        excluded+=1
-    if embed and ready:
-        result=resource_vectors.embed(conn,client=embedding_client,resource_types=['books'],resource_ids=ready)
-        if resource_vectors.plan(conn,['books'],ready)['pending_count']:
-            raise ValueError('적재 최종 검사 실패: 신규 도서 벡터 누락')
-    else:
-        result={'embedding_model':resource_vectors.MODEL,'selected_count':len(ready),'embedded_count':0,
-                'database_changes':False,'embedding_api_called':False}
-    deleted={'deleted':{kind:0 for kind in TABLES},'removed_resource_associations':0,
-             'skill_ids_preserved':True,'parent_roadmaps_preserved':True,'existing_references_preserved':True}
-    return result,{'passed':True,'scope':'new_books_only','books_checked':len(isbns),'books_ready':len(ready),
-                   'skill_links':link_count,'unusable_rows_excluded':excluded,'removed_rows':deleted,
-                   'vectors_verified':bool(embed and ready)}
