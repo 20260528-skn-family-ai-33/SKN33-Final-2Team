@@ -17,12 +17,14 @@ export function planWeeklyHours(handoffHours?: number | null, optionHours?: numb
   return handoffHours || optionHours || D.autoHours;
 }
 
-export function buildPlan(def: OptionDef, prm: Partial<PlanParams>, goal: string): PlanContent {
+type PlanResource = Pick<Resource, 'hours' | 'cost' | 'estimated' | 'timeNote' | 'type'>;
+export function buildPlan(def: OptionDef, prm: Partial<PlanParams>, goal: string,
+  lookup: (id: string | null | undefined) => PlanResource | null = resOf): PlanContent {
   const p: PlanParams = { start: 1, hours: 4, format: 'mixed', patch: {}, ...prm };
   const acts: Activity[] = def.acts
     .filter((a) => a.stage >= p.start)
     .map((a) => {
-      const r = resOf(a.res);
+      const r = lookup(a.res);
       const x: Activity = {
         id: a.id,
         skill: a.skill,
@@ -60,8 +62,8 @@ export function buildPlan(def: OptionDef, prm: Partial<PlanParams>, goal: string
   });
   const weeks = def.materialSchedule?.length ? studyWeeks : Math.max(1, Math.ceil(cum / p.hours));
   const resIds = [...new Set(acts.map((a) => a.res).filter(Boolean) as string[])];
-  const cost = resIds.reduce((s, r) => s + (resOf(r)?.cost || 0), 0);
-  const costUnknown = resIds.some((r) => !resOf(r) || resOf(r)?.cost == null);
+  const cost = resIds.reduce((s, r) => s + (lookup(r)?.cost || 0), 0);
+  const costUnknown = resIds.some((r) => !lookup(r) || lookup(r)?.cost == null);
   return applyMaterialSchedule({
     displayTitle: def.displayTitle,
     opt: def.id,

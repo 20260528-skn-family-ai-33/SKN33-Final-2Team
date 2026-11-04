@@ -167,7 +167,7 @@ export const CostB = ({ c, unk }: { c: number; unk?: boolean }) => (
   </>
 );
 
-export const Stats = ({ pl, bare, periodLabel = pl.durationBasis === 'materials-only' ? '자료 학습 예상 기간' : '기간', periodWeeks }: { pl: Pick<PlanContent, 'weeks' | 'hours' | 'cost' | 'costUnknown' | 'materialHours' | 'taskHours' | 'totalHUnknown' | 'durationBasis'>; bare?: boolean; periodLabel?: string; periodWeeks?: number | null }) => (
+export const Stats = ({ pl, bare, periodLabel = pl.durationBasis === 'materials-only' ? '자료 학습 예상 기간' : '기간', periodWeeks }: { pl: Pick<PlanContent, 'weeks' | 'hours' | 'cost' | 'costUnknown' | 'materialHours' | 'taskHours' | 'otherMaterialHours' | 'totalHUnknown' | 'durationBasis'>; bare?: boolean; periodLabel?: string; periodWeeks?: number | null }) => (
   <><div className={`stats ${bare ? 'bare' : ''}`}>
     <div>
       <small>{periodLabel}</small>

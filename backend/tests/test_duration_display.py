@@ -20,6 +20,49 @@ def example_plan():
 
 
 class DurationDisplayTests(TestCase):
+    def test_other_resources_are_not_tasks_and_shared_ids_count_once(self):
+        source = example_plan()
+        source['acts'] += [dict(id=name, skill='SQL', res='cert', task=True, hours=10)
+                           for name in ('cert1', 'cert2')]
+        plan = apply_plan_schedule(source)
+        self.assertEqual((plan['materialHours'], plan['taskHours'], plan['otherMaterialHours'], plan['totalH']),
+                         (18.5, 8, 10, 36.5))
+        self.assertEqual(plan['weeks'], 4)
+        self.assertEqual(apply_plan_schedule(plan), plan)
+
+    def test_selected_and_replaced_tasks_match_the_review_contract(self):
+        from app.services.activity_selection import compose_skill_selection, selection_option, fingerprint
+        source = example_plan()
+        report = source['def']['learningReport']
+        saved = {'generationId': 'g', 'recommendations': report['recommendations'],
+                 'resourceChoices': report['choices'], 'skillOrder': report['skillOrder'],
+                 'project': {'goal': 'SQL', 'details': {'hours': 5}}}
+        option = dict(source['def'], id='A2', name='Crash', short='', tagline='', acts=source['acts'])
+        for act in option['acts']:
+            act.update(stage=2 if act.get('res') else 3, title=act['id'], how='')
+        draft = {'chosen': 'A2', 'handoff': {'key': 'h', 'prefs': {'weeklyHours': 5}},
+                 'gen': {'options': {'A2': option}}}
+        record = {'id': 'base', 'key': fingerprint(saved, draft), 'option': option,
+                  'selectedIds': [act['id'] for act in option['acts']]}
+        other = deepcopy(record)
+        other['id'] = 'alternative'
+        other['option']['acts'][-1].update(id='replacement', hours=3)
+        saved.update(activityProposal=record, activityVersions=[record, other])
+        resources = {'course': {'id': 'course', 'type': 'course', 'hours': 13.5, 'cost': 1000},
+                     'book': {'id': 'book', 'type': 'book', 'hours': 10, 'cost': None}}
+        with patch.object(roadmap, '_res', side_effect=resources.get):
+            for task in (True, False):
+                selected = [act['id'] for act in option['acts'] if task or act.get('res')]
+                chosen = selection_option(saved, draft, selected, 'base')
+                plan = roadmap.build_plan(chosen, {'hours': 5}, 'SQL')
+                self.assertEqual((plan['weeks'], plan['materialHours'], plan['taskHours']), (4, 18.5, 8 if task else 0))
+                self.assertEqual(next(act for act in plan['acts'] if act.get('res') == 'book')['hours'], 5)
+            composed = compose_skill_selection(saved, draft, 'base', {'SQL': 'alternative'})
+            saved['activityVersions'].append(composed)
+            selected = [act['id'] for act in composed['option']['acts']]
+            plan = roadmap.build_plan(selection_option(saved, draft, selected, composed['id']), {'hours': 5}, 'SQL')
+            self.assertEqual((plan['taskHours'], plan['totalH']), (3, 21.5))
+
     def test_material_allocation_task_separation_and_catalog_preservation(self):
         source = example_plan()
         before = deepcopy(source)

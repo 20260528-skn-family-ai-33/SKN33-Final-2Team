@@ -213,4 +213,11 @@ describe('공유 강좌의 실제 일정과 전체 기간', () => {
     expect(plan.weeks).toBe(0); expect(plan.totalH).toBe(100);
     expect(plan.acts[0]).toMatchObject({wFrom: 1, wTo: 1});
   });
+  it('자격 자료는 과제와 구분하고 중복 ID는 기타 자료 합계에 한 번만 더한다', () => {
+    const input = sharedOption();
+    input.acts.push({id:'task',skill:'RAG',stage:3,title:'Task',hours:8});
+    for (const name of ['RAG', 'Web']) input.acts.push({id:`cert-${name}`,skill:name,stage:4,title:'Cert',res:'cert',task:true,hours:10});
+    const plan = buildPlan(input, {hours:6}, '');
+    expect(plan).toMatchObject({materialHours:24.3,taskHours:8,otherMaterialHours:10,totalH:42.3});
+  });
 });

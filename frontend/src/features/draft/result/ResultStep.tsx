@@ -169,7 +169,7 @@ function ResultSelection({ editorRef, onChoicesChanged, locked = false, courseId
         {Object.values(estimates).some(row => row.unknownCourses?.length) ? <span className="small muted">시간 미확인 강좌는 각 1주로 가정</span> : Object.values(estimates).some(row => row.estimatedCourses?.length) && <span className="small muted">추정 시간 포함</span>}
         {estimating && <span className="small muted" role="status"><span className="sp" aria-hidden="true" /> 주차 계산 중…</span>}</div>
     </div>
-    <MaterialBasis />
+    {!courseId && <MaterialBasis />}
     {error && <div><p className="err" role="alert">{error}</p>{!result?.recommendations && <button className="btn line" disabled={busy} onClick={() => void generate()}>다시 시도하기</button>}</div>}
     {busy ? <div className="loading" role="status"><span className="sp" aria-hidden="true" />자료를 확인하고 추천을 정리하고 있어요.</div>
       : result?.recommendations ? <>{!skillFilter&&<MaterialSkillTabs names={materialNames} active={shownSkill} onChange={setActiveSkill} id={tabsId}/>}<div className="v2-skills-board">{materialNames.map((name,skillIndex) => {

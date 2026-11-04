@@ -41,6 +41,7 @@ export interface PlanContent {
   totalH: number;
   materialHours?: number;
   taskHours?: number;
+  otherMaterialHours?: number;
   totalHUnknown?: boolean;
   totalHEstimated?: boolean;
   durationBasis?: 'materials-only';

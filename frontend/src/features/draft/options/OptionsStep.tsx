@@ -1,5 +1,5 @@
 import { currentMaterialTotals } from './materialTotals';
-import { planDescription } from '@/shared/lib/planDescription';
+import { optionSummary, planDescription } from '@/shared/lib/planDescription';
 import { MaterialBasis } from '@/shared/ui/MaterialBasis';
 import { activityTime } from '@/shared/lib/resourceTime';
 import { invalidateDraft, invalidateMaterialChoices } from '../invalidation';
@@ -414,7 +414,7 @@ export function OptionsStep() {
                     </button></div></th>;
                 })}
               </tr>
-              {ps.some(plan => (plan.def.reason || '').trim().length > 48 || plan.def.pros.length > 2 || plan.def.pros.some(value => value.length > 32)) && <tr><th /><th colSpan={3} style={{ textAlign: 'center', padding: '2px 8px 7px', fontWeight: 400 }}><button type="button" className="course-more" aria-expanded={summariesOpen} aria-controls={ps.map(plan => `course-summary-${plan.opt}`).join(' ')} onClick={() => setSummariesOpen(open => !open)}>{summariesOpen ? '접기' : '더보기'}</button></th></tr>}
+              {ps.some(plan => optionSummary(plan.def.reason, plan.def.pros).expandable) && <tr><th /><th colSpan={3} style={{ textAlign: 'center', padding: '2px 8px 7px', fontWeight: 400 }}><button type="button" className="course-more" aria-expanded={summariesOpen} aria-controls={ps.map(plan => `course-summary-${plan.opt}`).join(' ')} onClick={() => setSummariesOpen(open => !open)}>{summariesOpen ? '접기' : '더보기'}</button></th></tr>}
             </thead>
             <tbody>
               {row('자료 학습 예상 기간', (p) => (

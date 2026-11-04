@@ -15,12 +15,16 @@ import { useKickSupport } from '../generation/GenerationStep';
 import { SupCell, SupNote } from '../options/support';
 import { Stepper } from '../Stepper';
 import { useDraftWatch } from '../useDraftWatch';
+import { reviewScope } from './reviewScope';
+import type { ReviewPlanState } from './reviewPlan';
 
 export function ReviewStep() {
   const go = useGo();
   const assessment = useWs(s => !!s.draft.v2Assessment);
   const deliverables = useRef<DeliverableSelectionHandle>(null);
-  const [materialWeeks, setMaterialWeeks] = useState<number | null>(null);
+  const scope = useWs(reviewScope);
+  const [review, setReview] = useState<ReviewPlanState | null>(null);
+  const reviewPlan = review?.scope === scope ? review.plan : null;
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -38,7 +42,8 @@ export function ReviewStep() {
     <button className="btn line" disabled={submitting} onClick={() => go(paths.newOptions)}>이전: 로드맵·자료 선택</button>
     <button className="btn pri" disabled={busy || submitting || !ready} onClick={() => void submit()}>확정하기</button>
   </>}>
-    {assessment ? <DeliverableSelection ref={deliverables} onReadyChange={setReady} onBusyChange={setBusy} onDurationChange={setMaterialWeeks} /> : <p role="status">최종 검토 결과를 불러오는 중…</p>}
+    {assessment && (reviewPlan ? <Stats pl={reviewPlan} bare periodLabel="자료 학습 예상 기간" /> : <p role="status">검토할 자료와 선택한 과제 시간을 계산 중…</p>)}
+    {assessment ? <DeliverableSelection ref={deliverables} onReadyChange={setReady} onBusyChange={setBusy} onPlanChange={setReview} /> : <p role="status">최종 검토 결과를 불러오는 중…</p>}
   </Page></>;
   const o = (g && g.options[pl.opt]) || pl.def;
   return (
@@ -62,10 +67,10 @@ export function ReviewStep() {
         <div className="card">
           <p style={{ fontWeight: 650 }}>{pl.goal}</p>
           <div style={{ marginTop: 16 }}>
-            <Stats pl={pl} bare periodLabel={assessment ? '자료 학습 예상 기간' : '기간'} periodWeeks={assessment ? materialWeeks : undefined} />
+            {assessment ? reviewPlan ? <Stats pl={reviewPlan} bare periodLabel="자료 학습 예상 기간" /> : <p role="status">검토할 자료와 선택한 과제 시간을 계산 중…</p> : <Stats pl={pl} bare periodLabel="기간" />}
           </div>
         </div>
-        {assessment && <DeliverableSelection ref={deliverables} onReadyChange={setReady} onBusyChange={setBusy} onDurationChange={setMaterialWeeks} />}
+        {assessment && <DeliverableSelection ref={deliverables} onReadyChange={setReady} onBusyChange={setBusy} onPlanChange={setReview} />}
         {!assessment && <><SkillMap pl={pl} /><div className="sec"><StagesView pl={pl} /></div></>}
         <p className="small muted">자료를 바꾸려면 <button className="link" onClick={() => go(paths.newOptions)}>자료 선택으로 돌아가기</button></p>
         <div className="sec">

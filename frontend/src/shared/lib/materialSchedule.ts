@@ -73,7 +73,8 @@ export function applyMaterialSchedule(input: PlanContent): PlanContent {
   plan.def.materialSchedule = Object.entries(estimates).map(([skill, row]) => ({skill, weeks: row.weeks!, startWeek: row.startWeek, endWeek: row.endWeek, addedWeeks: row.addedWeeks, totalWeeks: plan.weeks}));
   const seen = new Set<string>();
   const seenBooks = new Set<string>();
-  let materialHours = 0, taskHours = 0;
+  const seenOther = new Set<string>();
+  let materialHours = 0, taskHours = 0, otherMaterialHours = 0;
   for (const activity of plan.acts) {
     const rid = activity.res || '', name = activity.skill || '';
     const resource = courses.get(rid);
@@ -101,13 +102,17 @@ export function applyMaterialSchedule(input: PlanContent): PlanContent {
       if (seenBooks.has(rid)) continue;
       seenBooks.add(rid);
       materialHours += weekly;
-    } else {
+    } else if (!rid) {
       taskHours += positive(activity.hours) ? activity.hours : 0;
+    } else if (!seenOther.has(rid)) {
+      seenOther.add(rid);
+      otherMaterialHours += positive(activity.hours) ? activity.hours : 0;
     }
   }
   plan.materialHours = clean(materialHours);
   plan.taskHours = clean(taskHours);
-  plan.totalH = clean(materialHours + taskHours);
+  plan.otherMaterialHours = clean(otherMaterialHours);
+  plan.totalH = clean(materialHours + taskHours + otherMaterialHours);
   plan.totalHUnknown = [...courses.values()].some(row => row.timeStatus === 'unknown');
   plan.totalHEstimated = plan.acts.some(activity => activity.hoursEstimated);
   plan.durationBasis = 'materials-only';
