@@ -12,7 +12,7 @@ from app.services import book_candidates
 
 MODEL = 'text-embedding-3-small'
 DIMENSIONS = 1536
-VERSION = 'resource-pgvector-rag/v13-book-minimum-three'
+VERSION = 'resource-pgvector-rag/v15-targeted-evidence'
 PER_KIND = 6
 COURSE_REVIEW = 20
 FIELDS = ('id','title','provider','cost','hours','estimated','image','url','skills','content','curriculum')

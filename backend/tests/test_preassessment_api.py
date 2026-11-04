@@ -214,6 +214,22 @@ class ApiTests(unittest.TestCase):
         self.assertIsNone(response.json()['recommendations'])
         generate.assert_not_called()
 
+    def test_old_saved_recommendation_still_accepts_its_saved_choice_id(self):
+        self.auth()
+        rid = str(uuid4())
+        rec = {'id': rid, 'skills': [{'name': 'S', 'courses': [{'id': 'c'}], 'books': []}],
+               'retrieval': {'version': 'resource-pgvector-rag/v13-book-minimum-three'}}
+        choices = {'S': {'course': 'c', 'books': [], 'enabled': True}}
+        saved = dict(self.saved, completed=True, recommendations=rec, resourceChoices=choices)
+        with patch.object(api.db, 'tx', side_effect=lambda: transaction(Mock())), \
+                patch.object(api, 'recommendation_context', return_value=saved), \
+                patch.object(api, 'save_resource_choices', return_value=saved) as save:
+            response = self.client.put(f'/api/v2/drafts/{self.pid}/recommendations/choices', json={
+                'generationId': saved['generationId'], 'recommendationId': rid, 'choices': choices})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['choices'], choices)
+        save.assert_called_once()
+
     def test_changed_assessment_blocks_recommendation_save(self):
         self.auth()
         with patch.object(api.db,'tx',side_effect=lambda:transaction(Mock())),patch.object(api,'recommendation_context',side_effect=api.ApiError(409,'SURVEY_INPUT_CHANGED','변경')),patch.object(api,'save_resource_choices') as save:

@@ -50,6 +50,8 @@ npm run dev
 
 PR을 올리면 GitHub Actions(`.github/workflows/frontend-ci.yml`)가 같은 순서로 돌려요. 화면 흐름은 테스트가 아니라 브라우저에서 확인해요.
 
+자료 선택 화면은 로그인한 상태에서 `/new/options`의 **스킬별 자료 비교**에서 확인해요. 백엔드 없이 점검하려면 개발 서버의 [자료 선택 미리보기](http://localhost:5185/docs/material-relevance-preview.html)를 열어요. 두 스킬 탭에서 진단, 자료가 없는 응답의 기존 안내, 저장된 강좌 예시를 확인할 수 있어요. 주소에 `?state=pending` 또는 `?state=error`를 붙이면 기존 준비 중·조회 오류 화면도 확인할 수 있어요. 미리보기는 실제 자료 비교 컴포넌트에 고정 응답을 전달해요.
+
 ## 지켜야 할 것
 
 - 서버 호출은 `src/api/`에만 둬요. 계약이 바뀌면 `docs/API_계약.md`도 함께 고쳐요.

@@ -26,9 +26,9 @@ class CrashCourseTests(unittest.TestCase):
         result = self.rank([course('long', 20, retrievalScore=.88), course('short', 2, retrievalScore=.81)])
         self.assertEqual([r['id'] for r in result], ['short', 'long'])
 
-    def test_irrelevant_short_course_cannot_bypass_similarity_window(self):
+    def test_large_vector_gap_cannot_exclude_the_shorter_essential_match(self):
         result = self.rank([course('related', 12, retrievalScore=.9), course('far', .1, retrievalScore=.5)])
-        self.assertEqual([r['id'] for r in result], ['related'])
+        self.assertEqual([r['id'] for r in result], ['far', 'related'])
 
     def test_same_course_can_cover_two_skills_only_with_learning_evidence(self):
         self.selection['skills'].append({'name': 'Python', 'application': 'Python으로 SQL 연동'})
@@ -231,10 +231,55 @@ class CrashCourseTests(unittest.TestCase):
         rows=[course('long',12),course('short',2)]
         def generate(system,payload):
             chosen=next(row for row in payload['skills'][0]['courses'] if row['title'].endswith('long'))
+            plan = payload['crashStudyPlan']
+            self.assertEqual(plan['uniqueHours'], 2)
+            self.assertEqual(plan['skills'][0]['singleSwapExtraHours'][chosen['choiceKey']], 10)
+            self.assertIn('longer_for_coverage', system)
             return {'skills':[{'name':'SQL','courses':[{'key':chosen['choiceKey']}],'books':[]}]}
         result=recommend_resources(self.project,self.selection,{r['id']:r for r in rows},generate,
                                    course={'id':'A2'},retrieved_pools=[{'name':'SQL','courses':rows,'books':[]}])
         self.assertEqual(result['skills'][0]['selectedCourse'],'long')
+
+    def test_crash_single_swap_comparison_keeps_shared_course_and_omits_unknown_delta(self):
+        selection = {'skills': [{'name': 'SQL'}, {'name': 'Python'}]}
+        shared = course('shared', 3, skills=['SQL', 'Python'], content='SQL 조회와 Python 연동 실습')
+        alternative = course('sql', 2)
+        unknown = course('unknown', None)
+        pools = [{'name': 'SQL', 'courses': [alternative, shared, unknown]}, {'name': 'Python', 'courses': [shared]}]
+        plan = crash.study_plan(pools, self.project, selection, {'shared': 'S1-C1', 'sql': 'S1-C2', 'unknown': 'S1-C3'}, cache={})
+        self.assertEqual(plan['uniqueHours'], 3)
+        self.assertEqual(plan['skills'][0]['singleSwapExtraHours'], {'S1-C2': 2})
+
+    def test_model_empty_choice_is_preserved_with_diagnostic_and_no_invented_duration(self):
+        row = course('short', 2)
+        pools = [{'name': 'SQL', 'courses': [row], 'books': []}]
+
+        def generate(_, payload):
+            self.assertEqual(payload['crashStudyPlan']['uniqueHours'], 2)
+            return {'skills': [{'name': 'SQL', 'courses': [], 'books': []}]}
+
+        result = recommend_resources(self.project, self.selection, {'short': row}, generate,
+                                     course={'id': 'A2'}, retrieved_pools=pools)['skills'][0]
+        self.assertIsNone(result['selectedCourse'])
+        self.assertEqual(result['courses'], [])
+        self.assertEqual(result['courseDiagnostic']['reason'], 'insufficient_evidence')
+
+    def test_missing_skill_coverage_cannot_form_a_confirmed_shared_plan(self):
+        selection = {'skills': [{'name': 'SQL'}, {'name': 'Python'}]}
+        shared = course('tagged', 1, skills=['SQL', 'Python'], content='SQL 조인 실습')
+        pools = [{'name': 'SQL', 'courses': [shared], 'books': []},
+                 {'name': 'Python', 'courses': [], 'books': []}]
+        self.assertIsNone(crash.study_plan(pools, self.project, selection, {'tagged': 'S1-C1'}, cache={}))
+
+    def test_only_hour_estimate_flags_change_time_certainty(self):
+        row = course('short', 2, estimated=['format', 'stage'])
+        plan = crash.study_plan([{'name': 'SQL', 'courses': [row]}], self.project, self.selection,
+                                {'short': 'S1-C1'}, cache={})
+        self.assertEqual((plan['timeStatus'], plan['uniqueHours']), ('confirmed', 2))
+        row['timeStatus'] = 'unknown'
+        plan = crash.study_plan([{'name': 'SQL', 'courses': [row]}], self.project, self.selection,
+                                {'short': 'S1-C1'}, cache={})
+        self.assertEqual((plan['timeStatus'], plan['uniqueHours']), ('unknown', None))
 
     def test_main_fixed_five_skills_are_preserved_in_the_short_shared_plan(self):
         names=['SQL','Python','Docker','RAG','ETL']
@@ -262,16 +307,17 @@ class CrashCourseTests(unittest.TestCase):
         self.assertEqual(rag.version_for(None), rag.VERSION)
         self.assertNotEqual(rag.version_for('A2'), rag.VERSION)
 
-    def test_only_old_crash_cached_recommendations_are_invalidated(self):
+    def test_old_recommendation_caches_keep_saved_choices_without_mutating_saved_data(self):
         from app.routers import preassessment
         from app.services import drafts
         source = {'generationId': 'g', 'selection': self.selection, 'skillOrder': ['SQL'],
                   'resourceChoices': {'SQL': {'enabled': True}}, 'courseRecommendations': {}}
         for pid in ('A1', 'A2', 'A3'):
             source['courseRecommendations'][pid] = {'recommendations': {
-                'id': pid, 'retrieval': {'version': rag.VERSION},
+                'id': pid, 'retrieval': {'version': 'resource-pgvector-rag/v13-book-minimum-three'},
                 'skills': [{'name': 'SQL', 'courses': [{'id': 'c', 'cost': 0}], 'books': []}]},
-                'resourceChoices': {'SQL': {'course': 'c', 'books': [], 'enabled': True}}}
+                'resourceChoices': {'SQL': {'course': 'c', 'books': [], 'enabled': True}},
+                'durationEstimates': {'SQL': {'weeks': 2}}}
         original = copy.deepcopy(source)
         for pid in ('A1', 'A2', 'A3'):
             draft = {'chosen': pid, 'gen': {'options': {pid: {}}}}
@@ -279,10 +325,9 @@ class CrashCourseTests(unittest.TestCase):
                     patch.object(drafts, '_row', return_value={'draft_choices': {'draft': draft}}), \
                     patch('app.catalog.items', return_value={'c': {'cost': 0, 'usable': True}}):
                 scoped = preassessment.course_context(None, 1, 'project', pid)
-            if pid == 'A2':
-                self.assertIsNone(scoped['recommendations'])
-            else:
-                self.assertEqual(scoped['recommendations']['id'], pid)
+            self.assertEqual(scoped['recommendations'], original['courseRecommendations'][pid]['recommendations'])
+            self.assertEqual(scoped['resourceChoices'], original['courseRecommendations'][pid]['resourceChoices'])
+            self.assertEqual(scoped['durationEstimates'], {'SQL': {'weeks': 2}})
         self.assertEqual(source, original)
 
 

@@ -105,6 +105,23 @@ def free_cache_valid(recommendations,items):
     return True
 
 
+def recommendation_cache_compatible(saved: dict, version: str) -> bool:
+    """규칙 변경만으로 초안에 저장된 유효한 자료 선택을 잃지 않는다."""
+    recommendations = saved.get('recommendations')
+    if not recommendations:
+        return False
+    if (recommendations.get('retrieval') or {}).get('version') == version:
+        return True
+    if not recommendations.get('skills') or not saved.get('resourceChoices'):
+        return False
+    from app.agents.resource_recommendations import RecommendationError, validate_choices
+    try:
+        validate_choices(recommendations, saved['resourceChoices'])
+    except RecommendationError:
+        return False
+    return True
+
+
 def dependency_key(scoped):
     import hashlib,json
     return hashlib.sha256(json.dumps([scoped.get('generationId'),scoped.get('_course'),scoped.get('_optionKey'),scoped.get('skillSelectionKey'),scoped.get('skillOrder'),scoped.get('selection')],ensure_ascii=False,sort_keys=True).encode()).hexdigest()

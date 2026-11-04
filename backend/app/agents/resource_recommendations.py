@@ -12,26 +12,105 @@ class RecommendationError(ValueError):
     pass
 
 
-def _course_diagnostic(row: dict, has_candidates: bool, has_choices: bool) -> dict | None:
-    value = row.get('courseDiagnostic')
+_BOOK_REASONS = {'no_candidates', 'insufficient_evidence', 'scope_gap'}
+_COURSE_REASONS = _BOOK_REASONS | {'stack_mismatch', 'longer_for_coverage'}
+_DIAGNOSTIC_LIMIT = 240
+_CANDIDATE_TOKEN = re.compile(r'(?<![A-Za-z0-9_])(?:S[0-9]+-C[0-9]+|B[0-9]+)(?![A-Za-z0-9_])')
+_COMPARISON_LABEL = '비교 후보'
+
+
+def _diagnostic(row: dict, kind: str, has_candidates: bool, has_choices: bool) -> dict | None:
+    value = row.get(f'{kind}Diagnostic')
     if value is None:
         return None  # 기존 저장 응답·key 전용 응답과 호환한다.
-    reasons = {'no_candidates', 'insufficient_evidence', 'stack_mismatch', 'scope_gap', 'longer_for_coverage'}
+    reasons = _COURSE_REASONS if kind == 'course' else _BOOK_REASONS
     if (not isinstance(value, dict) or set(value) != {'reason', 'detail'}
             or not isinstance(value.get('reason'), str) or value['reason'] not in reasons
-            or not isinstance(value.get('detail'), str) or not 1 <= len(value['detail'].strip()) <= 240):
-        raise RecommendationError('강좌 진단 사유와 설명(1~240자)을 확인해 주세요.')
+            or not isinstance(value.get('detail'), str) or not 1 <= len(value['detail'].strip()) <= _DIAGNOSTIC_LIMIT):
+        raise RecommendationError('학습 자료 진단 사유와 설명(1~240자)을 확인해 주세요.')
     # 일부 자료를 추천하면서 남은 근거·범위·기술 부족을 설명할 수도 있다.
     # 실제 후보/선택의 존재를 단정하는 두 사유만 구조적 모순을 검사한다.
     if ((value['reason'] == 'longer_for_coverage' and not has_choices)
             or (value['reason'] == 'no_candidates' and (has_candidates or has_choices))):
-        raise RecommendationError('강좌 진단 사유가 제공 후보·선택 결과와 일치하지 않습니다.')
+        raise RecommendationError('학습 자료 진단 사유가 제공 후보·선택 결과와 일치하지 않습니다.')
     return {'reason': value['reason'], 'detail': value['detail'].strip()}
+
+
+def _display_diagnostic(diagnostic: dict, titles: dict[str, str]) -> dict:
+    """원문은 보존하고, 제목을 배치할 공간은 후보 키에서만 확보한다."""
+    detail = diagnostic['detail']
+    matches = list(_CANDIDATE_TOKEN.finditer(detail))
+    if not matches:
+        return diagnostic
+    budget = _DIAGNOSTIC_LIMIT - len(detail) + sum(len(match[0]) for match in matches)
+    labels = [titles.get(match[0], '') for match in matches]
+
+    # 긴 제목에 같은 상한을 적용하고, 확보된 공간에 맞을 때까지 상한을 줄인다.
+    for limit in range(48, 5, -1):
+        display = []
+        for title in labels:
+            if len(title) > limit:
+                title = title[:limit - 1].rstrip() + '…'
+            display.append(f'「{title}」' if title else _COMPARISON_LABEL)
+        if sum(map(len, display)) <= budget:
+            break
+    else:
+        display = [f'「{title}」' if title and len(title) + 2 <= len(_COMPARISON_LABEL) else _COMPARISON_LABEL
+                   for title in labels]
+        if sum(map(len, display)) > budget:
+            # 짧은 도서 키가 많으면 중립 표현도 예산을 넘길 수 있다. 그때는 화면이 원문을 가려 표시한다.
+            return diagnostic
+    replacements = iter(display)
+    return {**diagnostic, 'displayDetail': _CANDIDATE_TOKEN.sub(lambda _: next(replacements), detail)}
+
+
+def _no_candidates(kind: str) -> dict:
+    return {'reason': 'no_candidates', 'detail': f'조건에 맞는 {kind} 후보가 없습니다.'}
 
 
 def _empty_skill(name: str) -> dict:
     return {'name': name, 'courses': [], 'books': [], 'selectedCourse': None, 'selectedBooks': [],
-            'courseDiagnostic': {'reason': 'no_candidates', 'detail': '조건에 맞는 강좌 후보가 없습니다.'}}
+            'courseDiagnostic': _no_candidates('강좌'), 'bookDiagnostic': _no_candidates('도서')}
+
+
+def _course_gap(name: str, candidates: list[dict], cache: dict) -> dict:
+    if not candidates:
+        return _no_candidates('강좌')
+    profiles = [cache[card['id']]['suitability'][name] for card in candidates]
+    if any(profile['suitable'] for profile in profiles):
+        return {'reason': 'insufficient_evidence', 'detail': '후보가 있었으나 모델 응답에서 선택 근거를 확인하지 못했습니다.'}
+    relevant = [profile for profile in profiles if profile['evidenceLevel'] in ('conceptual', 'applied')]
+    if relevant and all(p['missingStack'] or p['conflictingStack'] for p in relevant):
+        stacks = ', '.join(sorted({stack for p in relevant for stack in p['requiredStack']}))
+        return {'reason': 'stack_mismatch', 'detail': (f'필요 기술({stacks})의 학습 근거를 확인할 수 없습니다.' if stacks
+                 else '후보의 구현 기술이 목표에서 요구한 기술과 다릅니다.')}
+    if relevant and all(not cache[card['id']]['scopeEvidence'][name] for card in candidates
+                        if cache[card['id']]['suitability'][name] in relevant):
+        return {'reason': 'scope_gap', 'detail': '후보의 학습 내용에서 이 스킬에 필요한 적용 범위를 확인할 수 없습니다.'}
+    return {'reason': 'insufficient_evidence', 'detail': '목차와 소개를 검토했으나 추천을 확정할 강좌 근거가 부족합니다.'}
+
+
+def _finalize_crash(result: list[dict], pools: list[dict], selection: dict, project: dict, cache: dict) -> None:
+    from app.services import crash_courses as crash
+    # 모델이 짧은 후보에서 부족한 필수 근거를 설명했으면 그 강좌와 설명을 같이 보존한다.
+    pinned = {row['name']: row['courses'][0] for row in result
+              if (row.get('courseDiagnostic') or {}).get('reason') == 'longer_for_coverage'}
+    groups = [{'name': row['name'], 'courses': [pinned[row['name']]] if row['name'] in pinned else row['courses']}
+              for row in result]
+    chosen = crash.shortest_bundle(groups, project, selection, cache)
+    chosen.update(pinned)
+    for output, pool in zip(result, pools):
+        name, cards = output['name'], output['courses']
+        ordered = crash.rank(cards, project, selection, {'name': name}, cache=cache)
+        if name in chosen:
+            first = chosen[name]
+            ordered = [first] + [card for card in ordered if card['id'] != first['id']]
+        output['courses'] = ordered
+        if not output['courses'] and 'courseDiagnostic' not in output:
+            output['courseDiagnostic'] = _course_gap(name, pool['courses'], cache)
+        for index, card in enumerate(output['courses']):
+            card['aiRecommended'] = index == 0
+        output['selectedCourse'] = output['courses'][0]['id'] if output['courses'] else None
 
 
 def candidate_pools(project: dict, selection: dict, items: dict[str, dict], limit: int = 6, *, free_only: bool = False,
@@ -83,7 +162,8 @@ def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
     from app.services import resource_evidence
     from app.services import book_candidates
     crash_cache = {}
-    if crash_courses.is_crash(course):
+    is_crash = crash_courses.is_crash(course)
+    if is_crash:
         pools = crash_courses.share_candidates(pools, project, selection, items, cache=crash_cache)
     pools, common_books = book_candidates.common_pool(pools, items, selection=selection)
     if not any(pool['courses'] or pool['books'] for pool in pools):
@@ -100,45 +180,45 @@ def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
     references.update({book_refs[row['id']]: ('books', row['id']) for row in common_books})
     provided = {key: {row['id']: (pool['name'], row) for pool in pools for row in pool[key]}
                 for key in ('courses', 'books')}
+    local_courses = {pool['name']: {row['id'] for row in pool['courses']} for pool in pools}
+    for rid, (_, original) in provided['courses'].items():
+        if rid not in crash_cache:
+            crash_cache[rid] = resource_evidence.facts(items.get(rid, original), project, selection)
+    course_eligibility = {rid: [name for name in names if name in (items.get(rid, original).get('skills') or [])
+                               and (not is_crash or rid in local_courses[name]
+                                    or resource_evidence.suitable(crash_cache[rid], name))]
+                          for rid, (_, original) in provided['courses'].items()}
     # 같은 원본 강좌여도 스킬별로 발췌가 다르므로 입력 카드는 별도 객체로 만든다.
     evidence_pools = [deepcopy(pool) for pool in pools]
     for si, pool in enumerate(evidence_pools, 1):
         pool['maxBooks'] = min(3, len(pool['books']))
-        for key in ('courses', 'books'):
-            if key == 'books':
-                pool[key] = [{'choiceKey': book_refs[row['id']]} for row in pool[key]]
-                continue
-            for ri, row in enumerate(pool[key], 1):
-                row['choiceKey'] = course_refs[row['id']]
-                row.pop('id', None)
-                row['title'] = resource_evidence.normalize(row.get('title'))
-                row['content'] = resource_evidence.normalize(row.get('content'))[:350]
-                curriculum = row.pop('curriculum', None)
-                outline = (curriculum.get('items') or []) if isinstance(curriculum, dict) else []
-                if not isinstance(outline, list):
-                    outline = []
-                row['outline'] = [{field: str(part.get(field) or '')[:100] for field in ('section', 'title')}
-                                  for part in outline[:3] if isinstance(part, dict)]
-                if key == 'courses':
-                    original = pools[si - 1][key][ri - 1]
-                    source = items.get(original['id'], original)
-                    if original['id'] not in crash_cache:
-                        crash_cache[original['id']] = resource_evidence.facts(source, project, selection)
-                    row['outline'] = resource_evidence.outline(source, project, selection, selection['skills'][si - 1], course,
-                                                             info=crash_cache[original['id']])
-                    info = crash_cache[original['id']]
-                    row['learningEvidence'] = {key: value for key, value in info['suitability'][pool['name']].items()
-                                               if key != 'stageGap'}
-                    row['applicableSelectedSkills'] = [name for name in names if resource_evidence.suitable(info, name)]
-                    if crash_courses.is_crash(course):
-                        row['supportedSelectedSkills'] = info['supported']
-                row.pop('image', None)
-                row.pop('url', None)
-                row.pop('skills', None)
-                row['eligibleSkills'] = [name for name in names if name in (source.get('skills') or [])]
+        pool['books'] = [{'choiceKey': book_refs[row['id']]} for row in pool['books']]
+        skill = selection['skills'][si - 1]
+        for ri, row in enumerate(pool['courses'], 1):
+            rid = row.pop('id')
+            row['choiceKey'] = course_refs[rid]
+            slot = f'S{si}-C{ri}'
+            if slot != row['choiceKey']:
+                row['slotKey'] = slot
+                if references.setdefault(slot, ('courses', rid)) != ('courses', rid):
+                    raise RecommendationError('강좌 후보 키가 서로 다른 자료를 가리킵니다.')
+            info = crash_cache[rid]
+            row['title'] = resource_evidence.normalize(row.get('title'))
+            row['content'] = resource_evidence.description_excerpt(info, project, skill, course)
+            row['outline'] = resource_evidence.outline(items.get(rid, {}), project, selection, skill, course, info=info)
+            row['learningEvidence'] = {key: value for key, value in info['suitability'][pool['name']].items()
+                                       if key not in ('stageGap', 'appliedDescription')}
+            row['learningEvidence']['scopeMatch'] = info['scopeEvidence'][pool['name']]
+            row['applicableSelectedSkills'] = [name for name in names if resource_evidence.suitable(info, name)]
+            row['eligibleSkills'] = course_eligibility[rid]
+            if is_crash:
+                row['supportedSelectedSkills'] = info['supported']
+                row['timeStatus'] = crash_courses.time_certainty(row)
+            for field in ('image', 'url', 'skills', 'curriculum'):
+                row.pop(field, None)
     payload = {'project': {key: project.get(key) for key in ('goal', 'projectSummary', 'desiredCompetencies')}, 'skills': evidence_pools}
     payload['bookCatalog'] = book_catalog
-    if crash_courses.is_crash(course):
+    if is_crash:
         payload['crashStudyPlan'] = crash_courses.study_plan(pools, project, selection, course_refs, cache=crash_cache)
     payload['learnerKnowledge']=deepcopy(project.get('learnerKnowledge') or {})
     payload['hrContext']=deepcopy(project.get('hrContext') or {})
@@ -159,8 +239,10 @@ def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
         if not isinstance(row, dict) or row.get('name') not in [p['name'] for p in pools] or row['name'] in by_name:
             raise RecommendationError('추천 스킬이 입력과 다르거나 중복되었습니다.')
         by_name[row['name']] = row
+    candidate_titles = {key: ' '.join(resource_evidence.normalize(provided[kind][rid][1].get('title')).split())
+                        for key, (kind, rid) in references.items()}
     result = []
-    for si, pool in enumerate(pools, 1):
+    for pool in pools:
         row = by_name[pool['name']]
         output = {'name': pool['name']}
         for key in ('courses', 'books'):
@@ -173,13 +255,16 @@ def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
                 if not isinstance(recommendation, dict):
                     raise RecommendationError('자료 추천 형식이 올바르지 않습니다.')
                 reference = recommendation.get('key')
-                if reference is not None and (not isinstance(reference, str) or reference not in references or references[reference][0] != key):
+                if 'key' in recommendation and (not isinstance(reference, str) or reference not in references or references[reference][0] != key):
                     raise RecommendationError('해당 스킬·자료 종류의 후보 키가 아닙니다.')
                 rid = references[reference][1] if reference is not None else recommendation.get('id')
+                if 'id' in recommendation and recommendation['id'] != rid:
+                    raise RecommendationError('후보 키와 자료 ID가 일치하지 않습니다.')
                 source = items.get(rid) if isinstance(rid, str) else None
                 if (not source or source.get('type') != ('course' if key == 'courses' else 'book')
                         or not source.get('usable') or pool['name'] not in (source.get('skills') or [])
-                        or rid not in provided[key] or rid in seen or (key == 'books' and rid not in candidates)):
+                        or rid not in provided[key] or rid in seen or (key == 'books' and rid not in candidates)
+                        or (key == 'courses' and pool['name'] not in course_eligibility[rid])):
                     raise RecommendationError('후보에 없거나 중복된 자료입니다.')
                 card = deepcopy(candidates.get(rid) or provided[key][rid][1])
                 if rid not in candidates:
@@ -190,30 +275,26 @@ def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
                 seen.add(rid)
                 cards.append({**card, 'why': recommendation.get('why', '').strip(),
                               'knowledge': recommendation.get('knowledge', '').strip(), 'aiRecommended': len(cards) == 0})
-            if key == 'courses' and crash_courses.is_crash(course):
-                # 모델이 고른 강좌만 정렬하며 후보 밖 자료나 사용자의 선택을 추가·변경하지 않는다.
-                diagnostic = _course_diagnostic(row, bool(pool['courses']), bool(cards))
-                preferred = cards[0] if cards and diagnostic and diagnostic['reason'] == 'longer_for_coverage' else None
-                cards = crash_courses.rank(cards, project, selection, selection['skills'][si - 1], cache=crash_cache, similarity_gate=False)
-                if preferred is not None:
-                    cards = [preferred] + [card for card in cards if card['id'] != preferred['id']]
-                for index, card in enumerate(cards):
-                    card['aiRecommended'] = index == 0
             output[key] = cards
         output['selectedCourse'] = output['courses'][0]['id'] if output['courses'] else None
         output['selectedBooks'] = [output['books'][0]['id']] if output['books'] else []
-        diagnostic = _course_diagnostic(row, bool(pool['courses']), bool(output['courses']))
-        if diagnostic is not None:
-            output['courseDiagnostic'] = diagnostic
-        elif not pool['courses']:
-            output['courseDiagnostic'] = _empty_skill(pool['name'])['courseDiagnostic']
+        eligible = [card for rid, (_, card) in provided['courses'].items() if pool['name'] in course_eligibility[rid]]
+        diagnostic = _diagnostic(row, 'course', bool(eligible), bool(output['courses']))
+        if diagnostic:
+            output['courseDiagnostic'] = _display_diagnostic(diagnostic, candidate_titles)
+        elif not is_crash and not output['courses']:
+            output['courseDiagnostic'] = _course_gap(pool['name'], eligible, crash_cache)
+        diagnostic = _diagnostic(row, 'book', bool(pool['books']), bool(output['books']))
+        if not pool['books']:
+            output['bookDiagnostic'] = _no_candidates('도서')
+        elif diagnostic:
+            output['bookDiagnostic'] = _display_diagnostic(diagnostic, candidate_titles)
+        elif not output['books']:
+            output['bookDiagnostic'] = {'reason': 'insufficient_evidence',
+                                        'detail': '도서 후보가 있었으나 모델 응답에서 선택 근거를 확인하지 못했습니다.'}
         result.append(output)
-    if crash_courses.is_crash(course):
-        result = crash_courses.align_shared_courses(result, project, selection, crash_cache)
-        for row in result:
-            row['selectedCourse'] = row['courses'][0]['id'] if row['courses'] else None
-            for index, card in enumerate(row['courses']):
-                card['aiRecommended'] = index == 0
+    if is_crash:
+        _finalize_crash(result, pools, selection, project, crash_cache)
     return {'skills': result}
 
 

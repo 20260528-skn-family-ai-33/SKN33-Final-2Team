@@ -176,6 +176,9 @@ export interface OptionDef {
 }
 
 export type MaterialResource = { id: string; title: string; hours?: number | null; estimated?: string[]; timeStatus?: string; [key: string]: unknown };
+type DiagnosticText = { detail: string; displayDetail?: string };
+export type BookDiagnostic = DiagnosticText & { reason: 'no_candidates' | 'insufficient_evidence' | 'scope_gap' };
+export type CourseDiagnostic = DiagnosticText & { reason: BookDiagnostic['reason'] | 'stack_mismatch' | 'longer_for_coverage' };
 
 export interface Gen {
   key: string;

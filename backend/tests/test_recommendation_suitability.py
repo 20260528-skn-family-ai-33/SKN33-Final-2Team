@@ -83,7 +83,7 @@ class SuitabilityTests(unittest.TestCase):
         self.assertIn(2, profile['unitIndices'])
 
     def test_question_style_tutorial_is_valid_when_it_is_an_actual_lab(self):
-        row = course('lab', ['실습: RAG 검색 챗봇을 어떻게 구현하나요?'])
+        row = course('lab', ['실습: RAG 문서 검색 챗봇을 어떻게 구현하나요?'])
         self.assertTrue(evidence.suitable(self.facts(row), RAG))
 
     def test_one_matching_anchor_cannot_hide_a_conflicting_implementation_stack(self):
@@ -240,9 +240,10 @@ class SuitabilityTests(unittest.TestCase):
                                     course={'id': 'A2'}, retrieved_pools=pools)
 
     def test_longer_choice_diagnostic_preserves_model_choice_and_legacy_key_responses(self):
-        rows = [course('short', ['RAG 문서 검색 구현'], hours=1), course('long', ['RAG 문서 검색 구현과 평가'], hours=9)]
+        rows = [course('short', ['RAG 문서 검색 구현'], hours=1),
+                course('long', ['RAG 문서 검색 구현', 'RAG 검색 품질 평가'], hours=9)]
         pools = [{'name': RAG, 'courses': rows, 'books': []}]
-        selection = {'skills': [self.selection['skills'][0]]}
+        selection = {'skills': [dict(self.selection['skills'][0], completionCriteria=['검색 품질 평가'])]}
         def generate(_, payload):
             chosen = next(row for row in payload['skills'][0]['courses'] if row['title'] == 'long')
             return {'skills': [{'name': RAG, 'courses': [{'key': chosen['choiceKey']}], 'books': [],
@@ -250,6 +251,7 @@ class SuitabilityTests(unittest.TestCase):
         result = recommend_resources(self.project, selection, {row['id']: row for row in rows}, generate,
                                      course={'id': 'A2'}, retrieved_pools=pools)
         self.assertEqual(result['skills'][0]['selectedCourse'], 'long')
+        self.assertEqual(result['skills'][0]['courseDiagnostic']['reason'], 'longer_for_coverage')
         self.assertEqual(len(result['skills'][0]['courses']), 1)
 
     def test_partial_coverage_diagnostic_can_accompany_a_valid_course_choice(self):
@@ -296,6 +298,29 @@ class SuitabilityTests(unittest.TestCase):
                                      course={'id': 'A2'}, retrieved_pools=pools)
         self.assertEqual([skill['selectedCourse'] for skill in result['skills']], ['long', 'long'])
         self.assertTrue(all(skill['courses'][0]['aiRecommended'] for skill in result['skills']))
+
+    def test_missing_course_reason_falls_back_to_confirmed_stack_or_scope_gap(self):
+        cases = (
+            (self.selection['skills'][1], ['Spring REST API 구현'], 'stack_mismatch'),
+            (self.selection['skills'][0], ['RAG 이미지 검색 앱 구현'], 'scope_gap'),
+        )
+        for skill, units, reason in cases:
+            with self.subTest(reason=reason):
+                name = skill['name']
+                row = course('mismatch', units, skills=[name])
+                pools = [{'name': name, 'courses': [row], 'books': []}]
+                raw = {'skills': [{'name': name, 'courses': [], 'books': []}]}
+                result = recommend_resources(self.project, {'skills': [skill]}, {'mismatch': row}, lambda *_: raw,
+                                             course={'id': 'A3'}, retrieved_pools=pools)
+                self.assertEqual(result['skills'][0]['courseDiagnostic']['reason'], reason)
+
+    def test_transferable_rag_retrieval_is_useful_without_claiming_document_ingestion(self):
+        general = course('general', ['RAG 실습: 벡터 DB 구성과 벡터 데이터 저장', 'RAG 조회와 챗봇 구현'])
+        image_only = course('image', ['이미지 검색용 벡터 DB 구성', '이미지 검색 RAG 앱 구현'], title='이미지 검색 전용 RAG')
+        general_info = self.facts(general)
+        self.assertTrue(evidence.suitable(general_info, RAG))
+        self.assertEqual(general_info['suitability'][RAG]['unverifiedTargetTopics'], ['문서 입력·전처리'])
+        self.assertFalse(evidence.suitable(self.facts(image_only), RAG))
 
 
 @unittest.skipUnless(os.environ.get('RECOMMENDATION_CATALOG_SNAPSHOT'), '외부 실제 카탈로그 스냅샷 미지정')
