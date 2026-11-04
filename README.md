@@ -131,8 +131,8 @@ DB 백업·규정 원문·모델 가중치는 저장소 밖에서 전달합니�
 ```text
 frontend/          사용자·부서장·관리자 화면, API 연결, 비교용 테마
 backend/           참고 FastAPI 백엔드, AI 역할, 저장·권한 서비스
+└── models/        질문 분류 실행 파일과 Chatbot_classification 실험 자료
 database/          DB 코드·마이그레이션·전처리·검색·복원 도구
-models/            질문 분류 실험·모델 안내
 fine_tunning/      최종 27B 모델 안내와 외부 가중치 링크
 team_db/           외부 백업·규정 원문을 넣는 위치와 준비 안내
 docs/              기획·설계·데이터·모델 산출물과 파일 manifest
