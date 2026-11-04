@@ -21,8 +21,8 @@
 | `tools/setup_db.py` | 시연 비밀번호가 비면 관리자 계정·팀 시험 비밀번호 단계를 건너뜀 | 비밀번호는 저장소 밖에서 정해요 |
 | `app/admin_io/hr.py` | 시연 비밀번호가 비어 있으면 새 직원 추가를 막고 안내 | 빈 비밀번호로 계정이 생기지 않게 |
 | `app/llm.py`, `app/regstore.py`, `app/agents/regulation.py`, `app/routers/admin.py`·`account.py`, `app/config.py`, `app/errors.py` | 규정 검색 임베딩을 RunPod-Ollama·OpenAI 모드 모두 OpenAI `text-embedding-3-small`(`OPENAI_EMBED_MODEL`)로 통일하고 `OLLAMA_EMBED_MODEL`을 없앰. OpenAI 키가 없으면 키워드로 바꾸지 않고 오류로 알림(가데이터만 키워드). 관리자 색인 만들기는 모드를 고르지 않음(받은 `provider`는 무시 · 색인 만들기는 뒤에 아래 '규정 원문 PDF' 줄에서 없앰) | 팀 합의(2026-10-26): 팀 DB 벡터가 그 모델로 만들어져 있음. 원본은 모드별 임베딩이라 Ollama 모드가 키워드 검색으로 떨어져 조항을 못 찾는 일이 있었음 |
-| `app/agents/regulation.py`(`REG_SYS`) | 되묻기(`clarify`) 조건을 넓힘: 규정 질문의 뜻이 여러 가지로 읽히고 찾은 조항이 그중 일부 뜻에만 답하면 되묻기. 뜻이 분명하거나 되물은 뒤 고른 질문이면 되묻지 않음 | 원본은 '유형이 애매할 때만' 되물어서, 뜻이 갈리는 규정 질문을 모델마다 한 뜻으로 답하거나 '확인 불가'로 둠(2026-10-26 '근로 시작일' 질문) |
-| `app/agents/regulation.py`(`clean_option`·`check_more`) | 되묻기 선택지는 질문만 남김(괄호 설명·첫 물음 뒤 문장을 떼고, 질문·사용자 상황에 없던 숫자가 남으면 그 선택지를 버림). '추가로 확인할 것'(more) 문장도 숫자 검사: 근거에 없는 숫자면 이번에 넘긴 조항 중 그 숫자가 있는 조항을 근거에 더하고, 없으면 문장을 버림. 규정 이름+조 번호로 가리킨 조항도 근거에 넣음. 지시문에도 같은 규칙을 적음 | 원본은 요약·적용 문장만 숫자를 검사해서, 선택지·more에 확인 안 된 숫자가 들어가거나 more에 쓴 조항이 '규정 근거 보기'에 빠짐(2026-10-26 '급여 지급일 21일' · '별표 1에 1일') |
+| `app/agents/regulation.py`, `app/agents/grounded_answer.py` | 현재 실제 모델 모드는 사용자 요청에 따라 되묻기(`clarify`)를 생성하지 않음. RoBERTa가 질문 유형을 결정하고 LLM은 근거 상태·요약·출처만 생성 | 2026-10-26에는 `REG_SYS`의 되묻기 조건을 넓혔으나 이후 흐름으로 대체됨. 가데이터의 고정 되묻기와 이전 대화 표시는 호환 유지. 현재 기준은 [챗봇 질문 분류 안내](classification.md#답변-상태와-오류-2026-11-03-사용자-요청-반영) |
+| `app/agents/regulation.py`(규정 답변 검증) | 현재 실제 모델 답변은 인용 출처와 요약의 숫자를 검사하고, 검증 실패는 오류로 표시. 확인된 일부 내용만 답하는 `partial` 상태와 구분 | 2026-10-26의 선택지 정리(`clean_option`)·추가 안내 검사(`check_more`)는 과거 구현 이력이며 현재 실제 모델 답변 경로에서는 사용하지 않음 |
 | `app/agents/runtime.py`, `app/routers/account.py`, `app/services/goals.py` | '에이전트 동작 보기'(`GET /ai/log`)가 본인 호출 대신 모든 계정의 호출을 줌(직원·관리자 계정 모두). 기록마다 누구의 일인지(`employee`)와 관리자 화면에서 시작했는지(`by`)를 붙이고, 시각은 설정 시간대(`GP5_DB_TIMEZONE`)로 적음 | 시연·디버그 전용 기능이라 누가 호출했든 다 보이게(2026-10-26 사용자 결정 · 운영에서는 아무도 쓰지 않음 → B-1로 꺼야 함) · 컨테이너 시계가 UTC라 기록 시각이 9시간 어긋났음 |
 | `app/routers/admin.py`, `app/services/goals.py` | 관리자 목표 후보 다시 만들기에 모델 고르기(`mode`: `ollama`·`openai` 추가 · 이번 작업에만 쓰고 직원이 고른 AI 모드는 바꾸지 않음)와 직원 고르기(`employeeIds` · 새 `GET /admin/goal-suggestions/employees`) 추가 | 관리자가 모델을 정해 일괄로, 또는 몇 명만 골라 다시 만들 수 있게(2026-10-26 사용자 요청) · 원본은 가데이터 / 각 직원의 모드 두 가지로 재직 직원 전체만 |
 | `app/errors.py` | Ollama 401·403을 '키 문제(auth)'로 분류하고 `OLLAMA_API_KEY` 넣는 법을 조치로 안내(원본은 '잠시 뒤 다시 시도') | Pod 앞 nginx가 키를 확인하는 구성(RunPod Pod 연결 절차는 [RunPod_Ollama_연결_절차.md](RunPod_Ollama_연결_절차.md))에서 원인이 바로 보이게 (2026-10-26) |
@@ -72,6 +72,8 @@ docker compose up -d backend
 - API 문서: <http://localhost:8815/api/docs>
 - 설정은 맨 위의 `.env` 하나를 읽어요(`.env.example` 참고).
 
+챗봇 파인튜닝 모델(`growpath-regulation-4b` · `qwen35-4b-diagnosis-agent` · `role=regulation`)은 `options.num_gpu=-1`로 Ollama 실행 서버의 GPU·VRAM에 맞춰 자동 선택해요. 사용할 GPU가 없으면 서버가 CPU로 실행하며, 모델에 저장된 CPU 강제 설정도 요청 값으로 덮어써요. 같은 모델을 쓰는 안별 지원 조건 확인에도 적용돼요. GPU 드라이버·컨테이너 장치 노출은 **모델 실행 서버**에서 준비해야 해요. 실제 사용 여부는 서버의 `ollama ps` 또는 `/api/ps`의 `size_vram`으로 확인해요. [Ollama GPU 문서](https://docs.ollama.com/gpu), [자동 선택 옵션 원본](https://github.com/ollama/ollama/blob/main/api/types.go)을 참고해요.
+
 파이썬으로 직접 띄울 때(선택 · Python 3.12 · 이번 작업에서는 전체 서버 시작을 확인하지 않은 방법): 이 폴더에서 패키지를 설치하고, 맨 위 `.env`를 `GP5_ENV_FILE`로 알려 준 뒤 **토크나이저 설치 → 서버 실행** 순서로 진행해요(앱은 기본으로 이 폴더의 `.env`를 읽어요). DB는 Docker의 `db` 서비스를 그대로 써요(`.env`의 `GP5_DB_PORT`). 도커의 `backend`와 같은 8815를 쓰므로 둘 중 하나만 켜요.
 
 ```bash
@@ -92,6 +94,10 @@ python -m uvicorn app.main:app --port 8815
 최초 설치·Docker 이미지 빌드는 HuggingFace 다운로드가 필요합니다. 차단된 환경은 접속 가능한 환경에서 만든 백엔드 이미지를 `docker save`/`docker load`로 전달하고 해당 이미지를 사용하도록 Compose를 지정하거나, 호스트 실행용 고정 토크나이저 파일을 전달받아 `ROADMAP_TOKENIZER_PATH`를 지정합니다. 파일은 아래 후보 선정 절의 고정 SHA-256과 일치해야 합니다. 이미 올바른 파일이 있으면 설치기는 다운로드 없이 해시만 확인합니다. 팀원 PC에서의 빌드는 별도 확인이 필요합니다.
 
 분류 모델 연결 흐름·파일별 역할·실행 방법·검증 기록은 [챗봇 질문 분류 안내](classification.md)를 참고하세요.
+
+로그인한 직원의 챗봇은 로드맵과 같은 계정별 AI 설정을 따릅니다. 실제 모드는 규정·회사 정보·사내 생활 DB만 답변 근거로 검색하고, 시연 모드는 추천 질문에 가데이터 예시를 제공합니다. 실제 모드에서는 RoBERTa가 질문을 분류하고 답변 모델은 근거 상태·요약·출처를 반환합니다. 화면에서 근거 원문과 생활 자료의 가상 여부를 확인할 수 있습니다. 결과 조회·취소는 요청한 직원에게만 허용합니다. 자세한 동작은 [분류 안내](classification.md)를 참고하세요.
+
+실제 모델 모드의 되묻기는 삭제했습니다. 규정 답변의 확인된 내용·적용 조건·부족한 근거는 요약에 담으며, ‘내 상황에 적용’(`apply`)·‘추가로 확인할 것’(`more`)·‘등록되지 않은 기준’(`missing`)을 별도 생성 항목으로 요청하지 않습니다. 해당 필드와 되묻기 카드 표시는 가데이터·이전 대화 호환을 위해 유지합니다. `근거 일부 확인`은 일부 내용을 유효한 출처로 확인했다는 뜻이며, 잘못된 숫자·출처를 허용하는 상태가 아닙니다.
 
 ## 목표 후보 사전 준비
 

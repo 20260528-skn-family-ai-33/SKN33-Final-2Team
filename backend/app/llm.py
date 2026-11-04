@@ -143,7 +143,8 @@ def _ollama_takes(model: str, level: str) -> bool:
     return levels is None or level in levels
 
 
-def chat(provider: str, messages: list, role: str = 'default', json_mode: bool = True, reasoning: str | None = None) -> dict:
+def chat(provider: str, messages: list, role: str = 'default', json_mode: bool = True, reasoning: str | None = None,
+         temperature: float | None = None) -> dict:
     """한 번의 대화 호출 → {content, model, provider, loadMs, totalMs}.
     reasoning: 직원이 화면에서 고른 추론 정도(단계 이름). 없으면 .env 기본값(OLLAMA_THINK / OPENAI_REASONING_EFFORT),
     그것도 비면 보내지 않아 모델 기본값을 따른다. 이미지 읽기 모델은 화면에서 고르지 않아 직원 값을 쓰지 않는다.
@@ -162,6 +163,12 @@ def chat(provider: str, messages: list, role: str = 'default', json_mode: bool =
             from .catalog_budget import OUTPUT_RESERVE, DEFAULT_CONTEXT
             payload.setdefault('options', {})['num_predict'] = OUTPUT_RESERVE
             payload['options'].setdefault('num_ctx', DEFAULT_CONTEXT)
+        if role == 'regulation':
+            # 챗봇 파인튜닝 모델의 GPU/VRAM 선택은 Ollama 서버에 맡긴다.
+            # -1은 자동 선택이며 모델에 남은 CPU 강제(num_gpu=0)도 덮어쓴다.
+            payload.setdefault('options', {})['num_gpu'] = -1
+        if temperature is not None:
+            payload.setdefault('options', {})['temperature'] = temperature
         if S.ollama_keep_alive:
             payload['keep_alive'] = S.ollama_keep_alive
         if role == 'regulation':
@@ -178,6 +185,8 @@ def chat(provider: str, messages: list, role: str = 'default', json_mode: bool =
         raise LlmError('OpenAI 비전 모델 설정이 없어요 (.env 의 OPENAI_VISION_MODEL)')
     model = model_name('openai', role)
     payload = {'model': model, 'messages': _with_images(messages, 'openai')}
+    if temperature is not None:
+        payload['temperature'] = temperature
     if json_mode and S.openai_json:
         payload['response_format'] = {'type': 'json_object'}
     if role == 'roadmap':

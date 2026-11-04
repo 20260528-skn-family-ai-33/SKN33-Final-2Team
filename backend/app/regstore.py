@@ -155,10 +155,10 @@ def bundle(ids) -> dict:
     return {'articles': arts, 'regs': regs}
 
 
-def pool(group: str | None, query: str) -> list[dict]:
+def pool(group: str | None, query: str, *, all_groups: bool = False) -> list[dict]:
     """검색 대상: 내 직원 구분의 규정 청크(국외근무 규정은 국외근무 질문에만). 묶음이 없으면 빈 목록"""
     os_ = bool(OVERSEAS.search(query or ''))
-    return [a for a in data()['arts'].values() if a['group'] == group and (os_ or not a['overseas'])]
+    return [a for a in data()['arts'].values() if (all_groups or a['group'] == group) and (os_ or not a['overseas'])]
 
 
 # ── 키워드 검색 (4차 AI.retrieve) ──
@@ -176,7 +176,7 @@ SYN = [
 ]
 
 
-def keyword_search(query: str, k: int, group: str | None) -> list[dict]:
+def keyword_search(query: str, k: int, group: str | None, *, all_groups: bool = False) -> list[dict]:
     terms = [(t, w) for pat, ts, w in SYN if re.search(pat, query) for t in ts]
     if not terms or not any(w == 1 for _, w in terms):
         return []
@@ -185,7 +185,7 @@ def keyword_search(query: str, k: int, group: str | None) -> list[dict]:
         return (3 if t in (a['title'] or '') or t in (a['no'] or '') else 0) + (1 if t in a['text'] else 0)
 
     scored = []
-    for a in pool(group, query):
+    for a in pool(group, query, all_groups=all_groups):
         if not any(w == 1 and hit(a, t) for t, w in terms):
             continue
         scored.append((sum(w * hit(a, t) for t, w in terms), a['type'] == 'article', a['id']))
@@ -233,9 +233,9 @@ def _embed_text(a: dict) -> str:
     return f"「{reg.get('name', '')}」 {a['no']}({a['title']}) {a['chapter']}\n{a['text'][:EMBED_TEXT_MAX]}"
 
 
-def vector_search(query: str, k: int, group: str | None) -> list[dict]:
+def vector_search(query: str, k: int, group: str | None, *, all_groups: bool = False) -> list[dict]:
     model = llm.embed_model()
-    ids = [a['id'] for a in pool(group, query)]
+    ids = [a['id'] for a in pool(group, query, all_groups=all_groups)]
     if not ids:
         return []
     qv = llm.embed([query])[0]   # 키가 없으면 여기서 LlmError (빈 결과로 넘기지 않음)
@@ -247,11 +247,11 @@ def vector_search(query: str, k: int, group: str | None) -> list[dict]:
     return [{'id': r['rag_chunk_id'], 'score': round(float(r['score']), 4)} for r in rows]
 
 
-def search(query: str, k: int, group: str | None, mode: str) -> list[dict]:
+def search(query: str, k: int, group: str | None, mode: str, *, all_groups: bool = False) -> list[dict]:
     """실제 모델 모드는 벡터(어느 모드든 같은 OpenAI 임베딩), 가데이터는 키워드"""
     if mode in ('ollama', 'openai'):
-        return vector_search(query, k, group)
-    return keyword_search(query, k, group)
+        return vector_search(query, k, group, all_groups=all_groups)
+    return keyword_search(query, k, group, all_groups=all_groups)
 
 
 def find_article(reg_name: str, label: str, paragraph: str = '') -> list[str]:
@@ -298,7 +298,7 @@ def _item(text: str, n: int) -> str | None:
     return text[m.start():e.start() if e else len(text)].strip()
 
 
-def explicit_ref(query: str, group: str | None, default_reg: str | None = None) -> dict | None:
+def explicit_ref(query: str, group: str | None, default_reg: str | None = None, *, all_groups: bool = False) -> dict | None:
     """질문에 규정 이름과 조(항·호) 번호가 있으면 그 조항을 바로 찾는다.
     벡터·키워드 검색은 '제2조 3항' 같은 번호를 뜻으로 찾지 못해, 직접 물은 조항이 답변 근거에 들어가지 않던 문제를 막는다(10/21).
     규정 이름이 없으면 앞 답변의 규정(default_reg · 이어 묻기)으로 찾는다. 내 직원 구분의 규정 묶음 안에서만 찾는다"""
@@ -309,7 +309,8 @@ def explicit_ref(query: str, group: str | None, default_reg: str | None = None) 
     after = query[m.end():]
     pm, im = REF_PARA.search(after), REF_ITEM.search(after)
     para, item = (int(pm[1]) if pm else None), (int(im[1]) if im else None)
-    regs = (set_for(group) or {}).get('regs') or []
+    regs = ([reg for value in data()['sets'].values() for reg in value['regs']] if all_groups
+            else (set_for(group) or {}).get('regs') or [])
     qn = _norm(query)
     named = sorted((r for r in regs if _norm(r['name']) and _norm(r['name']) in qn), key=lambda r: -len(_norm(r['name'])))
     reg = named[0] if named else next((r for r in regs if r['key'] == default_reg), None) if default_reg else None

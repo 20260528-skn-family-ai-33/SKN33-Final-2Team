@@ -36,12 +36,12 @@ SIM_ERR = {
 }
 _tries: dict[tuple, int] = {}
 _tries_lock = threading.Lock()
-_logs: dict[int, deque] = {}
+_logs: dict[int | None, deque] = {}
 
 
 @dataclass
 class Ctx:
-    employee_id: int
+    employee_id: int | None
     provider: str = 'ollama'
     demo: bool = False
     fail_sim: dict = field(default_factory=dict)
@@ -167,7 +167,8 @@ def parse_json(t: str) -> dict:
         raise llm.LlmError('모델 응답이 JSON 형식이 아니에요')
 
 
-def llm_json(ctx: Ctx, system: str, inp, role: str = 'default', images: list | None = None, history: list | None = None) -> dict:
+def llm_json(ctx: Ctx, system: str, inp, role: str = 'default', images: list | None = None, history: list | None = None,
+             temperature: float | None = None) -> dict:
     """실제 모델에 JSON 응답을 요청한다. ctx.mode 가 ollama/openai 일 때만 부른다"""
     # 로드맵·자료 추천은 JSON 값·순서·문자열을 보존하고 구분자 공백만 줄인다.
     options = {'separators': (',', ':')} if role in ('roadmap', 'resources') else {}
@@ -175,7 +176,8 @@ def llm_json(ctx: Ctx, system: str, inp, role: str = 'default', images: list | N
     if images:
         user['images'] = images
     messages = [{'role': 'system', 'content': system}] + list(history or []) + [user]
-    res = llm.chat(ctx.mode, messages, role=role, json_mode=True, reasoning=ctx.reasoning.get(ctx.mode))
+    options = {} if temperature is None else {'temperature': temperature}
+    res = llm.chat(ctx.mode, messages, role=role, json_mode=True, reasoning=ctx.reasoning.get(ctx.mode), **options)
     ctx.meta = {'loadMs': res.get('loadMs', 0)}
     return parse_json(res['content'])
 
