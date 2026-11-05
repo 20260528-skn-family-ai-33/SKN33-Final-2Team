@@ -777,6 +777,7 @@ def team_members(head_id: int) -> dict:
     me = profile.view(head_id)
     ids = profile.member_ids(head_id)
     rows = profile._rows()
+    unseen = NT.unseen_counts(head_id)  # 부서장이 아직 읽지 않은 그 직원의 로드맵·보고서 알림(#96)
     out = []
     for r in rows:
         if r['employee_id'] not in ids:
@@ -785,8 +786,10 @@ def team_members(head_id: int) -> dict:
         recs = records(r['employee_id'], for_mgr=True)
         reps = reports(r['employee_id'])
         act = [x for x in recs.values() if x['status'] == 'active']
+        u = unseen.get(r['employee_id'], {})
         out.append({'user': profile.team_view(v), 'activePlans': len(act), 'pastPlans': len(recs) - len(act), 'reports': len(reps),
-                    'unreadComments': sum(1 for x in act for c in x['comments'] if c['status'] == 'new')})
+                    'unreadComments': sum(1 for x in act for c in x['comments'] if c['status'] == 'new'),
+                    'unseenPlans': u.get('plans', 0), 'unseenReports': u.get('reports', 0)})
     return {'group': me.get('supGroup'), 'members': out}
 
 
@@ -794,4 +797,5 @@ def member_state(head_id: int, member_id: int) -> dict:
     if member_id not in profile.member_ids(head_id):
         raise forbidden('소속 직원이 아니에요')
     recs = records(member_id, for_mgr=True)
-    return {'user': profile.team_view(profile.view(member_id)), 'plans': recs, 'reports': reports(member_id, for_mgr=True), 'res': resources_of(recs), 'reg': reg_of(recs)}
+    return {'user': profile.team_view(profile.view(member_id)), 'plans': recs, 'reports': reports(member_id, for_mgr=True), 'res': resources_of(recs), 'reg': reg_of(recs),
+            'unseen': NT.unseen_targets(head_id, member_id)}

@@ -151,7 +151,7 @@
 
 | 요청 | 쓰는 곳 |
 | --- | --- |
-| `GET /team/members` · `GET /team/members/{uid}/plans` | 소속 직원 목록 · 직원 기록(공개 범위만). 직원 정보는 이름·사번·소속·직급·직위·부서장 여부만(`TeamUser`), 보고서에서는 심화 질문 결과·목표 달성 답·결과물 첨부를 뺌 |
+| `GET /team/members` · `GET /team/members/{uid}/plans` | 소속 직원 목록 · 직원 기록(공개 범위만). 직원 정보는 이름·사번·소속·직급·직위·부서장 여부만(`TeamUser`), 보고서에서는 심화 질문 결과·목표 달성 답·결과물 첨부를 뺌. 확인 전 표시(#96): 목록의 직원마다 `unseenPlans`·`unseenReports`, 직원 기록에 `unseen: {plans, reports}`(id 목록) — 부서장이 아직 읽지 않은 그 직원의 로드맵·보고서 알림 기준 |
 | `POST /team/plans/{pid}/comments` · `PATCH /team/plans/{pid}/comments/{cid}` | 코멘트 보내기 · 고치기(설계서 밖 추가 · 10/23) |
 
 ### 완료 알림 — `notifications.ts` (설계서 밖 추가 · #82)
@@ -162,6 +162,7 @@
 | --- | --- |
 | `GET /notifications` | 상단 띠 알림 버튼·목록(30초마다·화면 이동·창 열 때). `{items: AppNotification[] (최근 50건), unread}` — `unread`는 목록 길이와 관계없이 전체 수 |
 | `POST /notifications/{id}/read` · `POST /notifications/read-all` | 한 건 읽음(내 알림이 아니면 404) · 모두 읽음. 둘 다 바뀐 목록을 그대로 돌려줌 |
+| `POST /notifications/read-target` `{kind: 'roadmap'\|'report', id}` | 부서장이 직원의 로드맵·보고서 화면을 열 때(#96). 그 대상의 내 알림을 모두 읽음으로 바꾸고 바뀐 목록과 `changed`(바뀐 수)를 돌려줌. 잘못된 종류 400 · 형식이 틀린 id 404 · 읽을 알림이 없으면 `changed: 0` |
 
 `AppNotification`은 `{id, kind: 'roadmap'|'report', audience: 'self'|'head', employee: {id, name}, planId, planTitle, track, reportId, createdAt, read}`예요. 문구와 이동할 주소는 화면이 정해요(`features/notifications/notificationView.ts`): 본인은 `/roadmaps/{planId}`·`/reports/{reportId}`, 부서장은 `/team/{employee.id}/plans/{planId}`·`/team/{employee.id}/reports/{reportId}`. 확인 전 보고서를 다시 만들면 이전 보고서 알림은 지워지고 새 보고서 알림만 남아요. 부서장 알림은 그 직원이 지금도 같은 부서일 때만 보여요.
 

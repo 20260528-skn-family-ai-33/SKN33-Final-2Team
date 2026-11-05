@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 
 from .. import db
-from ..errors import ApiError
+from ..errors import ApiError, bad
 
 LIMIT = 50
 
@@ -83,3 +83,42 @@ def read_all(employee_id: int) -> dict:
     with db.tx() as t:
         t.run('UPDATE app_ext.notifications SET read_at = now() WHERE recipient_id = :e AND read_at IS NULL', e=employee_id)
     return inbox(employee_id)
+
+
+# ── 부서장의 확인 전 로드맵·보고서 (#96) ──
+# '확인 전' = 부서장이 아직 읽지 않은 소속 직원 알림. 알림 창에서 누르거나 그 직원의 로드맵·보고서 화면을 열면(read_target) 읽음이 된다.
+# 알림이 없는 예전 로드맵·보고서(#82 이전)는 확인 전으로 세지 않는다.
+_TARGET = {'roadmap': 'n.roadmap_id', 'report': 'n.report_id'}
+
+
+def unseen_counts(head_id: int) -> dict[int, dict]:
+    """소속 직원별 확인 전 로드맵·보고서 수(대상 기준). 지금도 같은 부서인 직원만 센다(inbox 와 같은 _VISIBLE)"""
+    rows = db.all_(f"""SELECT n.actor_id, count(DISTINCT n.roadmap_id) FILTER (WHERE n.kind = 'roadmap') AS plans,
+                              count(DISTINCT n.report_id) FILTER (WHERE n.kind = 'report') AS reports
+                       {_FROM} WHERE n.recipient_id = :e AND n.audience = 'head' AND n.read_at IS NULL AND {_VISIBLE}
+                       GROUP BY n.actor_id""", e=head_id)
+    return {int(r['actor_id']): {'plans': int(r['plans'] or 0), 'reports': int(r['reports'] or 0)} for r in rows}
+
+
+def unseen_targets(head_id: int, member_id: int) -> dict:
+    """한 소속 직원의 확인 전 로드맵 id·보고서 id(부르는 쪽이 소속을 확인한 뒤 부른다)"""
+    rows = db.all_("""SELECT DISTINCT n.kind, n.roadmap_id, n.report_id FROM app_ext.notifications n
+                       WHERE n.recipient_id = :h AND n.actor_id = :m AND n.audience = 'head' AND n.read_at IS NULL""", h=head_id, m=member_id)
+    return {'plans': sorted({str(r['roadmap_id']) for r in rows if r['kind'] == 'roadmap'}),
+            'reports': sorted({str(r['report_id']) for r in rows if r['kind'] == 'report' and r['report_id']})}
+
+
+def read_target(employee_id: int, kind: str, target_id: str) -> dict:
+    """그 로드맵(kind=roadmap)·보고서(kind=report)를 열었을 때 그 대상의 내 알림을 모두 읽음으로.
+    읽을 알림이 없으면(예전 기록·이미 읽음) 바꾸지 않는다. 바뀐 목록과 바뀐 수(changed)를 돌려준다"""
+    col = _TARGET.get(str(kind))
+    if not col:
+        raise bad('알림 대상 종류는 roadmap 또는 report 예요')
+    try:
+        tid = str(uuid.UUID(str(target_id)))
+    except ValueError:
+        raise _missing() from None
+    with db.tx() as t:
+        n = t.run(f"""UPDATE app_ext.notifications n SET read_at = now()
+                      WHERE n.recipient_id = :e AND n.read_at IS NULL AND n.kind = :k AND {col} = CAST(:i AS uuid)""", e=employee_id, k=kind, i=tid)
+    return dict(inbox(employee_id), changed=int(n or 0))

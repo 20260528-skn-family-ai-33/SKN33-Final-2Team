@@ -21,6 +21,11 @@ export interface AppNotification {
   read: boolean;
 }
 
+/** 대상 읽음(#96)의 응답: 바뀐 목록과 이번에 읽음으로 바뀐 알림 수 */
+export interface NotificationTargetRead extends NotificationInbox {
+  changed: number;
+}
+
 export interface NotificationInbox {
   /** 최근 50건 */
   items: AppNotification[];

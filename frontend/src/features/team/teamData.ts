@@ -8,7 +8,9 @@ import { isSup, me } from '@/shared/state/session';
 import { prepRec } from '@/shared/state/workspace';
 
 export const teamKey = ['team'] as const;
-export const memberKey = (uid: string) => ['team-member', uid] as const;
+/** 모든 직원 기록 캐시(앞부분 일치로 한꺼번에 무효화할 때) */
+export const memberKeyAll = ['team-member'] as const;
+export const memberKey = (uid: string) => [...memberKeyAll, uid] as const;
 
 export function useTeam() {
   return useQuery({ queryKey: teamKey, queryFn: teamApi.members, enabled: isSup(me()) });

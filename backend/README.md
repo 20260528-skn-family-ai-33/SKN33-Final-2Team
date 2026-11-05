@@ -416,6 +416,15 @@ PR #57 HEAD `64b020b`를 기준으로 수정했다. 아래 내용은 로컬 수�
 - API: `GET /api/v1/notifications`·`POST /api/v1/notifications/{id}/read`·`POST /api/v1/notifications/read-all`(직원 계정만 · `routers/notifications.py`). 부서장 알림은 그 직원이 지금도 같은 부서일 때만 목록·읽지 않은 수에 들어간다.
 - 시연 도구의 '단계로 바로 이동'은 확정·보고서 작성 함수를 거치지 않고 기록을 직접 만들어서 알림을 남기지 않는다.
 
+### 부서장의 확인 전 로드맵·보고서 (#96, 2026-11-05)
+
+'확인 전'은 부서장이 아직 읽지 않은 소속 직원 알림(`audience = 'head'`)으로 판단한다. 새 표는 없다.
+
+- `GET /api/v1/team/members`의 직원마다 `unseenPlans`·`unseenReports`(확인 전 로드맵·보고서 수, 같은 대상의 알림은 1개로 셈)를 싣는다. 지금도 같은 부서인 직원만 센다(알림 목록과 같은 조건).
+- `GET /api/v1/team/members/{uid}/plans`에 `unseen: {plans: [로드맵 id], reports: [보고서 id]}`를 싣는다.
+- `POST /api/v1/notifications/read-target` `{kind: 'roadmap'|'report', id}`: 그 대상의 내 알림을 모두 읽음으로 바꾸고 바뀐 알림 목록과 `changed`(바뀐 수)를 돌려준다. 부서장이 직원의 로드맵·보고서 화면을 열 때 화면이 부른다. 잘못된 종류는 400, 형식이 틀린 id 는 404, 읽을 알림이 없으면 `changed: 0`.
+- 알림이 생기기 전(#82 이전)의 로드맵·보고서는 확인 전으로 세지 않는다.
+
 ### LLM 도서 후보 최소 확보 (#76)
 
 세 코스 모두 스킬별 벡터 검색 최대 30권을 검토하고, 공통 도서 입력은 중복을 제거한 최대 30권으로 유지한다. `book_candidates.common_pool`은 스킬의 application·targetOutcome·완료 기준과 제목·소개를 대조해 순위를 보완한 뒤, 각 스킬의 후보 3권을 먼저 확보하고 나머지를 교차 배분한다. 실제로 태그가 연결된 공유 도서만 다른 스킬의 후보로 사용할 수 있고, 사용 불가 자료·태그 불일치·중복 ISBN은 최소 수량에 포함하지 않는다.

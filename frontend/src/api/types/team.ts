@@ -12,6 +12,9 @@ export interface TeamMember {
   pastPlans: number;
   reports: number;
   unreadComments: number;
+  /** 부서장이 아직 확인하지 않은(알림을 읽지 않은) 이 직원의 로드맵·보고서 수(#96) */
+  unseenPlans: number;
+  unseenReports: number;
 }
 
 export interface TeamList {
@@ -25,6 +28,8 @@ export interface MemberState {
   reports: Report[];
   res?: ResourceMap;
   reg?: RegBundle;
+  /** 부서장이 아직 확인하지 않은 로드맵 id·보고서 id(#96) */
+  unseen?: { plans: string[]; reports: string[] };
 }
 
 export interface CommentBody {

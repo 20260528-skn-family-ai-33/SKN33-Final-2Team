@@ -5,9 +5,9 @@
       없을 때만 받는다. 보고서 알림은 그 로드맵의 보고서 목록만 받아 바꾼다 */
 import type { QueryClient } from '@tanstack/react-query';
 import { notificationsApi } from '@/api/endpoints/notifications';
-import type { AppNotification, NotificationInbox } from '@/api/types/notification';
+import type { AppNotification, NotificationInbox, NotificationKind } from '@/api/types/notification';
 import { plansApi } from '@/api/endpoints/plans';
-import { memberKey } from '@/features/team/teamData';
+import { memberKey, memberKeyAll, teamKey } from '@/features/team/teamData';
 import { mergeReg, mergeRes } from '@/shared/state/catalog';
 import { me, signInSeq } from '@/shared/state/session';
 import { putRec, updateWs, ws } from '@/shared/state/workspace';
@@ -30,11 +30,31 @@ export const currentSignIn = (): SignIn | null => {
 /** 요청을 시작한 그 로그인이 아직 이어지고 있는지 */
 export const stillSignedIn = (t: SignIn): boolean => signInSeq() === t.seq && me()?.id === t.id;
 
-/** 한 건(id) 또는 모두(id 없음) 읽음. 응답이 왔을 때 같은 로그인이면 그 직원 캐시에 넣고 true, 로그인이 바뀌었으면 버리고 false */
+/** 소속 직원 목록·직원 기록의 '새 로드맵·보고서' 표시와 정렬은 부서장 알림의 읽음 여부로 정해진다(#96).
+ *  어느 경로로든 알림이 읽음이 되면 두 캐시를 무효화한다: 보고 있는 화면은 바로, 나머지는 다음에 들어갈 때 다시 받는다.
+ *  부서장이 아니면 목록 조회가 꺼져 있어(useTeam enabled) 아무것도 받지 않는다 (PR #107 리뷰) */
+function refreshTeamMarks(qc: QueryClient): Promise<unknown> {
+  return Promise.all([qc.invalidateQueries({ queryKey: teamKey }), qc.invalidateQueries({ queryKey: memberKeyAll })]);
+}
+
+/** 한 건(id) 또는 모두(id 없음) 읽음. 응답이 왔을 때 같은 로그인이면 그 직원 캐시에 넣고 true, 로그인이 바뀌었으면 버리고 false.
+ *  소속 직원 목록·기록 캐시도 무효화하되 다시 받기를 기다리지 않는다(알림을 누른 뒤 이동이 목록 다시 받기에 막히지 않게) */
 export async function markRead(qc: QueryClient, t: SignIn, id?: string): Promise<boolean> {
   const box: NotificationInbox = id ? await notificationsApi.read(id) : await notificationsApi.readAll();
   if (!stillSignedIn(t)) return false;
   qc.setQueryData(notificationKey(t.id), box);
+  void refreshTeamMarks(qc);
+  return true;
+}
+
+/** 그 로드맵·보고서의 내 알림을 모두 읽음으로(#96). 같은 로그인이면 바뀐 목록을 그 직원 캐시에 넣고 true.
+ *  실제로 읽음이 된 알림이 있으면 소속 직원 목록·직원 기록 캐시도 무효화한다. 읽음 응답보다 먼저 끝난 목록 조회가
+ *  '새 로드맵·보고서' 표시와 우선 정렬을 옛 값으로 남기지 않게(PR #107 리뷰). 보고 있는 화면의 캐시는 바로 다시 받는다 */
+export async function markTargetRead(qc: QueryClient, t: SignIn, kind: NotificationKind, id: string): Promise<boolean> {
+  const res = await notificationsApi.readTarget(kind, id);
+  if (!stillSignedIn(t)) return false;
+  qc.setQueryData<NotificationInbox>(notificationKey(t.id), { items: res.items, unread: res.unread });
+  if (res.changed > 0) await refreshTeamMarks(qc);
   return true;
 }
 
