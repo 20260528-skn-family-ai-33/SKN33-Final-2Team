@@ -16,8 +16,9 @@ import { resolveGoalInput } from './goalInput';
 import { Icon } from '@/shared/ui/Icon';
 import { AgentRow, Note, OpsBox, Page, runSub } from '@/shared/ui/parts';
 import { Skeleton } from '@/shared/ui/Skeleton';
-import { DraftSaveError, draftCall, ensureDraft, pullDraft, takeDraft } from '../draftSync';
-import { docIdle, goalOk } from '../model';
+import { draftCall, pullDraft } from '../draftSync';
+import { clearProject, docDoneText, uploadProject } from './projectDoc';
+import { docBusy, goalOk } from '../model';
 import { StaleNote } from '../stale';
 import { Stepper } from '../Stepper';
 import { useDraftWatch } from '../useDraftWatch';
@@ -203,14 +204,15 @@ async function docAgain(skipImages: boolean): Promise<void> {
 
 function DocBox() {
   const doc = useWs((s) => s.draft.doc);
-  const uploading = useGoalStore((s) => s.docUploading);
+  const uploading = useWs((s) => !!s.docUpload);
   const status = uploading ? 'reading' : doc?.status;
-  /* 요약은 이 화면에 보여 주지 않으므로, 이 화면에서 기다리다 끝나면 알림으로도 한 번 알린다 */
+  const done = docDoneText(doc);
+  /* 요약은 이 화면에 보여 주지 않으므로, 이 화면에서 기다리다 끝나면 알림으로도 한 번 알린다(상자와 같은 문구 기준) */
   const prev = useRef(status);
   useEffect(() => {
-    if (prev.current === 'reading' && status === 'ok') toast('기획서 요약을 마쳤어요. 다음 단계로 넘어갈 수 있어요');
+    if (prev.current === 'reading' && status === 'ok') toast(done.toast);
     prev.current = status;
-  }, [status]);
+  }, [status, done.toast]);
   if (uploading || doc?.status === 'reading') {
     const step = doc?.status === 'reading' ? doc.step : 'extract';
     return (
@@ -222,18 +224,16 @@ function DocBox() {
     );
   }
   if (!doc) return null;
-  if (doc.status === 'ok') {
-    const summarized = !!doc.summary?.trim();
+  if (doc.status === 'ok')
     return (
       <div className="docbox ok" role="status">
         <p className="db-h">
           <Icon name="check" />
-          <b>{summarized ? '기획서 요약 완료' : '기획서 읽기 완료'}</b>
+          <b>{done.title}</b>
         </p>
-        <p className="small">{summarized ? '요약은 다음 단계(세부 사항)에서 확인하고 고칠 수 있어요.' : '요약할 내용을 찾지 못했어요. 목표만으로 진행해요.'}</p>
+        <p className="small">{done.body}</p>
       </div>
     );
-  }
   if (doc.status === 'fail') {
     const c = cause(doc.fail?.cause || {});
     const visionFail = doc.step === 'vision';
@@ -255,38 +255,9 @@ function DocBox() {
   return null;
 }
 
-async function uploadProject(file: File): Promise<void> {
-  const owner = ws().owner;
-  useGoalStore.setState({ docErr: null });
-  try {
-    const id = await ensureDraft();
-    const r = await draftsApi.projectFile(id, file);
-    if (ws().owner !== owner) return;
-    takeDraft(r, true);
-  } catch (err) {
-    if (ws().owner !== owner) return;
-    updateWs((s) => {
-      s.draft.project = null;
-      s.draft.doc = null;
-    });
-    useGoalStore.setState({ docErr: { name: file.name, cause: cause(err instanceof DraftSaveError ? err.original : err) } });
-  } finally {
-    useGoalStore.setState({ docUploading: false });
-  }
-}
-
-async function clearProject(): Promise<void> {
-  useGoalStore.setState({ docErr: null });
-  updateWs((s) => {
-    s.draft.project = null;
-    s.draft.doc = null;
-  });
-  if (ws().draftId) await draftCall('기획서를 빼지 못했어요', (id) => draftsApi.projectClear(id), { soft: true });
-  setAt('draft.project', null);
-}
-
 function ProjectField() {
   const f = useWs((s) => s.draft.project);
+  const uploading = useWs((s) => !!s.docUpload);
   const docErr = useGoalStore((s) => s.docErr);
   if (f)
     return (
@@ -297,9 +268,14 @@ function ProjectField() {
             <b>{f.name}</b>
             <small className="muted">{kb(f.size || 0)}</small>
           </div>
-          <button className="link quiet" onClick={() => void clearProject()}>
-            빼기
-          </button>
+          {/* 올리는 중에는 빼거나 다른 파일로 바꾸지 않는다(늦게 끝난 업로드가 바꾼 상태를 덮지 않게) */}
+          {uploading ? (
+            <span className="small muted">올리는 중…</span>
+          ) : (
+            <button className="link quiet" onClick={() => void clearProject()}>
+              빼기
+            </button>
+          )}
         </div>
         <DocBox />
       </>
@@ -318,9 +294,6 @@ function ProjectField() {
           onChange={(e) => {
             const file = e.target.files && e.target.files[0];
             if (!file) return;
-            setAt('draft.project', { name: file.name, size: file.size });
-            updateWs((s) => void (s.draft.doc = { name: file.name, status: 'reading', step: 'extract' }));
-            useGoalStore.setState({ docUploading: true });
             void uploadProject(file);
           }}
         />
@@ -341,14 +314,14 @@ export function GoalStep() {
   const d = useWs((s) => s.draft);
   const firstGoal = useGoalStore((s) => s.gs && s.gs.owner && s.gs.owner === me()?.id ? s.gs.candidates[0]?.goal?.trim() ?? '' : '');
   const effectiveGoal = resolveGoalInput(d.goal, firstGoal);
-  const uploading = useGoalStore((s) => s.docUploading);
-  const ok = goalOk({ ...d, goal: effectiveGoal }) && docIdle(d) && !uploading;
+  const busy = useWs(docBusy);
+  const ok = goalOk({ ...d, goal: effectiveGoal }) && !busy;
   const proceed = () => {
     const current = ws().draft;
-    const { gs: state, docUploading } = useGoalStore.getState();
+    const state = useGoalStore.getState().gs;
     const first = state && state.owner && state.owner === me()?.id ? state.candidates[0]?.goal : '';
     const goal = resolveGoalInput(current.goal, first);
-    if (!goalOk({ ...current, goal }) || !docIdle(current) || docUploading) return;
+    if (!goalOk({ ...current, goal }) || docBusy(ws())) return;
     if (!current.goal.trim()) setAt('draft.goal', goal);
     go(paths.newDetails);
   };
@@ -358,7 +331,8 @@ export function GoalStep() {
   }, []);
   return (
     <>
-      <Stepper cur="goal" />
+      {/* 기획서를 올리거나 요약하는 중에는 이미 지난 단계로도 옮기지 않는다 */}
+      <Stepper cur="goal" busy={busy} />
       <Page
         title="어떤 역량을 키우고 싶나요?"
         lead="목표와, 적용할 프로젝트 기획서가 있으면 함께 알려 주세요. 기획서는 진단 에이전트가 읽고 요약해요. 학습 여건은 다음 단계에서 적어 주세요(모두 선택)."

@@ -80,6 +80,9 @@ export interface WsState {
   regenReq: RegenReq | null;
   picks: string[];
   lastRoute: string | null;
+  /** 기획서 파일을 올리는 중인 요청 번호(화면에만 · 저장하지 않음). 서버가 아직 기획서를 몰라
+      저장·다시 읽기 응답이 화면의 '읽는 중'을 지울 수 있어, 이 동안 1단계를 마치지 않은 것으로 본다 */
+  docUpload: number | null;
 }
 
 export const freshWs = (owner: string | null = null): WsState => ({
@@ -98,6 +101,7 @@ export const freshWs = (owner: string | null = null): WsState => ({
   regenReq: null,
   picks: [],
   lastRoute: null,
+  docUpload: null,
 });
 
 export const useWs = create<WsState>()(immer(() => freshWs()));

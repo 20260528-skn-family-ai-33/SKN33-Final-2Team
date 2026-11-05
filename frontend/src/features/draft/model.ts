@@ -30,15 +30,19 @@ export const mcqDone = (mcq: Record<string, unknown>, ans: Record<string, string
 export const quizDone = (d: DraftDoc): boolean =>
   d.v2Assessment ? d.v2Assessment.completed : !!d.quiz && d.quiz.questions.every((q) => d.answers[q.id]) && (!(d.deepOn && d.quiz.deep) || mcqDone(d.quiz.deep.mcq, d.deepMcq));
 export const docIdle = (d: DraftDoc): boolean => !d.doc || d.doc.status !== 'reading';
+/** 기획서를 올리거나 요약하는 중: 하단 버튼·상단 단계·주소 진입 어느 쪽으로도 1단계를 떠나지 않는다(#81 리뷰).
+    요약 작업이 끊기면 서버가 읽을 때 '실패'로 바꾸므로(drafts 의 작업 확인) 읽는 중에 갇히지 않는다 */
+export const docBusy = (s: Pick<WsState, 'draft'> & Partial<Pick<WsState, 'docUpload'>>): boolean => !docIdle(s.draft) || !!s.docUpload;
 
-export function stepDone(s: Pick<WsState, 'draft' | 'draftPlan'>, k: StepKey): boolean {
+export function stepDone(s: Pick<WsState, 'draft' | 'draftPlan'> & Partial<Pick<WsState, 'docUpload'>>, k: StepKey): boolean {
   const d = s.draft;
-  /* 세부 사항은 모두 선택 사항이라, 확인 화면에서 '다음'을 눌렀거나 역량 테스트 문항이 있으면 지난 것으로 본다 */
-  return { goal: goalOk(d), details: canContinueSkills(d) || !!(!d.selectedSkills && (d.detailsOk || d.quiz)), check: !!(d.detailsOk || d.quiz), quiz: quizDone(d), result: !!(d.handoff || d.gen || d.v2Assessment?.completed), options: d.v2Assessment ? !!(d.chosen && d.gen?.options[d.chosen] && !d.gen.regenRun?.[d.chosen]) : !!s.draftPlan, materials: !!(d.v2Assessment?.materialsReady || d.v2Assessment?.activitiesReady), review: false }[k];
+  /* 세부 사항은 모두 선택 사항이라, 확인 화면에서 '다음'을 눌렀거나 역량 테스트 문항이 있으면 지난 것으로 본다.
+     기획서를 올리거나 요약하는 중이면 1단계를 마치지 않은 것으로 본다(docBusy) */
+  return { goal: goalOk(d) && !docBusy(s), details: canContinueSkills(d) || !!(!d.selectedSkills && (d.detailsOk || d.quiz)), check: !!(d.detailsOk || d.quiz), quiz: quizDone(d), result: !!(d.handoff || d.gen || d.v2Assessment?.completed), options: d.v2Assessment ? !!(d.chosen && d.gen?.options[d.chosen] && !d.gen.regenRun?.[d.chosen]) : !!s.draftPlan, materials: !!(d.v2Assessment?.materialsReady || d.v2Assessment?.activitiesReady), review: false }[k];
 }
 
 /** 이 단계 앞에 마치지 않은 단계가 있으면 그 단계 주소 */
-export function blockedTo(s: Pick<WsState, 'draft' | 'draftPlan'> & Partial<Pick<WsState,'pendingFlow'>>, k: StepKey): string | null {
+export function blockedTo(s: Pick<WsState, 'draft' | 'draftPlan'> & Partial<Pick<WsState,'pendingFlow'|'docUpload'>>, k: StepKey): string | null {
   if(k==='review'&&s.pendingFlow==='materials')return paths.newOptions;
   if(k==='review' && s.draft.v2Assessment && !s.draft.v2Assessment.materialsReady && !s.draft.v2Assessment.activitiesReady)return paths.newOptions;
   const i = STEPS.findIndex((x) => x[0] === (k==='materials'?'options':k));
