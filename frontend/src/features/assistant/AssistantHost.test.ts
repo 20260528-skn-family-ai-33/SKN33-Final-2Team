@@ -24,6 +24,7 @@ describe('사내 생활 DB 근거 카드', () => {
         summary: '개인학습도 학습시간에 포함돼요 (「인재개발규정」 제7조 제2항). 세부 기준(승인 절차 포함)은 따로 확인해 주세요.\n\n출처: 인재개발규정 제7조 제2항' });
       const html = renderToStaticMarkup(createElement(MemoryRouter, null, createElement(RegCard, { a })));
       const [summary, details] = html.split('<details>');
+      expect(summary).toContain('>근거 확인</span>');
       expect(summary).toContain('개인학습도 학습시간에 포함돼요. 세부 기준(승인 절차 포함)은 따로 확인해 주세요.');
       expect(summary).toContain('아래 ‘근거 보기’에서 확인해 주세요.');
       expect(summary).not.toContain('인재개발규정');
@@ -87,7 +88,7 @@ describe('사내 생활 DB 근거 카드', () => {
       const html = renderToStaticMarkup(createElement(MemoryRouter, null, createElement(RegCard, { a, mlLabel: '범위 밖' })));
       expect(html).not.toContain('title="ML 질문 분류"');
       expect(html).not.toContain('title="LLM 근거 상태"');
-      expect(html).toContain(a.kind === 'out' ? '범위 밖' : '사내 생활 답변 불가');
+      expect(html).toContain('>답변 불가</span>');
     }
   });
 });

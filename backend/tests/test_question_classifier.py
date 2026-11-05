@@ -148,7 +148,12 @@ class ClassifierRoutingTest(unittest.TestCase):
         self.search.return_value = []
         result, model = self.route('사내 규정', self.response(status='not_found'))
         self.assertEqual(result['evidenceStatus'], 'not_found')
-        self.assertEqual(model.call_args.args[2]['sources'], [])
+        self.assertEqual(result['basis'], [])
+        _, system, payload = model.call_args.args
+        self.assertEqual(payload['sources'], [])
+        self.assertIn('not_found를 쓰고 sourceIds=[]', system)
+        self.assertIn('자료 부족이나 질문 뜻이 불명확한 경우는 refused가 아니다', system)
+        self.assertIn('승진·보상 결과를 예측하지 않는다', system)
 
     def test_prohibited_request_without_hits_still_refuses(self):
         self.search.return_value = []

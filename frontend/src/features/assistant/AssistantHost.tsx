@@ -70,11 +70,10 @@ const eun = (w: string) => {
 
 function AnswerLabels({ mlLabel, label, style }: { mlLabel?: string; label: string; style: string }) {
   if (!mlLabel) return <span className={`tag ${style}`}>{label}</span>;
-  const evidence = label.replace(/^(규정|회사|사내 생활) /, '');
   return (
     <span className="answer-tags">
       <span className="tag line" title="ML 질문 분류">{mlLabel}</span>
-      <span className={`tag ${style}`} title="LLM 근거 상태">{evidence}</span>
+      <span className={`tag ${style}`} title="LLM 근거 상태">{label}</span>
     </span>
   );
 }
@@ -94,7 +93,7 @@ export function RegCard({ a, mlLabel, demo }: { a: AssistantAnswer; mlLabel?: st
         <p className="sum">{summary}</p>
       </div>
     );
-  if (a.evidenceStatus === 'refused')
+  if (a.evidenceStatus === 'refused' || a.level === 'refused')
     return (
       <div className="ans">
         <div className="who">
@@ -109,7 +108,7 @@ export function RegCard({ a, mlLabel, demo }: { a: AssistantAnswer; mlLabel?: st
       <div className="ans">
         <div className="who">
           <Icon name="chat" />
-          사내 생활 도우미 <span className="tag line">범위 밖</span>
+          사내 생활 도우미 <span className={`tag ${statusStyle}`}>{statusLabel}</span>
         </div>
         <p className="sum">업무·사내 생활과 관련 없는 질문이라 답하지 않아요.</p>
         <p className="small muted">규정, 수자원공사 정보, 사내 생활(사내 홈페이지 안내)에 대해 물어봐 주세요.</p>
@@ -120,7 +119,7 @@ export function RegCard({ a, mlLabel, demo }: { a: AssistantAnswer; mlLabel?: st
       <div className="ans">
         <div className="who">
           <Icon name="chat" />
-          사내 생활 도우미 <span className="tag">확인 필요</span>
+          사내 생활 도우미 <span className={`tag ${statusStyle}`}>{statusLabel}</span>
         </div>
         <p className="sum">{a.question}</p>
         {a.options && a.options.length ? (
@@ -225,7 +224,7 @@ export function RegCard({ a, mlLabel, demo }: { a: AssistantAnswer; mlLabel?: st
       <div className="ans">
         <div className="who">
           <Icon name="chat" />
-          사내 생활 도우미 <AnswerLabels mlLabel={mlLabel} label={isKnowledge ? statusLabel : a.source === 'app' ? '사용법 안내' : '일반 답변'} style={isKnowledge ? statusStyle : ''} />
+          사내 생활 도우미 <AnswerLabels mlLabel={mlLabel} label={statusLabel} style={statusStyle} />
         </div>
         <h4>답변 요약</h4>
         <p className="sum">{answerSummary}</p>

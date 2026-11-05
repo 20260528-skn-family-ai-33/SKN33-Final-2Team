@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 from app import auth, jobs, knowledge, regstore
 from app.agents import regulation as reg
 from app.agents import runtime as rt
-from app.errors import ApiError, api_error_handler
+from app.errors import AgentError, ApiError, api_error_handler
 from app.llm import LlmError
 from app.routers import work
 from app.services import profile
@@ -174,17 +174,25 @@ class DocumentScopeTest(unittest.TestCase):
         self.assertEqual(result['summary'], '원문 안내')
         group.assert_not_called()
 
-    def test_regulation_question_without_employee_group_skips_search(self):
-        ctx = rt.Ctx(employee_id=42)
-        inp = {'question': '교육비 지원 조건', 'me': {}, 'context': {}, 'documents_only': True}
-        with (patch.object(regstore, 'search') as search,
-              patch.object(regstore, 'explicit_ref') as explicit_ref,
-              patch.object(reg.grounded_answer, 'generate', return_value={'status': 'not_found'})):
-            answer = reg._api_answer(ctx, inp, '사내 규정')
-        search.assert_not_called()
-        explicit_ref.assert_not_called()
-        self.assertEqual(answer['evidenceStatus'], 'not_found')
-        self.assertIn('직원 구분', answer['summary'])
+    def test_regulation_question_without_employee_group_fails_before_search_and_model(self):
+        for group in (None, '', '  '):
+            ctx = rt.Ctx(employee_id=42, me={'empGroup': group})
+            with (self.subTest(group=group),
+                  patch.object(reg.llm, 'available', return_value=True),
+                  patch.object(reg.question_classifier, 'classify', return_value={'label': '사내 규정'}),
+                  patch.object(rt, '_log') as log,
+                  patch.object(regstore, 'search') as search,
+                  patch.object(regstore, 'explicit_ref') as explicit_ref,
+                  patch.object(reg.grounded_answer, 'generate') as model,
+                  self.assertRaises(AgentError) as error):
+                reg.answer(ctx, '교육비 지원 조건', [], {}, documents_only=True)
+            search.assert_not_called()
+            explicit_ref.assert_not_called()
+            model.assert_not_called()
+            self.assertEqual(error.exception.info['code'], 'EMPLOYEE_GROUP_UNAVAILABLE')
+            self.assertEqual(error.exception.info['user'], '로그인한 직원의 직원 구분을 확인할 수 없어요')
+            self.assertFalse(error.exception.info['retryable'])
+            self.assertEqual(log.call_args.args[1]['mode'], 'error')
 
     def test_pool_uses_employee_group_by_default_and_filters_overseas(self):
         arts = {'a': {'group': '일반직', 'overseas': False}, 'b': {'group': '실무직', 'overseas': False},

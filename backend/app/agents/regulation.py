@@ -15,6 +15,7 @@ import json
 import re
 
 from .. import knowledge, llm, question_classifier, regstore
+from ..errors import AgentError
 from . import runtime as rt
 from . import grounded_answer
 from .demo import D
@@ -460,8 +461,8 @@ def _api_answer(ctx: rt.Ctx, inp: dict, label: str) -> dict:
     group = me.get('empGroup')
     follow_history = inp.get('_history') or []
     documents_only = inp.get('documents_only')
-    if documents_only and not group:
-        return _empty_evidence_answer(ctx, 'regulation', inp, '로그인한 직원의 직원 구분을 확인할 수 없어 적용 규정을 찾지 못했어요.')
+    if documents_only and not (group or '').strip():
+        raise AgentError('로그인한 직원의 직원 구분을 확인할 수 없어요')
     ref = regstore.explicit_ref(q, group)
     # 규정 이름이 없는 조항 질문은 일반 이어 묻기 판별과 별도로 직전 규정을 참조한다.
     if ref is None and hist and regstore.REF_ART.search(q):
