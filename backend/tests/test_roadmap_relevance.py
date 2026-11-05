@@ -44,7 +44,10 @@ class RoadmapRelevanceTests(TestCase):
 
     def test_legacy_options_and_free_crash_contract_remain_compatible(self):
         row={'name':'SQL','application':'집계 쿼리 작성'}
-        for course in ['A1','A2']:
-            self.assertEqual(course_skills.validate_recommendations([row],{'SQL'},course,require_depth=True),[row])
-        self.assertEqual(course_skills.validate_recommendations([row],{'SQL'},'A3'),[row])
+        self.assertEqual(course_skills.validate_recommendations([row],{'SQL'},'A1',require_depth=True),[row])
+        # 이전에 만든 Crash 안은 핵심 기준 없이도 읽고, 새로 만드는 Crash 안에는 핵심 기준이 필요하다.
+        for course in ['A2','A3']:
+            self.assertEqual(course_skills.validate_recommendations([row],{'SQL'},course),[row])
+        with self.assertRaises(ValueError):
+            course_skills.validate_recommendations([row],{'SQL'},'A2',require_depth=True)
         self.assertEqual(course_skills.selected({'learningSkills':[row]})[0]['application'],row['application'])

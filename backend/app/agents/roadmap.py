@@ -25,6 +25,7 @@ from . import runtime as rt
 from .demo import D, TEMPLATES, TEMPLATES_ALT, domain_of
 
 AUTO_HOURS = D['autoHours']
+LEARNING_SKILL_FIELDS = ('learningSkills', 'learningSkillSelection', 'learningSkillsVersion', 'learningSkillsKey')
 
 
 def _cat() -> dict:
@@ -49,7 +50,8 @@ def _task_skills(v) -> list[str]:
     return out[:3]
 
 
-def finish_option(pid: str, raw: dict, source: str, off_domain: bool = False, keep_key: bool = False) -> dict:
+def finish_option(pid: str, raw: dict, source: str, off_domain: bool = False, keep_key: bool = False, *,
+                  preserve_learning_skills: bool = True) -> dict:
     """에이전트가 쓴 안을 화면 형식으로. 목록에 없는 자료 id 는 그릴 정보가 없어 뺀다(표시용 처리 · 검사 기능 아님)
     keep_key: 수정안만 — 에이전트가 돌려준 원래 활동 key 를 남겨 keep_ids 가 쓰게 한다(keep_ids 가 쓰고 지움)"""
     per = D['perspectives'][pid]
@@ -88,9 +90,12 @@ def finish_option(pid: str, raw: dict, source: str, off_domain: bool = False, ke
     except (TypeError, ValueError):
         wh = 0
     display_title = ' '.join(str(raw.get('displayTitle') or '').split())[:30]
-    return {'displayTitle': display_title, 'id': pid, 'name': per['name'], 'short': per['short'], 'tagline': str(raw.get('tagline') or per['focus'])[:60], 'reason': str(raw.get('reason') or ''),
+    option = {'displayTitle': display_title, 'id': pid, 'name': per['name'], 'short': per['short'], 'tagline': str(raw.get('tagline') or per['focus'])[:60], 'reason': str(raw.get('reason') or ''),
             'pros': lst(raw.get('pros')), 'cons': lst(raw.get('cons')), 'scope': str(raw.get('scope') or ''), 'acts': acts,
             'weeklyHours': round(wh * 2) / 2 if 0.5 <= wh <= 40 else None, 'source': source, 'offDomain': bool(off_domain)}
+    if preserve_learning_skills:
+        option.update({field: copy.deepcopy(raw[field]) for field in LEARNING_SKILL_FIELDS if field in raw})
+    return option
 
 
 def build_plan(d: dict, prm: dict, goal: str) -> dict:
@@ -381,10 +386,10 @@ def agent_catalog(handoff: dict, extra_ids: list | None = None, *, free_only: bo
             for row in payload['catalog']]
 
 
-PROMPT_VERSION = 'v2.5'  # Public curriculum evidence and confirmed/estimated course time.
+PROMPT_VERSION = 'v2.6'  # Free 강좌의 0원 조건과 도서 예외를 일치시킨다.
 # 관점별 규칙: 하위 에이전트는 다른 안을 보지 못하므로 규칙으로 차이를 만든다(개선안 2-3절 · A2 는 v2.1 에서 목표의 일을 빼지 않게 고침)
 PERSPECTIVE_RULES = {
-    'A1': ('- cost가 0인 자료와 직접 실습을 먼저 쓴다. cost가 null이거나 0보다 큰 자료는 같은 내용을 다룰 무료 자료가 없을 때만 쓰고, 쓰면 cons에 적는다.\n'
+    'A1': ('- 강좌는 cost가 정확히 0인 자료만 쓴다. 유료·가격 미확인 강좌는 무료 대안이 없어도 쓰지 않고 부족한 범위는 scope에 적는다. 도서는 가격·예산과 무관하게 유료·가격 미확인도 추천할 수 있으며 비용을 표시한다.\n'
            '- 실습 도구도 무료로 쓸 수 있는 것(오픈소스, 무료 등급)으로 고른다.'),
     'A2': ('- 총 시간을 가장 적게 잡는다. 목표 문장에 직접 나온 일은 범위 밖으로 빼지 않고 반드시 다룬다. 그 밖의 gaps는 핵심 1~2개만 더하고, 나머지는 scope에 "이번 범위 밖: …"으로 적는다.\n'
            '- 결과물은 outcome의 최소 기능판으로 줄인다. 10시간이 넘는 자료는 꼭 필요할 때만 쓴다.'),
@@ -495,8 +500,12 @@ def option(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
         from app.learner_knowledge import POLICY
         provenance = {}
         system = _sys(pid, R_SYS, provenance, inp.get('_evaluationPrompt')) + extra
-        if not system.startswith('[통합 생성 계약 roadmap-generation/v1]'):
-            system += POLICY + track_policy.challenge_guidance(pid, 'plan') + track_policy.PERIOD_GUIDANCE
+        if system.startswith('[통합 생성 계약 roadmap-generation/v1]'):
+            # 이전에 설치된 통합 프롬프트에는 Crash 핵심 기준 계약이 없다. DB 재설치 전에도 같은 계약을 적용한다.
+            if track_policy.CRASH_CORE_MARKER not in system:
+                system += track_policy.crash_guidance(pid, 'plan')
+        else:
+            system += POLICY + track_policy.course_guidance(pid, 'plan') + track_policy.PERIOD_GUIDANCE
             if inp['handoff'].get('courseSkillSelection'):
                 from app.services.course_skills import CONTRACT, FIXED_SELECTION_CONTRACT
                 system += FIXED_SELECTION_CONTRACT if inp['handoff'].get('selectedSkillsFixed') else CONTRACT
@@ -507,7 +516,7 @@ def option(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
                                    rt.S.ollama_num_ctx if ctx.mode == 'ollama' else catalog_budget.DEFAULT_CONTEXT)
         r = rt.llm_json(ctx, system, payload, role='roadmap')
         _validate_learning_acts(r,inp['handoff'])
-        o = finish_option(pid, r, ctx.mode)
+        o = finish_option(pid, r, ctx.mode, preserve_learning_skills=False)
         if provenance:
             o['optionId'] = str(uuid4())
             o['promptProvenance'] = dict(provenance, source=ctx.mode,
@@ -683,9 +692,60 @@ def _drop_gone_keys(o: dict, changes: dict) -> dict:
     return o
 
 
+def _revision_skill_targets(plan: dict, handoff: dict) -> list[dict]:
+    definition = plan.get('def') or {}
+    report = definition.get('learningReport') or {}
+    order = report.get('skillOrder') or handoff.get('skillOrder') or handoff.get('skillNames') or []
+    choices = report.get('choices') or {}
+    names = [name for name in dict.fromkeys(order) if (choices.get(name) or {}).get('enabled', True)]
+    if definition.get('learningSkills'):
+        rows = {row['name']: row for row in definition['learningSkills']}
+        return copy.deepcopy([rows[name] for name in names if name in rows] if order else list(rows.values()))
+
+    # 이전 과제 제안에서 누락된 목표는 확정 당시 선택된 스킬과 해당 코스의 기준이 맞을 때만 복구한다.
+    course = plan.get('opt')
+    if course not in ('A2', 'A3') or not names:
+        return []
+    from app.services.course_skills import validate_recommendations
+    stored = {row['name']: row for row in handoff.get('skillDetails') or []
+              if isinstance(row, dict) and isinstance(row.get('name'), str)}
+    targets = []
+    for name in names:
+        if name not in stored:
+            continue
+        try:
+            targets.extend(validate_recommendations([stored[name]], {name}, course, require_depth=True))
+        except ValueError:
+            continue
+    return targets
+
+
 def revise(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
     """inp: pid, handoff, changes, request, fromComment, plan{opt,name,tagline,def,hours,start,acts[{id,stage,title,res,hours,how,done}]}"""
     pid, pl = inp['pid'], inp['plan']
+    skill_targets = _revision_skill_targets(pl, inp['handoff'])
+    course_changed = pid != pl['opt']
+    report = (pl.get('def') or {}).get('learningReport') or {}
+    target_names = list(dict.fromkeys(report.get('skillOrder') or inp['handoff'].get('skillOrder')
+                                     or inp['handoff'].get('skillNames') or [row['name'] for row in skill_targets]))
+    target_names = [name for name in target_names if (report.get('choices', {}).get(name) or {}).get('enabled', True)]
+    refresh_targets = course_changed and bool(target_names)
+    by_name = {row['name']: row for row in (inp['handoff'].get('skillDetails') or []) + skill_targets}
+    fresh_inputs = [{'name': name, 'application': by_name.get(name, {}).get('application') or inp['handoff'].get('goal') or name}
+                    for name in target_names]
+
+    def new_targets(raw):
+        from app.services.course_skills import validate_recommendations, recommendation_key
+        try:
+            targets = validate_recommendations(raw.get('learningSkills'), set(target_names), pid,
+                                               require_depth=True, max_skills=5)
+            if [row['name'] for row in targets] != target_names:
+                raise ValueError('코스를 바꿀 때도 선택한 스킬과 순서는 유지해야 해요.')
+        except ValueError as error:
+            raise llm.LlmError(str(error)) from error
+        result = {'learningSkills': targets, 'learningSkillsVersion': str(uuid4())}
+        result['learningSkillsKey'] = recommendation_key(result)
+        return result
 
     def api(_):
         current = {'perspective': f"{pl['opt']} {pl['name']}", 'weeklyHours': pl['hours'], 'startStage': pl['start'],
@@ -703,25 +763,48 @@ def revise(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
         system = _sys(pid, REV_SYS, evaluation_prompt=inp.get('_evaluationPrompt'))
         integrated_revision = system.startswith('[통합 수정 계약 roadmap-revision/v1]')
         if not integrated_revision:
-            system += POLICY + track_policy.challenge_guidance(pid, 'tasks') + track_policy.PERIOD_GUIDANCE
-        current['learningSkills'] = (pl.get('def') or {}).get('learningSkills') or []
+            system += POLICY + track_policy.course_guidance(pid, 'tasks') + track_policy.PERIOD_GUIDANCE
+        elif track_policy.CRASH_CORE_MARKER not in system:
+            system += track_policy.crash_guidance(pid, 'tasks')
+        current['learningSkills'] = skill_targets
+        if skill_targets or refresh_targets:
+            # 확정 정의가 기준이다. 코스 전환 전에 저장한 handoff의 기준을 다시 섞지 않는다.
+            handoff['skillDetails'] = copy.deepcopy(fresh_inputs if refresh_targets else skill_targets)
+            handoff['skillOrder'] = list(target_names)
+            handoff['skillNames'] = list(target_names)
+            handoff['selectedSkillsFixed'] = True
+        if refresh_targets:
+            # 이전 완료 기준은 비교용으로만 전달하고 새 코스의 필수 기준으로 재사용하지 않는다.
+            system += '''\n[코스 전환 시 목표 재작성]
+current.learningSkills는 이전 코스의 참고 기록이다. skillTargets는 유지할 스킬·적용 범위이며 이전 완료 기준을 새 코스의 필수 조건으로 복사하지 않는다.
+새 코스 정책에 맞는 learningSkills를 활동과 함께 반드시 반환한다. skillTargets의 이름·순서는 전부 유지하고 추가·삭제하지 않는다.
+각 항목에 name·application을 쓴다. A2는 coreOutcome·coreCriteria(서로 다른 1~3개)·followUpScope(0~3개), A3는 targetOutcome·completionCriteria(서로 다른 2~4개)를 새로 작성한다. A1은 name·application을 쓴다.
+Crash는 최소 기능판으로 범위를 좁히되 핵심 기능의 안전성·정확성 기준은 유지한다. 완료한 활동의 key·skill·진행 기록은 보존한다.
+'''
         if (pl.get('def') or {}).get('learningReport'):
-            current['skillOrder'] = pl['def']['learningReport']['skillOrder']
+            current['skillOrder'] = list(target_names)
             if not integrated_revision:
                 system += '\n각 활동에 소속 skill을 skillOrder 중 정확히 하나로 반환한다. 유지 활동은 key와 skill을 보존한다. 추가·교체 활동도 실제 소속을 명시한다. 과제의 skills 태그 목록과 단일 소속 skill은 구분한다.'
-        payload = _catalog_payload(pid, {'current': current, 'skillTargets': current['learningSkills'], 'handoff': handoff, 'changes': inp['changes'],
+        payload = _catalog_payload(pid, {'current': current, 'skillTargets': fresh_inputs if refresh_targets else current['learningSkills'], 'handoff': handoff, 'changes': inp['changes'],
                                         'request': inp.get('request'), 'skillTags': catalog.skill_names()}, system, extra_ids,
                                    rt.S.ollama_num_ctx if ctx.mode == 'ollama' else catalog_budget.DEFAULT_CONTEXT)
         r = rt.llm_json(ctx, system, payload, role='roadmap')
         _validate_learning_acts(r,inp['handoff'])
-        o = finish_option(pid, r, ctx.mode, keep_key=True)
+        o = finish_option(pid, r, ctx.mode, keep_key=True, preserve_learning_skills=False)
+        if refresh_targets:
+            o.update(new_targets(r))
         o.update(summary=str(r.get('summary') or '').strip()[:80], notes=rt.arr(r.get('notes'), 4))
         return o
     from app.services.material_plan import rebuild_revision
     def checked(callback):
         def run(data):
             result = _drop_gone_keys(callback(data), inp['changes'])
-            return rebuild_revision(result, pl, inp['handoff'])
+            if refresh_targets and not result.get('learningSkills'):
+                raise llm.LlmError('코스 전환에는 새 학습 기준을 생성할 수 있는 AI 모델이 필요해요. 기존 계획은 유지됩니다.')
+            result = rebuild_revision(result, pl, inp['handoff'])
+            if not course_changed and skill_targets and not result.get('learningSkills'):
+                result['learningSkills'] = copy.deepcopy(skill_targets)
+            return result
         return run
     task = '관점 바꿔 다시 작성' if inp['changes'].get('perspective') else '수정안 작성'
     return _drop_gone_keys(rt.run(ctx, f'로드맵 계획 · {pid}', task, inp, checked(_mock_revise), checked(api), role='roadmap', sim=sim, mock_delay=0.9), inp['changes'])

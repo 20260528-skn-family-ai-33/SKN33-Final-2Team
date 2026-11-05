@@ -42,6 +42,7 @@ def bad(message: str, code: str = 'BAD_REQUEST') -> ApiError:
 # 앞머리 문구(Ollama 연결 실패 / RunPod 프록시 / OpenAI 401 …)는 llm.py 가 만드는 오류 문구와 맞춘다
 CAUSES = [
     (r'^Challenge (추천에는|산출물|완료 기준)', 'format', 'Challenge 응답의 산출물 목표·완료 기준 형식을 확인하지 못했어요'),
+    (r'^Crash (추천에는|핵심 완료 기준|후속 학습)', 'format', 'Crash 응답의 핵심 결과물·완료 기준 형식을 확인하지 못했어요'),
     (r'^회사 정보 검색 임베딩', 'config', '회사 정보 검색의 임베딩 모델·키·저장 벡터 설정을 확인해 주세요'),
     (r'^질문 분류 모델', 'classifier', '로컬 질문 분류 모델을 읽거나 실행하지 못했어요'),
     (r'^로그인한 직원의 직원 구분을 확인할 수 없어요$', 'employee_group', '규정 검색에 필요한 직원 구분이 없어요'),

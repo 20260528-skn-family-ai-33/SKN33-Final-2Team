@@ -3,6 +3,7 @@ import json
 import re
 from html import unescape
 from html.parser import HTMLParser
+from .english_patterns import english_token as _en
 
 CATALOG_BYTES = 12_000
 EVIDENCE_COURSES = 4
@@ -34,7 +35,7 @@ class _Text(HTMLParser):
 
 def content_text(value):
     value = str(value or '')
-    if re.search(r'</?(?:div|p|br|section|article|table|h[1-6]|span|script|style)\b', value, re.I):
+    if re.search(_en(r'</?(?:div|p|br|section|article|table|h[1-6]|span|script|style)', left=False), value, re.I):
         parser = _Text()
         parser.feed(value)
         value = ''.join(parser.parts)

@@ -55,7 +55,7 @@ class PromptSelectionStoreTests(TestCase):
              patch.object(roadmap,'_catalog_payload',side_effect=lambda pid,value,*args:value), \
              patch.object(roadmap.catalog,'skill_names',return_value=[]), \
              patch.object(roadmap.rt,'llm_json',return_value={'acts':[]}), \
-             patch.object(roadmap,'finish_option',side_effect=lambda *args:{'id':'A1','acts':[]}), \
+             patch.object(roadmap,'finish_option',side_effect=lambda *args,**kwargs:{'id':'A1','acts':[]}), \
              patch.object(roadmap.rt,'run',side_effect=lambda ctx,name,task,inp,mock,api,**kw:api(None)):
             first=roadmap.option(SimpleNamespace(mode='ollama'),{'pid':'A1','handoff':{'goal':'조회'}})
             second=roadmap.option(SimpleNamespace(mode='ollama'),{'pid':'A1','handoff':{'goal':'조회'}})

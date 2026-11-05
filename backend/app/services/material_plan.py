@@ -49,6 +49,11 @@ def rebuild_revision(option, plan, handoff):
     from app import llm
     from app.services.duration_proposals import RecommendationError
     prior = plan.get('def') or {}
+    course_changed = option.get('id', plan.get('opt')) != plan.get('opt')
+    if not course_changed:
+        for field in roadmap.LEARNING_SKILL_FIELDS:
+            if field in prior:
+                option[field] = deepcopy(prior[field])
     old_report = prior.get('learningReport')
     if not isinstance(old_report, dict):
         return option  # 구형 계획의 기존 기간 계산 유지
@@ -102,13 +107,14 @@ def rebuild_revision(option, plan, handoff):
     details = []
     for name in names:
         detail = deepcopy(next((row for row in old_report.get('skillDetails', []) if row['name'] == name), {'name': name, 'application': ''}))
+        if course_changed:
+            target = next((row for row in option.get('learningSkills') or [] if row['name'] == name), None)
+            if target:
+                detail = dict(deepcopy(target), competencySummary=[])
         before = {a['res'] for a in old_acts if a.get('res') and a.get('skill') == name and (roadmap._res(a['res']) or {}).get('type') in ('course', 'book')}
-        if before != set(resources[name]):
+        if course_changed or before != set(resources[name]):
             detail['competencySummary'] = []
         details.append(detail)
-    for field in ('learningSkills', 'learningSkillSelection', 'learningSkillsVersion', 'learningSkillsKey'):
-        if field in prior:
-            option[field] = deepcopy(prior[field])
     option['learningReport'] = {'recommendations': {'skills': rec}, 'choices': choices,
                                 'skillOrder': names, 'skillDetails': details, 'durationEstimates': estimates}
     option['materialSchedule'] = schedule_rows(estimates)

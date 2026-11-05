@@ -172,6 +172,32 @@ class BookCandidateTests(unittest.TestCase):
                                    course={'id':'A3'},retrieved_pools=pools)
         self.assertEqual([p['selectedCourse'] for p in result['skills']],['same','same'])
 
+    def test_shared_slot_alias_preserves_canonical_keys_for_other_courses(self):
+        shared = item('shared', ['RAG', 'NLP'], kind='course')
+        local = item('local', ['NLP'], kind='course')
+        pools = [{'name': 'RAG', 'courses': [shared], 'books': []},
+                 {'name': 'NLP', 'courses': [shared, local], 'books': []}]
+        selection = {'skills': [{'name': 'RAG'}, {'name': 'NLP'}]}
+        sources = {'shared': shared, 'local': local}
+
+        def generate(_, payload):
+            nlp = payload['skills'][1]['courses']
+            self.assertEqual((nlp[0]['choiceKey'], nlp[0]['slotKey'], nlp[1]['choiceKey']),
+                             ('S1-C1', 'S2-C1', 'S2-C2'))
+            return {'skills': [{'name': 'RAG', 'courses': [{'key': 'S1-C1'}], 'books': []},
+                               {'name': 'NLP', 'courses': [{'key': 'S2-C1'}, {'key': 'S2-C2'}], 'books': [],
+                                'courseDiagnostic': {'reason': 'scope_gap', 'detail': 'S2-C1 및 S1-C1의 설명입니다.'}}]}
+
+        result = recommend_resources({}, selection, sources, generate, course={'id': 'A3'}, retrieved_pools=pools)
+        self.assertEqual([card['id'] for card in result['skills'][1]['courses']], ['shared', 'local'])
+        self.assertEqual(result['skills'][1]['courseDiagnostic']['displayDetail'],
+                         f'「{shared["title"]}」 및 「{shared["title"]}」의 설명입니다.')
+        for key in ('S2-C3', None):
+            raw = {'skills': [{'name': 'RAG', 'courses': [], 'books': []},
+                              {'name': 'NLP', 'courses': [{'key': key, 'id': 'local'}], 'books': []}]}
+            with self.subTest(key=key), self.assertRaises(RecommendationError):
+                recommend_resources({}, selection, sources, lambda *_: raw, course={'id': 'A3'}, retrieved_pools=pools)
+
     def test_book_thirty_uses_one_search_and_one_embedding_without_a_free_price_filter(self):
         from unittest.mock import Mock
         from app.services import resource_rag as rag

@@ -1,6 +1,6 @@
 import copy
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 from app.services import survey_store as store
 from app.agents.resource_recommendations import RecommendationError
 
@@ -9,7 +9,12 @@ class RecommendationStoreTests(unittest.TestCase):
         self.tx=Mock();self.tx.run.return_value=1
         self.pre={'version':1,'generationId':'pre','completed':True,'survey':{},'answers':{'q':0}}
         self.tx.one.return_value={'draft_choices':{store.KEY:self.pre}}
-        self.result={'skills':[{'name':'분석','courses':[{'id':'c'}],'books':[{'id':'b'}],'selectedCourse':'c','selectedBooks':['b']}]}
+        items = {'c': {'id': 'c', 'type': 'course', 'cost': 0, 'usable': True},
+                 'b': {'id': 'b', 'type': 'book', 'usable': True}}
+        catalog = patch('app.catalog.items', return_value=items)
+        catalog.start()
+        self.addCleanup(catalog.stop)
+        self.result={'skills':[{'name':'분석','courses':[items['c']],'books':[items['b']],'selectedCourse':'c','selectedBooks':['b']}]}
     def test_recommendations_default_one_book_and_preserve_assessment(self):
         saved=store.save_recommendations(self.tx,1,'project','pre',self.result)
         self.assertEqual(saved['resourceChoices'],{'분석':{'course':'c','books':['b'],'enabled':True}})

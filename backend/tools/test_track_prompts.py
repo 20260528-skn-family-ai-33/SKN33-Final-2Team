@@ -48,6 +48,24 @@ class TrackPromptTests(unittest.TestCase):
         self.assertEqual(out['displayTitle'], '요약 제목')
         self.assertEqual(out['acts'][0]['res'], 'resource')
 
+    def test_free_prompt_wording_matches_course_filter_and_book_exception(self):
+        from app.agents.roadmap_generation import POLICIES as generation
+        from app.agents.roadmap_revision import POLICIES as revision
+        from tools.install_track_prompts import POLICIES as install
+        self.assertEqual(rm.PROMPT_VERSION, 'v2.6')
+        for text in (rm.PERSPECTIVE_RULES['A1'], generation['A1'], revision['A1'], install['A1']):
+            with self.subTest(policy=text):
+                self.assertIn('강좌', text)
+                self.assertIn('도서는 가격·예산과 무관하게 유료·가격 미확인', text)
+                self.assertNotIn('무료 자료가 없을 때만', text)
+                self.assertNotIn('유료 자료로 대체하지 않는다', text)
+
+    def test_free_output_allows_paid_and_unknown_books(self):
+        for cost in (100, None):
+            with self.subTest(cost=cost), patch.object(rm, '_res', return_value={'type': 'book', 'cost': cost, 'hours': 1, 'title': '도서'}):
+                out = rm.finish_option('A1', {'acts': [{'res': 'book'}]}, 'api')
+                self.assertEqual(out['acts'][0]['res'], 'book')
+
 
 if __name__ == '__main__':
     unittest.main()

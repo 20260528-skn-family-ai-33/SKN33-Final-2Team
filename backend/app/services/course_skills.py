@@ -12,6 +12,7 @@ Crash는 최소 기능 구현 핵심(최대 3개), Challenge는 설계·측정·
 태그 이름은 후보 이름 그대로 쓰되 application은 이 로드맵에서 익힐 구체적인 지식·역량을 짧은 명사형으로 쓴다.
 새 태그나 프로젝트 밖의 목표를 추가하지 않는다. 최소 1개이며 추천한 역량은 활동에서도 다룬다.
 JSON에 "learningSkills":[{"name":"선정 스킬명","application":"이 로드맵의 구체적인 지식·역량"}]을 추가한다.
+Crash는 각 항목에 coreOutcome·coreCriteria(1~3개)·followUpScope(0~3개)를 함께 쓴다.
 새 안을 요청받으면 이전 learningSkills도 참고하여 관점 안에서 학습 범위·강조점과 추천을 다시 검토한다.
 차이를 만들기 위해 필수 역량을 억지로 빼거나 무관한 역량을 추가하지 않는다.
 [프로젝트 적합성]
@@ -36,8 +37,29 @@ A3 Challenge는 모든 learningSkills 항목에 targetOutcome(구체적인 산�
 completionCriteria(서로 다른 완료 기준 문자열 2~4개)를 반드시 함께 반환한다. 설명 본문만 쓰고 필드를 생략하면 실패다.
 A3 형식: {"learningSkills":[{"name":"skillOrder의 스킬명","application":"프로젝트 적용 범위",
 "targetOutcome":"프로젝트에 맞는 확인 가능한 산출물 목표","completionCriteria":["확인 기준 1","확인 기준 2"]}]}
-이는 산출물의 목표 기준이며 사용자가 최종 산출물을 이미 선택한 것은 아니다. A1·A2도 learningSkills의 name·application은 필수다.
+A2 Crash는 스킬을 유지하되 모든 learningSkills 항목에 coreOutcome(최소 기능판에서 이 스킬로 만들 결과 문자열),
+coreCriteria(서로 다른 핵심 완료 기준 문자열 1~3개), followUpScope(후속 학습으로 넘기는 범위 문자열 0~3개)를 반드시 함께 반환한다.
+A2 형식: {"learningSkills":[{"name":"skillOrder의 스킬명","application":"프로젝트 적용 범위",
+"coreOutcome":"최소 기능판 결과","coreCriteria":["핵심 기준 1"],"followUpScope":["후속 학습 범위"]}]}
+이는 산출물의 목표 기준이며 사용자가 최종 산출물을 이미 선택한 것은 아니다. A1도 learningSkills의 name·application은 필수다.
 """
+
+
+def crash_core_fields(row: dict, required: bool = False) -> dict:
+    """Crash 핵심 결과물·완료 기준·후속 학습. 이전에 만든 Crash 안은 필드 없이도 읽는다."""
+    if not required and not any(key in row for key in ('coreOutcome','coreCriteria','followUpScope')):
+        return {}
+    outcome,criteria,follow=row.get('coreOutcome'),row.get('coreCriteria'),row.get('followUpScope') or []
+    if not isinstance(outcome,str) or not outcome.strip():
+        raise ValueError('Crash 추천에는 최소 기능판의 핵심 결과물이 필요해요.')
+    if not isinstance(criteria,list) or not 1<=len(criteria)<=3 or any(not isinstance(item,str) or not item.strip() for item in criteria):
+        raise ValueError('Crash 핵심 완료 기준은 1~3개가 필요해요.')
+    if len({' '.join(item.split()) for item in criteria})!=len(criteria):
+        raise ValueError('Crash 핵심 완료 기준은 서로 다른 확인 항목이어야 해요.')
+    if not isinstance(follow,list) or len(follow)>3 or any(not isinstance(item,str) or not item.strip() for item in follow):
+        raise ValueError('Crash 후속 학습 범위는 0~3개로 써 주세요.')
+    return {'coreOutcome':outcome.strip(),'coreCriteria':[item.strip() for item in criteria],
+            'followUpScope':[item.strip() for item in follow]}
 
 
 def validate_recommendations(rows, allowed, course, *, require_depth=False, max_skills=None):
@@ -61,6 +83,8 @@ def validate_recommendations(rows, allowed, course, *, require_depth=False, max_
                 if require_depth and len({' '.join(item.split()) for item in criteria}) != len(criteria):
                     raise ValueError('Challenge 완료 기준은 서로 다른 확인 항목이어야 해요.')
                 value['completionCriteria']=[item.strip() for item in criteria]
+        elif course=='A2':
+            value.update(crash_core_fields(row,require_depth))
         seen.add(row['name']);result.append(value)
     return result
 
@@ -133,9 +157,9 @@ def initialize(employee_id,project_id,course):
             payload={'learnerKnowledge':from_profile(saved.get('profile')),'hrContext':hr_context(saved.get('profile')),'handoff':{'goal':saved['project']['goal'],'projectSummary':saved['project'].get('projectSummary'),'desiredCompetencies':deepcopy(saved['project'].get('desiredCompetencies') or saved['project']['goal']),'details':deepcopy(saved['project'].get('details') or {}),'skillDetails':candidates},'course':course,'existingPlan':deepcopy(option)}
         ctx=runtime.context(employee_id)
         if not ctx.live:raise ApiError(422,'LIVE_MODEL_REQUIRED','역량 추천에는 연결된 AI 모델이 필요해요.')
-        from app.track_policy import challenge_guidance
+        from app.track_policy import course_guidance
         from app.learner_knowledge import POLICY
-        raw=runtime.llm_json(ctx,CONTRACT+POLICY+challenge_guidance(course,'plan')+'\n기존 로드맵 existingPlan은 바꾸지 않고, 그 계획에서 익히게 될 learningSkills만 반환한다.',payload,role='roadmap')
+        raw=runtime.llm_json(ctx,CONTRACT+POLICY+course_guidance(course,'plan')+'\n기존 로드맵 existingPlan은 바꾸지 않고, 그 계획에서 익히게 될 learningSkills만 반환한다.',payload,role='roadmap')
         try:rows=validate_recommendations(raw.get('learningSkills') if isinstance(raw,dict) else None,{row['name'] for row in candidates},course,require_depth=True)
         except ValueError as e:raise ApiError(422,'SKILLS_INVALID',str(e)) from e
         def apply(t,current):

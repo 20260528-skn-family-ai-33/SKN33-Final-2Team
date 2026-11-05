@@ -94,7 +94,7 @@ def matrix(case):
             row=next(row for row in payload['catalog'] if code in row['skills'])
             used.append(row['id']);acts.append({'stage':2,'title':name+' 자료 확인','res':row['id'],'hours':row['hours'],'how':'공개 규정 실습을 수행해요. 출처와 결과를 대조해요.','skill':name})
             acts.append({'stage':3,'title':name+' 검증 결과물','res':None,'hours':4,'how':'만들 것: 근거 대조 결과물\n필수 항목: 입력·출력 비교\n제출물: 검증 기록\n평가 기준: 출처 오류 재현','skill':name,'skills':[name]})
-        targets=[{'name':name,'application':case['selection'][i]['application'],'targetOutcome':'근거 대조 결과물','completionCriteria':['출처 위치 대조','오류 재현 기록']} for i,name in enumerate(h['skillOrder'])]
+        targets=[{'name':name,'application':case['selection'][i]['application'],'targetOutcome':'근거 대조 결과물','completionCriteria':['출처 위치 대조','오류 재현 기록'],'coreOutcome':'최소 기능 결과','coreCriteria':['핵심 동작 확인']} for i,name in enumerate(h['skillOrder'])]
         captured.append({'skills':len(h['skillOrder']),'mode':mode,'course':payload.get('_testCourse'), 'systemTokens':budget.tokens(system),'payloadTokens':budget.tokens(payload), 'totalTokens':total,
                          'catalogCount':len(payload['catalog']),'catalogPerSkill':payload['catalogCounts']['perSkill'],'assessmentTokens':budget.tokens(sent['assessment']),
                          'rawAssessmentTokens':budget.tokens(h['assessment']),'projectSummaryChars':len(h['projectSummary']), 'requiredPresent':not payload.get('previous') or all(a.get('res') in {r['id'] for r in payload['catalog']} for a in payload['previous'].get('acts',[]) if a.get('res'))})
