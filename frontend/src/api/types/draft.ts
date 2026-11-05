@@ -137,7 +137,14 @@ export interface Support {
 }
 
 /** 관점 하나의 로드맵 안(A1·A2·A3) */
-export type LearningSkill = { name: string; application: string };
+export type LearningSkill = {
+  name: string;
+  application: string;
+  /** Crash 최소 기능판의 핵심 결과물·완료 기준과 후속 학습 범위. 이전 안에는 없다. */
+  coreOutcome?: string;
+  coreCriteria?: string[];
+  followUpScope?: string[];
+};
 export type LearningSkillSelection = { name: string; enabled: boolean };
 export interface OptionDef {
   optionId?: string;
@@ -175,7 +182,10 @@ export interface OptionDef {
   displayTitle?: string;
 }
 
-export type MaterialResource = { id: string; title: string; hours?: number | null; estimated?: string[]; timeStatus?: string; [key: string]: unknown };
+export type MaterialResource = { id: string; title: string; hours?: number | null; estimated?: string[]; timeStatus?: string; unverifiedTargetTopics?: string[]; [key: string]: unknown };
+type DiagnosticText = { detail: string; displayDetail?: string };
+export type BookDiagnostic = DiagnosticText & { reason: 'no_candidates' | 'insufficient_evidence' | 'scope_gap' };
+export type CourseDiagnostic = DiagnosticText & { reason: BookDiagnostic['reason'] | 'stack_mismatch' | 'longer_for_coverage' };
 
 export interface Gen {
   key: string;

@@ -204,7 +204,8 @@ class SkillIdentityTests(unittest.TestCase):
             self.assertEqual(payload['handoff']['assessment']['unmatchedSkills'][0]['surveys'][0]['selfRating'], 3)
             return {'acts': [{'stage': 2, 'res': 'sql'}],
                     'learningSkills': [{'name': 'SQL 현재 이름', 'application': '조회 결과 대조',
-                                        'targetOutcome': '조인 오류 비교표', 'completionCriteria': ['입력 행 비교', '출력 키 대조']}]}
+                                        'targetOutcome': '조인 오류 비교표', 'completionCriteria': ['입력 행 비교', '출력 키 대조'],
+                                        'coreOutcome': '최소 기능 결과', 'coreCriteria': ['핵심 동작 확인']}]}
 
         with patch.object(catalog, 'items', return_value=rows), patch.object(catalog, 'skill_names', return_value=['SQL 현재 이름']), \
                 patch.object(budget, 'tokens', return_value=1), patch.object(rm, '_sys', return_value='DB unchanged'), \
@@ -222,7 +223,7 @@ class SkillIdentityTests(unittest.TestCase):
         h = {'goal': 'SQL 조회 API', 'prefs': {}, 'selectedSkillsFixed': True, 'courseSkillSelection': True,
              'skillNames': names, 'skillOrder': list(reversed(names))}
         reply = {'acts': [{'stage': 2, 'res': 'sql'}],
-                 'learningSkills': [{'name': name, 'application': '조회 결과를 대조한다.'} for name in names]}
+                 'learningSkills': [{'name': name, 'application': '조회 결과를 대조한다.', 'coreOutcome': '최소 기능 결과', 'coreCriteria': ['핵심 동작 확인']} for name in names]}
         with patch.object(catalog, 'items', return_value={'sql': resource('sql'), 'py': resource('py', 'Python')}), \
                 patch.object(catalog, 'skill_names', return_value=names), patch.object(budget, 'tokens', return_value=1), \
                 patch.object(rm, '_sys', return_value='DB unchanged'), patch.object(runtime, 'llm_json', return_value=reply), \
@@ -279,7 +280,7 @@ class RealTokenizerBudgetTests(unittest.TestCase):
             self.assertLessEqual(budget.tokens(system) + budget.tokens(payload) + budget.FRAMING_RESERVE, budget.INPUT_TOKENS)
             return {'acts': [{'stage': 2, 'res': '0-29', 'title': 'SQL 결과 검증'}],
                     'learningSkills': [{'name': name, 'application': 'SQL 결과 대조', 'targetOutcome': '오류 재현 보고서',
-                                        'completionCriteria': ['입출력 키 대조', '오류 재현 근거']} for name in names]}
+                                        'completionCriteria': ['입출력 키 대조', '오류 재현 근거'], 'coreOutcome': '최소 기능 결과', 'coreCriteria': ['핵심 동작 확인']} for name in names]}
 
         with patch.object(catalog, 'items', return_value=rows), patch.object(catalog, 'skill_names', return_value=names + ['Docker']), \
                 patch.object(rm, '_sys', return_value='DB system prompt unchanged'), \

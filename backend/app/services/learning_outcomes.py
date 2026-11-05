@@ -28,7 +28,8 @@ CHALLENGE="""
 
 
 def instructions(course):
-    return SYSTEM + (CHALLENGE if course == 'A3' else '')
+    from app.track_policy import crash_guidance
+    return SYSTEM + (CHALLENGE if course == 'A3' else '') + crash_guidance(course, 'summary')
 
 
 def current(saved,draft):

@@ -167,16 +167,14 @@ def recommendation_context(t, employee_id: int, project_id: str) -> dict:
 
 def course_context(t, employee_id: int, project_id: str, course: str | None = None) -> dict:
     saved = recommendation_context(t, employee_id, project_id)
-    from app.services.resource_rag import VERSION, version_for
+    from app.services.resource_rag import version_for
+    from app.services.course_recommendations import compatible_recommendations, scope_view
     if not course:
-        if (saved.get('recommendations') or {}).get('retrieval', {}).get('version') != VERSION:
-            saved['recommendations']=None
-            saved['resourceChoices']={}
-            saved['durationEstimates']={}
-        return saved
+        recommendations = compatible_recommendations(saved, version_for())
+        if recommendations is not None:
+            return dict(saved, recommendations=recommendations)
+        return dict(saved, recommendations=None, resourceChoices={}, durationEstimates={})
     from app.services import drafts as draft_service
-    from app.services.course_recommendations import scope_view, free_cache_valid
-    from app import catalog
     draft = draft_service._row(t, employee_id, project_id, lock=False)['draft_choices']['draft']
     if course not in ('A1','A2','A3') or course not in (draft.get('gen') or {}).get('options', {}):
         raise ApiError(409,'COURSE_CHANGED','선택한 코스를 다시 확인해 주세요.')
@@ -185,8 +183,9 @@ def course_context(t, employee_id: int, project_id: str, course: str | None = No
     scoped=scope_view(saved,course,draft['gen']['options'][course])
     expected_names = {row['name'] for row in scoped['selection']['skills']}
     cached_names = {row['name'] for row in (scoped.get('recommendations') or {}).get('skills', [])}
-    if expected_names != cached_names or (scoped.get('recommendations') or {}).get('retrieval', {}).get('version') != version_for(course) or (course=='A1' and scoped.get('recommendations') and not free_cache_valid(scoped['recommendations'],catalog.items())):
-        scoped['recommendations']=None
+    scoped['recommendations'] = (compatible_recommendations(scoped, version_for(course))
+                                 if expected_names == cached_names else None)
+    if scoped['recommendations'] is None:
         scoped['resourceChoices']={}
         scoped['durationEstimates']={}
     return scoped
@@ -205,7 +204,11 @@ def course_input(t, employee_id, project_id, course):
 
 
 def recommendation_view(saved: dict) -> dict:
-    return {'courseId': saved.get('_course'), 'skillDetails': deepcopy((saved.get('selection') or {}).get('skills') or []), 'generationId': saved['generationId'], 'recommendations': saved.get('recommendations'),
+    from app.services.resource_rag import version_for
+    recommendations = deepcopy(saved.get('recommendations'))
+    if recommendations:
+        recommendations['outdated'] = (recommendations.get('retrieval') or {}).get('version') != version_for(saved.get('_course'))
+    return {'courseId': saved.get('_course'), 'skillDetails': deepcopy((saved.get('selection') or {}).get('skills') or []), 'generationId': saved['generationId'], 'recommendations': recommendations,
             'choices': saved.get('resourceChoices') or {},
             'durationEstimates': saved.get('durationEstimates') or {},
             'skillOrder': saved.get('skillOrder') or [row['name'] for row in (saved.get('recommendations') or {}).get('skills', [])]}

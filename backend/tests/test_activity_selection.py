@@ -156,8 +156,9 @@ class ActivityTests(unittest.TestCase):
     key=activities.fingerprint(saved,draft)
     def generate(system,payload):
      self.assertEqual(system,instructions(pid));self.assertEqual(payload,expected)
-     self.assertEqual(json.loads(system.split('JSON: ',1)[1].split('\n[Challenge',1)[0]),SCHEMA)
+     self.assertEqual(json.loads(system.split('JSON: ',1)[1].split('\n',1)[0]),SCHEMA)
      self.assertEqual('[Challenge 과제]' in system,pid=='A3')
+     self.assertEqual('[Crash 핵심 완료 기준]' in system,pid=='A2')
      return {'acts':deepcopy(self.acts),'skillSummaries':{'S':['자료 이해','프로젝트 적용','결과 검증']}}
     result=activities.propose(saved,draft,generate,'mock')
     self.assertEqual(result['key'],key)

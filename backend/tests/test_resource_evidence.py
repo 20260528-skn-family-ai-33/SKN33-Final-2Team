@@ -110,6 +110,125 @@ class ResourceEvidenceTests(unittest.TestCase):
         result=evidence.rank_applicable(list(rows.values()),self.project,self.selection,self.skill,{'id':'A3'},limit=6,sources=rows,cache={})
         self.assertEqual(result[0]['id'],'deep')
 
+    def test_stage_stack_and_target_scope_beat_boilerplate_in_both_tracks(self):
+        cases = (
+            ('ETL & 데이터 파이프라인', 'dbt로 데이터 변환 구현',
+             'dbt 증분 모델로 데이터 변환을 구현하고 재처리 결과를 검증',
+             'ETL 데이터 파이프라인 단계별 정리'),
+            ('SQL', 'SQL 조인 결과 정합성 검증', 'SQL 조인 실행과 결과 정합성 검증',
+             'SQL 단계별 정리와 기본 문법 소개'),
+            ('RAG', '문서 검색 RAG 챗봇 구현', 'PDF 문서 검색 RAG 챗봇 구현과 결과 평가',
+             '이미지 검색 RAG 앱 구현 및 단계별 정리'),
+            ('클라우드', 'AWS에서 쿠버네티스 배포', 'AWS EKS 쿠버네티스 배포와 롤백 검증',
+             'Azure 쿠버네티스 배포 단계별 정리와 설정 비교'),
+            ('자연어 처리(NLP) & LLM 기초', 'NLP 토큰화 원리 이해', 'NLP 토큰화 원리와 서브워드 방식 비교',
+             '회귀 통계와 신뢰구간의 단계별 정리'),
+        )
+        for name, target, actual, generic in cases:
+            with self.subTest(name=name):
+                skill = {'name': name, 'application': target, 'targetOutcome': target + ' 단계별 정리'}
+                selection = {'skills': [skill]}
+                project = {'goal': target}
+                boilerplate = dict(resource([{'title': generic}] * 12), id='generic', title=f'{name} 고급',
+                                   skills=[name], retrievalScore=.93, difficulty='ADVANCED')
+                substantive = dict(resource([{'title': '과정 안내'}]), id='actual', title=f'{name} 자료',
+                                   skills=[name], retrievalScore=.74, difficulty='BEGINNER',
+                                   content='과정 안내\n' + '일반 수강 안내. ' * 80 + '\n' + actual)
+                sources = {row['id']: row for row in (boilerplate, substantive)}
+                for track in ('A1', 'A3'):
+                    ranked = evidence.rank_applicable(list(sources.values()), project, selection, skill, track,
+                                                      limit=2, sources=sources, cache={})
+                    self.assertEqual(ranked[0]['id'], 'actual')
+                    def generate(_, payload):
+                        card = payload['skills'][0]['courses'][0]
+                        self.assertIn(actual, card['content'])
+                        self.assertTrue(card['learningEvidence']['suitable'])
+                        return {'skills': [{'name': name, 'courses': [{'key': card['choiceKey']}], 'books': []}]}
+                    pools = [{'name': name, 'courses': ranked, 'books': []}]
+                    recommend_resources(project, selection, sources, generate, course={'id': track}, retrieved_pools=pools)
+
+    def test_async_cancellation_target_outweighs_general_python_and_exam_material(self):
+        name = 'Python 프로그래밍 & 비동기 I/O'
+        skill = {'name': name, 'application': 'Python 비동기 I/O와 작업 취소·오류 처리'}
+        project, selection = {'goal': '작업 스케줄러 개선'}, {'skills': [skill]}
+        rows = {str(i): dict(resource([{'title': 'Python 문법과 예외 처리'}]), id=str(i), skills=[name],
+                             title=f'Python 기초 {i}', retrievalScore=.99 - i * .005) for i in range(8)}
+        rows['8'] = dict(resource([{'title': 'Asyncio 코루틴 작업 취소 실습'}]), id='8', title='Python 동시성',
+                         skills=[name], retrievalScore=.7)
+        ranked = evidence.rank_applicable(list(rows.values()), project, selection, skill, 'A3', limit=6,
+                                          sources=rows, cache={})
+        self.assertEqual(ranked[0]['id'], '8')
+        generic = evidence.facts(rows['0'], project, selection)
+        self.assertFalse(generic['scopeEvidence'][name])
+        self.assertEqual(generic['suitability'][name]['requiredStage'], 'build')
+
+    def test_workload_specific_async_comparison_preserves_actual_context_and_short_plan(self):
+        from app.services import crash_courses
+        name = 'Python 프로그래밍 & 비동기 I/O'
+        skill = {'name': name, 'application': 'Python 비동기 I/O와 작업 취소·오류 처리'}
+        project, selection = {'goal': '작업 스케줄러 개선'}, {'skills': [skill]}
+        description = '멀티스레딩과 병렬성으로 실행 효율을 높이는 방법을 다루는 과정입니다.'
+        topics = ['AsyncIO 동작 개요', 'I/O Bound(2) - threading vs asyncio vs multiprocessing']
+        short = dict(resource([{'title': title} for title in topics]), id='short', skills=[name],
+                     title='Python 동시성', hours=7.85, content=description + '\n파이썬 실전 문법')
+        long = dict(resource([{'title': 'Python asyncio 작업 취소 실습'}]), id='long', skills=[name], hours=21.68)
+        intro = dict(short, curriculum={'items': [{'title': topics[0]}]})
+        facts = evidence.facts(short, project, selection)
+        self.assertTrue(evidence.suitable(facts, name))
+        self.assertFalse(evidence.suitable(evidence.facts(intro, project, selection), name))
+        self.assertIn(description, evidence.description_excerpt(facts, project, skill))
+        self.assertEqual(evidence.outline(short, project, selection, skill, 'A2', info=facts)[0]['title'], topics[1])
+        plan = crash_courses.study_plan([{'name': name, 'courses': [long, short]}], project, selection,
+                                        {'short': 'S1-C1', 'long': 'S1-C2'}, cache={})
+        self.assertEqual(plan['uniqueHours'], 7.85)
+        self.assertEqual(plan['skills'][0]['singleSwapExtraHours'], {'S1-C2': 13.83})
+
+    def test_dbt_section_supplies_topic_but_the_unit_supplies_design_or_practice(self):
+        name = 'ETL & 데이터 파이프라인'
+        skill = {'name': name, 'application': 'dbt 모델·품질 테스트·증분 변환·재처리를 설계'}
+        selection, project = {'skills': [skill]}, {'goal': '이벤트 데이터 파이프라인'}
+        row = dict(resource([{'section': 'Airflow 데이터 파이프라인', 'title': 'Airflow DAG 설계'},
+                             {'section': 'dbt resources', 'title': 'Model compile and run'},
+                             {'section': 'dbt resources', 'title': 'Data Quality test'},
+                             {'section': 'dbt materializations', 'title': 'Incremental materialization - design1'}]),
+                   skills=[name], title='데이터 엔지니어링', content='Source, Seed, Model, Test를 직접 다루는 dbt hands-on')
+        facts = evidence.facts(row, project, selection)
+        self.assertTrue(evidence.suitable(facts, name))
+        self.assertEqual(facts['suitability'][name]['unitIndices'], [3])
+        for track in ('A1', 'A2', 'A3'):
+            excerpts = evidence.outline(row, project, selection, skill, track, info=facts)
+            self.assertEqual({x['index'] for x in excerpts}, {1, 2, 3})
+        row['curriculum']['items'][3]['title'] = 'Incremental materialization 개념 소개'
+        self.assertFalse(evidence.suitable(evidence.facts(row, project, selection), name))
+
+    def test_linux_security_uses_platform_specific_evidence_and_concurrency_uses_real_controls(self):
+        security = {'name': '시스템 & OS 보안 강화', 'application': 'Linux 권한·서비스 격리·OS 보안 강화'}
+        concurrency = {'name': '멀티스레딩 & 비동기 동시성', 'application': '스레드 동기화·비동기 실행과 경쟁 상태 제어'}
+        selection, project = {'skills': [security, concurrency]}, {'goal': 'POSIX 수집 데몬 구현'}
+        windows = dict(resource([{'title': 'Windows AI 에이전트 격리 검증'}]), skills=[security['name']], title='Windows 보안')
+        linux = dict(resource([{'title': 'setuid 프로세스 권한 제어 실습'}]), skills=[security['name']], title='OS 보안')
+        async_course = dict(resource([{'title': 'Thread(4) - Lock, Deadlock'},
+                                      {'title': 'I/O Bound - threading vs asyncio vs multiprocessing'}]),
+                            skills=[concurrency['name']], title='Concurrent workloads')
+        self.assertFalse(evidence.suitable(evidence.facts(windows, project, selection), security['name']))
+        linux_info = evidence.facts(linux, project, selection)
+        self.assertTrue(evidence.suitable(linux_info, security['name']))
+        self.assertEqual(linux_info['suitability'][security['name']]['unverifiedTargetTopics'], ['Linux 서비스 격리'])
+        self.assertTrue(evidence.suitable(evidence.facts(async_course, project, selection), concurrency['name']))
+        self.assertIn(0, {x['index'] for x in evidence.outline(async_course, project, selection, concurrency, 'A2')})
+
+    def test_topic_mentions_in_outline_are_separate_from_real_description_evidence(self):
+        genuine = dict(resource([{'title': '과정 안내'}]), content='소개\nSQL 조인 실행과 결과 검증')
+        misleading = dict(resource([{'title': '과정 안내'}]), id='prereq',
+                          content='과정 안내\n선수지식\nSQL 조인 실행과 결과 검증')
+        selection = self.selection
+        facts = evidence.facts(genuine, self.project, selection)
+        prereq = evidence.facts(misleading, self.project, selection)
+        self.assertTrue(evidence.suitable(facts, 'SQL'))
+        self.assertFalse(evidence.suitable(prereq, 'SQL'))
+        self.assertEqual(evidence.outline(genuine, self.project, selection, self.skill, 'A1'), [])
+        self.assertIn('SQL 조인 실행과 결과 검증', evidence.description_excerpt(facts, self.project, self.skill))
+
 
 if __name__=='__main__':
     unittest.main()

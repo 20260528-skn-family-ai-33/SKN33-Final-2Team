@@ -99,7 +99,8 @@ def learning_context(saved, draft):
             **catalog_evidence.evidence(resource,[saved['project']['goal'],saved['project'].get('projectSummary') or '']+active)})
     from app.learner_knowledge import from_profile,hr_context
     payload={'learnerKnowledge':from_profile(saved.get('profile')),'hrContext':hr_context(saved.get('profile')),'project':saved['project'],'skillOrder':active,'choices':{name:choices[name] for name in active},'materials':materials,'course':draft['gen']['options'][draft['chosen']]}
-    if draft['chosen']=='A3':payload['skillTargets']={row['name']:deepcopy(row) for row in (saved.get('selection') or {}).get('skills',[]) if row['name'] in active}
+    # Challenge 심화 목표와 Crash 핵심 완료 기준을 과제 평가 기준에 이어 준다.
+    if draft['chosen'] in ('A2','A3'):payload['skillTargets']={row['name']:deepcopy(row) for row in (saved.get('selection') or {}).get('skills',[]) if row['name'] in active}
     return active, payload
 
 

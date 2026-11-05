@@ -42,7 +42,12 @@ POLICIES = {'A1': 'Free: 무료 강좌·공식 문서·무료 도구의 핵심 �
 
 SCHEMA = '{"displayTitle":"...","tagline":"...","reason":"...","pros":["..."],"cons":["..."],"scope":"...","weeklyHours":4,"acts":[{"stage":2,"title":"...","res":"catalog id","hours":5,"how":"..."},{"stage":3,"title":"...","res":null,"hours":6,"how":"...","skills":["skillTags 이름"]}],"learningSkills":[{"name":"skillDetails 이름","application":"프로젝트 적용 범위"DEPTH}]}'
 
+DEPTH = {'A2': ',"coreOutcome":"최소 기능판 결과","coreCriteria":["핵심 기준1"],"followUpScope":["후속 학습 범위"]',
+         'A3': ',"targetOutcome":"산출물 목표","completionCriteria":["기준1","기준2"]'}
+
+
 def generation(course):
-    depth = ',"targetOutcome":"산출물 목표","completionCriteria":["기준1","기준2"]' if course == 'A3' else ''
+    from app.track_policy import crash_guidance
     from app.agents.roadmap_display import with_display_contract
-    return with_display_contract(COMMON.replace('{course}', course).replace('{policy}', POLICIES[course]).replace('{schema}', SCHEMA.replace('DEPTH', depth)).strip())
+    policy = POLICIES[course] + crash_guidance(course, 'plan')
+    return with_display_contract(COMMON.replace('{course}', course).replace('{policy}', policy).replace('{schema}', SCHEMA.replace('DEPTH', DEPTH.get(course, ''))).strip())

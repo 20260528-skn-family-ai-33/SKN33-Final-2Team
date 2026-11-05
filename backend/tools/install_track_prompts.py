@@ -5,12 +5,13 @@ from app.agents.roadmap_generation import generation as generation_prompt
 from app.agents.roadmap_revision import revision as revision_prompt
 
 POLICIES = {
-    'A1': '''Free Track: 무료 자료만 허용한다.
-- catalog에서 cost가 정확히 0인 자료만 사용한다. 유료 및 비용 미확인(null) 자료는 금지한다.
+    'A1': '''Free Track: 강좌는 무료만 허용한다.
+- catalog에서 cost가 정확히 0인 강좌만 사용한다. 유료 및 비용 미확인(null) 강좌는 금지한다.
+- 도서는 가격·예산과 무관하게 유료·가격 미확인도 추천할 수 있으며 비용을 표시한다.
 - 목표에 맞는 무료 강좌를 우선하고 무료 공식 문서와 무료 도구로 직접 실습한다.
-- 무료 자료가 부족하면 근거 있는 무료 자료와 실습으로 보완하고 부족한 범위는 scope에 명시한다. 유료 자료로 대체하지 않는다.
+- 무료 강좌가 부족하면 근거 있는 무료 자료와 실습으로 보완하고 부족한 범위는 scope에 명시한다. 유료 강좌로 대체하지 않는다.
 - 유료 자격시험, 유료 API 결제, 결제수단 등록이 필요한 실습을 요구하지 않는다. 유료인 필수 요청은 불가 이유를 scope/notes에 명시한다.
-- 기간·주당 시간·예산·보안 조건을 지킨다. 무료 전용 규칙은 다른 요청 및 수정 요청보다 우선한다.''',
+- 기간·주당 시간·예산·보안 조건을 지킨다. 무료 강좌 규칙은 다른 요청 및 수정 요청보다 우선한다.''',
     'A2': '''Fast Track: 단기 집중 과정이다.
 - 목표에 직접 필요한 핵심 내용과 최소 기능 결과물에 집중하여 총 학습 시간을 줄인다.
 - 목표에 명시된 작업은 누락하지 않는다. 부가 학습은 줄이고 제외 범위는 scope에 설명한다.
@@ -44,7 +45,7 @@ def install():
             t.run('UPDATE public.prompt_versions SET is_active=false,deactivated_at=now() WHERE agent_id=:a AND is_active', a=agent)
             t.run('INSERT INTO public.prompt_versions(agent_id,version_num,system_prompt,is_active,parent_version_id,change_reason) VALUES(:a,:v,:p,true,:parent,:reason)',
                   a=agent, v=version, p=prompt, parent=parent,
-                  reason=values['name'] + ' 통합 생성·수정 지침 및 #72 기간·비용 표시 계약 v1. 기존 이력 보존.')
+                  reason=values['name'] + ' 통합 생성·수정 지침, #72 기간·비용 표시 계약 v1, #76 Crash 핵심 완료 기준·Free 강좌 0원/도서 예외 문구 정합화 v2.6. 기존 이력 보존.')
             print(agent, 'version', version)
 
 

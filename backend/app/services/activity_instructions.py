@@ -42,4 +42,5 @@ skillTargets.targetOutcome·completionCriteria 계승. 스킬별 과제 하나 �
 
 
 def instructions(course):
-    return SYSTEM + (CHALLENGE if course == 'A3' else '')
+    from app.track_policy import crash_guidance
+    return SYSTEM + (CHALLENGE if course == 'A3' else '') + crash_guidance(course, 'tasks')

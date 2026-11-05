@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>#76 자료 선택 로컬 확인</title>
+</head>
+<body>
+  <main class="wrap xwide" style="max-width: 1320px; margin: auto; padding: 24px">
+    <p class="small muted">#76 로컬 확인용 고정 응답</p>
+    <div id="root"></div>
+  </main>
+  <script type="module">
+    import { createElement } from 'react';
+    import { createRoot } from 'react-dom/client';
+    import { MemoryRouter } from 'react-router';
+    import '/src/styles/gp.css';
+    import '/src/styles/gp-v2.css';
+    import { OptionsStep } from '/src/features/draft/options/OptionsStep.tsx';
+    import { updateWs } from '/src/shared/state/workspace.ts';
+
+    const skills = ['SQL', '데이터 검증'];
+    const tracks = { A1: 'Free Track', A2: 'Crash Course', A3: 'Challenge' };
+    const diagnose = (reason, detail) => ({ reason, detail });
+    const resource = (id, title, extra) => ({ id, title, provider: '로컬 예시', cost: 0, ...extra });
+    const skill = (name, fields = {}) => ({ name, courses: [], books: [], selectedCourse: null, selectedBooks: [], ...fields });
+    const recommendations = {
+      A1: [skill('SQL', {
+        courseDiagnostic: diagnose('no_candidates', '무료 강좌 후보를 확보하지 못했어요.'),
+        bookDiagnostic: diagnose('insufficient_evidence', '도서 소개에서 조인과 실행 계획을 다루는지 확인하기 어려워요.'),
+      }), skill('데이터 검증')],
+      A2: [skill('SQL', {
+        courses: [
+          resource('course_long', '쿼리 최적화와 실행 계획', { hours: 12, aiRecommended: true }),
+          resource('course_saved', '저장한 SQL 실습', { hours: 8 }),
+        ],
+        selectedCourse: 'course_long',
+        courseDiagnostic: {
+          ...diagnose('longer_for_coverage', 'S1-C2에는 없던 실행 계획 비교 실습을 S1-C1에서 다뤄요.'),
+          displayDetail: '「저장한 SQL 실습」에는 없던 실행 계획 비교 실습을 「쿼리 최적화와 실행 계획」에서 다뤄요.',
+        },
+        bookDiagnostic: diagnose('scope_gap', 'B1의 소개에 실행 계획 비교 예제가 없어요.'),
+      }), skill('데이터 검증', {
+        courseDiagnostic: diagnose('insufficient_evidence', '강의 소개에 검증 규칙 작성 실습이 명시되어 있지 않아요.'),
+        bookDiagnostic: diagnose('no_candidates', '이 스킬에 제공된 도서 후보가 없어요.'),
+      })],
+      A3: [skill('SQL', {
+        books: [resource('book_sql', 'SQL 쿼리 실무')],
+        courseDiagnostic: diagnose('stack_mismatch', '후보 강좌는 MySQL 실습을 다루고 프로젝트는 PostgreSQL을 사용해요.'),
+      }), skill('데이터 검증', {
+        courseDiagnostic: diagnose('scope_gap', '후보에 누락 데이터 처리와 검증 자동화가 빠져 있어요.'),
+      })],
+    };
+    const state = new URLSearchParams(location.search).get('state');
+    let challengeAttempts = 0;
+    window.fetch = async (input, init = {}) => {
+      const url = new URL(String(input), location.href);
+      const courseId = url.searchParams.get('course');
+      if (url.pathname === '/api/v2/drafts/material-preview/recommendations/durations') {
+        return Response.json({ durationEstimates: {} });
+      }
+      if (url.pathname !== '/api/v2/drafts/material-preview/recommendations' || !tracks[courseId]) {
+        return Response.json({ error: { message: '미리보기에서 제공하지 않는 요청이에요.' } }, { status: 503 });
+      }
+      const rows = recommendations[courseId];
+      const choices = Object.fromEntries(rows.map(row => [row.name, {
+        course: courseId === 'A2' && row.name === 'SQL' ? 'course_saved' : row.selectedCourse,
+        books: row.selectedBooks,
+      }]));
+      const payload = {
+        courseId, generationId: 'preview-generation', choices, skillOrder: skills,
+        recommendations: { id: `preview-${courseId}`, skills: rows, retrieval: {
+          matches: [{ skill: '데이터 검증', resourceId: 'book_legacy' }],
+        } },
+      };
+      if (courseId === 'A3') {
+        if (state === 'pending') await new Promise(resolve => setTimeout(resolve, 4000));
+        if (state === 'error' && challengeAttempts++ === 0) {
+          return Response.json({ error: { message: '추천 자료를 읽지 못했어요.' } }, { status: 503 });
+        }
+      }
+      if (init.method && init.method !== 'POST') return new Response(null, { status: 405 });
+      return Response.json(payload);
+    };
+
+    updateWs(state => {
+      state.draftId = 'material-preview';
+      state.draft.goal = '데이터 분석과 검증 자동화';
+      state.draft.chosen = 'A2';
+      state.draft.v2Assessment = { generationId: 'preview-generation', completed: true };
+      state.draft.selectedSkills = skills.map(name => ({ name, application: '업무 데이터 실습' }));
+      state.draft.handoff = { startStage: 1, prefs: { weeklyHours: 4, formatKey: 'mixed' } };
+      state.draft.gen = { options: Object.fromEntries(Object.entries(tracks).map(([id, name]) => [id, {
+        id, optionId: `preview-${id}`, name, tagline: name, acts: [], pros: [], cons: [],
+      }])) };
+    });
+    createRoot(document.getElementById('root')).render(createElement(MemoryRouter, null, createElement(OptionsStep)));
+  </script>
+</body>
+</html>

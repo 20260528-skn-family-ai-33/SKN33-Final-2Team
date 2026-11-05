@@ -41,6 +41,8 @@ class RecommendationTests(unittest.TestCase):
         diagnostic=json.loads(COMMON.split('courseDiagnostic 형식: ',1)[1].splitlines()[0])
         self.assertEqual(set(diagnostic),{'reason','detail'})
         self.assertEqual(set(diagnostic['reason'].split('|')),{'no_candidates','insufficient_evidence','stack_mismatch','scope_gap','longer_for_coverage'})
+        book_diagnostic = json.loads(COMMON.split('bookDiagnostic 형식: ', 1)[1].splitlines()[0])
+        self.assertEqual(set(book_diagnostic['reason'].split('|')), {'no_candidates', 'insufficient_evidence', 'scope_gap'})
 
     def test_only_exact_goal_duplicate_is_removed_from_model_copy(self):
         from unittest.mock import patch
@@ -87,6 +89,69 @@ class RecommendationTests(unittest.TestCase):
         raw=self.raw();raw['skills'][0]['books']=raw['skills'][0]['books'][:1]
         result=self.recommend(raw)
         self.assertEqual(len(result['skills'][0]['books']),1)
+
+    def test_book_diagnostic_keeps_empty_choices_and_distinguishes_missing_candidates(self):
+        scope = {'reason': 'scope_gap', 'detail': '시각화 소개는 있지만 전처리 근거가 부족합니다.'}
+        raw = {'skills': [{'name': '분석', 'courses': [], 'books': [], 'bookDiagnostic': scope}]}
+        output = self.recommend(raw)['skills'][0]
+        self.assertEqual(output['bookDiagnostic'], scope)
+        self.assertEqual((output['books'], output['selectedBooks']), ([], []))
+        self.assertEqual(output['courseDiagnostic']['reason'], 'insufficient_evidence')
+        del raw['skills'][0]['bookDiagnostic']
+        self.assertEqual(self.recommend(raw)['skills'][0]['bookDiagnostic']['reason'], 'insufficient_evidence')
+        no_books = {key: value for key, value in self.items.items() if value['type'] == 'course'}
+        self.assertEqual(self.recommend(raw, no_books)['skills'][0]['bookDiagnostic']['reason'], 'no_candidates')
+
+    def test_invalid_book_diagnostics_fall_back_to_server_guidance(self):
+        # 도서 후보가 있는데 no_candidates라고 하거나 형식이 틀려도 추천 전체를 실패시키지 않는다.
+        for reason, detail in (('no_candidates', '사유'), ('stack_mismatch', '사유'), ('scope_gap', '  ')):
+            raw = {'skills': [{'name': '분석', 'courses': [], 'books': [],
+                              'bookDiagnostic': {'reason': reason, 'detail': detail}}]}
+            with self.subTest(reason=reason, detail=detail), \
+                    self.assertLogs('app.agents.resource_recommendations', 'WARNING'):
+                self.assertEqual(self.recommend(raw)['skills'][0]['bookDiagnostic']['reason'], 'insufficient_evidence')
+        raw = {'skills': [{'name': '분석', 'courses': [], 'books': [],
+                          'bookDiagnostic': {'reason': 'scope_gap', 'detail': 'x' * 241}}]}
+        self.assertEqual(self.recommend(raw)['skills'][0]['bookDiagnostic'],
+                         {'reason': 'scope_gap', 'detail': 'x' * 239 + '…'})
+
+    def test_display_diagnostic_uses_supplied_titles_even_for_unselected_candidates(self):
+        detail = 'S1-C1의 범위가 좁고 S1-C2에는 실습이 있습니다. S1-C10의 근거는 확인이 필요합니다.'
+        book_detail = 'B1은 원리를 다룹니다.'
+        raw = {'skills': [{'name': '분석', 'courses': [{'key': 'S1-C2'}], 'books': [],
+                          'courseDiagnostic': {'reason': 'scope_gap', 'detail': detail},
+                          'bookDiagnostic': {'reason': 'scope_gap', 'detail': book_detail}}]}
+        result = self.recommend(raw)['skills'][0]
+        self.assertEqual(result['selectedCourse'], 'course1')
+        self.assertEqual(result['selectedBooks'], [])
+        self.assertEqual(result['courseDiagnostic'], {
+            'reason': 'scope_gap', 'detail': detail,
+            'displayDetail': '「자료 0」의 범위가 좁고 「자료 1」에는 실습이 있습니다. 비교 후보의 근거는 확인이 필요합니다.'})
+        self.assertEqual(result['bookDiagnostic']['displayDetail'], '「자료 0」은 원리를 다룹니다.')
+        self.assertNotIn('displayDetail', raw['skills'][0]['courseDiagnostic'])
+
+    def test_display_diagnostic_shortens_only_titles_to_fit_240_characters(self):
+        items = copy.deepcopy(self.items)
+        items['course0']['title'] = 'A 과정 ' * 20
+        items['course1']['title'] = 'B 강좌 ' * 20
+        ending = ' 두 강좌 모두 입력 검증을 다루지만 복구 절차는 확인되지 않습니다.'
+        detail = 'S1-C1 및 S1-C2' + ('가' * 175) + ending
+        result = self.recommend({'skills': [{'name': '분석', 'courses': [], 'books': [],
+            'courseDiagnostic': {'reason': 'scope_gap', 'detail': detail}}]}, items)['skills'][0]['courseDiagnostic']
+        self.assertEqual(result['detail'], detail)
+        display = result['displayDetail']
+        self.assertLessEqual(len(display), 240)
+        self.assertTrue(display.startswith('「A 과정 '))
+        self.assertIn(' 및 「B 강좌 ', display)
+        self.assertEqual(display.count('…'), 2)
+        self.assertTrue(display.endswith(('가' * 175) + ending))
+
+    def test_display_diagnostic_falls_back_when_neutral_book_labels_exceed_budget(self):
+        detail = 'B1 ' + '가' * 237
+        result = self.recommend({'skills': [{'name': '분석', 'courses': [], 'books': [],
+            'bookDiagnostic': {'reason': 'scope_gap', 'detail': detail}}]})['skills'][0]
+        self.assertEqual(result['bookDiagnostic'], {'reason': 'scope_gap', 'detail': detail})
+
     def test_wrong_type_unknown_duplicate_and_more_than_three_rejected(self):
         bad=[]
         raw=self.raw();raw['skills'][0]['courses'][0]['id']='book0';bad.append(raw)
