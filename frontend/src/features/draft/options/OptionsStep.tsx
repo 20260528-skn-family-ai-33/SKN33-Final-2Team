@@ -32,6 +32,7 @@ import { updateWs, useWs, ws } from '@/shared/state/workspace';
 import { BText } from '@/shared/ui/bound';
 import { Icon } from '@/shared/ui/Icon';
 import { ActThumb, Note, OpsBox, Page } from '@/shared/ui/parts';
+import { Skeleton } from '@/shared/ui/Skeleton';
 import { DraftSaveError, draftCall, flush, takeDraft } from '../draftSync';
 import { useKickSupport } from '../generation/GenerationStep';
 import { Stepper } from '../Stepper';
@@ -432,6 +433,7 @@ export function OptionsStep() {
         <section id="roadmap-material-comparison" ref={materialPanel} className="roadmap-material-panel full-width-materials" hidden={!materialsOpen} aria-label="스킬별 학습 자료 비교">
           <header className="roadmap-material-header"><div><span>학습 자료</span><h2>스킬별 자료 비교</h2></div><button type="button" className="btn line small" disabled={selecting} onClick={()=>setMaterialsOpen(false)}>접기 <Icon name="x"/></button></header>
           {!comparisonVisible&&<div className="loading" role="status"><span className="sp" aria-hidden="true"/><span>{materialsFailed?'자료 제안 일부를 준비하지 못했어요. 다시 시도해 주세요.':'세 코스의 자료 제안을 준비하고 있어요. 완료되면 함께 표시합니다.'}</span>{materialsFailed&&<button type="button" className="btn line small" onClick={()=>{reportPreparation({type:'reset',scope:comparisonScope});setMaterialAttempt(n=>n+1);}}>다시 시도</button>}</div>}
+          {!comparisonVisible&&!materialsFailed&&<Skeleton kind="columns" count={ps.length||3}/>}
           <div hidden={!comparisonVisible}>
           <MaterialSkillTabs names={materialNames} active={activeMaterialSkill} onChange={setMaterialSkill} id={materialTabsId} panelId="material-comparison-panel"/>
           <div className="material-course-comparison" role="tabpanel" id="material-comparison-panel" aria-labelledby={`${materialTabsId}-tab-${materialNames.indexOf(activeMaterialSkill)}`}>{ps.map(p=><section className={`material-course-column${cur===p.opt?' is-selected':''}`} key={p.opt} aria-label={`${trackName(p.opt,p.name)} 자료`}>
