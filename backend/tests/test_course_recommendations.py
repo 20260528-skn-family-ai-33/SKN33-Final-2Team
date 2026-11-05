@@ -1,5 +1,6 @@
 import unittest
 from copy import deepcopy
+from unittest.mock import patch
 from app.agents.resource_recommendations import candidate_pools,recommend_resources
 from app.services.course_recommendations import scope_view,merge_scope,free_cache_valid,recommendation_cache_compatible
 
@@ -38,10 +39,11 @@ class CourseRecommendationTests(unittest.TestCase):
  def test_old_cache_only_reuses_valid_saved_choices(self):
   saved={'recommendations':{'skills':[{'name':'S','courses':[{'id':'c'}],'books':[]}]},
          'resourceChoices':{'S':{'course':'c','books':[],'enabled':True}}}
-  self.assertTrue(recommendation_cache_compatible(saved,'new'))
-  self.assertFalse(recommendation_cache_compatible(dict(saved,resourceChoices={}), 'new'))
-  saved['resourceChoices']['S']['course']='unavailable'
-  self.assertFalse(recommendation_cache_compatible(saved, 'new'))
+  with patch('app.catalog.items', return_value={'c':{'type':'course','usable':True}}):
+   self.assertTrue(recommendation_cache_compatible(saved,'new'))
+   self.assertFalse(recommendation_cache_compatible(dict(saved,resourceChoices={}), 'new'))
+   saved['resourceChoices']['S']['course']='unavailable'
+   self.assertFalse(recommendation_cache_compatible(saved, 'new'))
 
  def test_crash_uses_only_first_three_included_skills(self):
   base={'selection':{'skills':[{'name':n} for n in 'ABCDE']},'skillOrder':list('EDCBA'),'resourceChoices':{n:{'enabled':True} for n in 'ABCDE'}}

@@ -383,7 +383,7 @@ class CrashCourseTests(unittest.TestCase):
             draft = {'chosen': pid, 'gen': {'options': {pid: {}}}}
             with patch.object(preassessment, 'recommendation_context', return_value=source), \
                     patch.object(drafts, '_row', return_value={'draft_choices': {'draft': draft}}), \
-                    patch('app.catalog.items', return_value={'c': {'cost': 0, 'usable': True}}):
+                    patch('app.catalog.items', return_value={'c': {'type': 'course', 'cost': 0, 'usable': True}}):
                 scoped = preassessment.course_context(None, 1, 'project', pid)
             self.assertEqual(scoped['recommendations'], original['courseRecommendations'][pid]['recommendations'])
             self.assertEqual(scoped['resourceChoices'], original['courseRecommendations'][pid]['resourceChoices'])

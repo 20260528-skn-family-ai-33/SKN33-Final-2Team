@@ -106,20 +106,28 @@ def free_cache_valid(recommendations,items):
 
 
 def recommendation_cache_compatible(saved: dict, version: str) -> bool:
-    """규칙 변경만으로 초안에 저장된 유효한 자료 선택을 잃지 않는다."""
+    """규칙이 바뀌어도 현재 카탈로그에서 유효한 선택은 재사용한다."""
     recommendations = saved.get('recommendations')
     if not recommendations:
         return False
-    if (recommendations.get('retrieval') or {}).get('version') == version:
+    choices = saved.get('resourceChoices') or {}
+    if (recommendations.get('retrieval') or {}).get('version') != version:
+        if not recommendations.get('skills') or not choices:
+            return False
+        from app.agents.resource_recommendations import RecommendationError, validate_choices
+        try:
+            validate_choices(recommendations, choices)
+        except RecommendationError:
+            return False
+
+    selected = {(choice['course'], 'course') for choice in choices.values() if choice.get('course')}
+    selected.update((rid, 'book') for choice in choices.values() for rid in choice.get('books') or [])
+    if not selected:
         return True
-    if not recommendations.get('skills') or not saved.get('resourceChoices'):
-        return False
-    from app.agents.resource_recommendations import RecommendationError, validate_choices
-    try:
-        validate_choices(recommendations, saved['resourceChoices'])
-    except RecommendationError:
-        return False
-    return True
+    from app import catalog
+    items = catalog.items()
+    return all((item := items.get(rid)) and item.get('usable') and item.get('type') == kind
+               for rid, kind in selected)
 
 
 def dependency_key(scoped):

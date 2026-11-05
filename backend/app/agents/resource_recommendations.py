@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from copy import deepcopy
 import logging
+import math
 import re
 from typing import Any
 
@@ -83,6 +84,11 @@ def _empty_skill(name: str) -> dict:
             'courseDiagnostic': _no_candidates('강좌'), 'bookDiagnostic': _no_candidates('도서')}
 
 
+def _missing_stack_diagnostic(profiles: list[dict]) -> dict:
+    stacks = ', '.join(sorted({stack for profile in profiles for stack in profile['missingStack']}))
+    return {'reason': 'insufficient_evidence', 'detail': f'필요 기술({stacks})의 학습 근거를 확인할 수 없습니다.'}
+
+
 def _course_gap(name: str, candidates: list[dict], cache: dict) -> dict:
     if not candidates:
         return _no_candidates('강좌')
@@ -91,9 +97,9 @@ def _course_gap(name: str, candidates: list[dict], cache: dict) -> dict:
         return {'reason': 'insufficient_evidence', 'detail': '후보가 있었으나 모델 응답에서 선택 근거를 확인하지 못했습니다.'}
     relevant = [profile for profile in profiles if profile['evidenceLevel'] in ('conceptual', 'applied')]
     if relevant and all(p['missingStack'] or p['conflictingStack'] for p in relevant):
-        stacks = ', '.join(sorted({stack for p in relevant for stack in p['requiredStack']}))
-        return {'reason': 'stack_mismatch', 'detail': (f'필요 기술({stacks})의 학습 근거를 확인할 수 없습니다.' if stacks
-                 else '후보의 구현 기술이 목표에서 요구한 기술과 다릅니다.')}
+        if all(p['conflictingStack'] for p in relevant):
+            return {'reason': 'stack_mismatch', 'detail': '후보의 구현 기술이 목표에서 요구한 기술과 다릅니다.'}
+        return _missing_stack_diagnostic(relevant)
     if relevant and all(not cache[card['id']]['scopeEvidence'][name] for card in candidates
                         if cache[card['id']]['suitability'][name] in relevant):
         return {'reason': 'scope_gap', 'detail': '후보의 학습 내용에서 이 스킬에 필요한 적용 범위를 확인할 수 없습니다.'}
@@ -102,6 +108,7 @@ def _course_gap(name: str, candidates: list[dict], cache: dict) -> dict:
 
 def _finalize_crash(result: list[dict], pools: list[dict], selection: dict, project: dict, cache: dict) -> None:
     from app.services import crash_courses as crash
+    from app.services.resource_evidence import hours
     # 모델은 핵심 기준에 맞는 강좌만 고르고, 그 안에서 중복 제외 시간이 가장 짧은 조합은 서버가 정한다.
     chosen = crash.shortest_bundle(result, project, selection, cache)
     default = crash.shortest_bundle(pools, project, selection, cache)
@@ -117,9 +124,22 @@ def _finalize_crash(result: list[dict], pools: list[dict], selection: dict, proj
         for index, card in enumerate(output['courses']):
             card['aiRecommended'] = index == 0
         output['selectedCourse'] = output['courses'][0]['id'] if output['courses'] else None
-        # 기본안이 그대로 선택되면 '더 긴 강좌를 추천했다'는 안내가 사실과 달라진다.
+
+    # 같은 스킬을 다루며 시간이 확인된 두 조합에서만 중복을 제외한 시간을 비교한다.
+    selected = {row['name']: row['courses'][0] for row in result if row['courses']}
+    default_rows = {row['id']: row for row in default.values()}.values()
+    selected_rows = {row['id']: row for row in selected.values()}.values()
+    longer = False
+    if selected and selected.keys() == default.keys() and all(
+        crash.time_certainty(row) == 'confirmed' for row in (*default_rows, *selected_rows)
+    ):
+        default_hours = math.fsum(hours(row) for row in default_rows)
+        selected_hours = math.fsum(hours(row) for row in selected_rows)
+        longer = selected_hours > default_hours and not math.isclose(selected_hours, default_hours, abs_tol=1e-9)
+    for output in result:
+        name = output['name']
         if ((output.get('courseDiagnostic') or {}).get('reason') == 'longer_for_coverage'
-                and name in default and default[name]['id'] == output['selectedCourse']):
+                and (not longer or name not in default or default[name]['id'] == output['selectedCourse'])):
             del output['courseDiagnostic']
 
 
@@ -295,6 +315,10 @@ def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
         output['selectedBooks'] = [output['books'][0]['id']] if output['books'] else []
         eligible = [card for rid, (_, card) in provided['courses'].items() if pool['name'] in course_eligibility[rid]]
         diagnostic = _diagnostic(row, 'course', bool(eligible), bool(output['courses']))
+        if diagnostic and diagnostic['reason'] == 'stack_mismatch':
+            profiles = [crash_cache[card['id']]['suitability'][pool['name']] for card in eligible]
+            if any(p['missingStack'] for p in profiles) and not any(p['conflictingStack'] for p in profiles):
+                diagnostic = _missing_stack_diagnostic(profiles)
         if diagnostic:
             output['courseDiagnostic'] = _display_diagnostic(diagnostic, candidate_titles)
         elif not is_crash and not output['courses']:

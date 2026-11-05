@@ -18,4 +18,9 @@ export function crashCore(skills: LearningSkill[] | undefined): CrashCore | null
 }
 
 export const crashCoreExpandable = (core: CrashCore | null) =>
-  !!core && (core.rows.length > 2 || core.followUp.length > 2 || core.rows.some(row => row.outcome.length > 32));
+  !!core && (
+    core.rows.length > 2
+    || core.followUp.length > 2
+    || core.rows.some(row => row.criteria.length > 0 || row.outcome.length > 32)
+    || core.followUp.some(value => value.length > 32)
+  );

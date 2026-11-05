@@ -25,6 +25,7 @@ from . import runtime as rt
 from .demo import D, TEMPLATES, TEMPLATES_ALT, domain_of
 
 AUTO_HOURS = D['autoHours']
+LEARNING_SKILL_FIELDS = ('learningSkills', 'learningSkillSelection', 'learningSkillsVersion', 'learningSkillsKey')
 
 
 def _cat() -> dict:
@@ -49,7 +50,8 @@ def _task_skills(v) -> list[str]:
     return out[:3]
 
 
-def finish_option(pid: str, raw: dict, source: str, off_domain: bool = False, keep_key: bool = False) -> dict:
+def finish_option(pid: str, raw: dict, source: str, off_domain: bool = False, keep_key: bool = False, *,
+                  preserve_learning_skills: bool = True) -> dict:
     """에이전트가 쓴 안을 화면 형식으로. 목록에 없는 자료 id 는 그릴 정보가 없어 뺀다(표시용 처리 · 검사 기능 아님)
     keep_key: 수정안만 — 에이전트가 돌려준 원래 활동 key 를 남겨 keep_ids 가 쓰게 한다(keep_ids 가 쓰고 지움)"""
     per = D['perspectives'][pid]
@@ -88,9 +90,12 @@ def finish_option(pid: str, raw: dict, source: str, off_domain: bool = False, ke
     except (TypeError, ValueError):
         wh = 0
     display_title = ' '.join(str(raw.get('displayTitle') or '').split())[:30]
-    return {'displayTitle': display_title, 'id': pid, 'name': per['name'], 'short': per['short'], 'tagline': str(raw.get('tagline') or per['focus'])[:60], 'reason': str(raw.get('reason') or ''),
+    option = {'displayTitle': display_title, 'id': pid, 'name': per['name'], 'short': per['short'], 'tagline': str(raw.get('tagline') or per['focus'])[:60], 'reason': str(raw.get('reason') or ''),
             'pros': lst(raw.get('pros')), 'cons': lst(raw.get('cons')), 'scope': str(raw.get('scope') or ''), 'acts': acts,
             'weeklyHours': round(wh * 2) / 2 if 0.5 <= wh <= 40 else None, 'source': source, 'offDomain': bool(off_domain)}
+    if preserve_learning_skills:
+        option.update({field: copy.deepcopy(raw[field]) for field in LEARNING_SKILL_FIELDS if field in raw})
+    return option
 
 
 def build_plan(d: dict, prm: dict, goal: str) -> dict:
@@ -511,7 +516,7 @@ def option(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
                                    rt.S.ollama_num_ctx if ctx.mode == 'ollama' else catalog_budget.DEFAULT_CONTEXT)
         r = rt.llm_json(ctx, system, payload, role='roadmap')
         _validate_learning_acts(r,inp['handoff'])
-        o = finish_option(pid, r, ctx.mode)
+        o = finish_option(pid, r, ctx.mode, preserve_learning_skills=False)
         if provenance:
             o['optionId'] = str(uuid4())
             o['promptProvenance'] = dict(provenance, source=ctx.mode,
@@ -687,9 +692,38 @@ def _drop_gone_keys(o: dict, changes: dict) -> dict:
     return o
 
 
+def _revision_skill_targets(plan: dict, handoff: dict) -> list[dict]:
+    definition = plan.get('def') or {}
+    report = definition.get('learningReport') or {}
+    order = report.get('skillOrder') or handoff.get('skillOrder') or handoff.get('skillNames') or []
+    choices = report.get('choices') or {}
+    names = [name for name in dict.fromkeys(order) if (choices.get(name) or {}).get('enabled', True)]
+    if definition.get('learningSkills'):
+        rows = {row['name']: row for row in definition['learningSkills']}
+        return copy.deepcopy([rows[name] for name in names if name in rows] if order else list(rows.values()))
+
+    # 이전 과제 제안에서 누락된 목표는 확정 당시 선택된 스킬과 해당 코스의 기준이 맞을 때만 복구한다.
+    course = plan.get('opt')
+    if course not in ('A2', 'A3') or not names:
+        return []
+    from app.services.course_skills import validate_recommendations
+    stored = {row['name']: row for row in handoff.get('skillDetails') or []
+              if isinstance(row, dict) and isinstance(row.get('name'), str)}
+    targets = []
+    for name in names:
+        if name not in stored:
+            continue
+        try:
+            targets.extend(validate_recommendations([stored[name]], {name}, course, require_depth=True))
+        except ValueError:
+            continue
+    return targets
+
+
 def revise(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
     """inp: pid, handoff, changes, request, fromComment, plan{opt,name,tagline,def,hours,start,acts[{id,stage,title,res,hours,how,done}]}"""
     pid, pl = inp['pid'], inp['plan']
+    skill_targets = _revision_skill_targets(pl, inp['handoff'])
 
     def api(_):
         current = {'perspective': f"{pl['opt']} {pl['name']}", 'weeklyHours': pl['hours'], 'startStage': pl['start'],
@@ -710,7 +744,7 @@ def revise(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
             system += POLICY + track_policy.course_guidance(pid, 'tasks') + track_policy.PERIOD_GUIDANCE
         elif track_policy.CRASH_CORE_MARKER not in system:
             system += track_policy.crash_guidance(pid, 'tasks')
-        current['learningSkills'] = (pl.get('def') or {}).get('learningSkills') or []
+        current['learningSkills'] = skill_targets
         if (pl.get('def') or {}).get('learningReport'):
             current['skillOrder'] = pl['def']['learningReport']['skillOrder']
             if not integrated_revision:
@@ -720,14 +754,17 @@ def revise(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
                                    rt.S.ollama_num_ctx if ctx.mode == 'ollama' else catalog_budget.DEFAULT_CONTEXT)
         r = rt.llm_json(ctx, system, payload, role='roadmap')
         _validate_learning_acts(r,inp['handoff'])
-        o = finish_option(pid, r, ctx.mode, keep_key=True)
+        o = finish_option(pid, r, ctx.mode, keep_key=True, preserve_learning_skills=False)
         o.update(summary=str(r.get('summary') or '').strip()[:80], notes=rt.arr(r.get('notes'), 4))
         return o
     from app.services.material_plan import rebuild_revision
     def checked(callback):
         def run(data):
             result = _drop_gone_keys(callback(data), inp['changes'])
-            return rebuild_revision(result, pl, inp['handoff'])
+            result = rebuild_revision(result, pl, inp['handoff'])
+            if skill_targets and not result.get('learningSkills'):
+                result['learningSkills'] = copy.deepcopy(skill_targets)
+            return result
         return run
     task = '관점 바꿔 다시 작성' if inp['changes'].get('perspective') else '수정안 작성'
     return _drop_gone_keys(rt.run(ctx, f'로드맵 계획 · {pid}', task, inp, checked(_mock_revise), checked(api), role='roadmap', sim=sim, mock_delay=0.9), inp['changes'])

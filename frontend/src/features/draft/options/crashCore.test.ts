@@ -20,10 +20,25 @@ describe('crashCore', () => {
     expect(crashCoreExpandable(null)).toBe(false);
   });
 
-  it('긴 결과물이나 세 개 이상의 항목이 있으면 펼쳐 볼 수 있다', () => {
-    const rows = [{ name: 'A', application: '', coreOutcome: '짧은 결과', coreCriteria: ['기준'] }];
-    expect(crashCoreExpandable(crashCore(rows))).toBe(false);
-    expect(crashCoreExpandable(crashCore([{ ...rows[0], followUpScope: ['1', '2', '3'] }]))).toBe(true);
-    expect(crashCoreExpandable(crashCore([{ ...rows[0], coreOutcome: '가'.repeat(33) }]))).toBe(true);
+  it.each([1, 2])('짧은 결과물이 %i개여도 숨겨진 완료 기준을 펼쳐 볼 수 있다', count => {
+    const skills = Array.from({ length: count }, (_, i) => ({
+      name: `스킬 ${i + 1}`, application: '', coreOutcome: '짧은 결과', coreCriteria: [' 기준 ', ' '],
+    }));
+    expect(crashCoreExpandable(crashCore(skills))).toBe(true);
+  });
+
+  it('결과물이나 완료 기준이 공백이면 펼칠 요약이 없다', () => {
+    const core = crashCore([
+      { name: 'SQL', application: '', coreOutcome: '짧은 결과', coreCriteria: ['', '  '] },
+      { name: 'Python', application: '', coreOutcome: '  ', coreCriteria: ['기준'] },
+    ]);
+    expect(crashCoreExpandable(core)).toBe(false);
+  });
+
+  it('후속 학습은 접힌 요약의 32자 제한을 넘을 때 펼칠 수 있다', () => {
+    const core = { rows: [{ name: 'SQL', outcome: '짧은 결과', criteria: [] }], followUp: [] };
+    expect(crashCoreExpandable(core)).toBe(false);
+    expect(crashCoreExpandable({ ...core, followUp: ['가'.repeat(32)] })).toBe(false);
+    expect(crashCoreExpandable({ ...core, followUp: ['가'.repeat(33)] })).toBe(true);
   });
 });

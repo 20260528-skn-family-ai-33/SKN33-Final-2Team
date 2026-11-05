@@ -224,6 +224,7 @@ class ApiTests(unittest.TestCase):
         saved = dict(self.saved, completed=True, recommendations=rec, resourceChoices=choices)
         with patch.object(api.db, 'tx', side_effect=lambda: transaction(Mock())), \
                 patch.object(api, 'recommendation_context', return_value=saved), \
+                patch('app.catalog.items', return_value={'c': {'type': 'course', 'usable': True}}), \
                 patch.object(api, 'save_resource_choices', return_value=saved) as save:
             response = self.client.put(f'/api/v2/drafts/{self.pid}/recommendations/choices', json={
                 'generationId': saved['generationId'], 'recommendationId': rid, 'choices': choices})
