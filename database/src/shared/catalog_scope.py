@@ -7,6 +7,8 @@ POLICY_VERSION = "kr-it-2026-10-27-v7"
 SOURCES = {"books": {"API_DATA4LIBRARY"}, "courses": {"API_KMOOC", "API_MS_LEARN", "WEB_KOCW", "WEB_INFLEARN", "WEB_OPENTUTORIALS", "WEB_STEP"},
            "certifications": {"API_ODCLOUD_KDATA", "API_MS_CERT"},
            "jobs": {"API_CAREERNET"}, "majors": {"API_CAREERNET_MAJOR"}}
+# Every list and detail class_no of a book must be KDC 004/005.
+BOOK_KDC = re.compile(r"00[45](?:\.\d+)?")
 # ASCII boundaries accept SQL로/AWS에서 while rejecting sqlish and rag in storage.
 # These are aliases for existing DB skills, not permission to admit AI mentions alone.
 TECH_WORD = (
@@ -95,7 +97,7 @@ def scope_reason(kind, fields, source, raw):
             return "scope_not_korean_publication"
         records = [raw.get("detail_record"), raw.get("list_record"), raw]
         codes = [str(r.get("class_no") or "").strip() for r in records if isinstance(r, dict) and r.get("class_no")]
-        if not codes or any(not re.fullmatch(r"00[45](?:\.\d+)?", code) for code in codes):
+        if not codes or any(not BOOK_KDC.fullmatch(code) for code in codes):
             return "scope_book_not_kdc_004_005"
     if source == "API_KMOOC":
         classification = " ".join(str(raw.get(k) or "") for k in ("classfy_name", "middle_classfy_name"))

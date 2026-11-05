@@ -83,10 +83,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "4aaae71530b8996a929686176f5fcabf37da44eb4bce2455854c390055742aae",
-      "bytes": 47898,
+      "sha256": "bd30905eec13aaf3d2e47e3ce7942c5e458adf6ce93592cfa23625e4ec09d3cc",
+      "bytes": 50008,
       "handling": "adjusted",
-      "change_note": "Issue #35: supplementary course normalization, verified outline cache upgrade, timezone-stable evidence and regression checks (2026-10-30).",
+      "change_note": "Issue #83: remove the unneeded book-only mode; retain shared backup and LLM candidates, keep the existing request budget (2026-11-04).",
       "local_update_source": {
         "path": "README.md",
         "sha256": "e872d64ea58c53311d098dc1c769f5bc3232ad947d690054b75a0a0a20c6d8c6"
@@ -98,10 +98,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "a7c61ac147269c2c70cffa9e7733a2c0fa43496c743f95d67b1998f7ff70b55e",
-      "bytes": 10484,
+      "sha256": "cf56ea7e881e82322df42776c1f5c811b6b4cf0e8854f0409df4752594212c0e",
+      "bytes": 9150,
       "handling": "adjusted",
-      "change_note": "Issue #35: supplementary course normalization, verified outline cache upgrade, timezone-stable evidence and regression checks (2026-10-30)."
+      "change_note": "Issue #83: remove the unneeded book-only mode; retain shared backup and LLM candidates, keep the existing request budget (2026-11-04)."
     },
     {
       "path": "database/assets.manifest.json",
@@ -109,10 +109,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "7205d57fdd217e627c377fd04447df94480f4d2b4c8995e9c7c9f898e6ef74e6",
-      "bytes": 26518,
+      "sha256": "f6cd41c2455477fbf8c77ef2045732ece78aebfcb31561a045bea97db32d4484",
+      "bytes": 26513,
       "handling": "adjusted",
-      "change_note": "Issue #27 final DB quality: deterministic profile ordering, evidence-preserving curriculum titles, DevOps link recognition and verified current backup metadata (2026-10-29)."
+      "change_note": "Issue #83: new-books-only ingestion, verified shared backup and artifact synchronization (2026-11-04)."
     },
     {
       "source_path": "database/config/paths.yaml",
@@ -120,10 +120,10 @@
       "source_sha256": "f3c6661660777e2f9618d07b3649eceec758b11d1c7b902bd1c2beffcac7781e",
       "source_bytes": 2936,
       "source_kind": "source_commit_file",
-      "sha256": "cd340a8305f78fa4f9e94fd02d66f51835f6667e307d1f085f5095bf5ce8a6ee",
-      "bytes": 2944,
+      "sha256": "53ce9fd06d71e7cd8c46e057230aafc8460d732f87d4386e04a3d72ed5c4b08b",
+      "bytes": 4452,
       "handling": "copied",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "change_note": "Issue #83: remove the unneeded book-only mode; retain shared backup and LLM candidates, keep the existing request budget (2026-11-04).",
       "local_update_source": {
         "path": "config/paths.yaml",
         "sha256": "cd340a8305f78fa4f9e94fd02d66f51835f6667e307d1f085f5095bf5ce8a6ee"
@@ -175,10 +175,10 @@
       "source_sha256": "59e13c3fd7bdde78922da1df1c242b08838925e9c3a5e19d8333070d46726420",
       "source_bytes": 59668,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "a28d26b0159fd5c48edad49a44696281510de2ff9acba938b8190a89d41bfd09",
-      "bytes": 82013,
+      "sha256": "f9508f285eba1383f2530dd0c4a57d22f3cd880c6f16e52a2def159596518702",
+      "bytes": 74040,
       "handling": "adjusted",
-      "change_note": "Issue #27 final DB quality: deterministic profile ordering, evidence-preserving curriculum titles, DevOps link recognition and verified current backup metadata (2026-10-29).",
+      "change_note": "Issue #83: new-books-only ingestion, verified shared backup and artifact synchronization (2026-11-04).",
       "local_update_source": {
         "path": "data/exports/growpath_latest.manifest.json",
         "sha256": "59e13c3fd7bdde78922da1df1c242b08838925e9c3a5e19d8333070d46726420"
@@ -238,7 +238,7 @@
       "sha256": "86ad1d6cc0680ce795e4fe02f44461bb42a4e173e9a78dcfff7b86c5c7514dfa",
       "bytes": 3383,
       "handling": "copied",
-      "change_note": "PR #22 follow-up: incremental defaults, explicit reset and committed-change reporting; paid dry-run and operational guidance; deterministic ERD newline; free regressions.",
+      "change_note": "Issue #83: remove the unneeded book-only mode; retain shared backup and LLM candidates, keep the existing request budget (2026-11-04).",
       "local_update_source": {
         "path": "load_data.py",
         "sha256": "306f028a1e7623f95b2b8e4cf9f2ed36faa72a43891bc718bb8779dbcd356223"
@@ -717,7 +717,7 @@
       "sha256": "5205cfe0c821908ed6371e1cff59fed2b8e417a84d76a496ffd75aa4b62c128f",
       "bytes": 5427,
       "handling": "adjusted",
-      "change_note": "Issue #26 course-first publication: preserve latest #14/#15 main; time, outlines, UI and snapshot only.",
+      "change_note": "Issue #83: remove the unneeded book-only mode; retain shared backup and LLM candidates, keep the existing request budget (2026-11-04).",
       "local_update_source": {
         "path": "src/database/ingestion/catalog_finalization.py",
         "sha256": "e568b5447a02f5a1d944397d03cf044d0a4a1f53c8a22131a82868035d3c299f"
@@ -774,10 +774,10 @@
       "source_sha256": "0432c150ef770fc7abbd9257e95ad88f34555d9dc102080826dd6d11ade3e6b1",
       "source_bytes": 41897,
       "source_kind": "source_commit_file",
-      "sha256": "7f54e67f3004e8fd9c56270cacff6a3e9eb75afd073bf68709ca6c27c6ea5e48",
-      "bytes": 48890,
+      "sha256": "e0f0e0855a6007bc0161a0440dc5e5c7c931cb20149a5d433bdb341d8b8ff180",
+      "bytes": 49388,
       "handling": "copied",
-      "change_note": "PR #22 follow-up: incremental defaults, explicit reset and committed-change reporting; paid dry-run and operational guidance; deterministic ERD newline; free regressions.",
+      "change_note": "Issue #83: remove the unneeded book-only mode; retain shared backup and LLM candidates, keep the existing request budget (2026-11-04).",
       "local_update_source": {
         "path": "src/database/ingestion/real_data_ingestor.py",
         "sha256": "7382ff2768333b8ddb77d2dc0322025351944c5acedc9036c8a33dec8920ca1b"
@@ -1149,10 +1149,10 @@
       "source_sha256": "fcf62e38edceec7298965eb8ec1ea7031b25dcb862798f3a40bf6a372934cd14",
       "source_bytes": 7583,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "1c28e57fedbd938b99aea930b13d2dd64cc18cf62e94cdcd1bdab37b59758b59",
-      "bytes": 7901,
+      "sha256": "7eb8c0309476c5fde1aab29b21181b537171e2dd1b230285b855fef2dc6f4710",
+      "bytes": 7995,
       "handling": "adjusted",
-      "change_note": "Issue #26 course-first publication: preserve latest #14/#15 main; time, outlines, UI and snapshot only.",
+      "change_note": "Issue #83: books-only incremental collection (--only-new-books), under-covered skill book keywords searched first, KDC pre-filter before detail calls (2026-11-04).",
       "local_update_source": {
         "path": "src/shared/catalog_scope.py",
         "sha256": "fcf62e38edceec7298965eb8ec1ea7031b25dcb862798f3a40bf6a372934cd14"
@@ -1204,10 +1204,10 @@
       "source_sha256": "f74d89de9acbc9e801fc448cceac30d2abd1099c33199e628cca21ffaeaefef6",
       "source_bytes": 8507,
       "source_kind": "source_commit_file",
-      "sha256": "2148be6dd4294d210b611dc48150cff3e6db11f02130be12e7c1dbd8f2df96ec",
-      "bytes": 12918,
+      "sha256": "0d89f1a53cecd679a91502ca6bc3c348c778a71d23afc8e3152474773a8dfc98",
+      "bytes": 13125,
       "handling": "adjusted",
-      "change_note": "Issue #27 final DB quality: deterministic profile ordering, evidence-preserving curriculum titles, DevOps link recognition and verified current backup metadata (2026-10-29).",
+      "change_note": "Issue #83: preserve new-books-only isolation; recognize explicit SQL tuning in body evidence, reject NoSQL/PLSQL and title-only false positives; verified book expansion 2026-11-04.",
       "local_update_source": {
         "path": "src/shared/skill_matching.py",
         "sha256": "2341cc2a5051e79337d9a9dab04e1ec9b4f3438e0892d0a2a2182125936433e6"
@@ -1249,10 +1249,10 @@
       "source_sha256": "2531e5882b559cf5c00b304f6847638f9121ab3a5911681498af953746ac6045",
       "source_bytes": 9909,
       "source_kind": "source_commit_file",
-      "sha256": "12e77bbd46d7eefb6737aadb178fdf228d07e18d201b3eba772aee57b1a807ae",
-      "bytes": 9983,
+      "sha256": "76d045f9bf4020a8ff8cba8fbea3d2e9eb28440f7534cb7cbf77620757d3063f",
+      "bytes": 13974,
       "handling": "copied",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "change_note": "Issue #83: remove the unneeded book-only mode; retain shared backup and LLM candidates, keep the existing request budget (2026-11-04).",
       "local_update_source": {
         "path": "tests/test_catalog_expansion.py",
         "sha256": "12e77bbd46d7eefb6737aadb178fdf228d07e18d201b3eba772aee57b1a807ae"
@@ -1446,10 +1446,10 @@
       "source_sha256": "f5260d82fdb90d1b6f3309f4cb3f6062034be533133406f25cf5060a27b90b2b",
       "source_bytes": 166111,
       "source_kind": "user_delivered_external_erd",
-      "sha256": "7804652205a004bf879798a5cbb1b77338014f804b0bafe740d03f78f152c969",
-      "bytes": 182136,
+      "sha256": "b98327a083a6af87cbb0086f00b8ccebcfbfaa5b323f81728fd8dc33d77be82e",
+      "bytes": 182159,
       "handling": "adjusted",
-      "change_note": "Issue #27 final DB quality: deterministic profile ordering, evidence-preserving curriculum titles, DevOps link recognition and verified current backup metadata (2026-10-29).",
+      "change_note": "Issue #83: new-books-only ingestion, verified shared backup and artifact synchronization (2026-11-04).",
       "local_update_source": {
         "path": "docs/ERD_최종.html",
         "sha256": "68cd694ae64009304fa7f663861a80e9f93d3a8f67ef84e479971e4f709c66f2"
@@ -1562,9 +1562,9 @@
       "source_bytes": null,
       "source_kind": "review_regression_test",
       "handling": "added",
-      "sha256": "c2cd03743f42c7d64c1dd1e67ec89f0318bd76f08624c475b5dbe90f0d0e828a",
-      "bytes": 8635,
-      "change_note": "PR #22 follow-up: incremental defaults, explicit reset and committed-change reporting; paid dry-run and operational guidance; deterministic ERD newline; free regressions."
+      "sha256": "2e46f2cccca7f1c82af04ee865ccdf0afcebc03b0559b321b74581b6c3416d8b",
+      "bytes": 9077,
+      "change_note": "Issue #83: remove the unneeded book-only mode; retain shared backup and LLM candidates, keep the existing request budget (2026-11-04)."
     },
     {
       "path": "database/src/database/migrations/023_direct_department_visibility.sql",

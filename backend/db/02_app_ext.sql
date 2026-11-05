@@ -329,3 +329,21 @@ CREATE TABLE IF NOT EXISTS app_ext.regulation_uploads (
 
 -- 사후 점검 심화 질문(10/23): 같은 개념의 새 문제·답·생성 상태. 사전 심화 질문은 로드맵 content.assess.deep 에 있다
 ALTER TABLE app_ext.post_checks ADD COLUMN IF NOT EXISTS deep jsonb;
+
+-- ── 완료 알림(#82) ──
+-- 로드맵 확정·결과 보고서 작성이 끝나면 작성한 직원 본인(self)과 그 직원 부서의 부서장(head)에게 남긴다(services/notifications.py).
+-- 화면 문구·이동할 주소는 읽을 때 만든다. 확인 전 보고서를 다시 만들면 이전 보고서를 지우므로 그 보고서의 알림도 함께 지워진다
+CREATE TABLE IF NOT EXISTS app_ext.notifications (
+  notification_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  recipient_id integer NOT NULL REFERENCES public.employees(employee_id) ON DELETE CASCADE,
+  actor_id integer NOT NULL REFERENCES public.employees(employee_id) ON DELETE CASCADE,
+  kind text NOT NULL CHECK (kind IN ('roadmap', 'report')),
+  audience text NOT NULL CHECK (audience IN ('self', 'head')),
+  roadmap_id uuid NOT NULL REFERENCES public.roadmaps(roadmap_id) ON DELETE CASCADE,
+  report_id uuid REFERENCES public.growth_reports(report_id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  read_at timestamptz,
+  CHECK ((kind = 'report') = (report_id IS NOT NULL)),
+  CHECK ((audience = 'self') = (recipient_id = actor_id))
+);
+CREATE INDEX IF NOT EXISTS notifications_recipient_idx ON app_ext.notifications (recipient_id, created_at DESC);

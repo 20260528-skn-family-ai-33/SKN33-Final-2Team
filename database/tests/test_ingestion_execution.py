@@ -112,6 +112,14 @@ class IngestionExecutionTests(unittest.TestCase):
 
 
 class IngestionCliTests(unittest.TestCase):
+    def test_removed_book_mode_fails_before_collection_or_paid_client(self):
+        with patch.object(sys, 'argv', ['load_data.py', '--only-new-books']), \
+             patch.object(load_data, 'RealDataIngestor') as constructor, redirect_stderr(StringIO()):
+            with self.assertRaises(SystemExit) as caught:
+                load_data.main()
+        self.assertEqual(caught.exception.code, 2)
+        constructor.assert_not_called()
+
     def test_default_incremental_alias_and_explicit_reset(self):
         for suffix, expected in (([], False), (['--incremental'], False), (['--reset'], True)):
             with self.subTest(args=suffix), patch.object(sys, 'argv', ['load_data.py'] + suffix), \
