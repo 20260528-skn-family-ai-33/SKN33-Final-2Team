@@ -47,10 +47,15 @@ def api_logout(request: Request):
     return resp
 
 
-@r.get('/demo/accounts')
+def require_demo_mode() -> None:
+    if not S.demo_mode:
+        raise ApiError(404, 'NOT_FOUND', '요청한 기능을 찾을 수 없어요')
+
+
+@r.get('/demo/accounts', dependencies=[Depends(require_demo_mode)])
 def api_accounts():
     """로그인 화면의 '직원 고르기'(시연 전용 · 설계서 부록 A). 비밀번호는 보내지 않는다"""
-    return {'accounts': profile.accounts(), 'demoPassword': S.demo_password, 'adminLogin': S.admin_login}
+    return {'accounts': profile.accounts(), 'adminLogin': S.admin_login}
 
 
 @r.get('/me')
@@ -194,7 +199,7 @@ def api_log(a: Account = Depends(require_account)):
 
 
 # ── 시연 도구 ──
-@r.put('/me/demo-settings')
+@r.put('/me/demo-settings', dependencies=[Depends(require_demo_mode)])
 def api_demo_settings(body: dict, a: Account = Depends(require_employee)):
     cur = _settings(a.id)
     demo_mock = bool(body['demoMock']) if 'demoMock' in body else cur['demoMock']
@@ -209,12 +214,12 @@ def api_demo_settings(body: dict, a: Account = Depends(require_employee)):
     return _settings(a.id)
 
 
-@r.post('/demo/reset')
+@r.post('/demo/reset', dependencies=[Depends(require_demo_mode)])
 def api_reset(a: Account = Depends(require_employee)):
     demo.reset(a.id)
     return {'ok': True}
 
 
-@r.post('/demo/jump')
+@r.post('/demo/jump', dependencies=[Depends(require_demo_mode)])
 def api_jump(body: dict, a: Account = Depends(require_employee)):
     return demo.jump(a.id, str(body.get('stage') or ''))

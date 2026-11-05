@@ -91,7 +91,6 @@ export interface DemoAccount {
 
 export interface DemoAccounts {
   accounts: DemoAccount[];
-  demoPassword?: string;
   adminLogin?: string;
 }
 

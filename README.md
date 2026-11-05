@@ -182,6 +182,18 @@ docker compose up -d --build
 
 Compose는 **DB → 빈 DB의 백업 복원 → 보충 자료·보조 스키마 준비 → API → 화면** 순서로 실행합니다. 이미 데이터가 있으면 최초 백업 복원은 건너뜁니다. `docker compose down`으로 종료하며 DB와 업로드 파일은 볼륨에 남습니다.
 
+### 베타 설치·시연 설정 (#63, #64)
+
+Windows·macOS·Linux 모두 Docker Engine/Desktop과 Compose v2가 필요합니다. macOS·Linux에서는 저장소 루트에서 `cp .env.example .env`로 복사한 뒤 위 1~4번을 진행하세요. Windows에서는 `Copy-Item .env.example .env`를 사용합니다. 기존 `.env`는 덮어쓰지 마세요.
+
+OpenAI가 직원의 기본 AI입니다. 실제 생성 전에 `.env`의 `OPENAI_API_KEY`에 유효한 키를 입력하세요. 예시 파일은 빈 값이며 키가 없으면 OpenAI는 사용 불가로 표시됩니다. 이전 예시의 `sk-example-not-a-real-key`를 복사했다면 지우세요. 값을 바꾼 뒤 `docker compose up -d --build`로 반영합니다.
+
+`GP5_DEMO_MODE=off`에서는 직원 목록(`/demo/accounts`), 시연 초기화(`/demo/reset`), 단계 이동(`/demo/jump`), 시연 설정(`/me/demo-settings`) API가 404를 반환합니다. 직원 고르기는 숨겨지고 사번 직접 입력은 유지됩니다. 외부 베타는 예시 파일의 `off`를 유지하세요. 설정을 생략하면 기존 시연 호환을 위해 `on`입니다.
+
+키 없이 로컬 시연할 때만 `GP5_DEMO_MODE=on`으로 켜고 화면 시연 도구의 ‘가데이터로 보기’를 사용하세요. 프런트 시연 도구 표시는 기존 `VITE_DEMO_TOOLS` 설정을 따릅니다. 비밀번호는 API·화면·직원 엑셀 안내문으로 배포하지 않으며 관리자가 별도로 전달합니다. 직원별 초기 비밀번호와 첫 로그인 변경은 별도 후속 범위입니다.
+
+이번 베타에서는 제출본 전용 `setup.ps1`·`scripts/fetch_model.py`·`model-fetch` 반영을 제외했습니다. 분류 모델과 DB 백업은 위 안내대로 별도 준비해야 합니다.
+
 ### AI 연결 설정
 
 저장소 루트의 [`.env.example`](.env.example)을 기준으로 `.env`를 작성합니다. Pod 생성·인증키 설정·두 팀 모델 준비는 [RunPod 연결 절차](backend/RunPod_Ollama_연결_절차.md)를 따릅니다.

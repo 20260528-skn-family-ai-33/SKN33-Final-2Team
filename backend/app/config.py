@@ -56,6 +56,7 @@ class Settings:
     db_timezone: str
     host: str
     port: int
+    demo_mode: bool
     demo_password: str
     admin_login: str
     var_dir: Path
@@ -141,6 +142,7 @@ def load() -> Settings:
         host=env('GP5_HOST', '127.0.0.1'),
         port=int(env('GP5_PORT', '8785')),
         # 공개 저장소라 기본값을 두지 않는다(팀 database/RESTORE.md: 공용 기본 비밀번호 없음 · 2026-10-26). 비우면 시연 비밀번호를 쓰는 준비 단계를 건너뛴다
+        demo_mode=env('GP5_DEMO_MODE', 'on').lower() == 'on',
         demo_password=env('GP5_DEMO_PASSWORD'),
         admin_login=env('GP5_ADMIN_LOGIN', 'admin'),
         var_dir=Path(env('GP5_VAR_DIR', str(ROOT / 'var'))),
