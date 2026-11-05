@@ -41,6 +41,16 @@ it('제안 버전을 바꾸면 이전 버전의 진행 중인 조회를 재사�
   await Promise.all([first, next]);
   expect(fetchMock).toHaveBeenCalledTimes(2);
 });
+it('서버에서 로드맵 후 준비 중인 자료 작업을 재사용하고 POST하지 않는다', async () => {
+  const ready: Result={generationId:'bg',recommendations:{id:'bg-r',skills:[]},choices:{}};
+  waitJob.mockResolvedValue(ready);
+  const fetchMock=vi.fn<typeof fetch>().mockResolvedValue(Response.json({...ready,recommendations:null,preparingJobId:'server-job'}));
+  vi.stubGlobal('fetch',fetchMock);
+  await expect(loadRecommendations('server-draft','bg','A3','server-version')).resolves.toEqual(ready);
+  expect(waitJob).toHaveBeenCalledWith('server-job');
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(fetchMock.mock.calls[0][1]?.method).not.toBe('POST');
+});
 
 it.each([true, false])('진단 유무(%s)와 무관하게 기존 선택을 조회하고 생성 요청을 하지 않는다', async withDiagnostics => {
   const saved: Result = {

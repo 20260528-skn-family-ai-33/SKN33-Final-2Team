@@ -34,19 +34,19 @@ class ResourceScheduleTests(TestCase):
 
     def test_reproduction_is_five_weeks_and_overlapping_windows_are_not_added(self):
         rows = self.estimates()
-        self.assertEqual({row['totalWeeks'] for row in rows.values()}, {5})
-        self.assertEqual(sum(row['addedWeeks'] for row in rows.values()), 5)
-        self.assertGreater(sum(row['weeks'] for row in rows.values()), 5)
+        self.assertEqual({row['totalWeeks'] for row in rows.values()}, {7})
+        self.assertEqual(sum(row['addedWeeks'] for row in rows.values()), 7)
+        self.assertGreater(sum(row['weeks'] for row in rows.values()), 7)
         self.assertEqual(rows['RAG']['resources'], rows['Web']['resources'])
         self.assertEqual(rows['Web']['addedWeeks'], 0)
-        self.assertEqual((rows['Web']['startWeek'], rows['Web']['endWeek']), (1, 2))
+        self.assertEqual((rows['Web']['startWeek'], rows['Web']['endWeek']), (1, 3))
 
     def test_nonadjacent_sharing_and_book_gap_keep_the_original_course_window(self):
         self.choices['RAG']['books'] = ['book']
         rows = self.estimates(['RAG', 'ETL', 'Web', 'MLOps'])
         self.assertEqual(rows['Web']['addedWeeks'], 0)
-        self.assertEqual((rows['Web']['startWeek'], rows['Web']['endWeek']), (1, 2))
-        self.assertEqual(rows['Web']['totalWeeks'], 6)
+        self.assertEqual((rows['Web']['startWeek'], rows['Web']['endWeek']), (1, 3))
+        self.assertEqual(rows['Web']['totalWeeks'], 8)
         self.assertEqual(rows['RAG']['bookWeeks'], 1)
         for row in rows.values():
             self.assertLessEqual(row['startWeek'], row['endWeek'])
@@ -55,31 +55,30 @@ class ResourceScheduleTests(TestCase):
     def test_distinct_subweek_courses_round_once_and_exact_decimal_boundary(self):
         courses = [{'id': str(i), 'hours': 0.1} for i in range(3)]
         result = material_duration(courses, [], 0.3)
-        self.assertEqual(result['totalWeeks'], 1)
-        self.assertEqual(result['courseWeeks'], 1)
+        self.assertEqual(result['totalWeeks'], 3)
+        self.assertEqual(result['courseWeeks'], 3)
 
     def test_shared_book_is_one_week_even_for_nonadjacent_skills(self):
         for name in ('RAG', 'Web'):
             self.choices[name]['books'] = ['book']
         rows = self.estimates(['RAG', 'ETL', 'Web', 'MLOps'])
-        self.assertEqual(rows['RAG']['totalWeeks'], 6)
+        self.assertEqual(rows['RAG']['totalWeeks'], 9)
         self.assertEqual(rows['RAG']['bookWeeks'], 1)
-        self.assertEqual(rows['Web']['bookWeeks'], 0)
-        self.assertEqual(rows['Web']['addedWeeks'], 0)
-        self.assertEqual(rows['RAG']['resources'], rows['Web']['resources'])
-        self.assertEqual(sum(row['addedWeeks'] for row in rows.values()), 6)
+        self.assertEqual(rows['Web']['bookWeeks'], 1)
+        self.assertEqual(rows['Web']['addedWeeks'], 1)
+        self.assertEqual(sum(row['addedWeeks'] for row in rows.values()), 9)
         before = deepcopy(self.saved)
         preview = material_plan.preview(self.saved, self.draft)
-        self.assertEqual(preview['weeks'], 6)
+        self.assertEqual(preview['weeks'], 9)
         self.assertEqual(preview['totalH'], 30.3)
         books = [a for a in preview['acts'] if a.get('res') == 'book']
         self.assertEqual(len(books), 2)
-        self.assertEqual([a['resourceWindow'] for a in books], [{'from': 2, 'to': 3}] * 2)
+        self.assertEqual([a['resourceWindow'] for a in books], [{'from': 4, 'to': 4}, {'from': 5, 'to': 5}])
         self.assertEqual(self.saved, before)
         revision = dict(deepcopy(preview['def']), acts=[dict(a, key=a['id']) for a in preview['acts']])
         rebuilt = material_plan.rebuild_revision(revision, preview, self.draft['handoff'])
         revised = roadmap.build_plan(rebuilt, {'hours': 6, 'start': 2}, 'Goal')
-        self.assertEqual(revised['weeks'], 6)
+        self.assertEqual(revised['weeks'], 9)
         self.assertEqual(revised['totalH'], 30.3)
 
     def test_book_only_shared_selection_reorder_disable_and_reselect(self):
@@ -89,11 +88,11 @@ class ResourceScheduleTests(TestCase):
         self.choices['RAG']['books'] = ['book']
         self.choices['Web']['books'] = ['book']
         rows = self.estimates()
-        self.assertEqual(rows['RAG']['totalWeeks'], 1)
-        self.assertEqual(rows['Web']['bookWeeks'], 0)
+        self.assertEqual(rows['RAG']['totalWeeks'], 2)
+        self.assertEqual(rows['Web']['bookWeeks'], 1)
         reordered = self.estimates(list(reversed(self.order)))
         self.assertEqual(reordered['Web']['bookWeeks'], 1)
-        self.assertEqual(reordered['RAG']['bookWeeks'], 0)
+        self.assertEqual(reordered['RAG']['bookWeeks'], 1)
         self.choices['RAG']['enabled'] = False
         self.assertEqual(self.estimates()['Web']['bookWeeks'], 1)
         self.choices['Web']['books'] = []
@@ -144,7 +143,7 @@ class ResourceScheduleTests(TestCase):
         self.assertIsNone(rows['RAG']['resources'][0]['hours'])
         self.assertEqual(rows['ETL']['estimatedCourses'], ['etl'])
         self.assertIn('미확인', rows['RAG']['basis'])
-        self.assertEqual(rows['RAG']['totalWeeks'], 4)
+        self.assertEqual(rows['RAG']['totalWeeks'], 6)
         self.assertEqual(rows, self.estimates())
 
     def test_preview_save_confirm_revision_agree_and_keep_input_and_activity_ids(self):
@@ -152,7 +151,7 @@ class ResourceScheduleTests(TestCase):
         expected = self.estimates()
         self.saved['durationEstimates'] = {'RAG': {'weeks': 100, 'method': 'stale'}}
         preview = material_plan.preview(self.saved, self.draft)
-        self.assertEqual(preview['weeks'], 5)
+        self.assertEqual(preview['weeks'], 7)
         self.assertEqual(preview['totalH'], 24.3)
         self.assertEqual(self.option['acts'], [])
         self.assertEqual(self.saved['recommendations'], before['recommendations'])
@@ -168,17 +167,17 @@ class ResourceScheduleTests(TestCase):
         original = deepcopy(option)
         confirmed = roadmap.build_plan(option, {'hours': 6, 'start': 2}, 'Goal')
         self.assertEqual(option, original)
-        self.assertEqual(confirmed['weeks'], 5)
+        self.assertEqual(confirmed['weeks'], 7)
         self.assertEqual(confirmed['totalH'], 124.3)
         self.assertEqual(confirmed['durationBasis'], 'materials-only')
         self.assertEqual([a['id'] for a in confirmed['acts']], record['selectedIds'])
         shared = [a for a in confirmed['acts'] if a.get('res') == 'shared']
-        self.assertEqual([(a['wFrom'], a['wTo']) for a in shared], [(1, 2), (1, 2)])
+        self.assertEqual([(a['wFrom'], a['wTo']) for a in shared], [(1, 3), (1, 3)])
         source = deepcopy(confirmed)
         revision = dict(deepcopy(option), acts=[dict(a, key=a['id']) for a in confirmed['acts']])
         rebuilt = material_plan.rebuild_revision(revision, confirmed, self.draft['handoff'])
         revised = roadmap.build_plan(rebuilt, {'hours': 6, 'start': 2}, 'Goal')
-        self.assertEqual(revised['weeks'], 5)
+        self.assertEqual(revised['weeks'], 7)
         self.assertEqual(revised['totalH'], 124.3)
         self.assertEqual(confirmed, source)
 
@@ -196,7 +195,7 @@ class ResourceScheduleTests(TestCase):
     def test_multi_course_revision_rounds_all_unique_hours_once(self):
         rec = {'skills': [{'name': 'S', 'courses': [{'id': str(i), 'hours': 2} for i in range(3)], 'books': []}]}
         choices = {'S': {'course': '0', 'courses': ['0', '1', '2'], 'books': []}}
-        self.assertEqual(resource_schedule(rec, choices, ['S'], 6)['weeks'], 1)
+        self.assertEqual(resource_schedule(rec, choices, ['S'], 6)['weeks'], 3)
 
     def test_changed_weekly_invalidates_activity_even_without_handoff_key_change(self):
         self.saved['activityProposal'] = {'key': activity_selection.fingerprint(self.saved, self.draft)}
@@ -224,8 +223,8 @@ class ResourceScheduleTests(TestCase):
         self.rec['skills'][0]['courses'][0].update(hours=60, estimated=['hours'])
         rows = self.estimates()
         reversed_rows = self.estimates(list(reversed(self.order)))
-        self.assertEqual(rows['RAG']['totalWeeks'], 5)
-        self.assertEqual(reversed_rows['RAG']['totalWeeks'], 5)
+        self.assertEqual(rows['RAG']['totalWeeks'], 7)
+        self.assertEqual(reversed_rows['RAG']['totalWeeks'], 7)
         self.assertEqual(rows['RAG']['resources'][0]['hours'], 6.9)
 
     def test_task_only_plan_and_zero_material_plan_are_explicit_about_duration_basis(self):
@@ -252,4 +251,4 @@ class ResourceScheduleTests(TestCase):
         self.choices['Security']['books'] = ['book']
         rows = self.estimates()
         self.assertEqual(rows['Security']['addedWeeks'], 1)
-        self.assertEqual(rows['Security']['totalWeeks'], 6)
+        self.assertEqual(rows['Security']['totalWeeks'], 8)

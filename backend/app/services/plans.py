@@ -169,6 +169,7 @@ def post_deep_start(employee_id: int, roadmap_id: str) -> str | None:
             t.run('UPDATE app_ext.post_checks SET deep = :d, updated_at = now() WHERE roadmap_id = :r',
                   d=db.J({'status': 'ready', 'quiz': out['deep'], 'notes': out.get('notes') or [], 'mcq': {}, 'essay': {}}), r=row['roadmap_id'])
         return {'ok': True}
+    work._resume = {'operation':'plans.post_deep_start','kwargs':{'employee_id':employee_id,'roadmap_id':roadmap_id}}
     jid = jobs.start('post-deep', employee_id, roadmap_id, work)
     with db.tx() as t:
         t.run("""UPDATE app_ext.post_checks SET deep = jsonb_set(deep, '{jobId}', to_jsonb(CAST(:j AS text)))
@@ -266,6 +267,10 @@ def reg_of(recs: dict) -> dict:
 
 def workspace(employee_id: int) -> dict:
     recs = records(employee_id)
+    from .post_quiz import prepare as prepare_post_quiz
+    for r in recs.values():
+        if r.get('status') == 'active' and not (r.get('post') or {}).get('quizSurvey'):
+            prepare_post_quiz(employee_id, r['id'], r['plan'])
     reps = reports(employee_id)
     return {'plans': recs, 'reports': reps, 'res': resources_of(recs), 'reg': reg_of(recs)}
 
@@ -413,6 +418,7 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
         if not to['def'].get('support'):
             revision_support(employee_id, roadmap_id, rev_id)
         return {'revisionId': rev_id}
+    work._resume = {'operation':'plans.revise_start','kwargs':{'employee_id':employee_id,'roadmap_id':roadmap_id,'body':body}}
     jid = jobs.start('revision', employee_id, roadmap_id, work)
     with db.tx() as t:
         t.run('UPDATE app_ext.roadmap_revisions SET job_id = CAST(:j AS uuid) WHERE revision_id = CAST(:i AS uuid)', j=jid, i=rev_id)
@@ -455,6 +461,7 @@ def revision_support(employee_id: int, roadmap_id: str, rev_id: str) -> str | No
         if err:
             raise AgentError(err['raw'] or err['text'])
         return {'ok': True}
+    work._resume = {'operation':'plans.revision_support','kwargs':{'employee_id':employee_id,'roadmap_id':roadmap_id,'rev_id':rev_id}}
     return jobs.start('revision-support', employee_id, roadmap_id, work)
 
 
@@ -737,6 +744,7 @@ def report_start(employee_id: int, roadmap_id: str) -> str:
             # 보고서 작성 완료 알림(#82): 본인·부서장. 위에서 지운 이전 보고서의 알림은 함께 지워졌다(report_id ON DELETE CASCADE)
             NT.report_created(t, employee_id, str(row['roadmap_id']), rep_id)
         return {'reportId': rep_id}
+    work._resume = {'operation':'plans.report_start','kwargs':{'employee_id':employee_id,'roadmap_id':roadmap_id}}
     jid = jobs.start('report', employee_id, roadmap_id, work)
     with db.tx() as t:
         t.run('UPDATE app_ext.post_checks SET job_id = CAST(:j AS uuid) WHERE roadmap_id = :r', j=jid, r=row['roadmap_id'])

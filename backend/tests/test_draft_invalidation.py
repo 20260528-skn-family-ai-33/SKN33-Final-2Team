@@ -56,3 +56,7 @@ class InvalidationTests(unittest.TestCase):
    drafts.select(1,'p','A2')
   self.assertEqual(w['v2Survey'],before)
   self.assertEqual(w['draft']['chosen'],'A2')
+ def test_confirming_details_with_same_inputs_keeps_details_ok_when_reset_after_inputs_is_sent(self):
+  w=self.state();w['draft']['detailsOk']=False
+  drafts._apply_client(w,{'goal':'원래 목표','detailsOk':True,'resetAfter':'inputs'})
+  self.assertTrue(w['draft']['detailsOk'])

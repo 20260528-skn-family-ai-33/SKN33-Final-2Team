@@ -451,11 +451,6 @@ export function OptionsStep() {
             {missing.map((id) => `${D.perspectives[id].name}`).join(', ')}은 생성되지 않았어요. 코스 이름 옆 ‘재생성’으로 해당 코스만 다시 받을 수 있어요. 성공한 코스는 유지됩니다.
           </Note>
         ) : null}
-        <Note>
-          {ps.length > 1
-            ? '고른 안(보고 있는 버전)을 쓴 에이전트(관점)만 저장해요. 고르지 않은 안과 다른 버전은 저장하지 않아요.'
-            : '고른 안(보고 있는 버전)을 쓴 에이전트(관점)만 저장해요.'}
-        </Note>
         {off ? <Note>가데이터 모드에는 RAG 시나리오 후보만 있어요. 다른 목표의 후보는 좌측 ‘AI 모델’에서 RunPod-Ollama나 OpenAI API를 쓰면 확인할 수 있어요.</Note> : null}
       </Page>
     </>

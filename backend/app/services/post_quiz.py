@@ -30,7 +30,7 @@ def comparison(plan,answers,post_survey=None):
     for q in questions(plan):
         correct=q.get('answer')
         post_correct=post_questions.get(q['id'],q).get('answer')
-        rows.append({'skill':q['skill'],'question':q.get('q') or q.get('text') or '',
+        rows.append({'skill':q['skill'],'question':q.get('q') or q.get('text') or '', 'concept':q.get('concept') or '',
             'pre':('정답' if str(pre.get(q['id']))==str(correct) else '오답') if correct is not None else '채점 근거 없음',
             'post':('정답' if str(answers.get(q['id']))==str(post_correct) else '오답') if correct is not None else '채점 근거 없음'})
     return rows
@@ -80,3 +80,40 @@ JSON: {"quizzes":[{"id":"사전 id","skill":"스킬명","concept":"사전 값","
     for group in plan['assess']['v2']['survey']['groups']:
         groups.append({'skill':group['skill'],'title':group.get('title') or group['skill'],'surveys':[],'quizzes':[checked[q['id']] for q in group['quizzes']]})
     return {'generationId':'post-quiz','groups':groups,'questionCount':len(rows)}
+
+
+def ensure_generated(employee_id,plan_id):
+    from app import db
+    from app.agents import runtime as rt
+    from app.services import plans as PL
+    from app.services.generation_lock import generation_guard
+    with generation_guard('roadmap',str(plan_id)):
+        row=PL._owned(employee_id,plan_id)
+        if PL.STATUS.get(row['status'])!='active':raise ApiError(409,'NOT_ACTIVE','진행 중인 로드맵만 사후 점검할 수 있어요.')
+        if not questions(row['content']):return None
+        old=(db.one('SELECT deep FROM app_ext.post_checks WHERE roadmap_id = :r',r=row['roadmap_id']) or {}).get('deep') or {}
+        if old.get('v2Quiz'):return old['v2Quiz']
+        ctx=rt.context(employee_id)
+        if not ctx.live:raise ApiError(409,'LIVE_REQUIRED','사후 퀴즈 생성에는 연결된 모델이 필요해요.')
+        survey=generate(row['content'],lambda system,payload:rt.llm_json(ctx,system,payload))
+        with db.tx() as t:
+            t.run("INSERT INTO app_ext.post_checks(roadmap_id,deep) VALUES(:r,:d) ON CONFLICT(roadmap_id) DO UPDATE SET deep=coalesce(app_ext.post_checks.deep,'{}'::jsonb) || EXCLUDED.deep,updated_at=now()",r=row['roadmap_id'],d=db.J({'v2Quiz':survey,'v2Answers':{}}))
+        return survey
+
+
+def prepare(employee_id,plan_id,plan):
+    if not questions(plan):return None
+    from app import jobs
+    # 확정 트랜잭션 종료 후 등록. 실패 시 사후 화면의 기존 재시도 경로 사용.
+    from app.services.generation_job import start_shared
+    def work(_):
+        ensure_generated(employee_id,plan_id)
+        from app.services import plans as PL
+        from app.routers.work import _plan_out
+        return _plan_out(PL.record(PL._owned(employee_id,plan_id)))
+    work._resume={'operation':'post-quiz','kwargs':{'employee_id':employee_id,'plan_id':plan_id}}
+    try:return start_shared(employee_id,f'post-quiz:{plan_id}',work)
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception('사후 퀴즈 사전 준비 등록 실패')
+        return None

@@ -31,7 +31,10 @@ logger = logging.getLogger(__name__)
 async def lifespan(_: FastAPI):
     n = jobs.mark_lost()
     if n:
-        print(f'  서버가 다시 시작돼 끊긴 작업 {n}개를 실패로 남겼어요(다시 시도는 사용자가 누를 때만)')
+        print(f'  서버가 다시 시작돼 끊긴 작업 {n}개를 실패로 남겼어요(복구 정보가 있는 작업은 다시 준비)')
+    if n:
+        from .services.job_recovery import resume_pending
+        await run_in_threadpool(resume_pending)
     started = time.perf_counter()
     try:
         await run_in_threadpool(catalog.warmup_roadmap)

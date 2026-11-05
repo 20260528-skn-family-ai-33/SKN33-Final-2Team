@@ -21,6 +21,7 @@ import { useCatalog } from '@/shared/state/catalog';
 import './homeSkills.css';
 import { GanttAll } from './Gantt';
 import { LearningSpace } from './LearningSpace';
+import { sharedCourses } from './sharedCourses';
 
 function DraftBox() {
   const go = useGo();
@@ -80,19 +81,55 @@ function StageCard({ R }: { R: PlanRecord }) {
   const pl = R.plan;
   const [expanded, setExpanded] = useState(false);
   const week = weekNow(R);
-  const currentActs = pl.acts.filter(activity => activity.wFrom <= week && week <= activity.wTo);
-  const acts = expanded ? pl.acts : currentActs;
   const resources = useCatalog(s => s.res);
+  const shared = sharedCourses(pl.acts, resources);
+  const sharedIds = new Set(shared.map(course => course.id));
   const skillNames = pl.def.learningSkills?.map(skill => skill.name) || [];
-  const groups = new Map<string, Map<string, typeof acts>>();
-  for (const activity of acts) {
+  const skillOf = (activity: PlanRecord['plan']['acts'][number]) => {
     const resource = activity.res ? resources[activity.res] : undefined;
-    const skill = activity.skill || activity.skills?.[0] || resource?.skills?.find(name => skillNames.includes(name)) || resource?.skills?.[0] || '기타 활동';
-    const kind = !activity.res ? '과제' : resource?.type === 'book' || resource?.kind === '도서' ? '도서' : resource?.type === 'course' || resource?.kind === '강좌' ? '강좌' : '기타 자료';
-    if (!groups.has(skill)) groups.set(skill, new Map());
-    const categories = groups.get(skill)!;
-    categories.set(kind, [...(categories.get(kind) || []), activity]);
+    return activity.skill || activity.skills?.[0] || resource?.skills?.find(name => skillNames.includes(name)) || resource?.skills?.[0] || '기타 활동';
+  };
+  const bySkill = new Map<string, typeof pl.acts>();
+  for (const activity of pl.acts) {
+    const skill = skillOf(activity);
+    bySkill.set(skill, [...(bySkill.get(skill) || []), activity]);
   }
+  const orderedSkills = [...skillNames.filter(name => bySkill.has(name)), ...[...bySkill.keys()].filter(name => !skillNames.includes(name))];
+  const skillInWeek = (skill: string, list: typeof pl.acts) => {
+    const sharedCourse = shared.find(course => course.skills.includes(skill));
+    if (sharedCourse) {
+      const sharedGroupActs = pl.acts.filter(a => sharedCourse.skills.includes(a.skill || ''));
+      const sharedDeliverables = sharedGroupActs.filter(a => !a.res);
+      const from = sharedCourse.from;
+      const to = sharedDeliverables.length ? Math.max(...sharedDeliverables.map(a => a.wTo)) : Math.max(...sharedGroupActs.map(a => a.wTo));
+      return from <= week && week <= to;
+    }
+    const schedule = pl.def.materialSchedule?.find(row => row.skill === skill);
+    const from = schedule?.startWeek ?? Math.min(...list.map(a => a.wFrom));
+    const to = schedule?.endWeek ?? Math.max(...list.map(a => a.wTo));
+    return from <= week && week <= to;
+  };
+  const currentSkills = new Set(orderedSkills.filter(skill => skillInWeek(skill, bySkill.get(skill)!)));
+  const visibleSkills = expanded ? orderedSkills : orderedSkills.filter(skill => currentSkills.has(skill));
+  const visibleShared = expanded ? shared : shared.filter(course => (course.from <= week && week <= course.to) || course.skills.some(skill => currentSkills.has(skill)));
+  const groups = new Map<string, Map<string, typeof pl.acts>>();
+  for (const skill of visibleSkills) {
+    const categories = new Map<string, typeof pl.acts>();
+    for (const activity of bySkill.get(skill)!) {
+      if (activity.res && sharedIds.has(activity.res)) continue;
+      if (!expanded && (activity.wFrom > week || activity.wTo < week)) continue;
+      const resource = activity.res ? resources[activity.res] : undefined;
+      const kind = !activity.res ? '과제' : resource?.type === 'book' || resource?.kind === '도서' ? '도서' : resource?.type === 'course' || resource?.kind === '강좌' ? '강좌' : '기타 자료';
+      categories.set(kind, [...(categories.get(kind) || []), activity]);
+    }
+    if (categories.size) groups.set(skill, categories);
+  }
+  const hasHiddenActs = pl.acts.some(a => {
+    if (a.res && sharedIds.has(a.res)) return false;
+    return a.wFrom > week || a.wTo < week;
+  });
+  const hasHiddenShared = shared.some(course => course.to < week || course.from > week);
+  const hasMore = hasHiddenActs || hasHiddenShared || orderedSkills.length > currentSkills.size;
   return (
     <div className="card">
       <div className="sec-h">
@@ -100,11 +137,19 @@ function StageCard({ R }: { R: PlanRecord }) {
           {expanded ? '전체 활동' : '이번 주차 활동'} · {week}주차
         </h2>
         <span className="small muted" style={{ marginLeft: 'auto' }}>
-          {pl.acts.length > currentActs.length && <button type="button" className="btn line home-show-all" aria-expanded={expanded} onClick={() => setExpanded(value => !value)}>{expanded ? '접기' : '모두 보기'}</button>}
+          {hasMore && <button type="button" className="btn line home-show-all" aria-expanded={expanded} onClick={() => setExpanded(value => !value)}>{expanded ? '접기' : '모두 보기'}</button>}
         </span>
       </div>
-      {!acts.length && <p className="small muted">이번 주차에 예정된 활동이 없어요. 모두 보기에서 전체 활동을 확인할 수 있어요.</p>}
-      <div className="home-skill-groups">{[...groups].map(([skill, categories]) => <section className="home-skill-group" key={skill}>
+      {!groups.size && !visibleShared.length && <p className="small muted">이번 주차에 예정된 활동이 없어요. 모두 보기에서 전체 활동을 확인할 수 있어요.</p>}
+      <div className="home-skill-groups">
+        {visibleShared.map(course => <section className="home-skill-group" key={`shared:${course.id}`}>
+          <h3>{course.skills.join(' and ')}</h3>
+          <div className="home-material-group" data-kind="강좌">
+            <h4>강좌<span>{course.activities.length}개</span></h4>
+            <ul className="acts">{course.activities.map(activity => <ActRow key={activity.id} a={activity} R={R} />)}</ul>
+          </div>
+        </section>)}
+        {[...groups].map(([skill, categories]) => <section className="home-skill-group" key={skill}>
         <h3>{skill}</h3>
         {['도서', '강좌', '과제', '기타 자료'].filter(kind => categories.has(kind)).map(kind => <div className="home-material-group" data-kind={kind} key={kind}>
           <h4>{kind}<span>{categories.get(kind)!.length}개</span></h4>

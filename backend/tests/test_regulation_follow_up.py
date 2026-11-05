@@ -72,6 +72,27 @@ class RegulationFollowUpTest(unittest.TestCase):
                 self.assertEqual(payload['sources'][0]['no'], '제9조')
                 self.assert_summary_history(model)
 
+    def test_chatbot_includes_directly_referenced_paragraphs_without_replacing_search_hits(self):
+        for aid, key, no, text in (
+            ('edu-24-5', 'edu', '제24조 제5항', '제1항부터 제4항까지의 규정에도 불구하고 조정할 수 있다.'),
+            ('edu-24-1', 'edu', '제24조 제1항', '위탁교육 경비의 지급기준은 따로 정한다.'),
+            ('edu-24-4', 'edu', '제24조 제4항', '예산 범위에서 지급한다.'),
+            ('edu-24-6', 'edu', '제24조 제6항', '별도 확인한다.'),
+            ('work-24-1', 'work', '제24조 제1항', '다른 규정의 같은 번호다.'),
+        ):
+            self.articles[aid] = {'id': aid, 'reg': key, 'no': no, 'text': text, 'title': '',
+                                  'chapter': '', 'type': 'paragraph', 'path': ''}
+        self.search.return_value = [{'id': 'edu-24-5'}, {'id': 'edu-9'}]
+        with (patch.object(rt, '_log'), patch.object(rt, 'llm_json', return_value={
+            'status': 'partial', 'summary': '지급기준은 따로 확인해야 해요.', 'sourceIds': ['S003'],
+        }) as model):
+            answer = reg.answer(self.ctx, '교육비 지원 신청 조건이 궁금해요', [], {}, documents_only=True)
+        self.assertEqual(answer['retrieved'], ['edu-24-5', 'edu-9', 'edu-24-1', 'edu-24-4'])
+        self.assertEqual(answer['basis'], ['edu-24-1'])
+        self.assertEqual(answer['evidenceStatus'], 'partial')
+        self.assertEqual(model.call_args.args[2]['sources'][2]['no'], '제24조 제1항')
+        self.assertEqual(reg.regstore.referenced_paragraphs(['edu-24-5'], limit=1), ['edu-24-1'])
+
     def test_reference_follow_up_also_passes_summary_to_classifier(self):
         _, model, inp = self.ask('그 규정 제9조 내용을 알려줘')
         self.assertIn('인재개발규정 제7조', self.classify.call_args.args[0])
@@ -111,25 +132,36 @@ class RegulationFollowUpTest(unittest.TestCase):
         self.assertIn(second['a']['summary'], self.classify.call_args.args[0])
         self.assertIn('인재개발규정', self.search.call_args.args[0])
         messages = model.call_args.kwargs['history']
-        self.assertEqual(len(messages), 2)
-        self.assertIn(self.history[0]['q'], messages[0]['content'])
-        self.assertIn(self.history[0]['a']['summary'], messages[1]['content'])
-        self.assertIn(second['a']['summary'], messages[1]['content'])
+        self.assertEqual(messages, [
+            {'role': 'user', 'content': self.history[0]['q']},
+            {'role': 'assistant', 'content': self.history[0]['a']['summary']},
+            {'role': 'user', 'content': second['q']},
+            {'role': 'assistant', 'content': second['a']['summary']},
+        ])
         self.assertNotIn('관계없는 앞 주제', str(messages))
         self.assertNotIn('work-9', str(messages))
 
-    def test_summary_stays_compact_and_keeps_root_and_latest_answers(self):
+    def test_follow_up_passes_only_latest_five_turns_verbatim(self):
+        repeated_answer = '앞서 안내한 교육 조건을 다시 확인해요.' * 6 + '\n원문 끝의 추가 조건도 확인해요.'
         history = [*self.history, *[
-            {'q': f'그 내용의 후속 질문 {index}', 'a': {'summary': f'후속 답변 요약 {index}'}}
+            {'q': f'그 내용의 후속 질문 {index}', 'a': {'summary': repeated_answer}}
             for index in range(6)]]
         original = copy.deepcopy(history)
-        messages = reg._hist_msgs(history)
-        self.assertEqual(len(messages), 2)
-        self.assertIn(self.history[0]['q'], messages[0]['content'])
-        self.assertIn('후속 답변 요약 4', messages[1]['content'])
-        self.assertIn('후속 답변 요약 5', messages[1]['content'])
-        self.assertIn('후속 답변 요약 2', messages[1]['content'])
-        self.assertNotIn('그 내용의 후속 질문 2', messages[0]['content'])
+        question = '그 내용을 더 설명해 주세요'
+        _, model, _ = self.ask(question, history=history)
+        expected = []
+        for turn in history[-5:]:
+            expected.extend(({'role': 'user', 'content': turn['q']},
+                             {'role': 'assistant', 'content': repeated_answer}))
+        self.assertEqual(model.call_args.kwargs['history'], expected)
+        classified = self.classify.call_args.args[0]
+        searched = self.search.call_args.args[0]
+        self.assertTrue(classified.startswith(f'현재 질문: {question}'))
+        self.assertLess(classified.index(history[-1]['q']), classified.index(history[-5]['q']))
+        for query in (classified, searched):
+            self.assertEqual(query.count(repeated_answer), 5)
+            self.assertNotIn(history[0]['q'], query)
+            self.assertNotIn(history[1]['q'], query)
         self.assertEqual(history, original)
 
     def test_explicit_topic_change_and_outside_question_do_not_use_old_summary(self):

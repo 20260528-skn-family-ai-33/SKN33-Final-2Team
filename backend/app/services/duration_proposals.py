@@ -69,52 +69,67 @@ def resource_schedule(recommendations: dict, choices: dict, order: list[str], we
         if not selected <= times.keys():
             raise RecommendationError('선택한 강좌의 시간 근거를 확인해 주세요.')
     budget = Decimal(str(weekly))
-    cursor = Decimal(0)
-    course_slots, book_slots, estimates = {}, {}, {}
+    cursor = 0
+    course_slots, book_slots, skill_book_slots, estimates = {}, {}, {}, {}
+    course_counts = {}
+    for name in active:
+        for rid in _courses(choices[name]):
+            course_counts[rid] = course_counts.get(rid, 0) + 1
 
-    def allocate(hours: Decimal) -> dict:
+    def allocate_weeks(weeks_count: int) -> dict:
         nonlocal cursor
-        start = int((cursor / budget).to_integral_value(rounding=ROUND_FLOOR)) + 1
-        cursor += hours
-        return {'startWeek': start, 'endWeek': _ceil(cursor / budget)}
+        start = cursor + 1
+        cursor += weeks_count
+        return {'startWeek': start, 'endWeek': cursor}
 
     for name in active:
-        before = _ceil(cursor / budget)
+        before = cursor
         choice = choices[name]
         slots = []
+        course_added = 0
         for rid in _courses(choice):
             if rid not in course_slots:
                 hours, status = times[rid]
-                course_slots[rid] = dict(allocate(Decimal(str(hours))), id=rid,
+                base_weeks = max(1, _ceil(Decimal(str(hours)) / budget))
+                extra_weeks = 1 if course_counts.get(rid, 0) > 1 else 0
+                w = base_weeks + extra_weeks
+                course_slots[rid] = dict(allocate_weeks(w), id=rid,
                                          hours=None if status == 'unknown' else hours, timeStatus=status)
+                course_added += w
             slots.append(course_slots[rid])
-        course_added = _ceil(cursor / budget) - before
         book_added = 0
+        own_slots = []
         for rid in sorted(choice['books']):
-            if rid not in book_slots:
-                book_slots[rid] = dict(allocate(budget), id=rid)
-                book_added += 1
-            slots.append(book_slots[rid])
-        start = min((slot['startWeek'] for slot in slots), default=None)
-        end = max((slot['endWeek'] for slot in slots), default=None)
+            slot = dict(allocate_weeks(1), id=rid)
+            book_slots.setdefault(rid, slot)
+            skill_book_slots[(name, rid)] = slot
+            slots.append(slot)
+            own_slots.append(slot)
+            book_added += 1
+        for rid in _courses(choice):
+            if course_counts.get(rid, 0) <= 1 or course_added > 0:
+                own_slots.append(course_slots[rid])
+        window_slots = own_slots or slots
+        start = min((slot['startWeek'] for slot in window_slots), default=None)
+        end = max((slot['endWeek'] for slot in window_slots), default=None)
         unknown = [rid for rid in _courses(choice) if times[rid][1] == 'unknown']
         estimated = [rid for rid in _courses(choice) if times[rid][1] == 'estimated']
         note = f'시간 미확인 {len(unknown)}개(각 1주 가정)' if unknown else ''
         if estimated:
             note = ' · '.join(filter(None, [note, f'추정 시간 {len(estimated)}개 포함']))
-        estimates[name] = {**deepcopy(context), 'weeks': end - start + 1 if slots else 0,
+        estimates[name] = {**deepcopy(context), 'weeks': end - start + 1 if window_slots else 0,
                            'startWeek': start, 'endWeek': end,
-                           'addedWeeks': _ceil(cursor / budget) - before,
+                           'addedWeeks': cursor - before,
                            'courseWeeks': course_added, 'bookWeeks': book_added,
                            'basis': ' · '.join(filter(None, ['강좌 ID별 시간 1회 합산 후 전체 올림 + 도서 ID별 1주', note])),
                            'method': METHOD, 'scheduleKey': key,
                            'course': choice.get('course'), 'courses': _courses(choice),
                            'books': sorted(choice['books']), 'unknownCourses': unknown, 'estimatedCourses': estimated,
                            'resources': deepcopy(slots)}
-    total = _ceil(cursor / budget)
+    total = cursor
     for estimate in estimates.values():
         estimate['totalWeeks'] = total
-    return {'estimates': estimates, 'weeks': total, 'courses': course_slots, 'books': book_slots}
+    return {'estimates': estimates, 'weeks': total, 'courses': course_slots, 'books': book_slots, 'skillBooks': skill_book_slots}
 
 
 def calculate_durations(project, recommendations, choices, order, weekly_hours):
@@ -165,7 +180,7 @@ def apply_plan_schedule(plan: dict) -> dict:
     other_material_hours = Decimal(0)
     for activity in plan['acts']:
         name, rid = activity.get('skill'), activity.get('res')
-        resource_slot = schedule['courses'].get(rid) or schedule['books'].get(rid)
+        resource_slot = schedule['courses'].get(rid) or schedule.get('skillBooks', {}).get((name, rid)) or schedule['books'].get(rid)
         slot = resource_slot
         slot = slot or schedule['estimates'].get(name)
         if slot:

@@ -21,3 +21,24 @@ it('failure releases the pending entry so explicit retry can succeed',async()=>{
  const fetch=vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({ok:true,status:200,json:async()=>({survey:{generationId:'retry',groups:[],questionCount:0}})});vi.stubGlobal('fetch',fetch);
  await expect(loadSurvey('u:retry')).rejects.toThrow('offline');expect((await loadSurvey('u:retry')).generationId).toBe('retry');
 });
+it('퀴즈 작업 완료 전에도 저장된 설문을 먼저 반환한다',async()=>{
+ vi.useFakeTimers();
+ try {
+  const partial={generationId:'partial',groups:[],questionCount:10,answers:{},completed:false,quizStatus:'pending'};
+  mocks.wait.mockReturnValue(new Promise(()=>{}));
+  const fetch=vi.fn().mockResolvedValueOnce(Response.json({survey:null})).mockResolvedValueOnce(Response.json({jobId:'slow-quiz'},{status:202})).mockResolvedValue(Response.json({survey:partial}));
+  vi.stubGlobal('fetch',fetch);
+  const work=loadSurvey('partial-owner');
+  await vi.advanceTimersByTimeAsync(810);
+  await expect(work).resolves.toEqual(partial);
+ }finally{vi.useRealTimers();}
+});
+it('설문이 준비된 상태에서 퀴즈가 중단된 경우 설문을 즉시 반환하고 백그라운드로 퀴즈를 이어서 준비한다',async()=>{
+ const existing={generationId:'interrupted-gen',groups:[{skill:'RAG',title:'검색 점검',surveys:[{id:'s1',text:'설문 1'}],quizzes:[]}],questionCount:2,answers:{},completed:false,quizStatus:'interrupted'};
+ mocks.wait.mockReturnValue(new Promise(()=>{}));
+ const fetch=vi.fn().mockResolvedValueOnce(Response.json({survey:existing})).mockResolvedValueOnce(Response.json({jobId:'resume-quiz'},{status:202}));
+ vi.stubGlobal('fetch',fetch);
+ const result=await loadSurvey('interrupted-owner');
+ expect(result).toEqual({...existing,quizStatus:'pending'});
+ expect(fetch).toHaveBeenCalledWith('/api/v2/drafts/draft/survey',expect.objectContaining({method:'POST'}));
+});

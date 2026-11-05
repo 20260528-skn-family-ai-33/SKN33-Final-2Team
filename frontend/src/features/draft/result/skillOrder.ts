@@ -43,5 +43,5 @@ export function durationLabel(estimate: DurationEstimate): string {
   if (estimate.method !== DURATION_METHOD) return `예상 ${estimate.weeks}주`;
   const span = estimate.startWeek == null ? '자료 학습 0주' : estimate.startWeek === estimate.endWeek ? `${estimate.startWeek}주차` : `${estimate.startWeek}–${estimate.endWeek}주차`;
   const status = estimate.unknownCourses?.length ? ' · 시간 미확인' : estimate.estimatedCourses?.length ? ' · 추정 시간 포함' : '';
-  return `${span} · 전체 일정 +${estimate.addedWeeks ?? 0}주${status}`;
+  return `${span}${status}`;
 }
