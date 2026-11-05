@@ -475,6 +475,16 @@ def _validate_learning_acts(raw,handoff):
         if reason:raise llm.LlmError(f'기존 지식 반영 필요: {reason}')
 
 
+def _validate_crash_requirements(pid: str, result: dict, inp: dict) -> None:
+    if pid != 'A2':
+        return
+    from app.services.crash_requirements import validate_core_requirements
+    try:
+        validate_core_requirements(result.get('learningSkills') or [], inp['handoff'], inp.get('request'))
+    except ValueError as error:
+        raise llm.LlmError(str(error)) from error
+
+
 def option(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
     """inp: pid, handoff, variant?, request?, previousDef?, previous?"""
     pid = inp['pid']
@@ -500,6 +510,9 @@ def option(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
         from app.learner_knowledge import POLICY
         provenance = {}
         system = _sys(pid, R_SYS, provenance, inp.get('_evaluationPrompt')) + extra
+        if pid == 'A2':
+            from app.services.crash_requirements import prompt_requirements
+            system += prompt_requirements(inp['handoff'], inp.get('request'))
         if system.startswith('[통합 생성 계약 roadmap-generation/v1]'):
             # 이전에 설치된 통합 프롬프트에는 Crash 핵심 기준 계약이 없다. DB 재설치 전에도 같은 계약을 적용한다.
             if track_policy.CRASH_CORE_MARKER not in system:
@@ -541,8 +554,14 @@ def option(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
         if inp.get('request'):
             o.update(summary=str(r.get('summary') or '').strip()[:80], notes=rt.arr(r.get('notes'), 3))
         return o
+    def checked(callback):
+        def run(data):
+            result = callback(data)
+            _validate_crash_requirements(pid, result, inp)
+            return result
+        return run
     task = f"{D['perspectives'][pid]['name']} {'요청 반영해 다시 작성' if inp.get('request') else '다시 작성' if inp.get('variant') else '작성'}"
-    return rt.run(ctx, f'로드맵 계획 · {pid}', task, inp, _mock_option, api, role='roadmap', sim=sim, mock_delay=0.7 + D['optionOrder'].index(pid) * 0.26,
+    return rt.run(ctx, f'로드맵 계획 · {pid}', task, inp, checked(_mock_option), checked(api), role='roadmap', sim=sim, mock_delay=0.7 + D['optionOrder'].index(pid) * 0.26,
                   log_input={k: v for k, v in inp.items() if k not in ('previousDef', '_evaluationPrompt')})
 
 
@@ -761,6 +780,9 @@ def revise(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
             handoff['prefs'] = dict(handoff['prefs'], certRes=None)
         from app.learner_knowledge import POLICY
         system = _sys(pid, REV_SYS, evaluation_prompt=inp.get('_evaluationPrompt'))
+        if pid == 'A2':
+            from app.services.crash_requirements import prompt_requirements
+            system += prompt_requirements(inp['handoff'], inp.get('request'))
         integrated_revision = system.startswith('[통합 수정 계약 roadmap-revision/v1]')
         if not integrated_revision:
             system += POLICY + track_policy.course_guidance(pid, 'tasks') + track_policy.PERIOD_GUIDANCE
@@ -804,6 +826,7 @@ Crash는 최소 기능판으로 범위를 좁히되 핵심 기능의 안전성·
             result = rebuild_revision(result, pl, inp['handoff'])
             if not course_changed and skill_targets and not result.get('learningSkills'):
                 result['learningSkills'] = copy.deepcopy(skill_targets)
+            _validate_crash_requirements(pid, result, inp)
             return result
         return run
     task = '관점 바꿔 다시 작성' if inp['changes'].get('perspective') else '수정안 작성'
