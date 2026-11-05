@@ -145,6 +145,86 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual(t.run.call_args.kwargs, {'i': NID, 'e': 7})
 
 
+class UnseenTests(unittest.TestCase):
+    """부서장의 확인 전 로드맵·보고서(#96): 아직 읽지 않은 소속 직원 알림을 대상 기준으로 센다"""
+
+    def test_unseen_counts_by_member(self):
+        rows = [{'actor_id': 8, 'plans': 2, 'reports': 1}, {'actor_id': 9, 'plans': 0, 'reports': None}]
+        with patch.object(NT.db, 'all_', return_value=rows) as q:
+            out = NT.unseen_counts(7)
+        sql = q.call_args.args[0]
+        self.assertIn(NT.HEAD_SEES, sql)  # 부서를 옮긴 직원의 알림은 세지 않는다
+        self.assertIn('read_at IS NULL', sql)
+        self.assertIn("n.audience = 'head'", sql)
+        self.assertIn('count(DISTINCT n.roadmap_id)', sql)  # 같은 대상의 알림이 여럿이어도 1개로
+        self.assertEqual(q.call_args.kwargs, {'e': 7})
+        self.assertEqual(out, {8: {'plans': 2, 'reports': 1}, 9: {'plans': 0, 'reports': 0}})
+
+    def test_unseen_targets_of_one_member(self):
+        rows = [{'kind': 'roadmap', 'roadmap_id': RID, 'report_id': None}, {'kind': 'report', 'roadmap_id': RID, 'report_id': NID}]
+        with patch.object(NT.db, 'all_', return_value=rows) as q:
+            out = NT.unseen_targets(7, 8)
+        self.assertEqual(q.call_args.kwargs, {'h': 7, 'm': 8})
+        self.assertIn('read_at IS NULL', q.call_args.args[0])
+        self.assertEqual(out, {'plans': [RID], 'reports': [NID]})
+
+    def test_read_target_rejects_bad_kind_and_id(self):
+        with patch.object(NT.db, 'tx') as tx:
+            with self.assertRaises(ApiError) as e:
+                NT.read_target(7, 'comment', RID)
+            self.assertEqual(e.exception.status, 400)
+            with self.assertRaises(ApiError) as e:
+                NT.read_target(7, 'roadmap', 'not-a-uuid')
+            self.assertEqual(e.exception.status, 404)
+            tx.assert_not_called()
+
+    def test_read_target_marks_only_that_target_of_mine(self):
+        empty = {'items': [], 'unread': 0}
+        for kind, col, n in (('roadmap', 'n.roadmap_id', 2), ('report', 'n.report_id', 0)):
+            t = Mock()
+            t.run.return_value = n
+            with patch.object(NT.db, 'tx', side_effect=lambda: tx_of(t)), patch.object(NT, 'inbox', return_value=empty):
+                out = NT.read_target(7, kind, NID)
+            sql = t.run.call_args.args[0]
+            self.assertIn(f'{col} = CAST(:i AS uuid)', sql)
+            self.assertIn('n.recipient_id = :e', sql)  # 내 알림만
+            self.assertEqual(t.run.call_args.kwargs, {'e': 7, 'k': kind, 'i': NID})
+            self.assertEqual(out, {'items': [], 'unread': 0, 'changed': n})  # 읽을 알림이 없어도 오류가 아니다
+
+
+class TeamUnseenTests(unittest.TestCase):
+    """소속 직원 목록·직원 기록 응답에 확인 전 수와 대상 id 가 실리는지(#96)"""
+
+    def test_team_members_carry_unseen_counts(self):
+        rows = [{'employee_id': 8}, {'employee_id': 9}, {'employee_id': 10}]
+        with ExitStack() as stack:
+            stack.enter_context(patch.object(plans.profile, 'view', side_effect=lambda i, *_: {'id': i, 'supGroup': None}))
+            stack.enter_context(patch.object(plans.profile, 'member_ids', return_value={8, 9}))
+            stack.enter_context(patch.object(plans.profile, '_rows', return_value=rows))
+            stack.enter_context(patch.object(plans.profile, 'team_view', side_effect=lambda v: {'id': str(v['id'])}))
+            stack.enter_context(patch.object(plans, 'records', return_value={}))
+            stack.enter_context(patch.object(plans, 'reports', return_value=[]))
+            stack.enter_context(patch.object(NT, 'unseen_counts', return_value={8: {'plans': 1, 'reports': 2}}))
+            out = plans.team_members(7)
+        got = {m['user']['id']: (m['unseenPlans'], m['unseenReports']) for m in out['members']}
+        self.assertEqual(got, {'8': (1, 2), '9': (0, 0)})
+
+    def test_member_state_carries_unseen_targets(self):
+        unseen = {'plans': [RID], 'reports': []}
+        with ExitStack() as stack:
+            stack.enter_context(patch.object(plans.profile, 'member_ids', return_value={8}))
+            stack.enter_context(patch.object(plans.profile, 'view', return_value={'id': 8}))
+            stack.enter_context(patch.object(plans.profile, 'team_view', return_value={'id': '8'}))
+            stack.enter_context(patch.object(plans, 'records', return_value={}))
+            stack.enter_context(patch.object(plans, 'reports', return_value=[]))
+            stack.enter_context(patch.object(plans, 'resources_of', return_value={}))
+            stack.enter_context(patch.object(plans, 'reg_of', return_value={}))
+            q = stack.enter_context(patch.object(NT, 'unseen_targets', return_value=unseen))
+            out = plans.member_state(7, 8)
+        q.assert_called_once_with(7, 8)
+        self.assertEqual(out['unseen'], unseen)
+
+
 class ApiTests(unittest.TestCase):
     def setUp(self):
         app = FastAPI()
@@ -163,6 +243,7 @@ class ApiTests(unittest.TestCase):
         self.as_account(auth.Account('admin', 1, '관리자'))
         for method, path in (('get', ''), ('post', '/read-all'), ('post', f'/{NID}/read')):
             self.assertEqual(getattr(self.client, method)('/api/v1/notifications' + path).status_code, 403)
+        self.assertEqual(self.client.post('/api/v1/notifications/read-target', json={'kind': 'roadmap', 'id': RID}).status_code, 403)
 
     def test_employee_reads_own_notifications(self):
         self.as_account(auth.Account('employee', 7, '시험'))
@@ -175,6 +256,13 @@ class ApiTests(unittest.TestCase):
         inbox.assert_called_once_with(7)
         read.assert_called_once_with(7, NID)
         read_all.assert_called_once_with(7)
+
+    def test_employee_marks_a_target_read(self):
+        self.as_account(auth.Account('employee', 7, '시험'))
+        with patch.object(NT, 'read_target', return_value={'items': [], 'unread': 0, 'changed': 1}) as read_target:
+            res = self.client.post('/api/v1/notifications/read-target', json={'kind': 'report', 'id': NID})
+        self.assertEqual(res.json()['changed'], 1)
+        read_target.assert_called_once_with(7, 'report', NID)
 
 
 if __name__ == '__main__':

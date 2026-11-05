@@ -5,7 +5,7 @@
       없을 때만 받는다. 보고서 알림은 그 로드맵의 보고서 목록만 받아 바꾼다 */
 import type { QueryClient } from '@tanstack/react-query';
 import { notificationsApi } from '@/api/endpoints/notifications';
-import type { AppNotification, NotificationInbox } from '@/api/types/notification';
+import type { AppNotification, NotificationInbox, NotificationKind } from '@/api/types/notification';
 import { plansApi } from '@/api/endpoints/plans';
 import { memberKey } from '@/features/team/teamData';
 import { mergeReg, mergeRes } from '@/shared/state/catalog';
@@ -35,6 +35,15 @@ export async function markRead(qc: QueryClient, t: SignIn, id?: string): Promise
   const box: NotificationInbox = id ? await notificationsApi.read(id) : await notificationsApi.readAll();
   if (!stillSignedIn(t)) return false;
   qc.setQueryData(notificationKey(t.id), box);
+  return true;
+}
+
+/** 그 로드맵·보고서의 내 알림을 모두 읽음으로(#96). 같은 로그인이면 바뀐 목록을 그 직원 캐시에 넣고 true.
+ *  소속 직원 목록·직원 기록의 '새 로드맵·보고서' 표시는 그 화면에 다시 들어갈 때 서버에서 새로 받는다 */
+export async function markTargetRead(qc: QueryClient, t: SignIn, kind: NotificationKind, id: string): Promise<boolean> {
+  const res = await notificationsApi.readTarget(kind, id);
+  if (!stillSignedIn(t)) return false;
+  qc.setQueryData<NotificationInbox>(notificationKey(t.id), { items: res.items, unread: res.unread });
   return true;
 }
 

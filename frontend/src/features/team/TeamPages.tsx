@@ -24,10 +24,19 @@ import { Icon } from '@/shared/ui/Icon';
 import { Loading, Note, Page, Stats } from '@/shared/ui/parts';
 import { StagesView } from '@/shared/ui/StagesView';
 import { mk, useMemberOf, useMemberState, useRefreshTeam, useTeam } from './teamData';
+import { arrangeMembers, hasRecords, unseenOf } from './teamList';
+import { useMarkSeen } from './teamSeen';
 
 const ST_TAG: Record<string, React.ReactNode> = { done: <span className="tag line">마침</span>, archived: <span className="tag line">보관</span> };
 const who = (e: TeamUser) => `${e.name} · ${meLine(e)}`;
 const Av = ({ e }: { e: TeamUser }) => <span className="avatar">{e.name.slice(1)}</span>;
+/** 줄 끝 '보기 >' — 아이콘만 있던 것을 글자와 테두리로 눈에 띄게(#96) */
+const Go = () => (
+  <span className="team-go" aria-hidden="true">
+    보기
+    <Icon name="right" />
+  </span>
+);
 const Privacy = () => (
   <Note>
     직원의 소속·직급·직위, 확정한 로드맵, 활동 진행 상태, 결과 보고서(사전→사후 점검 응답 변화 포함)를 볼 수 있어요. 활동 메모·첨부, 진단 수준값, 작성 중인 로드맵은 공개되지 않아요.
@@ -43,7 +52,7 @@ function TeamRow({ m }: { m: TeamMember }) {
       <span className="tag line">부서장</span>
     </>
   ) : null;
-  if (!(m.activePlans + m.pastPlans))
+  if (!hasRecords(m))
     return (
       <div className="li">
         <Av e={e} />
@@ -57,7 +66,7 @@ function TeamRow({ m }: { m: TeamMember }) {
       </div>
     );
   return (
-    <button className="li" onClick={() => go(paths.member(e.id))}>
+    <button className={`li team-row${unseenOf(m) ? ' has-unseen' : ''}`} onClick={() => go(paths.member(e.id))}>
       <Av e={e} />
       <div className="tx">
         <b>
@@ -70,8 +79,10 @@ function TeamRow({ m }: { m: TeamMember }) {
         </small>
       </div>
       <span className="end">
+        {m.unseenPlans ? <span className="tag team-new">새 로드맵 {m.unseenPlans}</span> : null}
+        {m.unseenReports ? <span className="tag team-new">새 보고서 {m.unseenReports}</span> : null}
         {m.unreadComments ? <span className="tag acc">코멘트 확인 전 {m.unreadComments}</span> : null}
-        <Icon name="right" />
+        <Go />
       </span>
     </button>
   );
@@ -81,6 +92,7 @@ export function MemberListPage() {
   const me = useMe();
   const t = useTeam();
   const members = t.data?.members || [];
+  const { shown, empty } = arrangeMembers(members);
   return (
     <Page eyebrow={`부서장 · ${me?.name} · ${me?.dept || ''}`} title="소속 직원의 성장 로드맵" lead={`소속 직원 ${members.length}명이 확정한 로드맵과 진행 상태, 결과 보고서를 보고 계획 조정 의견을 남길 수 있어요.`}>
       {t.error ? (
@@ -88,11 +100,27 @@ export function MemberListPage() {
           {cause(t.error).user}
         </p>
       ) : null}
-      <div className="list">
-        {members.map((m) => (
-          <TeamRow key={m.user.id} m={m} />
-        ))}
-      </div>
+      {shown.length ? (
+        <div className="list">
+          {shown.map((m) => (
+            <TeamRow key={m.user.id} m={m} />
+          ))}
+        </div>
+      ) : t.data ? (
+        <p className="small muted">확정한 로드맵이 있는 직원이 아직 없어요.</p>
+      ) : null}
+      {empty.length ? (
+        <details className="team-empty">
+          <summary>
+            로드맵·보고서가 없는 직원 <b>{empty.length}명</b>
+          </summary>
+          <div className="list">
+            {empty.map((m) => (
+              <TeamRow key={m.user.id} m={m} />
+            ))}
+          </div>
+        </details>
+      ) : null}
       <Privacy />
       <Note>소속 직원은 내 부서의 직원이에요. 부서·부서장 권한은 관리자 화면의 인적 데이터 엑셀로 바꿔요.</Note>
     </Page>
@@ -108,7 +136,7 @@ const MemberLoading = ({ q }: { q: ReturnType<typeof useMemberState> }) =>
     </p>
   ) : null;
 
-function MgrRoadRow({ uid, R }: { uid: string; R: PlanRecord }) {
+function MgrRoadRow({ uid, R, unseen = false }: { uid: string; R: PlanRecord; unseen?: boolean }) {
   const go = useGo();
   const me = useMe();
   const pl = R.plan;
@@ -121,21 +149,22 @@ function MgrRoadRow({ uid, R }: { uid: string; R: PlanRecord }) {
         <Icon name="map" />
       </span>
       <div className="tx">
-        <b>{pl.goal}</b>
+        <b>{pl.displayTitle || pl.goal}</b>
         <small>
           {trackName(pl.opt, pl.name)} v{pl.version} · 활동 {c.done}/{c.t} 완료{mine ? ` · 보낸 코멘트 ${mine}개` : ''}
         </small>
       </div>
       <span className="end">
+        {unseen ? <span className="tag team-new">새 로드맵</span> : null}
         {ST_TAG[R.status] || null}
         {wait ? <span className="tag acc">확인 전 {wait}</span> : null}
-        <Icon name="right" />
+        <Go />
       </span>
     </button>
   );
 }
 
-function MgrRepRow({ uid, r }: { uid: string; r: Report }) {
+function MgrRepRow({ uid, r, unseen = false }: { uid: string; r: Report; unseen?: boolean }) {
   const go = useGo();
   return (
     <button className="li" onClick={() => go(paths.memberReport(uid, r.id))}>
@@ -151,7 +180,8 @@ function MgrRepRow({ uid, r }: { uid: string; r: Report }) {
         </small>
       </div>
       <span className="end">
-        <Icon name="right" />
+        {unseen ? <span className="tag team-new">새 보고서</span> : null}
+        <Go />
       </span>
     </button>
   );
@@ -175,6 +205,7 @@ export function MemberPlansPage() {
   const act = all.filter((R) => R.status === 'active');
   const past = all.filter((R) => R.status !== 'active');
   const reps = q.data.reports;
+  const seenNot = q.data.unseen || { plans: [], reports: [] };
   if (!all.length)
     return (
       <Page back={paths.team} eyebrow={who(e)} title="확정한 로드맵이 없어요" lead="직원이 로드맵을 확정하면 여기에서 볼 수 있어요.">
@@ -190,7 +221,7 @@ export function MemberPlansPage() {
           </div>
           <div className="list">
             {act.map((R) => (
-              <MgrRoadRow key={R.id} uid={uid} R={R} />
+              <MgrRoadRow key={R.id} uid={uid} R={R} unseen={seenNot.plans.includes(R.id)} />
             ))}
           </div>
         </div>
@@ -202,7 +233,7 @@ export function MemberPlansPage() {
           </div>
           <div className="list">
             {past.map((R) => (
-              <MgrRoadRow key={R.id} uid={uid} R={R} />
+              <MgrRoadRow key={R.id} uid={uid} R={R} unseen={seenNot.plans.includes(R.id)} />
             ))}
           </div>
         </div>
@@ -214,7 +245,7 @@ export function MemberPlansPage() {
           </div>
           <div className="list">
             {reps.map((r) => (
-              <MgrRepRow key={r.id} uid={uid} r={r} />
+              <MgrRepRow key={r.id} uid={uid} r={r} unseen={seenNot.reports.includes(r.id)} />
             ))}
           </div>
         </div>
@@ -369,6 +400,7 @@ export function MemberRoadPage() {
   const q = useMemberState(uid);
   const key = mk(uid, pid);
   const draft = useWs((s) => s.mgr[key]);
+  useMarkSeen('roadmap', pid, !!q.data?.plans[pid]);
   if (gone) return <Navigate to={paths.team} replace />;
   if (teamLoading || !e) return <Loading text="서버에서 불러오는 중…" />;
   if (!q.data) return <Page back={paths.member(uid)} eyebrow={who(e)} title="확정한 로드맵"><MemberLoading q={q} /></Page>;
@@ -426,7 +458,7 @@ export function MemberRoadPage() {
           </div>
           <div className="list">
             {reps.map((r) => (
-              <MgrRepRow key={r.id} uid={uid} r={r} />
+              <MgrRepRow key={r.id} uid={uid} r={r} unseen={!!q.data.unseen?.reports.includes(r.id)} />
             ))}
           </div>
         </div>
@@ -477,6 +509,7 @@ export function MemberReportPage() {
   const { rid = '' } = useParams();
   const { uid, member: e, gone, teamLoading } = useMemberGate();
   const q = useMemberState(uid);
+  useMarkSeen('report', rid, !!q.data?.reports.some((x) => x.id === rid));
   if (gone) return <Navigate to={paths.team} replace />;
   if (teamLoading || !e) return <Loading text="서버에서 불러오는 중…" />;
   if (!q.data) return <Page back={paths.member(uid)} eyebrow={who(e)} title="학습 결과 보고서"><MemberLoading q={q} /></Page>;

@@ -615,6 +615,37 @@ details.more[open] > summary { margin-bottom: 12px; }
   overflow-wrap: anywhere;
 }
 
+/* 소속 직원 계획(#96): 확인 전 로드맵·보고서가 있는 직원 강조, 줄 끝 '보기 >' 를 눈에 띄게, 기록 없는 직원은 접어 둔다 */
+.team-row.has-unseen { background: var(--accent-soft, transparent); box-shadow: inset 3px 0 0 var(--accent); }
+.tag.team-new { background: var(--accent); color: #fff; font-weight: 650; }
+/* 표시가 여러 개여도 좁은 화면에서 줄을 넘지 않게 */
+.li .end:has(.team-go) { flex-wrap: wrap; justify-content: flex-end; white-space: normal; }
+.team-go {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 8px 4px 10px;
+  border: 1px solid var(--accent-line, var(--line));
+  border-radius: 999px;
+  background: var(--accent-soft, transparent);
+  color: var(--accent-ink, var(--accent));
+  font-size: 12.5px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.team-go svg.i { width: 15px; height: 15px; }
+.li:hover .team-go { background: var(--accent); border-color: var(--accent); color: #fff; }
+.team-empty { margin-top: 14px; }
+.team-empty > summary { cursor: pointer; padding: 10px 2px; color: var(--ink-2, #474A4F); font-size: 14px; }
+.team-empty > summary b { color: var(--ink, #18191B); }
+.team-empty > .list { margin-top: 6px; }
+/* 좁은 화면: 표시·'보기'를 이름 아래 줄로 내려 이름·소속이 한두 글자씩 끊기지 않게 */
+@media (max-width: 600px) {
+  .li:has(.team-go) { flex-wrap: wrap; row-gap: 8px; }
+  .li:has(.team-go) .tx { flex: 1 1 calc(100% - 60px); }
+  .li .end:has(.team-go) { flex: 1 1 100%; }
+}
+
 /* 완료 알림(#82) — AI 모델 선택 버튼·창과 같은 모양(테마도 같이 따른다)으로 그 오른쪽에 둔다 */
 .api-picker.notif { margin-left: 0; }
 .notif-button svg.i { width: 15px; height: 15px; }

@@ -4,9 +4,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppNotification, NotificationInbox } from '@/api/types/notification';
 import type { PlanRecord, Report } from '@/api/types/plan';
 
-const m = vi.hoisted(() => ({ me: { id: 'A' } as { id: string } | null, seq: 1, read: vi.fn(), readAll: vi.fn(), get: vi.fn(), reports: vi.fn() }));
+const m = vi.hoisted(() => ({ me: { id: 'A' } as { id: string } | null, seq: 1, read: vi.fn(), readAll: vi.fn(), readTarget: vi.fn(), get: vi.fn(), reports: vi.fn() }));
 vi.mock('@/shared/state/session', () => ({ me: () => m.me, signInSeq: () => m.seq, isSup: () => true }));
-vi.mock('@/api/endpoints/notifications', () => ({ notificationsApi: { read: m.read, readAll: m.readAll } }));
+vi.mock('@/api/endpoints/notifications', () => ({ notificationsApi: { read: m.read, readAll: m.readAll, readTarget: m.readTarget } }));
 vi.mock('@/api/endpoints/plans', () => ({ plansApi: { get: m.get, reports: m.reports } }));
 vi.mock('@/shared/state/catalog', () => ({ mergeRes: vi.fn(), mergeReg: vi.fn() }));
 
@@ -147,5 +147,25 @@ describe('P2 본인 알림: 화면에 있는 로드맵은 덮지 않고, 없는 
     await pending;
     expect(wsMod.ws().plans.p1).toBeUndefined();
     expect(wsMod.ws().reports.map((r) => r.id)).toEqual(['r-old', 'r-other']);
+  });
+});
+
+describe('markTargetRead (#96 · 부서장이 직원 기록 화면을 열 때)', () => {
+  it('같은 로그인이면 바뀐 목록만(changed 빼고) 그 직원 캐시에 넣는다', async () => {
+    const qc = new QueryClient();
+    m.readTarget.mockResolvedValue({ ...box('읽음으로 바뀐 로드맵'), changed: 1 });
+    expect(await act.markTargetRead(qc, A1, 'roadmap', 'p1')).toBe(true);
+    expect(m.readTarget).toHaveBeenCalledWith('roadmap', 'p1');
+    expect(qc.getQueryData(act.notificationKey('A'))).toEqual(box('읽음으로 바뀐 로드맵'));
+  });
+  it('응답이 오기 전에 로그인이 바뀌면 넣지 않는다', async () => {
+    const qc = new QueryClient();
+    const late = deferred<NotificationInbox & { changed: number }>();
+    m.readTarget.mockReturnValue(late.promise);
+    const pending = act.markTargetRead(qc, A1, 'report', 'r1');
+    m.seq = 3;
+    late.resolve({ ...box('이전 로그인'), changed: 1 });
+    expect(await pending).toBe(false);
+    expect(qc.getQueryData(act.notificationKey('A'))).toBeUndefined();
   });
 });
