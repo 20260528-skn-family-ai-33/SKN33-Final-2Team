@@ -2,7 +2,7 @@ import type { PlanRecord } from '@/api/types/plan';
 import { paths } from '@/app/paths';
 import { useGo } from '@/shared/hooks/useGo';
 import { actMeta, range, st } from '@/shared/lib/plan';
-import { hrs } from '@/shared/lib/format';
+import { activityTime } from '@/shared/lib/resourceTime';
 import { useCatalog } from '@/shared/state/catalog';
 import { useMe } from '@/shared/state/session';
 import { ActThumb, Stt } from '@/shared/ui/parts';
@@ -65,7 +65,7 @@ export function RoadmapActivityList({ R, readOnly = false }: { R: PlanRecord; re
     {[{ title: '자료 학습', acts: group.materials }, { title: '산출물', acts: group.tasks }].filter(category => category.acts.length).map(category => <div className="roadmap-learning-category" key={category.title}>
       <h3>{category.title}</h3><ul className="acts">{category.acts.map(activity => <li id={activityAnchor(activity.id)} tabIndex={-1} className={`roadmap-learning-anchor${due(activity) ? ' is-current-week' : ''}`} key={activity.id}>
         {R.status === 'active' && !readOnly ? <ul className="acts"><ActRow a={activity} R={R} /></ul> : <div className="roadmap-learning-readonly">
-          <Stt done={st(R.progress, activity.id) === 'done'} /><ActThumb a={activity} /><span className="tx">{activity.title}<small>{actMeta(activity)} · {activity.wFrom === activity.wTo ? `${activity.wFrom}주차` : `${activity.wFrom}~${activity.wTo}주차`}</small>{R.progress[activity.id]?.memo && <small>메모 · {R.progress[activity.id].memo}</small>}</span><span className="small muted">{hrs(activity.hours)}</span>
+          <Stt done={st(R.progress, activity.id) === 'done'} /><ActThumb a={activity} /><span className="tx">{activity.title}<small>{actMeta(activity)} · {activity.wFrom === activity.wTo ? `${activity.wFrom}주차` : `${activity.wFrom}~${activity.wTo}주차`}</small>{R.progress[activity.id]?.memo && <small>메모 · {R.progress[activity.id].memo}</small>}</span><span className="small muted" title={activityTime(activity).title}>{activityTime(activity).text}</span>
         </div>}
       </li>)}</ul>
     </div>)}

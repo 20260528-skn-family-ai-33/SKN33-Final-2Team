@@ -37,7 +37,7 @@ export function MemberRoadView({ R }: { R: PlanRecord }) {
           currentSkillNames={current}
         />
       ) : (
-        <SkillMap pl={pl} />
+        <SkillMap pl={pl} owned={[]} />
       )}
       <div className="sec">
         <RoadmapActivityList R={R} readOnly />
