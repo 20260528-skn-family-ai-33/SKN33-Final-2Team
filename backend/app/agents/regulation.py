@@ -434,11 +434,9 @@ def _knowledge_answer(ctx: rt.Ctx, inp: dict, topic: str) -> dict:
     allowed_numbers = set(re.findall(r'\d+(?:\.\d+)?', re.sub(r'(\d),(?=\d{3})', r'\1', cited_text)))
     if any(match.group(1) not in allowed_numbers for match in NUM_RE.finditer(re.sub(r'(\d),(?=\d{3})', r'\1', summary))):
         raise llm.LlmError(f'답변 형식 오류: {title} 답변의 숫자가 인용 자료에 없어요')
-    provenance, citations = [], []
+    provenance = []
     for hit in selected:
         meta = hit['metadata'] or {}
-        citation = ' · '.join(str(value) for value in (hit['document_title'], meta.get('location'), meta.get('as_of')) if value)
-        citations.append(citation)
         provenance.append({'chunkId': hit['chunk_id'], 'documentId': hit['document_id'],
                            'documentTitle': hit['document_title'], 'sourceUrl': meta.get('source_url'),
                            'location': meta.get('location'), 'asOf': meta.get('as_of'),
@@ -447,7 +445,7 @@ def _knowledge_answer(ctx: rt.Ctx, inp: dict, topic: str) -> dict:
                             'textTruncated': len(hit['chunk_text']) > 3000,
                             'excerpt': passed_sources[hit['chunk_id']]['text']})
     return ans(source='work' if topic == 'company' else 'intranet', topic=topic, evidenceStatus=result['status'],
-               summary=summary + '\n\n출처: ' + ' / '.join(rt.uniq(citations)), knowledgeSources=provenance)
+               summary=summary, knowledgeSources=provenance)
 
 
 def _api_answer(ctx: rt.Ctx, inp: dict, label: str) -> dict:

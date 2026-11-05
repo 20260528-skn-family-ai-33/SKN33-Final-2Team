@@ -111,7 +111,7 @@
 
 실제 모델 모드는 로컬 RoBERTa로 질문을 먼저 4분류해요. `meta.classification`(선택)은 `{model, label, confidence, ms, usedHistory}`이며 `label`은 `범위 밖`·`사내 규정`·`사내 생활안내`·`수자원공사 정보`예요. 기존 `answer.kind`는 유지하고 가데이터 모드에는 이 메타데이터가 없어요. 범위 밖은 검색/LLM을 호출하지 않고, 규정·회사는 각각 해당 자료 검색과 근거 검사를 거쳐요. 모델·토크나이저·해시 문제는 기존 오류 형식의 `code=AI_CLASSIFIER`, `kind=classifier`, `retryable=false`로 알려요. LLM은 질문 유형을 재분류하지 않고 서버가 분류별 `answer.kind`를 구성해요. JSON 구조·없는 인용 ID·근거 없는 숫자 등의 실패는 기존 `AI_BAD_OUTPUT` 오류로 유지해요.
 
-실제 모델과 가데이터 모두 `apply`·`more`·`missing`을 반환하지 않습니다. 실제 모델은 확인된 내용과 적용 조건, 부족한 근거를 `summary`에 담습니다. 가데이터는 추천 질문의 예시를 `meta.mode=mock`으로 반환합니다. 화면에는 ‘시연용 가데이터’를 표시합니다.
+실제 모델과 가데이터 모두 `apply`·`more`·`missing`을 반환하지 않습니다. 실제 모델은 확인된 내용과 적용 조건, 부족한 근거를 최대 두 문장의 `summary`로 작성하도록 지시받습니다. 회사·사내 생활의 출처는 `knowledgeSources`에서 제공합니다. 가데이터는 추천 질문의 예시를 `meta.mode=mock`으로 반환합니다. 화면에는 ‘시연용 가데이터’를 표시합니다.
 
 `answer.topic`(선택)은 `regulation|company|life`, `answer.evidenceStatus`(선택)는 `found|partial|not_found|refused`예요. 규정·회사·생활 DB 답변은 `meta.classification.label` 옆에 ‘근거 확인’ 또는 ‘근거 확인 불가’를 표시해요. `partial`도 인용 조항이나 문서가 있으면 ‘근거 확인’으로 표시하고, 확인하지 못한 부분은 본문에서 설명해요. 제공 금지 거절은 ‘답변 불가’, 범위 밖은 ‘범위 밖’, 연결·검증 실패는 ‘오류’라는 단일 결과 라벨이에요. 오류는 LLM 출력 상태가 아니에요. 규정은 `found→level=ok`, `partial→unclear`, `not_found→none`, `refused→refused`예요. 규정의 적용 대상은 검색한 원문에서 확인해요. 회사는 `kind=general, source=work`, 생활은 `kind=general, source=intranet`이고 거절·자료 부족은 `knowledgeSources=[]`예요.
 
