@@ -248,6 +248,7 @@ const USER_TEXT: Record<string, string> = {
 export const userText = (kind?: string): string => USER_TEXT[kind || ''] || USER_TEXT.other;
 
 export function userTodo(kind?: string): string[] {
+  if (kind === 'employee_group') return ['인사 담당 부서에 직원 구분 등록 여부를 확인해 주세요.'];
   if (kind === 'docbig') return ['15MB 이하로 줄여 다시 골라 주세요.', '기획서 없이 목표만으로 진행해도 돼요.'];
   if (/^doc/.test(kind || '')) return ['DOCX·PPTX·HWPX·PDF·TXT 중 하나로 저장해 다시 골라 주세요.', '기획서 없이 목표만으로 진행해도 돼요.'];
   const other = ai.choice() === 'api' ? 'ollama' : 'api';

@@ -18,6 +18,7 @@ from ..config import S
 from ..errors import ApiError, not_found
 from ..services import drafts as DR
 from ..services import plans as PL
+from ..services import profile
 from . import job_response
 
 r = APIRouter(prefix='/api/v1')
@@ -379,7 +380,7 @@ def api_ask(request: Request, body: dict, a: Account = Depends(require_employee)
     hist = body.get('history') or []
 
     def work(job: jobs.JobCtx):
-        ctx = rt.context(a.id, me={})
+        ctx = rt.context(a.id, me={'empGroup': profile.employee_group(a.id)})
         ans = REG.answer(ctx, q, hist, {}, sim=rt.sim_once(ctx, 'reg', q), documents_only=True)
         ids = list(ans.get('basis') or []) + list(ans.get('ref') or [])
         return {'answer': ans, 'reg': regstore.bundle(ids), 'meta': ctx.meta}

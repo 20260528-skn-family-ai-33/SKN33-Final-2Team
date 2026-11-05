@@ -15,6 +15,7 @@ import json
 import re
 
 from .. import knowledge, llm, question_classifier, regstore
+from ..errors import AgentError
 from . import runtime as rt
 from . import grounded_answer
 from .demo import D
@@ -32,6 +33,7 @@ CONTEXT_REF = re.compile(
 ADDED_CONDITION = re.compile(r'도\s*(?:교육비\s*)?(?:지원|인정|적용|가능|신청|받을|받는)')
 NAMED_RULE = re.compile(r'\w+(?:규정|규칙|세칙)')
 NEW_TOPIC = re.compile(r'^(?:다른|새(?:로운)?)\s*(?:질문|주제)|^(?:주제|질문)\s*(?:를|을)?\s*바꿔')
+FOLLOW_HISTORY_LIMIT = 5
 DEMO_ANSWERS = (
     (r'교육비.*지원', 'regulation', '교육비 지원을 신청하기 전에 대상 과정과 승인 조건을 교육 담당 부서에 확인하는 예시예요.'),
     (r'통근\s*버스.*시간표', 'life', '시연 화면에서는 사내 포털의 ‘생활 → 통근버스’ 메뉴에서 시간표를 확인해요.'),
@@ -248,7 +250,7 @@ def _ref_answer(ref: dict, me: dict) -> dict:
 def _mock(inp: dict) -> dict:
     q, me, hist = inp['question'], inp['me'], inp.get('history') or []
     group = me.get('empGroup')
-    hits = regstore.keyword_search(q, 3, group)
+    hits = regstore.keyword_search(q, 3, group, all_groups=False)
     prev = hist[-1] if hist else None
     if OUT_HINT.search(q):
         return ans(kind='out', level='out')
@@ -315,17 +317,18 @@ def _art_in(a: dict) -> dict:
             'text': a['text'][:ART_MAX] + (' …(뒤 생략)' if len(a['text']) > ART_MAX else '')}
 
 
-def _history_summary(turn: dict) -> str:
+def _history_answer(turn: dict) -> str:
     answer = turn['a']
     summary = answer.get('summary') or ''
     if not summary and answer.get('intranet'):
-        # 생활 안내는 모델 원문 대신 검증된 메뉴만 표시하므로 그 안내를 요약으로 쓴다.
+        # 이전 메뉴형 안내는 본문 대신 화면에 표시한 메뉴 정보를 전달한다.
         summary = ' / '.join(f"{item['menu']}: {item['covers']}" for item in D['intranet']
                              if item['id'] in answer['intranet'])
     return summary
 
 
 def _follow_history(q: str, hist: list, me: dict) -> list:
+    hist = hist[-FOLLOW_HISTORY_LIMIT:]
     if not hist or not _is_follow(q, hist[-1], me):
         return []
     start = len(hist) - 1
@@ -334,29 +337,22 @@ def _follow_history(q: str, hist: list, me: dict) -> list:
     return hist[start:]
 
 
-def _hist_msgs(h: list) -> list:
-    """이미 생성된 답변 요약으로 주제·최근 맥락을 압축한다. 출처 ID·옛 JSON은 넘기지 않는다."""
-    if not h:
-        return []
-    # 질문은 처음 주제·최근 맥락만, 답변은 이미 생성한 요약을 중복 없이 누적한다.
-    # 중간 답변의 적용 조건을 버리거나 요약용 모델을 추가 호출하지 않는다.
-    questions = list(dict.fromkeys(turn['q'] for turn in [h[0], *h[-2:]]))
-    summaries = list(dict.fromkeys(filter(None, (_history_summary(turn) for turn in h))))
-    return [{'role': 'user', 'content': '\n'.join(questions)},
-            {'role': 'assistant', 'content': '\n'.join(summaries)}]
+def _hist_msgs(history: list) -> list:
+    """질문과 화면에 표시한 답변을 턴별로 전달한다."""
+    messages = []
+    for turn in history:
+        messages.extend(({'role': 'user', 'content': turn['q']},
+                         {'role': 'assistant', 'content': _history_answer(turn)}))
+    return messages
 
 
 def _context_query(q: str, history: list, *, classify: bool = False) -> str:
     if not history:
         return q
-    messages = _hist_msgs(history)
-    if classify:
-        # 분류기는 128토큰 입력이므로 처음 주제와 최근 답변 요약을 짧게 전달한다.
-        context = f"{history[0]['q'][:60]} {_history_summary(history[-1])[:60]}"
-    else:
-        context = ' '.join(message['content'] for message in messages)
-    # 입력 길이 제한에서 현재 질문이 과거 요약 뒤로 잘리지 않게 먼저 둔다.
-    return f'현재 질문: {q}\n앞 대화 요약: {context}'
+    # 128토큰 분류기는 현재 질문에 이어 가장 최근 턴부터 읽는다.
+    turns = reversed(history) if classify else history
+    context = '\n'.join(f"질문: {turn['q']}\n답변: {_history_answer(turn)}" for turn in turns)
+    return f'현재 질문: {q}\n앞 대화:\n{context}'
 
 
 def _api(ctx: rt.Ctx, inp: dict) -> dict:
@@ -438,11 +434,9 @@ def _knowledge_answer(ctx: rt.Ctx, inp: dict, topic: str) -> dict:
     allowed_numbers = set(re.findall(r'\d+(?:\.\d+)?', re.sub(r'(\d),(?=\d{3})', r'\1', cited_text)))
     if any(match.group(1) not in allowed_numbers for match in NUM_RE.finditer(re.sub(r'(\d),(?=\d{3})', r'\1', summary))):
         raise llm.LlmError(f'답변 형식 오류: {title} 답변의 숫자가 인용 자료에 없어요')
-    provenance, citations = [], []
+    provenance = []
     for hit in selected:
         meta = hit['metadata'] or {}
-        citation = ' · '.join(str(value) for value in (hit['document_title'], meta.get('location'), meta.get('as_of')) if value)
-        citations.append(citation)
         provenance.append({'chunkId': hit['chunk_id'], 'documentId': hit['document_id'],
                            'documentTitle': hit['document_title'], 'sourceUrl': meta.get('source_url'),
                            'location': meta.get('location'), 'asOf': meta.get('as_of'),
@@ -451,7 +445,7 @@ def _knowledge_answer(ctx: rt.Ctx, inp: dict, topic: str) -> dict:
                             'textTruncated': len(hit['chunk_text']) > 3000,
                             'excerpt': passed_sources[hit['chunk_id']]['text']})
     return ans(source='work' if topic == 'company' else 'intranet', topic=topic, evidenceStatus=result['status'],
-               summary=summary + '\n\n출처: ' + ' / '.join(rt.uniq(citations)), knowledgeSources=provenance)
+               summary=summary, knowledgeSources=provenance)
 
 
 def _api_answer(ctx: rt.Ctx, inp: dict, label: str) -> dict:
@@ -464,19 +458,21 @@ def _api_answer(ctx: rt.Ctx, inp: dict, label: str) -> dict:
     q, me, hist = inp['question'], inp['me'], inp.get('history') or []
     group = me.get('empGroup')
     follow_history = inp.get('_history') or []
-    scope = {'all_groups': True} if inp.get('documents_only') else {}
-    ref = regstore.explicit_ref(q, group, **scope)
+    documents_only = inp.get('documents_only')
+    if documents_only and not (group or '').strip():
+        raise AgentError('로그인한 직원의 직원 구분을 확인할 수 없어요')
+    ref = regstore.explicit_ref(q, group)
     # 규정 이름이 없는 조항 질문은 일반 이어 묻기 판별과 별도로 직전 규정을 참조한다.
     if ref is None and hist and regstore.REF_ART.search(q):
         default_reg = _prev_reg(hist[-1])
         if default_reg:
-            ref = regstore.explicit_ref(q, group, default_reg, **scope)
+            ref = regstore.explicit_ref(q, group, default_reg)
             if ref is not None and not follow_history:
                 follow_history = [hist[-1]]
     prev = follow_history[-1] if follow_history else None
     history = _hist_msgs(follow_history)
-    alone = regstore.search(q, 4, group, ctx.mode, **scope)
-    joined = regstore.search(_context_query(q, follow_history), 4, group, ctx.mode, **scope) if prev else []
+    alone = regstore.search(q, 4, group, ctx.mode)
+    joined = regstore.search(_context_query(q, follow_history), 4, group, ctx.mode) if prev else []
     mix = []
     for index in range(max(len(alone), len(joined))):
         if index < len(joined):
@@ -485,12 +481,17 @@ def _api_answer(ctx: rt.Ctx, inp: dict, label: str) -> dict:
             mix.append(alone[index]['id'])
     ref_ids = (ref or {}).get('ids') or []
     previous_ids = list((prev or {}).get('a', {}).get('basis') or [])
+    if documents_only:
+        # 브라우저에서 전달한 이전 근거는 현재 직원 구분에서 다시 확인한다.
+        previous_ids = [aid for aid in previous_ids if (source := regstore.article(aid)) and source.get('group') == group]
     ids = [value for value in rt.uniq(ref_ids + previous_ids + mix) if regstore.article(value)][:max(7, len(ref_ids))]
     if ref and not ref_ids:
         note = f"{ref['note']}. 규정명과 조 번호를 확인하거나 담당 부서에 문의해 주세요."
         return _empty_evidence_answer(ctx, 'regulation', inp, note, ids, history=history)
     if not ids:
         return _empty_evidence_answer(ctx, 'regulation', inp, history=history)
+    if documents_only:
+        ids += regstore.referenced_paragraphs(ids, limit=min(3, 7 - len(ids)))
     requested = {'where': ref['where'], 'focus': ref['focus'], 'note': ref['note']} if ref else None
     result = grounded_answer.generate(ctx, 'regulation', q, [_art_in(regstore.article(value)) for value in ids],
                                      inp['context'], history=history, requested=requested)
@@ -518,8 +519,8 @@ def scope_answer(a: dict, me: dict) -> dict:
 
 def answer(ctx: rt.Ctx, question: str, history: list, context: dict, sim: str | None = None,
            *, documents_only: bool = False) -> dict:
-    """history: 앞 대화 중 답을 받은 질문·답 [{q, a}] (대화 전체 · 10/14 사용자 결정)"""
-    me = {} if documents_only else ctx.me
+    """history는 답을 받은 질문·답 [{q, a}]이다. 이어 묻기에는 최대 5턴을 사용한다."""
+    me = {'empGroup': ctx.me.get('empGroup')} if documents_only else ctx.me
     context = {} if documents_only else context
     inp = {'question': question, 'history': history or [], 'context': context, 'me': me,
            'documents_only': documents_only}
@@ -593,7 +594,8 @@ def support(ctx: rt.Ctx, plans: list[dict], context: dict, sim: str | None = Non
         return {x['pid']: support_scope(me) for x in plans}
 
     def api(_):
-        hits = regstore.search(SUP_QUERY.get(me.get('empGroup'), SUP_QUERY['일반직']), 6, me.get('empGroup'), ctx.mode)
+        hits = regstore.search(SUP_QUERY.get(me.get('empGroup'), SUP_QUERY['일반직']), 6, me.get('empGroup'), ctx.mode,
+                               all_groups=False)
         arts = [regstore.article(h['id']) for h in hits if regstore.article(h['id'])]
         ids = [a['id'] for a in arts]
         r = rt.llm_json(ctx, SUP_SYS, {'plans': plans, 'user': context, 'articles': [_art_in(a) for a in arts]}, role='regulation')

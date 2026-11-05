@@ -21,6 +21,16 @@ EDU_LEVEL = {'middle_school_or_lower': '중학교 이하', 'high_school': '고�
 EMP_GROUP_SQL = "coalesce(h.employee_group, substring(coalesce(g.name, e.grade) from '^([^ ]+직) '))"
 
 
+def employee_group(employee_id: int) -> str | None:
+    """인증된 직원 한 명의 규정 적용 직원 구분을 조회한다."""
+    row = db.one(f"""SELECT {EMP_GROUP_SQL} AS employee_group
+        FROM public.employees e
+        LEFT JOIN public.job_grades g ON g.job_grade_id = e.job_grade_id
+        LEFT JOIN app_ext.employee_hr h ON h.employee_id = e.employee_id
+        WHERE e.employee_id = :employee_id""", employee_id=employee_id)
+    return (row or {}).get('employee_group')
+
+
 def _grade(name: str | None) -> str:
     # 팀 DB 직급 이름은 '일반직 4급'. 화면은 4차처럼 '4급'
     return (name or '').replace('일반직 ', '', 1) or ''

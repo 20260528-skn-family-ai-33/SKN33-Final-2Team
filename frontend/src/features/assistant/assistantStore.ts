@@ -1,5 +1,5 @@
 /* 사내 생활 도우미 상태 (5차 gp-reg.js 를 옮김)
-   · 이어 묻기: 답을 받은 앞 대화 전체를 에이전트에 넘긴다
+   · 이어 묻기: 답을 받은 최근 5턴을 에이전트에 넘긴다
    · 기록: 탭을 닫을 때까지 남는다(sessionStorage). 새로 고쳐도, 화면을 옮겨도 이어진다. '새 대화'로 지운다
    · 답을 쓰는 동안: 입력창은 그대로 쓸 수 있고 보내기 자리에 '멈추기'가 나온다. 써 둔 질문은 지우지 않는다 */
 import { create } from 'zustand';
@@ -16,6 +16,7 @@ export type Msg = { me: true; t: string } | { q: string; a?: AssistantAnswer; ml
 const LOG_KEY = 'log';
 const DRAFT_KEY = 'draft';
 const OPEN_KEY = 'open';
+const HISTORY_LIMIT = 5;
 let employeeId = meOf(useSession.getState().account)?.id;
 const storageKey = (k: string) => `growpath.assistant.${employeeId}.${k}`;
 const ss = {
@@ -99,11 +100,12 @@ const brief = (a: AssistantAnswer): HistoryTurn['a'] => ({
   question: a.question || '',
   options: a.options || [],
 });
-/** 이 말풍선(i) 앞까지 답을 받은 질문·답만 넘긴다. 실패·멈춘 질문은 답이 없어 넘기지 않는다 */
+/** 이 말풍선(i) 앞까지 답을 받은 최근 질문·답을 넘긴다. */
 const historyBefore = (i: number): HistoryTurn[] =>
   get()
     .log.slice(0, i)
     .filter((m): m is Extract<Msg, { q: string }> => !m.me && !!m.a && m.a.kind !== 'out')
+    .slice(-HISTORY_LIMIT)
     .map((m) => ({ q: m.q, a: brief(m.a as AssistantAnswer) }));
 
 export const setHint = (hint: string) => useAssistant.setState({ hint });

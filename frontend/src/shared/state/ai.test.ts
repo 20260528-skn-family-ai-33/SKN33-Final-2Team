@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/api/client';
 import { aiApi, type ProviderInfo, type ThinkLevels } from '@/api/endpoints/account';
 import type { ReasoningPicks } from '@/api/types/account';
-import { ai, applySettings, cause, levelLabel, setReasoning, useAi } from './ai';
+import { ai, applySettings, cause, errText, levelLabel, setReasoning, useAi } from './ai';
 
 const useOllama = (models: ProviderInfo['models']) =>
   useAi.setState({
@@ -40,6 +40,14 @@ describe('cause', () => {
 
   it('로그인이 끊긴 오류는 서버 문제로 분류한다', () => {
     expect(cause(new ApiError(401, { code: 'AUTH_REQUIRED', message: '로그인이 필요해요' })).kind).toBe('server');
+  });
+
+  it('직원 구분을 확인할 수 없으면 원인과 인사 담당 부서 문의를 표시한다', () => {
+    const error = new ApiError(502, {
+      code: 'EMPLOYEE_GROUP_UNAVAILABLE', kind: 'employee_group',
+      message: '로그인한 직원의 직원 구분을 확인할 수 없어요', retryable: false,
+    });
+    expect(errText(cause(error))).toBe('로그인한 직원의 직원 구분을 확인할 수 없어요. 인사 담당 부서에 직원 구분 등록 여부를 확인해 주세요.');
   });
 
   it('작업에 저장된 원인(kind·text)은 그대로 살린다', () => {

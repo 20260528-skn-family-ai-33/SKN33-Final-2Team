@@ -44,6 +44,7 @@ CAUSES = [
     (r'^Challenge (추천에는|산출물|완료 기준)', 'format', 'Challenge 응답의 산출물 목표·완료 기준 형식을 확인하지 못했어요'),
     (r'^회사 정보 검색 임베딩', 'config', '회사 정보 검색의 임베딩 모델·키·저장 벡터 설정을 확인해 주세요'),
     (r'^질문 분류 모델', 'classifier', '로컬 질문 분류 모델을 읽거나 실행하지 못했어요'),
+    (r'^로그인한 직원의 직원 구분을 확인할 수 없어요$', 'employee_group', '규정 검색에 필요한 직원 구분이 없어요'),
     (r'^모드 사용 불가', 'off', '고른 AI 모델 모드가 설정되지 않아 쓸 수 없어요'),
     (r'작업을 찾을 수 없어요|서버가 다시 시작', 'lost', '서버를 다시 켜서 진행 중이던 작업이 없어졌어요'),
     (r'기획서 형식', 'docfmt', '읽을 수 없는 파일 형식이에요'),
@@ -80,9 +81,10 @@ CODE_OF = {'off': 'AI_UNAVAILABLE', 'lost': 'JOB_LOST', 'conn': 'AI_UNREACHABLE'
            'memory': 'AI_OUT_OF_MEMORY', 'format': 'AI_BAD_OUTPUT', 'auth': 'AI_AUTH', 'limit': 'AI_RATE_LIMIT', 'visioncfg': 'VISION_NOT_SET',
            'docfmt': 'DOC_FORMAT', 'doclib': 'DOC_LIB', 'docread': 'DOC_READ', 'docbig': 'DOC_TOO_BIG', 'config': 'AI_CONFIG', 'server': 'SERVER',
            'other': 'AI_ERROR'}
-CODE_OF['classifier'] = 'AI_CLASSIFIER'
+CODE_OF.update(classifier='AI_CLASSIFIER', employee_group='EMPLOYEE_GROUP_UNAVAILABLE')
 HINT = {
     'classifier': {'any': 'backend/models의 모델·토크나이저·classifier-manifest.json과 백엔드 로그를 확인해 주세요. 모델 교체 시 검증한 manifest도 갱신해야 해요'},
+    'employee_group': {'any': '인사 담당 부서에 직원 구분 등록 여부를 확인해 주세요'},
     'off': {'ollama': '.env에 OLLAMA_BASE_URL을 넣고 서버를 다시 실행해 주세요. 가데이터로 보려면 시연 도구에서 직접 켜야 해요(자동 대체 없음)',
             'any': '.env에 OPENAI_API_KEY를 넣고 서버를 다시 실행해 주세요. 가데이터로 보려면 시연 도구에서 직접 켜야 해요(자동 대체 없음)'},
     'lost': {'any': '다시 시도하면 새 작업으로 만들어요'},
@@ -108,6 +110,7 @@ HINT = {
 }
 USER_TEXT = {
     'classifier': '질문 유형을 확인하지 못했어요',
+    'employee_group': '로그인한 직원의 직원 구분을 확인할 수 없어요',
     'off': '고른 AI 모델을 지금 쓸 수 없어요', 'lost': '진행 중이던 작업을 찾지 못했어요',
     'server': 'AI 서버에 연결하지 못했어요', 'config': 'AI 모델 설정이 아직 준비되지 않았어요', 'conn': 'AI 모델이 지금 응답하지 않아요',
     'model': 'AI 모델을 아직 쓸 수 없어요', 'auth': 'AI 모델을 쓸 권한을 확인하지 못했어요', 'timeout': 'AI 모델의 응답이 너무 오래 걸려 멈췄어요',

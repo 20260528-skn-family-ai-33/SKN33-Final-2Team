@@ -63,7 +63,7 @@ export interface AssistantResult {
   };
 }
 
-/** 앞 대화: 답을 받은 질문과 답(요약본)만 넘긴다 */
+/** 앞 대화: 질문과 화면에 표시한 답변 본문을 넘긴다. */
 export interface HistoryTurn {
   q: string;
   a: Pick<AssistantAnswer, 'kind' | 'level' | 'source' | 'summary' | 'basis' | 'intranet' | 'question' | 'options'>;
