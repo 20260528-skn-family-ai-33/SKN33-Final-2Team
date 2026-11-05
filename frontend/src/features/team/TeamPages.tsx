@@ -24,7 +24,7 @@ import { Icon } from '@/shared/ui/Icon';
 import { Loading, Note, Page, Stats } from '@/shared/ui/parts';
 import { StagesView } from '@/shared/ui/StagesView';
 import { mk, useMemberOf, useMemberState, useRefreshTeam, useTeam } from './teamData';
-import { arrangeMembers, hasRecords, unseenOf } from './teamList';
+import { arrangeMembers, detailShown, hasRecords, unseenOf } from './teamList';
 import { useMarkSeen } from './teamSeen';
 
 const ST_TAG: Record<string, React.ReactNode> = { done: <span className="tag line">마침</span>, archived: <span className="tag line">보관</span> };
@@ -400,7 +400,7 @@ export function MemberRoadPage() {
   const q = useMemberState(uid);
   const key = mk(uid, pid);
   const draft = useWs((s) => s.mgr[key]);
-  useMarkSeen('roadmap', pid, !!q.data?.plans[pid]);
+  useMarkSeen('roadmap', pid, detailShown({ gone, teamLoading, member: e }, !!q.data?.plans[pid]));
   if (gone) return <Navigate to={paths.team} replace />;
   if (teamLoading || !e) return <Loading text="서버에서 불러오는 중…" />;
   if (!q.data) return <Page back={paths.member(uid)} eyebrow={who(e)} title="확정한 로드맵"><MemberLoading q={q} /></Page>;
@@ -509,7 +509,7 @@ export function MemberReportPage() {
   const { rid = '' } = useParams();
   const { uid, member: e, gone, teamLoading } = useMemberGate();
   const q = useMemberState(uid);
-  useMarkSeen('report', rid, !!q.data?.reports.some((x) => x.id === rid));
+  useMarkSeen('report', rid, detailShown({ gone, teamLoading, member: e }, !!q.data?.reports.some((x) => x.id === rid)));
   if (gone) return <Navigate to={paths.team} replace />;
   if (teamLoading || !e) return <Loading text="서버에서 불러오는 중…" />;
   if (!q.data) return <Page back={paths.member(uid)} eyebrow={who(e)} title="학습 결과 보고서"><MemberLoading q={q} /></Page>;

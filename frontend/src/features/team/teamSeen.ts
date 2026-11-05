@@ -6,7 +6,7 @@ import type { NotificationKind } from '@/api/types/notification';
 import { currentSignIn, markTargetRead, stillSignedIn } from '@/features/notifications/notificationActions';
 import { failToast } from '@/shared/lib/fail';
 
-/** ready: 그 기록이 화면에 실제로 보일 때만(없어서 목록으로 돌려보내는 중에는 읽음으로 바꾸지 않는다) */
+/** ready: 그 기록이 화면에 실제로 보일 때만(teamList.detailShown · 로딩 중이거나 없어서 목록으로 돌려보내는 중에는 읽음으로 바꾸지 않는다) */
 export function useMarkSeen(kind: NotificationKind, id: string, ready: boolean) {
   const qc = useQueryClient();
   useEffect(() => {

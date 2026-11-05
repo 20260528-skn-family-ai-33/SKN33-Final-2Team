@@ -1,7 +1,7 @@
 /* 소속 직원 목록 정렬(#96): 확인 전 기록 있는 직원 → 기록 있는 직원 → 기록 없는 직원(접어 둠) */
 import { describe, expect, it } from 'vitest';
 import type { TeamMember } from '@/api/types/team';
-import { arrangeMembers, hasRecords, unseenOf } from './teamList';
+import { arrangeMembers, detailShown, hasRecords, unseenOf } from './teamList';
 
 const mem = (id: string, o: Partial<TeamMember> = {}): TeamMember =>
   ({ user: { id }, activePlans: 0, pastPlans: 0, reports: 0, unreadComments: 0, unseenPlans: 0, unseenReports: 0, ...o }) as TeamMember;
@@ -42,5 +42,22 @@ describe('hasRecords · unseenOf', () => {
   it('확인 전 수는 로드맵과 보고서를 더하고, 서버가 값을 빠뜨려도 0으로 본다', () => {
     expect(unseenOf(mem('a', { unseenPlans: 2, unseenReports: 1 }))).toBe(3);
     expect(unseenOf({ ...mem('a'), unseenPlans: undefined } as unknown as TeamMember)).toBe(0);
+  });
+});
+
+describe('detailShown (PR #107 리뷰 · 상세가 실제로 보일 때만 읽음 처리)', () => {
+  const ok = { gone: false, teamLoading: false, member: { id: '8' } };
+  it('소속 직원 목록과 그 기록이 모두 있으면 보인다', () => {
+    expect(detailShown(ok, true)).toBe(true);
+  });
+  it('직원 기록이 먼저 와도 소속 직원 목록을 기다리는 중(로딩 화면)이면 아직 안 보인다', () => {
+    expect(detailShown({ gone: false, teamLoading: true, member: null }, true)).toBe(false);
+  });
+  it('소속 직원이 아니거나(목록으로 돌려보냄) 직원을 아직 못 찾았으면 안 보인다', () => {
+    expect(detailShown({ gone: true, teamLoading: false, member: null }, true)).toBe(false);
+    expect(detailShown({ ...ok, member: null }, true)).toBe(false);
+  });
+  it('그 로드맵·보고서가 기록에 없으면(받는 중·지워짐) 안 보인다', () => {
+    expect(detailShown(ok, false)).toBe(false);
   });
 });

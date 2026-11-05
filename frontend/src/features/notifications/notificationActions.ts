@@ -7,7 +7,7 @@ import type { QueryClient } from '@tanstack/react-query';
 import { notificationsApi } from '@/api/endpoints/notifications';
 import type { AppNotification, NotificationInbox, NotificationKind } from '@/api/types/notification';
 import { plansApi } from '@/api/endpoints/plans';
-import { memberKey } from '@/features/team/teamData';
+import { memberKey, memberKeyAll, teamKey } from '@/features/team/teamData';
 import { mergeReg, mergeRes } from '@/shared/state/catalog';
 import { me, signInSeq } from '@/shared/state/session';
 import { putRec, updateWs, ws } from '@/shared/state/workspace';
@@ -39,11 +39,13 @@ export async function markRead(qc: QueryClient, t: SignIn, id?: string): Promise
 }
 
 /** 그 로드맵·보고서의 내 알림을 모두 읽음으로(#96). 같은 로그인이면 바뀐 목록을 그 직원 캐시에 넣고 true.
- *  소속 직원 목록·직원 기록의 '새 로드맵·보고서' 표시는 그 화면에 다시 들어갈 때 서버에서 새로 받는다 */
+ *  실제로 읽음이 된 알림이 있으면 소속 직원 목록·직원 기록 캐시도 무효화한다. 읽음 응답보다 먼저 끝난 목록 조회가
+ *  '새 로드맵·보고서' 표시와 우선 정렬을 옛 값으로 남기지 않게(PR #107 리뷰). 보고 있는 화면의 캐시는 바로 다시 받는다 */
 export async function markTargetRead(qc: QueryClient, t: SignIn, kind: NotificationKind, id: string): Promise<boolean> {
   const res = await notificationsApi.readTarget(kind, id);
   if (!stillSignedIn(t)) return false;
   qc.setQueryData<NotificationInbox>(notificationKey(t.id), { items: res.items, unread: res.unread });
+  if (res.changed > 0) await Promise.all([qc.invalidateQueries({ queryKey: teamKey }), qc.invalidateQueries({ queryKey: memberKeyAll })]);
   return true;
 }
 

@@ -158,14 +158,34 @@ describe('markTargetRead (#96 · 부서장이 직원 기록 화면을 열 때)',
     expect(m.readTarget).toHaveBeenCalledWith('roadmap', 'p1');
     expect(qc.getQueryData(act.notificationKey('A'))).toEqual(box('읽음으로 바뀐 로드맵'));
   });
+
+  it('PR #107 리뷰: 읽음이 된 알림이 있으면 먼저 받아 둔 소속 직원 목록·직원 기록 캐시를 무효화한다', async () => {
+    const qc = new QueryClient();
+    qc.setQueryData(['team'], { members: [] }); // 읽음 응답보다 먼저 끝난 목록 조회(옛 '새' 표시)
+    qc.setQueryData(['team-member', '8'], { unseen: { plans: ['p1'], reports: [] } });
+    m.readTarget.mockResolvedValue({ ...box('x'), changed: 1 });
+    await act.markTargetRead(qc, A1, 'roadmap', 'p1');
+    expect(qc.getQueryState(['team'])?.isInvalidated).toBe(true);
+    expect(qc.getQueryState(['team-member', '8'])?.isInvalidated).toBe(true);
+  });
+
+  it('읽음이 된 알림이 없으면(이미 읽음·예전 기록) 목록 캐시를 건드리지 않는다', async () => {
+    const qc = new QueryClient();
+    qc.setQueryData(['team'], { members: [] });
+    m.readTarget.mockResolvedValue({ ...box('x'), changed: 0 });
+    await act.markTargetRead(qc, A1, 'report', 'r1');
+    expect(qc.getQueryState(['team'])?.isInvalidated).toBe(false);
+  });
   it('응답이 오기 전에 로그인이 바뀌면 넣지 않는다', async () => {
     const qc = new QueryClient();
     const late = deferred<NotificationInbox & { changed: number }>();
     m.readTarget.mockReturnValue(late.promise);
     const pending = act.markTargetRead(qc, A1, 'report', 'r1');
     m.seq = 3;
+    qc.setQueryData(['team'], { members: [] });
     late.resolve({ ...box('이전 로그인'), changed: 1 });
     expect(await pending).toBe(false);
     expect(qc.getQueryData(act.notificationKey('A'))).toBeUndefined();
+    expect(qc.getQueryState(['team'])?.isInvalidated).toBe(false); // 다른 로그인의 캐시도 건드리지 않는다
   });
 });
