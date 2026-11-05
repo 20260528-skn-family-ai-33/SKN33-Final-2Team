@@ -148,7 +148,12 @@ class ClassifierRoutingTest(unittest.TestCase):
         self.search.return_value = []
         result, model = self.route('사내 규정', self.response(status='not_found'))
         self.assertEqual(result['evidenceStatus'], 'not_found')
-        self.assertEqual(model.call_args.args[2]['sources'], [])
+        self.assertEqual(result['basis'], [])
+        _, system, payload = model.call_args.args
+        self.assertEqual(payload['sources'], [])
+        self.assertIn('not_found를 쓰고 sourceIds=[]', system)
+        self.assertIn('자료 부족이나 질문 뜻이 불명확한 경우는 refused가 아니다', system)
+        self.assertIn('승진·보상 결과를 예측하지 않는다', system)
 
     def test_prohibited_request_without_hits_still_refuses(self):
         self.search.return_value = []
@@ -194,6 +199,7 @@ class ClassifierRoutingTest(unittest.TestCase):
         self.search_life.return_value = [self.company_hit(category=reg.knowledge.LIFE_CATEGORY, is_virtual=True)]
         result, model = self.route('사내 생활안내', self.response(summary='등록된 생활 안내예요.'))
         self.assertEqual(result['source'], 'intranet')
+        self.assertEqual(result['summary'], '등록된 생활 안내예요.')
         self.assertEqual(result['intranet'], [])
         self.assertEqual(result['knowledgeSources'][0]['chunkId'], 'company-1')
         self.assertTrue(result['knowledgeSources'][0]['isVirtual'])
@@ -202,6 +208,8 @@ class ClassifierRoutingTest(unittest.TestCase):
         self.search_company.assert_not_called()
         self.search_life.assert_called_once()
         self.assertEqual(model.call_args.args[2]['topic'], 'life')
+        self.assertIn('짧은 두 문장 이내', model.call_args.args[1])
+        self.assertIn('인용은 sourceIds에만', model.call_args.args[1])
 
     def test_life_unknown_is_guidance_not_refusal(self):
         result, _ = self.route('사내 생활안내', self.response(status='not_found'))
@@ -237,10 +245,11 @@ class ClassifierRoutingTest(unittest.TestCase):
                 self.assertEqual(result['topic'], 'company')
                 if status in ('found', 'partial'):
                     self.assertEqual(result['knowledgeSources'][0]['chunkId'], 'company-1')
-                    self.assertIn('출처: 회사 소개', result['summary'])
+                    self.assertEqual(result['summary'], '수돗물 공급 업무를 해요.')
                 else:
                     self.assertEqual(result['knowledgeSources'], [])
                 self.assertIn('수돗물', model.call_args.args[2]['sources'][0]['text'])
+                self.assertIn('짧은 두 문장 이내', model.call_args.args[1])
                 self.assertEqual(model.call_args.kwargs['role'], 'regulation')
 
     def test_company_rejects_virtual_material(self):
