@@ -78,9 +78,17 @@ def resume(job_id,employee):
 
 
 def resume_pending():
-    rows=db.all_("SELECT job_id,employee_id FROM app_ext.jobs WHERE status='failed' AND error->>'code'='JOB_INTERRUPTED' AND progress ? '_resume' AND NOT (progress ? 'redirectJobId') ORDER BY created_at LIMIT 32")
-    for row in rows:
-        try:resume(str(row['job_id']),row['employee_id'])
-        except Exception:
-            import logging
-            logging.getLogger(__name__).exception('중단 작업 자동 복구 보류')
+    import logging
+    logger = logging.getLogger(__name__)
+    while True:
+        rows = db.all_("SELECT job_id, employee_id FROM app_ext.jobs WHERE status='failed' AND error->>'code'='JOB_INTERRUPTED' AND progress ? '_resume' AND NOT (progress ? 'redirectJobId') ORDER BY created_at LIMIT 32")
+        if not rows:
+            break
+        for row in rows:
+            jid = str(row['job_id'])
+            try:
+                resume(jid, row['employee_id'])
+            except Exception:
+                logger.exception('중단 작업 자동 복구 보류: %s', jid)
+                with db.tx() as t:
+                    t.run("UPDATE app_ext.jobs SET progress = coalesce(progress, '{}'::jsonb) || jsonb_build_object('redirectJobId', 'unrecoverable') WHERE job_id = CAST(:j AS uuid)", j=jid)

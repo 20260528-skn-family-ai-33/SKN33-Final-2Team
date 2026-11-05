@@ -3,6 +3,7 @@ import { ensureDraft } from '../draftSync';
 import type { Answers, Survey } from './assessment/flow';
 export type Stored = Survey & { answers: Answers; completed: boolean };
 const flights = new Map<string, Promise<Stored>>();
+const retryFlights = new Map<string, Promise<Stored | null>>();
 export class SurveyRequestError extends Error {
   constructor(message: string, readonly code: string) { super(message); }
 }
@@ -34,8 +35,14 @@ export async function loadSurvey(owner: string): Promise<Stored> {
   const work=(async()=>{
     const path=`/api/v2/drafts/${id}/survey`;
     const existing=await request(path);
+    const inFlightRetry = retryFlights.get(key);
     if (existing && (existing.quizStatus === 'failed' || existing.quizStatus === 'interrupted') && existing.groups?.some(g => g.surveys?.length)) {
-      void request(path, { method: 'POST' }).catch(() => {});
+      if (!inFlightRetry) {
+        const retry = request(path, { method: 'POST' }).finally(() => {
+          if (retryFlights.get(key) === retry) retryFlights.delete(key);
+        });
+        retryFlights.set(key, retry);
+      }
       return { ...existing, quizStatus: 'pending' as const };
     }
     const result=(existing?.quizStatus==='failed'||existing?.quizStatus==='interrupted')?await request(path,{method:'POST'}):existing??await request(path,{method:'POST'});
