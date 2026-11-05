@@ -37,15 +37,12 @@ def start(kind: str, employee_id: int | None, ref: str, fn: Callable[[JobCtx], A
     progress=dict(progress or {})
     descriptor=getattr(fn,'_resume',None)
     if isinstance(descriptor,dict):progress['_resume']=descriptor
+    from .services.job_recovery import parent_job
+    parent=parent_job.get()
     try:
         with db.tx() as t:
             jid = str(t.val("INSERT INTO app_ext.jobs(employee_id, kind, ref, status, progress) VALUES(:e, :k, :r, 'running', :p) RETURNING job_id",
                             e=employee_id, k=kind, r=ref, p=db.J(progress or {})))
-            from .services.job_recovery import parent_job
-            parent=parent_job.get()
-            if parent:
-                updated=t.run("UPDATE app_ext.jobs SET progress=coalesce(progress,'{}'::jsonb)||jsonb_build_object('redirectJobId',CAST(:n AS text)) WHERE job_id=CAST(:j AS uuid) AND employee_id=:e AND status='failed' AND error->>'code'='JOB_INTERRUPTED'",n=jid,j=parent,e=employee_id)
-                if updated!=1:raise ApiError(409,'RECOVERY_CANCELLED','중단 작업의 상태가 변경됐어요.')
             if kind == 'learning_generation' or isinstance(descriptor,dict):
                 from .services.generation_lock import generation_guard
                 owner = generation_guard('job', jid)
@@ -83,6 +80,11 @@ def start(kind: str, employee_id: int | None, ref: str, fn: Callable[[JobCtx], A
     try:
         if before_start:
             before_start(jid)
+        if parent:
+            with db.tx() as t:
+                updated = t.run("UPDATE app_ext.jobs SET progress=coalesce(progress,'{}'::jsonb)||jsonb_build_object('redirectJobId',CAST(:n AS text)) WHERE job_id=CAST(:j AS uuid) AND employee_id=:e AND status='failed' AND error->>'code'='JOB_INTERRUPTED'", n=jid, j=parent, e=employee_id)
+                if updated != 1:
+                    raise ApiError(409, 'RECOVERY_CANCELLED', '중단 작업의 상태가 변경됐어요.')
         POOL.submit(work)
     except Exception:
         try:

@@ -124,7 +124,12 @@ function StageCard({ R }: { R: PlanRecord }) {
     }
     if (categories.size) groups.set(skill, categories);
   }
-  const hasMore = orderedSkills.length > currentSkills.size || shared.length > visibleShared.length;
+  const hasHiddenActs = pl.acts.some(a => {
+    if (a.res && sharedIds.has(a.res)) return false;
+    return a.wFrom > week || a.wTo < week;
+  });
+  const hasHiddenShared = shared.some(course => course.to < week || course.from > week);
+  const hasMore = hasHiddenActs || hasHiddenShared || orderedSkills.length > currentSkills.size;
   return (
     <div className="card">
       <div className="sec-h">
@@ -140,8 +145,8 @@ function StageCard({ R }: { R: PlanRecord }) {
         {visibleShared.map(course => <section className="home-skill-group" key={`shared:${course.id}`}>
           <h3>{course.skills.join(' and ')}</h3>
           <div className="home-material-group" data-kind="강좌">
-            <h4>강좌<span>1개</span></h4>
-            <ul className="acts"><ActRow a={course.activities[0]} R={R} /></ul>
+            <h4>강좌<span>{course.activities.length}개</span></h4>
+            <ul className="acts">{course.activities.map(activity => <ActRow key={activity.id} a={activity} R={R} />)}</ul>
           </div>
         </section>)}
         {[...groups].map(([skill, categories]) => <section className="home-skill-group" key={skill}>

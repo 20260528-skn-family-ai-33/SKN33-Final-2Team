@@ -66,14 +66,22 @@ def resume(job_id,employee):
         if row['status']!='failed' or (row.get('error') or {}).get('code')!='JOB_INTERRUPTED' or not progress.get('_resume'):
             raise ApiError(409,'RECOVERY_UNAVAILABLE','자동으로 다시 준비할 작업이 아니에요.')
         token=parent_job.set(str(job_id))
-        try:result=invoke(progress['_resume'],employee)
-        finally:parent_job.reset(token)
+        try:
+            result=invoke(progress['_resume'],employee)
+        except ApiError as e:
+            if e.code == 'OPTION_READY':
+                with db.tx() as t:
+                    t.run("UPDATE app_ext.jobs SET status='done', result=:r, updated_at=now() WHERE job_id=CAST(:j AS uuid)", r=db.J({'ready': True}), j=str(job_id))
+                return str(job_id)
+            raise
+        finally:
+            parent_job.reset(token)
         jid=result if isinstance(result,str) else (result or {}).get('jobId') if isinstance(result,dict) else None
         if not jid and isinstance(result,dict):jid=next(iter((result.get('jobs') or {}).values()),None)
         if jid:
-            with db.tx() as t:t.run("UPDATE app_ext.jobs SET progress=coalesce(progress,'{}'::jsonb)||jsonb_build_object('redirectJobId',CAST(:n AS text)) WHERE job_id=CAST(:j AS uuid)",n=str(jid),j=str(job_id))
+            with db.tx() as t:t.run("UPDATE app_ext.jobs SET progress=(coalesce(progress,'{}'::jsonb)-'recoveryFailed')||jsonb_build_object('redirectJobId',CAST(:n AS text)) WHERE job_id=CAST(:j AS uuid)",n=str(jid),j=str(job_id))
             return str(jid)
-        with db.tx() as t:t.run("UPDATE app_ext.jobs SET status='done',result=:r,updated_at=now() WHERE job_id=CAST(:j AS uuid)",r=db.J(result if isinstance(result,dict) else {}),j=str(job_id))
+        with db.tx() as t:t.run("UPDATE app_ext.jobs SET status='done',result=:r,updated_at=now(),progress=(coalesce(progress,'{}'::jsonb)-'recoveryFailed') WHERE job_id=CAST(:j AS uuid)",r=db.J(result if isinstance(result,dict) else {}),j=str(job_id))
         return str(job_id)
 
 
@@ -81,7 +89,7 @@ def resume_pending():
     import logging
     logger = logging.getLogger(__name__)
     while True:
-        rows = db.all_("SELECT job_id, employee_id FROM app_ext.jobs WHERE status='failed' AND error->>'code'='JOB_INTERRUPTED' AND progress ? '_resume' AND NOT (progress ? 'redirectJobId') ORDER BY created_at LIMIT 32")
+        rows = db.all_("SELECT job_id, employee_id FROM app_ext.jobs WHERE status='failed' AND error->>'code'='JOB_INTERRUPTED' AND progress ? '_resume' AND NOT (progress ? 'redirectJobId') AND NOT (progress ? 'recoveryFailed') ORDER BY created_at LIMIT 32")
         if not rows:
             break
         for row in rows:
@@ -91,4 +99,4 @@ def resume_pending():
             except Exception:
                 logger.exception('중단 작업 자동 복구 보류: %s', jid)
                 with db.tx() as t:
-                    t.run("UPDATE app_ext.jobs SET progress = coalesce(progress, '{}'::jsonb) || jsonb_build_object('redirectJobId', 'unrecoverable') WHERE job_id = CAST(:j AS uuid)", j=jid)
+                    t.run("UPDATE app_ext.jobs SET progress = coalesce(progress, '{}'::jsonb) || jsonb_build_object('recoveryFailed', true) WHERE job_id = CAST(:j AS uuid)", j=jid)

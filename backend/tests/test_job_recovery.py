@@ -49,3 +49,34 @@ class RecoveryTests(TestCase):
         for live,status in [(False,'interrupted'),(True,'pending')]:
             with patch.object(preassessment.db,'tx',return_value=nullcontext(Mock())),patch.object(preassessment,'read',return_value=saved),patch.object(preassessment,'project_input',return_value=project),patch.object(preassessment.profile,'view',return_value={}),patch.object(preassessment,'inputs_match',return_value=True),patch.object(preassessment,'public_view',return_value={'quizStatus':'pending'}),patch.object(generation_lock,'generation_running',return_value=live):
                 self.assertEqual(preassessment.get_survey('p',Account('employee',1,''))['survey']['quizStatus'],status)
+
+    def test_option_ready_completes_interrupted_job_as_done(self):
+        t=Mock()
+        row={'status':'failed','error':{'code':'JOB_INTERRUPTED'},'progress':{'_resume':{'operation':'post-quiz'}}}
+        with patch.object(jobs,'view'),patch.object(recovery,'generation_guard',return_value=nullcontext()),patch.object(db,'one',return_value=row),patch.object(recovery,'invoke',side_effect=ApiError(409,'OPTION_READY','이미 작성된 계획이에요')),patch.object(db,'tx',return_value=nullcontext(t)):
+            self.assertEqual(recovery.resume('old',1),'old')
+            self.assertIn("status='done'",t.run.call_args.args[0])
+
+    def test_failed_before_start_does_not_redirect_parent_job(self):
+        t=Mock()
+        t.val.return_value='new-job'
+        token=recovery.parent_job.set('parent-job')
+        try:
+            with patch.object(db,'tx',return_value=nullcontext(t)),patch.object(jobs,'cancel') as cancel:
+                def failing_mark(jid):
+                    raise ApiError(409,'OPTION_READY','ready')
+                with self.assertRaises(ApiError):
+                    jobs.start('option',1,'ref',lambda ctx:None,before_start=failing_mark)
+                cancel.assert_called_once_with('new-job',1)
+                self.assertFalse(any('redirectJobId' in str(c) for c in t.run.call_args_list))
+        finally:
+            recovery.parent_job.reset(token)
+
+    def test_resume_pending_marks_recovery_failed_without_redirect_job_id(self):
+        t=Mock()
+        rows=[{'job_id':'11111111-1111-1111-1111-111111111111','employee_id':1}]
+        with patch.object(db,'all_',side_effect=[rows,[]]),patch.object(recovery,'resume',side_effect=RuntimeError('boom')),patch.object(db,'tx',return_value=nullcontext(t)):
+            recovery.resume_pending()
+            sql=t.run.call_args.args[0]
+            self.assertIn('recoveryFailed',sql)
+            self.assertNotIn('redirectJobId',sql)

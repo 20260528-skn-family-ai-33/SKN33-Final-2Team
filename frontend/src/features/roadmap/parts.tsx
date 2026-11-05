@@ -29,7 +29,7 @@ export function ActRow({ a, R }: { a: Activity; R: PlanRecord }) {
         <span className="tx">
           {a.title}
           <small>
-            {actMeta(a)} · {activityTime(a).text}
+            {a.skill ? `${a.skill} · ` : ''}{actMeta(a)} · {activityTime(a).text}
             {memo ? ' · 메모 있음' : ''}
           </small>
         </span>
