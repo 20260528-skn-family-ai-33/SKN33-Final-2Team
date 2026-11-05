@@ -79,6 +79,30 @@ describe('P1·P3 요청을 시작한 로그인에만 반영', () => {
     expect(qc.getQueryData(act.notificationKey('A'))).toEqual(box('내 로드맵'));
     expect(qc.getQueryData(act.notificationKey('B'))).toBeUndefined();
   });
+
+  it('PR #107 리뷰: 한 건·모두 읽음도 소속 직원 목록·직원 기록 캐시를 무효화한다(새 로드맵·보고서 표시가 남지 않게)', async () => {
+    for (const id of ['n1', undefined]) {
+      const qc = new QueryClient();
+      qc.setQueryData(['team'], { members: [] });
+      qc.setQueryData(['team-member', '8'], { unseen: { plans: ['p1'], reports: [] } });
+      (id ? m.read : m.readAll).mockResolvedValue(box('x'));
+      expect(await act.markRead(qc, A1, id)).toBe(true);
+      expect(qc.getQueryState(['team'])?.isInvalidated).toBe(true);
+      expect(qc.getQueryState(['team-member', '8'])?.isInvalidated).toBe(true);
+    }
+  });
+
+  it('다른 로그인의 늦은 읽음 응답은 목록 캐시도 건드리지 않는다', async () => {
+    const qc = new QueryClient();
+    qc.setQueryData(['team'], { members: [] });
+    const late = deferred<NotificationInbox>();
+    m.readAll.mockReturnValue(late.promise);
+    const pending = act.markRead(qc, A1);
+    m.seq = 3;
+    late.resolve(box('이전 로그인'));
+    expect(await pending).toBe(false);
+    expect(qc.getQueryState(['team'])?.isInvalidated).toBe(false);
+  });
 });
 
 describe('P2 부서장 알림: 이동 전에 그 직원 기록을 새로 받는다', () => {
