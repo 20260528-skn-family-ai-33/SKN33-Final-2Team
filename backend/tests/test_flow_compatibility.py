@@ -65,8 +65,9 @@ class FlowCompatibilityTests(unittest.TestCase):
   w,_=self.state();pending=[];old=copy.deepcopy(w['draft']['gen']['options']['A1'])
   newer=dict(copy.deepcopy(old),optionId='new-option',learningSkillsVersion='new-skills')
   def mutate(employee,project,fn):fn(Mock(),w);return w
-  with patch.object(drafts,'_mutate',side_effect=mutate),patch.object(drafts.jobs,'start',side_effect=lambda kind,employee,key,work:pending.append(work) or 'job'),patch.object(drafts,'present',side_effect=lambda state,*_:state),patch.object(drafts.rt,'context',return_value=Mock()),patch.object(drafts.RM,'option',return_value=newer),patch.object(drafts,'_maybe_support'):
+  with patch.object(drafts,'_mutate',side_effect=mutate),patch.object(drafts.jobs,'start',side_effect=lambda kind,employee,key,work:pending.append(work) or 'job'),patch.object(drafts,'present',side_effect=lambda state,*_:state),patch.object(drafts.rt,'context',return_value=Mock()),patch.object(drafts.RM,'option',return_value=newer),patch.object(drafts,'_maybe_support'),patch('app.services.material_preparation.prepare') as prepared:
    drafts.regenerate(1,'p','A1',None);pending[0](Mock())
+   prepared.assert_called_once_with(1,'p',['A1'])
   self.assertIsNone(scope_view(w['v2Survey'],'A1',newer)['recommendations'])
   drafts._apply_client(w,{'genCur':{'A1':0}})
   restored=scope_view(w['v2Survey'],'A1',old)
@@ -103,7 +104,7 @@ class FlowCompatibilityTests(unittest.TestCase):
   w,_=self.state();jobs=[]
   def mutate(employee,project,fn):fn(Mock(),w);return w
   def start(kind,employee,key,work):jobs.append(work);return 'job'
-  with patch.object(drafts,'_mutate',side_effect=mutate),patch.object(drafts.jobs,'start',side_effect=start),patch.object(drafts,'present',side_effect=lambda state,*_:state),patch.object(drafts.rt,'context',return_value=Mock()),patch.object(drafts.RM,'option',return_value={'id':'A1','acts':[]}),patch.object(drafts,'_maybe_support'):
+  with patch.object(drafts,'_mutate',side_effect=mutate),patch.object(drafts.jobs,'start',side_effect=start),patch.object(drafts,'present',side_effect=lambda state,*_:state),patch.object(drafts.rt,'context',return_value=Mock()),patch.object(drafts.RM,'option',return_value={'id':'A1','acts':[]}),patch.object(drafts,'_maybe_support'),patch('app.services.material_preparation.prepare') as prepared:
    drafts.regenerate(1,'p','A1',None)
    self.assertIn('A1',w['v2Survey']['courseRecommendations']) # Keep the old result until replacement succeeds.
    drafts._apply_client(w,{'goal':'완전히 바뀐 목표'})

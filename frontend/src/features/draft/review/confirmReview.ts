@@ -1,4 +1,5 @@
 import { draftsApi } from '@/api/endpoints/drafts';
+import { ensurePostQuiz } from '@/features/assessment/postActions';
 import { paths } from '@/app/paths';
 import { failToast } from '@/shared/lib/fail';
 import { updateWs, ws } from '@/shared/state/workspace';
@@ -30,6 +31,7 @@ export function confirmReview(go: Go, save?: () => Promise<boolean>): Promise<bo
       if (!await reloadWorkspace(current)) return false;
       if (ws().owner !== owner) return false;
       updateWs(state => { state.lastNew = null; });
+      if (!ws().plans?.[result.planId]?.post?.quizSurvey) void ensurePostQuiz(result.planId).catch(() => {});
       go(paths.confirmed(result.planId), {force:true});
       return true;
     } catch (error) {

@@ -22,9 +22,11 @@ import { ResPicker } from '@/shared/ui/ResPicker';
 import { DetailsForm } from '../details/DetailsForm';
 import { draftCall, pullDraft } from '../draftSync';
 import { deepOnOf, diagKey, dv, edited, editMissing, editOk, FIX, startOf, staleOf } from '../model';
+import { prepareRoadmaps } from '../prepareRoadmaps';
 import { openStaleSheet } from '../stale';
 import { Stepper } from '../Stepper';
 import { useDraftWatch } from '../useDraftWatch';
+import { failToast } from '@/shared/lib/fail';
 
 const DIAG_AGENT = '진단 에이전트 · 수준 진단·로드맵 미리보기';
 let diagAsk = '';
@@ -52,6 +54,16 @@ export async function genStart(go: ReturnType<typeof useGo>): Promise<void> {
     return;
   }
   if(ws().draft.gen){go(paths.newOptions,{force:true});return;}
+  if (ws().draft.v2Assessment?.completed) {
+    try {
+      await prepareRoadmaps();
+    } catch (err) {
+      failToast(err, '로드맵 생성을 시작하지 못했어요');
+      return;
+    }
+    go(ws().draft.gen ? paths.newOptions : paths.newGen, { force: true });
+    return;
+  }
   const r = await draftCall('로드맵 생성을 시작하지 못했어요', (id) => draftsApi.optionsStart(id));
   if (!r) return;
   go(ws().draft.gen ? paths.newOptions : paths.newGen, { force: true });

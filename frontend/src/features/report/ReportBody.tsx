@@ -1,3 +1,4 @@
+import { QuizLearningCheck } from './QuizLearningCheck';
 /* 보고서 본문: 직원 화면과 부서장 화면(소속 직원 보고서 · 10/15 전체 공개)이 함께 쓴다 (5차 P.reportBody · P.reportDeep) */
 import type { PlanRecord, Report } from '@/api/types/plan';
 import { DeepReveal } from '@/features/assessment/quizParts';
@@ -33,6 +34,7 @@ export function ReportBody({ r }: { r: Report }) {
           <SurveyComparisonRow phase="post" value={row.post} />
         </li>)}</ol>
       </details>}
+      {!!r.quizEvidence?.length && <QuizLearningCheck evidence={r.quizEvidence} />}
       <div className="card" style={{ marginTop: 12 }}>
         <h2 className="st">실행 기록</h2>
         <dl className="kv">

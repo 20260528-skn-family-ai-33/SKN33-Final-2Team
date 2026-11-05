@@ -1,24 +1,25 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 const mock=vi.hoisted(()=>({
   state:{pendingFlow:undefined as 'materials'|undefined,owner:'u' as string|null,draftId:'d' as string|null,lastNew:'old' as string|null,draft:{goal:'검색 구현',prefs:{hours:4},chosen:'A1',v2Assessment:{generationId:'g',materialsKey:'m'}}},
-  flush:vi.fn(),confirm:vi.fn(),reload:vi.fn(),toast:vi.fn(),
+  flush:vi.fn(),confirm:vi.fn(),reload:vi.fn(),toast:vi.fn(),ensurePostQuiz:vi.fn(),
 }));
 vi.mock('@/shared/state/workspace',()=>({ws:()=>mock.state,updateWs:(fn:(s:typeof mock.state)=>void)=>fn(mock.state)}));
 vi.mock('@/api/endpoints/drafts',()=>({draftsApi:{confirm:mock.confirm}}));
+vi.mock('@/features/assessment/postActions',()=>({ensurePostQuiz:mock.ensurePostQuiz}));
 vi.mock('@/shared/lib/fail',()=>({failToast:mock.toast}));
 vi.mock('../draftSync',()=>({flush:mock.flush,reloadWorkspace:mock.reload,DraftSaveError:class extends Error{}}));
 import { confirmReview } from './confirmReview';
 function deferred<T>() {let resolve!:(value:T)=>void; const work=new Promise<T>(done=>{resolve=done;});return {work,resolve};}
 beforeEach(()=>{
   vi.resetAllMocks();mock.state.pendingFlow=undefined;mock.state.owner='u';mock.state.draftId='d';mock.state.lastNew='old';mock.state.draft.goal='검색 구현';mock.state.draft.chosen='A1';
-  mock.flush.mockResolvedValue(undefined);mock.confirm.mockResolvedValue({planId:'plan'});mock.reload.mockResolvedValue(true);
+  mock.flush.mockResolvedValue(undefined);mock.confirm.mockResolvedValue({planId:'plan'});mock.reload.mockResolvedValue(true);mock.ensurePostQuiz.mockResolvedValue(undefined);
 });
 it('연속 확정 클릭은 산출물 저장·확정·화면 이동을 각각 한 번만 실행한다',async()=>{
   const pending=deferred<boolean>(),save=vi.fn(()=>pending.work),go=vi.fn();
   const first=confirmReview(go,save),second=confirmReview(go,save);
   await vi.waitFor(()=>expect(save).toHaveBeenCalledOnce());expect(mock.confirm).not.toHaveBeenCalled();pending.resolve(true);
   expect(await first).toBe(true);expect(await second).toBe(true);
-  expect(mock.confirm).toHaveBeenCalledExactlyOnceWith('d');expect(mock.reload).toHaveBeenCalledOnce();expect(go).toHaveBeenCalledExactlyOnceWith('/roadmaps/plan/confirmed',{force:true});
+  expect(mock.confirm).toHaveBeenCalledExactlyOnceWith('d');expect(mock.reload).toHaveBeenCalledOnce();expect(mock.ensurePostQuiz).toHaveBeenCalledExactlyOnceWith('plan');expect(go).toHaveBeenCalledExactlyOnceWith('/roadmaps/plan/confirmed',{force:true});
 });
 it('자동 저장 대기 중 입력이 바뀌면 산출물 저장·확정을 시작하지 않는다',async()=>{
   const pending=deferred<void>();mock.flush.mockReturnValue(pending.work);const save=vi.fn(),go=vi.fn();

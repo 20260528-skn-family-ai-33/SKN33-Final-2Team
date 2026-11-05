@@ -14,6 +14,11 @@ class ActivityTests(unittest.TestCase):
    return propose(self.saved,self.draft,lambda *_:{'acts':self.acts if acts is None else acts,'skillSummaries':{'S':['자료 이해','프로젝트 적용','결과 검증']}},'openai')
  def test_all_proposed_activities_selected_by_default(self):
   p=self.propose();self.assertEqual(p['selectedIds'],['0','1'])
+ def test_duplicate_course_activities_in_same_skill_are_merged_into_one(self):
+  acts=[{'skill':'S','stage':1,'title':'학습 1','res':'c','hours':2,'how':'기초 확인'},{'skill':'S','stage':2,'title':'학습 2','res':'c','hours':2,'how':'심화 확인'},{'skill':'S','stage':3,'title':'적용','res':None,'hours':2,'how':'구현 후 확인한다.'}]
+  p=self.propose(acts)
+  self.assertEqual(len([a for a in p['option']['acts'] if a.get('res')=='c']),1)
+  self.assertEqual(p['selectedIds'],['0','1'])
  def test_unselected_material_rejected(self):
   acts=deepcopy(self.acts);acts[0]['res']='outside'
   with self.assertRaises(ApiError):self.propose(acts)

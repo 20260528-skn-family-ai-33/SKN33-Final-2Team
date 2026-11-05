@@ -27,7 +27,7 @@ class DurationDisplayTests(TestCase):
         plan = apply_plan_schedule(source)
         self.assertEqual((plan['materialHours'], plan['taskHours'], plan['otherMaterialHours'], plan['totalH']),
                          (18.5, 8, 10, 36.5))
-        self.assertEqual(plan['weeks'], 4)
+        self.assertEqual(plan['weeks'], 6)
         self.assertEqual(apply_plan_schedule(plan), plan)
 
     def test_selected_and_replaced_tasks_match_the_review_contract(self):
@@ -55,7 +55,7 @@ class DurationDisplayTests(TestCase):
                 selected = [act['id'] for act in option['acts'] if task or act.get('res')]
                 chosen = selection_option(saved, draft, selected, 'base')
                 plan = roadmap.build_plan(chosen, {'hours': 5}, 'SQL')
-                self.assertEqual((plan['weeks'], plan['materialHours'], plan['taskHours']), (4, 18.5, 8 if task else 0))
+                self.assertEqual((plan['weeks'], plan['materialHours'], plan['taskHours']), (6, 18.5, 8 if task else 0))
                 self.assertEqual(next(act for act in plan['acts'] if act.get('res') == 'book')['hours'], 5)
             composed = compose_skill_selection(saved, draft, 'base', {'SQL': 'alternative'})
             saved['activityVersions'].append(composed)
@@ -67,14 +67,14 @@ class DurationDisplayTests(TestCase):
         source = example_plan()
         before = deepcopy(source)
         plan = apply_plan_schedule(source)
-        self.assertEqual((plan['weeks'], plan['materialHours'], plan['taskHours'], plan['totalH']), (4, 18.5, 8, 26.5))
+        self.assertEqual((plan['weeks'], plan['materialHours'], plan['taskHours'], plan['totalH']), (6, 18.5, 8, 26.5))
         books = [a for a in plan['acts'] if a['res'] == 'book']
         self.assertTrue(all(a['hours'] == 5 and a['catalogHours'] == 10 and a['hoursAllocation'] == 'book-week' for a in books))
         self.assertEqual(source, before)
         self.assertEqual(apply_plan_schedule(plan), plan)
         plan['hours'] = 10
         revised = apply_plan_schedule(plan)
-        self.assertEqual((revised['weeks'], revised['materialHours'], revised['taskHours']), (3, 23.5, 8))
+        self.assertEqual((revised['weeks'], revised['materialHours'], revised['taskHours']), (5, 23.5, 8))
         self.assertTrue(all(a['hours'] == 10 and a['catalogHours'] == 10 for a in revised['acts'] if a['res'] == 'book'))
         self.assertEqual(plan['acts'][1]['hours'], 5)
 
@@ -83,7 +83,7 @@ class DurationDisplayTests(TestCase):
         for row in source['def']['learningReport']['recommendations']['skills']:
             row['courses'][0].update(hours=None, timeStatus='unknown')
         plan = apply_plan_schedule(source)
-        self.assertEqual((plan['weeks'], plan['materialHours'], plan['totalH']), (2, 10, 18))
+        self.assertEqual((plan['weeks'], plan['materialHours'], plan['totalH']), (4, 10, 18))
         self.assertTrue(plan['totalHUnknown'])
         self.assertTrue(all(a['hours'] == 5 and a['timeStatus'] == 'unknown' and '미확인' in a['hoursBasis'] for a in plan['acts'] if a['res'] == 'course'))
 

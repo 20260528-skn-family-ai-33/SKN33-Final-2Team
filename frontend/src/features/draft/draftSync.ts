@@ -27,7 +27,7 @@ function bodyOf(st: WsState): Record<string, unknown> {
   const b: Record<string, unknown> = Object.fromEntries(CLIENT.map((k) => [k, d[k]]));
   b.lastNew = st.lastNew;
   if (st.pendingFlow === 'inputs' || st.pendingFlow === 'options') b.resetAfter = st.pendingFlow;
-  if (d.doc && d.doc.status === 'ok') b.docSummary = d.doc.summary || '';
+  if (d.doc && d.doc.status === 'ok') b.docSummary = (d.doc.summary || '').slice(0, 1500);
   if (d.gen && d.gen.cur && curJ(st) !== serverGenCur) b.genCur = d.gen.cur;
   return b;
 }
@@ -60,7 +60,7 @@ export function takeDraftInto(st: WsState, r: Partial<DraftResponse> | null | un
   const staleAnswerResponse = soft && st.draft.v2Assessment?.generationId === server.v2Assessment?.generationId && st.draft.v2Assessment?.completed === false && server.v2Assessment?.completed === true;
   if (soft && st.draft) {
     const keep = Object.fromEntries(CLIENT.map((k) => [k, st.draft[k]]));
-    const summary = st.draft.doc && server.doc ? st.draft.doc.summary : undefined;
+    const summary = st.draft.doc && server.doc ? st.draft.doc.summary?.slice(0, 1500) : undefined;
     st.draft = { ...freshDraft(), ...server, ...keep };
     if (summary !== undefined && st.draft.doc) st.draft.doc = { ...st.draft.doc, summary };
   } else st.draft = { ...freshDraft(), ...server };
@@ -68,7 +68,7 @@ export function takeDraftInto(st: WsState, r: Partial<DraftResponse> | null | un
   if (staleInputResponse) invalidateDraft(st);
   else if (staleAnswerResponse) invalidateDraft(st, 'answers');
   else if (soft && st.pendingFlow === 'inputs') {
-    if (!server.gen && !server.v2Assessment) st.pendingFlow = undefined;
+    if (!server.gen && !server.v2Assessment?.completed) st.pendingFlow = undefined;
     else invalidateDraft(st);
   } else if (soft && st.pendingFlow === 'options') {
     if (!server.v2Assessment?.materialsReady && !r.draftPlan && server.chosen === st.draft.chosen) st.pendingFlow = undefined;

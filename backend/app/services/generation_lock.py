@@ -32,3 +32,9 @@ def generation_guard(kind, identifier):
         finally:
             # 세션 종료도 잠금을 해제한다. 연결은 풀에 재사용하지 않는다.
             connection.execute(text('SELECT pg_advisory_unlock(:key)'), {'key': key})
+
+
+def generation_running(kind, identifier):
+    """잠금을 획득하지 않고 실제 생성 세션의 존재만 확인한다."""
+    key=lock_key(kind,identifier) & ((1 << 64)-1)
+    return bool(db.val("SELECT EXISTS (SELECT 1 FROM pg_locks WHERE locktype='advisory' AND granted AND objsubid=1 AND classid::bigint=:hi AND objid::bigint=:lo AND database=(SELECT oid FROM pg_database WHERE datname=current_database()))",hi=key>>32,lo=key & ((1<<32)-1)))

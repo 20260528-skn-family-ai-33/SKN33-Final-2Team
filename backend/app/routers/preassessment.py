@@ -55,7 +55,10 @@ def inputs_match(saved: dict, project: dict, personal: dict) -> bool:
     return saved.get('project') == project and saved.get('profile') == personal
 
 
-def generate_for(employee_id: int, project_id: str) -> dict:
+def generate_for(employee_id: int, project_id: str, *, staged: bool = False) -> dict:
+    if staged:
+        from app.services.preassessment_staged import generate_for as staged_generate
+        return staged_generate(employee_id, project_id)
     with generation_guard('draft', str(project_id)):
         me = profile.view(employee_id)
         if me is None:
@@ -125,13 +128,17 @@ def get_survey(project_id: UUID, a: Account = Depends(require_employee)):
         me = profile.view(a.id)
         if me is None or not inputs_match(saved, project, profile_input(me)):
             return {'survey': None, 'stale': True}
-        return {'survey': public_view(saved)}
+        view=public_view(saved)
+        if saved.get('quizStatus')=='pending':
+            from app.services.generation_lock import generation_running
+            if not generation_running('draft',str(project_id)):view['quizStatus']='interrupted'
+        return {'survey': view}
 
 
 @r.post('/api/v2/drafts/{project_id}/survey')
-@queued_generation
+@queued_generation(reference_prefix='survey:')
 def make_survey(project_id: UUID, a: Account = Depends(require_employee)):
-    return {'survey': generate_for(a.id, str(project_id))}
+    return {'survey': generate_for(a.id, str(project_id), staged=True)}
 
 
 @r.put('/api/v2/drafts/{project_id}/survey/answers')
@@ -213,7 +220,13 @@ def get_recommendations(project_id: UUID, a: Account = Depends(require_employee)
             from app.services import drafts as draft_service
             draft=draft_service._row(t,a.id,str(project_id),lock=False)['draft_choices'].get('draft') or {}
             saved['durationEstimates']=duration_estimates(saved,draft)
-        return recommendation_view(saved)
+        result=recommendation_view(saved)
+        if course:
+            from app.services.material_preparation import pending
+            from app.services import drafts as draft_service
+            draft=draft_service._row(t,a.id,str(project_id),lock=False)['draft_choices'].get('draft') or {}
+            result['preparingJobId']=pending(a.id,str(project_id),course,((draft.get('gen') or {}).get('options') or {}).get(course))
+        return result
 
 
 @r.post('/api/v2/drafts/{project_id}/recommendations')

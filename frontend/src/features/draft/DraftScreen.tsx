@@ -31,4 +31,4 @@ export function DraftScreen({ step, extra, remember = true, children }: { step?:
 export const editGate = (s: WsState) => (s.draft.diag && s.draft.diag.key === diagKey(s.draft) ? null : paths.newResult);
 /* 3안 작성·선택 화면은 앞 단계 결과(handoff·gen)만 보고 들어오므로, 기획서를 다시 읽는 중이면 따로 1단계로 돌려보낸다(#81 리뷰) */
 export const genGate = (s: WsState) => (docBusy(s) ? paths.newGoal : s.draft.handoff || s.draft.v2Assessment?.completed ? null : blockedTo(s, 'options') || paths.newResult);
-export const optionsGate = (s: WsState) => (docBusy(s) ? paths.newGoal : s.draft.gen ? null : s.draft.handoff ? paths.newGen : blockedTo(s, 'options') || paths.newResult);
+export const optionsGate = (s: WsState) => (docBusy(s) ? paths.newGoal : s.draft.gen ? null : s.draft.handoff || s.draft.v2Assessment?.completed ? paths.newGen : blockedTo(s, 'options') || paths.newResult);

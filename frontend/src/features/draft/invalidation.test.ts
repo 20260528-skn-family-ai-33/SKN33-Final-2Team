@@ -1,4 +1,5 @@
 import { blockedTo } from './model';
+import { skillInputKey, skillsReady } from './details/skillInput';
 import type { OptionDef } from '@/api/types/draft';
 import { describe, expect, it } from 'vitest';
 import { freshWs } from '@/shared/state/workspace';
@@ -116,5 +117,19 @@ describe('코스별 자료 수정과 검토 이동',()=>{
   });
   it('늦은 응답의 준비 플래그가 남아도 미저장 표시는 검토 진입을 차단한다',()=>{
     const s=ready();s.pendingFlow='materials';expect(blockedTo(s,'review')).toBe('/new/options');
+  });
+  it('3단계 선준비 설문과 1500자 요약 절단이 3→4단계 진입(detailsOk)을 되돌리지 않는다',()=>{
+    const longSummary='가'.repeat(1800);
+    const s=freshWs('u');s.draftId='d';s.draft.goal='검색 구현';s.draft.selectedSkills=[{name:'RAG',application:'검색'}];
+    s.draft.doc={name:'a.pdf',size:1,chars:1800,imageTotal:0,imagesRead:0,imageNotes:[],visionWhy:'',status:'ok',summary:longSummary};
+    s.draft.skillInputKey=JSON.stringify([s.draft.goal,s.draft.project,longSummary]);
+    s.draft.detailsOk=true;s.pendingFlow='inputs';
+    const server={...s.draft,doc:{...s.draft.doc,summary:longSummary.slice(0,1500)},v2Assessment:{generationId:'g',completed:false}};
+    takeDraftInto(s,{draftId:'d',draft:server},true);
+    expect(s.draft.detailsOk).toBe(true);
+    expect(s.pendingFlow).toBeUndefined();
+    expect(skillsReady(s.draft)).toBe(true);
+    expect(skillInputKey(s.draft)).toBe(skillInputKey(server));
+    expect(blockedTo(s,'quiz')).toBeNull();
   });
 });

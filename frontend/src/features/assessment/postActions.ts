@@ -19,12 +19,16 @@ const quizFlights = new Map<string, Promise<void>>();
 export function ensurePostQuiz(pid: string): Promise<void> {
   if (ws().plans[pid]?.post.quizSurvey) return Promise.resolve();
   const pending = quizFlights.get(pid); if (pending) return pending;
-  const work = plansApi.postQuiz(pid).then(result => {
+  const apply = (result: Awaited<ReturnType<typeof plansApi.postQuiz>>) => {
     const mine = ws().plans[pid]?.post;
     const keep = mine ? { answers: { ...mine.answers }, quizAnswers: { ...mine.quizAnswers }, goalSelf: mine.goalSelf } : null;
     takePlan(result);
     if (keep && ws().plans[pid]) updateWs(s => { Object.assign(s.plans[pid].post, keep); });
-  });
+  };
+  const work = (typeof plansApi.get === 'function'
+    ? plansApi.get(pid).then(got => got?.plan?.post?.quizSurvey ? got : plansApi.postQuiz(pid), () => plansApi.postQuiz(pid))
+    : plansApi.postQuiz(pid)
+  ).then(apply);
   quizFlights.set(pid, work);
   void work.finally(() => quizFlights.delete(pid)).catch(() => {});
   return work;

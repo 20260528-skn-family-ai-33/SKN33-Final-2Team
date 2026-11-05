@@ -62,7 +62,7 @@ def _text(value: Any, label: str) -> str:
 
 def generate_survey(project: dict[str, Any], selection: dict[str, Any], profile: dict[str, Any],
                     generate: Callable[[str, dict[str, Any]], dict[str, Any]], *,
-                    require_measurement: bool = False) -> dict[str, Any]:
+                    require_measurement: bool = False, phase: str | None = None) -> dict[str, Any]:
     if not isinstance(project, dict) or not isinstance(selection, dict) or not isinstance(profile, dict):
         raise SurveyError('프로젝트·스킬·프로필 입력 형식을 확인해 주세요.')
     goal = _text(project.get('goal'), '목표')
@@ -84,7 +84,11 @@ def generate_survey(project: dict[str, Any], selection: dict[str, Any], profile:
                         'quizzesPerSkill': per_skill})
     if desired == goal:
         payload.pop('desiredCompetencies')
-    raw = generate(SYSTEM, payload)
+    if phase not in (None, "surveys", "quizzes"): raise SurveyError("문항 생성 단계를 확인해 주세요.")
+    if phase:
+        payload["quizzesPerSkill" if phase == "surveys" else "surveysPerSkill"] = 0
+    instruction = SYSTEM + (f"\n[현재 생성 단계] {phase}만 생성. 반대 종류는 빈 배열. 개수는 payload의 surveysPerSkill·quizzesPerSkill 기준." if phase else "")
+    raw = generate(instruction, payload)
     groups = raw.get('groups') if isinstance(raw, dict) else None
     if not isinstance(groups, list) or len(groups) != len(names):
         raise SurveyError('스킬별 문항 그룹 수가 일치하지 않습니다.')
@@ -101,7 +105,7 @@ def generate_survey(project: dict[str, Any], selection: dict[str, Any], profile:
         cleaned = {'skill': skill, 'title': title, 'surveys': [], 'quizzes': []}
         for kind in ('surveys', 'quizzes'):
             rows = group.get(kind)
-            if not isinstance(rows, list) or len(rows) != per_skill:
+            if not isinstance(rows, list) or len(rows) != (per_skill if phase is None or phase == kind else 0):
                 raise SurveyError('스킬별 설문·퀴즈 개수가 일치하지 않습니다.')
             for row in rows:
                 if not isinstance(row, dict):
@@ -144,7 +148,7 @@ def generate_survey(project: dict[str, Any], selection: dict[str, Any], profile:
     # 화면은 그룹별 교차가 아니라 전체 설문 → 전체 퀴즈의 두 단계로 진행한다.
     phases = [{'kind': kind, 'questionIds': [row['id'] for group in ordered for row in group[kind]]}
               for kind in ('surveys', 'quizzes')]
-    return {'groups': ordered, 'phases': phases, 'questionCount': len(names) * per_skill * 2}
+    return {'groups': ordered, 'phases': phases, 'questionCount': len(names) * per_skill * (1 if phase else 2)}
 
 
 def generate_from_profile(ctx: Any, project: dict[str, Any], selection: dict[str, Any]) -> dict[str, Any]:

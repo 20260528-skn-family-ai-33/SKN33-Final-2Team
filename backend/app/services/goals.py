@@ -146,6 +146,7 @@ def _request(employee_id: int, trigger: str, avoid: list[str] | None, mode: str 
         with db.tx() as t:
             _run_state(t, employee_id, status='running', used=inp['used'], profile_hash=ph, trigger=trigger, job_id=jid)
 
+    work._resume = {'operation':'goals.request','kwargs':{'employee_id':employee_id,'trigger':trigger,'avoid':avoid,'mode':mode}}
     return jobs.start('goal-suggestions', employee_id, str(employee_id), work, before_start=mark)
 
 

@@ -6,7 +6,7 @@ export const initialMaterialPreparation:MaterialPreparation={scope:'',revealed:f
 export function canRevealMaterials(courses:MaterialPreparation['courses'],versions:Record<string,string>,unavailable:string[],generating:string[]):boolean {
  const ready=(course:string)=>!!versions[course]&&courses[course]?.version===versions[course]&&courses[course]?.status==='ready';
  const settled=['A1','A2','A3'].every(course=>{
-  if(generating.includes(course))return false;
+  if(generating.includes(course))return !!versions[course];
   if(!versions[course])return unavailable.includes(course);
   return courses[course]?.version===versions[course]&&['ready','failed'].includes(courses[course]?.status);
  });

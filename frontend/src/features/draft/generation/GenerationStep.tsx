@@ -233,7 +233,7 @@ export function GenerationStep() {
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const cur = ws().draft;
-      if (cur.v2Assessment) {
+      if (cur.v2Assessment && !curGen(cur)) {
         void genStart(go);
         return;
       }
