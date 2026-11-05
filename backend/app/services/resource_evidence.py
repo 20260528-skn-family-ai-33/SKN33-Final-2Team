@@ -356,12 +356,12 @@ def _profile(skill: dict, project: dict, rows: list, descriptions: list[str], te
     applied = [value for _, value in applied_units] + applied_claims
     required, missing, conflicts = _stack_evidence(text, applied, project, skill, stage)
     if stage == 'security' and applied and missing and (core := crash_core_scope(skill)):
-        # 보안 검증 차시가 있을 때, 구현에만 명시된 기술은 별도의 구현 실습에서도 확인한다.
+        # 명사형 결과물의 기술도 별도 구현 실습에서 확인한다. 보안에 명시된 기술은 보안 차시에서 확인한다.
         build_stacks, security_stacks = set(), set()
         for target in _target_texts(skill, core):
             if _security.search(target):
                 security_stacks.update(_stack_names(target))
-            elif _build.search(target):
+            elif target == core['coreOutcome'] or _build.search(target):
                 build_stacks.update(_stack_names(target))
         separate_stacks = set(missing) & (build_stacks - security_stacks)
         if separate_stacks:

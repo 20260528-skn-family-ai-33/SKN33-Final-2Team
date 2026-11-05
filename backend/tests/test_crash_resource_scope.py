@@ -4,7 +4,7 @@ import json
 import unittest
 from unittest.mock import Mock
 
-from app.agents.resource_recommendations import recommend_resources
+from app.agents.resource_recommendations import recommend_resources, validate_choices
 from app.services import crash_courses, resource_evidence, resource_rag
 from test_recommendation_suitability import WEB, course
 
@@ -68,6 +68,18 @@ class CrashResourceScopeTests(unittest.TestCase):
         self.assertEqual(payload['project']['goal'], original[0]['goal'])
         self.assertEqual((self.project, self.selection, self.option), original)
 
+    def test_unsuitable_model_only_choice_leaves_course_unselected(self):
+        items = {row['id']: row for row in (self.short, self.long, self.django)}
+        pools = [{'name': WEB, 'courses': list(items.values()), 'books': []}]
+        raw = {'skills': [{'name': WEB, 'courses': [{'id': 'django'}], 'books': []}]}
+        result = recommend_resources(self.project, self.selection, items, lambda *_: raw,
+                                     course=self.option, retrieved_pools=pools)
+        row, = result['skills']
+        self.assertEqual(row['courses'], [])
+        self.assertIsNone(row['selectedCourse'])
+        self.assertIn(row['courseDiagnostic']['reason'], ('stack_mismatch', 'insufficient_evidence'))
+        validate_choices(result, {WEB: {'course': None, 'books': []}})
+
     def test_core_security_stage_and_explicit_stack_still_required(self):
         self.skill['coreCriteria'] = ['FastAPI 보안 개념과 권한 경계를 검증']
         secured = course('secured', ['FastAPI 권한 경계 검증 실습'], skills=[WEB], hours=6)
@@ -84,7 +96,8 @@ class CrashResourceScopeTests(unittest.TestCase):
         self.assertEqual(chosen[WEB]['id'], 'secured')
 
     def test_core_implementation_and_security_can_be_taught_in_separate_units(self):
-        self.skill['coreCriteria'] = ['FastAPI REST API 구현', 'JWT 권한 경계 검증']
+        self.skill['coreOutcome'] = 'FastAPI CRUD API'
+        self.skill['coreCriteria'] = ['권한 테스트 통과']
         security_unit = 'JWT 권한 경계 검증 실습'
         complete = course('complete', ['FastAPI REST API 구현 실습', security_unit],
                           skills=[WEB], hours=2)
@@ -107,7 +120,7 @@ class CrashResourceScopeTests(unittest.TestCase):
         self.assertEqual(chosen[WEB]['id'], 'complete')
 
         # 보안 기준 자체가 특정 기술을 명시하면 구현 차시만으로 그 조건을 대신하지 않는다.
-        self.skill['coreCriteria'][1] = 'FastAPI에서 JWT 권한 경계 검증'
+        self.skill['coreCriteria'][0] = 'FastAPI에서 JWT 권한 경계 검증'
         profile = resource_evidence.facts(complete, self.project, self.selection)['suitability'][WEB]
         self.assertEqual(profile['missingStack'], ['fastapi'])
         self.assertFalse(profile['suitable'])
