@@ -117,25 +117,28 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
     <>
       {shared.map(course=>{
         const done=course.activities.every(activity=>st(R.progress,activity.id)==='done');
-        const show=()=>openSheet({title:course.title,sub:`공통 강좌 · ${course.skills.join(' · ')}`,body:()=> <div>{course.activities.map(activity=><section key={activity.id}><h3>{activity.skill}</h3><ul className="acts"><ActRow a={activity} R={R}/></ul></section>)}</div>});
+        const skillLabel=course.skills.join(' and ');
+        const show=()=>openSheet({title:course.title,sub:`공통 강좌 · ${skillLabel}`,body:()=> <div>{course.activities.map(activity=><section key={activity.id}><h3>{activity.skill}</h3><ul className="acts"><ActRow a={activity} R={R}/></ul></section>)}</div>});
         return <Row key={`shared:${course.id}`} lv={1} ins={up}
-          label={<button className="gt-a" aria-label={`${course.title} 공통 강좌 · ${course.skills.join(' · ')} · 관련 스킬 기록 열기`} onClick={show}><span className="gt-name">{course.title}<small>공통 · {course.skills.join(' · ')}</small></span></button>}
-          bar={<button type="button" className={`gt-bar act gt-materials-open${done?' done':''}`} aria-label={`${course.title} · ${course.skills.join(' · ')} · ${course.from}~${course.to}주차`} onClick={show} style={gtPos(off+7*(course.from-1),off+7*course.to,T)}/>}
-          tip={{v:when(course.from,course.to),t:course.title,m:`${course.skills.join(' · ')}에 연결된 공통 강좌 · 배정 범위 표시`}}/>;
+          label={<button className="gt-a" aria-label={`${course.title} 공통 강좌 · ${skillLabel} · 관련 스킬 기록 열기`} onClick={show}><span className="gt-name">{course.title}<small>{skillLabel}</small></span></button>}
+          bar={<button type="button" className={`gt-bar act gt-materials-open${done?' done':''}`} aria-label={`${course.title} · ${skillLabel} · ${course.from}~${course.to}주차`} onClick={show} style={gtPos(off+7*(course.from-1),off+7*course.to,T)}/>}
+          tip={{v:when(course.from,course.to),t:course.title,m:`${skillLabel}에 연결된 공통 강좌 · 배정 범위 표시`}}/>;
       })}
       {names.map((name, index) => {
           const as = groups.get(name)!;
           const number = index + 1;
           const materials = as.filter(activity => activity.res);
           const separateMaterials=materials.filter(activity=>!sharedIds.has(activity.res!));
-          const courses = materials.filter(activity => { const resource = resources[activity.res!]; return resource?.type === 'course' || resource?.kind === '강좌'; }).length;
-          const books = materials.filter(activity => { const resource = resources[activity.res!]; return resource?.type === 'book' || resource?.kind === '도서'; }).length;
-          const materialLabel = [courses ? `강좌 ${courses}개` : '', books ? `도서 ${books}권` : '', materials.length > courses + books ? `기타 ${materials.length - courses - books}개` : ''].filter(Boolean).join(' · ');
-          const showMaterials = () => openSheet({ title: `${name} · 학습 자료`, sub: materialLabel, body: () => <ul className="acts">{materials.map(activity => <ActRow key={activity.id} a={activity} R={R} />)}</ul> });
+          const courses = separateMaterials.filter(activity => { const resource = resources[activity.res!]; return resource?.type === 'course' || resource?.kind === '강좌'; }).length;
+          const books = separateMaterials.filter(activity => { const resource = resources[activity.res!]; return resource?.type === 'book' || resource?.kind === '도서'; }).length;
+          const materialLabel = [courses ? `강좌 ${courses}개` : '', books ? `도서 ${books}권` : '', separateMaterials.length > courses + books ? `기타 ${separateMaterials.length - courses - books}개` : ''].filter(Boolean).join(' · ') || '공통 강좌 연결';
+          const showMaterials = () => openSheet({ title: `${name} · 학습 자료`, sub: materialLabel, body: () => <ul className="acts">{(separateMaterials.length ? separateMaterials : materials).map(activity => <ActRow key={activity.id} a={activity} R={R} />)}</ul> });
           const dn = as.filter((a) => st(R.progress, a.id) === 'done').length;
           const key = `${R.id}:skill:${name}`;
-          const f = Math.min(...as.map((a) => a.wFrom));
-          const t = Math.max(...as.map((a) => a.wTo));
+          const schedule = pl.def.materialSchedule?.find(row => row.skill === name);
+          const baseActs = separateMaterials.length ? separateMaterials : materials.length ? materials : as;
+          const f = separateMaterials.length ? Math.min(...separateMaterials.map((a) => a.wFrom)) : schedule?.startWeek ?? Math.min(...baseActs.map((a) => a.wFrom));
+          const t = separateMaterials.length ? Math.max(...separateMaterials.map((a) => a.wTo)) : schedule?.endWeek ?? Math.max(...baseActs.map((a) => a.wTo));
           const rangeEnd = Math.min(T, off + 7 * t + (as.some(activity => !activity.res) ? 3.5 : 0));
           return (
             <Fragment key={key}>
@@ -159,7 +162,7 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
                 }
                 tip={{ v: when(f, t), t: name, m: `활동 ${as.length}개 중 ${dn}개 완료` }}
               />
-              {materials.length > 0 && <Row lv={2} ins={up.concat(key)} label={<button className="gt-a" aria-label={`${name} 자료 학습 · ${materialLabel} · 자료 목록 열기`} onClick={showMaterials}><span className="gt-no">{number}.1</span><span className="gt-name">자료 학습 <small>{materialLabel}</small></span></button>} bar={separateMaterials.length ? <button type="button" className="gt-bar act gt-materials-open" aria-label={`${name} 학습 자료 열기`} onClick={showMaterials} style={gtPos(off + 7 * (Math.min(...separateMaterials.map(activity => activity.wFrom)) - 1), off + 7 * Math.max(...separateMaterials.map(activity => activity.wTo)), T)} /> : <span className="gt-shared-note">공통 강좌 연결 표시 참조</span>} tip={{ v: when(Math.min(...materials.map(activity => activity.wFrom)), Math.max(...materials.map(activity => activity.wTo))), t: `${name} 자료 학습`, m: `${materialLabel} · 클릭하면 개별 자료와 기록을 볼 수 있어요.` }} />}
+              {materials.length > 0 && <Row lv={2} ins={up.concat(key)} label={<button className="gt-a" aria-label={`${name} 자료 학습 · ${materialLabel} · 자료 목록 열기`} onClick={showMaterials}><span className="gt-no">{number}.1</span><span className="gt-name">자료 학습 <small>{materialLabel}</small></span></button>} bar={separateMaterials.length ? <button type="button" className="gt-bar act gt-materials-open" aria-label={`${name} 학습 자료 열기`} onClick={showMaterials} style={gtPos(off + 7 * (Math.min(...separateMaterials.map(activity => activity.wFrom)) - 1), off + 7 * Math.max(...separateMaterials.map(activity => activity.wTo)), T)} /> : <span className="gt-shared-note">공통 강좌 연결 표시 참조</span>} tip={{ v: when(separateMaterials.length ? Math.min(...separateMaterials.map(activity => activity.wFrom)) : f, separateMaterials.length ? Math.max(...separateMaterials.map(activity => activity.wTo)) : t), t: `${name} 자료 학습`, m: `${materialLabel} · 클릭하면 개별 자료와 기록을 볼 수 있어요.` }} />}
               {as.filter(activity => !activity.res).map((a, i) => {
                 const task = !a.res;
                 const activityFrom = task ? t : a.wFrom;

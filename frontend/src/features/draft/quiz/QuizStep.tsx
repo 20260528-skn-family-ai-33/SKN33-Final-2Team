@@ -40,22 +40,29 @@ export function QuizStep() {
         if (dirty) invalidateDraft(s, 'answers');
       });
     } })
-      .catch(e => { if (active) setLoaded({ key: requestKey, survey: null, error: e instanceof Error ? e.message : '문항을 불러오지 못했어요.' }); });
+      .catch(e => { if (active) setLoaded({ key: requestKey, survey: null, error: e instanceof Error ? e.message : '설문을 불러오지 못했어요.' }); });
     return () => { active = false; };
   }, [owner, id, inputKey, requestKey]);
   useEffect(() => {
-    if (!id || !survey || survey.quizStatus !== 'pending') return;
+    if (!id || !survey || (survey.quizStatus !== 'pending' && survey.quizStatus !== 'interrupted')) return;
     let active=true;
     const poll=setInterval(() => {
       void request(`/api/v2/drafts/${id}/survey`).then(result => {
         if (active && result && result.generationId===survey.generationId && ws().owner===owner && ws().draftId===id && inputSignature(ws().draft)===inputKey)
           {
+            if(result.quizStatus==='pending')return;
             if(result.quizStatus==='interrupted' && (recoveries.current[result.generationId]||0)<2){
               recoveries.current[result.generationId]=(recoveries.current[result.generationId]||0)+1;
-              setAttempt(n=>n+1);return;
+              void request(`/api/v2/drafts/${id}/survey`, { method: 'POST' }).catch(() => {});
+              return;
             }
             if(result.quizStatus==='interrupted')result.quizStatus='failed';
             setLoaded(old => old?.survey?.quizStatus==='ready' ? old : {key:requestKey,survey:result,error:''});
+            const currentPending = pendingAnswers(answerMemoryKey(owner, id, result.generationId, inputKey));
+            updateWs(s => {
+              const dirty = !result.completed && currentPending && !sameJ(currentPending.answers, result.answers);
+              s.draft.v2Assessment = surveyState(s.draft.v2Assessment, result, !!dirty);
+            });
           }
       }).catch(() => {});
     },1000);
@@ -64,7 +71,7 @@ export function QuizStep() {
   return <><Stepper cur="quiz" busy={saving} /><Page title={<span style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>역량 테스트
     <button type="button" className="btn line" style={{ fontSize: 12, padding: '5px 10px', minHeight: 0 }} disabled={!survey || survey.completed} onClick={() => surveyRef.current?.randomize()}>test용으로 삭제예정 · 무작위 선택</button>
   </span>}
-    lead="프로젝트 요약과 키우고 싶은 역량, 개인 프로필을 참고해 선정 스킬의 역량을 확인해요. 설문을 모두 마치면 퀴즈로 이어집니다.">
+    lead="프로젝트와 함께 키우고 싶은 역량, 현재 업무 배경에 맞춘 설문과 퀴즈를 확인해요. 모든 응답을 마치면 다음 단계로 이어집니다.">
     {error ? <div className="card"><p role="alert">{error}</p><div className="actions">
       <button className="btn line" onClick={() => go(paths.newDetailsCheck)}>입력 내용 확인</button>
       <button className="btn pri" onClick={() => setAttempt(n => n + 1)}>다시 시도하기</button></div></div>
@@ -81,7 +88,9 @@ export function QuizStep() {
             const scope = {owner,id,inputKey,generationId:survey.generationId};
             const saved = await saveSurvey(scope, answers, complete);
             if (!surveyScopeCurrent(scope)) return;
-            setLoaded({ key: requestKey, survey: saved, error: '' });
+            setLoaded(old => old?.key === requestKey && old.survey?.generationId === saved.generationId && old.survey.quizStatus === 'ready' && saved.quizStatus !== 'ready'
+              ? { key: requestKey, survey: { ...old.survey, answers: saved.answers, completed: saved.completed }, error: '' }
+              : { key: requestKey, survey: saved, error: '' });
             if (complete) void prepareRoadmaps().catch(() => {});
           } catch (e) {
             if (e instanceof SurveyRequestError && e.code === 'SURVEY_INPUT_CHANGED') {
@@ -89,6 +98,6 @@ export function QuizStep() {
             }
             throw e;
           } finally { setSaving(false); }
-        }} /> : <div className="loading" role="status" aria-live="polite"><span className="sp" aria-hidden="true" /><span>프로젝트와 희망 역량에 맞춰 스킬·문항을 준비하고 있어요.</span></div>}
+        }} /> : <div className="loading" role="status" aria-live="polite"><span className="sp" aria-hidden="true" /><span>프로젝트에 맞는 설문과 퀴즈를 준비하고 있어요.</span></div>}
   </Page></>;
 }

@@ -26,6 +26,7 @@ export function SurveyFlow({ onRetry, ref, survey, initialAnswers = {}, initialC
   } }));
   const questions = survey.groups.flatMap(g => g[phase]);
   const answered = questions.filter(q => Object.hasOwn(answers, q.id)).length;
+  const totalAnswered = survey.groups.flatMap(g => [...g.surveys, ...g.quizzes]).filter(q => Object.hasOwn(answers, q.id)).length;
   function navigate(target: Phase) {
     if (saving) return;
     if (!review && target === 'quizzes' && !complete(survey, answers, 'surveys')) {
@@ -50,39 +51,43 @@ export function SurveyFlow({ onRetry, ref, survey, initialAnswers = {}, initialC
     } finally { setSaving(false); }
   }
   if (finished && !review) return <div className="v2-survey"><h2>역량 테스트를 완료했어요.</h2><p>설문과 퀴즈 응답이 저장되었습니다.</p>{onContinue && <button className="primary" onClick={onContinue}>다음: 점검 결과</button>}</div>;
+  const quizPending = phase === 'quizzes' && (survey.quizStatus === 'pending' || (!questions.length && survey.quizStatus !== 'failed'));
+  const quizFailed = phase === 'quizzes' && survey.quizStatus === 'failed';
   return <div className={`v2-survey${review?' v2-survey-review':''}`}>
     <nav aria-label="역량 테스트 순서"><button type="button" disabled={saving} aria-current={phase === 'surveys' ? 'step' : undefined} onClick={() => navigate('surveys')}>1. 설문</button>
       <button type="button" disabled={saving} aria-current={phase === 'quizzes' ? 'step' : undefined} onClick={() => navigate('quizzes')}>2. 퀴즈</button></nav>
-    <h2>{phase === 'surveys' ? '지금의 나를 살펴볼까요?' : '배울 내용을 확인해 볼까요?'}</h2>
-    <p>{review ? '저장한 응답을 확인하는 화면입니다. 답변은 변경할 수 없어요.' : phase === 'surveys' ? '각 문장에 나에게 맞는 정도를 선택해 주세요.' : '각 문항에서 가장 적절한 답을 하나 골라 주세요.'}</p>
-    {phase==='quizzes' && survey.quizStatus==='pending' && <p role="status"><span className="sp" aria-hidden="true" /> 퀴즈를 준비하고 있어요.</p>}
-    {phase==='quizzes' && survey.quizStatus==='failed' && <p role="alert">퀴즈 준비를 완료하지 못했어요. 설문 응답은 유지됩니다. <button onClick={onRetry}>퀴즈 다시 준비</button></p>}
-    <p className="muted" role="status">답한 문항 {answered} / {questions.length} · 전체 {survey.questionCount}문항</p>
-    {survey.groups.map(group => <section key={group.skill}>
-      <h2>{group.title}</h2><p className="muted">확인할 역량: {group.skill}</p>
-      {group[phase].map((q, index) => {
-        const outcome=review&&phase==='quizzes'&&typeof q.answer==='number'&&Object.hasOwn(answers,q.id)?answers[q.id]===q.answer?'correct':'wrong':null;
-        return <fieldset key={q.id} disabled={saving || review}>
-        <legend>{review&&phase==='quizzes'?<><span className={`quiz-result-number${outcome?' '+outcome:''}`}>{index+1}{outcome?` · ${outcome==='correct'?'정답':'오답'}`:''}</span> {q.q}</>:<>{index + 1}. {phase === 'surveys' ? q.text : q.q}</>}</legend>
-        <div className={phase === 'surveys' ? 'scale' : 'choices'}>
-          {(phase === 'surveys' ? scale : q.options ?? []).map((label, i) => {
-            const value = phase === 'surveys' ? i + 1 : i;
-            const chosen=answers[q.id]===value;
-            const correct=review&&phase==='quizzes'&&q.answer===value;
-            const wrong=review&&phase==='quizzes'&&chosen&&q.answer!==undefined&&!correct;
-            return <label key={value} className={[chosen?'selected':'',correct?'answer-correct':'',wrong?'answer-wrong':'',correct&&chosen?'answer-chosen-correct':''].filter(Boolean).join(' ')}>
-              {!(review&&phase==='surveys')&&<input type="radio" name={q.id} value={value} checked={answers[q.id] === value}
-                onChange={() => { const next = { ...answers, [q.id]: value }; setAnswers(next); onProgress?.(next, phase); setError(''); }} />}
-              <span>{i + 1}. {label}{review&&phase==='quizzes'&&<>{correct?<small className="answer-label">{chosen?'내 선택 · 정답':'정답'}</small>:wrong?<small className="answer-label">내 선택 · 오답</small>:chosen?<small className="answer-label">내 선택</small>:null}</>}</span>
-            </label>;
-          })}
-        </div>
-        {review&&phase==='quizzes'&&q.explain&&<p className="quiz-explanation"><b>해설</b> {q.explain}</p>}
-      </fieldset>;})}
-    </section>)}
+    {quizPending ? <div className="loading" role="status" aria-live="polite"><span className="sp" aria-hidden="true" /><span>퀴즈를 준비하고 있어요.</span></div>
+      : quizFailed ? <div className="card"><p role="alert">퀴즈 준비를 완료하지 못했어요. 설문 응답은 유지됩니다.</p><div className="actions"><button type="button" className="btn pri" onClick={onRetry}>퀴즈 다시 준비</button></div></div>
+      : <>
+        <h2>{phase === 'surveys' ? '지금의 나를 살펴볼까요?' : '배울 내용을 확인해 볼까요?'}</h2>
+        <p>{review ? '저장한 응답을 확인하는 화면입니다. 답변은 변경할 수 없어요.' : phase === 'surveys' ? '각 문장에 나에게 맞는 정도를 선택해 주세요.' : '각 문항에서 가장 적절한 답을 하나 골라 주세요.'}</p>
+        <p className="muted" role="status">답한 문항 {answered} / {questions.length} · 전체 {totalAnswered}/{survey.questionCount}문항</p>
+        {survey.groups.map(group => <section key={group.skill}>
+          <h2>{group.title}</h2><p className="muted">확인할 역량: {group.skill}</p>
+          {group[phase].map((q, index) => {
+            const outcome=review&&phase==='quizzes'&&typeof q.answer==='number'&&Object.hasOwn(answers,q.id)?answers[q.id]===q.answer?'correct':'wrong':null;
+            return <fieldset key={q.id} disabled={saving || review}>
+            <legend>{review&&phase==='quizzes'?<><span className={`quiz-result-number${outcome?' '+outcome:''}`}>{index+1}{outcome?` · ${outcome==='correct'?'정답':'오답'}`:''}</span> {q.q}</>:<>{index + 1}. {phase === 'surveys' ? q.text : q.q}</>}</legend>
+            <div className={phase === 'surveys' ? 'scale' : 'choices'}>
+              {(phase === 'surveys' ? scale : q.options ?? []).map((label, i) => {
+                const value = phase === 'surveys' ? i + 1 : i;
+                const chosen=answers[q.id]===value;
+                const correct=review&&phase==='quizzes'&&q.answer===value;
+                const wrong=review&&phase==='quizzes'&&chosen&&q.answer!==undefined&&!correct;
+                return <label key={value} className={[chosen?'selected':'',correct?'answer-correct':'',wrong?'answer-wrong':'',correct&&chosen?'answer-chosen-correct':''].filter(Boolean).join(' ')}>
+                  {!(review&&phase==='surveys')&&<input type="radio" name={q.id} value={value} checked={answers[q.id] === value}
+                    onChange={() => { const next = { ...answers, [q.id]: value }; setAnswers(next); onProgress?.(next, phase); setError(''); }} />}
+                  <span>{i + 1}. {label}{review&&phase==='quizzes'&&<>{correct?<small className="answer-label">{chosen?'내 선택 · 정답':'정답'}</small>:wrong?<small className="answer-label">내 선택 · 오답</small>:chosen?<small className="answer-label">내 선택</small>:null}</>}</span>
+                </label>;
+              })}
+            </div>
+            {review&&phase==='quizzes'&&q.explain&&<p className="quiz-explanation"><b>해설</b> {q.explain}</p>}
+          </fieldset>;})}
+        </section>)}
+      </>}
     {error && <p role="alert" className="error">{error}</p>}
     {!review&&<footer>{phase === 'quizzes' && <button disabled={saving} onClick={() => navigate('surveys')}>이전: 설문</button>}
-      <button className="primary" disabled={saving || (phase==='quizzes' && (survey.quizStatus==='pending' || survey.quizStatus==='failed'))} onClick={() => void next()}>
+      <button className="primary" disabled={saving || quizPending || quizFailed} onClick={() => void next()}>
         {saving ? '저장 중…' : phase === 'surveys' ? '다음: 퀴즈' : '역량 테스트 완료'}
       </button></footer>}
   </div>;

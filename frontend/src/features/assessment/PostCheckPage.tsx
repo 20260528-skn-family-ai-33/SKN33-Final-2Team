@@ -207,7 +207,7 @@ function Post({ R }: { R: PlanRecord }) {
           preMap={pl.assess?.answers}
           dq={deepOpen(dp) && dp?.quiz ? { quiz: dp.quiz, mcq: `${base}.deep.mcq`, essay: `${base}.deep.essay` } : null}
         />}
-        {phase === 'quizzes' && quizPending && <div className="card" role={quizError ? 'alert' : 'status'}>{quizError ? <><p>{quizError}</p><button className="btn line small" onClick={() => { setQuizError(''); setQuizAttempt(value => value + 1); }}>퀴즈 다시 준비하기</button></> : <p><span className="sp" /> 사후 퀴즈 생성 중… 같은 개념의 새 문제를 준비하고 있어요.</p>}</div>}
+        {phase === 'quizzes' && quizPending && (quizError ? <div className="card" role="alert"><p>{quizError}</p><button className="btn line small" onClick={() => { setQuizError(''); setQuizAttempt(value => value + 1); }}>퀴즈 다시 준비하기</button></div> : <div className="loading" role="status" aria-live="polite"><span className="sp" aria-hidden="true" /><span>퀴즈를 준비하고 있어요.</span></div>)}
         {phase === 'quizzes' && <PostQuiz R={R} disabled={running} />}
         {phase === 'surveys' && <>
         <div className="card">

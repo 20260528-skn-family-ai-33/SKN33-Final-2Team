@@ -13,6 +13,7 @@ import { closeSheet, openSheet } from '@/shared/state/ui';
 import { draftActive, newComments, planReports, recs, useWs, ws } from '@/shared/state/workspace';
 import { Icon } from '@/shared/ui/Icon';
 import { ActThumb, Hero, Note } from '@/shared/ui/parts';
+import { ensurePostQuiz } from '@/features/assessment/postActions';
 import { openRecord } from './RecordSheet';
 
 /** 활동 한 줄(홈·내 로드맵 진행 중). 줄 전체가 실행 기록 창을 여는 버튼이고, 상태는 보여 주기만 한다 */
@@ -226,6 +227,7 @@ export function openPostAnswers(pid: string): void {
 export function postStart(go: ReturnType<typeof useGo>, pid: string): void {
   const R = ws().plans[pid];
   if (!R || R.status !== 'active') return;
+  if (R.plan.assess?.v2 && !R.post.quizSurvey) void ensurePostQuiz(R.id).catch(() => {});
   const left = R.plan.acts.filter((a) => st(R.progress, a.id) !== 'done').length;
   const begun = !!(R.post.goalSelf || Object.keys(R.post.answers || {}).length || R.post.fail);
   if (!left || begun) {

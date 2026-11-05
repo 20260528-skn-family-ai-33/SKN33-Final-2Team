@@ -135,6 +135,25 @@ def propose(saved, draft, generate, source, *, previous=None):
     if covered!=set(active) or task_skills!=set(active) or used!=set(ids): raise ApiError(422,'ACTIVITIES_INVALID','선택한 역량·자료를 모두 반영하지 못했어요. 다시 제안받아 주세요.')
     if any(sum(1 for act in acts if act['skill']==name and not act.get('res'))!=1 for name in active):
         raise ApiError(422,'ACTIVITIES_INVALID','스킬마다 산출물 과제 하나가 필요해요.')
+    deduped=[]; by_pair={}; by_res={}
+    for act in acts:
+        if not act.get('res'):
+            deduped.append(deepcopy(act))
+            continue
+        by_res.setdefault(act['res'], deepcopy(act))
+        pair=(act['skill'],act['res'])
+        if pair not in by_pair:
+            item=deepcopy(act); by_pair[pair]=item; deduped.append(item)
+        else:
+            how=str(act.get('how') or '').strip()
+            if how and how not in by_pair[pair]['how']:
+                by_pair[pair]['how']=f"{by_pair[pair]['how'].rstrip()}\n{how}"
+    for name in active:
+        for rid in [choices[name]['course']]+list(choices[name]['books']):
+            if rid and (name,rid) not in by_pair and rid in by_res:
+                item=dict(deepcopy(by_res[rid]),skill=name)
+                by_pair[(name,rid)]=item; deduped.append(item)
+    acts=deduped
     base=deepcopy(draft['gen']['options'][draft['chosen']]);base['acts']=acts
     option=RM.finish_option(draft['chosen'],base,source)
     for target,source in zip(option['acts'],acts):target['skill']=source['skill']

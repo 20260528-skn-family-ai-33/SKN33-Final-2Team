@@ -387,6 +387,8 @@ def _apply_client(w: dict, body: dict) -> None:
                     w['draftPlan'] = None
     if input_signature(d)!=previous_inputs or body.get('resetAfter')=='inputs':
         invalidate_inputs(w)
+        if input_signature(d)==previous_inputs and body.get('detailsOk'):
+            d['detailsOk']=True
     elif previous_chosen!=d.get('chosen') or body.get('resetAfter')=='options':
         from app.services.course_recommendations import invalidate_course_tail
         if previous_chosen==d.get('chosen'):
@@ -501,7 +503,7 @@ def doc_summary_start(employee_id: int, draft_id: str, skip_images: bool = False
         except AgentError as e:
             _set_doc(employee_id, draft_id, dict(doc, status='fail', step=step, fail={'cause': e.info}))
             raise
-        _set_doc(employee_id, draft_id, dict(doc, status='ok', step='done', summary=s['text'], source=ctx.mode, fail=None))
+        _set_doc(employee_id, draft_id, dict(doc, status='ok', step='done', summary=str(s['text'] or '')[:1500], source=ctx.mode, fail=None))
         return {'ok': True}
     _set_doc(employee_id, draft_id, {'status': 'reading', 'fail': None, 'jobId': None})
     work._resume = {'operation':'drafts.doc_summary_start','kwargs':{'employee_id':employee_id,'draft_id':draft_id,'skip_images':skip_images}}

@@ -266,6 +266,10 @@ def reg_of(recs: dict) -> dict:
 
 def workspace(employee_id: int) -> dict:
     recs = records(employee_id)
+    from .post_quiz import prepare as prepare_post_quiz
+    for r in recs.values():
+        if r.get('status') == 'active' and not (r.get('post') or {}).get('quizSurvey'):
+            prepare_post_quiz(employee_id, r['id'], r['plan'])
     reps = reports(employee_id)
     return {'plans': recs, 'reports': reps, 'res': resources_of(recs), 'reg': reg_of(recs)}
 
@@ -733,9 +737,12 @@ def report_start(employee_id: int, roadmap_id: str) -> str:
             t.run('DELETE FROM public.growth_reports WHERE roadmap_id = :r', r=row['roadmap_id'])
             rep_id = str(t.val("INSERT INTO public.growth_reports(project_id, roadmap_id, report_type, report_content) VALUES(:p, :r, 'PRE_POST', :c) RETURNING report_id",
                                p=row['project_id'], r=row['roadmap_id'], c=db.J(r)))
-            t.run('INSERT INTO app_ext.report_meta(report_id) VALUES(CAST(:i AS uuid))', i=rep_id)
+            t.run('INSERT INTO app_ext.report_meta(report_id, confirmed, confirmed_at) VALUES(CAST(:i AS uuid), true, now()) ON CONFLICT (report_id) DO UPDATE SET confirmed = true, confirmed_at = now()', i=rep_id)
             t.run('UPDATE public.diagnostic_rounds SET post_completed_at = now() WHERE diagnostic_round_id = :d', d=row['diagnostic_round_id'])
             t.run('UPDATE app_ext.post_checks SET running = false, fail = NULL WHERE roadmap_id = :r', r=row['roadmap_id'])
+            t.run("UPDATE public.projects SET status = 'COMPLETED', updated_at = now() WHERE project_id = :p AND status <> 'COMPLETED'", p=row['project_id'])
+            t.run('UPDATE app_ext.roadmap_meta SET done_at = coalesce(done_at, now()) WHERE roadmap_id = :r', r=row['roadmap_id'])
+            t.run("UPDATE app_ext.roadmap_revisions SET status = 'discarded', updated_at = now() WHERE roadmap_id = :r AND status IN ('running', 'ready', 'failed')", r=row['roadmap_id'])
         return {'reportId': rep_id}
     work._resume = {'operation':'plans.report_start','kwargs':{'employee_id':employee_id,'roadmap_id':roadmap_id}}
     jid = jobs.start('report', employee_id, roadmap_id, work)

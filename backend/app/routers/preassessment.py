@@ -136,7 +136,7 @@ def get_survey(project_id: UUID, a: Account = Depends(require_employee)):
 
 
 @r.post('/api/v2/drafts/{project_id}/survey')
-@queued_generation
+@queued_generation(reference_prefix='survey:')
 def make_survey(project_id: UUID, a: Account = Depends(require_employee)):
     return {'survey': generate_for(a.id, str(project_id), staged=True)}
 
