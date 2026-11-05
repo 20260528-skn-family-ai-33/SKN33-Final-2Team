@@ -1,15 +1,15 @@
 import { waitJob } from '@/api/jobs';
-import type { BookDiagnostic, CourseDiagnostic } from '@/api/types/draft';
+import type { BookDiagnostic, CourseDiagnostic, MaterialResource } from '@/api/types/draft';
 import { flush } from '../draftSync';
 import type { Choices, DurationEstimate } from './skillOrder';
 
-export type Resource = { id: string; title: string; provider?: string; image?: string; url?: string; cost: number | null; hours?: number | null; timeStatus?: string; estimated?: string[]; why: string; knowledge: string; aiRecommended: boolean };
+export type Resource = Pick<MaterialResource, 'id' | 'title' | 'unverifiedTargetTopics'> & { provider?: string; image?: string; url?: string; cost: number | null; hours?: number | null; timeStatus?: string; estimated?: string[]; why: string; knowledge: string; aiRecommended: boolean };
 type Skill = {
   name: string; courses: Resource[]; books: Resource[]; selectedCourse: string | null; selectedBooks: string[];
   courseDiagnostic?: CourseDiagnostic;
   bookDiagnostic?: BookDiagnostic;
 };
-export type Result = { courseId?: string | null; skillDetails?: { name: string; application: string }[]; generationId: string; recommendations: { id: string; skills: Skill[]; retrieval?: { matches?: { skill: string; resourceId: string }[] } } | null; choices: Choices; skillOrder?: string[]; durationEstimates?: Record<string, DurationEstimate> };
+export type Result = { courseId?: string | null; skillDetails?: { name: string; application: string }[]; generationId: string; recommendations: { id: string; skills: Skill[]; outdated?: boolean; retrieval?: { matches?: { skill: string; resourceId: string }[] } } | null; choices: Choices; skillOrder?: string[]; durationEstimates?: Record<string, DurationEstimate> };
 
 export function recommendationUrl(id: string, course?: string | null, suffix = '') {
   return `/api/v2/drafts/${id}/recommendations${suffix}${course ? `?course=${encodeURIComponent(course)}` : ''}`;

@@ -230,14 +230,24 @@ class SuitabilityTests(unittest.TestCase):
         payload = model.call_args.args[1]
         self.assertIsNone(payload['crashStudyPlan'])
         self.assertEqual(payload['skills'][0]['courses'][0]['learningEvidence']['evidenceLevel'], 'conceptual')
-        for diagnostic in ({'reason': 'invented', 'detail': '사유'}, {'reason': 'scope_gap', 'detail': 'x' * 241},
-                           {'reason': 'scope_gap', 'detail': ' '}, {'reason': 'scope_gap', 'detail': '사유', 'extra': True},
-                           {'reason': 'longer_for_coverage', 'detail': '사유'}, {'reason': 'no_candidates', 'detail': '사유'}):
-            with self.subTest(diagnostic=diagnostic), self.assertRaises(RecommendationError):
+        # 진단 형식·사유 오류는 추천 전체를 실패시키지 않고 서버가 계산한 안내로 대체한다.
+        fallback = recommend_resources(self.project, selection, {'intro': row}, lambda *_: dict(raw, skills=[
+            dict(raw['skills'][0], courseDiagnostic=None)]), course={'id': 'A2'}, retrieved_pools=pools)
+        server = fallback['skills'][0]['courseDiagnostic']
+        for diagnostic in ({'reason': 'invented', 'detail': '사유'}, {'reason': 'scope_gap', 'detail': ' '},
+                           {'reason': 'longer_for_coverage', 'detail': '사유'}, {'reason': 'no_candidates', 'detail': '사유'},
+                           'scope_gap'):
+            with self.subTest(diagnostic=diagnostic), self.assertLogs('app.agents.resource_recommendations', 'WARNING'):
                 bad = deepcopy(raw)
                 bad['skills'][0]['courseDiagnostic'] = diagnostic
-                recommend_resources(self.project, selection, {'intro': row}, lambda *_: bad,
-                                    course={'id': 'A2'}, retrieved_pools=pools)
+                result = recommend_resources(self.project, selection, {'intro': row}, lambda *_: bad,
+                                             course={'id': 'A2'}, retrieved_pools=pools)
+                self.assertEqual(result['skills'][0]['courseDiagnostic'], server)
+        long = deepcopy(raw)
+        long['skills'][0]['courseDiagnostic'] = {'reason': 'scope_gap', 'detail': 'x' * 300, 'extra': True}
+        kept = recommend_resources(self.project, selection, {'intro': row}, lambda *_: long,
+                                   course={'id': 'A2'}, retrieved_pools=pools)['skills'][0]['courseDiagnostic']
+        self.assertEqual(kept, {'reason': 'scope_gap', 'detail': 'x' * 239 + '…'})
 
     def test_longer_choice_diagnostic_preserves_model_choice_and_legacy_key_responses(self):
         rows = [course('short', ['RAG 문서 검색 구현'], hours=1),
@@ -283,7 +293,7 @@ class SuitabilityTests(unittest.TestCase):
                 recommend_resources(self.project, selection, {'actual': row}, lambda *_: raw,
                                     course={'id': 'A2'}, retrieved_pools=pools)
 
-    def test_explicit_coverage_reason_keeps_longer_first_choice_when_shorter_alternative_is_returned(self):
+    def test_shared_longer_course_wins_when_it_alone_covers_every_returned_skill(self):
         short = course('short', ['RAG 문서 검색 구현'], skills=[RAG, WEB], hours=1)
         long = course('long', ['RAG 문서 검색 구현과 평가', 'FastAPI 서버 실행'], skills=[RAG, WEB], hours=9)
         selection = {'skills': self.selection['skills'][:2]}

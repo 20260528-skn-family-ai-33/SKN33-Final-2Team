@@ -102,13 +102,18 @@ class RecommendationTests(unittest.TestCase):
         no_books = {key: value for key, value in self.items.items() if value['type'] == 'course'}
         self.assertEqual(self.recommend(raw, no_books)['skills'][0]['bookDiagnostic']['reason'], 'no_candidates')
 
-    def test_invalid_book_diagnostics_are_not_accepted_as_choices(self):
-        for reason, detail in (('no_candidates', '사유'), ('stack_mismatch', '사유'), ('scope_gap', 'x' * 241),
-                               ('scope_gap', '  ')):
+    def test_invalid_book_diagnostics_fall_back_to_server_guidance(self):
+        # 도서 후보가 있는데 no_candidates라고 하거나 형식이 틀려도 추천 전체를 실패시키지 않는다.
+        for reason, detail in (('no_candidates', '사유'), ('stack_mismatch', '사유'), ('scope_gap', '  ')):
             raw = {'skills': [{'name': '분석', 'courses': [], 'books': [],
                               'bookDiagnostic': {'reason': reason, 'detail': detail}}]}
-            with self.subTest(reason=reason, detail=detail), self.assertRaises(RecommendationError):
-                self.recommend(raw)
+            with self.subTest(reason=reason, detail=detail), \
+                    self.assertLogs('app.agents.resource_recommendations', 'WARNING'):
+                self.assertEqual(self.recommend(raw)['skills'][0]['bookDiagnostic']['reason'], 'insufficient_evidence')
+        raw = {'skills': [{'name': '분석', 'courses': [], 'books': [],
+                          'bookDiagnostic': {'reason': 'scope_gap', 'detail': 'x' * 241}}]}
+        self.assertEqual(self.recommend(raw)['skills'][0]['bookDiagnostic'],
+                         {'reason': 'scope_gap', 'detail': 'x' * 239 + '…'})
 
     def test_display_diagnostic_uses_supplied_titles_even_for_unselected_candidates(self):
         detail = 'S1-C1의 범위가 좁고 S1-C2에는 실습이 있습니다. S1-C10의 근거는 확인이 필요합니다.'

@@ -6,6 +6,7 @@ import threading
 from dataclasses import dataclass, field
 
 from .catalog_evidence import content_text
+from .english_patterns import english_token as _en
 from . import track_policy
 
 PER_SKILL = 20
@@ -29,25 +30,26 @@ class UnavailableResourcesError(ValueError):
 
 # DB Fast/Challenge 정책의 학습 행동. 제목의 홍보 문구만으로 실무 깊이를 판정하지 않는다.
 _actions = {
-    'build': re.compile(r'만들|구현|구축|연결|개발|실습|프로젝트|\b(?:build\w*|implement\w*|develop\w*|integrat\w*|project|hands[- ]on|labs?)\b', re.I),
-    'verify': re.compile(r'테스트|평가|검증|벤치마크|품질|\b(?:test\w*|evaluat\w*|validat\w*|benchmark\w*)\b', re.I),
-    'improve': re.compile(r'최적화|개선|문제\s*해결|트러블슈팅|디버깅|성능\s*튜닝|\b(?:optimi\w*|troubleshoot\w*|debug\w*|improv\w*)\b', re.I),
-    'operate': re.compile(r'배포|모니터링|운영|복구|롤백|\b(?:deploy\w*|monitor\w*|production|observability|rollback|recover\w*)\b', re.I),
+    'build': re.compile(r'만들|구현|구축|연결|개발|실습|프로젝트|' + _en(r'(?:build\w*|implement\w*|develop\w*|integrat\w*|project|hands[- ]on|labs?)'), re.I),
+    'verify': re.compile(r'테스트|평가|검증|벤치마크|품질|' + _en(r'(?:test\w*|evaluat\w*|validat\w*|benchmark\w*)'), re.I),
+    'improve': re.compile(r'최적화|개선|문제\s*해결|트러블슈팅|디버깅|성능\s*튜닝|' + _en(r'(?:optimi\w*|troubleshoot\w*|debug\w*|improv\w*)'), re.I),
+    'operate': re.compile(r'배포|모니터링|운영|복구|롤백|' + _en(r'(?:deploy\w*|monitor\w*|production|observability|rollback|recover\w*)'), re.I),
 }
 # 구현/배포 횟수와 구별하는 심화 근거. 목표에 맞는 개별 단원에서만 인정한다.
 _depth_actions = {
-    'design': re.compile(r'아키텍처|설계|트레이드\s*오프|대안\s*비교|전략\s*비교|배포\s*전략|모델.*?수명\s*주기|\b(?:architect\w*|design|trade[- ]?offs?|compar\w*)\b', re.I),
+    'design': re.compile(r'아키텍처|설계|트레이드\s*오프|대안\s*비교|전략\s*비교|배포\s*전략|모델.*?수명\s*주기|' + _en(r'(?:architect\w*|design|trade[- ]?offs?|compar\w*)'), re.I),
     'measure': re.compile(r'평가\s*(?:지표|기준)|성능\s*(?:평가|측정|비교|검증)|(?:부하|스트레스)\s*테스트|벤치마크|정확도|재현율|지연\s*(?:측정|분석)|(?:배포된\s*)?모델.*?모니터링|(?<![a-z0-9])(?:benchmark[a-z]*|metrics?|recall|precision|mrr|ndcg|latency|evaluation|load test[a-z]*)(?![a-z0-9])', re.I),
-    'solve': re.compile(r'최적화|문제\s*해결|트러블슈팅|디버깅|(?:오류|장애|실패|병목|오답).*?(?:분석|원인|해결|대응|복구)|성능\s*(?:튜닝|개선)|(?:복구|권한|보안|공격).*?(?:검증|테스트)|(?:모델|배포).*?(?:승격|롤백)|\b(?:optimi\w*|troubleshoot\w*|debug\w*|root cause|performance tun\w*|failure analys\w*)\b', re.I),
+    'solve': re.compile(r'최적화|문제\s*해결|트러블슈팅|디버깅|(?:오류|장애|실패|병목|오답).*?(?:분석|원인|해결|대응|복구)|성능\s*(?:튜닝|개선)|(?:복구|권한|보안|공격).*?(?:검증|테스트)|(?:모델|배포).*?(?:승격|롤백)|' + _en(r'(?:optimi\w*|troubleshoot\w*|debug\w*|root cause|performance tun\w*|failure analys\w*)'), re.I),
 }
-_intro_lesson = re.compile(r'입문|첫걸음|맛보기|따라\s*하기|무엇인가|개념\s*(?:소개|설명|이해)|\b(?:introduct\w*|overview|step[- ]by[- ]step)\b', re.I)
+_intro_lesson = re.compile(r'입문|첫걸음|맛보기|따라\s*하기|무엇인가|개념\s*(?:소개|설명|이해)|' + _en(r'(?:introduct\w*|overview|step[- ]by[- ]step)'), re.I)
 _generic_topics = set('공개 샘플 예제 작은 기본 기초 전체 이전 이후 생성 결과 기능 연결 기록 환경 설정 구성 사용 적용 모델 데이터 개발 서비스 서버 입력 출력 도구 코드 처리 확인 내용 방법 목표 학습 업무 구현 실습 배포 운영 평가 검증 개선 분석 테스트 보강 성능 버전 기준 제한 부족 함께 위한 가능한 만들기 만들어요 해요 각각 관련 무료 등급 합성 보여 주는 나누고 분리해 찾아 사용한 없는 여부 기록해요 확인해요 제공하고 시험해요 묶어요 받는 표시하고 표시해요'.split())
 _generic_topics.update('the and for with from into using use build implement develop test evaluate improve model data code example sample system service server'.split())
 _context_topics = {'점검', '상태', '권한', '실행', '추론', '이미지', '접근', '지연', '오픈소스'}
-_course_admin = re.compile(r'만족도|수강\s*후기|강의\s*평가|과정\s*평가|설문\s*조사|\b(?:course evaluation|feedback survey)\b', re.I)
+_course_admin = re.compile(r'만족도|수강\s*후기|강의\s*평가|과정\s*평가|설문\s*조사|' + _en(r'(?:course evaluation|feedback survey)'), re.I)
 
-_blocked = re.compile(r'^(?:학습자의\s*)?(?:선수\s*(?:지식|능력|학습)|선행\s*(?:지식|학습)|수강\s*대상|학습\s*대상|추천\s*대상|강사\s*(?:소개|경력)|prerequisites?|requirements?|target audience|instructor)\b', re.I)
-_learning = re.compile(r'^(?:과정\s*소개|강좌\s*소개|수업\s*(?:소개|내용|목표)|학습\s*(?:목표|내용)|교육\s*(?:목표|내용)|커리큘럼|강의\s*계획|목차|개요|소개|overview|description|learning objectives?|curriculum|syllabus)\b', re.I)
+# 한글 구역명은 기존 단어 경계를 유지하고 영문 분기만 조사에 대응한다.
+_blocked = re.compile(r'^(?:학습자의\s*)?(?:(?:선수\s*(?:지식|능력|학습)|선행\s*(?:지식|학습)|수강\s*대상|학습\s*대상|추천\s*대상|강사\s*(?:소개|경력))\b|' + _en(r'prerequisites?|requirements?|target audience|instructor', left=False) + ')', re.I)
+_learning = re.compile(r'^(?:(?:과정\s*소개|강좌\s*소개|수업\s*(?:소개|내용|목표)|학습\s*(?:목표|내용)|교육\s*(?:목표|내용)|커리큘럼|강의\s*계획|목차|개요|소개)\b|' + _en(r'overview|description|learning objectives?|curriculum|syllabus', left=False) + ')', re.I)
 _lock = threading.Lock()
 _source: dict | None = None
 _index: dict = {}

@@ -47,5 +47,7 @@ POLICIES = {
 
 
 def revision(course):
+    from app.track_policy import crash_guidance
     from app.agents.roadmap_display import with_display_contract
-    return with_display_contract(COMMON.replace('{course}', course).replace('{policy}', POLICIES[course]).strip())
+    policy = POLICIES[course] + crash_guidance(course, 'tasks')
+    return with_display_contract(COMMON.replace('{course}', course).replace('{policy}', policy).strip())

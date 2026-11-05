@@ -185,7 +185,7 @@ class CrashCourseTests(unittest.TestCase):
         pools = [{'name': 'SQL', 'application': 'SQL 조회', 'courses': rows, 'books': []}]
 
         def generate(system, payload):
-            self.assertIn('확인된 총 학습시간이 짧은', system)
+            self.assertIn('중복 제외 학습시간이 가장 짧은 조합', system)
             self.assertIn('목표에 명시된 기술을 다른 기술로 대체하지', system)
             short=next(row for row in payload['skills'][0]['courses'] if row['title'].endswith('short'))
             self.assertEqual(short['outline'][0]['index'], 5)
@@ -210,7 +210,7 @@ class CrashCourseTests(unittest.TestCase):
             self.assertEqual(plan['uniqueCourses'],1)
             self.assertEqual(plan['uniqueHours'],3)
             self.assertEqual(len({p['key'] for p in plan['skills']}),1)
-            self.assertIn('고유 강좌 총 수강시간',system)
+            self.assertIn('같은 choiceKey는 한 번만 합산',system)
             return {'skills':[{'name':p['name'],'courses':[{'key':p['key']}],'books':[]} for p in plan['skills']]}
         result=recommend_resources(self.project,selection,items,generate,course={'id':'A2'},retrieved_pools=pools)
         self.assertEqual([p['selectedCourse'] for p in result['skills']],['shared','shared'])
@@ -249,6 +249,66 @@ class CrashCourseTests(unittest.TestCase):
         plan = crash.study_plan(pools, self.project, selection, {'shared': 'S1-C1', 'sql': 'S1-C2', 'unknown': 'S1-C3'}, cache={})
         self.assertEqual(plan['uniqueHours'], 3)
         self.assertEqual(plan['skills'][0]['singleSwapExtraHours'], {'S1-C2': 2})
+
+    def test_partial_async_course_is_not_the_default_when_a_complete_course_exists(self):
+        name = 'Python 프로그래밍 & 비동기 I/O'
+        project = {'goal': 'Python 비동기 API 수집기 구현'}
+        selection = {'skills': [{'name': name, 'application': 'asyncio로 외부 API 호출을 병렬 처리하는 수집기 구현',
+                                 'completionCriteria': ['asyncio로 동시 요청 구현', '타임아웃·취소 처리']}]}
+        generic = course('generic', 3, skills=[name], title='파이썬 기초 다지기',
+                         content='학습목표\n파이썬 문법과 함수, 예외 처리를 실습한다.\n비동기는 개념만 소개한다.',
+                         curriculum={'items': [{'title': '파이썬 함수 실습'}, {'title': '파이썬 예외 처리 실습'},
+                                               {'title': '비동기 개요'}]})
+        focused = course('focused', 10, skills=[name], title='asyncio 실전',
+                         content='학습목표\nasyncio로 동시 요청과 취소를 구현한다.',
+                         curriculum={'items': [{'title': 'asyncio.gather로 동시 요청 구현'},
+                                               {'title': '타임아웃과 작업 취소 처리'}]})
+        cache = {}
+        plan = crash.study_plan([{'name': name, 'courses': [generic, focused]}], project, selection,
+                                {'generic': 'S1-C1', 'focused': 'S1-C2'}, cache=cache)
+        self.assertEqual(crash.target_gaps(cache['generic'], name), ['비동기 I/O'])
+        self.assertEqual(crash.target_gaps(cache['focused'], name), [])
+        self.assertEqual(plan['skills'][0]['key'], 'S1-C2')
+        self.assertEqual(plan['uniqueHours'], 10)
+        # 일부 대상만 다루는 강좌도 적합 후보로 남아 모델이 보조 강좌로 고를 수 있다.
+        self.assertTrue(crash.suitable(cache['generic'], name))
+
+    def test_partial_dbt_course_reports_missing_targets_and_yields_to_complete_course(self):
+        name = 'ETL & 데이터 파이프라인'
+        project = {'goal': 'dbt 기반 데이터 파이프라인 구축'}
+        selection = {'skills': [{'name': name, 'application': 'dbt로 증분 모델과 품질 테스트를 구현',
+                                 'completionCriteria': ['dbt 증분 모델 구현', 'dbt 테스트로 품질 검증']}]}
+        partial = course('partial', 2, skills=[name], title='dbt 시작하기', content='학습목표\ndbt 설치와 첫 모델 실행을 실습한다.',
+                         curriculum={'items': [{'section': 'dbt 시작', 'title': 'dbt 설치와 첫 모델 실행 실습'}]})
+        full = course('full', 9, skills=[name], title='dbt 실무', content='학습목표\ndbt 모델, 테스트, 증분 처리를 구현한다.',
+                      curriculum={'items': [{'section': 'dbt 모델', 'title': 'dbt 모델 실습'},
+                                            {'section': 'dbt 테스트', 'title': 'dbt 테스트로 품질 검증 실습'},
+                                            {'section': 'dbt 증분', 'title': 'dbt 증분 모델 구현'}]})
+        cache = {}
+        chosen = crash.shortest_bundle([{'name': name, 'courses': [partial, full]}], project, selection, cache)
+        self.assertEqual(crash.target_gaps(cache['partial'], name), ['dbt 품질 테스트', 'dbt 증분 처리'])
+        self.assertEqual(chosen[name]['id'], 'full')
+        plan = crash.study_plan([{'name': name, 'courses': [partial, full]}], project, selection,
+                                {'partial': 'S1-C1', 'full': 'S1-C2'}, cache=cache)
+        self.assertEqual(plan['skills'][0]['key'], 'S1-C2')
+        # 세부 대상을 빠뜨리는 짧은 강좌를 시간 절감 교체안(-7시간)으로 보여 주지 않는다.
+        self.assertEqual(plan['skills'][0]['singleSwapExtraHours'], {})
+        # 'dbt로'처럼 조사가 붙은 영문 기술어만 있어도 세부 대상을 찾는다.
+        particle = {'skills': [{'name': name, 'application': 'dbt로 증분 처리와 품질 테스트를 구현'}]}
+        info = crash.facts(partial, project, particle)
+        self.assertEqual(crash.target_gaps(info, name), ['dbt 품질 테스트', 'dbt 증분 처리'])
+        # 완전한 후보가 없으면 일부 대상 강좌를 기본안으로 두고 부족한 대상을 모델 입력에 표시한다.
+        plan = crash.study_plan([{'name': name, 'courses': [partial]}], project, selection, {'partial': 'S1-C1'}, cache=cache)
+        self.assertEqual(plan['skills'][0]['unverifiedTargetTopics'], ['dbt 품질 테스트', 'dbt 증분 처리'])
+
+    def test_single_swap_lists_only_suitable_alternatives(self):
+        ok = course('ok', 5, title='SQL 조인 실습', content='학습목표\nSQL 조인 조회를 실습한다.')
+        intro = course('intro', 1, title='SQL 소개', content='학습목표\nSQL이 무엇인지 소개한다.',
+                       curriculum={'items': [{'title': 'SQL 개요 소개'}]})
+        plan = crash.study_plan([{'name': 'SQL', 'courses': [ok, intro]}], self.project, self.selection,
+                                {'ok': 'S1-C1', 'intro': 'S1-C2'}, cache={})
+        self.assertEqual(plan['skills'][0]['key'], 'S1-C1')
+        self.assertEqual(plan['skills'][0]['singleSwapExtraHours'], {})
 
     def test_model_empty_choice_is_preserved_with_diagnostic_and_no_invented_duration(self):
         row = course('short', 2)

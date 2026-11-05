@@ -2,10 +2,13 @@
 from __future__ import annotations
 from collections.abc import Callable
 from copy import deepcopy
+import logging
 import re
 from typing import Any
 
 from .resource_instructions import COMMON as SYSTEM, instructions
+
+logger = logging.getLogger(__name__)
 
 
 class RecommendationError(ValueError):
@@ -20,20 +23,27 @@ _COMPARISON_LABEL = '비교 후보'
 
 
 def _diagnostic(row: dict, kind: str, has_candidates: bool, has_choices: bool) -> dict | None:
+    """진단은 선택을 설명하는 보조 정보다. 형식이 틀렸다고 검증된 자료 선택까지 실패시키지 않는다.
+
+    사용할 수 없는 진단은 버리고 기록한다. 호출 측은 후보·선택 상태로 계산한 서버 안내를 대신 붙인다."""
     value = row.get(f'{kind}Diagnostic')
     if value is None:
         return None  # 기존 저장 응답·key 전용 응답과 호환한다.
     reasons = _COURSE_REASONS if kind == 'course' else _BOOK_REASONS
-    if (not isinstance(value, dict) or set(value) != {'reason', 'detail'}
-            or not isinstance(value.get('reason'), str) or value['reason'] not in reasons
-            or not isinstance(value.get('detail'), str) or not 1 <= len(value['detail'].strip()) <= _DIAGNOSTIC_LIMIT):
-        raise RecommendationError('학습 자료 진단 사유와 설명(1~240자)을 확인해 주세요.')
+    if (not isinstance(value, dict) or not isinstance(value.get('reason'), str) or value['reason'] not in reasons
+            or not isinstance(value.get('detail'), str) or not value['detail'].strip()):
+        logger.warning('자료 진단 형식 오류로 서버 안내 사용: kind=%s', kind)
+        return None
     # 일부 자료를 추천하면서 남은 근거·범위·기술 부족을 설명할 수도 있다.
     # 실제 후보/선택의 존재를 단정하는 두 사유만 구조적 모순을 검사한다.
     if ((value['reason'] == 'longer_for_coverage' and not has_choices)
             or (value['reason'] == 'no_candidates' and (has_candidates or has_choices))):
-        raise RecommendationError('학습 자료 진단 사유가 제공 후보·선택 결과와 일치하지 않습니다.')
-    return {'reason': value['reason'], 'detail': value['detail'].strip()}
+        logger.warning('자료 진단 사유가 후보·선택과 모순되어 서버 안내 사용: kind=%s reason=%s', kind, value['reason'])
+        return None
+    detail = value['detail'].strip()
+    if len(detail) > _DIAGNOSTIC_LIMIT:
+        detail = detail[:_DIAGNOSTIC_LIMIT - 1].rstrip() + '…'
+    return {'reason': value['reason'], 'detail': detail}
 
 
 def _display_diagnostic(diagnostic: dict, titles: dict[str, str]) -> dict:
@@ -92,13 +102,9 @@ def _course_gap(name: str, candidates: list[dict], cache: dict) -> dict:
 
 def _finalize_crash(result: list[dict], pools: list[dict], selection: dict, project: dict, cache: dict) -> None:
     from app.services import crash_courses as crash
-    # 모델이 짧은 후보에서 부족한 필수 근거를 설명했으면 그 강좌와 설명을 같이 보존한다.
-    pinned = {row['name']: row['courses'][0] for row in result
-              if (row.get('courseDiagnostic') or {}).get('reason') == 'longer_for_coverage'}
-    groups = [{'name': row['name'], 'courses': [pinned[row['name']]] if row['name'] in pinned else row['courses']}
-              for row in result]
-    chosen = crash.shortest_bundle(groups, project, selection, cache)
-    chosen.update(pinned)
+    # 모델은 핵심 기준에 맞는 강좌만 고르고, 그 안에서 중복 제외 시간이 가장 짧은 조합은 서버가 정한다.
+    chosen = crash.shortest_bundle(result, project, selection, cache)
+    default = crash.shortest_bundle(pools, project, selection, cache)
     for output, pool in zip(result, pools):
         name, cards = output['name'], output['courses']
         ordered = crash.rank(cards, project, selection, {'name': name}, cache=cache)
@@ -111,6 +117,10 @@ def _finalize_crash(result: list[dict], pools: list[dict], selection: dict, proj
         for index, card in enumerate(output['courses']):
             card['aiRecommended'] = index == 0
         output['selectedCourse'] = output['courses'][0]['id'] if output['courses'] else None
+        # 기본안이 그대로 선택되면 '더 긴 강좌를 추천했다'는 안내가 사실과 달라진다.
+        if ((output.get('courseDiagnostic') or {}).get('reason') == 'longer_for_coverage'
+                and name in default and default[name]['id'] == output['selectedCourse']):
+            del output['courseDiagnostic']
 
 
 def candidate_pools(project: dict, selection: dict, items: dict[str, dict], limit: int = 6, *, free_only: bool = False,
@@ -267,6 +277,11 @@ def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
                         or (key == 'courses' and pool['name'] not in course_eligibility[rid])):
                     raise RecommendationError('후보에 없거나 중복된 자료입니다.')
                 card = deepcopy(candidates.get(rid) or provided[key][rid][1])
+                if key == 'courses':
+                    card.pop('unverifiedTargetTopics', None)
+                    gaps = resource_evidence.target_gaps(crash_cache[rid], pool['name'])
+                    if gaps:
+                        card['unverifiedTargetTopics'] = gaps
                 if rid not in candidates:
                     card.pop('retrievalScore', None)
                     card.update(sharedCandidate=True, sourceSkill=provided[key][rid][0])

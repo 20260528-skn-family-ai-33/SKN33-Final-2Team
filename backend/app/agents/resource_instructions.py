@@ -31,12 +31,13 @@ JSON: {"skills":[{"name":"입력 스킬명","courses":[{"key":"S1-C1 형태의 c
 """
 POLICIES = {
  'A1': "[현재 코스 · Free] 강좌는 예산과 무관하게 cost=0만 허용, 도서는 유료·가격 미확인도 허용하며 가격·예산으로 제외 금지.",
- 'A2': "[현재 코스 · Crash]\n1. 스킬별 crashStudyPlan.skills[].key를 첫 강좌의 기본안으로 검토한다. key로 실제 목차·소개를 찾아 필수 기술과 핵심 학습 내용에 맞는지 확인한다. 확인된 총 학습시간이 짧은 조합이 핵심을 충족하면 그 조합을 첫 추천으로 반환한다. 강좌마다 모든 세부 과제를 담을 필요는 없으며, 목표에 명시된 기술을 다른 기술로 대체하지 않는다.\n2. 비교 대상은 각 스킬의 첫 강좌가 만드는 고유 강좌 총 수강시간이다. 같은 choiceKey는 한 번만 합산한다. uniqueHours는 기본안의 확인된 시간이고, singleSwapExtraHours는 다른 스킬을 그대로 둔 채 해당 스킬의 첫 강좌 하나를 바꿀 때 늘어나는 시간이다. 여러 스킬을 바꾸면 차이를 더하지 말고 고유 키의 전체 시간을 다시 합산한다. 추정·미확인 시간은 확인된 시간과 구분한다.\n3. 확인된 더 짧은 조합 대신 고유시간이 늘어나는 첫 강좌를 선택하려면, 짧은 후보에서 부족한 명시적 필수 내용과 긴 강좌가 제공하는 목차·소개 근거를 해당 스킬의 courseDiagnostic(reason=longer_for_coverage)에 적는다. 단순한 개념 확장이나 강좌 분량은 추가 시간의 근거가 되지 않는다. 응답 전 첫 강좌 키·전체 고유시간·예외 사유를 대조하고, 빈 강좌로 시간을 절약한 것으로 계산하지 않는다.\n공유는 applicableSelectedSkills와 목차·소개에 근거한다. 한 강좌로 충분하면 대안을 더 채우지 않는다.",
+ 'A2': "[현재 코스 · Crash]\n1. crashStudyPlan.skills[].key는 서버가 계산한 짧은 기본안이다. 스킬마다 기본안을 먼저 검토하고, 같은 스킬의 나머지 후보를 hours가 짧은 순서로 확인해 제목·소개·발췌 단원의 주제가 coreOutcome·coreCriteria에 직접 맞는 강좌를 최대 3개 courses에 담는다. 3개가 차면 더 긴 후보는 확인하지 않는다. uniqueHours·singleSwapExtraHours는 참고 값이다.\n2. outline은 일부 발췌이므로 세부 항목이 보이지 않는다는 이유만으로 제외하지 않는다. 주제·기술·목적이 다르면 제외한다. 목표에 명시된 기술을 다른 기술로 대체하지 않으며, 강좌마다 모든 세부 과제를 담을 필요는 없다.\n3. 서버가 courses 안에서 중복 제외 학습시간이 가장 짧은 조합을 첫 추천으로 정한다. 순서나 진단으로 긴 강좌를 먼저 오게 할 수 없으니 담을지만 판단한다. 같은 choiceKey는 한 번만 합산하므로, applicableSelectedSkills와 목차·소개로 확인되면 같은 강좌를 여러 스킬에 담는다.\n4. 기본안을 뺐으면 해당 스킬의 courseDiagnostic(reason=longer_for_coverage)에 기본안의 주제가 맞지 않는 이유를 적는다. 기본안을 담았으면 longer_for_coverage를 쓰지 않는다. 맞는 강좌가 없으면 빈 배열과 해당 진단을 쓴다.",
  'A3': "[현재 코스 · Challenge] 프로젝트 직접 적용 실습 중심, 동일 스킬의 기초 이해·단순 따라하기보다 높은 도달 수준. 목표 범위·학습자 수준 내 관련 설계 대안 비교·성능/품질 측정·실패 원인 분석·개선 전후 검증 구체화. 자료/과제 개수·시간·기간만 늘린 도전성 및 새 스킬·프로젝트 밖 배포/모델 학습 강요 금지. 필요한 기초 보강 허용, 최종 산출물은 실행 성공을 넘어 선택 이유·검증 근거 보존. 없는 DB 목차·성능 수치 창작 금지, 적절한 기준선·측정 방법 기반 검증.\nskills·course.learningSkills의 targetOutcome·completionCriteria를 뒷받침하는 자료 우선. 제목의 고급/실무 단어·난이도 표지만의 선정 금지, 제공 설명·목차의 설계·비교·측정·검증 학습 근거 확인. 선수 학습용 입문 자료 허용, 단순 따라하기 자료만으로 심화 충족 단정 금지. 후보 밖 자료·비용 창작 금지."
 }
 
 
 def instructions(course):
+    from app.track_policy import crash_guidance
     course_id = course.get('id') if isinstance(course, dict) else course
     policy = POLICIES.get(course_id, '')
-    return COMMON + ('\n' + policy if policy else '')
+    return COMMON + ('\n' + policy if policy else '') + crash_guidance(course_id, 'resources')

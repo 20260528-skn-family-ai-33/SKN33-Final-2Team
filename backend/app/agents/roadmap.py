@@ -381,10 +381,10 @@ def agent_catalog(handoff: dict, extra_ids: list | None = None, *, free_only: bo
             for row in payload['catalog']]
 
 
-PROMPT_VERSION = 'v2.5'  # Public curriculum evidence and confirmed/estimated course time.
+PROMPT_VERSION = 'v2.6'  # Free 강좌의 0원 조건과 도서 예외를 일치시킨다.
 # 관점별 규칙: 하위 에이전트는 다른 안을 보지 못하므로 규칙으로 차이를 만든다(개선안 2-3절 · A2 는 v2.1 에서 목표의 일을 빼지 않게 고침)
 PERSPECTIVE_RULES = {
-    'A1': ('- cost가 0인 자료와 직접 실습을 먼저 쓴다. cost가 null이거나 0보다 큰 자료는 같은 내용을 다룰 무료 자료가 없을 때만 쓰고, 쓰면 cons에 적는다.\n'
+    'A1': ('- 강좌는 cost가 정확히 0인 자료만 쓴다. 유료·가격 미확인 강좌는 무료 대안이 없어도 쓰지 않고 부족한 범위는 scope에 적는다. 도서는 가격·예산과 무관하게 유료·가격 미확인도 추천할 수 있으며 비용을 표시한다.\n'
            '- 실습 도구도 무료로 쓸 수 있는 것(오픈소스, 무료 등급)으로 고른다.'),
     'A2': ('- 총 시간을 가장 적게 잡는다. 목표 문장에 직접 나온 일은 범위 밖으로 빼지 않고 반드시 다룬다. 그 밖의 gaps는 핵심 1~2개만 더하고, 나머지는 scope에 "이번 범위 밖: …"으로 적는다.\n'
            '- 결과물은 outcome의 최소 기능판으로 줄인다. 10시간이 넘는 자료는 꼭 필요할 때만 쓴다.'),
@@ -495,8 +495,12 @@ def option(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
         from app.learner_knowledge import POLICY
         provenance = {}
         system = _sys(pid, R_SYS, provenance, inp.get('_evaluationPrompt')) + extra
-        if not system.startswith('[통합 생성 계약 roadmap-generation/v1]'):
-            system += POLICY + track_policy.challenge_guidance(pid, 'plan') + track_policy.PERIOD_GUIDANCE
+        if system.startswith('[통합 생성 계약 roadmap-generation/v1]'):
+            # 이전에 설치된 통합 프롬프트에는 Crash 핵심 기준 계약이 없다. DB 재설치 전에도 같은 계약을 적용한다.
+            if track_policy.CRASH_CORE_MARKER not in system:
+                system += track_policy.crash_guidance(pid, 'plan')
+        else:
+            system += POLICY + track_policy.course_guidance(pid, 'plan') + track_policy.PERIOD_GUIDANCE
             if inp['handoff'].get('courseSkillSelection'):
                 from app.services.course_skills import CONTRACT, FIXED_SELECTION_CONTRACT
                 system += FIXED_SELECTION_CONTRACT if inp['handoff'].get('selectedSkillsFixed') else CONTRACT
@@ -703,7 +707,9 @@ def revise(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
         system = _sys(pid, REV_SYS, evaluation_prompt=inp.get('_evaluationPrompt'))
         integrated_revision = system.startswith('[통합 수정 계약 roadmap-revision/v1]')
         if not integrated_revision:
-            system += POLICY + track_policy.challenge_guidance(pid, 'tasks') + track_policy.PERIOD_GUIDANCE
+            system += POLICY + track_policy.course_guidance(pid, 'tasks') + track_policy.PERIOD_GUIDANCE
+        elif track_policy.CRASH_CORE_MARKER not in system:
+            system += track_policy.crash_guidance(pid, 'tasks')
         current['learningSkills'] = (pl.get('def') or {}).get('learningSkills') or []
         if (pl.get('def') or {}).get('learningReport'):
             current['skillOrder'] = pl['def']['learningReport']['skillOrder']

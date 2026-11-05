@@ -205,6 +205,7 @@ class ApiTests(unittest.TestCase):
             response=self.client.get(f'/api/v2/drafts/{self.pid}/recommendations')
         self.assertEqual(response.status_code,200)
         self.assertEqual(response.json()['recommendations']['id'],'rec')
+        self.assertFalse(response.json()['recommendations']['outdated'])
         generate.assert_not_called()
 
     def test_old_keyword_cache_requires_regeneration_without_get_model_call(self):
@@ -228,6 +229,7 @@ class ApiTests(unittest.TestCase):
                 'generationId': saved['generationId'], 'recommendationId': rid, 'choices': choices})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['choices'], choices)
+        self.assertTrue(response.json()['recommendations']['outdated'])
         save.assert_called_once()
 
     def test_changed_assessment_blocks_recommendation_save(self):
@@ -246,6 +248,35 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(response.status_code,200)
         self.assertEqual(response.json()['durationEstimates']['S']['weeks'],3)
         context.assert_not_called();generate.assert_not_called();lock.assert_not_called()
+
+
+class RecommendationVersionViewTests(unittest.TestCase):
+    def test_current_and_old_versions_are_compared_per_course_without_storage_changes(self):
+        from app.services.resource_rag import version_for
+        for pid in (None, 'A1', 'A2', 'A3'):
+            for version in (version_for(pid), 'old-version', None):
+                with self.subTest(course=pid, version=version):
+                    rec = {'id': 'r', 'skills': [{'name': 'SQL', 'courses': [{'id': 'c'}], 'books': []}]}
+                    if version is not None:
+                        rec['retrieval'] = {'version': version}
+                    choices = {'SQL': {'course': 'c', 'books': []}}
+                    saved = {'generationId': 'g', '_course': pid, 'recommendations': rec,
+                             'resourceChoices': choices, 'durationEstimates': {'SQL': {'weeks': 2}}}
+                    before = copy.deepcopy(saved)
+                    view = api.recommendation_view(saved)
+                    self.assertEqual(view['recommendations']['outdated'], version != version_for(pid))
+                    self.assertEqual(view['choices'], choices)
+                    self.assertEqual(view['durationEstimates'], saved['durationEstimates'])
+                    self.assertEqual(saved, before)
+                    self.assertNotIn('outdated', rec)
+
+    def test_no_recommendation_remains_none(self):
+        self.assertIsNone(api.recommendation_view({'generationId': 'g'})['recommendations'])
+
+    def test_crash_version_is_not_the_base_version(self):
+        saved = {'generationId': 'g', '_course': 'A2',
+                 'recommendations': {'id': 'r', 'skills': [], 'retrieval': {'version': RESOURCE_RAG_VERSION}}}
+        self.assertTrue(api.recommendation_view(saved)['recommendations']['outdated'])
 
 
 class ActivityVersionApiTests(unittest.TestCase):

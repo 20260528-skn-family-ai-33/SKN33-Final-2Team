@@ -5,6 +5,8 @@ import math
 import re
 import unicodedata
 from app import catalog_candidates as evidence
+from app.english_patterns import english_token as _en
+
 
 _generic = {'기초', '실무', '활용', '학습', '이해', '환경', '프로그래밍', '아키텍처', '컴퓨팅',
             '프로젝트', '역량', '적용', '구현', '개발', '기술', '지식', '및', '기반',
@@ -36,64 +38,66 @@ _aliases = {
 }
 
 # 특정 학습 주제가 명시됐을 때만 구분한다. 긴 본문의 일반 단어 일치율을 문턱으로 삼지 않는다.
-_analysis_scope = re.compile(r'데이터\s*분석|전처리|탐색적|\b(?:data\s+analysis|pandas|eda)\b', re.I)
-_analysis_evidence = re.compile(r'데이터\s*분석|전처리|탐색적|시각화|\b(?:data\s+analysis|pandas|eda|dataframe)\b', re.I)
-_depth = re.compile(r'설계|비교|검증|측정|평가|최적화|문제\s*해결|트러블슈팅|\b(?:design|compar\w*|validat\w*|measur\w*|evaluat\w*|optimi\w*|benchmark|troubleshoot\w*)\b', re.I)
-_admin = re.compile(r'만족도|수강\s*후기|강의\s*평가|과정\s*평가|설문\s*조사|\b(?:course evaluation|feedback survey)\b', re.I)
+_analysis_scope = re.compile(r'데이터\s*분석|전처리|탐색적|' + _en(r'(?:data\s+analysis|pandas|eda)'), re.I)
+_analysis_evidence = re.compile(r'데이터\s*분석|전처리|탐색적|시각화|' + _en(r'(?:data\s+analysis|pandas|eda|dataframe)'), re.I)
+_depth = re.compile(r'설계|비교|검증|측정|평가|최적화|문제\s*해결|트러블슈팅|' + _en(r'(?:design|compar\w*|validat\w*|measur\w*|evaluat\w*|optimi\w*|benchmark|troubleshoot\w*)'), re.I)
+_admin = re.compile(r'만족도|수강\s*후기|강의\s*평가|과정\s*평가|설문\s*조사|' + _en(r'(?:course evaluation|feedback survey)'), re.I)
 _log_word = r'(?:(?<![가-힣])|(?:운영|서버|배치|시스템|보안|이벤트|웹)\s*)로그(?!인|아웃|손실|우도|함수|리즘)'
-_log_topic = re.compile(_log_word + r'|\b(?:logs?|logging)\b', re.I)
-_log_learning = re.compile(_log_word + r'|파싱|정규\s*표현|파일.{0,15}(?:읽|처리)|예외.{0,15}테스트|\b(?:logging|parsing|pytest|fixture|stderr|batch)\b', re.I)
+_log_topic = re.compile(_log_word + r'|' + _en(r'(?:logs?|logging)'), re.I)
+_log_learning = re.compile(_log_word + r'|파싱|정규\s*표현|파일.{0,15}(?:읽|처리)|예외.{0,15}테스트|' + _en(r'(?:logging|parsing|pytest|fixture|stderr|batch)'), re.I)
 
-_build = re.compile(r'만들|구현|구축|개발|실습|연동|실행|구성|빌드|코드\s*작성|파싱|조회|데이터\s*(?:변환|적재)|(?:예외|오류)\s*처리|작업\s*취소|\b(?:build\w*|implement\w*|develop\w*|integrat\w*|hands[- ]on|labs?|execut\w*)\b', re.I)
-_operate = re.compile(r'배포|서빙|모니터링|롤백|복구|\b(?:deploy\w*|serving|monitor\w*|rollback|recover\w*)\b', re.I)
-_concept = re.compile(r'개념|원리|이론|구조|이해|설명|무엇|개요|소개|\b(?:concept\w*|theory|principle\w*|understand\w*|overview|introduct\w*)\b', re.I)
-_intro_only = re.compile(r'소개|개요|이론|무엇|\b(?:overview|introduct\w*|theory)\b', re.I)
-_practice = re.compile(r'실습|직접|코드.{0,12}(?:작성|구현|실행)|\b(?:hands[- ]on|labs?)\b', re.I)
-_discussion = re.compile(r'경험\s*공유|경험담|(?:개발|활용)\s*팁|발표\s*세션|질의\s*응답\s*세션|Q\s*&\s*A|\b(?:experience sharing|panel discussion|development tips)\b', re.I)
+_build = re.compile(r'만들|구현|구축|개발|실습|연동|실행|구성|빌드|코드\s*작성|파싱|조회|데이터\s*(?:변환|적재)|(?:예외|오류)\s*처리|작업\s*취소|' + _en(r'(?:build\w*|implement\w*|develop\w*|integrat\w*|hands[- ]on|labs?|execut\w*)'), re.I)
+_operate = re.compile(r'배포|서빙|모니터링|롤백|복구|' + _en(r'(?:deploy\w*|serving|monitor\w*|rollback|recover\w*)'), re.I)
+_concept = re.compile(r'개념|원리|이론|구조|이해|설명|무엇|개요|소개|' + _en(r'(?:concept\w*|theory|principle\w*|understand\w*|overview|introduct\w*)'), re.I)
+_intro_only = re.compile(r'소개|개요|이론|무엇|' + _en(r'(?:overview|introduct\w*|theory)'), re.I)
+_practice = re.compile(r'실습|직접|코드.{0,12}(?:작성|구현|실행)|' + _en(r'(?:hands[- ]on|labs?)'), re.I)
+_discussion = re.compile(r'경험\s*공유|경험담|(?:개발|활용)\s*팁|발표\s*세션|질의\s*응답\s*세션|Q\s*&\s*A|' + _en(r'(?:experience sharing|panel discussion|development tips)'), re.I)
 _question = re.compile(r'^\s*(?:Q\s*[.:]|질문\s*[:.])|궁금(?:해|하|한)', re.I)
-_foundations = re.compile(r'문법|자료형|함수|조인|정규화|쿼리|토큰|컨텍스트|임베딩|벡터|자료\s*구조|\b(?:syntax|types?|joins?|queries|tokens?|context|embeddings?|vectors?)\b', re.I)
-_security = re.compile(r'보안|공격|권한|가드레일|신뢰\s*경계|레드\s*티밍|\b(?:security|attack\w*|guardrails?|red\s*team\w*|permission\w*)\b', re.I)
-_security_action = re.compile(r'검증|시험|진단|관찰|점검|지도|분석|실습|테스트|\b(?:test\w*|audit\w*|inspect\w*|map\w*)\b', re.I)
-_design = re.compile(r'설계|아키텍처|전략|\b(?:design(?:s|ed|ing|\d+)?|architect\w*|strateg\w*)\b', re.I)
-_business = re.compile(r'서비스\s*디자인|비즈니스|고객\s*여정|(?<![a-z0-9])(?:UX|UI)(?![a-z0-9])|페르소나|아이데이션|시장|수익|\b(?:business|customer journey|ideation)\b', re.I)
-_rag_objects = re.compile(r'\brag\b|검색\s*증강|챗봇|벡터|임베딩|색인|검색|재순위화|청크|지식\s*원본|\b(?:retriev\w*|embeddings?|vector\w*|chatbot\w*|indexing|rerank\w*|chunk\w*)\b', re.I)
-_document_target = re.compile(r'문서|\b(?:pdf|documents?)\b', re.I)
-_document_evidence = re.compile(r'문서|텍스트|지식\s*베이스|\b(?:pdf|documents?|text|textual|knowledge base)\b', re.I)
-_media_search = re.compile(r'(?:이미지|영상|비디오|음성|\b(?:images?|videos?|audio)\b).{0,14}(?:검색|검색기|\b(?:search|retrieval)\b)', re.I)
-_rag_retrieval_practice = re.compile(r'\brag\s*(?:실습|구성|구축|조회|검색)|벡터\s*(?:db|데이터베이스).{0,14}(?:구성|구축|적재|저장)|'
-                                    r'(?:검색|\bretrieval\b).{0,14}(?:효율|전처리|키워드)|\b(?:build|configure|query)\s+(?:a\s+)?(?:rag|vector (?:db|database))\b', re.I)
-_nlp_objects = re.compile(r'토큰|컨텍스트|언어\s*모델|임베딩|자연어|프롬프트|\b(?:tokens?|context|embeddings?|nlp|prompts?|language models?)\b', re.I)
-_nlp_topics = re.compile(r'챗봇|\b(?:llms?|chatbots?)\b', re.I)
-_async_io = r'비동기|코루틴|이벤트\s*루프|\b(?:async(?:io)?|await|coroutines?|event loop)\b'
-_async_context = re.compile(_async_io + r'|동시성|병행성|병렬성|멀티\s*(?:스레딩|프로세싱)|\b(?:concurrency|parallelism|multithreading|multiprocessing)\b', re.I)
-_io_workload = re.compile(r'\b(?:i/o|io)[ -]+bound\b|입출력\s*병목', re.I)
-_async_comparison = re.compile(r'(?=.*(?:비교|\b(?:vs\.?|versus|compar\w*)\b))(?=.*(?:스레드|프로세스|\b(?:threading|multiprocessing|synchronous)\b))', re.I)
-_linux = re.compile(r'리눅스|유닉스|\b(?:linux|unix|posix)\b', re.I)
-_linux_controls = re.compile(r'\b(?:setuid|setgid|chmod|chown|selinux|apparmor|systemd)\b', re.I)
-_os_controls = re.compile(r'권한|접근\s*제어|격리|보안|방화벽|\b(?:permissions?|access control|isolation|sandbox\w*|hardening|firewall|iptables)\b', re.I)
-_windows = re.compile(r'윈도우|\b(?:windows|win32|ntfs|powershell|iis)\b', re.I)
+_foundations = re.compile(r'문법|자료형|함수|조인|정규화|쿼리|토큰|컨텍스트|임베딩|벡터|자료\s*구조|' + _en(r'(?:syntax|types?|joins?|queries|tokens?|context|embeddings?|vectors?)'), re.I)
+_security = re.compile(r'보안|공격|권한|가드레일|신뢰\s*경계|레드\s*티밍|' + _en(r'(?:security|attack\w*|guardrails?|red\s*team\w*|permission\w*)'), re.I)
+_security_action = re.compile(r'검증|시험|진단|관찰|점검|지도|분석|실습|테스트|' + _en(r'(?:test\w*|audit\w*|inspect\w*|map\w*)'), re.I)
+_design = re.compile(r'설계|아키텍처|전략|' + _en(r'(?:design(?:s|ed|ing|\d+)?|architect\w*|strateg\w*)'), re.I)
+_business = re.compile(r'서비스\s*디자인|비즈니스|고객\s*여정|(?<![a-z0-9])(?:UX|UI)(?![a-z0-9])|페르소나|아이데이션|시장|수익|' + _en(r'(?:business|customer journey|ideation)'), re.I)
+_rag_objects = re.compile(_en(r'rag') + r'|검색\s*증강|챗봇|벡터|임베딩|색인|검색|재순위화|청크|지식\s*원본|' + _en(r'(?:retriev\w*|embeddings?|vector\w*|chatbot\w*|indexing|rerank\w*|chunk\w*)'), re.I)
+_document_target = re.compile(r'문서|' + _en(r'(?:pdf|documents?)'), re.I)
+_document_evidence = re.compile(r'문서|텍스트|지식\s*베이스|' + _en(r'(?:pdf|documents?|text|textual|knowledge base)'), re.I)
+_media_search = re.compile(r'(?:이미지|영상|비디오|음성|' + _en(r'(?:images?|videos?|audio)') + r').{0,14}(?:검색|검색기|' + _en(r'(?:search|retrieval)') + r')', re.I)
+_rag_retrieval_practice = re.compile(_en(r'rag', right=False) + r'\s*(?:실습|구성|구축|조회|검색)|벡터\s*(?:db|데이터베이스).{0,14}(?:구성|구축|적재|저장)|'
+                                    r'(?:검색|' + _en(r'retrieval') + r').{0,14}(?:효율|전처리|키워드)|' + _en(r'(?:build|configure|query)\s+(?:a\s+)?(?:rag|vector (?:db|database))'), re.I)
+_nlp_objects = re.compile(r'토큰|컨텍스트|언어\s*모델|임베딩|자연어|프롬프트|' + _en(r'(?:tokens?|context|embeddings?|nlp|prompts?|language models?)'), re.I)
+_nlp_topics = re.compile(r'챗봇|' + _en(r'(?:llms?|chatbots?)'), re.I)
+_async_io = r'비동기|코루틴|이벤트\s*루프|' + _en(r'async(?:io)?|await|coroutines?|event loop')
+_async_context = re.compile(_async_io + r'|동시성|병행성|병렬성|멀티\s*(?:스레딩|프로세싱)|' + _en(r'(?:concurrency|parallelism|multithreading|multiprocessing)'), re.I)
+_io_workload = re.compile(_en(r'(?:i/o|io)[ -]+bound') + r'|입출력\s*병목', re.I)
+_async_comparison = re.compile(r'(?=.*(?:비교|' + _en(r'(?:vs\.?|versus|compar\w*)') + r'))(?=.*(?:스레드|프로세스|' + _en(r'(?:threading|multiprocessing|synchronous)') + r'))', re.I)
+_linux = re.compile(r'리눅스|유닉스|' + _en(r'(?:linux|unix|posix)'), re.I)
+_linux_controls = re.compile(_en(r'(?:setuid|setgid|chmod|chown|selinux|apparmor|systemd)'), re.I)
+_os_controls = re.compile(r'권한|접근\s*제어|격리|보안|방화벽|' + _en(r'(?:permissions?|access control|isolation|sandbox\w*|hardening|firewall|iptables)'), re.I)
+_windows = re.compile(r'윈도우|' + _en(r'(?:windows|win32|ntfs|powershell|iis)'), re.I)
 _linux_security_topics = (
-    ('Linux 권한 설정', re.compile(r'권한|\bpermissions?\b', re.I),
-     re.compile(r'권한|접근\s*제어|\b(?:permissions?|access control|chmod|chown|setuid|setgid|sudo)\b', re.I)),
-    ('Linux 서비스 격리', re.compile(r'격리|\bisolation\b', re.I),
-     re.compile(r'격리|\b(?:isolation|sandbox\w*|namespaces?|seccomp|apparmor)\b', re.I)),
+    ('Linux 권한 설정', re.compile(r'권한|' + _en(r'permissions?'), re.I),
+     re.compile(r'권한|접근\s*제어|' + _en(r'(?:permissions?|access control|chmod|chown|setuid|setgid|sudo)'), re.I)),
+    ('Linux 서비스 격리', re.compile(r'격리|' + _en(r'isolation'), re.I),
+     re.compile(r'격리|' + _en(r'(?:isolation|sandbox\w*|namespaces?|seccomp|apparmor)'), re.I)),
 )
-_dbt = re.compile(r'\bdbt\b', re.I)
+_dbt = re.compile(_en('dbt'), re.I)
 _etl_targets = tuple((re.compile(request, re.I), re.compile(unit, re.I)) for request, unit in (
-    (r'모델|\bmodels?\b', r'모델|\bmodels?\b'),
-    (r'품질|테스트|검증|\b(?:quality|tests?|freshness)\b', r'품질|테스트|검증|\b(?:quality|tests?|freshness)\b'),
-    (r'증분|\bincremental\b', r'증분|\bincremental\b'),
-    (r'재처리|백필|\b(?:backfill|reprocess\w*)\b', r'재처리|백필|\b(?:back[ -]?fill|reprocess\w*)\b'),
+    (r'모델|' + _en(r'models?'), r'모델|' + _en(r'models?')),
+    (r'품질|테스트|검증|' + _en(r'quality|tests?|freshness'), r'품질|테스트|검증|' + _en(r'quality|tests?|freshness')),
+    (r'증분|' + _en(r'incremental'), r'증분|' + _en(r'incremental')),
+    (r'재처리|백필|' + _en(r'backfill|reprocess\w*'), r'재처리|백필|' + _en(r'back[ -]?fill|reprocess\w*')),
 ))
 
 # 스킬 태그가 넓어도 명시된 기술/학습 대상은 실제 학습 근거에서 찾는다.
+# label이 있는 대상은 요구 단계의 학습 근거에서 다시 확인한다. dbt는 아래 세부 대상으로 확인한다.
 _scope_topics = (
-    (r'ETL|파이프라인', r'\bdbt\b', r'\bdbt\b'),
-    (r'SQL|RDBMS', r'조인|\bjoins?\b', r'조인|\bjoins?\b'),
-    (r'RAG|NLP|자연어', r'토큰화|\btokeniz\w*\b', r'토큰|\btokens?\b|\btokeniz\w*\b'),
-    (r'클라우드|cloud|Docker', r'쿠버네티스|\b(?:kubernetes|k8s)\b', r'쿠버네티스|\b(?:kubernetes|k8s)\b'),
-    (r'Python|파이썬', _async_io, _async_io),
+    (None, r'ETL|파이프라인', _dbt.pattern, _dbt.pattern),
+    ('SQL 조인', r'SQL|RDBMS', r'조인|' + _en(r'joins?'), r'조인|' + _en(r'joins?')),
+    ('토큰화', r'RAG|NLP|자연어', r'토큰화|' + _en(r'tokeniz\w*'), r'토큰|' + _en(r'tokens?|tokeniz\w*')),
+    ('Kubernetes', r'클라우드|cloud|Docker', r'쿠버네티스|' + _en(r'kubernetes|k8s'), r'쿠버네티스|' + _en(r'kubernetes|k8s')),
+    ('비동기 I/O', r'Python|파이썬', _async_io, _async_io),
 )
+_ETL_TARGET_LABELS = ('dbt 모델', 'dbt 품질 테스트', 'dbt 증분 처리', 'dbt 재처리·백필')
 
 # 명시한 구현 도구만 해당 스킬에 적용한다. SQL 이론 등에 목표의 모든 영문 단어를 요구하지 않는다.
 _stacks = {
@@ -110,8 +114,8 @@ _stack_patterns = {name: re.compile(r'(?<![a-z0-9])(?:' + pattern + r')(?![a-z0-
 _web_stacks = {'fastapi', 'django', 'flask', 'spring', 'express', 'nestjs'}
 _runtime = {'fastapi': 'python', 'django': 'python', 'flask': 'python', 'spring': 'java',
             'express': 'javascript', 'nestjs': 'javascript'}
-_framework_after = re.compile(r'^[ \t]*(?:[/:-][ \t]*)?(?:(?:rest(?:ful)?|api|framework|server|middleware|router|routing|backend|web|rag)\b|으로|로|을|를|과|와|기반|기초|입문|설치|설정|활용|실습|구현|개발|서버|프레임워크)', re.I)
-_framework_before = re.compile(r'(?:\b(?:java|javascript|typescript|node\.?js|framework)|프레임워크|백엔드)[ \t]*(?:[/·:+-][ \t]*)?$', re.I)
+_framework_after = re.compile(r'^[ \t]*(?:[/:-][ \t]*)?(?:' + _en(r'(?:rest(?:ful)?|api|framework|server|middleware|router|routing|backend|web|rag)', left=False) + r'|으로|로|을|를|과|와|기반|기초|입문|설치|설정|활용|실습|구현|개발|서버|프레임워크)', re.I)
+_framework_before = re.compile(r'(?:' + _en(r'(?:java|javascript|typescript|node\.?js|framework)', right=False) + r'|프레임워크|백엔드)[ \t]*(?:[/·:+-][ \t]*)?$', re.I)
 
 
 def _stack_names(text: str) -> set[str]:
@@ -135,9 +139,16 @@ def normalize(value: object) -> str:
     return unicodedata.normalize('NFKC', str(value or ''))
 
 
+def _target_texts(skill: dict) -> list[str]:
+    """자료가 충족해야 할 스킬 목표. Crash는 계획의 핵심 완료 기준만 보고 후속 학습 범위는 요구하지 않는다."""
+    if skill.get('coreCriteria'):
+        return [str(skill.get('coreOutcome') or '')] + [str(value) for value in skill['coreCriteria']]
+    return ([str(skill.get(key) or '') for key in ('application', 'targetOutcome')]
+            + [str(value) for value in skill.get('completionCriteria') or []])
+
+
 def _skill_context(skill: dict) -> str:
-    return normalize(' '.join([str(skill.get(key) or '') for key in ('application', 'targetOutcome')]
-                              + [str(value) for value in skill.get('completionCriteria') or []])).casefold()
+    return normalize(' '.join(_target_texts(skill))).casefold()
 
 
 def _dbt_targets(skill: dict) -> tuple[re.Pattern, ...]:
@@ -145,6 +156,29 @@ def _dbt_targets(skill: dict) -> tuple[re.Pattern, ...]:
     if not (_dbt.search(context) and re.search(r'ETL|파이프라인', skill['name'], re.I)):
         return ()
     return tuple(unit for request, unit in _etl_targets if request.search(context))
+
+
+def _dbt_target_labels(skill: dict) -> list[tuple[str, re.Pattern]]:
+    context = _skill_context(skill)
+    if not (_dbt.search(context) and re.search(r'ETL|파이프라인', skill['name'], re.I)):
+        return []
+    return [(label, unit) for label, (request, unit) in zip(_ETL_TARGET_LABELS, _etl_targets) if request.search(context)]
+
+
+def _missing_targets(skill: dict, name: str, stage: str, applied: list[str]) -> list[str]:
+    """목표에 명시한 세부 대상이 요구 단계의 단원·소개에 없으면 표시한다. 부분 자료를 전체 충족으로 세지 않는다."""
+    if stage == 'conceptual':
+        return []
+    context = _skill_context(skill)
+    missing = [label for label, skill_pattern, request, proof in _scope_topics
+               if label and re.search(skill_pattern, name, re.I) and re.search(request, context, re.I)
+               and not any(re.search(proof, value, re.I) for value in applied)]
+    missing += [label for label, unit in _dbt_target_labels(skill) if not any(unit.search(value) for value in applied)]
+    return missing
+
+
+def target_gaps(info: dict, skill: str) -> list[str]:
+    return list(((info.get('suitability') or {}).get(skill) or {}).get('unverifiedTargetTopics') or [])
 
 
 def _dbt_facets(row: dict, value: str, targets: tuple[re.Pattern, ...]) -> set[int]:
@@ -280,7 +314,7 @@ def _profile(skill: dict, project: dict, rows: list, descriptions: list[str], te
             return bool(_design.search(value))
         if stage == 'build':
             return bool(_build.search(value) or (re.search(_async_io, value, re.I)
-                        and (re.search(r'사용|취소|병렬\s*처리|\b(?:cancell?\w*|await|asyncio\.\w+)\b', value, re.I)
+                        and (re.search(r'사용|취소|병렬\s*처리|' + _en(r'(?:cancell?\w*|await|asyncio\.\w+)'), value, re.I)
                              or (concurrency_skill and _io_workload.search(value) and _async_comparison.search(value)))))
         return bool(_concept.search(value) or _design.search(value) or _foundations.search(value)
                     or _discussion.search(value) or _question.search(value)
@@ -305,9 +339,11 @@ def _profile(skill: dict, project: dict, rows: list, descriptions: list[str], te
             'unitIndices': [index for index, value in applied_units][:3],
             'appliedDescription': applied_claims,
             'suitable': bool(supported and scope and gap == 0 and not missing and not conflicts)}
-    if linux_security:
+    missing_targets = _missing_targets(skill, name, stage, applied)
+    if linux_security or missing_targets:
         result['unverifiedTargetTopics'] = [label for label, request, proof in _linux_security_topics
-            if request.search(_skill_context(skill)) and not any(proof.search(value) for value in learning)]
+            if linux_security and request.search(_skill_context(skill))
+            and not any(proof.search(value) for value in learning)] + missing_targets
     return result
 
 def hours(item: dict) -> float | None:
@@ -397,7 +433,7 @@ def facts(item: dict, project: dict, selection: dict) -> dict:
             scope[skill['name']] &= bool(explicit or transferable)
             if transferable:
                 document_gaps.add(skill['name'])
-        for skill_pattern, request, proof in _scope_topics:
+        for _, skill_pattern, request, proof in _scope_topics:
             if re.search(skill_pattern, skill['name'], re.I) and re.search(request, _skill_context(skill), re.I):
                 section_proof = proof == _dbt.pattern and skill['name'] in dbt_scoped
                 scope[skill['name']] &= bool(re.search(proof, learning, re.I) or section_proof)
@@ -415,7 +451,7 @@ def facts(item: dict, project: dict, selection: dict) -> dict:
                                        skill['name'] in supported, scope[skill['name']],
                                        discussion_context=discussion_context) for skill in selection['skills']}
     for name in document_gaps:
-        profiles[name]['unverifiedTargetTopics'] = ['문서 입력·전처리']
+        profiles[name]['unverifiedTargetTopics'] = [*target_gaps({'suitability': profiles}, name), '문서 입력·전처리']
     return {'rows': rows, 'descriptions': descriptions, 'title': title, 'supported': supported,
             'scopeEvidence': scope, 'suitability': profiles, 'topicHits': hits,
             'topicCoverage': hits / len(topics) if topics else 1,
@@ -425,8 +461,7 @@ def focus_terms(project: dict, skill: dict, *, goal_only=False):
     """일반 행동어보다 문서·로그 같은 학습 대상을 찾고 표현 차이를 보완한다."""
     texts = [str(project.get('goal') or '')]
     if not goal_only:
-        texts += [str(skill.get('application') or ''), str(skill.get('targetOutcome') or '')]
-        texts += list(skill.get('completionCriteria') or [])
+        texts += _target_texts(skill)
     normalized = []
     for text in texts:
         words = re.findall(r'[a-z0-9+#.]{2,}|[가-힣]{2,}', normalize(text).casefold())
@@ -445,8 +480,8 @@ def focus_terms(project: dict, skill: dict, *, goal_only=False):
             terms += evidence.query_terms(list(synonyms))
     if re.search(_async_io, context, re.I):
         terms.append(re.compile(_async_io, re.I))
-    if re.search(r'동기화|경쟁\s*(?:상태|조건)|\b(?:synchronization|race condition)\b', context, re.I):
-        terms.append(re.compile(r'동기화|경쟁\s*(?:상태|조건)|교착\s*상태|\b(?:synchronization|race conditions?|locks?|mutex|deadlocks?|semaphores?)\b', re.I))
+    if re.search(r'동기화|경쟁\s*(?:상태|조건)|' + _en(r'(?:synchronization|race condition)'), context, re.I):
+        terms.append(re.compile(r'동기화|경쟁\s*(?:상태|조건)|교착\s*상태|' + _en(r'(?:synchronization|race conditions?|locks?|mutex|deadlocks?|semaphores?)'), re.I))
     return list({term.pattern: term for term in terms}.values())
 
 
@@ -547,7 +582,8 @@ def rank_applicable(rows: list[dict], project: dict, selection: dict, skill: dic
             cache[row['id']] = facts(sources.get(row['id'], row), project, selection)
         info = cache[row['id']]
         focus, depth, title = _rank_signals(info, project, skill, challenge)
-        return (not suitable(info, skill['name']), *suitability_key(info, skill['name']), -focus, -depth,
+        return (not suitable(info, skill['name']), *suitability_key(info, skill['name']),
+                len(target_gaps(info, skill['name'])), -focus, -depth,
                 -float(row.get('retrievalScore') or 0), -title, row['id'])
 
     return sorted(rows, key=key)[:limit]

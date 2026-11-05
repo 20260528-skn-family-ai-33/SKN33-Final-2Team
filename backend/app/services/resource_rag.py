@@ -12,7 +12,7 @@ from app.services import book_candidates
 
 MODEL = 'text-embedding-3-small'
 DIMENSIONS = 1536
-VERSION = 'resource-pgvector-rag/v15-targeted-evidence'
+VERSION = 'resource-pgvector-rag/v17-english-boundaries'
 PER_KIND = 6
 COURSE_REVIEW = 20
 FIELDS = ('id','title','provider','cost','hours','estimated','image','url','skills','content','curriculum')
@@ -32,6 +32,9 @@ def query_text(project: dict, skill: dict, course: dict | None) -> str:
         'desiredCompetencies': str(project.get('desiredCompetencies') or '')[:500],
         'skill': skill['name'], 'application': str(skill.get('application') or '')[:600],
         **({'targetOutcome':str(skill.get('targetOutcome') or '')[:500],'completionCriteria':skill.get('completionCriteria') or []} if course and course.get('id')=='A3' else {}),
+        # Crash는 핵심 완료 기준으로 자료를 찾는다. 후속 학습 범위는 검색 질의에 넣지 않는다.
+        **({'coreOutcome':str(skill.get('coreOutcome') or '')[:500],'coreCriteria':skill.get('coreCriteria') or []}
+           if course and course.get('id')=='A2' and skill.get('coreCriteria') else {}),
         'course': {key: str((course or {}).get(key) or '')[:500] for key in ('id','name','reason','scope')},
     }, ensure_ascii=False, sort_keys=True)
 

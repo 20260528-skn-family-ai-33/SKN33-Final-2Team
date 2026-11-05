@@ -197,7 +197,11 @@ def course_input(t, employee_id, project_id, course):
 
 
 def recommendation_view(saved: dict) -> dict:
-    return {'courseId': saved.get('_course'), 'skillDetails': deepcopy((saved.get('selection') or {}).get('skills') or []), 'generationId': saved['generationId'], 'recommendations': saved.get('recommendations'),
+    from app.services.resource_rag import version_for
+    recommendations = deepcopy(saved.get('recommendations'))
+    if recommendations:
+        recommendations['outdated'] = (recommendations.get('retrieval') or {}).get('version') != version_for(saved.get('_course'))
+    return {'courseId': saved.get('_course'), 'skillDetails': deepcopy((saved.get('selection') or {}).get('skills') or []), 'generationId': saved['generationId'], 'recommendations': recommendations,
             'choices': saved.get('resourceChoices') or {},
             'durationEstimates': saved.get('durationEstimates') or {},
             'skillOrder': saved.get('skillOrder') or [row['name'] for row in (saved.get('recommendations') or {}).get('skills', [])]}

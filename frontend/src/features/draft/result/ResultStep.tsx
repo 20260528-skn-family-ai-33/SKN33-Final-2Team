@@ -3,6 +3,7 @@ import { hrs } from '@/shared/lib/format';
 import { materialVersionKey } from './materialVersion';
 import { loadRecommendations, recommendationUrl, requestMaterials as request, type Resource, type Result } from './materialRequests';
 import { MaterialReason } from './MaterialReason';
+import { OutdatedRecommendations, UnverifiedTargets } from './ResourceNotices';
 import { MaterialSkillTabs } from './MaterialSkillTabs';
 import { AssessmentResults } from './AssessmentResults';
 import { prepareRoadmaps } from '../prepareRoadmaps';
@@ -41,7 +42,8 @@ function ResourceCard({ resource, kind, checked, disabled, onChange, weeklyHours
       <span><b title={resource.title}>{resource.title}</b>{resource.aiRecommended && <span className="tag acc">AI 추천</span>}</span>
     </label>
     <div className="v2-resource-meta"><span>{resource.provider || '출처 미확인'} · {resource.cost == null ? '가격 미확인' : resource.cost === 0 ? '무료' : `${Number(resource.cost).toLocaleString()}원`}</span>
-    <span>{kind === 'book' ? `도서 1주 배정 · ${hrs(weeklyHours)}` : resource.hours && resource.hours > 0 && resource.timeStatus !== 'unknown' ? `${hrs(resource.hours)}${resource.timeStatus === 'estimated' || resource.estimated?.includes('hours') ? ' (추정)' : ''}` : '시간 미확인 · 일정 1주 가정'}</span></div></div>
+    <span>{kind === 'book' ? `도서 1주 배정 · ${hrs(weeklyHours)}` : resource.hours && resource.hours > 0 && resource.timeStatus !== 'unknown' ? `${hrs(resource.hours)}${resource.timeStatus === 'estimated' || resource.estimated?.includes('hours') ? ' (추정)' : ''}` : '시간 미확인 · 일정 1주 가정'}</span></div>
+    {kind === 'course' && <UnverifiedTargets topics={resource.unverifiedTargetTopics} />}</div>
     {resource.url && <a className="v2-resource-link" href={resource.url} draggable={false} target="_blank" rel="noreferrer" aria-label={`${resource.title} 바로가기`}>바로가기 ↗</a>}
   </article>;
 
@@ -171,6 +173,7 @@ function ResultSelection({ editorRef, onChoicesChanged, locked = false, courseId
         {estimating && <span className="small muted" role="status"><span className="sp" aria-hidden="true" /> 주차 계산 중…</span>}</div>
     </div>
     {!courseId && <MaterialBasis />}
+    {result?.recommendations && <OutdatedRecommendations outdated={result.recommendations.outdated} courseId={courseId} />}
     {error && <div><p className="err" role="alert">{error}</p>{!result?.recommendations && <button className="btn line" disabled={busy} onClick={() => void generate()}>다시 시도하기</button>}</div>}
     {busy ? <div className="loading" role="status"><span className="sp" aria-hidden="true" />자료를 확인하고 추천을 정리하고 있어요.</div>
       : result?.recommendations ? <>{!skillFilter&&<MaterialSkillTabs names={materialNames} active={shownSkill} onChange={setActiveSkill} id={tabsId}/>}<div className="v2-skills-board">{materialNames.map((name,skillIndex) => {

@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import math
 from copy import deepcopy
-from app.services.resource_evidence import facts, hours, suitable, suitability_key
+from app.services.resource_evidence import facts, hours, suitable, suitability_key, target_gaps
 
-VERSION = 'crash-short-courses/v7-time-comparison'
+VERSION = 'crash-short-courses/v11-server-shortest-bundle'
 
 
 def is_crash(course) -> bool:
@@ -39,7 +39,8 @@ def rank(rows: list[dict], project: dict, selection: dict, skill: dict, *, limit
         coverage = max(1, sum(suitable(info, selected['name']) for selected in selection['skills']))
         # 여러 스킬의 학습 근거가 있을 때만 같은 강좌를 공유할 수 있는 효율을 인정한다.
         effective = duration / coverage if duration is not None else math.inf
-        return (*quality(info, skill['name']), certainty, effective, duration or math.inf, -coverage,
+        return (*quality(info, skill['name']), len(target_gaps(info, skill['name'])),
+                certainty, effective, duration or math.inf, -coverage,
                 -float(row.get('retrievalScore') or 0), str(row.get('title') or ''), row['id'])
 
     rows.sort(key=key)
@@ -71,6 +72,9 @@ def shortest_bundle(pools: list[dict], project: dict, selection: dict, cache: di
                 cache[rid] = facts(row, project, selection)
             if suitable(cache[rid], pool['name']):
                 applicable.append(row)
+        # 명시한 세부 대상을 가장 많이 확인한 강좌만 남긴다. 더 적게 다루는 짧은 강좌로 시간을 줄이지 않는다.
+        fewest = min((len(target_gaps(cache[row['id']], pool['name'])) for row in applicable), default=0)
+        applicable = [row for row in applicable if len(target_gaps(cache[row['id']], pool['name'])) == fewest]
         if not applicable:
             continue
         bit = 1 << len(names)
@@ -160,16 +164,21 @@ def study_plan(pools: list[dict], project: dict, selection: dict, references: di
         detail = {'name': pool['name'], 'key': references[row['id']],
                   'evidenceLevel': profile['evidenceLevel'], 'evidenceUnitIndices': profile['unitIndices'],
                   'hasDescriptionEvidence': bool(profile['appliedDescription'])}
+        if target_gaps(cache[row['id']], pool['name']):
+            detail['unverifiedTargetTopics'] = target_gaps(cache[row['id']], pool['name'])
         if confirmed:
             other = {card['id']: hours(card) for i, card in enumerate(picked) if i != index}
+            # 적용 근거가 없거나 기본안이 다루는 세부 대상을 빠뜨리는 짧은 강좌를 시간 절감안으로 보여 주지 않는다.
+            gaps = set(target_gaps(cache[row['id']], pool['name']))
             detail['singleSwapExtraHours'] = {
                 references[alt['id']]: round(math.fsum({**other, alt['id']: hours(alt)}.values()) - total, 3)
                 for alt in pool['courses'] if alt['id'] in references and alt['id'] != row['id']
-                and time_certainty(alt) == 'confirmed'
+                and time_certainty(alt) == 'confirmed' and suitable(cache[alt['id']], pool['name'])
+                and set(target_gaps(cache[alt['id']], pool['name'])) <= gaps
             }
         skills.append(detail)
     return {'skills': skills,
             'uniqueCourses': len(unique), 'uniqueHours': total,
             'hoursConfirmed': confirmed,
             'timeStatus': 'unknown' if 'unknown' in statuses else 'confirmed' if confirmed else 'estimated',
-            'basis': '스킬별 key의 목차·소개로 핵심 학습 근거를 확인하고, 첫 강좌 조합을 바꿀 때 고유시간을 비교한다.'}
+            'basis': '서버가 계산한 스킬별 짧은 기본안이다. key의 목차·소개로 핵심 학습 근거를 확인한다.'}

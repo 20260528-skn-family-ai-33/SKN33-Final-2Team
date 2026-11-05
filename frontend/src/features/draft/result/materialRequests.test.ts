@@ -75,3 +75,19 @@ it('자료 조회가 실패한 요청에서 추가 생성을 시도하지 않는
   await expect(loadRecommendations('unavailable-draft', 'g1', 'A3', 'v1')).rejects.toThrow('추천 자료를 읽지 못했어요.');
   expect(fetchMock).toHaveBeenCalledTimes(1);
 });
+
+it.each([true, false, undefined])('이전 기준 여부(%s)를 전달하고 저장된 선택을 자동 재추천하지 않는다', async outdated => {
+  const saved: Result = {
+    courseId: 'A2', generationId: 'g1', choices: { SQL: { course: 'saved', books: [] } },
+    recommendations: { id: 'old', outdated, skills: [{ name: 'SQL',
+      courses: [{ id: 'saved', title: '저장 강좌', hours: 8, cost: 0, why: '', knowledge: '', aiRecommended: true }],
+      books: [], selectedCourse: 'saved', selectedBooks: [],
+    }] },
+  };
+  const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(Response.json(saved));
+  vi.stubGlobal('fetch', fetchMock);
+
+  await expect(loadRecommendations(`version-notice-${outdated}`, 'g1', 'A2', 'v1')).resolves.toEqual(saved);
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(fetchMock.mock.calls[0][1]?.method).toBeUndefined();
+});

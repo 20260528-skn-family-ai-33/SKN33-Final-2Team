@@ -2,6 +2,7 @@
 from copy import deepcopy
 import re
 import unicodedata
+from .english_patterns import english_token as _en
 
 VERSION='learner-knowledge/v1'
 POLICY="""
@@ -58,8 +59,8 @@ def exclusion(resource,knowledge,goal=''):
     if re.search(r'복습|재학습|다시\s*배우|기초부터|입문부터',goal):return None
     if resource.get('type') not in ('course','book'):return None
     # 제목만으로 명확한 순수 입문 자료만 제외한다. 심화·응용이 섞인 자료는 모델이 목차를 보고 판단한다.
-    intro=re.search(r'입문|왕초보|초보자|기초(?:\s*(?:문법|다지기|학습|강좌|코딩|프로그래밍))?|처음\s*(?:배우|시작)|\bbeginner|\bintroduction\s+to',title,re.I)
-    advanced=re.search(r'심화|고급|비동기|최적화|튜닝|설계|검증|서빙|배포|실무|프로젝트|분석|머신러닝|데이터|\badvanced|\basync|\bproject',title,re.I)
+    intro=re.search(r'입문|왕초보|초보자|기초(?:\s*(?:문법|다지기|학습|강좌|코딩|프로그래밍))?|처음\s*(?:배우|시작)|' + _en(r'beginner', right=False) + r'|' + _en(r'introduction', right=False) + r'\s+to',title,re.I)
+    advanced=re.search(r'심화|고급|비동기|최적화|튜닝|설계|검증|서빙|배포|실무|프로젝트|분석|머신러닝|데이터|' + _en(r'advanced', right=False) + r'|' + _en(r'async', right=False) + r'|' + _en(r'project', right=False),title,re.I)
     if intro and not advanced:
         for term in _technology_names(knowledge):
             if re.search(r'(?<![a-z0-9])'+re.escape(term)+r'(?![a-z0-9])',title,re.I):return '이미 사용하는 기술의 입문 반복'
