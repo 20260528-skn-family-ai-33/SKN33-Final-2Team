@@ -10,10 +10,48 @@ export function notificationTarget(n: AppNotification): string {
   return head ? paths.memberPlan(n.employee.id, n.planId) : paths.roadmap(n.planId);
 }
 
-export function notificationTitle(n: AppNotification): string {
-  if (n.audience === 'head')
+/** bare: 직원별 묶음 안처럼 직원 이름이 위에 이미 보이면 이름을 뺀다(#96) */
+export function notificationTitle(n: AppNotification, bare = false): string {
+  if (n.audience === 'head' && !bare)
     return n.kind === 'report' ? `${n.employee.name} 님의 결과 보고서 작성이 끝났어요` : `${n.employee.name} 님이 새 로드맵 작성을 마쳤어요`;
   return n.kind === 'report' ? '결과 보고서 작성이 끝났어요' : '새 로드맵 작성을 마쳤어요';
+}
+
+/** 한 소속 직원에게서 생긴 알림 묶음(#96) */
+export interface StaffGroup {
+  employee: AppNotification['employee'];
+  /** 서버 순서 그대로(최근 것 먼저) */
+  items: AppNotification[];
+  unread: number;
+  latestAt: string;
+}
+
+/** 본인 알림(위)과 소속 직원 알림(아래)을 나누고, 소속 직원 알림은 직원별로 묶는다(#96).
+ *  서버가 최근 순으로 보내므로 따로 정렬하지 않는다. 묶음도 가장 최근 알림이 앞선 직원부터 */
+export function splitNotifications(items: AppNotification[]): { mine: AppNotification[]; staff: StaffGroup[] } {
+  const mine: AppNotification[] = [];
+  const staff = new Map<string, StaffGroup>();
+  for (const n of items) {
+    if (n.audience !== 'head') {
+      mine.push(n);
+      continue;
+    }
+    const g = staff.get(n.employee.id);
+    if (g) {
+      g.items.push(n);
+      if (!n.read) g.unread += 1;
+    } else {
+      staff.set(n.employee.id, { employee: n.employee, items: [n], unread: n.read ? 0 : 1, latestAt: n.createdAt });
+    }
+  }
+  return { mine, staff: [...staff.values()] };
+}
+
+/** 묶음 줄의 부제: 종류별 건수(없는 종류는 뺀다) */
+export function staffGroupSub(g: StaffGroup): string {
+  const roadmaps = g.items.filter((n) => n.kind === 'roadmap').length;
+  const reports = g.items.length - roadmaps;
+  return [roadmaps ? `로드맵 ${roadmaps}건` : '', reports ? `결과 보고서 ${reports}건` : ''].filter(Boolean).join(' · ');
 }
 
 export function notificationSub(n: AppNotification): string {
