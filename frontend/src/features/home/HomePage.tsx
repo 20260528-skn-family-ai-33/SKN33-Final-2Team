@@ -96,12 +96,17 @@ function StageCard({ R }: { R: PlanRecord }) {
   }
   const orderedSkills = [...skillNames.filter(name => bySkill.has(name)), ...[...bySkill.keys()].filter(name => !skillNames.includes(name))];
   const skillInWeek = (skill: string, list: typeof pl.acts) => {
-    const materials = list.filter(a => a.res);
-    const separate = materials.filter(a => !sharedIds.has(a.res!));
-    const base = separate.length ? separate : materials.length ? materials : list;
+    const sharedCourse = shared.find(course => course.skills.includes(skill));
+    if (sharedCourse) {
+      const sharedGroupActs = pl.acts.filter(a => sharedCourse.skills.includes(a.skill || ''));
+      const sharedDeliverables = sharedGroupActs.filter(a => !a.res);
+      const from = sharedCourse.from;
+      const to = sharedDeliverables.length ? Math.max(...sharedDeliverables.map(a => a.wTo)) : Math.max(...sharedGroupActs.map(a => a.wTo));
+      return from <= week && week <= to;
+    }
     const schedule = pl.def.materialSchedule?.find(row => row.skill === skill);
-    const from = separate.length ? Math.min(...separate.map(a => a.wFrom)) : schedule?.startWeek ?? Math.min(...base.map(a => a.wFrom));
-    const to = separate.length ? Math.max(...separate.map(a => a.wTo)) : schedule?.endWeek ?? Math.max(...base.map(a => a.wTo));
+    const from = schedule?.startWeek ?? Math.min(...list.map(a => a.wFrom));
+    const to = schedule?.endWeek ?? Math.max(...list.map(a => a.wTo));
     return from <= week && week <= to;
   };
   const currentSkills = new Set(orderedSkills.filter(skill => skillInWeek(skill, bySkill.get(skill)!)));
@@ -112,6 +117,7 @@ function StageCard({ R }: { R: PlanRecord }) {
     const categories = new Map<string, typeof pl.acts>();
     for (const activity of bySkill.get(skill)!) {
       if (activity.res && sharedIds.has(activity.res)) continue;
+      if (!expanded && (activity.wFrom > week || activity.wTo < week)) continue;
       const resource = activity.res ? resources[activity.res] : undefined;
       const kind = !activity.res ? '과제' : resource?.type === 'book' || resource?.kind === '도서' ? '도서' : resource?.type === 'course' || resource?.kind === '강좌' ? '강좌' : '기타 자료';
       categories.set(kind, [...(categories.get(kind) || []), activity]);

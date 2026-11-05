@@ -136,9 +136,18 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
           const dn = as.filter((a) => st(R.progress, a.id) === 'done').length;
           const key = `${R.id}:skill:${name}`;
           const schedule = pl.def.materialSchedule?.find(row => row.skill === name);
-          const baseActs = separateMaterials.length ? separateMaterials : materials.length ? materials : as;
-          const f = separateMaterials.length ? Math.min(...separateMaterials.map((a) => a.wFrom)) : schedule?.startWeek ?? Math.min(...baseActs.map((a) => a.wFrom));
-          const t = separateMaterials.length ? Math.max(...separateMaterials.map((a) => a.wTo)) : schedule?.endWeek ?? Math.max(...baseActs.map((a) => a.wTo));
+          const sharedCourse = shared.find(course => course.skills.includes(name));
+          let f: number, t: number;
+          if (sharedCourse) {
+            f = sharedCourse.from;
+            const sharedGroupActs = pl.acts.filter(a => sharedCourse.skills.includes(a.skill || ''));
+            const sharedDeliverables = sharedGroupActs.filter(a => !a.res);
+            t = sharedDeliverables.length ? Math.max(...sharedDeliverables.map(a => a.wTo)) : Math.max(...sharedGroupActs.map(a => a.wTo));
+          } else {
+            const ownDeliverables = as.filter(a => !a.res);
+            f = schedule?.startWeek ?? Math.min(...as.map(a => a.wFrom));
+            t = ownDeliverables.length ? Math.max(...ownDeliverables.map(a => a.wTo)) : schedule?.endWeek ?? Math.max(...as.map(a => a.wTo));
+          }
           const rangeEnd = Math.min(T, off + 7 * t + (as.some(activity => !activity.res) ? 3.5 : 0));
           return (
             <Fragment key={key}>
@@ -165,8 +174,9 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
               {materials.length > 0 && <Row lv={2} ins={up.concat(key)} label={<button className="gt-a" aria-label={`${name} 자료 학습 · ${materialLabel} · 자료 목록 열기`} onClick={showMaterials}><span className="gt-no">{number}.1</span><span className="gt-name">자료 학습 <small>{materialLabel}</small></span></button>} bar={separateMaterials.length ? <button type="button" className="gt-bar act gt-materials-open" aria-label={`${name} 학습 자료 열기`} onClick={showMaterials} style={gtPos(off + 7 * (Math.min(...separateMaterials.map(activity => activity.wFrom)) - 1), off + 7 * Math.max(...separateMaterials.map(activity => activity.wTo)), T)} /> : <span className="gt-shared-note">공통 강좌 연결 표시 참조</span>} tip={{ v: when(separateMaterials.length ? Math.min(...separateMaterials.map(activity => activity.wFrom)) : f, separateMaterials.length ? Math.max(...separateMaterials.map(activity => activity.wTo)) : t), t: `${name} 자료 학습`, m: `${materialLabel} · 클릭하면 개별 자료와 기록을 볼 수 있어요.` }} />}
               {as.filter(activity => !activity.res).map((a, i) => {
                 const task = !a.res;
-                const activityFrom = task ? t : a.wFrom;
-                const activityTo = task ? t : a.wTo;
+                const taskWeek = a.wTo || t;
+                const activityFrom = a.wFrom || taskWeek;
+                const activityTo = taskWeek;
                 const done = st(R.progress, a.id) === 'done';
                 const no = `${number}.${i + (materials.length ? 2 : 1)}`;
                 const w = when(activityFrom, activityTo);
@@ -184,7 +194,7 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
                       </button>
                     }
                     bar={
-                      task ? <button type="button" className={`gt-bar act gt-task-submit${done ? ' done' : ''}`} aria-label={`${a.title} 과제물 제출`} onClick={() => openRecord(R.id, a.id)} style={gtPos(Math.max(0, off + 7 * t - 3.5), Math.min(T, off + 7 * t + 3.5), T)}>{done ? <Icon name="check" /> : null}</button> : <span className={`gt-bar act${done ? ' done' : ''}`} style={gtPos(off + 7 * (activityFrom - 1), off + 7 * activityTo, T)}>{done ? <Icon name="check" /> : null}</span>
+                      task ? <button type="button" className={`gt-bar act gt-task-submit${done ? ' done' : ''}`} aria-label={`${a.title} 과제물 제출`} onClick={() => openRecord(R.id, a.id)} style={gtPos(Math.max(0, off + 7 * taskWeek - 3.5), Math.min(T, off + 7 * taskWeek + 3.5), T)}>{done ? <Icon name="check" /> : null}</button> : <span className={`gt-bar act${done ? ' done' : ''}`} style={gtPos(off + 7 * (activityFrom - 1), off + 7 * activityTo, T)}>{done ? <Icon name="check" /> : null}</span>
                     }
                     tip={{ v: w, t: a.title, m }}
                   />
