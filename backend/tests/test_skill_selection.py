@@ -78,6 +78,55 @@ class SkillSelectionTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, '연결 실패'):
             select_skills(self.project, self.tags, generate)
 
+    def test_top_level_key_variations_and_bare_list_are_supported(self):
+        expected = [self.row(self.tags[0])]
+        for payload in (
+            {'selected_skills': [self.row(self.tags[0])]},
+            {'selectedSkills': [self.row(self.tags[0])]},
+            {'skill_list': [self.row(self.tags[0])]},
+            {'skills_list': [self.row(self.tags[0])]},
+            {'recommended_skills': [self.row(self.tags[0])]},
+            {'result': [self.row(self.tags[0])]},
+            [self.row(self.tags[0])],
+            {'skills': {'1': self.row(self.tags[0])}},
+        ):
+            with self.subTest(payload=payload):
+                res = select_skills(self.project, self.tags, lambda *_: payload)
+                self.assertEqual(res['skills'], expected)
+
+    def test_field_name_variations_are_mapped_correctly(self):
+        cases = [
+            ({'skill': self.tags[0], 'why': '핵심 라이브러리', 'use_case': '파이프라인 구축'},
+             {'name': self.tags[0], 'reason': '핵심 라이브러리', 'application': '파이프라인 구축'}),
+            ({'skill_name': self.tags[1], 'explanation': '학습 필요', 'usage': '서비스 적용'},
+             {'name': self.tags[1], 'reason': '학습 필요', 'application': '서비스 적용'}),
+            ({'tag': self.tags[2], 'description': '기반 역량', 'purpose': '데이터 처리'},
+             {'name': self.tags[2], 'reason': '기반 역량', 'application': '데이터 처리'}),
+        ]
+        for item, exp in cases:
+            with self.subTest(item=item):
+                res = select_skills(self.project, self.tags, lambda *_: {'skills': [item]})
+                self.assertEqual(res['skills'], [exp])
+
+    def test_string_array_is_normalized_to_skill_objects(self):
+        res = select_skills(self.project, self.tags, lambda *_: {'skills': [self.tags[0], self.tags[1]]})
+        self.assertEqual(len(res['skills']), 2)
+        self.assertEqual(res['skills'][0]['name'], self.tags[0])
+        self.assertEqual(res['skills'][1]['name'], self.tags[1])
+        for row in res['skills']:
+            self.assertTrue(bool(row.get('reason')))
+            self.assertTrue(bool(row.get('application')))
+
+    def test_tag_name_normalization_and_numbering_bullet_stripping(self):
+        real_tags = ['Docker 컨테이너 가상화', 'SQL 기본 문법 & 조인', 'PyTorch/TensorFlow 딥러닝 구현']
+        payload = [
+            {'name': '1. docker 컨테이너 가상화', 'reason': '컨테이너 배포', 'application': '서버 구동'},
+            {'name': '- sql 기본 문법 & 조인', 'reason': '데이터 추출', 'application': '쿼리 작성'},
+            {'name': '• pytorch/tensorflow 딥러닝 구현', 'reason': '모델 학습', 'application': '추론 파이프라인'},
+        ]
+        res = select_skills(self.project, real_tags, lambda *_: payload)
+        self.assertEqual([r['name'] for r in res['skills']], real_tags)
+
 
 if __name__ == '__main__':
     unittest.main()
