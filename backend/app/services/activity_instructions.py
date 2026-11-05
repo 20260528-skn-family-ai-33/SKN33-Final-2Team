@@ -5,7 +5,6 @@ SCHEMA = {'skillSummaries': {'선택 스킬명': ['통합 역량 명사형 요�
 SYSTEM = """[입력·활동 범위]
 선택 코스·스킬 순서·프로젝트 요약·선택 자료만으로 학습 활동 제안. 코스 특성은 course.reason·scope 참고.
 선택 자료 전체의 학습 활동과 스킬당 정확히 하나의 프로젝트 적용 산출물 과제(res=null) 구성. 외부 자료 res는 materials.id만 허용, 제외 스킬·미선택 자료 추가 금지. 자료 없는 스킬은 직접 수행 과제로 한정.
-materials의 모든 id를 자료 활동 res로 한 번 이상 사용. 자료 활동의 skill은 res가 choices[그 스킬].course 또는 choices[그 스킬].books에 있는 스킬만 허용, 내용이 관련 있어도 다른 스킬의 자료를 배정 금지.
 원본 단계 체계 stage 1~4 유지. 자료 활동 title은 짧고 구체적, how는 수행 내용·완료 기준.
 
 [자료 기반 과제·제출 명세]

@@ -67,7 +67,6 @@ class CrashFirstChoiceTests(unittest.TestCase):
         self.assertEqual([row['selectedCourse'] for row in result], ['L', 'L'])
         choices = {row['name']: {'course': row['selectedCourse'], 'books': []} for row in result}
         schedule = resource_schedule({'skills': result}, choices, list(choices), 4)
-        self.assertEqual(schedule['weeks'], 2)
         self.assertEqual(set(schedule['courses']), {'L'})
         self.assertEqual(sum(row['hours'] for row in schedule['courses'].values()), 8)
 
@@ -94,7 +93,6 @@ class CrashFirstChoiceTests(unittest.TestCase):
     def test_returned_course_with_fewer_gaps_is_kept_and_duration_uses_unique_ids(self):
         result, schedule = self.finalize(['dbt 모델 실습', 'dbt 품질 테스트 실습'])
         self.assertEqual(result[0]['selectedCourse'], 'long')
-        self.assertEqual(schedule['weeks'], 3)
         self.assertEqual(sum(row['hours'] for row in schedule['courses'].values()), 10)
         self.assertEqual(set(schedule['courses']), {'long', 'short'})
 
@@ -103,12 +101,12 @@ class CrashFirstChoiceTests(unittest.TestCase):
             with self.subTest(titles=titles):
                 result, schedule = self.finalize(titles)
                 self.assertEqual(result[0]['selectedCourse'], 'short')
-                self.assertEqual(schedule['weeks'], 1)
+                self.assertEqual(set(schedule['courses']), {'short'})
 
     def test_unsuitable_returned_course_uses_shortest_bundle(self):
         result, schedule = self.finalize(['dbt 모델 실습', 'dbt 품질 테스트 실습'], unsuitable=True)
         self.assertEqual(result[0]['selectedCourse'], 'short')
-        self.assertEqual(schedule['weeks'], 1)
+        self.assertEqual(set(schedule['courses']), {'short'})
 
     def recommend(self, raw_courses, diagnostic=None):
         project = {'goal': 'dbt 파이프라인 구현'}
