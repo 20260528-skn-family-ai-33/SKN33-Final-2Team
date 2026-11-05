@@ -8,6 +8,7 @@
 """
 from __future__ import annotations
 
+from contextlib import nullcontext
 import hashlib
 import json
 
@@ -74,10 +75,10 @@ def request(employee_id: int, trigger: str, avoid: list[str] | None = None, mode
         t.val('SELECT pg_advisory_xact_lock(:ns, :e)', ns=1196443475, e=employee_id)
         run = t.one('SELECT * FROM app_ext.goal_suggestion_runs WHERE employee_id=:e', e=employee_id) or {}
         jid = str(run['job_id']) if run.get('job_id') else None
-        if run.get('status') == 'running' and jid and jid in jobs.alive([jid]):
+        if run.get('status') == 'running' and jid and jid in jobs.alive([jid], t):
             return jid
         if only_if_stale:
-            me = profile.view(employee_id)
+            me = profile.view(employee_id, t=t)
             if not me:
                 return None
             same = run.get('profile_hash') == _hash(G.goal_input(me))
@@ -85,20 +86,20 @@ def request(employee_id: int, trigger: str, avoid: list[str] | None = None, mode
             seeded_mock = run.get('trigger') == 'setup' and run.get('source') == 'mock'
             if same and (run.get('status') == 'failed' or (run.get('status') in ('ready', 'default') and count == 3 and not seeded_mock)):
                 return None
-        return _request(employee_id, trigger, avoid, mode)
+        return _request(employee_id, trigger, avoid, mode, t=t)
 
 
-def _request(employee_id: int, trigger: str, avoid: list[str] | None, mode: str | None) -> str | None:
+def _request(employee_id: int, trigger: str, avoid: list[str] | None, mode: str | None, *, t: db.Tx | None = None) -> str | None:
     """미리 만들기·다시 만들기 작업을 시작한다. 사내/본인 입력 근거가 전혀 없을 때만 기본 후보를 저장한다.
     mode 'mock' 은 관리자가 고른 '시연용 가데이터로 만들기', 'ollama'·'openai' 는 관리자가 고른 모델(직원이 고른 AI 모드 대신 ·
     직원 설정은 바꾸지 않음 · 실패 시연 없음). 없으면 그 직원이 고른 모드"""
-    me = profile.view(employee_id)
+    me = profile.view(employee_id, t=t) if t is not None else profile.view(employee_id)
     if not me:
         return None
     inp = G.goal_input(me)
     ph = _hash(inp)
     if not G.profile_enough(me):
-        with db.tx() as t:
+        with (nullcontext(t) if t is not None else db.tx()) as t:
             _save(t, employee_id, G.defaults())
             _run_state(t, employee_id, status='default', source='default', used=inp['used'], profile_hash=ph, trigger=trigger)
         return None
@@ -129,7 +130,7 @@ def _request(employee_id: int, trigger: str, avoid: list[str] | None, mode: str 
             if str(latest.get('job_id')) != job.job_id:
                 return {'discarded': True}
             t.val('SELECT employee_id FROM public.employees WHERE employee_id=:e FOR UPDATE', e=employee_id)
-            if _hash(G.goal_input(profile.view(employee_id))) != ph:
+            if _hash(G.goal_input(profile.view(employee_id, t=t))) != ph:
                 changed = cause('후보 생성 중 내 정보가 바뀌었어요. 바뀐 정보로 다시 만들어 주세요.')
                 _run_state(t, employee_id, status='failed', used=inp['used'], profile_hash=ph, trigger=trigger,
                            error=changed, job_id=job.job_id)
@@ -143,11 +144,11 @@ def _request(employee_id: int, trigger: str, avoid: list[str] | None, mode: str 
         return {'candidates': out['candidates']}
 
     def mark(jid: str) -> None:
-        with db.tx() as t:
-            _run_state(t, employee_id, status='running', used=inp['used'], profile_hash=ph, trigger=trigger, job_id=jid)
+        with (nullcontext(t) if t is not None else db.tx()) as state_tx:
+            _run_state(state_tx, employee_id, status='running', used=inp['used'], profile_hash=ph, trigger=trigger, job_id=jid)
 
     work._resume = {'operation':'goals.request','kwargs':{'employee_id':employee_id,'trigger':trigger,'avoid':avoid,'mode':mode}}
-    return jobs.start('goal-suggestions', employee_id, str(employee_id), work, before_start=mark)
+    return jobs.start('goal-suggestions', employee_id, str(employee_id), work, before_start=mark, transaction=t)
 
 
 def regenerate(employee_id: int) -> str | None:

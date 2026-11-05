@@ -7,6 +7,7 @@
 """
 from __future__ import annotations
 
+from contextlib import nullcontext
 from datetime import datetime
 import hashlib
 
@@ -36,9 +37,9 @@ def _grade(name: str | None) -> str:
     return (name or '').replace('일반직 ', '', 1) or ''
 
 
-def _rows() -> list[dict]:
+def _rows(t: db.Tx | None = None) -> list[dict]:
     # 입사일·현재 근무 시작일은 팀 DB employees(#22 최신 DB 의 hire_date·department_start_date)를 먼저 쓴다
-    return db.all_(f"""SELECT e.employee_id, e.employee_number, e.name, e.is_department_head, e.department_id, e.source_type,
+    return (t.all if t is not None else db.all_)(f"""SELECT e.employee_id, e.employee_number, e.name, e.is_department_head, e.department_id, e.source_type,
             coalesce(d.name, e.department) AS dept, pd.name AS parent_dept,
             coalesce(g.name, e.grade) AS grade, coalesce(j.title, e.job_title) AS job,
             {EMP_GROUP_SQL} AS employee_group, coalesce(e.hire_date, h.hire_date) AS hire_date, h.position, h.job_family, h.task,
@@ -185,9 +186,9 @@ def _restore_team(t: db.Tx, employee_id: int, st: dict) -> None:
         _write_work_desc(t, employee_id, st['workDesc'])
 
 
-def _self_of(employee_id: int) -> tuple[dict, bool, datetime | None]:
+def _self_of(employee_id: int, t: db.Tx | None = None) -> tuple[dict, bool, datetime | None]:
     """화면에 줄 본인 입력 값(팀 표 + 업무 설명·입력 상태), 직원이 내 정보에서 고쳤는지, 고친 때"""
-    with db.tx() as t:
+    with (nullcontext(t) if t is not None else db.tx()) as t:
         vals = _team_values(t, employee_id, _team_state(t, employee_id))
         x = t.one('SELECT edited, edited_at FROM app_ext.employee_self_inputs WHERE employee_id = :e', e=employee_id) or {}
     extra = x.get('edited') or {}
@@ -200,23 +201,23 @@ def _self_of(employee_id: int) -> tuple[dict, bool, datetime | None]:
     return src, x.get('edited_at') is not None, x.get('edited_at')
 
 
-def _evals(employee_id: int) -> list[dict]:
+def _evals(employee_id: int, t: db.Tx | None = None) -> list[dict]:
     return [{'period': v['period'], 'title': v['title'] or '', 'grade': v['grade'] or '', 'score': v['score'] or '',
              'consent': v['consent'] if v['consent'] is not None else v['consent_default'], 'consentDefault': v['consent_default']}
-            for v in db.all_('SELECT * FROM app_ext.employee_evaluations WHERE employee_id = :e ORDER BY period DESC', e=employee_id)]
+            for v in (t.all if t is not None else db.all_)('SELECT * FROM app_ext.employee_evaluations WHERE employee_id = :e ORDER BY period DESC', e=employee_id)]
 
 
-def view(employee_id: int, rows: list[dict] | None = None) -> dict | None:
+def view(employee_id: int, rows: list[dict] | None = None, *, t: db.Tx | None = None) -> dict | None:
     """4차 화면 모양의 계정 정보(GP.me)"""
-    rows = rows or _rows()
+    rows = rows or (_rows(t) if t is not None else _rows())
     r = next((x for x in rows if x['employee_id'] == employee_id), None)
     if not r:
         return None
-    src, edited, at = _self_of(employee_id)
+    src, edited, at = _self_of(employee_id, t) if t is not None else _self_of(employee_id)
     has_profile = src['present']
     sup = supervisor_of(r, rows)
     ms = members_of(r, rows)
-    edu = db.all_('SELECT school_name, education_level, department_name FROM public.employee_education_records WHERE employee_id = :e', e=employee_id)
+    edu = (t.all if t is not None else db.all_)('SELECT school_name, education_level, department_name FROM public.employee_education_records WHERE employee_id = :e', e=employee_id)
     return {
         'id': str(r['employee_id']), 'code': r['employee_number'] or '', 'name': r['name'], 'role': 'employee', 'source': r['source_type'],
         'hireDate': str(r['hire_date']) if r['hire_date'] else None, 'dept': r['dept'], 'parentDept': r['parent_dept'], 'deptId': r['department_id'],
@@ -229,7 +230,7 @@ def view(employee_id: int, rows: list[dict] | None = None) -> dict | None:
         'mySupervisor': _ref(sup) if sup else None,
         'profile': {k: src.get(k) for k in ('workDesc', 'expStatus', 'expSummary', 'devYears', 'inputStatus')} if has_profile else None,
         **{k: list(src.get(k) or []) for k in LISTS},
-        'evals': _evals(employee_id), 'edited': bool(edited), 'editedAt': at.strftime('%Y-%m-%d') if at else None,
+        'evals': _evals(employee_id, t) if t is not None else _evals(employee_id), 'edited': bool(edited), 'editedAt': at.strftime('%Y-%m-%d') if at else None,
         'education': [f"{x['school_name']} {x['department_name'] or ''} ({EDU_LEVEL.get(x['education_level'], x['education_level'])})".replace('  ', ' ') for x in edu],
     }
 

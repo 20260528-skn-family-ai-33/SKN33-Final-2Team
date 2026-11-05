@@ -7,6 +7,7 @@
 """
 from __future__ import annotations
 
+from contextlib import nullcontext
 import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor
@@ -32,7 +33,7 @@ class JobCtx:
 
 
 def start(kind: str, employee_id: int | None, ref: str, fn: Callable[[JobCtx], Any], progress: dict | None = None,
-          *, before_start: Callable[[str], None] | None = None) -> str:
+          *, before_start: Callable[[str], None] | None = None, transaction: db.Tx | None = None) -> str:
     owner = None
     progress=dict(progress or {})
     descriptor=getattr(fn,'_resume',None)
@@ -40,7 +41,7 @@ def start(kind: str, employee_id: int | None, ref: str, fn: Callable[[JobCtx], A
     from .services.job_recovery import parent_job
     parent=parent_job.get()
     try:
-        with db.tx() as t:
+        with (nullcontext(transaction) if transaction is not None else db.tx()) as t:
             jid = str(t.val("INSERT INTO app_ext.jobs(employee_id, kind, ref, status, progress) VALUES(:e, :k, :r, 'running', :p) RETURNING job_id",
                             e=employee_id, k=kind, r=ref, p=db.J(progress or {})))
             if kind == 'learning_generation' or isinstance(descriptor,dict):
@@ -81,14 +82,30 @@ def start(kind: str, employee_id: int | None, ref: str, fn: Callable[[JobCtx], A
         if before_start:
             before_start(jid)
         if parent:
-            with db.tx() as t:
+            with (nullcontext(transaction) if transaction is not None else db.tx()) as t:
                 updated = t.run("UPDATE app_ext.jobs SET progress=coalesce(progress,'{}'::jsonb)||jsonb_build_object('redirectJobId',CAST(:n AS text)) WHERE job_id=CAST(:j AS uuid) AND employee_id=:e AND status='failed' AND error->>'code'='JOB_INTERRUPTED'", n=jid, j=parent, e=employee_id)
                 if updated != 1:
                     raise ApiError(409, 'RECOVERY_CANCELLED', '중단 작업의 상태가 변경됐어요.')
-        POOL.submit(work)
+        if transaction is None:
+            POOL.submit(work)
+        else:
+            def submit_committed():
+                try:
+                    POOL.submit(work)
+                except Exception:
+                    try:
+                        cancel(jid, employee_id)
+                    finally:
+                        if owner is not None:
+                            owner.__exit__(None, None, None)
+                    raise
+            transaction.after_commit.append(submit_committed)
+            if owner is not None:
+                transaction.after_rollback.append(lambda: owner.__exit__(None, None, None))
     except Exception:
         try:
-            cancel(jid, employee_id)
+            if transaction is None:
+                cancel(jid, employee_id)
         finally:
             if owner is not None:
                 owner.__exit__(None, None, None)

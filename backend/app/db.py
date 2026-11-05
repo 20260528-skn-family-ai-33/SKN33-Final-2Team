@@ -37,6 +37,8 @@ class Tx:
 
     def __init__(self, conn: Connection):
         self.c = conn
+        self.after_commit = []
+        self.after_rollback = []
 
     def all(self, sql: str, **p) -> list[dict]:
         return [_row(r) for r in self.c.execute(text(sql), p)]
@@ -59,8 +61,20 @@ class Tx:
 
 @contextmanager
 def tx() -> Iterator[Tx]:
-    with engine.begin() as conn:
-        yield Tx(conn)
+    transaction = None
+    try:
+        with engine.begin() as conn:
+            transaction = Tx(conn)
+            yield transaction
+    except BaseException:
+        if transaction is not None:
+            for callback in reversed(transaction.after_rollback):
+                callback()
+        raise
+    else:
+        # 풀 연결을 반납한 뒤 작업을 제출해야 worker가 미커밋 상태를 읽지 않는다.
+        for callback in transaction.after_commit:
+            callback()
 
 
 def all_(sql: str, **p) -> list[dict]:
