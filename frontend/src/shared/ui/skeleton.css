@@ -1,0 +1,19 @@
+/* 스켈레톤(Skeleton.tsx). 색은 공통 변수(--line · --surface-2)를 써서 화면 테마(skins)를 바꿔도 바탕과 어울리게 한다 */
+.skel-wrap{display:grid;gap:8px;margin-top:10px}
+.skel-card{display:grid;gap:8px;padding:14px 16px;border:1px solid var(--line,#e6e5e0);border-radius:12px;background:var(--surface,#fff)}
+.skel{display:block;width:100%;height:11px;border-radius:6px;background:linear-gradient(90deg,var(--line,#e6e5e0) 0%,var(--surface-2,#fafaf8) 50%,var(--line,#e6e5e0) 100%);background-size:200% 100%;animation:skel-shine 1.4s ease-in-out infinite}
+.skel.skel-title{height:14px}
+.skel-row{grid-template-columns:28px minmax(0,1fr) 52px;align-items:center;gap:12px}
+.skel-stack{display:grid;gap:8px;min-width:0}
+.skel.skel-dot{width:28px;height:28px;border-radius:50%}
+.skel.skel-btn{height:26px;border-radius:8px}
+.skel-choices{display:grid;gap:8px;margin-top:6px}
+.skel.skel-choice{height:40px;border-radius:12px}
+.skel-grid{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}
+.skel.skel-thumb{height:84px;border-radius:8px}
+.skel-columns{gap:12px}
+.skel-column{align-content:start}
+.skel-block{display:grid;gap:7px;margin-top:6px;padding-top:12px;border-top:1px dashed var(--line,#e6e5e0)}
+@keyframes skel-shine{from{background-position:100% 0}to{background-position:-100% 0}}
+@media(prefers-reduced-motion:reduce){.skel{animation:none}}
+@media(max-width:760px){.skel-columns{grid-template-columns:minmax(0,1fr)!important}}
