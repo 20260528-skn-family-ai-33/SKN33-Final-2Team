@@ -326,7 +326,7 @@ OLLAMA_API_KEY=<키>
 OLLAMA_MODEL=
 OLLAMA_MODEL_REGULATION=
 OLLAMA_VISION_MODEL=
-OLLAMA_TIMEOUT=300
+OLLAMA_TIMEOUT=600
 OLLAMA_NUM_CTX=16384
 OLLAMA_KEEP_ALIVE=30m
 OLLAMA_THINK=off
@@ -381,8 +381,9 @@ docker compose exec -T backend printenv OLLAMA_BASE_URL OLLAMA_MODEL OLLAMA_MODE
 | `Ollama 401: unauthorized - check OLLAMA_API_KEY` (원인 칸: 'Ollama 키(OLLAMA_API_KEY)가 없거나 Pod의 키와 달라요') | `.env`에 키가 없거나 틀림, 또는 3-3을 안 함 | 키를 다시 복사해 넣고 3-3 |
 | `Ollama 연결 실패` | IP·포트가 틀림, Pod 꺼짐, nginx 꺼짐 | 3-1부터 확인, 필요하면 Pod에서 2-6 |
 | `RunPod 프록시 HTTP 502: Ollama 응답이 아니에요…` | nginx는 켜져 있는데 Ollama가 꺼짐 | Pod에서 2-3 |
+| `RunPod 프록시 HTTP 504: Ollama 응답이 아니에요…` | `.env`의 `OLLAMA_TIMEOUT`이 600보다 커서 Pod nginx가 600초에 먼저 끊음(화면은 'Pod가 꺼져 있거나 시작 중'으로 안내하지만 Pod는 켜져 있음) | `OLLAMA_TIMEOUT`을 600 이하로 두고 3-3, 또는 Pod에서 2-6의 `proxy_read_timeout`·`proxy_send_timeout`도 같이 늘림 |
 | `‘<모델 이름>’ 모델이 Ollama에 없어요` | 모델을 안 받았거나 2-4 '채팅 형식 붙이기'를 안 해서 `growpath-27b`·`growpath-regulation-4b` 이름이 Pod에 없음. `.env` 모델 줄에 원본 이름을 넣었다면 그 이름이 `ollama list`와 다름. 4b만 없으면 규정 에이전트(도우미 답변·지원 조건 확인)만 실패하고 진단·로드맵은 돼요 | 2-4, 3-2 |
-| `Ollama 시간 초과: 300초…` | 동시 요청이 몰렸거나 긴 작업이라 오래 걸림(생각 모드를 켰다면 더 길어짐) | `OLLAMA_TIMEOUT=600`으로 바꾸고 3-3 |
+| `Ollama 시간 초과: 300초…` 또는 `600초…` | 동시 요청이 몰렸거나 긴 작업이라 오래 걸림(생각 모드를 켰다면 더 길어짐). 600초는 Pod nginx(2-6 `proxy_read_timeout 600s`)가 기다리는 최대 시간이에요 | `.env`가 300이면 `OLLAMA_TIMEOUT=600`으로 바꾸고 3-3. 600에서도 나면 `OLLAMA_THINK=off`인지, 여러 작업을 동시에 돌리지 않았는지 확인. 더 길게 기다리려면 위 504 행처럼 nginx도 같이 늘림 |
 | `규정 검색 임베딩에 필요한 OpenAI 키가 없어요` (도우미 규정 질문) | `.env`에 `OPENAI_API_KEY`가 없음 | 키를 넣고 3-3 |
 
 ## 4. 끝낼 때
