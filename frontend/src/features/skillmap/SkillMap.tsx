@@ -25,14 +25,14 @@ function layoutOf(d: SkillMapData): Layout {
   return m;
 }
 
-function Info({ data, picked, cov, onClose }: { data: SkillMapData; picked: number | null; cov: Cover; onClose: () => void }) {
+function Info({ data, picked, cov, owned, onClose }: { data: SkillMapData; picked: number | null; cov: Cover; owned?: string[]; onClose: () => void }) {
   const certificates = useCatalog(state => state.certById);
   const me = useMe();
   if (picked == null || !data.skills.some((s) => s.id === picked))
     return <p className="small muted">스킬 점을 누르면 이 로드맵에서 몇 주차에 어떤 활동이 다루는지와 선수 관계를 보여 줘요.</p>;
   const s = data.skills.find((x) => x.id === picked)!;
   const { parents } = relOf(data);
-  const certs = matchingCertificates(Object.values(certificates), [s.name], me?.certs);
+  const certs = matchingCertificates(Object.values(certificates), [s.name], owned ?? me?.certs);
   const names = (ids?: number[]) =>
     ids && ids.length ? ids.map((id) => data.skills.find((x) => x.id === id)?.name || '').join(', ') : <span className="muted">없어요</span>;
   const c = cov.get(picked);
@@ -181,7 +181,8 @@ function Svg({ data, pl, picked, onPick, big }: { data: SkillMapData; pl: PlanCo
 }
 
 /** 검토·확정 = 작성 중 안, 내 로드맵 = 확정한 로드맵. 다른 로드맵으로 옮기면 누른 스킬은 풀어 둔다 */
-export function SkillMap({ pl }: { pl: PlanContent }) {
+/** owned: 추천 자격증에서 뺄 보유 자격증. 기본은 로그인한 본인 것 · 부서장이 직원 로드맵을 볼 때는 직원 보유 자격증을 받지 않으므로 [] (#96) */
+export function SkillMap({ pl, owned }: { pl: PlanContent; owned?: string[] }) {
   const q = useQuery({ queryKey: ['skills-map'], queryFn: catalogApi.skillMap, staleTime: Infinity });
   const key = pl.rid || 'draft';
   const [picked, setPicked] = useState<{ key: string; id: number | null }>({ key, id: null });
@@ -283,7 +284,7 @@ export function SkillMap({ pl }: { pl: PlanContent }) {
           <Svg data={data} pl={pl} picked={pid} onPick={pick} big={big} />
         </div>
         <div className="sm-info" aria-live="polite">
-          <Info data={data} picked={pid} cov={cov} onClose={() => pid != null && pick(pid)} />
+          <Info data={data} picked={pid} cov={cov} owned={owned} onClose={() => pid != null && pick(pid)} />
         </div>
       </div>
       {cov.size ? null : <Note>이 로드맵의 활동에서 팀 DB 스킬을 찾지 못했어요.</Note>}

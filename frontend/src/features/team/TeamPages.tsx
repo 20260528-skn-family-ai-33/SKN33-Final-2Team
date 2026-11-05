@@ -9,6 +9,7 @@ import type { Comment, PlanRecord, Report } from '@/api/types/plan';
 import type { TeamMember, TeamUser } from '@/api/types/team';
 import { paths } from '@/app/paths';
 import { ReportBody } from '@/features/report/ReportBody';
+import { MemberRoadView } from './MemberRoadView';
 import { CmItem, CmTag, cmMine } from '@/features/roadmap/comments';
 import { D } from '@/shared/constants/data';
 import { useGo } from '@/shared/hooks/useGo';
@@ -21,8 +22,7 @@ import { toast } from '@/shared/state/ui';
 import { newComments, updateWs, useWs, type MgrDraft } from '@/shared/state/workspace';
 import { BText } from '@/shared/ui/bound';
 import { Icon } from '@/shared/ui/Icon';
-import { Loading, Note, Page, Stats } from '@/shared/ui/parts';
-import { StagesView } from '@/shared/ui/StagesView';
+import { Loading, Note, Page } from '@/shared/ui/parts';
 import { mk, useMemberOf, useMemberState, useRefreshTeam, useTeam } from './teamData';
 import { arrangeMembers, detailShown, hasRecords, unseenOf } from './teamList';
 import { useMarkSeen } from './teamSeen';
@@ -426,8 +426,9 @@ export function MemberRoadPage() {
   return (
     <Page
       back={paths.member(uid)}
-      eyebrow={who(e)}
-      title="확정한 로드맵"
+      eyebrow={`${who(e)} · ${trackName(pl.opt, pl.name)} v${pl.version} · ${R.createdAt} 확정${live ? '' : R.status === 'done' ? ' · 마침' : ' · 보관'}`}
+      title={pl.displayTitle || pl.goal}
+      lead={pl.displayTitle ? pl.goal : undefined}
       foot={
         live ? (
           <button className="btn pri" disabled={!okNew} onClick={() => void send()}>
@@ -436,21 +437,8 @@ export function MemberRoadPage() {
         ) : undefined
       }
     >
-      <div className="card">
-        <p className="eyebrow">
-          {trackName(pl.opt, pl.name)} · v{pl.version} · {R.createdAt} 확정{live ? '' : R.status === 'done' ? ' · 마침' : ' · 보관'}
-        </p>
-        <p style={{ fontWeight: 650, fontSize: 16 }}>{pl.goal}</p>
-        <div style={{ marginTop: 16 }}>
-          <Stats pl={pl} bare />
-        </div>
-      </div>
-      <div className="sec">
-        <div className="sec-h">
-          <h2 className="st">단계별 진행</h2>
-        </div>
-        <StagesView pl={pl} progress={R.progress} status />
-      </div>
+      {/* 직원의 '내 로드맵'과 같은 구성(#96) — 읽기 전용 */}
+      <MemberRoadView R={R} />
       {reps.length ? (
         <div className="sec">
           <div className="sec-h">
