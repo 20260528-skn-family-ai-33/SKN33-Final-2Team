@@ -85,7 +85,7 @@ def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
     crash_cache = {}
     if crash_courses.is_crash(course):
         pools = crash_courses.share_candidates(pools, project, selection, items, cache=crash_cache)
-    pools, common_books = book_candidates.common_pool(pools, items)
+    pools, common_books = book_candidates.common_pool(pools, items, selection=selection)
     if not any(pool['courses'] or pool['books'] for pool in pools):
         return {'skills': [_empty_skill(pool['name']) for pool in pools]}
     names = [pool['name'] for pool in pools]

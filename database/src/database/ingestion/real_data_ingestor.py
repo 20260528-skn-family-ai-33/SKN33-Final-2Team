@@ -1,7 +1,7 @@
 """Fetch official APIs first, upsert atomically, map by evidence, then refresh vectors."""
 from __future__ import annotations
 
-from src.shared.catalog_scope import scoped_matches
+from src.shared.catalog_scope import BOOK_KDC, scoped_matches
 from collections import Counter
 from datetime import datetime, timezone
 from html import unescape
@@ -412,6 +412,13 @@ class RealDataIngestor:
         # Prioritize known technical titles across skills, but retain generic-title candidates
         # for detail matching. Exclude only explicit children's labels already disallowed by quality.
         rows = [r for r in rows if not CHILD_TITLE.search(r['fields']['title'])]
+        # catalog_scope rejects a book whose list class_no is outside KDC 004/005 whatever the
+        # detail says, so spend the shared library request budget only on possible candidates.
+        def listed_kdc(row):
+            return str(row['raw'].get('class_no') or '').strip()
+        kept = [r for r in rows if not listed_kdc(r) or BOOK_KDC.fullmatch(listed_kdc(r))]
+        self.reports['library']['detail_skipped_outside_kdc'] = len(rows) - len(kept)
+        rows = kept
         prioritized = self.matcher.select(rows,0)
         keys = {(r['source'],r['external_key']) for r in prioritized}
         ordered = prioritized + [r for r in rows if (r['source'],r['external_key']) not in keys]
