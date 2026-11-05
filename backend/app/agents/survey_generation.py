@@ -105,12 +105,20 @@ def generate_survey(project: dict[str, Any], selection: dict[str, Any], profile:
         cleaned = {'skill': skill, 'title': title, 'surveys': [], 'quizzes': []}
         for kind in ('surveys', 'quizzes'):
             rows = group.get(kind)
-            if not isinstance(rows, list) or len(rows) != (per_skill if phase is None or phase == kind else 0):
+            expected_count = per_skill if phase is None or phase == kind else 0
+            if rows is None and expected_count == 0:
+                rows = []
+            if not isinstance(rows, list) or len(rows) != expected_count:
                 raise SurveyError('스킬별 설문·퀴즈 개수가 일치하지 않습니다.')
             for row in rows:
+                if isinstance(row, str) and kind == 'surveys':
+                    row = {'text': row}
                 if not isinstance(row, dict):
                     raise SurveyError('문항 형식이 올바르지 않습니다.')
-                text = _text(row.get('text' if kind == 'surveys' else 'q'), '문항')
+                raw_text = row.get('text' if kind == 'surveys' else 'q')
+                if kind == 'quizzes' and not raw_text:
+                    raw_text = row.get('question') or row.get('text')
+                text = _text(raw_text, '문항')
                 key = ''.join(text.split()).casefold()
                 if key in all_texts:
                     raise SurveyError('중복 문항입니다.')

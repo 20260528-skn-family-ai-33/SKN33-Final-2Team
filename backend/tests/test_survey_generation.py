@@ -191,6 +191,33 @@ class SurveyTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, '접속 실패'):
             generate_survey(self.project, self.selection(2), self.profile, Mock(side_effect=RuntimeError('접속 실패')))
 
+    def test_string_array_surveys_are_normalized_to_dict_objects(self):
+        raw = self.result(2)
+        for group in raw['groups']:
+            group['surveys'] = [item['text'] for item in group['surveys']]
+        result = self.run_result(raw)
+        for group in result['groups']:
+            for item in group['surveys']:
+                self.assertIsInstance(item, dict)
+                self.assertIn('text', item)
+                self.assertTrue(item['text'].strip())
+
+    def test_quiz_question_key_compatibility(self):
+        raw = self.result(2)
+        for group in raw['groups']:
+            for q in group['quizzes']:
+                q['question'] = q.pop('q')
+        result = self.run_result(raw)
+        self.assertEqual(len(result['groups'][0]['quizzes']), 3)
+
+    def test_staged_phase_omitted_or_none_opposite_kind_is_allowed(self):
+        raw = self.result(2)
+        for group in raw['groups']:
+            group['quizzes'] = None
+        result = generate_survey(self.project, self.selection(2), self.profile, lambda *_: raw, phase='surveys')
+        self.assertEqual(len(result['groups'][0]['surveys']), 3)
+        self.assertEqual(len(result['groups'][0]['quizzes']), 0)
+
 
 if __name__ == '__main__':
     unittest.main()
