@@ -394,6 +394,20 @@ details.ops.sm .ops-b { padding: 8px 10px; gap: 6px; }
 .warn-t { display: flex; gap: 6px; align-items: flex-start; color: var(--warn); }
 .warn-t svg { width: 14px; height: 14px; margin-top: 3px; flex: none; }
 .docbox.fail { border-color: var(--danger-line); background: var(--danger-soft); }
+.docbox.ok { border-color: color-mix(in srgb, var(--ok) 35%, transparent); background: var(--ok-soft); }
+.docbox.ok .db-h { color: var(--ok); }
+
+/* 3안 작성 진행 막대 (#81): 결과는 다음 화면에서 보이므로 스켈레톤 대신 안별 진행만 보여 준다 */
+.gen-progress { margin: 0 0 16px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-2); display: grid; gap: 10px; }
+.gen-progress-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.gen-progress > p { margin: 0; }
+.gen-progress-bar { display: grid; gap: 6px; }
+.gen-seg { position: relative; height: 8px; overflow: hidden; border-radius: 99px; background: var(--line); }
+.gen-seg.run::after { content: ''; position: absolute; inset: 0; width: 40%; border-radius: inherit; background: var(--accent); opacity: .55; animation: gen-seg-run 1.4s ease-in-out infinite; }
+.gen-seg.ok { background: var(--accent); }
+.gen-progress.done .gen-seg.ok { background: var(--ok); }
+@keyframes gen-seg-run { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+@media (prefers-reduced-motion: reduce) { .gen-seg.run::after { animation: none; width: 100%; opacity: .25; } }
 .db-h { display: flex; gap: 6px; align-items: center; margin: 0; color: var(--danger); }
 .db-h svg { width: 16px; height: 16px; }
 .db-act { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 2px; }

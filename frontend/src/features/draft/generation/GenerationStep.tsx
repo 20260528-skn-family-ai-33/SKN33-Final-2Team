@@ -2,7 +2,7 @@
    하위 에이전트마다 따로 실행하고, API 오류를 가데이터로 대신하지 않는다. 실패한 줄은 빨간 X로 바뀌고
    그 안만 '다시 시도'(API-29)하거나, '로드맵 확인하기'(API-30)로 작성된 안만 가지고 다음 단계로 넘어갈 수 있다.
    진행 상태는 서버 작성 문서(genRun)에 있어 새로 고쳐도 이어서 보이고, 지원 조건은 세 안이 정해지면 서버가 규정 에이전트로 확인한다 */
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { draftsApi } from '@/api/endpoints/drafts';
 import type { DraftDoc, Handoff } from '@/api/types/draft';
 import { paths } from '@/app/paths';
@@ -193,6 +193,33 @@ function SupRow({ d }: { d: DraftDoc }) {
   );
 }
 
+/** 3안 진행 막대: 결과는 다음 화면(비교표)에서 보이므로 결과 모양을 흉내 내지 않고, 몇 안이 끝났는지와 이 화면에서 기다린 시간을 보여 준다 */
+function GenProgress({ d, done }: { d: DraftDoc; done: boolean }) {
+  const r = curGen(d);
+  const sts = D.optionOrder.map((id) => r?.rows[id]?.st || 'run');
+  const ok = sts.filter((st) => st === 'ok').length;
+  const [start] = useState(() => Date.now());
+  const [now, setNow] = useState(start);
+  useEffect(() => {
+    if (done) return;
+    const t = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, [done]);
+  const sec = Math.max(0, Math.floor((now - start) / 1000));
+  return (
+    <div className={`gen-progress${done ? ' done' : ''}`}>
+      <div className="gen-progress-head">
+        <b role="status" aria-live="polite">{done ? `${sts.length}안 모두 작성 완료` : `${sts.length}안 중 ${ok}안 작성 완료`}</b>
+        {!done && <span className="small muted" aria-hidden="true">기다린 시간 {Math.floor(sec / 60)}:{String(sec % 60).padStart(2, '0')}</span>}
+      </div>
+      <div className="gen-progress-bar" style={{ gridTemplateColumns: `repeat(${sts.length}, minmax(0, 1fr))` }} role="progressbar" aria-label="로드맵 3안 작성 진행" aria-valuemin={0} aria-valuemax={sts.length} aria-valuenow={ok}>
+        {D.optionOrder.map((id, i) => <span key={id} className={`gen-seg ${sts[i] === 'ok' ? 'ok' : 'run'}`} title={`${rowName(id)} · ${sts[i] === 'ok' ? '작성 완료' : '작성 중'}`} />)}
+      </div>
+      {!done && <p className="small muted">세 안을 모두 쓰면 ‘로드맵 계획 미리보기’에서 나란히 비교할 수 있어요.</p>}
+    </div>
+  );
+}
+
 /** 여러 안이 실패했을 때 할 일은 겹치지 않게 한 번씩만 */
 const todoOf = (errs: { kind: string }[]) => [...new Set(errs.flatMap((e) => userTodo(e.kind)))].join(' ');
 
@@ -306,6 +333,7 @@ export function GenerationStep() {
           </>
         }
       >
+        <GenProgress d={d} done={done} />
         {h && <HandoffView h={h} />}
         {rows}
       </Page>

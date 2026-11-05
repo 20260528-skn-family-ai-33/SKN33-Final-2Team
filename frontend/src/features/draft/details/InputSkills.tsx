@@ -7,6 +7,7 @@ import { skillInputKey, skillsReady, hasExistingSkillProgress, shouldRecommendSk
 import { loadSkills, summaryStage } from './skillRequest';
 import { reorderSkills } from './skillOrder';
 import { Icon } from '@/shared/ui/Icon';
+import { Skeleton } from '@/shared/ui/Skeleton';
 import './inputSkills.css';
 export function InputSkills(){
   const draft=useWs(s=>s.draft),owner=useWs(s=>s.owner);
@@ -45,6 +46,7 @@ export function InputSkills(){
       <button type="button" className="btn line small input-skills-retry" disabled={busy||stage!=='ready'} onClick={()=>setAttempt(value=>value+1)}><Icon name="retry"/>{busy?'제안 중…':'다시 제안받기'}</button>
     </header>
     {((busy&&stage==='ready')||stage==='reading')&&<div className="loading" role="status"><span className="sp" aria-hidden="true"/><span>{stage==='reading'?'프로젝트 요약 생성 중… 완료되면 스킬을 자동으로 제안해요.':'학습할 스킬을 제안하고 있어요…'}</span></div>}
+    {((busy&&stage==='ready')||stage==='reading')&&!(ready&&available.length>0)&&<Skeleton kind="rows" count={4}/>}
     {existing&&!ready&&<p className="small muted">기존 초안의 점검·로드맵을 유지하고 있어요. 스킬을 다시 제안받으면 이후 결과가 갱신됩니다.</p>}
     {stage==='missing'&&<div><p role="alert">프로젝트 요약을 확인하지 못했어요. 목표·기획서에서 다시 읽거나, 요약 없이 목표만으로 진행할 수 있어요.</p><button type="button" className="btn line small" disabled={busy} onClick={()=>{setGoalOnlyScope(fallbackScope);setAttempt(value=>value+1);}}>목표만으로 스킬 제안받기</button></div>}
     {goalOnly&&summaryStage(draft)==='missing'&&<p className="small muted">첨부 파일은 유지하며, 기획서 요약 없이 목표와 내 정보를 바탕으로 제안합니다.</p>}

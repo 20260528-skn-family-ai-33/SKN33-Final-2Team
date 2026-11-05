@@ -23,6 +23,7 @@ import { BCheckArr, BInput, BNum, BText } from '@/shared/ui/bound';
 import { Icon } from '@/shared/ui/Icon';
 import { ActThumb, AgentRow, FailPage, Note, OpsBox, Page, runSub } from '@/shared/ui/parts';
 import { ResPicker } from '@/shared/ui/ResPicker';
+import { Skeleton } from '@/shared/ui/Skeleton';
 import { CommentView, commentReq, CmTag } from './comments';
 import { cmBy, PlanGate } from './parts';
 import { acceptRevision, dropRevision, freshRev, pullPlan, REV_ITEMS, revise, revItemOk, revKey, revOk, usePlanWatch } from './planActions';
@@ -359,6 +360,7 @@ function Revise({ R }: { R: PlanRecord }) {
     out = (
       <div className="agents">
         <AgentRow st="run" name={`${agent} · 수정안 작성`} sub={runSub('roadmap', '고른 항목과 요청 내용을 반영하고 있어요')} />
+        <Skeleton kind="rows" />
       </div>
     );
   else if (fail)

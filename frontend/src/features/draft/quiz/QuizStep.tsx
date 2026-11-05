@@ -6,6 +6,7 @@ import { paths } from '@/app/paths';
 import { useGo } from '@/shared/hooks/useGo';
 import { updateWs, useWs, ws } from '@/shared/state/workspace';
 import { Page } from '@/shared/ui/parts';
+import { Skeleton } from '@/shared/ui/Skeleton';
 import { saveSurvey, surveyScopeCurrent } from './saveSurvey';
 import { surveyState } from './surveyState';
 import { inputSignature, invalidateDraft } from '../invalidation';
@@ -98,6 +99,6 @@ export function QuizStep() {
             }
             throw e;
           } finally { setSaving(false); }
-        }} /> : <div className="loading" role="status" aria-live="polite"><span className="sp" aria-hidden="true" /><span>프로젝트에 맞는 설문과 퀴즈를 준비하고 있어요.</span></div>}
+        }} /> : <><div className="loading" role="status" aria-live="polite"><span className="sp" aria-hidden="true" /><span>프로젝트와 희망 역량에 맞춰 스킬·문항을 준비하고 있어요.</span></div><Skeleton kind="quiz" /></>}
   </Page></>;
 }

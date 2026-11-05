@@ -15,6 +15,7 @@ import { paths } from '@/app/paths';
 import { useGo } from '@/shared/hooks/useGo';
 import { useWs } from '@/shared/state/workspace';
 import { Page } from '@/shared/ui/parts';
+import { Skeleton } from '@/shared/ui/Skeleton';
 import { Stepper } from '../Stepper';
 import { genStart, startEdit, ResultEdit } from './legacyResult';
 import { displayOrder, currentWeeks, currentEstimates, durationLabel, totalWeeks, type Choices, type DurationEstimate } from './skillOrder';
@@ -171,7 +172,7 @@ function ResultSelection({ editorRef, onChoicesChanged, locked = false, courseId
     </div>
     {!courseId && <MaterialBasis />}
     {error && <div><p className="err" role="alert">{error}</p>{!result?.recommendations && <button className="btn line" disabled={busy} onClick={() => void generate()}>다시 시도하기</button>}</div>}
-    {busy ? <div className="loading" role="status"><span className="sp" aria-hidden="true" />자료를 확인하고 추천을 정리하고 있어요.</div>
+    {busy ? <><div className="loading" role="status"><span className="sp" aria-hidden="true" />자료를 확인하고 추천을 정리하고 있어요.</div><Skeleton kind="grid" count={courseId ? 2 : 4} /></>
       : result?.recommendations ? <>{!skillFilter&&<MaterialSkillTabs names={materialNames} active={shownSkill} onChange={setActiveSkill} id={tabsId}/>}<div className="v2-skills-board">{materialNames.map((name,skillIndex) => {
         const skill = result.recommendations!.skills.find(s => s.name === name)!;
         const selected = choices[skill.name] ?? { course: skill.selectedCourse, books: skill.selectedBooks };
@@ -185,7 +186,7 @@ function ResultSelection({ editorRef, onChoicesChanged, locked = false, courseId
           {skill.courses.some(resource => course !== 'A1' || resource.cost === 0) ? <div className="v2-resource-grid">{skill.courses.filter(resource => course !== 'A1' || resource.cost === 0).map(resource => <ResourceCard key={resource.id} resource={resource} weeklyHours={weeklyHours} kind="course" checked={selected.course === resource.id} disabled={locked || busy || excluded} onChange={() => { onChoicesChanged?.(); setChoices(old => ({ ...old, [skill.name]: { ...selected, course: resource.id } })); }} />)}</div> : <p className="small muted">프로젝트에 맞는 강좌를 찾지 못했어요.</p>}
           </details>
         </section>;
-      })}{skillFilter&&!materialNames.includes(skillFilter)&&<p className="small muted">이 코스에는 해당 스킬의 추천 자료가 없어요.</p>}</div></> : !error && <div className="loading" role="status"><span className="sp" aria-hidden="true" />추천 자료를 준비하고 있어요.</div>}
+      })}{skillFilter&&!materialNames.includes(skillFilter)&&<p className="small muted">이 코스에는 해당 스킬의 추천 자료가 없어요.</p>}</div></> : !error && <><div className="loading" role="status"><span className="sp" aria-hidden="true" />추천 자료를 준비하고 있어요.</div><Skeleton kind="grid" count={courseId ? 2 : 4} /></>}
     <style>{`
       .v2-skill-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
       .v2-skill-summary>div,.v2-skill-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
