@@ -45,7 +45,7 @@ A2 형식: {"learningSkills":[{"name":"skillOrder의 스킬명","application":"�
 """
 
 
-def _crash_core(row, required):
+def crash_core_fields(row: dict, required: bool = False) -> dict:
     """Crash 핵심 결과물·완료 기준·후속 학습. 이전에 만든 Crash 안은 필드 없이도 읽는다."""
     if not required and not any(key in row for key in ('coreOutcome','coreCriteria','followUpScope')):
         return {}
@@ -84,7 +84,7 @@ def validate_recommendations(rows, allowed, course, *, require_depth=False, max_
                     raise ValueError('Challenge 완료 기준은 서로 다른 확인 항목이어야 해요.')
                 value['completionCriteria']=[item.strip() for item in criteria]
         elif course=='A2':
-            value.update(_crash_core(row,require_depth))
+            value.update(crash_core_fields(row,require_depth))
         seen.add(row['name']);result.append(value)
     return result
 

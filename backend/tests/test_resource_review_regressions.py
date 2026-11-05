@@ -11,7 +11,7 @@ from app.agents.resource_recommendations import recommend_resources
 from app.agents.roadmap_revision import revision
 from app.routers import preassessment as api
 from app.services import activity_selection, drafts
-from app.services.course_recommendations import recommendation_cache_compatible
+from app.services.course_recommendations import compatible_recommendations
 from app.services.resource_rag import version_for
 from test_recommendation_suitability import WEB
 from test_resource_followups import course
@@ -27,7 +27,7 @@ class CachedSelectionTests(TestCase):
 
     def test_preserves_choices_on_rule_change_if_selected_resources_are_usable(self):
         with patch.object(catalog, 'items', return_value=self.items):
-            self.assertTrue(recommendation_cache_compatible(self.saved, 'current'))
+            self.assertIsNotNone(compatible_recommendations(self.saved, 'current'))
         self.assertEqual(self.saved['resourceChoices'], self.choices)
 
     def test_invalidates_selected_course_or_book_even_on_current_rule_version(self):
@@ -37,7 +37,7 @@ class CachedSelectionTests(TestCase):
                     with self.subTest(version=version, rid=rid, item=item):
                         items = dict(self.items, **{rid: item})
                         with patch.object(catalog, 'items', return_value=items):
-                            self.assertFalse(recommendation_cache_compatible(self.saved, version))
+                            self.assertIsNone(compatible_recommendations(self.saved, version))
 
     def test_deleted_choice_triggers_fresh_recommendations_through_existing_route(self):
         draft = {'chosen': 'A2', 'gen': {'options': {'A2': {'id': 'A2'}}}}

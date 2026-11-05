@@ -23,7 +23,7 @@ class FlowCompatibilityTests(unittest.TestCase):
   d=drafts.fresh_draft();d.update(goal='검색 구현',detailsOk=True,chosen='A1',handoff={'key':'h','startStage':1,'prefs':{'weeklyHours':4}},gen={'key':'h','options':{'A1':option,'A3':dict(option,id='A3')}})
   base={'version':1,'generationId':'g','completed':True,'project':{'goal':'검색 구현','details':{'hours':4}},'selection':{'skills':[{'name':'S'}]},'survey':{'groups':[]},'answers':{'q':0}}
   scoped=scope_view(base,'A1',option)
-  scoped.update(recommendations={'id':'r','skills':[{'name':'S','courses':[{'id':'c','title':'강좌','hours':8}],'books':[{'id':'b','title':'도서'}]}]},resourceChoices={'S':{'course':'c','books':['b'],'enabled':True}},durationEstimates={'S':{'weeks':3,'course':'c','books':['b']}})
+  scoped.update(recommendations={'id':'r','skills':[{'name':'S','courses':[{'id':'c','title':'강좌','hours':8,'cost':0}],'books':[{'id':'b','title':'도서'}]}]},resourceChoices={'S':{'course':'c','books':['b'],'enabled':True}},durationEstimates={'S':{'weeks':3,'course':'c','books':['b']}})
   scoped['materialsSelectionKey']=activity_selection.materials_key(scoped)
   record={'id':'proposal','key':activity_selection.fingerprint(scoped,d),'selectedIds':['task'],
    'skillSummaries':{'S':['검색 구성','검색 평가','결과 검증']},'option':dict(option,acts=[{'id':'task','skill':'S','stage':3,'title':'과제','res':None,'hours':20,'how':'설명'}])}
@@ -78,7 +78,8 @@ class FlowCompatibilityTests(unittest.TestCase):
  def test_material_edit_clears_all_tasks_versions_outcomes_and_old_review(self):
   w,scoped=self.state();t=Mock();t.one.return_value={'draft_choices':w};t.run.return_value=1
   choices={'S':{'course':'c','books':[],'enabled':True}}
-  result=survey_store.save_resource_choices(t,1,'p','g','r',choices,skill_order=['S'],course='A1')
+  with patch('app.catalog.items', return_value={'c': {'type': 'course', 'cost': 0, 'usable': True}, 'b': {'type': 'book', 'usable': True}}):
+   result=survey_store.save_resource_choices(t,1,'p','g','r',choices,skill_order=['S'],course='A1')
   for field in ('activityProposal','activityVersions','learningOutcomes'):self.assertFalse(result.get(field))
   self.assertTrue(activity_selection.materials_ready(result));self.assertEqual(result['durationEstimates']['S']['weeks'],2)
   self.assertIn("'{draftPlan}'",t.run.call_args.args[0])

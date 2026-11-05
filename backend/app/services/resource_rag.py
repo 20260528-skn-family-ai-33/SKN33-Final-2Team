@@ -8,7 +8,7 @@ import math
 from time import perf_counter
 from app import db, llm
 from app.agents.resource_recommendations import RecommendationError, candidate_pools
-from app.services import book_candidates
+from app.services import book_candidates, resource_evidence
 
 MODEL = 'text-embedding-3-small'
 DIMENSIONS = 1536
@@ -24,6 +24,9 @@ def version_for(course=None):
 
 
 def query_text(project: dict, skill: dict, course: dict | None) -> str:
+    if course and course.get('id') == 'A2' and (core := resource_evidence.crash_core_scope(skill)):
+        # 스킬 이름에도 FastAPI/Django처럼 여러 기술이 들어갈 수 있다. 태그는 후보 필터에서 사용한다.
+        return json.dumps({**core, 'course': {'id': 'A2'}}, ensure_ascii=False, sort_keys=True)
     return json.dumps({
         'learnerKnowledge':project.get('learnerKnowledge') or {},
         'learningDirection':'이미 사용하는 기술의 입문 반복보다 프로젝트에 필요한 새 개념·심화·적용 중심',
@@ -32,9 +35,6 @@ def query_text(project: dict, skill: dict, course: dict | None) -> str:
         'desiredCompetencies': str(project.get('desiredCompetencies') or '')[:500],
         'skill': skill['name'], 'application': str(skill.get('application') or '')[:600],
         **({'targetOutcome':str(skill.get('targetOutcome') or '')[:500],'completionCriteria':skill.get('completionCriteria') or []} if course and course.get('id')=='A3' else {}),
-        # Crash는 핵심 완료 기준으로 자료를 찾는다. 후속 학습 범위는 검색 질의에 넣지 않는다.
-        **({'coreOutcome':str(skill.get('coreOutcome') or '')[:500],'coreCriteria':skill.get('coreCriteria') or []}
-           if course and course.get('id')=='A2' and skill.get('coreCriteria') else {}),
         'course': {key: str((course or {}).get(key) or '')[:500] for key in ('id','name','reason','scope')},
     }, ensure_ascii=False, sort_keys=True)
 
@@ -89,7 +89,6 @@ def retrieve(project, selection, items, course=None, *, embed=None, search=None)
     search=search or search_vectors
     matches=[]
     from app.services import crash_courses
-    from app.services import resource_evidence
     crash_cache = {}
     for index,vector in zip(active,vectors):
         for key,kind,prefix in [('courses','courses',''),('books','books','book_')]:

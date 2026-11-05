@@ -94,40 +94,48 @@ def merge_scope(base,scoped):
     result.setdefault('courseRecommendations',{})[course] = cache
     return result
 
-def free_cache_valid(recommendations,items):
-    if not recommendations:return False
-    for skill in recommendations['skills']:
-        for kind in ('courses','books'):
-            for resource in skill[kind]:
-                latest=items.get(resource['id'])
-                if not latest or not latest.get('usable'):return False
-                if kind=='courses' and (resource.get('cost')!=0 or latest.get('cost')!=0):return False
-    return True
+def available_recommendations(recommendations: dict, course: str | None, *, refresh: bool = False) -> dict:
+    """추천 근거는 보존하고 현재 선택할 수 없는 후보와 기본 선택만 제거한다."""
+    from app import catalog
+    rows = recommendations.get('skills') or []
+    items = catalog.items(refresh=refresh) if any(row['courses'] or row['books'] for row in rows) else {}
+
+    def available(resource: dict, kind: str) -> bool:
+        item = items.get(resource['id'])
+        return bool(item and item.get('usable') and item.get('type') == kind
+                    and (course != 'A1' or kind != 'course' or item.get('cost') == resource.get('cost') == 0))
+
+    filtered = []
+    for row in rows:
+        courses = [item for item in row['courses'] if available(item, 'course')]
+        books = [item for item in row['books'] if available(item, 'book')]
+        result = dict(row, courses=courses, books=books)
+        if 'selectedCourse' in row and not any(item['id'] == row['selectedCourse'] for item in courses):
+            result['selectedCourse'] = None
+        if 'selectedBooks' in row:
+            book_ids = {item['id'] for item in books}
+            result['selectedBooks'] = [rid for rid in row['selectedBooks'] if rid in book_ids]
+        filtered.append(result)
+    return dict(recommendations, skills=filtered)
 
 
-def recommendation_cache_compatible(saved: dict, version: str) -> bool:
-    """규칙이 바뀌어도 현재 카탈로그에서 유효한 선택은 재사용한다."""
+def compatible_recommendations(saved: dict, version: str) -> dict | None:
+    """선택이 유효하면 추천 규칙이 바뀌어도 남은 후보를 재사용한다."""
+    from app.agents.resource_recommendations import RecommendationError, validate_choices
     recommendations = saved.get('recommendations')
     if not recommendations:
-        return False
+        return None
     choices = saved.get('resourceChoices') or {}
-    if (recommendations.get('retrieval') or {}).get('version') != version:
-        if not recommendations.get('skills') or not choices:
-            return False
-        from app.agents.resource_recommendations import RecommendationError, validate_choices
+    outdated = (recommendations.get('retrieval') or {}).get('version') != version
+    if outdated and (not recommendations.get('skills') or not choices):
+        return None
+    available = available_recommendations(recommendations, saved.get('_course'))
+    if choices:
         try:
-            validate_choices(recommendations, choices)
+            validate_choices(available, choices)
         except RecommendationError:
-            return False
-
-    selected = {(choice['course'], 'course') for choice in choices.values() if choice.get('course')}
-    selected.update((rid, 'book') for choice in choices.values() for rid in choice.get('books') or [])
-    if not selected:
-        return True
-    from app import catalog
-    items = catalog.items()
-    return all((item := items.get(rid)) and item.get('usable') and item.get('type') == kind
-               for rid, kind in selected)
+            return None
+    return available
 
 
 def dependency_key(scoped):

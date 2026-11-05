@@ -5,7 +5,7 @@ import math
 from copy import deepcopy
 from app.services.resource_evidence import facts, hours, suitable, suitability_key, target_gaps
 
-VERSION = 'crash-short-courses/v11-server-shortest-bundle'
+VERSION = 'crash-short-courses/v12-core-search-scope'
 
 
 def is_crash(course) -> bool:

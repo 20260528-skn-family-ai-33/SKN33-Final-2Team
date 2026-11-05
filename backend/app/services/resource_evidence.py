@@ -6,6 +6,7 @@ import re
 import unicodedata
 from app import catalog_candidates as evidence
 from app.english_patterns import english_token as _en
+from app.services.course_skills import crash_core_fields
 
 
 _generic = {'기초', '실무', '활용', '학습', '이해', '환경', '프로그래밍', '아키텍처', '컴퓨팅',
@@ -139,16 +140,28 @@ def normalize(value: object) -> str:
     return unicodedata.normalize('NFKC', str(value or ''))
 
 
-def _target_texts(skill: dict) -> list[str]:
-    """자료가 충족해야 할 스킬 목표. Crash는 계획의 핵심 완료 기준만 보고 후속 학습 범위는 요구하지 않는다."""
-    if skill.get('coreCriteria'):
-        return [str(skill.get('coreOutcome') or '')] + [str(value) for value in skill['coreCriteria']]
+def crash_core_scope(skill: dict) -> dict:
+    """유효한 Crash 계획에서 자료가 충족해야 할 범위만 읽는다."""
+    try:
+        core = crash_core_fields(skill)
+    except ValueError:
+        return {}
+    return {key: core[key] for key in ('coreOutcome', 'coreCriteria')} if core else {}
+
+
+def _target_texts(skill: dict, core: dict) -> list[str]:
+    if core:
+        return [core['coreOutcome'], *core['coreCriteria']]
     return ([str(skill.get(key) or '') for key in ('application', 'targetOutcome')]
             + [str(value) for value in skill.get('completionCriteria') or []])
 
 
 def _skill_context(skill: dict) -> str:
-    return normalize(' '.join(_target_texts(skill))).casefold()
+    return normalize(' '.join(_target_texts(skill, crash_core_scope(skill)))).casefold()
+
+
+def _goal_context(project: dict, skill: dict) -> str:
+    return '' if crash_core_scope(skill) else normalize(project.get('goal')).casefold()
 
 
 def _dbt_targets(skill: dict) -> tuple[re.Pattern, ...]:
@@ -192,9 +205,13 @@ def _linux_security_target(skill: dict) -> bool:
 
 
 def _stage(project: dict, skill: dict) -> str:
-    local = _skill_context(skill)
-    goal = normalize(project.get('goal')).casefold()
+    core = crash_core_scope(skill)
+    local = normalize(' '.join(_target_texts(skill, core))).casefold()
+    goal = '' if core else normalize(project.get('goal')).casefold()
     name = normalize(skill['name'])
+    # 핵심 기준에 보안 검증을 명시했다면 개념 설명만으로 충족할 수 없다.
+    if core and _security.search(local) and _security_action.search(local):
+        return 'security'
     # 입문·원리 학습은 구현 프로젝트에서도 독립적인 학습 단계로 남긴다.
     if _concept.search(local) and not (_build.search(local) or _operate.search(local)):
         return 'conceptual'
@@ -216,7 +233,9 @@ def _stage(project: dict, skill: dict) -> str:
 
 
 def _stack_evidence(text: str, applied: list[str], project: dict, skill: dict, stage: str) -> tuple[list[str], list[str], list[str]]:
-    context = normalize(project.get('goal')) + ' ' + _skill_context(skill)
+    core = crash_core_scope(skill)
+    local = normalize(' '.join(_target_texts(skill, core))).casefold()
+    context = local if core else normalize(project.get('goal')) + ' ' + local
     requested = _stack_names(context)
     actual = _stack_names(text)
     name = normalize(skill['name'])
@@ -224,16 +243,20 @@ def _stack_evidence(text: str, applied: list[str], project: dict, skill: dict, s
     programming = bool(re.search(r'Python|파이썬|프로그래밍', name, re.I))
     cloud_skill = bool(re.search(r'클라우드|cloud', name, re.I))
     # 다른 스킬의 구현 스택은 개념 학습에 전파하지 않는다. 자체 도구를 명시한 학습은 예외다.
-    if stage in ('conceptual', 'design', 'security'):
-        required = _stack_names(_skill_context(skill)) & ({'aws', 'azure', 'gcp'} if cloud_skill else set())
+    if not core and stage in ('conceptual', 'design', 'security'):
+        required = _stack_names(local) & ({'aws', 'azure', 'gcp'} if cloud_skill else set())
         return sorted(required), sorted(required - set().union(*(_stack_names(value) for value in applied))), []
-    required = (requested & _web_stacks if web_skill else set())
-    if programming:
-        required |= requested & {'python', 'java', 'javascript'}
-    if cloud_skill:
-        required |= requested & {'aws', 'azure', 'gcp'}
-    if re.search(r'pytorch|tensorflow|파이토치|텐서플로', name, re.I):
-        required |= _stack_names(_skill_context(skill)) & {'pytorch', 'tensorflow'}
+    if core:
+        # 핵심 기준이 직접 명시한 기술은 스킬 태그가 넓거나 보안 검증 단계여도 확인한다.
+        required = requested
+    else:
+        required = requested & _web_stacks if web_skill else set()
+        if programming:
+            required |= requested & {'python', 'java', 'javascript'}
+        if cloud_skill:
+            required |= requested & {'aws', 'azure', 'gcp'}
+        if re.search(r'pytorch|tensorflow|파이토치|텐서플로', name, re.I):
+            required |= _stack_names(local) & {'pytorch', 'tensorflow'}
     taught = set().union(*(_stack_names(value) for value in applied))
     missing = required - taught
     conflicts = set()
@@ -300,7 +323,7 @@ def _profile(skill: dict, project: dict, rows: list, descriptions: list[str], te
         units = [(index, value) for index, value in units if not _business.search(value) or _nlp_objects.search(value)]
         claims = [value for value in claims if not _business.search(value) or _nlp_objects.search(value)]
     learning = [value for _, value in units] + claims
-    def satisfies(value):
+    def satisfies(value, stage):
         if stage in ('build', 'operate', 'security') and _intro_only.search(value) and not _practice.search(value):
             return False
         if stage == 'security':
@@ -321,14 +344,32 @@ def _profile(skill: dict, project: dict, rows: list, descriptions: list[str], te
                     or _build.search(value) or _operate.search(value) or _security.search(value))
     # '구현이 궁금해요'라는 질문과 '개발 팁'이라는 발표 소개는 구현 수업의 증거가 아니다.
     # 같은 강좌의 실제 실습 단원은 유지하며 개념 학습 목표에는 설명·토론도 허용한다.
-    applied_units = [(index, value) for index, value in units if satisfies(value)
-                     and (stage in ('conceptual', 'design') or index not in discussion_units)]
-    applied_claims = [value for value in claims if satisfies(value)
-                      and (stage in ('conceptual', 'design')
-                           or (not _question.search(value)
-                               and (not (_discussion.search(value) or discussion_context) or _practice.search(value))))]
+    def applied_evidence(stage):
+        allow_discussion = stage in ('conceptual', 'design')
+        return ([(index, value) for index, value in units if satisfies(value, stage)
+                 and (allow_discussion or index not in discussion_units)],
+                [value for value in claims if satisfies(value, stage)
+                 and (allow_discussion or (not _question.search(value)
+                      and (not (_discussion.search(value) or discussion_context) or _practice.search(value))))])
+
+    applied_units, applied_claims = applied_evidence(stage)
     applied = [value for _, value in applied_units] + applied_claims
     required, missing, conflicts = _stack_evidence(text, applied, project, skill, stage)
+    if stage == 'security' and applied and missing and (core := crash_core_scope(skill)):
+        # 보안 검증 차시가 있을 때, 구현에만 명시된 기술은 별도의 구현 실습에서도 확인한다.
+        build_stacks, security_stacks = set(), set()
+        for target in _target_texts(skill, core):
+            if _security.search(target):
+                security_stacks.update(_stack_names(target))
+            elif _build.search(target):
+                build_stacks.update(_stack_names(target))
+        separate_stacks = set(missing) & (build_stacks - security_stacks)
+        if separate_stacks:
+            build_units, build_claims = applied_evidence('build')
+            practice = [value for _, value in build_units] + build_claims
+            taught = set().union(*(_stack_names(value) for value in practice
+                                   if not _concept.search(value) or _practice.search(value)))
+            missing = sorted(set(missing) - (separate_stacks & taught))
     conceptual = [value for value in learning if _concept.search(value) or _design.search(value)
                   or _foundations.search(value) or _security.search(value)
                   or _discussion.search(value) or _question.search(value)]
@@ -416,7 +457,7 @@ def facts(item: dict, project: dict, selection: dict) -> dict:
     scope = {}
     document_gaps = set()
     for skill in selection['skills']:
-        context = goal + ' ' + _skill_context(skill)
+        context = _goal_context(project, skill) + ' ' + _skill_context(skill)
         scoped_analysis = bool(re.search(r'python|파이썬|EDA|탐색적', skill['name'], re.I) and _analysis_scope.search(context))
         scope[skill['name']] = not scoped_analysis or bool(_analysis_evidence.search(text))
         if re.search(r'python|파이썬', skill['name'], re.I) and _log_topic.search(context):
@@ -459,9 +500,10 @@ def facts(item: dict, project: dict, selection: dict) -> dict:
 
 def focus_terms(project: dict, skill: dict, *, goal_only=False):
     """일반 행동어보다 문서·로그 같은 학습 대상을 찾고 표현 차이를 보완한다."""
-    texts = [str(project.get('goal') or '')]
+    core = crash_core_scope(skill)
+    texts = [] if core else [str(project.get('goal') or '')]
     if not goal_only:
-        texts += _target_texts(skill)
+        texts += _target_texts(skill, core)
     normalized = []
     for text in texts:
         words = re.findall(r'[a-z0-9+#.]{2,}|[가-힣]{2,}', normalize(text).casefold())

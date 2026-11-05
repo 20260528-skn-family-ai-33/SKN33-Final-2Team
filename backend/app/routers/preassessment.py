@@ -168,13 +168,13 @@ def recommendation_context(t, employee_id: int, project_id: str) -> dict:
 def course_context(t, employee_id: int, project_id: str, course: str | None = None) -> dict:
     saved = recommendation_context(t, employee_id, project_id)
     from app.services.resource_rag import version_for
-    from app.services.course_recommendations import recommendation_cache_compatible, scope_view, free_cache_valid
+    from app.services.course_recommendations import compatible_recommendations, scope_view
     if not course:
-        if recommendation_cache_compatible(saved, version_for()):
-            return saved
+        recommendations = compatible_recommendations(saved, version_for())
+        if recommendations is not None:
+            return dict(saved, recommendations=recommendations)
         return dict(saved, recommendations=None, resourceChoices={}, durationEstimates={})
     from app.services import drafts as draft_service
-    from app import catalog
     draft = draft_service._row(t, employee_id, project_id, lock=False)['draft_choices']['draft']
     if course not in ('A1','A2','A3') or course not in (draft.get('gen') or {}).get('options', {}):
         raise ApiError(409,'COURSE_CHANGED','선택한 코스를 다시 확인해 주세요.')
@@ -183,9 +183,9 @@ def course_context(t, employee_id: int, project_id: str, course: str | None = No
     scoped=scope_view(saved,course,draft['gen']['options'][course])
     expected_names = {row['name'] for row in scoped['selection']['skills']}
     cached_names = {row['name'] for row in (scoped.get('recommendations') or {}).get('skills', [])}
-    if (expected_names != cached_names or not recommendation_cache_compatible(scoped, version_for(course))
-            or (course == 'A1' and not free_cache_valid(scoped['recommendations'], catalog.items()))):
-        scoped['recommendations']=None
+    scoped['recommendations'] = (compatible_recommendations(scoped, version_for(course))
+                                 if expected_names == cached_names else None)
+    if scoped['recommendations'] is None:
         scoped['resourceChoices']={}
         scoped['durationEstimates']={}
     return scoped
