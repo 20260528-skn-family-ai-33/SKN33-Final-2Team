@@ -656,6 +656,43 @@ details.more[open] > summary { margin-bottom: 12px; }
 .notif-it time { white-space: nowrap; }
 .notif-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .notif-empty { padding: 16px 14px; color: var(--ink-3, #777); }
+/* 부서장(#96): 내 알림(위)과 소속 직원 알림(아래)을 제목·배경·구분선으로 나누고, 소속 직원 알림은 직원별 묶음 → 건별(2단계)로 본다 */
+.notif-sec.staff { border-top: 6px solid var(--line); background: var(--surface-2, #FAFAF8); }
+.notif-h + .notif-sec.staff { border-top: 0; }
+.notif-sec-h { display: flex; align-items: center; gap: 6px; margin: 0; padding: 12px 14px 2px; color: var(--ink-2, #474A4F); font-size: 12px; font-weight: 700; }
+.notif-sec-h svg.i { width: 14px; height: 14px; }
+.notif-sec-h small { color: var(--ink-3, #777); font-size: 12px; font-weight: 500; }
+.notif-grp { align-items: center; }
+.notif-grp .notif-dot { margin-top: 0; }
+.notif-end { display: flex; align-items: center; gap: 6px; }
+.notif-end svg.i { width: 16px; height: 16px; color: var(--ink-2, #474A4F); }
+.notif-badge {
+  min-width: 18px;
+  padding: 2px 5px;
+  border-radius: 99px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1;
+  text-align: center;
+}
+.notif-back-h { display: flex; align-items: center; gap: 10px; padding: 8px 14px 8px 8px; border-bottom: 1px solid var(--line); background: var(--surface-2, #FAFAF8); }
+.notif-back {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card, #fff);
+  color: var(--ink-2, #474A4F);
+}
+.notif-back:hover { background: var(--accent-soft2, rgba(0, 0, 0, .04)); }
+.notif-back svg.i { width: 16px; height: 16px; }
+.notif-who { display: grid; gap: 1px; min-width: 0; }
+.notif-who b { overflow-wrap: anywhere; }
+.notif-who small { color: var(--ink-3, #777); font-size: 12px; }
 @media (max-width: 600px) {
   .notif-l { display: none; }
 }
