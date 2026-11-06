@@ -66,7 +66,7 @@ docker build -f frontend/Dockerfile -t growpath-web .
 
 `frontend/Dockerfile.dockerignore`가 VERSION과 프런트 소스만 빌드에 전달하고 `.env`·설치된 패키지·이전 빌드 결과는 제외해요. `docker compose`는 같은 경로를 사용해요.
 
-Compose의 시연 도구 빌드 설정은 루트 `.env`의 `VITE_DEMO_TOOLS`이며 기본값은 `off`예요. 로컬 시연에는 `VITE_DEMO_TOOLS=on`·`GP5_DEMO_MODE=on`을 함께 설정하고 다시 빌드해요. 단독 빌드는 `--build-arg VITE_DEMO_TOOLS=off`로 끌 수 있어요. 빌드가 on이어도 서버 `/ai/providers`의 `demoMode`가 true일 때만 직원·관리자 시연 도구와 관리자 가데이터 선택지를 표시해요.
+Compose의 시연 도구 빌드 설정은 루트 `.env`의 `VITE_DEMO_TOOLS`이며 기존 기본값 `on`을 유지해요. 기본 off 전환은 #77의 별도 PR에서 검토해요. 시연을 끄려면 `VITE_DEMO_TOOLS=off`·`GP5_DEMO_MODE=off`를 함께 설정하고 다시 빌드해요. 단독 빌드는 `--build-arg VITE_DEMO_TOOLS=off`로 끌 수 있어요. 프런트 설정이 명시적 off가 아니고 서버 `/ai/providers`의 `demoMode`가 true일 때만 직원·관리자 시연 도구와 관리자 가데이터 선택지를 표시해요. 단독 개발의 미설정도 기존 on 동작을 유지해요.
 
 ## 지켜야 할 것
 

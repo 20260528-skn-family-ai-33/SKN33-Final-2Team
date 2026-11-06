@@ -20,7 +20,9 @@ describe('직원·관리자 시연 도구 공개 범위', () => {
     ['on', false, false],
     ['on', undefined, false],
     ['off', true, false],
-    [undefined, true, false],
+    [undefined, true, true],
+    [undefined, false, false],
+    [undefined, undefined, false],
   ] as const)('빌드=%s 서버=%s이면 시연 도구 표시=%s', async (build, server, visible) => {
     vi.stubEnv('VITE_DEMO_TOOLS', build);
     vi.resetModules();

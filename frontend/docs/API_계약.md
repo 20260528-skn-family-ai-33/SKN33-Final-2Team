@@ -69,7 +69,7 @@
 
 `GP5_DEMO_MODE=off`이면 위 시연 전용 3개 API와 `GET /ai/log`는 인증·조회 전에 `404 / NOT_FOUND`를 반환합니다. 직원·관리자 모두 같은 제한을 받습니다. `GET /me`와 실행 컨텍스트는 off에서 저장된 `demo_mock`·`fail_sim`을 무시하고 `demoMock: false`, `failSim: {}`를 사용하며 DB 원본·선택한 AI 제공자·추론값은 유지합니다.
 
-`GET /ai/providers`에는 서버 시연 허용 여부인 최상위 `demoMode: boolean`이 추가됩니다. 예를 들어 `{ "current": "ollama", "demoMode": false, "providers": [...], "docLibs": {...} }`이면 화면은 시연 도구와 관리자 가데이터 선택지를 숨깁니다. 값이 없거나 조회가 실패해도 표시하지 않습니다. 이 기능은 프런트 빌드의 `VITE_DEMO_TOOLS`도 on일 때만 표시합니다. 직원의 미설정 AI 기본값은 `ollama`이며 OpenAI 키 설정만으로 선택이 바뀌지 않습니다.
+`GET /ai/providers`에는 서버 시연 허용 여부인 최상위 `demoMode: boolean`이 추가됩니다. 예를 들어 `{ "current": "ollama", "demoMode": false, "providers": [...], "docLibs": {...} }`이면 화면은 시연 도구와 관리자 가데이터 선택지를 숨깁니다. 값이 없거나 조회가 실패해도 표시하지 않습니다. 프런트 빌드의 `VITE_DEMO_TOOLS`가 명시적 off가 아니어야 표시하며, 미설정은 기존 on 동작을 유지합니다. 서버·화면 기본 off 전환은 #77의 별도 PR 범위입니다. 직원의 미설정 AI 기본값은 `ollama`이며 OpenAI 키 설정만으로 선택이 바뀌지 않습니다.
 
 시연 설정 저장은 서버가 성공 응답을 보낸 뒤에만 화면에 반영합니다. 가데이터·실패 시연 저장은 같은 큐에서 요청하고, 실패 시 기존값을 유지합니다. 이전 로그인 회차의 응답은 버리며 시연 응답으로 제공자·추론값을 덮지 않습니다.
 
