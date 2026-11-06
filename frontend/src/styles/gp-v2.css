@@ -125,6 +125,12 @@ select.input.df-sel option { color: var(--ink); }
 .addrow .input { padding-top: 8px; padding-bottom: 8px; font-size: 14px; }
 .addrow .btn { flex: none; height: 40px; gap: 4px; }
 .addrow .btn svg { width: 15px; height: 15px; }
+/* 입력하는 대로 찾기(#102): 결과 수 한 줄은 높이를 고정해 목록이 위아래로 흔들리지 않게 한다.
+   찾는 중 표시는 늘 자리만 두고, 응답이 0.3초 넘게 늦을 때만 나타난다(빠르게 칠 때 깜박이지 않게) */
+.search-status { display: flex; align-items: center; gap: 10px; height: 20px; margin: -6px 0 10px; font-size: 13px; line-height: 20px; color: var(--ink-3); white-space: nowrap; overflow: hidden; }
+.search-busy { display: inline-flex; align-items: center; gap: 6px; opacity: 0; transition: opacity .1s; }
+.is-busy .search-busy { opacity: 1; transition-delay: .3s; }
+.search-busy .sp { width: 12px; height: 12px; flex: none; border: 2px solid var(--line-2); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
 .back-sug { justify-self: start; font-size: 13px; }
 .back-sug svg { width: 14px; height: 14px; }
 .ef-n .back-sug { display: inline-flex; margin-left: 6px; vertical-align: middle; }
