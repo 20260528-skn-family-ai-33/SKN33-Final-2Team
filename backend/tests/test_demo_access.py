@@ -98,15 +98,35 @@ class DemoAccessTests(unittest.TestCase):
                 }):
                     self.assertEqual(config.load().beta_account_picker, picker == 'on')
 
-    def test_demo_default_and_explicit_off(self):
+    def test_demo_defaults_off_when_unset_in_environment_and_file(self):
         with patch.dict(os.environ), patch.dict(config._FILE):
             os.environ.pop('GP5_DEMO_MODE', None)
             config._FILE.pop('GP5_DEMO_MODE', None)
-            self.assertTrue(config.load().demo_mode)
-        with patch.dict(os.environ, {'GP5_DEMO_MODE': 'off'}):
             self.assertFalse(config.load().demo_mode)
-        with patch.dict(os.environ, {'GP5_DEMO_MODE': 'on'}):
-            self.assertTrue(config.load().demo_mode)
+
+    def test_demo_requires_normalized_explicit_on_in_environment_or_file(self):
+        cases = [('', False), (' \t ', False), ('on', True), ('ON', True),
+                 (' on ', True), ('off', False), ('unknown', False),
+                 ('true', False), ('1', False)]
+        for source in ('environment', 'file'):
+            for value, enabled in cases:
+                with self.subTest(source=source, value=value), \
+                     patch.dict(os.environ), patch.dict(config._FILE):
+                    os.environ.pop('GP5_DEMO_MODE', None)
+                    config._FILE.pop('GP5_DEMO_MODE', None)
+                    target = os.environ if source == 'environment' else config._FILE
+                    target['GP5_DEMO_MODE'] = value
+                    self.assertIs(config.load().demo_mode, enabled)
+
+    def test_demo_environment_takes_precedence_even_when_empty_or_invalid(self):
+        cases = [('', 'on', False), (' \t ', 'on', False),
+                 ('off', 'on', False), ('unknown', 'on', False),
+                 ('on', 'off', True)]
+        for environment, file_value, enabled in cases:
+            with self.subTest(environment=environment, file=file_value), \
+                 patch.dict(os.environ, {'GP5_DEMO_MODE': environment}), \
+                 patch.dict(config._FILE, {'GP5_DEMO_MODE': file_value}):
+                self.assertIs(config.load().demo_mode, enabled)
 
     def test_hr_guide_has_no_password_interpolation(self):
         self.assertIn('관리자에게 받은 초기 비밀번호', '\n'.join(hr.GUIDE))

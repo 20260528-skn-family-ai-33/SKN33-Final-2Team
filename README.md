@@ -204,13 +204,15 @@ Windows·macOS·Linux 모두 Docker Engine/Desktop과 Compose v2가 필요합니
 
 **베타 종료 시** `GP5_BETA_ACCOUNT_PICKER=off`로 바꾼 뒤 `docker compose up -d --no-deps --force-recreate backend`를 실행하고, `docker compose restart frontend`로 nginx가 새 백엔드 주소를 읽게 하세요. 로그인 화면을 새로고침하면 `/demo/accounts`가 DB 조회 전에 404를 반환하고 직원 고르기가 사라집니다. 사번 직접 입력 로그인은 유지합니다. 화면 재빌드는 필요하지 않으며 베타 종료 날짜·버전을 코드에서 임의로 판단하지 않습니다.
 
-시연 기본값을 바꾸는 정책은 #77의 별도 PR에서 검토합니다. 현재 환경 예시와 서버·프런트 기본값은 기존 시연 동작인 `on`을 유지합니다. 실제 배포에서는 운영 담당자가 두 시연 설정을 명시적으로 선택해야 합니다.
+시연 기본값은 서버·Compose·단독 프런트 개발/빌드에서 모두 `off`입니다(#77). `GP5_DEMO_MODE`와 `VITE_DEMO_TOOLS`는 미설정·빈 값·공백·알 수 없는 값을 off로 처리하며, 앞뒤 공백과 대소문자를 정리한 `on`만 허용합니다. 서버 환경변수가 있으면 빈 값도 `.env`보다 우선하므로 `.env`에 남은 on이 다시 적용되지 않습니다. 다른 환경변수의 해석은 그대로입니다.
 
-`GP5_DEMO_MODE=off`를 선택하면 시연 초기화(`/demo/reset`), 단계 이동(`/demo/jump`), 시연 설정(`/me/demo-settings`), 전체 직원 AI 기록(`/ai/log`) API가 인증·조회 전에 404를 반환합니다. 관리자 목표 생성에서 가데이터를 지정한 요청도 저장·작업 시작 전에 `409 / DEMO_DISABLED`로 거절하며 실제 모델로 자동 전환하지 않습니다. 설치 과정의 시연 목표 후보 생성은 건너뜁니다. 설정을 생략하면 기존 시연 호환을 위해 `on`입니다.
+`GP5_DEMO_MODE=off`이면 시연 초기화(`/demo/reset`), 단계 이동(`/demo/jump`), 시연 설정(`/me/demo-settings`), 전체 직원 AI 기록(`/ai/log`) API가 인증·조회 전에 404를 반환합니다. 관리자 목표 생성에서 가데이터를 지정한 요청도 저장·작업 시작 전에 `409 / DEMO_DISABLED`로 거절하며 실제 모델로 자동 전환하지 않습니다. 설치 과정의 시연 목표 후보 생성은 건너뜁니다.
 
 `off`에서는 DB에 저장된 직원별 가데이터(`demo_mock`)·실패 시연(`fail_sim`) 설정도 내 정보 응답과 모델 실행에서 무시합니다. 선택한 AI 제공자와 추론 정도는 유지하며, 모델을 사용할 수 없으면 가데이터로 대신하지 않고 오류를 반환합니다. DB의 시연 설정은 삭제하지 않으므로 서버를 `on`으로 다시 실행하면 저장된 값이 다시 적용됩니다.
 
-Compose는 루트 `.env`의 `VITE_DEMO_TOOLS`를 프런트 빌드 인자로 전달하며 기본값은 `on`입니다. 시연을 끄려면 `GP5_DEMO_MODE=off`와 `VITE_DEMO_TOOLS=off`를 함께 설정한 뒤 `docker compose up -d --build`로 다시 빌드하세요. 프런트 설정이 명시적 off가 아니고 서버가 `/ai/providers`의 `demoMode: true`를 반환할 때 시연 도구·관리자 가데이터 선택지를 표시합니다. 프런트 단독 개발에서는 `frontend/.env.local`의 `VITE_DEMO_TOOLS`를 사용하며 미설정도 기존 on 동작을 유지합니다.
+Compose는 루트 `.env`의 `VITE_DEMO_TOOLS`를 프런트 빌드 인자로 전달하며 기본값은 `off`입니다. 로컬 시연을 유지하려면 `GP5_DEMO_MODE=on`과 `VITE_DEMO_TOOLS=on`을 함께 명시하세요. 프런트 설정이 on이고 서버가 `/ai/providers`의 `demoMode: true`를 반환할 때만 시연 도구·관리자 가데이터 선택지를 표시합니다. 프런트 단독 개발은 `frontend/.env.local`, 단독 Docker 빌드는 `--build-arg VITE_DEMO_TOOLS=on`으로 시연을 선택합니다.
+
+기존 설치를 전환할 때는 `.env` 전체를 덮어쓰지 말고 두 시연 값만 선택하세요. 기존에 명시한 on은 계속 on이므로 기본값 변경만으로 꺼지지 않습니다. 적용은 `docker compose build backend frontend`, `docker compose up -d --no-deps --force-recreate backend frontend` 순서로 실행합니다. 이 경로는 DB 복원·설치기를 재실행하지 않습니다. 되돌리려면 두 값을 on으로 지정하고 같은 명령을 실행하세요. 기존 가데이터 결과·직원 선택·비밀번호는 변경하지 않습니다. off에서는 이후 AI 생성 작업과 재시작 시 복구되는 일부 작업이 기존에 선택한 실제 모델을 사용할 수 있으므로, 실행 전 진행 중 작업과 모델 연결·비용 설정을 확인하세요. 이 정책은 모델 연결 준비나 외부 베타 배포 승인을 대신하지 않습니다.
 
 관리자 초기 비밀번호는 루트 `.env`의 `GP5_ADMIN_PASSWORD`에서 정합니다. 신규 관리자를 만들 때만 사용하며 빈 값·공백만 있는 값·`GP5_DEMO_PASSWORD`와 같은 값은 거절합니다. **이미 존재하는 관리자 계정은 자동 갱신하지 않으므로**, 이 설정만 바꾸거나 설치기를 다시 실행해도 기존 비밀번호가 바뀌지 않습니다. 기존 공유 비밀번호를 쓰는 계정의 변경은 배포 담당자가 별도로 처리해야 합니다. 비밀번호는 API·화면·직원 엑셀 안내문으로 배포하지 않으며 관리자가 별도로 전달합니다. 직원별 초기 비밀번호와 첫 로그인 변경 기능은 별도 후속 범위입니다.
 
