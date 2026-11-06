@@ -23,6 +23,25 @@ def skill_label(s: str) -> str:
     return D['skills'].get(s, s)
 
 
+# 팀 합의 코스 이름은 Free·Crash·Challenge Course다(#78). 이전에 저장된 계획·보고서에는 4차 가데이터의 Track 이름이 남아 있다.
+# 저장된 보고서는 고칠 수 없어(팀 DB 트리거) 읽을 때 이전 이름을 코스 ID로 대응시킨다.
+LEGACY_COURSE_IDS = {'Free Track': 'A1', 'Fast Track': 'A2', 'Challenge Track': 'A3'}
+
+
+def course_id(value: str | None) -> str:
+    """코스 ID(A1~A3)나 현재·이전 코스 이름을 코스 ID로 바꾼다. 알 수 없는 값은 그대로 돌려준다."""
+    v = str(value or '')
+    if v in D['perspectives']:
+        return v
+    return next((k for k, p in D['perspectives'].items() if p['name'] == v), None) or LEGACY_COURSE_IDS.get(v, v)
+
+
+def course_name(value: str | None, fallback: str = '') -> str:
+    """코스 ID나 이름의 현재 공식 이름. 알 수 없으면 fallback."""
+    per = D['perspectives'].get(course_id(value))
+    return per['name'] if per else fallback
+
+
 # 팀 DB 자료 키 (2026-10-22 백업 기준 · 팀이 학습 자료를 IT 분야로 다시 모아 10/21 키 10개가 모두 빠져 다시 고름 · 2026-10-22 사용자 결정)
 # MS Learn 은 비용 0원, K-MOOC·도서는 비용 '확인 필요'. 맞는 자료가 없는 활동(생성형 AI·RAG 개념, 프롬프트, 위험 점검)은 직접 수행 과제로 바꿨다
 R = {

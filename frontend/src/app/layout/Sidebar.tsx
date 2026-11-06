@@ -96,14 +96,14 @@ export function Sidebar({ active }: { active: string }) {
   const lastNew = useWs((s) => s.lastNew);
   if (!me) return null;
   const sup = isSup(me);
+  // 내 정보는 위 계정 칸(이름)으로만 들어간다. 주 메뉴에도 두면 같은 화면 진입점이 겹쳐서 뺐다(#104)
   const items: [string, string, string, boolean?, string?][] = [
     [paths.home, '홈', 'home', newComment],
     [newIdToPath(lastNew), '새 로드맵 작성', 'pen', drafting, 'new'],
     [paths.roadmaps, '내 로드맵', 'map'],
     [paths.checks, '점검·보고서', 'chart'],
-    [paths.me, '내 정보', 'user'],
   ];
-  const keyOf = (to: string, key?: string) => key || ({ [paths.home]: 'home', [paths.roadmaps]: 'roadmap', [paths.checks]: 'checks', [paths.me]: 'me' } as Record<string, string>)[to];
+  const keyOf = (to: string, key?: string) => key || ({ [paths.home]: 'home', [paths.roadmaps]: 'roadmap', [paths.checks]: 'checks' } as Record<string, string>)[to];
   return (
     <>
       <Brand />

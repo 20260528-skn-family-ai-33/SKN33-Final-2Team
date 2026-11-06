@@ -189,6 +189,7 @@ export interface Report {
   quizEvidence?: { concept?: string; skill: string; question: string; pre: string; post: string }[];
   id: string;
   planId: string;
+  /** 코스 ID(A1~A3). 이전 보고서에 저장된 Track 이름은 서버가 ID로 바꿔 보낸다(#78) */
   opt: string;
   version: number;
   goal: string;
