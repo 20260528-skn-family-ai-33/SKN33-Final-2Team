@@ -84,7 +84,7 @@ services:
       context: .
       dockerfile: frontend/Dockerfile
       args:
-        VITE_DEMO_TOOLS: ${VITE_DEMO_TOOLS:-on}
+        VITE_DEMO_TOOLS: ${VITE_DEMO_TOOLS:-off}
     depends_on:
       - backend
     environment:

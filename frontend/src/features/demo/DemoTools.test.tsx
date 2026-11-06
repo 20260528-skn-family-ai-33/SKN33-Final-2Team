@@ -17,10 +17,17 @@ afterEach(() => vi.unstubAllEnvs());
 describe('직원·관리자 시연 도구 공개 범위', () => {
   it.each([
     ['on', true, true],
+    ['ON', true, true],
+    [' on ', true, true],
     ['on', false, false],
     ['on', undefined, false],
     ['off', true, false],
-    [undefined, true, true],
+    ['OFF', true, false],
+    [' off ', true, false],
+    ['', true, false],
+    ['   ', true, false],
+    ['unknown', true, false],
+    [undefined, true, false],
     [undefined, false, false],
     [undefined, undefined, false],
   ] as const)('빌드=%s 서버=%s이면 시연 도구 표시=%s', async (build, server, visible) => {
