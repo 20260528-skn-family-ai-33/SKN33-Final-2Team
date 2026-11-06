@@ -66,7 +66,8 @@ def restore(dump: Path) -> None:
 
 
 def apply_app_ext() -> None:
-    sql = (ROOT / 'db/02_app_ext.sql').read_text(encoding='utf-8')
+    sql = '\n'.join((ROOT / path).read_text(encoding='utf-8')
+                    for path in ('db/02_app_ext.sql', 'db/03_knowledge_bge.sql'))
     # 매개변수 없이 보내야 SQL 안의 '%'(LIKE)를 자리표시자로 읽지 않는다
     raw = db.engine.raw_connection()
     try:

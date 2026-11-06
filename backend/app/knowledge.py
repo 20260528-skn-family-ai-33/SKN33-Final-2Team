@@ -1,10 +1,11 @@
-"""회사 정보·사내 생활 자료의 범주별 읽기 전용 벡터 검색."""
+"""회사 정보·사내 생활의 읽기 전용 검색. 기본은 BGE+BM25, OpenAI는 명시적 복구용."""
 from __future__ import annotations
 
 import json
 import math
 
 from . import db, llm
+from .config import env
 
 CATEGORY = '수자원공사 정보'
 LIFE_CATEGORY = '사내 생활안내'
@@ -25,6 +26,16 @@ def search_life(question: str) -> list[dict]:
 def _search(question: str, category: str) -> list[dict]:
     if category not in (CATEGORY, LIFE_CATEGORY):
         raise llm.LlmError('검색 자료의 범주가 올바르지 않아요')
+    provider = env('KNOWLEDGE_EMBED_PROVIDER', 'bge-m3').strip().lower()
+    if provider == 'bge-m3':
+        from . import bge_knowledge_search
+        return bge_knowledge_search.search(question, category)
+    if provider != 'openai':
+        raise llm.LlmError('BGE-M3 설정: KNOWLEDGE_EMBED_PROVIDER는 openai 또는 bge-m3여야 해요')
+    return _search_openai(question, category)
+
+
+def _search_openai(question: str, category: str) -> list[dict]:
     title = '회사 정보' if category == CATEGORY else '사내 생활'
     real_only = category == CATEGORY
     if not question.strip():

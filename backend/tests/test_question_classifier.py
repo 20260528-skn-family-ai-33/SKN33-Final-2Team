@@ -270,7 +270,7 @@ class ClassifierRoutingTest(unittest.TestCase):
     def test_unrelated_history_does_not_change_regulation_search(self):
         self.inp.update(history=[{'q': '교육비 기준은?', 'a': {'kind': 'regulation', 'basis': ['old-source']}}])
         self.route('사내 규정', self.response())
-        self.search.assert_called_once_with(self.inp['question'], 4, '일반직', 'ollama')
+        self.search.assert_called_once_with(self.inp['question'], 5, '일반직', 'ollama')
 
     def test_follow_up_keeps_previous_question_for_classifier_and_search(self):
         self.inp.update(question='그럼 신청은 언제까지?', history=[{'q': '교육비 지원 기준은?', 'a': {'kind': 'regulation', 'basis': []}}])

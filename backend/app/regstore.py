@@ -4,8 +4,8 @@
   국외근무 전용 규정은 국외근무를 묻는 질문에만 넣는다. 맞는 묶음이 없으면 '적용 대상 아님'.
 - 검색 단위는 팀 DB 검색 청크(rag_chunks · search_status='active')다. 화면의 '규정 근거'는 청크 하나를 조항처럼 보여 준다
   (조항 청크 = 「규정」 제7조(제목), 별표 행 청크 = 「규정」 별표 1(구분)).
-- 검색: 실제 모델 모드(RunPod-Ollama·OpenAI)는 모두 OpenAI 임베딩(text-embedding-3-small) 벡터로 pgvector 코사인 거리를 쓴다
-  (팀 합의 2026-10-26 · 팀 DB 벡터가 그 모델로 만들어짐). OpenAI 키가 없으면 키워드로 바꾸지 않고 오류로 알린다(사용자 결정).
+- 검색: 실제 모델 모드는 REGULATION_EMBED_PROVIDER에 따라 BGE-M3 또는 기존 OpenAI 벡터를 사용한다.
+  Docker 기본은 BM25 + BGE-M3의 RRF 검색이다. 실패 시 대체 검색 없이 오류로 알린다.
   가데이터 모드만 키워드(4차 규칙). 1536차원이면 ERD rag_chunk_embeddings, 아니면 app_ext.rag_chunk_vectors 에 저장한다.
 """
 from __future__ import annotations
@@ -55,7 +55,7 @@ def _load() -> dict:
 
 
 CHUNK_SQL = """SELECT c.rag_chunk_id, c.regulation_version_id, c.chunk_type, c.context_path, c.chunk_text, c.search_status,
-            n.regulation_node_id, n.node_type, n.label, n.title, n.body_text, n.path, n.source_locator, n.display_order,
+            n.regulation_node_id, n.parent_node_id, n.node_type, n.label, n.title, n.body_text, n.path, n.source_locator, n.display_order,
             p.node_type AS p_type, p.label AS p_label, p.title AS p_title
         FROM regulations.rag_chunks c
         JOIN regulations.rag_chunk_sources s ON s.rag_chunk_id = c.rag_chunk_id AND s.source_role = 'primary'
@@ -82,7 +82,9 @@ def art_of(c: dict, reg: dict) -> dict:
     chapter = f"{c['p_label']} {c['p_title'] or ''}".strip() if c['p_type'] == 'chapter' else next((x for x in segs[1:2] if re.match(r'^제\d+장', x)), '')
     return {'id': c['rag_chunk_id'], 'reg': reg['short_key'], 'no': no, 'title': title, 'chapter': chapter,
             'page': pages[0] if pages else None, 'text': text, 'type': c['chunk_type'], 'node': c['regulation_node_id'],
-            'path': c['context_path'], 'group': reg['employee_group'], 'overseas': reg['overseas_only']}
+            'path': c['context_path'], 'group': reg['employee_group'], 'overseas': reg['overseas_only'],
+            'order': c.get('display_order', 0),
+            'parent': c.get('parent_node_id') if c['node_type'] == 'paragraph' and c['p_type'] == 'article' else None}
 
 
 def data() -> dict:
@@ -248,8 +250,12 @@ def vector_search(query: str, k: int, group: str | None, *, all_groups: bool = F
 
 
 def search(query: str, k: int, group: str | None, mode: str, *, all_groups: bool = False) -> list[dict]:
-    """실제 모델 모드는 벡터(어느 모드든 같은 OpenAI 임베딩), 가데이터는 키워드"""
+    """규정 전용 검색 모델 선택. 생성 모델·자료·회사 정보 임베딩과 별개다."""
     if mode in ('ollama', 'openai'):
+        # BGE 모듈은 조항 읽기 함수를 재사용하므로 호출 시점에 가져와 순환 초기화를 피한다.
+        from . import bge_regulation_search, regulation_embeddings
+        if regulation_embeddings.search_provider() == 'bge-m3':
+            return bge_regulation_search.search(query, k, group, all_groups=all_groups)
         return vector_search(query, k, group, all_groups=all_groups)
     return keyword_search(query, k, group, all_groups=all_groups)
 
@@ -280,6 +286,26 @@ PARAGRAPH_RANGE = re.compile(
     r'(?:(제\s*\d+\s*조(?:\s*의\s*\d+)?)\s*)?'
     r'제\s*(\d{1,3})\s*항(?:\s*(?:부터|내지|[~～])\s*제\s*(\d{1,3})\s*항)?'
 )
+
+
+def parent_context(ids: list[str], group: str | None, query: str, *, limit: int) -> list[str]:
+    """선택된 자식과 같은 실제 조 노드의 활성 항을 보충한다. 검색 범위 밖 항은 넣지 않는다."""
+    if limit <= 0:
+        return []
+    allowed = {item['id']: item for item in pool(group, query)}
+    seen, result = set(ids), []
+    for identifier in ids:
+        child = allowed.get(identifier)
+        if not child or not child.get('parent'):
+            continue
+        siblings = [item for item in allowed.values() if item['id'] not in seen
+                    and item['reg'] == child['reg'] and item.get('parent') == child['parent']]
+        for item in sorted(siblings, key=lambda item: (item.get('order', 0), item.get('path', ''), item['id'])):
+            result.append(item['id'])
+            seen.add(item['id'])
+            if len(result) == limit:
+                return result
+    return result
 
 
 def referenced_paragraphs(ids: list[str], *, limit: int) -> list[str]:

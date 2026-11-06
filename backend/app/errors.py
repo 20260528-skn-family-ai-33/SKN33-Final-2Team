@@ -41,6 +41,11 @@ def bad(message: str, code: str = 'BAD_REQUEST') -> ApiError:
 # ── 에이전트(모델) 오류 → 원인·종류·할 일 (4차 gp-ai.js 의 AI.cause 를 서버로 옮김) ──
 # 앞머리 문구(Ollama 연결 실패 / RunPod 프록시 / OpenAI 401 …)는 llm.py 가 만드는 오류 문구와 맞춘다
 CAUSES = [
+    (r'^BGE-M3 시간 초과', 'timeout', 'BGE-M3 임베딩 서버의 응답 시간이 초과됐어요'),
+    (r'^BGE-M3 연결 실패', 'conn', 'BGE-M3 임베딩 서버의 실행 상태를 확인해 주세요'),
+    (r'^BGE-M3 설정|^BGE-M3 색인', 'config', 'BGE-M3 연결 설정과 색인 준비 상태를 확인해 주세요'),
+    (r'^BGE-M3 응답 형식', 'format', 'BGE-M3 서버의 모델 이름과 1024차원 응답을 확인해 주세요'),
+    (r'^BGE-M3 HTTP', 'other', 'BGE-M3 임베딩 서버가 요청을 처리하지 못했어요'),
     (r'^Challenge (추천에는|산출물|완료 기준)', 'format', 'Challenge 응답의 산출물 목표·완료 기준 형식을 확인하지 못했어요'),
     (r'^Crash (추천에는|핵심 완료 기준|후속 학습)', 'format', 'Crash 응답의 핵심 결과물·완료 기준 형식을 확인하지 못했어요'),
     (r'^회사 정보 검색 임베딩', 'config', '회사 정보 검색의 임베딩 모델·키·저장 벡터 설정을 확인해 주세요'),

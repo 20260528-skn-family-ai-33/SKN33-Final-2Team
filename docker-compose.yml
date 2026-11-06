@@ -18,8 +18,32 @@ x-backend: &backend
     DATABASE_URL: postgresql+psycopg://${GP5_DB_USER:-growpath}:${GP5_DB_PASSWORD:?.env 에 GP5_DB_PASSWORD 를 넣어 주세요}@db:5432/${GP5_DB_NAME:-growpath}
     # 규정 원문 PDF(팀 규정 묶음의 source/ · team_db/README.md) — 관리자 '지금 규정' 내려받기
     GP5_REGULATION_FILES_DIR: /srv/growpath/regulation_files
+    # 사내규정·회사 정보·사내 생활은 BGE-M3. 학습 자료 추천은 OPENAI_EMBED_MODEL을 사용한다.
+    REGULATION_EMBED_PROVIDER: ${REGULATION_EMBED_PROVIDER:-bge-m3}
+    KNOWLEDGE_EMBED_PROVIDER: ${KNOWLEDGE_EMBED_PROVIDER:-bge-m3}
+    ASSISTANT_SEARCH_MODE: ${ASSISTANT_SEARCH_MODE:-hybrid}
+    BGE_M3_BASE_URL: ${BGE_M3_BASE_URL:-http://bge-m3:8080/v1}
 
 services:
+  # 규정·회사 정보·사내 생활 CPU 임베딩 서버. 모델 파일은 Git 밖에서 준비한다.
+  bge-m3:
+    image: ghcr.io/ggml-org/llama.cpp:server@sha256:c0a11067c72bb1eb330b8bddbf9869274c195e596bf4fae55fd527102e644b85
+    command: ["-m", "/models/bge-m3-f16.gguf", "--alias", "BAAI/bge-m3", "--host", "0.0.0.0", "--port", "8080", "--embedding", "--pooling", "cls", "-c", "8192", "-np", "1", "-b", "8192", "-ub", "8192", "-t", "4", "-tb", "4", "-ngl", "0"]
+    volumes:
+      - type: bind
+        source: ${BGE_M3_MODEL_FILE:-./.cache/embedding-eval/bge-m3-f16.gguf}
+        target: /models/bge-m3-f16.gguf
+        read_only: true
+        bind:
+          create_host_path: false
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 3s
+      start_period: 30s
+      retries: 20
+    restart: unless-stopped
+
   # PostgreSQL 17 + pgvector — 팀 DB(PostgreSQL 17.11 + pgvector 0.8.x)와 버전을 맞춤
   db:
     image: pgvector/pgvector:pg17
@@ -70,6 +94,9 @@ services:
     depends_on:
       backend-setup:
         condition: service_completed_successfully
+      bge-m3:
+        condition: service_healthy
+    restart: unless-stopped
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8815}:8785"
     volumes:

@@ -100,6 +100,21 @@ class RegulationFollowUpTest(unittest.TestCase):
         self.assertTrue(inp['_classification']['usedHistory'])
         self.assert_summary_history(model)
 
+    def test_hybrid_chatbot_supplies_sibling_context_with_original_citation_ids(self):
+        def paragraph(identifier, number, text):
+            return {'id': identifier, 'reg': 'edu', 'no': f'제24조 제{number}항', 'text': text,
+                    'title': '', 'chapter': '', 'type': 'paragraph', 'path': '',
+                    'parent': 'actual-article-node', 'order': number, 'group': '일반직', 'overseas': False}
+        hit = paragraph('edu-24-2', 2, '교육비 지원은 승인된 과정에 적용한다.')
+        sibling = paragraph('edu-24-1', 1, '승인 조건은 담당 부서에 확인한다.')
+        self.articles.update({hit['id']: hit, sibling['id']: sibling})
+        self.search.return_value = [{'id': hit['id']}, {'id': 'edu-9'}]
+        with patch.object(reg.regulation_embeddings, 'search_provider', return_value='bge-m3'), patch.object(reg.hybrid_search, 'enabled', return_value=True), patch.object(reg.regstore, 'pool', return_value=[hit, sibling]), patch.object(rt, '_log'), patch.object(rt, 'llm_json', return_value={'status': 'partial', 'summary': '승인 조건은 담당 부서에 확인해요.', 'sourceIds': ['S003']}) as model:
+            answer = reg.answer(self.ctx, '교육비 지원 조건', [], {}, documents_only=True)
+        self.assertEqual(answer['retrieved'], ['edu-24-2', 'edu-9', 'edu-24-1'])
+        self.assertEqual(answer['basis'], ['edu-24-1'])
+        self.assertEqual(model.call_args.args[2]['sources'][2]['no'], '제24조 제1항')
+
     def test_long_and_topic_keyword_follow_ups_use_summary_throughout_route(self):
         questions = ('그 규정에서 교육 신청을 취소하는 절차도 알려 주세요',
                      '앞에서 설명한 내용을 내 상황에 적용하면 어떻게 되나요?',

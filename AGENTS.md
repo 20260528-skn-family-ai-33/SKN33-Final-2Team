@@ -69,6 +69,8 @@
 - `frontend/`는 React + Vite + TypeScript 화면이다. 실행·검사 방법은 `frontend/README.md`를 따른다. `frontend/`를 작업 경로로 `npm ci` 뒤 `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`로 검사하고(PR마다 GitHub Actions `frontend`가 같은 순서로 실행), 실제 화면 흐름은 브라우저에서 별도로 확인한다. `backend/`는 5차 FastAPI 백엔드(팀 백엔드 준비 전 참고용)이며 원본과 다른 곳은 `backend/README.md`를 따른다. DB·백엔드·화면은 저장소 맨 위 `docker compose`로 함께 실행하고(README '11. 개발 환경 실행'), 파이썬 문법은 `python -m py_compile`로 확인한다.
 
 - 실제 저장소의 README, 패키지 설정, CI에서 검사 명령을 확인한다. 존재하지 않는 경로나 도구를 가정해 실행하지 않는다.
+- 사내규정·수자원공사 정보·사내 생활 BGE-M3 검색·색인은 `backend/README.md`의 '#122'·'#125' 절을 따른다. 세 범주는 BGE-M3 1024차원, 학습 자료 추천은 OpenAI를 사용한다. `backend/`에서 `python -m unittest discover -s tests -p test_regulation_embeddings.py -v`와 `python -m unittest discover -s tests -p test_knowledge_embeddings.py -v`로 연결·실패·저장 격리·OpenAI 복구 경로를 확인하고 실제 모델·DB 검색과 Docker 재시작은 별도로 검증한다. 기존 OpenAI 벡터와 적용된 `database/` 마이그레이션을 보존하며 새 자료 색인은 `backend/db/03_knowledge_bge.sql`로 적용한다.
+- 세 범주의 BGE 검색은 기본 `ASSISTANT_SEARCH_MODE=hybrid`로 BM25+pgvector 후보를 RRF로 합치고 규정은 실제 부모 노드의 문맥을 보충한다. 상세는 `backend/README.md`의 '#126' 절을 따른다. `python -m unittest discover -s tests -p test_hybrid_search.py -v`로 수식·독립 후보·범위 격리·캐시·실패를 검사한다. BM25는 DB 원문에서 메모리 색인을 구성하며 기존 벡터를 재생성하지 않는다. 복구는 `ASSISTANT_SEARCH_MODE=vector`를 지정하고 백엔드를 재생성한다.
 - 문서만 바꿨다면 내용의 일관성, 링크·경로, 예시, Markdown 구조를 확인한다. 의미 없는 코드 테스트를 추가하지 않는다.
 - 코드 변경은 관련 정상·실패·경계 사례를 검증한다. 계약·저장·모델 연결 변경에는 해당 동작을 확인하는 테스트를 함께 갱신한다.
 - UI는 실제 사용자 흐름, API는 연동과 실패 응답, 모델은 합의한 평가 사례를 확인한다. 문법 검사 통과를 UI 동작 확인으로 표현하지 않는다.

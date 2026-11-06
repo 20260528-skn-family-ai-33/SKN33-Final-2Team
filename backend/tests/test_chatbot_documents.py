@@ -89,7 +89,7 @@ class EmployeeChatbotTest(unittest.TestCase):
                     for dependency in (classify, search, model):
                         dependency.assert_not_called()
                 else:
-                    search.assert_called_once_with('교육비 지원을 받을 수 있나요?', 4, '일반직', provider)
+                    search.assert_called_once_with('교육비 지원을 받을 수 있나요?', 5, '일반직', provider)
                     ctx, _, payload = model.call_args.args
                     self.assertEqual(ctx.reasoning, {provider: 'low'})
                     self.assertEqual(payload['user'], {})
@@ -161,6 +161,11 @@ class EmployeeChatbotTest(unittest.TestCase):
 
 
 class DocumentScopeTest(unittest.TestCase):
+    def setUp(self):
+        settings = patch.dict(os.environ, KNOWLEDGE_EMBED_PROVIDER='openai', REGULATION_EMBED_PROVIDER='openai')
+        settings.start()
+        self.addCleanup(settings.stop)
+
     def test_documents_only_discards_even_a_supplied_profile_context(self):
         ctx = rt.Ctx(employee_id=1, me={'name': 'private', 'empGroup': '실무직', 'grade': '4급'})
         def run(ctx, agent, task, inp, *args, **kwargs):

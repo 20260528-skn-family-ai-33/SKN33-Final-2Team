@@ -71,7 +71,7 @@ flowchart TB
     API --> AGENTS["진단·로드맵 계획·규정 에이전트"]
     API --> DB["PostgreSQL + pgvector<br/>프로필·계획·자료·기록·벡터"]
     AGENTS --> LLM["RunPod-Ollama / OpenAI<br/>문항·계획·근거 답변 생성"]
-    AGENTS --> EMBED["OpenAI 임베딩<br/>자료·규정·회사 검색"]
+    AGENTS --> EMBED["검색<br/>사내 도우미 BM25 + BGE-M3 + RRF<br/>학습 자료 OpenAI"]
     EMBED --> DB
 ```
 
@@ -85,9 +85,14 @@ flowchart TB
 | 팀 파인튜닝 27B · Q4_K_M | 목표·스킬·문항·로드맵 등 학습 계획 생성. Ollama 이름은 `growpath-27b`입니다. |
 | 팀 파인튜닝 4B · BF16 | 규정·회사 답변과 지원 조건 해석. Ollama 이름은 `growpath-regulation-4b`이며 추론 모드는 항상 끕니다. |
 | OpenAI 생성 모드 | 화면에서 선택할 수 있는 대체 생성 경로. 사용할 모델은 서버 설정으로 지정합니다. |
-| `text-embedding-3-small` | 생성 모드와 공통으로 사용하는 1,536차원 검색 임베딩입니다. RunPod 모드도 검색에는 OpenAI 키가 필요합니다. |
+| `text-embedding-3-small` | 학습 자료 추천의 1,536차원 임베딩과 사내 도우미 검색의 수동 복구 경로입니다. 이 경로에는 OpenAI 키가 필요합니다. |
+| `BAAI/bge-m3` | 사내규정·수자원공사 정보·사내 생활 검색용 1,024차원 임베딩입니다. `bge-m3` 컨테이너에서 질문을 임베딩하고 같은 모델로 저장한 벡터를 검색합니다. |
 
 [분류 모델 연결](backend/classification.md) · [27B 모델 안내](backend/models/fine_tunning/README.md) · [RunPod 연결·27B/4B 모델 준비](backend/RunPod_Ollama_연결_절차.md)
+
+서버·규정 색인은 [BGE-M3 규정 검색·색인](backend/README.md#bge-m3-규정-검색색인-122), 회사·생활 자료 DB 생성은 [회사 정보·사내 생활 BGE-M3 색인](backend/README.md#회사-정보사내-생활-bge-m3-색인-125)을 참고합니다. 생성 모델 선택과 별개로 세 범주 모두 BGE-M3를 사용합니다.
+
+사내 도우미 검색은 **BM25 키워드 검색 + BGE-M3 pgvector 검색 → RRF 순위 합치기 → 규정의 같은 부모 조항 문맥 보충**을 기본으로 사용합니다. [하이브리드 검색·복구 안내](backend/README.md#bm25pgvector-하이브리드-검색-126)를 참고합니다. 기존 벡터를 재생성하지 않습니다.
 
 ## 5. AI 에이전트
 
@@ -225,9 +230,13 @@ Compose는 루트 `.env`의 `VITE_DEMO_TOOLS`를 프런트 빌드 인자로 전�
 | `OLLAMA_BASE_URL` · `OLLAMA_API_KEY` | RunPod-Ollama 서버 주소와 인증키입니다. |
 | `OLLAMA_MODEL` · `OLLAMA_MODEL_REGULATION` | 비워 두면 각각 `growpath-27b`(진단·로드맵), `growpath-regulation-4b`(규정)를 사용합니다. Pod에서 준비한 Ollama 모델 이름을 사용합니다. |
 | `OLLAMA_THINK` | 예시값은 `off`입니다. 27B는 사용자 선택이 우선하며, 이 값을 비우면 모델 기본값을 따릅니다. 규정 4B의 Ollama 호출은 이 설정과 관계없이 생각 모드를 끕니다. |
-| `OPENAI_API_KEY` | OpenAI 생성과 공통 검색 임베딩에 사용합니다. RunPod-Ollama 모드에서도 검색용으로 필요합니다. |
+| `OPENAI_API_KEY` | OpenAI 생성·학습 자료 추천과 OpenAI 검색 복구용입니다. 기본 BGE-M3 검색에는 쓰지 않습니다. |
 | `OPENAI_MODEL` | OpenAI 생성 모드에서 사용할 모델입니다. 서버 설정으로 지정합니다. |
 | `OPENAI_EMBED_MODEL` | 팀 DB 벡터와 같은 `text-embedding-3-small`(1,536차원)을 사용합니다. |
+| `REGULATION_EMBED_PROVIDER` | 규정 검색 선택. Docker 기본은 `bge-m3`, 기존 벡터로 복구할 때는 `openai`입니다. |
+| `KNOWLEDGE_EMBED_PROVIDER` | 회사 정보·사내 생활 검색 선택. 기본 `bge-m3`, 기존 벡터로 복구할 때는 `openai`입니다. |
+| `ASSISTANT_SEARCH_MODE` | 세 범주의 BGE 검색은 기본 `hybrid`(BM25+pgvector+RRF)입니다. `vector`는 기존 벡터 단독 복구용입니다. |
+| `BGE_M3_MODEL_FILE` | Docker가 읽을 외부 F16 GGUF 파일입니다. 기본은 `.cache/embedding-eval/bge-m3-f16.gguf`이며 Git에 포함되지 않습니다. |
 
 ### Python 직접 실행
 
