@@ -1,6 +1,6 @@
 /* 로그인 (API-01 · 5차 gp-app.js scr.login)
    팀 DB 직원(사번)과 관리자 전용 계정(직원과 별개)이 같은 칸으로 로그인한다. 비밀번호는 서버가 argon2 로 확인한다.
-   '직원 고르기'(시연용)는 부서별로 묶고, 팀이 넣은 테스트 계정은 따로 묶는다 */
+   '직원 고르기'(베타용)는 부서별로 묶고, 팀이 넣은 테스트 계정은 따로 묶는다 */
 import { useRef, useState, type FormEvent } from 'react';
 import { ApiError } from '@/api/client';
 import { accountApi } from '@/api/endpoints/account';
@@ -108,7 +108,7 @@ export function LoginPage() {
         <form id="loginForm" noValidate onSubmit={submit}>
           {accts.length > 0 && <div className="field lg-pick">
             <label htmlFor="lgPick">
-              직원 고르기 <span className="muted small">시연용 · 고르면 사번을 채워요</span>
+              직원 고르기 <span className="muted small">베타용 · 고르면 사번을 채워요</span>
             </label>
             <select
               className="input"

@@ -21,12 +21,12 @@ class DemoAccessTests(unittest.TestCase):
         app.add_exception_handler(ApiError, api_error_handler)
         self.client = TestClient(app)
 
-    def test_disabled_routes_are_404_before_auth_or_database(self):
-        with patch.object(account, 'S', replace(account.S, demo_mode=False)), \
+    def test_disabled_demo_routes_are_404_even_when_account_picker_is_enabled(self):
+        with patch.object(account, 'S', replace(account.S, demo_mode=False, beta_account_picker=True)), \
              patch.object(account.profile, 'accounts') as query, \
              patch.object(auth, 'account_of') as authentication, \
              patch.object(rt, 'all_logs') as logs, patch.object(account.db, 'all_') as database:
-            for method, path in [('get', '/demo/accounts'), ('post', '/demo/reset'), ('post', '/demo/jump'), ('put', '/me/demo-settings'), ('get', '/ai/log')]:
+            for method, path in [('post', '/demo/reset'), ('post', '/demo/jump'), ('put', '/me/demo-settings'), ('get', '/ai/log')]:
                 with self.subTest(path=path):
                     self.assertEqual(self.client.request(method, '/api/v1'+path).status_code, 404)
             query.assert_not_called()
@@ -59,12 +59,44 @@ class DemoAccessTests(unittest.TestCase):
                     self.assertIs(response.json()['demoMode'], enabled)
 
     def test_enabled_accounts_never_return_password(self):
-        with patch.object(account, 'S', replace(account.S, demo_mode=True, demo_password='SECRET_SENTINEL')), patch.object(account.profile, 'accounts', return_value=[{'code': '123'}]):
+        with patch.object(account, 'S', replace(account.S, demo_mode=False, beta_account_picker=True, demo_password='SECRET_SENTINEL')), patch.object(account.profile, 'accounts', return_value=[{'code': '123'}]):
             response = self.client.get('/api/v1/demo/accounts')
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.json()['accounts'], [{'code': '123'}])
+            self.assertEqual(set(response.json()), {'accounts', 'adminLogin'})
             self.assertNotIn('demoPassword', response.json())
             self.assertNotIn('SECRET_SENTINEL', response.text)
+
+    def test_account_picker_flag_is_independent_of_demo_mode(self):
+        for picker_enabled in (False, True):
+            for demo_enabled in (False, True):
+                with self.subTest(picker=picker_enabled, demo=demo_enabled), \
+                     patch.object(account, 'S', replace(account.S, beta_account_picker=picker_enabled, demo_mode=demo_enabled)), \
+                     patch.object(account.profile, 'accounts', return_value=[{'code': 'QA109'}]) as query, \
+                     patch.object(account.db, 'all_') as database, patch.object(auth, 'account_of') as authentication:
+                    response = self.client.get('/api/v1/demo/accounts')
+                    if picker_enabled:
+                        self.assertEqual(response.status_code, 200)
+                        self.assertEqual(response.json()['accounts'], [{'code': 'QA109'}])
+                        query.assert_called_once_with()
+                    else:
+                        self.assertEqual(response.status_code, 404)
+                        self.assertEqual(response.json()['error']['code'], 'NOT_FOUND')
+                        query.assert_not_called()
+                    database.assert_not_called()
+                    authentication.assert_not_called()
+
+    def test_account_picker_defaults_off_and_accepts_explicit_on_off(self):
+        with patch.dict(os.environ), patch.dict(config._FILE):
+            os.environ.pop('GP5_BETA_ACCOUNT_PICKER', None)
+            config._FILE.pop('GP5_BETA_ACCOUNT_PICKER', None)
+            self.assertFalse(config.load().beta_account_picker)
+        for picker in ('on', 'off'):
+            for demo in ('on', 'off'):
+                with self.subTest(picker=picker, demo=demo), patch.dict(os.environ, {
+                    'GP5_BETA_ACCOUNT_PICKER': picker, 'GP5_DEMO_MODE': demo,
+                }):
+                    self.assertEqual(config.load().beta_account_picker, picker == 'on')
 
     def test_demo_default_and_explicit_off(self):
         with patch.dict(os.environ), patch.dict(config._FILE):

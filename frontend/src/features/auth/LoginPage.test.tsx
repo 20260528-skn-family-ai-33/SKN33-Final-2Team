@@ -12,8 +12,8 @@ vi.mock('@/shared/state/ai', () => ({ ai: {}, cause: vi.fn(), ping: vi.fn() }));
 vi.mock('@/shared/state/ui', () => ({ toast: vi.fn() }));
 vi.mock('@/shared/state/workspace', () => ({ ws: vi.fn() }));
 
-describe('로그인 시연 목록', () => {
-  it('시연 API가 꺼져도 사번 직접 입력과 비밀번호 안내를 제공한다', () => {
+describe('로그인 베타 직원 목록', () => {
+  it('베타 직원 선택이 꺼져도 사번 직접 입력과 비밀번호 안내를 제공한다', () => {
     state.demo = { accounts: [] };
     const html = renderToStaticMarkup(<LoginPage />);
     expect(html).not.toContain('직원 고르기');
@@ -21,10 +21,12 @@ describe('로그인 시연 목록', () => {
     expect(html).toContain('사번 또는 관리자 아이디');
     expect(html).toContain('관리자에게 받은 초기 비밀번호');
   });
-  it('시연 목록을 받으면 직원 선택을 제공한다', () => {
+  it('베타 목록을 받으면 직원 선택을 제공하고 비밀번호는 비워 둔다', () => {
     state.demo = { accounts: [{ code: 'TEST001', name: '테스트 직원', dept: '테스트 부서' }] };
     const html = renderToStaticMarkup(<LoginPage />);
     expect(html).toContain('직원 고르기');
+    expect(html).toContain('베타용 · 고르면 사번을 채워요');
     expect(html).toContain('TEST001');
+    expect(html).toMatch(/<input[^>]*id="lgPw"[^>]*value=""/);
   });
 });

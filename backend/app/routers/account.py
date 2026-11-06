@@ -54,9 +54,14 @@ def require_demo_mode() -> None:
         raise ApiError(404, 'NOT_FOUND', '요청한 기능을 찾을 수 없어요')
 
 
-@r.get('/demo/accounts', dependencies=[Depends(require_demo_mode)])
+def require_beta_account_picker() -> None:
+    if not S.beta_account_picker:
+        raise ApiError(404, 'NOT_FOUND', '요청한 기능을 찾을 수 없어요')
+
+
+@r.get('/demo/accounts', dependencies=[Depends(require_beta_account_picker)])
 def api_accounts():
-    """로그인 화면의 '직원 고르기'(시연 전용 · 설계서 부록 A). 비밀번호는 보내지 않는다"""
+    """베타 로그인 화면의 '직원 고르기'. 시연 도구와 독립적으로 켜며 비밀번호는 보내지 않는다."""
     return {'accounts': profile.accounts(), 'adminLogin': S.admin_login}
 
 

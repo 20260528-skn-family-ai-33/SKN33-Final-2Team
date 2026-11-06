@@ -200,7 +200,11 @@ Windows·macOS·Linux 모두 Docker Engine/Desktop과 Compose v2가 필요합니
 
 직원이 아직 AI를 선택하지 않았다면 기본값은 **RunPod-Ollama(`ollama`)**입니다(#58의 기본값 변경은 진행하지 않기로 결정). 기존에 저장한 선택은 유지합니다. RunPod 연결을 준비하거나 화면의 AI 모델 메뉴에서 OpenAI를 직접 선택하세요. `OPENAI_API_KEY`만 입력해도 직원의 선택이 OpenAI로 바뀌지는 않습니다. 키는 OpenAI 생성과 두 모드의 공통 규정 검색 임베딩에 사용하며, 키가 없으면 OpenAI는 사용 불가로 표시됩니다. 예시 파일의 키는 빈 값이고 이전 `sk-example-not-a-real-key`를 복사했다면 지우세요. 값을 바꾼 뒤 `docker compose up -d --build`로 반영합니다.
 
-`GP5_DEMO_MODE=off`에서는 직원 목록(`/demo/accounts`), 시연 초기화(`/demo/reset`), 단계 이동(`/demo/jump`), 시연 설정(`/me/demo-settings`), 전체 직원 AI 기록(`/ai/log`) API가 인증·조회 전에 404를 반환합니다. 직원 고르기는 숨겨지고 사번 직접 입력은 유지됩니다. 관리자 목표 생성에서 가데이터를 지정한 요청도 저장·작업 시작 전에 `409 / DEMO_DISABLED`로 거절하며 실제 모델로 자동 전환하지 않습니다. 설치 과정의 시연 목표 후보 생성은 건너뜁니다. 외부 베타는 예시 파일의 `off`를 유지하세요. 설정을 생략하면 기존 시연 호환을 위해 `on`입니다.
+베타 동안은 루트 `.env`의 **`GP5_BETA_ACCOUNT_PICKER=on`**으로 로그인 화면의 DB 직원 고르기를 유지합니다. 기존 `.env`를 쓰는 경우 이 값을 추가하세요. 로그인 전 이름·사번·부서·부서장 여부가 표시되며, 선택하면 사번만 채워지고 비밀번호는 직접 입력합니다. 이 설정은 가데이터·시연 도구와 독립적이며 미설정 기본값은 `off`입니다.
+
+**베타 종료 시** `GP5_BETA_ACCOUNT_PICKER=off`로 바꾼 뒤 `docker compose up -d --no-deps --force-recreate backend`를 실행하고, `docker compose restart frontend`로 nginx가 새 백엔드 주소를 읽게 하세요. 로그인 화면을 새로고침하면 `/demo/accounts`가 DB 조회 전에 404를 반환하고 직원 고르기가 사라집니다. 사번 직접 입력 로그인은 유지합니다. 화면 재빌드는 필요하지 않으며 베타 종료 날짜·버전을 코드에서 임의로 판단하지 않습니다.
+
+`GP5_DEMO_MODE=off`에서는 시연 초기화(`/demo/reset`), 단계 이동(`/demo/jump`), 시연 설정(`/me/demo-settings`), 전체 직원 AI 기록(`/ai/log`) API가 인증·조회 전에 404를 반환합니다. 관리자 목표 생성에서 가데이터를 지정한 요청도 저장·작업 시작 전에 `409 / DEMO_DISABLED`로 거절하며 실제 모델로 자동 전환하지 않습니다. 설치 과정의 시연 목표 후보 생성은 건너뜁니다. 외부 베타는 예시 파일의 `off`를 유지하세요. 설정을 생략하면 기존 시연 호환을 위해 `on`입니다.
 
 `off`에서는 DB에 저장된 직원별 가데이터(`demo_mock`)·실패 시연(`fail_sim`) 설정도 내 정보 응답과 모델 실행에서 무시합니다. 선택한 AI 제공자와 추론 정도는 유지하며, 모델을 사용할 수 없으면 가데이터로 대신하지 않고 오류를 반환합니다. DB의 시연 설정은 삭제하지 않으므로 서버를 `on`으로 다시 실행하면 저장된 값이 다시 적용됩니다.
 

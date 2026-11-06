@@ -1314,7 +1314,7 @@
   /* ───────── 로그인 (서버 · API-01) ─────────
      팀 DB 직원(사번)과 관리자 전용 계정(직원과 별개 · 2026-10-21 사용자 결정)이 같은 칸으로 로그인한다. 비밀번호는 서버가 argon2 로 확인한다.
      시연 환경은 모든 계정의 초기 비밀번호가 같다(.env GP5_DEMO_PASSWORD · 로컬 사본만). 계정은 로그아웃한 뒤 다시 로그인해야만 바뀐다.
-     '직원 고르기'(시연용)는 부서별로 묶고, 팀이 넣은 테스트 계정은 따로 묶는다 */
+     '직원 고르기'(베타용)는 부서별로 묶고, 팀이 넣은 테스트 계정은 따로 묶는다 */
   const feat = (ic, t, d) => `<div class="feat"><span class="ico">${icon(ic)}</span><span><b>${t}</b><small>${d}</small></span></div>`;
   const deptGroups = () => {
     const out = [], team = [];
@@ -1334,7 +1334,7 @@
         <h1 class="t lg" id="lgTitle">다시 오신 걸 환영해요</h1>
         <p class="lead">AI 활용·개발 역량 성장 로드맵을 이어서 만들어 보세요.</p>
         <form id="loginForm" novalidate>
-          <div class="field lg-pick" ${GP.ACCTS.length ? '' : 'hidden'}><label for="lgPick">직원 고르기 <span class="muted small">시연용 · 고르면 사번을 채워요</span></label>
+          <div class="field lg-pick" ${GP.ACCTS.length ? '' : 'hidden'}><label for="lgPick">직원 고르기 <span class="muted small">베타용 · 고르면 사번을 채워요</span></label>
             <select class="input" id="lgPick"><option value="">팀 DB 직원 ${GP.ACCTS.length}명 중 고르기</option>${deptGroups().map(g => `<optgroup label="${esc(g.dept)}">${g.list.map(e => `<option value="${esc(e.code)}">${esc(e.name)}${e.supervisor ? ' (부서장)' : ''}${e.team ? ` · ${esc(e.dept)}` : ''}</option>`).join('')}</optgroup>`).join('')}
               ${GP.DEMO && GP.DEMO.adminLogin ? `<optgroup label="관리자"><option value="${esc(GP.DEMO.adminLogin)}">관리자 전용 계정 (${esc(GP.DEMO.adminLogin)})</option></optgroup>` : ''}</select></div>
           <div class="field"><label for="lgId">사번 또는 관리자 아이디</label><input class="input" id="lgId" maxlength="40" autocomplete="username" placeholder="8자리 사번 (예: 20200001)"></div>
