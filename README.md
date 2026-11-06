@@ -183,6 +183,8 @@ Docker Compose는 VERSION을 프런트 빌드와 백엔드 이미지에 함께 �
 
 Docker Desktop과 Compose v2를 준비합니다. 로컬에서 화면을 개발할 때는 Node.js 20.19 이상(24 권장), Python 직접 실행은 3.12를 사용합니다.
 
+아래 1~4번은 최초 설치 절차입니다. 이미 설치한 환경의 코드·설정을 바꿀 때는 [기존 설치의 설정 변경과 업데이트](#기존-설치의-설정-변경과-업데이트)를 따르세요.
+
 1. 저장소 루트의 `.env.example`을 `.env`로 복사하고 DB용 `GP5_DB_PASSWORD`, 직원 시연용 `GP5_DEMO_PASSWORD`, 신규 관리자용 `GP5_ADMIN_PASSWORD`를 각각 설정합니다. 관리자 비밀번호는 직원 초기 비밀번호와 다른 값을 사용합니다.
 2. 팀 백업 `growpath_latest.dump`와 동반 manifest를 받아 해시를 확인한 뒤 `team_db/`에 두고, 규정 PDF를 `team_db/regulations/`에 준비합니다.
 3. [분류 모델 파일](backend/classification.md)을 `backend/models/`에 준비합니다. 생성에는 [RunPod-Ollama 연결](backend/RunPod_Ollama_연결_절차.md) 또는 OpenAI 설정이 필요하며, 공통 검색용 `OPENAI_API_KEY`도 설정합니다. 키·비밀번호는 저장소에 넣지 않습니다.
@@ -203,19 +205,46 @@ Compose는 **DB → 빈 DB의 백업 복원 → 보충 자료·보조 스키마 
 
 Windows·macOS·Linux 모두 Docker Engine/Desktop과 Compose v2가 필요합니다. macOS·Linux에서는 저장소 루트에서 `cp .env.example .env`로 복사한 뒤 위 1~4번을 진행하세요. Windows에서는 `Copy-Item .env.example .env`를 사용합니다. 기존 `.env`는 덮어쓰지 마세요.
 
-직원이 아직 AI를 선택하지 않았다면 기본값은 **RunPod-Ollama(`ollama`)**입니다(#58의 기본값 변경은 진행하지 않기로 결정). 기존에 저장한 선택은 유지합니다. RunPod 연결을 준비하거나 화면의 AI 모델 메뉴에서 OpenAI를 직접 선택하세요. `OPENAI_API_KEY`만 입력해도 직원의 선택이 OpenAI로 바뀌지는 않습니다. 키는 OpenAI 생성과 두 모드의 공통 규정 검색 임베딩에 사용하며, 키가 없으면 OpenAI는 사용 불가로 표시됩니다. 예시 파일의 키는 빈 값이고 이전 `sk-example-not-a-real-key`를 복사했다면 지우세요. 값을 바꾼 뒤 `docker compose up -d --build`로 반영합니다.
+직원이 아직 AI를 선택하지 않았다면 기본값은 **RunPod-Ollama(`ollama`)**입니다(#58의 기본값 변경은 진행하지 않기로 결정). 기존에 저장한 선택은 유지합니다. RunPod 연결을 준비하거나 화면의 AI 모델 메뉴에서 OpenAI를 직접 선택하세요. `OPENAI_API_KEY`만 입력해도 직원의 선택이 OpenAI로 바뀌지는 않습니다. 키는 OpenAI 생성과 두 모드의 공통 규정 검색 임베딩에 사용하며, 키가 없으면 OpenAI는 사용 불가로 표시됩니다. 예시 파일의 키는 빈 값이고 이전 `sk-example-not-a-real-key`를 복사했다면 지우세요. 기존 환경의 키·설정 변경은 아래 [앱만 다시 만드는 절차](#기존-설치의-설정-변경과-업데이트)로 반영합니다.
 
 베타 동안은 루트 `.env`의 **`GP5_BETA_ACCOUNT_PICKER=on`**으로 로그인 화면의 DB 직원 고르기를 유지합니다. 기존 `.env`를 쓰는 경우 이 값을 추가하세요. 로그인 전 이름·사번·부서·부서장 여부가 표시되며, 선택하면 사번만 채워지고 비밀번호는 직접 입력합니다. 이 설정은 가데이터·시연 도구와 독립적이며 미설정 기본값은 `off`입니다.
 
 **베타 종료 시** `GP5_BETA_ACCOUNT_PICKER=off`로 바꾼 뒤 `docker compose up -d --no-deps --force-recreate backend`를 실행하고, `docker compose restart frontend`로 nginx가 새 백엔드 주소를 읽게 하세요. 로그인 화면을 새로고침하면 `/demo/accounts`가 DB 조회 전에 404를 반환하고 직원 고르기가 사라집니다. 사번 직접 입력 로그인은 유지합니다. 화면 재빌드는 필요하지 않으며 베타 종료 날짜·버전을 코드에서 임의로 판단하지 않습니다.
 
-시연 기본값을 바꾸는 정책은 #77의 별도 PR에서 검토합니다. 현재 환경 예시와 서버·프런트 기본값은 기존 시연 동작인 `on`을 유지합니다. 실제 배포에서는 운영 담당자가 두 시연 설정을 명시적으로 선택해야 합니다.
+시연 기본값은 서버·Compose·단독 프런트 개발/빌드에서 모두 `off`입니다(#77). `GP5_DEMO_MODE`와 `VITE_DEMO_TOOLS`는 미설정·빈 값·공백·알 수 없는 값을 off로 처리하며, 앞뒤 공백과 대소문자를 정리한 `on`만 허용합니다. 서버 환경변수가 있으면 빈 값도 `.env`보다 우선하므로 `.env`에 남은 on이 다시 적용되지 않습니다. 다른 환경변수의 해석은 그대로입니다.
 
-`GP5_DEMO_MODE=off`를 선택하면 시연 초기화(`/demo/reset`), 단계 이동(`/demo/jump`), 시연 설정(`/me/demo-settings`), 전체 직원 AI 기록(`/ai/log`) API가 인증·조회 전에 404를 반환합니다. 관리자 목표 생성에서 가데이터를 지정한 요청도 저장·작업 시작 전에 `409 / DEMO_DISABLED`로 거절하며 실제 모델로 자동 전환하지 않습니다. 설치 과정의 시연 목표 후보 생성은 건너뜁니다. 설정을 생략하면 기존 시연 호환을 위해 `on`입니다.
+`GP5_DEMO_MODE=off`이면 시연 초기화(`/demo/reset`), 단계 이동(`/demo/jump`), 시연 설정(`/me/demo-settings`), 전체 직원 AI 기록(`/ai/log`) API가 인증·조회 전에 404를 반환합니다. 관리자 목표 생성에서 가데이터를 지정한 요청도 저장·작업 시작 전에 `409 / DEMO_DISABLED`로 거절하며 실제 모델로 자동 전환하지 않습니다. 설치 과정의 시연 목표 후보 생성은 건너뜁니다.
 
 `off`에서는 DB에 저장된 직원별 가데이터(`demo_mock`)·실패 시연(`fail_sim`) 설정도 내 정보 응답과 모델 실행에서 무시합니다. 선택한 AI 제공자와 추론 정도는 유지하며, 모델을 사용할 수 없으면 가데이터로 대신하지 않고 오류를 반환합니다. DB의 시연 설정은 삭제하지 않으므로 서버를 `on`으로 다시 실행하면 저장된 값이 다시 적용됩니다.
 
-Compose는 루트 `.env`의 `VITE_DEMO_TOOLS`를 프런트 빌드 인자로 전달하며 기본값은 `on`입니다. 시연을 끄려면 `GP5_DEMO_MODE=off`와 `VITE_DEMO_TOOLS=off`를 함께 설정한 뒤 `docker compose up -d --build`로 다시 빌드하세요. 프런트 설정이 명시적 off가 아니고 서버가 `/ai/providers`의 `demoMode: true`를 반환할 때 시연 도구·관리자 가데이터 선택지를 표시합니다. 프런트 단독 개발에서는 `frontend/.env.local`의 `VITE_DEMO_TOOLS`를 사용하며 미설정도 기존 on 동작을 유지합니다.
+Compose는 루트 `.env`의 `VITE_DEMO_TOOLS`를 프런트 빌드 인자로 전달하며 기본값은 `off`입니다. 로컬 시연을 유지하려면 `GP5_DEMO_MODE=on`과 `VITE_DEMO_TOOLS=on`을 함께 명시하세요. 프런트 설정이 on이고 서버가 `/ai/providers`의 `demoMode: true`를 반환할 때만 시연 도구·관리자 가데이터 선택지를 표시합니다. 프런트 단독 개발은 `frontend/.env.local`, 단독 Docker 빌드는 `--build-arg VITE_DEMO_TOOLS=on`으로 시연을 선택합니다.
+
+서버만 on이고 프런트가 off이면 저장된 가데이터 설정은 실행에 적용되지만 화면에서 바꿀 수 없습니다. 두 시연 설정을 함께 선택하세요.
+
+#### 기존 설치의 설정 변경과 업데이트
+
+기존 `.env`에 두 시연 키가 없으면 이번 버전으로 앱을 다시 빌드·생성할 때 기본 off가 적용됩니다. 가데이터를 쓰던 직원도 이후 생성에서 기존에 선택한 실제 모델을 사용할 수 있습니다. 시연을 유지하려면 두 값을 모두 on으로 명시하세요. 기존에 명시한 on은 유지되며, `.env` 전체를 예시 파일로 덮어쓰지 않습니다.
+
+신규 요청이 들어오지 않는 점검 시간에 진행 중인 작업이 끝난 것을 확인한 뒤 적용하세요. 현재 백엔드가 실행 중이면 저장소 루트에서 아래 읽기 전용 명령으로 작업 수를 확인할 수 있습니다. 기존 실행에 `-p`나 별도 Compose 파일을 사용했다면 같은 옵션을 사용합니다.
+
+```bash
+docker compose exec -T backend python -c "from app import db; print(db.val('SELECT count(*) FROM app_ext.jobs WHERE status = :s', s='running'))"
+```
+
+결과가 0이 아니면 작업 완료를 기다린 뒤 다시 확인하세요. 백엔드가 내려가 있다면 DB 연결 도구에서 `SELECT count(*) FROM app_ext.jobs WHERE status = 'running';`을 실행합니다. 조회 뒤 새 작업이 시작되지 않도록 요청 유입도 멈춰야 합니다. 진행 중 작업을 남긴 채 재시작하면 일부 중단 작업이 자동 복구되면서 실제 모델 호출·비용이 발생할 수 있습니다.
+
+선택한 실제 모델의 연결·비용 설정을 확인하고, 기존 DB가 실행 중인 상태에서 앱만 다시 만듭니다. 이 절차는 DB 스키마 변경이 없는 앱·설정 갱신에 사용하며, DB 변경이 포함된 버전은 해당 마이그레이션 안내도 따릅니다.
+
+```bash
+docker compose build backend frontend
+docker compose up -d --no-deps --force-recreate backend frontend
+```
+
+이 경로는 DB 복원·설치기를 재실행하지 않아 기존 가데이터 결과·직원 선택·비밀번호를 보존합니다. 일반 `docker compose up -d --build`로 설치기가 다시 실행되고 `GP5_DEMO_PASSWORD`가 설정되어 있으면, 보존 옵션 없이 실행되는 `team_passwords`가 사번 있는 직원의 다른 비밀번호를 그 값으로 바꿀 수 있습니다. 이는 시연 off 여부와 무관하므로 기존 설치 갱신에는 위 `--no-deps` 절차를 사용하세요. 설치기의 비밀번호 변경 정책은 #77의 별도 후속 범위입니다.
+
+모델 연결은 직원의 목표 화면 첫 진입 전에 준비하세요. 저장된 후보가 없고 프로필에 추천 근거가 있는 계정은 첫 진입에서 생성을 시도하며, 모델이 미연결이면 실패 상태가 남을 수 있습니다. 모델을 연결한 뒤에는 목표 후보의 **다시 시도**를 눌러 재생성합니다. 자동 재시도는 하지 않습니다. 기존 가데이터 후보는 삭제되지 않아 계속 가데이터 태그와 함께 보일 수 있습니다.
+
+시연으로 되돌리려면 두 값을 on으로 지정하고 같은 앱 갱신 명령을 실행하세요. 이 절차는 실제 모델 평가나 외부 베타 배포 승인을 대신하지 않습니다.
 
 관리자 초기 비밀번호는 루트 `.env`의 `GP5_ADMIN_PASSWORD`에서 정합니다. 신규 관리자를 만들 때만 사용하며 빈 값·공백만 있는 값·`GP5_DEMO_PASSWORD`와 같은 값은 거절합니다. **이미 존재하는 관리자 계정은 자동 갱신하지 않으므로**, 이 설정만 바꾸거나 설치기를 다시 실행해도 기존 비밀번호가 바뀌지 않습니다. 기존 공유 비밀번호를 쓰는 계정의 변경은 배포 담당자가 별도로 처리해야 합니다. 비밀번호는 API·화면·직원 엑셀 안내문으로 배포하지 않으며 관리자가 별도로 전달합니다. 직원별 초기 비밀번호와 첫 로그인 변경 기능은 별도 후속 범위입니다.
 
@@ -251,7 +280,7 @@ python backend/tools/install_catalog_tokenizer.py
 
 ### 화면 직접 실행
 
-화면을 직접 개발할 때는 `docker compose up -d backend`로 API·DB를 준비한 뒤 아래 명령을 사용합니다. 개발 화면은 <http://localhost:5185>이며 `/api`는 설정한 백엔드로 전달됩니다.
+화면을 직접 개발할 때는 위 최초 설치 절차로 API·DB를 준비한 뒤 아래 명령을 사용합니다. 이미 설치했다면 [기존 설치의 설정 변경과 업데이트](#기존-설치의-설정-변경과-업데이트)를 따르세요. 개발 화면은 <http://localhost:5185>이며 `/api`는 설정한 백엔드로 전달됩니다.
 
 ```bash
 npm ci --prefix frontend

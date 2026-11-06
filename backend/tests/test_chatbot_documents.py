@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from dataclasses import replace
 import os
 import unittest
 from unittest.mock import Mock, patch
@@ -60,6 +61,7 @@ class EmployeeChatbotTest(unittest.TestCase):
 
             settings = {'ai_provider': provider, 'demo_mock': demo, 'reasoning': {provider: 'low'}}
             with (self.subTest(provider=provider, demo=demo),
+                  patch.object(rt, 'S', replace(rt.S, demo_mode=True)),
                   patch.object(auth, 'account_of', return_value=self.employee),
                   patch.object(rt.db, 'one', return_value=settings) as load_settings,
                   patch.object(profile, 'employee_group', return_value='일반직') as load_group,
