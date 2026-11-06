@@ -52,10 +52,11 @@ def _item(n: dict) -> dict:
 
 
 def inbox(employee_id: int, limit: int = LIMIT) -> dict:
-    """내 알림(최근 limit 건)과 읽지 않은 수. 읽지 않은 수는 목록 길이와 관계없이 전체를 센다"""
+    """내 읽지 않은 알림(최근 limit 건)과 읽지 않은 수. 읽지 않은 수는 목록 길이와 관계없이 전체를 센다.
+    읽은 알림은 목록에서만 뺀다(#96). 기록은 지우지 않고 read_at 으로 남긴다"""
     rows = db.all_(f"""SELECT n.notification_id, n.kind, n.audience, n.actor_id, w.name AS actor_name, n.roadmap_id, n.report_id, n.created_at, n.read_at,
                               coalesce(nullif(r.content->>'displayTitle', ''), r.content->>'goal') AS plan_title, r.content->>'opt' AS track
-                       {_FROM} WHERE n.recipient_id = :e AND {_VISIBLE}
+                       {_FROM} WHERE n.recipient_id = :e AND n.read_at IS NULL AND {_VISIBLE}
                        ORDER BY n.created_at DESC, n.notification_id LIMIT :n""", e=employee_id, n=limit)
     unread = db.val(f'SELECT count(*) {_FROM} WHERE n.recipient_id = :e AND n.read_at IS NULL AND {_VISIBLE}', e=employee_id)
     return {'items': [_item(n) for n in rows], 'unread': int(unread or 0)}
