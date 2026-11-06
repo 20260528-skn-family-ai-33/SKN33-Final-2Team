@@ -6,7 +6,7 @@ import { catalogApi } from '@/api/endpoints/catalog';
 import { resourceTime } from '@/shared/lib/resourceTime';
 import { resourceSource } from '@/shared/lib/resourceSource';
 import { costText } from '@/shared/lib/plan';
-import { searchTerm } from '@/shared/lib/search';
+import { pickerTerm, searchTerm } from '@/shared/lib/search';
 import { cause } from '@/shared/state/ai';
 import { useAt } from '@/shared/state/bind';
 import { mergeRes, useCatalog } from '@/shared/state/catalog';
@@ -35,11 +35,11 @@ export function ResPicker({ path, stage, exclude }: { path: string; stage?: numb
     placeholderData: keepPreviousData,
   });
   /** 입력하는 대로 찾기(#102): 검색어가 달라지면 그 자리에서 바로 찾는다.
-   *  조합 중 낱자만 바뀐 입력은 건너뛰고, 입력을 비우면 처음 안내로 돌아간다 */
+   *  조합 중 낱자만 바뀐 입력은 건너뛰고, 입력을 완전히 비우면 처음 안내로 돌아간다(pickerTerm) */
   const onInput = (text: string) => {
     setQ(text);
-    const next = searchTerm(text) || null;
-    if (next !== (term || null)) setTerm(next);
+    const next = pickerTerm(text, term);
+    if (next !== term) setTerm(next);
   };
   /** Enter·검색·다시 시도: 지금 입력으로 다시 받는다(빈 칸이면 전체 · 같은 검색어면 다시 받음) */
   const search = () => {
