@@ -13,6 +13,7 @@ import { toast } from '@/shared/state/ui';
 import { ws } from '@/shared/state/workspace';
 import { Icon } from '@/shared/ui/Icon';
 import { Note } from '@/shared/ui/parts';
+import { AppVersion } from '@/shared/ui/AppVersion';
 
 const Feat = ({ ic, t, d }: { ic: string; t: string; d: string }) => (
   <div className="feat">
@@ -200,6 +201,7 @@ export function LoginPage() {
           관리자에게 받은 초기 비밀번호로 로그인해 주세요. 관리자 화면은 관리자 전용 계정으로 들어가요.
           다른 계정으로 바꾸려면 로그아웃한 뒤 다시 로그인해 주세요.
         </Note>
+        <AppVersion />
       </section>
       <aside className="login-side">
         <span className="pill">

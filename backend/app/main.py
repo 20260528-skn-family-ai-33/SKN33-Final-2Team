@@ -22,6 +22,7 @@ from . import catalog, jobs
 from .config import ROOT
 from .errors import ApiError, api_error_handler
 from .routers import account, notifications, team, work, preassessment
+from .version import read_project_version
 
 WEB = ROOT / 'web'
 logger = logging.getLogger(__name__)
@@ -60,7 +61,7 @@ async def lifespan(_: FastAPI):
                 await prompt_task
 
 
-app = FastAPI(title='GrowPath 5차 목업 API', version='5.0', lifespan=lifespan, docs_url='/api/docs', openapi_url='/api/openapi.json')
+app = FastAPI(title='GrowPath 5차 목업 API', version=read_project_version(), lifespan=lifespan, docs_url='/api/docs', openapi_url='/api/openapi.json')
 app.add_exception_handler(ApiError, api_error_handler)
 app.include_router(account.r)
 app.include_router(work.r)

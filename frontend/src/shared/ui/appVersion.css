@@ -1,0 +1,48 @@
+.app-version {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.login-card > .app-version {
+  margin-top: 20px;
+  color: var(--ink-2);
+}
+
+.side > .app-version {
+  margin-top: 12px;
+  padding: 0 6px;
+  color: inherit;
+}
+
+/* 메뉴가 가로로 배치될 때 버전은 마지막 줄을 써서 메뉴 폭을 줄이지 않는다. */
+@media (max-width: 900px) {
+  .side > .app-version {
+    order: 5;
+    flex-basis: 100%;
+    margin-top: 0;
+    padding: 0;
+  }
+}
+
+@media (min-width: 901px) {
+  :root[data-skin]:not([data-nav="side"]) .side > .app-version {
+    order: 5;
+    flex-basis: 100%;
+    margin-top: 0;
+    padding: 0 0 8px;
+    text-align: right;
+  }
+
+  :root[data-side="collapsed"]:not([data-skin]:not([data-nav="side"])) .side > .app-version {
+    padding: 0;
+    font-size: 11px;
+    text-align: center;
+  }
+
+  :root[data-side="collapsed"]:not([data-skin]:not([data-nav="side"])) .side > .app-version .app-version-name {
+    display: none;
+  }
+}
