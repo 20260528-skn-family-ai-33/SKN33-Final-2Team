@@ -214,7 +214,8 @@ export function DemoTools() {
           onChange={(e) => {
             const on = e.target.checked;
             setDemoMock(on)
-              .then(() => {
+              .then((saved) => {
+                if (!saved) return;
                 resetConn();
                 toast(
                   on
@@ -248,7 +249,9 @@ export function DemoTools() {
             onChange={(e) => {
               const on = e.target.checked;
               setFailSim(k, on)
-                .then(() => toast(on ? '다음 생성의 첫 시도가 실패해요. 다시 시도하면 성공해요' : '실패 시연을 껐어요'))
+                .then((saved) => {
+                  if (saved) toast(on ? '다음 생성의 첫 시도가 실패해요. 다시 시도하면 성공해요' : '실패 시연을 껐어요');
+                })
                 .catch((err) => failToast(err));
             }}
           />
