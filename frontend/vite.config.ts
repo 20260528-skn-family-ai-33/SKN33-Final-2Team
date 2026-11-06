@@ -26,6 +26,6 @@ export default defineConfig(({ mode }) => {
       // 라이브러리(React 등)는 따로 묶는다: 화면 코드만 바뀐 배포에서는 브라우저가 라이브러리 파일을 캐시에서 그대로 쓴다
       rolldownOptions: { output: { codeSplitting: { groups: [{ name: 'vendor', test: /node_modules/ }] } } },
     },
-    test: { environment: 'node', include: ['src/**/*.test.ts'] },
+    test: { environment: 'node', include: ['src/**/*.test.{ts,tsx}'] },
   };
 });
