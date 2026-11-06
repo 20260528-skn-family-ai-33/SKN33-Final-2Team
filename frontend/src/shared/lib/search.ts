@@ -1,0 +1,21 @@
+/* 입력하는 대로 찾기 (#102): 학습 자료 목록·자료 고르기가 같은 기준으로 검색어를 확정한다.
+   기다림 없이 글자마다 찾되, 검색어가 실제로 달라질 때만 요청한다 */
+
+/* 한글 호환 낱자(ㄱ~ㅎ, ㅏ~ㅣ). 조합 중인 마지막 음절은 '도ㅋ'처럼 낱자로 남는다 */
+const TRAILING_JAMO = /[ㄱ-ㆎ]+$/u;
+
+/** 서버에 보낼 검색어: 앞뒤 공백을 빼고, 한글 조합 중 끝에 남은 낱자는 뺀다.
+ *  조합이 끝나지 않은 음절로 찾으면 대부분 결과가 없고 요청만 늘기 때문이다 */
+export function searchTerm(text: string): string {
+  return text.trim().replace(TRAILING_JAMO, '').trimEnd();
+}
+
+/** 자료 고르기에서 입력이 바뀐 뒤의 검색어. null 은 처음 안내, 빈 글자는 '검색'을 눌러 전체를 본 상태다.
+ *  - 입력을 완전히 비우면 전체를 보던 중이어도 처음 안내로 돌아간다
+ *  - 낱자·공백만 남은 입력은 검색어가 없는 것으로 보되, 전체를 보던 중이면 그대로 둔다
+ *    ('프롬프트'를 치려고 'ㅍ'을 누를 때 전체 목록 → 안내 → 결과로 깜박이지 않게) */
+export function pickerTerm(text: string, current: string | null): string | null {
+  const next = searchTerm(text);
+  if (next) return next;
+  return text !== '' && current === '' ? '' : null;
+}

@@ -149,7 +149,7 @@ class FreeTrackRegressions(unittest.TestCase):
             validate_free_plan(t, plan)
         self.assertEqual(error.exception.code, 'FREE_TRACK_PRICE_CHANGED')
         self.assertIn('다시 생성', error.exception.message)
-        self.assertIn('다른 Track', error.exception.message)
+        self.assertIn('다른 코스', error.exception.message)
         self.assertEqual(plan, original)
     def test_soft_deleted_free_resource_is_rejected_without_plan_change(self):
         t = Mock()

@@ -5,11 +5,13 @@ name: frontend
 on:
   pull_request:
     paths:
+      - 'VERSION'
       - 'frontend/**'
       - '.github/workflows/frontend-ci.yml'
   push:
     branches: [main]
     paths:
+      - 'VERSION'
       - 'frontend/**'
       - '.github/workflows/frontend-ci.yml'
 

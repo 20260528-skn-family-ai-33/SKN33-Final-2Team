@@ -1,7 +1,6 @@
 {
   "name": "growpath-frontend",
   "private": true,
-  "version": "0.1.0",
   "type": "module",
   "description": "GrowPath 화면 (React + Vite + TypeScript) — 5차 목업 화면을 그대로 옮긴 것",
   "engines": {
@@ -13,7 +12,7 @@
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "lint": "eslint .",
-    "test": "vitest run",
+    "test": "node --test scripts/version.test.mjs && vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {

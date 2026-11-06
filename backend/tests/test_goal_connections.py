@@ -74,3 +74,94 @@ class GoalConnectionTests(unittest.TestCase):
                 t.after_commit.append(lambda: events.append('submitted'))
         self.assertEqual(events, ['released', 'submitted'])
 
+    def test_commit_failure_does_not_submit_job_and_releases_owner_once(self):
+        events, connection = [], Mock()
+        connection.execute.return_value.first.return_value = ('job',)
+        owner = MagicMock()
+        owner.__exit__.side_effect = lambda *args: events.append('owner-released')
+        @contextmanager
+        def begin():
+            try:
+                yield connection
+                events.append('commit-failed')
+                raise RuntimeError('commit failed')
+            finally:
+                events.append('connection-released')
+        with patch.object(db.engine, 'begin', begin), \
+             patch.object(generation_lock, 'generation_guard', return_value=owner), \
+             patch.object(jobs.POOL, 'submit') as submit, patch.object(jobs, 'cancel') as cancel:
+            with self.assertRaisesRegex(RuntimeError, 'commit failed'):
+                with db.tx() as t:
+                    self.assertEqual(jobs.start('goal-suggestions', 1, '1', Mock(_resume={}), transaction=t), 'job')
+                    submit.assert_not_called()
+                    owner.__exit__.assert_not_called()
+            submit.assert_not_called()
+            cancel.assert_not_called()
+        owner.__exit__.assert_called_once_with(None, None, None)
+        self.assertEqual(events, ['commit-failed', 'connection-released', 'owner-released'])
+
+    def test_submit_failure_cancels_committed_job_and_releases_owner_once(self):
+        events, connection = [], Mock()
+        selected = SimpleNamespace(_mapping={'employee_id': 1, 'kind': 'goal-suggestions', 'status': 'running'})
+        connection.execute.return_value.first.side_effect = [('job',), selected]
+        owner = MagicMock()
+        owner.__exit__.side_effect = lambda *args: events.append('owner-released')
+        @contextmanager
+        def begin():
+            try:
+                yield connection
+                events.append('committed')
+            finally:
+                events.append('connection-released')
+        def fail_submit(work):
+            self.assertEqual(events, ['committed', 'connection-released'])
+            events.append('submit-failed')
+            raise RuntimeError('submit failed')
+        with patch.object(db.engine, 'begin', begin), \
+             patch.object(generation_lock, 'generation_guard', return_value=owner), \
+             patch.object(jobs.POOL, 'submit', side_effect=fail_submit) as submit, \
+             patch.object(jobs, 'cancel', wraps=jobs.cancel) as cancel:
+            with self.assertRaisesRegex(RuntimeError, 'submit failed'):
+                with db.tx() as t:
+                    jobs.start('goal-suggestions', 1, '1', Mock(_resume={}), transaction=t)
+                    submit.assert_not_called()
+            submit.assert_called_once()
+            cancel.assert_called_once_with('job', 1)
+        statements = [str(item.args[0]) for item in connection.execute.call_args_list]
+        self.assertEqual(len(statements), 3)
+        self.assertIn('INSERT INTO app_ext.jobs', statements[0])
+        self.assertIn('FOR UPDATE', statements[1])
+        self.assertIn("SET status = 'cancelled'", statements[2])
+        self.assertEqual(connection.execute.call_args_list[2].args[1], {'j': 'job'})
+        owner.__exit__.assert_called_once_with(None, None, None)
+        self.assertEqual(events, ['committed', 'connection-released', 'submit-failed',
+                                  'committed', 'connection-released', 'owner-released'])
+
+    def test_before_start_failure_rolls_back_without_submit_or_double_release(self):
+        events, connection = [], Mock()
+        connection.execute.return_value.first.return_value = ('job',)
+        owner = MagicMock()
+        @contextmanager
+        def begin():
+            try:
+                yield connection
+            except RuntimeError:
+                events.append('rolled-back')
+                raise
+            else:
+                events.append('committed')
+            finally:
+                events.append('connection-released')
+        mark = Mock(side_effect=RuntimeError('mark failed'))
+        with patch.object(db.engine, 'begin', begin), \
+             patch.object(generation_lock, 'generation_guard', return_value=owner), \
+             patch.object(jobs.POOL, 'submit') as submit, patch.object(jobs, 'cancel') as cancel:
+            with self.assertRaisesRegex(RuntimeError, 'mark failed'):
+                with db.tx() as t:
+                    jobs.start('goal-suggestions', 1, '1', Mock(_resume={}), before_start=mark, transaction=t)
+            mark.assert_called_once_with('job')
+            submit.assert_not_called()
+            cancel.assert_not_called()
+        owner.__exit__.assert_called_once_with(None, None, None)
+        self.assertEqual(events, ['rolled-back', 'connection-released'])
+

@@ -9,11 +9,13 @@ import { queryClient } from '@/app/queryClient';
 import { paths } from '@/app/paths';
 import { useGo } from '@/shared/hooks/useGo';
 import { failToast } from '@/shared/lib/fail';
+import { canUseDemo } from '@/shared/lib/demoAccess';
 import { toast } from '@/shared/state/ui';
+import { ai, useAi } from '@/shared/state/ai';
 import { Icon } from '@/shared/ui/Icon';
 import { Loading, Note, Page } from '@/shared/ui/parts';
 import { adminKeys, refreshAdmin, useUpload } from './adminData';
-import { adm, setAdm, setChoice, useAdmin } from './adminStore';
+import { adm, requireDemoGoalAllowed, setAdm, setChoice, useAdmin } from './adminStore';
 import { DS, isDataset } from './datasets';
 import { FailBox, RowCard } from './parts';
 
@@ -46,6 +48,7 @@ async function applyUpload(id: string): Promise<void> {
   if (!p || !p.canApply || adm().saving) return;
   setAdm((s) => void (s.saving = true));
   try {
+    requireDemoGoalAllowed(adm().choice.applyGoal, canUseDemo(ai.demoAllowed()));
     const r = await adminApi.apply(id, adm().choice.applyGoal === 'mock' ? 'mock' : null);
     queryClient.setQueryData<UploadView>(adminKeys.upload(id), { ...p, status: 'applied', canApply: false, applied: r.applied, goalCount: r.goalCount });
     refreshAdmin();
@@ -61,6 +64,7 @@ async function applyUpload(id: string): Promise<void> {
 
 function ApplyFoot({ p }: { p: UploadView }) {
   const goal = useAdmin((s) => s.choice.applyGoal);
+  const demoAllowed = useAi((s) => canUseDemo(s.status.demoMode));
   const saving = useAdmin((s) => s.saving);
   const go = useGo();
   const discard = async () => {
@@ -79,18 +83,21 @@ function ApplyFoot({ p }: { p: UploadView }) {
       {p.dataset === 'hr' ? (
         <div className="stack" style={{ marginBottom: 10 }}>
           <span className="small muted">반영한 뒤 바뀐 직원의 목표 후보를 다시 만들 때</span>
-          <label className="radio">
-            <input type="radio" name="admApplyGoal" value="mock" checked={goal === 'mock'} onChange={() => setChoice('applyGoal', 'mock')} />
-            시연용 가데이터로 만들기
-          </label>
+          {demoAllowed ? (
+            <label className="radio">
+              <input type="radio" name="admApplyGoal" value="mock" checked={goal === 'mock'} onChange={() => setChoice('applyGoal', 'mock')} />
+              시연용 가데이터로 만들기
+            </label>
+          ) : null}
           <label className="radio">
             <input type="radio" name="admApplyGoal" value="employee" checked={goal === 'employee'} onChange={() => setChoice('applyGoal', 'employee')} />각 직원이 고른 AI 모드로
             만들기(설정 안 된 직원은 실패로 남아요)
           </label>
+          {goal === 'mock' && !demoAllowed ? <Note>시연 모드가 꺼져 있어요. 사용할 AI 모드를 다시 골라 주세요.</Note> : null}
         </div>
       ) : null}
       <div className="actions" style={{ marginTop: 0 }}>
-        <button className="btn pri" disabled={!p.canApply || saving} onClick={() => void applyUpload(p.uploadId)}>
+        <button className="btn pri" disabled={!p.canApply || saving || (goal === 'mock' && !demoAllowed)} onClick={() => void applyUpload(p.uploadId)}>
           {saving ? (
             <>
               <span className="sp" />
@@ -120,7 +127,7 @@ function Preview({ id }: { id: string }) {
   const go = useGo();
   const q = useUpload(id);
   const filter = useAdmin((s) => s.filter);
-  useEffect(() => setChoice('applyGoal', 'mock'), [id]);
+  useEffect(() => setChoice('applyGoal', 'employee'), [id]);
   if (q.isPending)
     return (
       <Page back={paths.adminHistory} title="미리보기">

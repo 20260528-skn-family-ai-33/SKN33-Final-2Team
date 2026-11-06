@@ -20,7 +20,7 @@ from ..agents import diag as DG
 from ..agents import regulation as REG
 from ..agents import roadmap as RM
 from ..agents import runtime as rt
-from ..agents.demo import D
+from ..agents.demo import D, course_id, course_name
 from ..errors import AgentError, ApiError, forbidden, not_found
 from ..free_track import validate_free_plan
 from . import notifications as NT
@@ -244,7 +244,8 @@ def reports(employee_id: int, for_mgr: bool = False) -> list[dict]:
     for r in rows:
         # 수준값은 화면에 보내지 않는다. 부서장 화면에는 심화 질문 결과(10/23)와 사후 점검 원본 응답·첨부(목표 달성 답·결과물 파일 · PR #23 리뷰)를 빼고 보낸다
         c = {k: v for k, v in r['report_content'].items() if k != 'hidden' and not (for_mgr and k in (*MGR_HIDDEN,'quizEvidence','surveyEvidence'))}
-        c.update(id=str(r['report_id']), planId=str(r['roadmap_id']), confirmed=bool(r['confirmed']), createdAt=_d(r['created_at']))
+        # 이전 보고서는 opt 에 Track 이름이 저장돼 있어 코스 ID로 대응시킨다(#78)
+        c.update(id=str(r['report_id']), planId=str(r['roadmap_id']), opt=course_id(c.get('opt')), confirmed=bool(r['confirmed']), createdAt=_d(r['created_at']))
         out.append(c)
     return out
 
@@ -702,7 +703,7 @@ def report_start(employee_id: int, roadmap_id: str) -> str:
 
     def work(job: jobs.JobCtx):
         ctx = rt.context(employee_id)
-        inp = {'goal': pl['goal'], 'planName': pl['name'], 'opt': pl['opt'], 'domain': A.get('domain'), 'items': items, 'doneTitles': [a['title'] for a in done],
+        inp = {'goal': pl['goal'], 'planName': course_name(pl['opt'], pl['name']), 'opt': pl['opt'], 'domain': A.get('domain'), 'items': items, 'doneTitles': [a['title'] for a in done],
                'restTitles': [a['title'] for a in rest], 'total': len(pl['acts']), 'goalSelf': goal_self}
         inp['executionEvidence']=evidence(execution_snapshot)
         if quiz_evidence:inp['quizEvidence']=quiz_evidence
@@ -714,7 +715,7 @@ def report_start(employee_id: int, roadmap_id: str) -> str:
             with db.tx() as t:
                 t.run('UPDATE app_ext.post_checks SET running = false, fail = :f WHERE roadmap_id = :r', f=db.J({'cause': e.info}), r=row['roadmap_id'])
             raise
-        r = {'planId': roadmap_id, 'version': pl['version'], 'goal': pl['goal'], 'opt': pl['name'],
+        r = {'planId': roadmap_id, 'version': pl['version'], 'goal': pl['goal'], 'opt': pl['opt'],
              'gained': [{'skill': x['skill'], 'from': x['pre'], 'to': x['post']} for x in items if DG.rose(x['pre'], x['post'])],
              'still': [{'skill': x['skill'], 'from': x['pre'], 'to': x['post']} for x in items if not DG.rose(x['pre'], x['post'])],
              'doneTitles': inp['doneTitles'], 'restTitles': inp['restTitles'], 'goalSelf': goal_self, 'file': post.get('file'),

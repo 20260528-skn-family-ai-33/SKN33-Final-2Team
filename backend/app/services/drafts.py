@@ -22,7 +22,7 @@ from ..agents import doc as DOC
 from ..agents import regulation as REG
 from ..agents import roadmap as RM
 from ..agents import runtime as rt
-from ..agents.demo import D
+from ..agents.demo import D, course_name
 from ..errors import AgentError, ApiError, cause, not_found
 from ..free_track import validate_free_plan
 from . import notifications as NT
@@ -715,13 +715,13 @@ def _sup_input(pid: str, name: str, pl: dict) -> dict:
     unknown = [r for r in used if r in items and items[r]['cost'] is None and items[r]['kind'] != '자격']
     cert = next((a['res'] for a in pl['acts'] if a.get('res') and (items.get(a['res']) or {}).get('kind') == '자격'), None)
     view = lambda r: {'title': items[r]['title'], 'provider': items[r]['provider'], 'costWon': items[r]['cost'], 'kind': items[r]['kind']}  # noqa: E731
-    return {'pid': pid, 'name': f'{pid} {name}', 'weeks': pl['weeks'], 'weeklyHours': pl['hours'], 'totalCostWon': pl['cost'],
+    return {'pid': pid, 'name': f'{pid} {course_name(pid, name)}', 'weeks': pl['weeks'], 'weeklyHours': pl['hours'], 'totalCostWon': pl['cost'],
             'paidResources': [view(r) for r in paid], 'unknownCostResources': [view(r) for r in unknown], 'certification': items[cert]['title'] if cert else None,
             'onlineOnly': True}
 
 
 def _plans_brief(employee_id: int) -> list:
-    return [{'goal': r['plan']['goal'], 'name': r['plan']['name'], 'weeklyHours': r['plan']['hours'], 'costWon': r['plan']['cost']}
+    return [{'goal': r['plan']['goal'], 'name': course_name(r['plan']['opt'], r['plan']['name']), 'weeklyHours': r['plan']['hours'], 'costWon': r['plan']['cost']}
             for r in PL.records(employee_id, statuses=('active',)).values()]
 
 
@@ -1055,7 +1055,8 @@ def select(employee_id: int, draft_id: str, pid: str, displayed: list | None = N
 
 
 def selection_of(d: dict) -> dict:
-    return {'perspective': d['id'], 'name': d['name'], 'agent': f"로드맵 계획 에이전트 · {d['id']} {d['name']}", 'source': d.get('source'), 'at': today()}
+    name = course_name(d['id'], d['name'])
+    return {'perspective': d['id'], 'name': name, 'agent': f"로드맵 계획 에이전트 · {d['id']} {name}", 'source': d.get('source'), 'at': today()}
 
 
 def confirm(employee_id: int, draft_id: str) -> dict:

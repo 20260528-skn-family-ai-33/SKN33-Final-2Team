@@ -2,16 +2,17 @@
 
   python tools/setup_db.py            # 빈 Docker DB면 복원부터(백업 기본 위치 team_db/), 아니면 보충만 (여러 번 실행해도 같은 결과)
   python tools/setup_db.py --supplement-only   # 팀원이 운영하는 DB(복사본)에 붙을 때: 복원 없이 보조 스키마·보충만 · 그 DB 팀 표에 데이터를 쓴다
+  python tools/setup_db.py --reset-team-passwords   # 로컬 시험 사본에서만: 사번 있는 직원 비밀번호를 GP5_DEMO_PASSWORD로 일괄 초기화
 
 보충 자료 (2026-10-21 사용자 결정 · 2026-10-27 팀 최신 DB 기준으로 정리):
-  - 관리자 전용 계정 1개(아이디 .env GP5_ADMIN_LOGIN · 비밀번호 GP5_DEMO_PASSWORD)
+  - 관리자 전용 계정 1개(아이디 .env GP5_ADMIN_LOGIN · 신규 비밀번호 GP5_ADMIN_PASSWORD · 기존 계정은 변경하지 않음)
   - 직원·부서·보유 스킬·자격·학력은 팀 DB(#22 최신 백업)의 것을 그대로 쓴다. 예전 직원 가데이터 엑셀(2.9.0)은 쓰지 않는다
-  - 사번이 있는 팀 시험 직원의 비밀번호를 이 로컬 사본에서만 시연 비밀번호로 바꾼다. 사번이 없는 계정(REAL_USER)은
-    로그인할 수 없고 팀 DB 의 사번 필수 제약 때문에 고칠 수도 없어 건드리지 않는다
-    (--keep-team-passwords 면 그대로 · --supplement-only 는 남의 DB라 늘 그대로 · 2026-10-23 사용자 결정)
+  - 복원된 직원의 비밀번호는 기본으로 보존한다. 로컬 시험 사본에서 --reset-team-passwords를 명시할 때만
+    사번 있는 직원의 비밀번호를 GP5_DEMO_PASSWORD로 맞춘다. 사번 없는 계정(REAL_USER)은 건드리지 않는다
+    (--keep-team-passwords는 기존 명령 호환용 · --supplement-only에서는 초기화 불가)
   - 학습 자료 보조 값(형식·시간·단계·비용)을 규칙으로 채우고 '추정'으로 표시, 자격증 분야 묶음
   - 규정 묶음(적용 직원 구분·국외근무 전용·짧은 키)
-  - 목표 후보 첫 생성(가데이터 규칙 · 본인 입력이 없으면 기본 후보)
+  - 시연 모드일 때 목표 후보 첫 생성(가데이터 규칙 · 본인 입력이 없으면 기본 후보)
 """
 from __future__ import annotations
 
@@ -80,12 +81,21 @@ def apply_app_ext() -> None:
 # ── 2. 계정 ──
 def admin_account() -> None:
     with db.tx() as t:
-        if not t.one('SELECT 1 FROM app_ext.admin_accounts WHERE login_id = :l', l=S.admin_login):
-            t.run('INSERT INTO app_ext.admin_accounts(login_id, name, password_hash) VALUES(:l, :n, :h)', l=S.admin_login, n='시스템 관리자(시연)', h=hash_password(S.demo_password))
-            say(f'관리자 계정 만듦: {S.admin_login}')
+        # 준비 스크립트 재실행으로 기존 관리자 비밀번호를 바꾸지 않는다.
+        if t.one('SELECT 1 FROM app_ext.admin_accounts WHERE login_id = :l', l=S.admin_login):
+            return
+        if not S.admin_password.strip():
+            raise SystemExit('신규 관리자 생성에는 GP5_ADMIN_PASSWORD가 필요해요. 직원 초기 비밀번호와 다른 값을 설정해 주세요.')
+        if S.admin_password == S.demo_password:
+            raise SystemExit('GP5_ADMIN_PASSWORD는 직원 초기 비밀번호 GP5_DEMO_PASSWORD와 다른 값이어야 해요.')
+        t.run('INSERT INTO app_ext.admin_accounts(login_id, name, password_hash) VALUES(:l, :n, :h)',
+              l=S.admin_login, n='시스템 관리자(시연)', h=hash_password(S.admin_password))
+        say(f'관리자 계정 만듦: {S.admin_login}')
 
 
 def team_passwords() -> None:
+    if not S.demo_password.strip():
+        raise ValueError('직원 비밀번호 초기화에는 비어 있지 않은 GP5_DEMO_PASSWORD가 필요해요.')
     n = 0
     with db.tx() as t:
         # 사번 없는 행은 로그인할 수 없고, 팀 DB 의 사번 필수 제약(NOT VALID)이 그런 행의 어떤 수정도 막는다
@@ -93,7 +103,7 @@ def team_passwords() -> None:
             if not verify_password(e['password_hash'], S.demo_password):
                 t.run('UPDATE public.employees SET password_hash = :h WHERE employee_id = :i', h=hash_password(S.demo_password), i=e['employee_id'])
                 n += 1
-    say(f'팀 시험 직원 비밀번호(로컬 사본만 · 사번 있는 계정): {n}명 바꿈')
+    say(f'팀 시험 직원 비밀번호 명시적 초기화(로컬 사본만 · 사번 있는 계정): {n}명 바꿈')
 
 
 # ── 3. 학습 자료 보조 값 ──
@@ -181,6 +191,9 @@ def regulations() -> None:
 
 
 def goals() -> None:
+    if not S.demo_mode:
+        say('목표 후보 첫 생성 건너뜀: GP5_DEMO_MODE=off(가데이터를 만들지 않음)')
+        return
     try:
         from app.services import goals as G
     except ImportError as e:  # 서버 코드가 아직 없을 때(처음 개발 중)는 건너뛴다
@@ -192,9 +205,16 @@ def goals() -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument('--supplement-only', action='store_true')
-    ap.add_argument('--keep-team-passwords', action='store_true')
+    ap.add_argument('--supplement-only', action='store_true', help='복원 없이 보충만 실행하고 직원 비밀번호는 보존')
+    passwords = ap.add_mutually_exclusive_group()
+    passwords.add_argument('--keep-team-passwords', action='store_true', help='기존 명령 호환용: 기본 동작도 직원 비밀번호 보존')
+    passwords.add_argument('--reset-team-passwords', action='store_true', help='로컬 시험 사본의 사번 있는 직원 비밀번호를 GP5_DEMO_PASSWORD로 일괄 초기화')
     args = ap.parse_args()
+    # 잘못된 초기화 요청은 복원·스키마 적용·관리자 생성 등 DB 쓰기 전에 거절한다.
+    if args.reset_team_passwords and args.supplement_only:
+        ap.error('--reset-team-passwords와 --supplement-only는 함께 사용할 수 없어요.')
+    if args.reset_team_passwords and not S.demo_password.strip():
+        ap.error('--reset-team-passwords에는 비어 있지 않은 GP5_DEMO_PASSWORD가 필요해요.')
     print('GrowPath 5차 DB 준비')
     if not args.supplement_only:
         if db_is_empty():
@@ -202,15 +222,13 @@ def main() -> None:
         else:
             say('DB에 이미 표가 있어 복원은 건너뜀')
     apply_app_ext()
-    # 시연 비밀번호는 저장소 밖에서 정한다(팀 database/RESTORE.md · 2026-10-26). 없으면 계정 단계만 건너뛴다
-    if not S.demo_password:
-        say('GP5_DEMO_PASSWORD 가 비어 있어 관리자 계정·팀 테스트 비밀번호 단계를 건너뜀(.env 에 넣고 다시 실행)')
+    # 관리자 최초 생성은 직원의 공통 초기값과 독립적이다. 기존 관리자 계정은 그대로 둔다.
+    admin_account()
+    # .env 변경이나 설치기 재실행이 기존 계정의 비밀번호를 바꾸지 않게 한다.
+    if args.reset_team_passwords:
+        team_passwords()
     else:
-        admin_account()
-        if args.supplement_only:
-            say('팀 테스트 직원 비밀번호: 그대로 둠(--supplement-only · 팀원이 운영하는 DB)')
-        elif not args.keep_team_passwords:
-            team_passwords()
+        say('팀 직원 비밀번호: 기존 값 보존(초기화는 로컬 시험 사본에서 --reset-team-passwords를 명시)')
     resources()
     regulations()
     goals()

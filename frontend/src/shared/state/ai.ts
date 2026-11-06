@@ -7,6 +7,7 @@ import { ApiError } from '@/api/client';
 import { aiApi, demoApi, type ModelState, type ProviderInfo, type ThinkLevels } from '@/api/endpoints/account';
 import type { FailSim, ServerProvider, UserSettings } from '@/api/types/account';
 import type { StoredCause } from '@/api/types/common';
+import { signInSeq } from './session';
 
 /** 화면은 4차처럼 'api' 를 OpenAI 로 쓰고, 서버에는 'openai' 로 보낸다 */
 export type UiProvider = 'ollama' | 'api';
@@ -35,13 +36,13 @@ export interface Conn {
 }
 
 interface AiState {
-  status: { checked: boolean; server?: boolean; docLibs: Record<string, boolean>; providers: Record<string, ProviderInfo> };
+  status: { checked: boolean; server?: boolean; demoMode?: boolean; docLibs: Record<string, boolean>; providers: Record<string, ProviderInfo> };
   settings: UserSettings;
   conn: Conn;
 }
 
 export const useAi = create<AiState>(() => ({
-  status: { checked: false, providers: {}, docLibs: {} },
+  status: { checked: false, demoMode: false, providers: {}, docLibs: {} },
   settings: { aiProvider: 'ollama', demoMock: false, failSim: {}, reasoning: {} },
   conn: { state: 'idle', provider: '', at: 0 },
 }));
@@ -54,6 +55,7 @@ const modeOf = (s: AiState): Mode => {
 };
 
 export const ai = {
+  demoAllowed: (): boolean => g().status.demoMode === true,
   choice: (): UiProvider => toUi(g().settings.aiProvider || 'ollama'),
   demoMock: (): boolean => !!g().settings.demoMock,
   available: (p: string): boolean => !!prov(p).available,
@@ -100,12 +102,17 @@ export const useAiMode = (): { mode: Mode; choice: UiProvider; demo: boolean; ch
 export const DOC_CHARS = 6000;
 export const SIM_KINDS = ['goal', 'doc', 'quiz', 'diag', 'gen', 'sup', 'report', 'reg', 'rev'];
 
+let statusRequest = 0;
 export async function checkStatus(): Promise<void> {
+  const request = ++statusRequest;
+  useAi.setState((s) => ({ status: { ...s.status, demoMode: false } }));
   try {
     const j = await aiApi.providers();
-    useAi.setState({ status: { checked: true, server: true, docLibs: j.docLibs || {}, providers: Object.fromEntries(j.providers.map((p) => [p.id, p])) } });
+    if (request !== statusRequest) return;
+    useAi.setState({ status: { checked: true, server: true, demoMode: j.demoMode === true, docLibs: j.docLibs || {}, providers: Object.fromEntries(j.providers.map((p) => [p.id, p])) } });
   } catch {
-    useAi.setState((s) => ({ status: { ...s.status, checked: true, server: false } }));
+    if (request !== statusRequest) return;
+    useAi.setState((s) => ({ status: { ...s.status, checked: true, server: false, demoMode: false } }));
   }
 }
 
@@ -158,15 +165,41 @@ export async function setReasoning(p: UiProvider, level: string | null): Promise
   }
 }
 
-export async function setDemoMock(on: boolean): Promise<void> {
-  useAi.setState((s) => ({ settings: { ...s.settings, demoMock: on } }));
-  const r = await demoApi.settings({ demoMock: on });
-  useAi.setState((s) => ({ settings: { ...s.settings, ...r } }));
+// 두 시연 옵션은 서버에서 같은 행을 읽고 저장하므로 요청도 함께 직렬화한다.
+let demoQueue: Promise<unknown> = Promise.resolve();
+let demoSession = -1;
+
+/** 저장된 시연 옵션만 표시한다. 이전 로그인의 결과이면 호출자의 알림·연결 확인도 생략하도록 false를 반환한다. */
+function saveDemoSettings(change: Partial<Pick<UserSettings, 'demoMock' | 'failSim'>>): Promise<boolean> {
+  const seq = signInSeq();
+  if (demoSession !== seq) {
+    demoSession = seq;
+    demoQueue = Promise.resolve();
+  }
+  const request = demoQueue.then(async () => {
+    if (signInSeq() !== seq) return false;
+    try {
+      const saved = await demoApi.settings(change);
+      if (signInSeq() !== seq) return false;
+      // 제공자·추론값은 별도 API에서 바뀔 수 있으므로 이 응답으로 덮지 않는다.
+      useAi.setState((s) => ({ settings: { ...s.settings, demoMock: !!saved.demoMock, failSim: saved.failSim || {} } }));
+      return true;
+    } catch (err) {
+      if (signInSeq() !== seq) return false;
+      throw err;
+    }
+  });
+  // 실패는 호출자에게 전달하되 다음 시연 설정 저장을 막지 않는다.
+  demoQueue = request.catch(() => undefined);
+  return request;
 }
 
-export async function setFailSim(k: string, on: boolean): Promise<void> {
-  useAi.setState((s) => ({ settings: { ...s.settings, failSim: { ...s.settings.failSim, [k]: on } } }));
-  applySettings(await demoApi.settings({ failSim: { [k]: on } }));
+export function setDemoMock(on: boolean): Promise<boolean> {
+  return saveDemoSettings({ demoMock: on });
+}
+
+export function setFailSim(k: string, on: boolean): Promise<boolean> {
+  return saveDemoSettings({ failSim: { [k]: on } });
 }
 
 /* ── 연결 상태 (좌측 'AI 모델'·진단 에이전트 창 상단) ── */

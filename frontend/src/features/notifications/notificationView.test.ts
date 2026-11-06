@@ -42,7 +42,7 @@ describe('문구', () => {
     expect(notificationTitle(n({ audience: 'head' }), true)).toBe('새 로드맵 작성을 마쳤어요');
     expect(notificationTitle(n({ audience: 'head', kind: 'report', reportId: 'r1' }), true)).toBe('결과 보고서 작성이 끝났어요');
   });
-  it('부제는 로드맵 제목 · 트랙 이름, 없는 값은 뺀다', () => {
+  it('부제는 로드맵 제목 · 코스 이름, 없는 값은 뺀다', () => {
     expect(notificationSub(base)).toBe('SQL 분석 역량 · Crash Course');
     expect(notificationSub(n({ track: '' }))).toBe('SQL 분석 역량');
     expect(notificationSub(n({ planTitle: '', track: 'zz' }))).toBe('');

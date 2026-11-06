@@ -1,6 +1,6 @@
 """로그인·세션 (설계서 v1.7 API-01~04, 6.2 인증·권한).
 
-- 직원: 사번 + 비밀번호(팀 DB employees.password_hash · Argon2id). 시연 초기 비밀번호는 .env 의 GP5_DEMO_PASSWORD(기본값 없음 · 저장소에 값을 적지 않는다).
+- 직원: 사번 + 비밀번호(팀 DB employees.password_hash · Argon2id). 기존 해시는 설치 시 보존하며, 관리자 화면의 신규 직원은 .env 의 GP5_DEMO_PASSWORD를 초기값으로 사용한다(기본값 없음).
 - 관리자: 직원과 별개인 관리자 전용 계정(app_ext.admin_accounts · 2026-10-21 사용자 결정). 로그인 아이디는 사번 자리에 적는다.
 - 세션: 쿠키에는 무작위 토큰만 두고, DB(app_ext.sessions)에는 그 SHA-256 만 둔다. 서버를 여러 대 띄워도 같은 세션을 본다.
 """

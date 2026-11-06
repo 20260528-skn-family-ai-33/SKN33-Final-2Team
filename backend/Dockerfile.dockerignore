@@ -1,5 +1,6 @@
 # 빌드 컨텍스트는 저장소 맨 위. 실행 코드와 의존성 파일만 전달한다.
 **
+!VERSION
 !requirements.txt
 !backend/
 !backend/Dockerfile
@@ -11,6 +12,8 @@
 !backend/db/**
 !backend/tools/
 !backend/tools/**
+!backend/evals/
+!backend/evals/**
 !database/
 !database/requirements.txt
 !database/requirements-db.txt

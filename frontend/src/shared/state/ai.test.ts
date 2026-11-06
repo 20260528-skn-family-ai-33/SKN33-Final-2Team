@@ -5,13 +5,44 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/api/client';
 import { aiApi, type ProviderInfo, type ThinkLevels } from '@/api/endpoints/account';
 import type { ReasoningPicks } from '@/api/types/account';
-import { ai, applySettings, cause, errText, levelLabel, setReasoning, useAi } from './ai';
+import { ai, applySettings, cause, checkStatus, errText, levelLabel, setReasoning, useAi } from './ai';
 
 const useOllama = (models: ProviderInfo['models']) =>
   useAi.setState({
     status: { checked: true, docLibs: {}, providers: { ollama: { id: 'ollama', label: 'RunPod-Ollama', available: true, reason: '', models } } },
     settings: { aiProvider: 'ollama', demoMock: false, failSim: {}, reasoning: {} },
   });
+
+describe('서버 시연 허용 상태', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it.each([true, false, undefined])('서버 demoMode=%s를 받아 명시적으로 true일 때만 시연을 허용한다', async (demoMode) => {
+    vi.spyOn(aiApi, 'providers').mockResolvedValue({ current: 'ollama', demoMode, providers: [], docLibs: {} });
+    await checkStatus();
+    expect(ai.demoAllowed()).toBe(demoMode === true);
+  });
+
+  it('조회 중과 조회 실패 뒤에는 이전 true를 남기지 않는다', async () => {
+    useAi.setState((s) => ({ status: { ...s.status, demoMode: true } }));
+    vi.spyOn(aiApi, 'providers').mockRejectedValue(new Error('network'));
+    const pending = checkStatus();
+    expect(ai.demoAllowed()).toBe(false);
+    await pending;
+    expect(ai.demoAllowed()).toBe(false);
+    expect(useAi.getState().status.server).toBe(false);
+  });
+
+  it('새 조회가 off를 확인한 뒤 도착한 이전 on 응답은 시연을 다시 켜지 않는다', async () => {
+    let finish!: (value: Awaited<ReturnType<typeof aiApi.providers>>) => void;
+    const oldResponse = new Promise<Awaited<ReturnType<typeof aiApi.providers>>>((resolve) => { finish = resolve; });
+    vi.spyOn(aiApi, 'providers').mockReturnValueOnce(oldResponse).mockResolvedValue({ current: 'ollama', demoMode: false, providers: [], docLibs: {} });
+    const old = checkStatus();
+    await checkStatus();
+    finish({ current: 'ollama', demoMode: true, providers: [], docLibs: {} });
+    await old;
+    expect(ai.demoAllowed()).toBe(false);
+  });
+});
 
 describe('역할별 모델 이름', () => {
   it('규정 역할은 규정 모델을, 진단·로드맵은 각자의 모델을 쓴다', () => {

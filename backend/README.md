@@ -17,8 +17,8 @@
 | --- | --- | --- |
 | `app/auth.py` | 로그인 쿠키 이름을 `GP5_SESSION_COOKIE`로 설정(기본값은 원본과 같은 `gp5_session`) | 같은 PC·같은 브라우저에서 다른 환경과 번갈아 열 때 로그인이 서로 덮이지 않게 |
 | `tools/setup_db.py` | 복원 대상 컨테이너 이름을 `COMPOSE_PROJECT_NAME`으로(기본값은 원본과 같은 `gp5`) | 고정값이면 다른 compose 프로젝트의 DB에 복원할 수 있어서 |
-| `app/config.py`, `app/auth.py`(설명), `web/assets/gp-core.js`(주석) | 시연 초기 비밀번호를 코드에 적힌 기본값 없이 `.env`의 `GP5_DEMO_PASSWORD`로만 받음 | 공개 저장소에 공용 기본 비밀번호를 두지 않는 팀 원칙(`database/RESTORE.md`) |
-| `tools/setup_db.py` | 시연 비밀번호가 비면 관리자 계정·팀 시험 비밀번호 단계를 건너뜀 | 비밀번호는 저장소 밖에서 정해요 |
+| `app/config.py`, `app/auth.py`(설명), `web/assets/gp-core.js`(주석) | 직원 초기 비밀번호를 코드에 적힌 기본값 없이 `.env`의 `GP5_DEMO_PASSWORD`로만 받음 | 공개 저장소에 공용 기본 비밀번호를 두지 않는 팀 원칙(`database/RESTORE.md`) |
+| `app/config.py`, `tools/setup_db.py` | 신규 관리자는 별도 `GP5_ADMIN_PASSWORD`로 생성하고 빈 값·공백만 있는 값·직원 초기값과 같은 비밀번호는 거절. 기존 관리자는 변경하지 않음 | 비밀번호는 저장소 밖에서 정해요. 설정을 바꾸거나 설치기를 다시 실행해도 기존 관리자 비밀번호가 바뀌지는 않아요 |
 | `app/admin_io/hr.py` | 시연 비밀번호가 비어 있으면 새 직원 추가를 막고 안내 | 빈 비밀번호로 계정이 생기지 않게 |
 | `app/llm.py`, `app/regstore.py`, `app/agents/regulation.py`, `app/routers/admin.py`·`account.py`, `app/config.py`, `app/errors.py` | 규정 검색 임베딩을 RunPod-Ollama·OpenAI 모드 모두 OpenAI `text-embedding-3-small`(`OPENAI_EMBED_MODEL`)로 통일하고 `OLLAMA_EMBED_MODEL`을 없앰. OpenAI 키가 없으면 키워드로 바꾸지 않고 오류로 알림(가데이터만 키워드). 관리자 색인 만들기는 모드를 고르지 않음(받은 `provider`는 무시 · 색인 만들기는 뒤에 아래 '규정 원문 PDF' 줄에서 없앰) | 팀 합의(2026-10-26): 팀 DB 벡터가 그 모델로 만들어져 있음. 원본은 모드별 임베딩이라 Ollama 모드가 키워드 검색으로 떨어져 조항을 못 찾는 일이 있었음 |
 | `app/agents/regulation.py`, `app/agents/grounded_answer.py` | 현재 실제 모델 모드는 사용자 요청에 따라 되묻기(`clarify`)를 생성하지 않음. RoBERTa가 질문 유형을 결정하고 LLM은 근거 상태·요약·출처만 생성 | 2026-10-26에는 `REG_SYS`의 되묻기 조건을 넓혔으나 이후 흐름으로 대체됨. 가데이터의 고정 되묻기와 이전 대화 표시는 호환 유지. 현재 기준은 [챗봇 질문 분류 안내](classification.md#답변-상태와-오류-2026-11-03-사용자-요청-반영) |
@@ -39,7 +39,7 @@
 | 파일 | 바꾼 것 | 이유 |
 | --- | --- | --- |
 | `tools/setup_db.py`, `Dockerfile` | 직원 가데이터 엑셀(2.9.0) 단계와 `data/seed/` 폴더를 없앰. 기본 백업을 `team_db/growpath_latest.dump`로 | 최신 백업에 시험 직원 100명·부서장 5명·스킬·자격·학력이 들어 있고, 예전 가데이터 16명은 부서장 중복(`employees_one_department_head`)으로 들어가지 않음 |
-| `tools/setup_db.py` | 시험 비밀번호(로컬 사본만)를 사번이 있는 계정에만 넣음 | 사번 없는 `REAL_USER` 행은 로그인할 수 없고, 새 사번 필수 제약(`employees_number_required` · NOT VALID)이 그 행의 어떤 수정도 막음 |
+| `tools/setup_db.py` | 복원한 직원 비밀번호 해시는 기본으로 보존. 로컬 시험 사본에서 `--reset-team-passwords`를 명시할 때만 사번 있는 전체 직원을 `GP5_DEMO_PASSWORD`로 초기화 | 환경변수 설정·설치기 재실행만으로 기존 비밀번호를 바꾸지 않음. 사번 없는 `REAL_USER` 행은 초기화 대상에서 제외 |
 | `app/services/profile.py` | 업무 설명은 `employees.planned_project_description`, 경험·개발 경력·기술·프로젝트·교육은 `employee_input_profiles`, 자격은 `employee_certifications` + `employees.unlisted_certifications`. 업무·프로젝트는 각각 선택. `app_ext.employee_self_inputs`에는 처음 값·입력 상태·설명 변경 해시만 저장. 구판 설명은 읽기 호환 유지 | 팀 직원 입력 양식과 같은 표·열에 저장. 새 표/열 없음. 선택 이관 SQL은 `db/migrate_self_work_descriptions.sql` |
 | `app/services/profile.py`, `app/admin_io/hr.py` | 입사일·현재 근무 시작일을 `employees.hire_date`·`department_start_date`에서 읽고 관리자 인적 데이터 반영도 그 열에 씀. 직원 구분이 비면 직급 이름('일반직 4급')의 앞부분 | 최신 DB 에 생긴 열 · 직원 구분은 규정 묶음 선택에 씀 |
 
@@ -72,6 +72,12 @@ docker compose up -d backend
 - API 문서: <http://localhost:8815/api/docs>
 - 설정은 맨 위의 `.env` 하나를 읽어요(`.env.example` 참고).
 
+복원한 직원은 백업 제공자·관리자에게 별도로 전달받은 기존 비밀번호로 로그인해요. 설치기는 NULL·잘못된 형식까지 포함해 기존 해시를 그대로 보존하고, `GP5_DEMO_PASSWORD`만 설정해도 덮어쓰지 않아요. 관리자 화면에서 새 직원을 만들 때의 초기 비밀번호는 계속 `GP5_DEMO_PASSWORD`를 사용하며, 신규 관리자용 `GP5_ADMIN_PASSWORD`와는 별개예요.
+
+기존 베타 DB의 해시 보존이 로그인 가능 여부나 새 배포 승인을 뜻하지는 않아요. NULL·잘못된 해시·비밀번호 미상 계정은 배포 전에 확인해야 하며, 새 배포의 비밀번호 전달·로그인 확인 담당자와 완료 여부는 현재 미정이에요.
+
+로컬 시험 사본에서 사번 있는 전체 직원의 비밀번호를 바꿀 때만 [직원 비밀번호 초기화 명령](../README.md#로컬-시험-사본의-직원-비밀번호-초기화-선택)의 `run --build`로 최신 설치기 이미지를 준비하고 `--reset-team-passwords`를 명시해요. 베타 전체 계정의 비밀번호 배포에는 사용하지 않아요. `--keep-team-passwords`는 기존 명령 호환용으로 남고, `--supplement-only`도 보존을 유지해요. 초기화 옵션과 이 두 옵션의 조합, 초기화 시 빈 값·공백뿐인 `GP5_DEMO_PASSWORD`는 DB 작업 전에 거절해요. 일반 앱 업데이트는 [DB 복원·보충을 제외하는 절차](../README.md#기존-설치의-설정-변경과-업데이트)로 세 이미지(`backend`·`backend-setup`·`frontend`)를 빌드하고, 설치기 실행 없이 API·화면만 `up --no-deps`로 다시 만들어요.
+
 챗봇 파인튜닝 모델(`growpath-regulation-4b` · `qwen35-4b-diagnosis-agent` · `role=regulation`)은 `options.num_gpu=-1`로 Ollama 실행 서버의 GPU·VRAM에 맞춰 자동 선택해요. 사용할 GPU가 없으면 서버가 CPU로 실행하며, 모델에 저장된 CPU 강제 설정도 요청 값으로 덮어써요. 같은 모델을 쓰는 안별 지원 조건 확인에도 적용돼요. GPU 드라이버·컨테이너 장치 노출은 **모델 실행 서버**에서 준비해야 해요. 실제 사용 여부는 서버의 `ollama ps` 또는 `/api/ps`의 `size_vram`으로 확인해요. [Ollama GPU 문서](https://docs.ollama.com/gpu), [자동 선택 옵션 원본](https://github.com/ollama/ollama/blob/main/api/types.go)을 참고해요.
 
 파이썬으로 직접 띄울 때(선택 · Python 3.12 · 이번 작업에서는 전체 서버 시작을 확인하지 않은 방법): 이 폴더에서 패키지를 설치하고, 맨 위 `.env`를 `GP5_ENV_FILE`로 알려 준 뒤 **토크나이저 설치 → 서버 실행** 순서로 진행해요(앱은 기본으로 이 폴더의 `.env`를 읽어요). DB는 Docker의 `db` 서비스를 그대로 써요(`.env`의 `GP5_DB_PORT`). 도커의 `backend`와 같은 8815를 쓰므로 둘 중 하나만 켜요.
@@ -102,6 +108,8 @@ python -m uvicorn app.main:app --port 8815
 ## 목표 후보 사전 준비
 
 로그인과 세션 조회에서는 목표 생성 요청을 하지 않아요. 홈페이지에서 본인 입력 저장·되돌리기·평정 동의 또는 관리자 수정/업로드가 성공한 뒤, 추천 입력이 바뀐 직원만 백그라운드로 갱신해요. 부서명·상위 부서 변경과 보유 자격명 변경도 영향을 받는 직원을 포함해요. 목표 화면은 후보가 없는 계정만 처음 준비하고 기존 후보는 그대로 읽어요. 동시 요청은 한 작업을 공유하며 실패하면 이전 후보를 보존하고 사용자가 다시 시도해요. SQL로 직접 수정한 경우에는 명시적으로 후보를 다시 만들어요.
+
+목표 후보 요청은 직원별 잠금을 잡은 트랜잭션의 연결 하나로 프로필 조회·진행 작업 확인·새 작업 등록을 처리해요. 풀 연결을 모두 사용 중이어도 요청 안에서 추가 연결을 기다리지 않도록 하며, 커밋하고 연결을 반납한 뒤 생성 작업을 제출해요. 롤백하면 작업을 제출하지 않고 생성 잠금을 해제하며, 제출에 실패하면 등록된 작업을 취소해요. 모델 호출 동안 요청의 DB 트랜잭션을 유지하지 않아요.
 
 목표 후보의 생성 기준은 `app/agents/goals.py`의 `G_SYS`와 `_api`예요. 앱과 사전 생성 도구 모두 같은 서비스를 사용해요. 모델에는 이름·이메일·사번을 보내지 않고, 소속·직급·직무와 입력된 업무 설명·경험·기술·자격·교육·프로젝트를 전달해요. 평정은 본인이 활용에 동의한 정보만 포함해요. 본인 입력이 없어도 사내 기본 정보가 있으면 실제 모델로 기초 학습 방향을 제안하고, 근거가 전혀 없을 때만 기본 후보를 사용해요.
 
@@ -134,7 +142,7 @@ python tools/preload_goals.py --employee-id $preloadEmployeeId --provider ollama
 
 ## Track 프롬프트 DB 연결 (#38)
 
-Free Track(A1→agent_certified), Fast Track(A2→agent_fasttrack), Challenge Track(A3→agent_practical)은 `public.prompt_versions`의 활성 버전을 매 요청 읽습니다. 기존 agent_id는 유지하며, 이름 변경 전 버전도 보존합니다. 각 본문은 `### GENERATION`과 `### REVISION` 구역으로 나뉩니다. 활성 버전 누락·중복·형식 오류는 명시적으로 실패하며 코드 기본값으로 대체하지 않습니다.
+Free Course(A1→agent_certified), Crash Course(A2→agent_fasttrack), Challenge Course(A3→agent_practical)는 `public.prompt_versions`의 활성 버전을 매 요청 읽습니다. 화면·보고서의 코스 이름은 팀 합의(#78)에 따라 Course·Crash로 통일했고, 보고서 `opt`에는 코스 ID를 저장합니다. 이전 계획·보고서에 남은 Track 이름은 읽을 때 코스 ID·현재 이름으로 대응시킵니다. 기존 agent_id는 유지하며, 이름 변경 전 버전도 보존합니다. 각 본문은 `### GENERATION`과 `### REVISION` 구역으로 나뉩니다. 활성 버전 누락·중복·형식 오류는 명시적으로 실패하며 코드 기본값으로 대체하지 않습니다.
 
 새 환경에서는 기존 DB 백업을 보관한 후 아래 순서로 적용합니다. 모델 호출은 발생하지 않습니다.
 
@@ -182,7 +190,7 @@ Free Course만 후보 순위·개수 제한·본문 용량 배분 전에 강좌�
 
 삭제된 자료는 실제 행 삭제와 content_status=deleted 표시를 모두 확인합니다. Free 활동 저장 시 카탈로그를 갱신하고 검증된 0원을 활동별 비용에도 반영합니다.
 
-예전 Free 계획에 완료한 유료 강좌 활동이 남아 있어도 무료 강좌 정책의 예외는 없습니다. 유료·가격 미확인 도서는 허용하며 확인된 도서 가격은 합산하고 미확인 가격은 별도 표시합니다. 수정안 적용은 409로 거부하며 무료 자료로 다시 생성하거나 다른 Track을 선택하라는 메시지를 화면에 전달합니다. 기존 기록이나 활동을 자동 삭제하지 않습니다.
+예전 Free 계획에 완료한 유료 강좌 활동이 남아 있어도 무료 강좌 정책의 예외는 없습니다. 유료·가격 미확인 도서는 허용하며 확인된 도서 가격은 합산하고 미확인 가격은 별도 표시합니다. 수정안 적용은 409로 거부하며 무료 자료로 다시 생성하거나 다른 코스를 선택하라는 메시지를 화면에 전달합니다. 기존 기록이나 활동을 자동 삭제하지 않습니다.
 
 ### 스킬별 사전 점검 (#47)
 프로젝트/희망 역량에서 DB 스킬을 최대 5개 선정하고, 개인 DB 프로필과 기획서 요약(선택)을 참고해 사전 점검을 생성합니다. 스킬 1개는 설문 5개+퀴즈 5개, 2~5개는 스킬마다 설문 3개+퀴즈 3개입니다. 퀴즈는 5지선다이며 전체 설문 후 전체 퀴즈를 진행합니다.
