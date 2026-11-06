@@ -68,7 +68,8 @@
       .side .brand { order: 0; margin-right: auto; padding: 0; font-size: 22px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
       .side .brand .logo { width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: var(--tm-on-accent); }
       .side .nav { order: 1; flex-direction: row; align-items: center; gap: 0; }
-      .side .nav a { position: relative; height: var(--nav-h); padding: 0 12px; background: transparent; white-space: nowrap; flex-direction: column; justify-content: center; gap: 6px; border-radius: 0; color: #fff; font-size: 10.5px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; }
+      /* 위 여백 4px: 글자 줄 아래 빈 간격 때문에 아이콘+글자가 로고·계정 칸보다 약 2px 높아 보여, 내용을 2px 내려 눈에 보이는 높이를 맞춘다 */
+      .side .nav a { position: relative; height: var(--nav-h); padding: 4px 12px 0; background: transparent; white-space: nowrap; flex-direction: column; justify-content: center; gap: 6px; border-radius: 0; color: #fff; font-size: 10.5px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; }
       .side .nav a svg { display: none; }
       .side .nav a:hover { color: var(--accent); }
       .side .nav a.on { background: transparent; color: var(--accent); }
@@ -114,7 +115,7 @@
     @media (min-width: 901px) and (max-width: 1240px) {
       --nav-h: 84px;
       .side .brand { font-size: 18px; }
-      .side .nav a { padding: 0 8px; font-size: 12.5px; letter-spacing: 0; }
+      .side .nav a { padding: 4px 8px 0; font-size: 12.5px; letter-spacing: 0; }
       .side .me { padding: 3px; }
       .side .me .grow { display: none; }
     }
