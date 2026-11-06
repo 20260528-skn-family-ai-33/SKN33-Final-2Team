@@ -461,7 +461,7 @@ export const D: GpData = {
     },
     "A2": {
       "name": "Crash Course",
-      "short": "Fast",
+      "short": "Crash",
       "focus": "짧은 기간·적은 학습 부담. 핵심 강의와 꼭 필요한 실습만"
     },
     "A3": {

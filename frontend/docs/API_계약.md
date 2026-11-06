@@ -108,6 +108,8 @@
 | `PUT /plans/{id}/post-assessment` · `POST .../post-assessment/deep` | 사후 점검 저장 · 심화 질문 사후 문제(작업 · 설계서 밖 추가 10/23) |
 | `POST /plans/{id}/reports` · `GET /reports?planId=` · `POST /reports/{rid}/confirm` | 보고서 만들기(작업) · 목록 · 확인 |
 
+보고서(`Report`)의 `opt`는 코스 ID(A1~A3)예요. 화면은 `trackName(opt)`로 Free·Crash·Challenge Course 이름을 보여 줘요. 이전 보고서에 저장된 Track 이름(Free·Fast·Challenge Track)은 서버가 코스 ID로 바꿔 보내요. 보고서 목록, `GET /me/workspace`, 부서장의 직원 기록 응답에 모두 적용돼요(#78).
+
 ### 학습 자료·자격증·규정·스킬 지도 — `catalog.ts`
 
 `GET /resources`·`POST /resources/lookup`·작업 공간의 자료 첨부는 요약(`detailsLoaded=false`)이다. `content`는 최대 400자, `curriculum`에는 개수(`item_count`)·확보 상태(`coverage`)만 보내고 `items`는 제외한다. `GET /resources/{id}`는 상세(`detailsLoaded=true`)로 전체 소개와 순서 있는 `curriculum.items`(`title`, `section`, `description`)를 제공한다. 목차 유무·자료 유형과 관계없이 요약에 ‘전체 소개·상세 보기’ 링크를 제공한다. 상세 화면은 전체 상세 캐시가 있어도 재진입마다 단건 상세를 조회하며 이후 요약 수신으로 전체 목차를 지우지 않는다.

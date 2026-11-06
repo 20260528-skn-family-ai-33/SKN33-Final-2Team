@@ -149,7 +149,7 @@ def jump(employee_id: int, stage: str) -> dict:
     done = [a['title'] for a in pl['acts'] if (rec['progress'].get(a['id']) or {}).get('status') == 'done']
     rest = [a['title'] for a in pl['acts'] if (rec['progress'].get(a['id']) or {}).get('status') != 'done']
     out = DG._mock_report({'goal': pl['goal'], 'opt': 'A3', 'domain': A.get('domain'), 'items': items, 'doneTitles': done, 'restTitles': rest, 'total': len(pl['acts'])})
-    r = {'planId': rid, 'version': 1, 'goal': pl['goal'], 'opt': pl['name'], 'gained': [{'skill': x['skill'], 'from': x['pre'], 'to': x['post']} for x in items if DG.rose(x['pre'], x['post'])],
+    r = {'planId': rid, 'version': 1, 'goal': pl['goal'], 'opt': pl['opt'], 'gained': [{'skill': x['skill'], 'from': x['pre'], 'to': x['post']} for x in items if DG.rose(x['pre'], x['post'])],
          'still': [{'skill': x['skill'], 'from': x['pre'], 'to': x['post']} for x in items if not DG.rose(x['pre'], x['post'])], 'doneTitles': done, 'restTitles': rest,
          'goalSelf': D['goalSelf'][3], 'file': post.get('file'), 'good': out['good'], 'improve': out['improve'], 'next': out['next'],
          'hidden': {'pre': d['diag']['level'], 'post': DG.level_of(A['questions'], post['answers'])}}

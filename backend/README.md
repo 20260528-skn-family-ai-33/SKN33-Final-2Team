@@ -134,7 +134,7 @@ python tools/preload_goals.py --employee-id $preloadEmployeeId --provider ollama
 
 ## Track 프롬프트 DB 연결 (#38)
 
-Free Track(A1→agent_certified), Fast Track(A2→agent_fasttrack), Challenge Track(A3→agent_practical)은 `public.prompt_versions`의 활성 버전을 매 요청 읽습니다. 기존 agent_id는 유지하며, 이름 변경 전 버전도 보존합니다. 각 본문은 `### GENERATION`과 `### REVISION` 구역으로 나뉩니다. 활성 버전 누락·중복·형식 오류는 명시적으로 실패하며 코드 기본값으로 대체하지 않습니다.
+Free Course(A1→agent_certified), Crash Course(A2→agent_fasttrack), Challenge Course(A3→agent_practical)는 `public.prompt_versions`의 활성 버전을 매 요청 읽습니다. 화면·보고서의 코스 이름은 팀 합의(#78)에 따라 Course·Crash로 통일했고, 보고서 `opt`에는 코스 ID를 저장합니다. 이전 계획·보고서에 남은 Track 이름은 읽을 때 코스 ID·현재 이름으로 대응시킵니다. 기존 agent_id는 유지하며, 이름 변경 전 버전도 보존합니다. 각 본문은 `### GENERATION`과 `### REVISION` 구역으로 나뉩니다. 활성 버전 누락·중복·형식 오류는 명시적으로 실패하며 코드 기본값으로 대체하지 않습니다.
 
 새 환경에서는 기존 DB 백업을 보관한 후 아래 순서로 적용합니다. 모델 호출은 발생하지 않습니다.
 
@@ -182,7 +182,7 @@ Free Course만 후보 순위·개수 제한·본문 용량 배분 전에 강좌�
 
 삭제된 자료는 실제 행 삭제와 content_status=deleted 표시를 모두 확인합니다. Free 활동 저장 시 카탈로그를 갱신하고 검증된 0원을 활동별 비용에도 반영합니다.
 
-예전 Free 계획에 완료한 유료 강좌 활동이 남아 있어도 무료 강좌 정책의 예외는 없습니다. 유료·가격 미확인 도서는 허용하며 확인된 도서 가격은 합산하고 미확인 가격은 별도 표시합니다. 수정안 적용은 409로 거부하며 무료 자료로 다시 생성하거나 다른 Track을 선택하라는 메시지를 화면에 전달합니다. 기존 기록이나 활동을 자동 삭제하지 않습니다.
+예전 Free 계획에 완료한 유료 강좌 활동이 남아 있어도 무료 강좌 정책의 예외는 없습니다. 유료·가격 미확인 도서는 허용하며 확인된 도서 가격은 합산하고 미확인 가격은 별도 표시합니다. 수정안 적용은 409로 거부하며 무료 자료로 다시 생성하거나 다른 코스를 선택하라는 메시지를 화면에 전달합니다. 기존 기록이나 활동을 자동 삭제하지 않습니다.
 
 ### 스킬별 사전 점검 (#47)
 프로젝트/희망 역량에서 DB 스킬을 최대 5개 선정하고, 개인 DB 프로필과 기획서 요약(선택)을 참고해 사전 점검을 생성합니다. 스킬 1개는 설문 5개+퀴즈 5개, 2~5개는 스킬마다 설문 3개+퀴즈 3개입니다. 퀴즈는 5지선다이며 전체 설문 후 전체 퀴즈를 진행합니다.
