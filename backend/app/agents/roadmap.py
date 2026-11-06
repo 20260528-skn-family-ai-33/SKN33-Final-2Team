@@ -22,7 +22,7 @@ from uuid import uuid4
 
 from .. import catalog, catalog_budget, catalog_candidates, db, llm, roadmap_input, track_policy
 from . import runtime as rt
-from .demo import D, TEMPLATES, TEMPLATES_ALT, domain_of
+from .demo import D, TEMPLATES, TEMPLATES_ALT, course_name, domain_of
 
 AUTO_HOURS = D['autoHours']
 LEARNING_SKILL_FIELDS = ('learningSkills', 'learningSkillSelection', 'learningSkillsVersion', 'learningSkillsKey')
@@ -130,7 +130,7 @@ def build_plan(d: dict, prm: dict, goal: str) -> dict:
     weeks = study_weeks if schedule else max(1, math.ceil(cum / hrs))
     res_ids = list(dict.fromkeys(a['res'] for a in acts if a['res']))
     costs = [(_res(r) or {}).get('cost') for r in res_ids]
-    plan = {'displayTitle': d.get('displayTitle') or '', 'opt': d['id'], 'name': d['name'], 'short': d['short'], 'tagline': d['tagline'], 'goal': goal, 'def': d, 'params': p, 'start': p['start'],
+    plan = {'displayTitle': d.get('displayTitle') or '', 'opt': d['id'], 'name': course_name(d['id'], d['name']), 'short': d['short'], 'tagline': d['tagline'], 'goal': goal, 'def': d, 'params': p, 'start': p['start'],
             'hours': hrs, 'format': p['format'], 'acts': acts, 'totalH': cum, 'weeks': weeks, 'cost': int(sum(c for c in costs if c)),
             'costUnknown': any(c is None for c in costs)}
     from app.services.duration_proposals import apply_plan_schedule
@@ -555,7 +555,7 @@ def _mock_revise(inp: dict) -> dict:
         fresh = _mock_option({'pid': pid, 'handoff': h})
         acts = [{'stage': a['stage'], 'title': a['title'], 'res': a['res'], 'hours': a['hours'], 'how': a['how'], 'skills': a.get('skills')} for a in fresh['acts']]
         base = {k: fresh[k] for k in ('tagline', 'reason', 'pros', 'cons')}
-        done.append(f"{pid} {D['perspectives'][pid]['name']}으로 다시 쓰기")
+        done.append(f"{pid} {D['perspectives'][pid]['name']}로 다시 쓰기")
     else:
         acts = [{'key': a['id'], 'stage': a['stage'], 'title': a['title'], 'res': a.get('res'), 'hours': a.get('hours'), 'how': a.get('how'), 'done': a.get('done'),
                  'skills': a.get('skills'), 'skill': a.get('skill')} for a in plan['acts']]

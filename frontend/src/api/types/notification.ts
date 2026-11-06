@@ -12,7 +12,7 @@ export interface AppNotification {
   planId: string;
   /** 로드맵 제목(displayTitle, 없으면 목표) */
   planTitle: string;
-  /** 트랙 id(A1~A3) */
+  /** 코스 id(A1~A3) */
   track: string;
   /** kind 가 report 일 때만 */
   reportId: string | null;
