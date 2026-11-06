@@ -17,7 +17,9 @@ r = APIRouter(prefix='/api/v1')
 
 def _settings(employee_id: int) -> dict:
     s = db.one('SELECT ai_provider, demo_mock, fail_sim, reasoning FROM app_ext.user_settings WHERE employee_id = :e', e=employee_id) or {}
-    return {'aiProvider': s.get('ai_provider') or 'ollama', 'demoMock': bool(s.get('demo_mock')), 'failSim': s.get('fail_sim') or {},
+    # 시연을 끈 배포에서는 DB에 남아 있는 시연 옵션도 화면에 적용하지 않는다.
+    return {'aiProvider': s.get('ai_provider') or 'ollama', 'demoMock': S.demo_mode and bool(s.get('demo_mock')),
+            'failSim': (s.get('fail_sim') or {}) if S.demo_mode else {},
             'reasoning': s.get('reasoning') or {}}
 
 
