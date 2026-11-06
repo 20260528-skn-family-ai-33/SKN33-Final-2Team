@@ -99,98 +99,107 @@ python -m uvicorn app.main:app --port 8815
 
 실제 모델 모드의 되묻기는 삭제했습니다. 규정 답변의 확인된 내용·적용 조건·부족한 근거는 요약에 담으며, ‘내 상황에 적용’(`apply`)·‘추가로 확인할 것’(`more`)·‘등록되지 않은 기준’(`missing`)을 별도 생성 항목으로 요청하지 않습니다. 해당 필드와 되묻기 카드 표시는 가데이터·이전 대화 호환을 위해 유지합니다. 질문의 일부만 답할 수 있어도 유효한 출처를 인용하면 화면에 `근거 확인`을 표시합니다. 확인이 필요한 조건은 답변 본문에서 설명합니다.
 
-## BGE-M3 규정 검색·색인 (#122)
+## 공유 BGE-M3 DB 연결 (#124)
 
-Docker 기본 규정 검색은 BGE-M3입니다. `regstore.search`는 실제 생성 모드(Ollama·OpenAI)와 관계없이 `REGULATION_EMBED_PROVIDER=bge-m3`이면 BGE 검색으로 연결합니다. `regulation_embeddings.py`가 내부 `bge-m3` 서비스의 OpenAI 호환 `/embeddings` API로 질문을 임베딩하고, `bge_regulation_search.py`가 `app_ext.rag_chunk_vectors`의 `BAAI/bge-m3` 1,024차원 벡터를 검색합니다. 규정 검색에는 OpenAI API·키를 쓰지 않습니다. 회사 정보·사내 생활도 아래 #125 색인을 사용하며 학습 자료 추천과 생성 모델 설정은 기존대로 유지합니다. 가데이터 모드만 기존 키워드 검색을 사용합니다.
+현재 기본 검색은 #124 공유 DB입니다. PR #129의 이전 sidecar/GGUF 방식에서 **공유 DB의 원래 저장 위치·공식 가중치**를 직접 사용하는 방식으로 바꿨습니다. 생성 LLM·계정별 모델 선택은 변경하지 않습니다. 강좌·도서 추천도 BGE-M3를 사용하며 OpenAI 임베딩 호출이 필요하지 않습니다.
 
-입력은 DB의 활성 규정 청크(기존 조·항·별표 행 구분)에 규정명·번호·제목·장을 붙인 **본문 전체**입니다. 원문 PDF를 새로 추출하거나 재청킹하는 도구는 아닙니다. 기존 서비스의 6,000자 절단은 BGE 입력에 적용하지 않으며, 서버 문맥 한도 초과는 명시적으로 실패합니다. 입력 형식 버전은 `bge-regulation-full-text-v1`이며 변경 여부는 입력 SHA-256으로 확인합니다.
+| 검색 자료 | 저장 위치 | 벡터 수 | 입력 계약 |
+|---|---|---:|---|
+| 강좌·도서·스킬 등 | `public.learning_resource_embeddings` | 2,984 | `db-resource-fields-and-skill-links/v1`, provenance의 source/actual input 해시 구분 |
+| 규정 | `regulations.rag_chunk_embeddings` | 1,406 | `context_path + 빈 줄 + chunk_text`, `context_path+blank_line+chunk_text/v1` |
+| 회사·사내 생활 | `knowledge.chunks` | 442 | 원래 `chunk_text` 전체와 SHA-256 |
 
-1. [BGE-M3 F16 GGUF](https://huggingface.co/pqnet/bge-m3-gguf)를 Git 밖에 준비합니다. `.env`의 `BGE_M3_MODEL_FILE`로 파일을 지정하며 기본은 `.cache/embedding-eval/bge-m3-f16.gguf`입니다. 파일이 없으면 Docker 시작이 실패하며 빈 폴더나 다른 모델로 대체하지 않습니다. 가중치 SHA-256은 아래 실행 기록과 같아야 합니다. 기존 PC의 파일은 재사용하므로 다시 다운로드하지 않습니다.
+이전 PR의 `app_ext.rag_chunk_vectors`는 이 백업에서 비어 있고 `app_ext.knowledge_chunk_vectors`는 없습니다. 새로 채우거나 OpenAI 1,536차원 제약을 제거해 통과시키지 않습니다. 검색은 모델·1,024차원·입력 형식/해시·provenance revision을 확인합니다. 규정·회사·생활의 BM25/RRF와 직원 구분·국외·가상 자료 필터, 강좌·도서의 Free/Crash/Challenge 기존 정책을 유지합니다. #128의 직군별 준용 검색 제한은 여전히 별도 수정 중입니다.
 
-   ```powershell
-   docker compose up -d --build
-   ```
+### 공유 파일과 복원
 
-2. `docker compose`는 외부 포트 없는 CPU `bge-m3` 컨테이너를 함께 실행하고 `/health`가 정상이 된 뒤 백엔드를 시작합니다. 두 서비스는 `restart: unless-stopped`입니다. 공식 [llama.cpp 이미지](https://github.com/ggml-org/llama.cpp/blob/master/docs/docker.md)를 digest로 고정했으며 CLS pooling·F16·dense 1,024차원을 사용합니다. Docker의 기본 `BGE_M3_BASE_URL`은 `http://bge-m3:8080/v1`, `BGE_M3_TIMEOUT`은 90초입니다. 호스트 Python 실행은 별도 로컬 서버 주소가 필요하며 코드 기본 규정 provider는 `openai`이므로 BGE 시험 시 환경변수로 명시합니다.
-3. 기존 DB의 BGE 벡터는 볼륨에 남으므로 재시작 때 재임베딩하지 않습니다. 새 DB를 복원했거나 규정 원문이 바뀌었다면 사용자 검색 전에 아래 도구로 준비합니다. 기본 점검은 읽기만 하며, `--apply`에서 활성 규정 전체(모든 직원 구분·국외 포함)의 누락·변경 입력만 계산합니다. 일부 실패해도 앞서 저장한 배치는 보존되며 같은 명령으로 이어서 준비할 수 있습니다.
+- [BGE dump](https://drive.google.com/file/d/10dbnIx2YhhyB8-QeicvZqwofiPayJbyy/view)
+- [동반 manifest](https://drive.google.com/file/d/1LIombPvvEt3tp76Gj5BboDUOb1qg7nks/view)
+- [모델별 복원·사용 안내](https://drive.google.com/file/d/1xBtcHVlSVKQvx4twNnEBZGAre6Pxqt1c/view)
 
-   ```powershell
-   docker compose run --rm --no-deps backend python tools/index_regulations.py
-   docker compose run --rm --no-deps backend python tools/index_regulations.py --apply
-   docker compose run --rm --no-deps backend python tools/index_regulations.py --group 일반직 --query "미사용 연차를 이월할 수 있나요?"
-   ```
+백업은 `team_db/growpath_bge_m3_embedding.dump`, manifest는 같은 이름의 `.manifest.json`에 둡니다. 크기 36,077,485바이트, SHA-256 `d96c16ceeca8f8d6de8015d2f40903b9f7d6ccecddc8fc33f1e7213bd2a48c4b`입니다. 2026-11-06 로컬 작업 DB의 전체 백업이며 기존 Drive OpenAI 공유본(2026-11-04)과 모델만 다른 동일 스냅샷으로 간주하지 않습니다.
 
-4. 별도 검색은 `--query`와 `--group`을 함께 지정합니다. 검색은 DB를 쓰지 않으며 해당 범위에 누락·오래된 벡터가 있으면 색인을 먼저 준비하도록 실패합니다. 직원 구분·국외 규정 필터는 기존 데이터 선택 규칙을 따릅니다. 연결 실패·시간 초과·다른 모델·누락/중복 index·차원 오류·영벡터·비유한 숫자는 실패로 알리며 다른 모델이나 키워드로 자동 대체하지 않습니다.
-5. OpenAI로 되돌릴 때는 `.env`의 `REGULATION_EMBED_PROVIDER=openai`로 바꾼 후 `docker compose up -d --no-deps backend`로 환경변수를 다시 적용합니다(단순 `restart`는 변경한 환경변수를 읽지 않습니다). DB는 실행 중이어야 하며 기존 OpenAI 벡터와 키를 사용합니다. BGE 벡터·기존 OpenAI 행은 삭제하거나 덮어쓰지 않습니다. 스키마 변경·Python 의존성 추가는 없습니다. 모델/풀링/가중치를 바꾸는 경우 같은 이름의 벡터를 그대로 재사용하지 말고 별도 이관·검증이 필요합니다.
-
-외부 연결 없는 회귀 검사는 `backend/`에서 `python -m unittest discover -s tests -p test_regulation_embeddings.py -v`로 실행합니다. BGE는 dense만 사용하며 sparse·ColBERT·재순위화는 이번 범위에 없습니다. [공식 모델 카드](https://huggingface.co/BAAI/bge-m3)의 기본 모델과 GGUF F16·llama.cpp 실행을 구분합니다. 샘플 검색 점수는 최종 평가나 사람 리뷰를 대신하지 않습니다.
-
-2026-11-06 서비스 연결 전 독립 색인 생성 기록: 활성 규정 1,406청크의 1,024차원 BGE 벡터를 별도 모델 행으로 준비했습니다. 중단 시점의 1,034개에서 누락 372개를 생성하고 긴 조항 5개를 본문 전체로 갱신했습니다(저장 377회). 모든 행의 입력 SHA-256·차원·유한값·영벡터·누락을 검사했고 본문 절단은 0건입니다. 기존 OpenAI 규정 벡터 1,410개는 전후 내용 지문이 같았습니다. 로컬 CPU llama.cpp b11972·CLS pooling·`pqnet/bge-m3-gguf` F16을 사용했으며 가중치 SHA-256은 `970365953c8d47b07751a37d3333f641d2287495bea27111b1b955aa0ea20dca`입니다. 로컬 산출물은 Git 제외 경로 `.cache/embedding-eval/bge-m3-regulations.json`(15,212,194바이트, SHA-256 `faa0c024293b441452256ffb39d5b9df778c2b6d5a2e7600f10a6ef02aec2205`), 실행 근거는 같은 폴더의 `standalone-result.json`입니다. 실제 검색 2건에서 연차 이월은 취업규칙 제33조의4, 재택근무 장소 이탈은 유연근무제 운영기준 제30조가 1위였습니다. 검색 표본 확인이며 답변 생성·최종 품질 평가는 수행하지 않았습니다.
-
-서비스 연결 전 단계에서 AI가 도구·검사를 작성하고 실행했습니다. 당시 전체 검사 명령은 네트워크 차단·읽기 전용 Docker의 `python -m unittest discover -s tests -q`이며 `/tmp`는 임시 쓰기 영역, 고정 토크나이저를 지정했습니다. 현재 작업 트리에서는 별도로 진행된 `agents/regulation.py` 검색 개수 4→5 변경으로 기존 검사 3개가 실패했습니다. 해당 파일을 수정하지 않고 검사 컨테이너에서만 저장소 원본을 읽은 결과, 821개 수집·818개 통과·외부 실제 카탈로그 스냅샷 미지정 3개 제외였습니다. BGE 관련 검사 18개는 통과했고 `docker compose build backend`, `git diff --check`도 통과했습니다. 기존 서비스 재시작·전환, 커밋·푸시는 수행하지 않았으며 사람 리뷰는 남아 있습니다.
-
-### Docker 서비스 연결 확인 (2026-11-06)
-
-사용자 요청에 따라 규정 검색을 BGE-M3로 연결하고 실행 중인 로컬 백엔드에 적용했습니다. `docker compose build backend`, `docker compose up -d --no-deps --wait --wait-timeout 90 bge-m3 backend` 후, `docker compose restart bge-m3 backend`로 실제 재시작하고 다시 검색을 확인했습니다. Ollama·OpenAI 두 생성 모드 모두 규정 검색에서 BGE를 사용했고 연차 이월의 1위는 취업규칙 제33조의4였습니다. 검증 프로세스에서 OpenAI 임베딩 호출을 실패하도록 막아도 규정 검색이 성공했고, BGE 주소 오류는 명시적 연결 실패로 유지됐습니다. API 문서 200, 프런트 프록시를 통한 인증 없는 API 요청 401로 백엔드 연결도 확인했습니다. LLM 답변 생성과 브라우저 대화 전체 흐름은 이 검사에 포함하지 않았습니다.
-
-서버는 공식 CPU 이미지 llama.cpp b12124, digest `sha256:c0a11067c72bb1eb330b8bddbf9869274c195e596bf4fae55fd527102e644b85`로 고정했습니다. 기존 b11972 CPU 색인과 긴 조항 포함 4개 입력의 벡터를 대조한 최소 코사인 유사도는 0.9999993285였습니다. 기존 규정 BGE 1,406개·OpenAI 1,410개를 유지하고 OpenAI 내용 지문도 같았습니다. 모델 파일은 읽기 전용으로 마운트하며 외부 포트는 열지 않습니다. 기록은 Git 제외 경로 `.cache/embedding-eval/docker-bge-compatibility.json`, `active-bge-result.json`, `after-restart-bge-result.json`입니다.
-
-BGE 관련 22개 검사 통과. 위에 설명한 무관한 검색 개수 변경 파일만 검사 컨테이너에서 저장소 원본으로 읽은 전체 검사는 825개 수집·822개 통과·외부 카탈로그 스냅샷 미지정 3개 제외였습니다(`python -m unittest discover -s tests -q`, 네트워크 차단·소스 읽기 전용·`/tmp` 임시 쓰기·고정 토크나이저 지정). `docker compose config --quiet`와 `git diff --check`도 통과했습니다. AI가 위 코드·설정을 수정하고 검증했으며 커밋·푸시·PR 병합과 사람 리뷰는 남아 있습니다.
-
-## 회사 정보·사내 생활 BGE-M3 색인 (#125)
-
-`knowledge.chunks`는 기존 OpenAI 1,536차원 전용 제약이 있으므로 변경하지 않습니다. `db/03_knowledge_bge.sql`이 원문 청크 ID를 외래키로 연결한 `app_ext.knowledge_chunk_vectors`를 추가합니다. 모델은 `BAAI/bge-m3`, 차원은 `vector(1024)`·`dimensions=1024`로 제한합니다. 적용된 `database/` 마이그레이션은 수정하지 않으며, 새 DB 보충 작업의 `setup_db.py`와 아래 명시적 색인 도구에서 이 SQL을 적용합니다. 테이블은 RLS를 사용하고 PUBLIC 권한을 제거합니다. 기존 백엔드 DB 소유자 또는 BYPASSRLS 권한의 서버 역할에서 실행합니다.
-
-입력은 회사 정보·사내 생활의 기존 `chunk_text` 전체이며 청킹·본문·해시·출처·가상 자료 표시는 보존합니다. 공용 `regulation_embeddings.py`가 같은 BGE 서버로 임베딩하고, 입력 SHA-256·차원·벡터 개수·유한값·영벡터를 확인한 뒤 별도 테이블에 배치별 저장합니다. 같은 입력은 재사용하고 누락·변경 입력만 갱신하므로 중단 후 같은 명령으로 재개할 수 있습니다. 검색 요청 중에는 스키마나 벡터를 생성하지 않습니다.
-
-DB와 `bge-m3`가 켜져 있고 백엔드 이미지가 빌드된 상태에서 실행합니다.
+PowerShell에서 저장소 루트 기준:
 
 ```powershell
-docker compose run --rm --no-deps backend python tools/index_knowledge.py
-docker compose run --rm --no-deps backend python tools/index_knowledge.py --apply
-docker compose run --rm --no-deps backend python tools/index_knowledge.py --category "수자원공사 정보" --query "한국수자원공사는 어떤 일을 하나요?"
-docker compose run --rm --no-deps backend python tools/index_knowledge.py --category "사내 생활안내" --query "구내식당 안내는 어디서 확인하나요?"
-docker compose up -d --no-deps backend
+docker compose up -d --wait db
+./scripts/restore-bge-db.ps1             # 이름·크기·해시·모델 계약 검사, DB 쓰기 없음
+./scripts/restore-bge-db.ps1 -Apply      # 별도 growpath_bge_m3 생성·원자적 복원
 ```
 
-기본 명령은 읽기 전용이며 `--apply`에서만 DDL·임베딩·저장을 수행합니다. `--category`를 생략하면 두 범주 전체를 생성합니다. 검색은 같은 모델·1,024차원·원문 해시가 일치하는 벡터만 사용합니다. 벡터 단독 모드는 범주별 코사인 유사도 0.25 이상 상위 5개와 원문·출처를 반환합니다. 기본 하이브리드 모드는 아래 #126 절을 따릅니다. 이 임계값은 기존 검색 조건을 유지한 것으로 BGE 품질 평가로 확정한 값은 아닙니다. 회사 정보는 실제 자료만, 사내 생활은 가상 여부와 제약을 포함해 반환합니다. 색인 일부 누락·원문 변경·연결 실패를 빈 성공이나 OpenAI 자동 복구로 바꾸지 않습니다.
+도구는 기존 DB 덮어쓰기를 거부하고 `--single-transaction --exit-on-error --no-owner --no-acl`로 복원합니다. 역할·권한은 로컬 DB 소유자 기준으로 매핑하며 기존 OpenAI DB를 변경하지 않습니다. 동일 백업 재실행은 restore_state의 archive SHA-256으로 건너뜁니다. 실패 시 기존 DB는 그대로이며 빈 대상 DB에서 재시도할 수 있습니다. 수동 복원한 기존 DB나 다른 백업 해시가 있으면 자동 덮어쓰지 않습니다.
 
-기본 `KNOWLEDGE_EMBED_PROVIDER=bge-m3`를 사용합니다. 기존 OpenAI 검색으로 복구하려면 `.env`에 `KNOWLEDGE_EMBED_PROVIDER=openai`를 지정하고 `docker compose up -d --no-deps backend`로 컨테이너를 재생성합니다. 규정도 복구할 때만 `REGULATION_EMBED_PROVIDER=openai`를 함께 지정합니다. 기존 OpenAI 행·키·모델 설정을 사용하며 새 BGE 테이블은 그대로 보존합니다. `restart`만으로는 환경변수 변경이 반영되지 않습니다. 이번 변경은 Python 의존성을 추가하지 않습니다.
+다른 운영체제에서 PowerShell을 사용하지 않을 때는 PostgreSQL 17 클라이언트로 해시를 검증하고 **새 DB에만** `createdb` 후 `pg_restore --single-transaction --exit-on-error --no-owner --no-acl -d growpath_bge_m3 ...dump`로 복원합니다. DB 접속 값·역할 매핑은 환경에 맞게 지정합니다. 같은 BGE DB 확인 도구로 사후 검사하며 원본 DB나 볼륨을 삭제하지 않습니다.
 
-외부 연결 없는 검사는 `backend/`에서 `python -m unittest discover -s tests -p test_knowledge_embeddings.py -v`로 실행합니다. 기존 규정 검사는 `test_regulation_embeddings.py`, 인증·범주 및 OpenAI 복구 경로는 `test_chatbot_documents.py`입니다. 실제 모델·DB 검색과 최종 검색 품질 평가·브라우저 대화 검증을 구분합니다.
+### 공식 모델과 FP32 Docker 기본값
 
-2026-11-06 로컬 DB 적용 기록: `docker compose build backend` 후 `docker compose run --rm --no-deps backend python tools/index_knowledge.py --apply`로 회사 정보 137개·사내 생활 305개 전체의 BGE-M3 1,024차원 벡터를 실제 생성·저장했습니다(`chunks=442, saved=442`). 같은 명령 재실행은 `saved=0`으로 기존 442개를 재사용했습니다. 기존 규정 1,406개와 합쳐 총 1,848개이며 각 범주의 전체 개수·실제 벡터 차원·원문 입력 해시·영벡터 여부를 확인했습니다. 벡터는 로컬 Docker `pgdata` 볼륨에 저장되며 Git에 포함되지 않습니다. 다른 환경에서는 같은 SQL·도구로 준비합니다.
+공유본과 같은 `BAAI/bge-m3` revision `5617a9f61b028005a4858fdac845db406aefb181`, `pytorch_model.bin` SHA-256 `b5e0ce3470abf5ef3831aa1bd5553b486803e83251590ab7ff35a117cf6aad38`를 사용합니다. 서버는 시작할 때 가중치 해시를 확인하고 요청 응답에 revision·가중치 해시·CLS·L2 계약을 반환하며 클라이언트가 검사합니다. GGUF 변환본으로 대체하지 않습니다.
 
-`docker compose up -d --no-deps --wait --wait-timeout 90 backend`로 실행 중인 로컬 백엔드를 재생성하고 그 컨테이너에서 실제 검색을 확인했습니다. 회사 소개는 공식 홈페이지 발췌, 구내식당 질문은 생활안내서 `W003-1`, 연차 이월은 Ollama·OpenAI 생성 모드 모두 취업규칙 제33조의4가 1위였습니다. OpenAI 임베딩 호출을 실패하도록 차단해도 성공했으며, BGE 주소 오류는 연결 실패로 유지됐습니다. 잘못된 dimensions·1,536차원 벡터·다른 모델·영벡터를 DB 제약이 거부하는 것도 트랜잭션을 되돌려 확인했습니다. 기존 원문 442개·문서 4개·OpenAI 규정 벡터 1,410개·BGE 규정 벡터 1,406개의 전후 내용 지문이 같았고, API 문서 200·프런트 프록시의 인증 없는 요청 401도 확인했습니다. 실행 근거는 Git 제외 경로 `.cache/embedding-eval/knowledge-before.json`, `knowledge-after.json`입니다.
-
-AI가 구현·문서화·위 검증을 직접 수행했습니다. 신규 자료 검사 16개와 기존 규정 검사 22개가 통과했고, 변경 파일 `python -m py_compile`, `docker compose config --quiet`, `git diff --check`도 통과했습니다. 네트워크 차단·소스 읽기 전용 Docker의 전체 `python -m unittest discover -s tests -q`는 고정 `ROADMAP_TOKENIZER_PATH=/srv/growpath/tokenizer_assets/qwen38.json` 지정 시 839개 실행·실패 3건(하위 사례 포함)·외부 카탈로그 미지정 3개 제외였습니다. 실패는 기존 미커밋 `agents/regulation.py`의 검색 개수 4→5와 기존 기대값의 불일치입니다. 이 파일은 보존하고 검사 컨테이너에서만 저장소 원본으로 읽은 뒤 신규 2개 검사를 더한 결과는 841개 실행·838개 통과·3개 제외였습니다. 로그는 `.cache/embedding-eval/backend-knowledge-tests.log`, `backend-knowledge-isolated-tests.log`입니다. 유료 API·LLM 답변 생성·브라우저 대화 전체·최종 검색 품질 평가·커밋·푸시·사람 리뷰는 수행하지 않았습니다.
-
-## BM25·pgvector 하이브리드 검색 (#126)
-
-알려진 제한은 [직군별 공통 규정 준용 검색·가데이터 분기 수정 #128](https://github.com/20260528-skn-family-ai-33/SKN33-Final-2Team/issues/128)에서 **수정 중(분석 완료·구현 예정)**으로 추적합니다. 현재 직군 필터는 일반직으로 분류된 공통 규정을 다른 직군의 준용 근거로 가져오지 않습니다. 직군 추출·지원 조건 검색어·기존 가데이터 분기와 조 번호도 후속 범위이며 이번 BGE-M3·하이브리드 검색 변경에서 해결됐다고 보지 않습니다.
-
-사내규정·수자원공사 정보·사내 생활의 기본 BGE 검색은 `ASSISTANT_SEARCH_MODE=hybrid`입니다. 검색어를 BGE-M3로 임베딩해 pgvector 후보를 얻고, 같은 허용 원문 전체에서 BM25 후보를 독립적으로 찾습니다. 양쪽 상위 50개(규정 요청 개수가 50보다 크면 그 개수)의 합집합을 `sum(1/(60+rank))` RRF로 합쳐 규정은 요청 개수, 회사·생활은 최대 5개를 반환합니다. 회사·생활의 코사인 0.25 기준은 벡터 후보에만 적용하며 BM25 전용 후보를 제거하는 기준으로 쓰지 않습니다. `rrfScore`는 코사인 유사도나 답변 신뢰도가 아닙니다. 회사·생활 결과의 `retrieval`에 두 순위·원점수·RRF 점수를 구분해 남기며 BM25 전용 후보의 `similarity`는 `None`입니다.
-
-`app/hybrid_search.py`는 [BM25 수식](https://www.elastic.co/blog/practical-bm25-part-2-the-bm25-algorithm-and-its-variables)의 양수 IDF·포화 TF·문서 길이 정규화(`k1=1.2`, `b=0.75`)와 [RRF 순위 합산](https://www.elastic.co/docs/reference/elasticsearch/rest-apis/reciprocal-rank-fusion)을 표준 라이브러리로 구현합니다. 한국어는 NFKC·소문자 정규화한 단어와 한글 2음절 조각을 함께 쓰고, 영문·숫자·코드·조 번호 토큰을 보존합니다. 형태소 분석기나 최종 튜닝된 한국어 분석기는 아닙니다. 원문 ID·본문·검색 범위가 같은 최대 8개 스냅샷의 BM25 역색인을 프로세스 메모리에 캐시합니다. 변경·추가·삭제되면 새 키로 색인하고 재시작 후 첫 요청에서 다시 구성합니다. DB 스키마·벡터·원문 변경이나 새 패키지·검색 서버·유료 API는 필요하지 않습니다.
-
-규정은 직원 구분·활성 규정·국외 필터를 적용한 뒤 두 검색을 수행합니다. 같은 실제 부모 조 노드의 항들은 가장 높은 후보를 대표로 삼아 한 조가 결과를 독점하지 않게 합니다. 규정명과 조 번호를 지정하면 기존 구조화 조회의 정확한 대상 ID를 RRF 순위보다 우선하며 `exactReference=true`로 구분합니다. 사내 도우미 답변 구성에서는 직접 참조한 항 보충을 유지하고, 남은 전체 근거 7개 한도 안에서 같은 부모의 항을 최대 2개 보충합니다. 원래 청크 ID·원문·인용을 유지하고 다른 규정·직원 구분·국외 범위의 항을 가져오지 않습니다. 회사 정보는 실제 자료 필터, 사내 생활은 범주·가상 여부·출처 제약을 양쪽 검색에 동일하게 적용합니다. BGE 연결·색인 오류를 BM25 단독 성공으로 바꾸지 않습니다. OpenAI 복구·가데이터 모드의 기존 검색은 유지합니다.
-
-적용·복구:
+다음 파일을 공식 revision에서 Git 제외 폴더에 준비합니다(가중치 약 2.27GB).
 
 ```powershell
-docker compose build backend
-docker compose up -d --no-deps --wait --wait-timeout 90 backend
-# 기존 벡터 단독으로 복구: .env에 ASSISTANT_SEARCH_MODE=vector를 지정한 뒤
-docker compose up -d --no-deps backend
+$revision = '5617a9f61b028005a4858fdac845db406aefb181'
+New-Item -ItemType Directory -Force .cache/bge-m3-official-5617a9f | Out-Null
+foreach ($file in @('config.json','tokenizer.json','tokenizer_config.json','special_tokens_map.json','pytorch_model.bin')) {
+  curl.exe -L --fail "https://huggingface.co/BAAI/bge-m3/resolve/$revision/$file" -o ".cache/bge-m3-official-5617a9f/$file"
+  if ($LASTEXITCODE -ne 0) { throw "다운로드 실패: $file" }
+}
 ```
 
-임베딩을 다시 생성하는 `index_*.py --apply`는 이 검색 방식 변경에 필요하지 않습니다. 외부 연결 없는 검사는 `backend/`에서 `python -m unittest discover -s tests -p test_hybrid_search.py -v`로 실행하며, 전체 검사는 `python -m unittest discover -s tests -q`입니다. BM25 수식·독립 후보 합집합·RRF 중복/동률·한국어/조 번호·캐시 갱신·직원/범주/부모 격리·실패 유지·원래 인용 ID의 답변 전달을 확인합니다.
+`BGE_M3_MODEL_DIR` 기본값은 위 폴더입니다. **CPU 추론 기본은 `BGE_M3_DTYPE=float32`**, 정규화·출력도 FP32입니다. 사용자가 명시적으로 `float16`을 선택할 수 있지만 자동으로 정밀도를 낮추지 않습니다. CPU/GPU 선택과 정밀도는 별개이며 현재 서비스는 CPU입니다. 공유 DB는 GPU FP16 추론·FP32 정규화/저장으로 생성됐습니다. 모델·revision·입력·정규화가 같은 상태에서 CPU FP32와 저장 벡터의 수치 일치도를 별도 확인해 재사용합니다. FP32가 최종 검색 정답률 향상을 보장하는 것은 아닙니다.
 
-2026-11-06 AI 직접 검증·로컬 적용 기록: `docker compose build backend`와 위 `up` 명령으로 실행 중인 로컬 백엔드를 재생성했습니다. 그 컨테이너에서 실제 질의 7개를 벡터 단독·하이브리드로 각각 실행했습니다. 연차 이월은 취업규칙 제33조의4, 재택근무 장소이탈은 유연근무제 운영기준 제30조, 구내식당은 생활안내서 `W003-1`, 주차출입증은 `W025-2`가 두 모드 모두 1위였습니다. ‘디지털 물관리’는 벡터의 지속가능경영보고서에서 BM25가 합쳐진 공식 홈페이지 발췌로 1위가 바뀌었습니다. 규정명·조 번호를 직접 지정한 ‘취업규칙 제33조의4’는 벡터 단독에서 다른 규정 제33조가 1위였으나 정확한 구조화 ID를 우선한 하이브리드에서는 요청한 조항이 1위였습니다. 순수 RRF만의 개선으로 해석하지 않습니다. 실제 제20조 제3항과 같은 부모의 제1·2항을 보충하는 것도 확인했습니다. 이 7개는 구현 확인용 표본이며 합의된 정답셋의 검색 품질 평가가 아닙니다.
+서버는 로컬 파일만 읽고 `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`로 실행합니다. 8,192토큰 초과 입력은 조용히 자르지 않고 오류입니다. CPU 스레드는 `BGE_M3_THREADS`(기본 4)로 조절합니다. 장문 임베딩의 메모리·시간은 입력 길이에 따라 별도 확인해야 합니다.
 
-검증 프로세스에서 OpenAI 임베딩 호출을 차단해도 검색이 성공했고, BGE 연결 오류는 명시적 실패였습니다. 규정 BGE 1,406개·회사/생활 BGE 442개·원문 442개·OpenAI 규정 1,410개의 전체 행 내용 지문이 검색 전후 동일했습니다. API 문서 200·프런트 프록시의 인증 없는 요청 401을 확인했습니다. 검색 기록·모드별 시간·순위·원점수·부모 예시·보존 지문은 Git 제외 `.cache/embedding-eval/hybrid-search-result.json`에 보존했습니다.
+```powershell
+docker compose up -d --build --wait --wait-timeout 180
+docker compose ps
+docker compose exec backend python tools/verify_bge_database.py --server
+```
 
-현재 작업 트리 전체를 네트워크 차단·소스 읽기 전용 Docker에서 `ROADMAP_TOKENIZER_PATH=/srv/growpath/tokenizer_assets/qwen38.json` 지정 후 `python -m unittest discover -s tests -q`로 검사한 결과 855개 실행·852개 통과·외부 카탈로그 미지정 3개 제외였습니다. 이전 #125 기록의 검색 개수 불일치는 기존 5개 검색 동작을 보존하고 두 검사 파일의 기대값을 5개로 맞춰 해결했습니다. 로그는 `.cache/embedding-eval/backend-hybrid-tests.log`입니다. 변경 Python 파일의 `python -m py_compile`, `docker compose config --quiet`, `git diff --check`도 통과했습니다. 유료 API·실제 LLM 답변 생성·브라우저 대화 전체·최종 품질 평가·사람 리뷰·커밋·푸시·PR 병합은 수행하지 않았습니다.
+화면은 `http://localhost:8816`, API 문서는 `http://localhost:8815/api/docs`입니다. DB와 검색 서버는 서로 다른 컨테이너이며 BGE API는 Docker 내부에서만 열립니다. 확인 명령의 `database=growpath_bge_m3`, `vectors=4832`, `server.precision=float32`, `normalization_dtype=float32`를 확인합니다. `backend-setup`이 0으로 종료되는 것은 읽기 전용 검증을 마친 정상 상태입니다.
+
+`GP5_DB_NAME=growpath`는 보존할 기존 DB, 앱 연결은 `GP5_APP_DB_NAME=growpath_bge_m3`로 분리합니다. Docker는 앱 URL을 이 이름으로 구성하고 로컬 Python도 같은 변수를 사용합니다. 공유 DB에는 기존 `setup_db.py`의 보충·비밀번호 초기화·OpenAI 설치를 실행하지 않습니다. Compose의 기존 OpenAI 복원 서비스는 `legacy-openai` 프로필로 분리했습니다.
+
+### 사전 색인·재실행·검증
+
+공유본은 이미 4,832개가 색인되어 있으므로 **재임베딩이 필요하지 않습니다.** 규정의 재구성 본문 입력을 그대로 사용하지 않고 원래 공유 입력 계약으로 맞췄습니다. 처음에는 다음 읽기 전용 검사를 사용합니다.
+
+```powershell
+docker compose exec backend python tools/verify_bge_database.py --server
+docker compose exec backend python tools/index_regulations.py
+docker compose exec backend python tools/index_knowledge.py
+```
+
+`index_*.py --apply`는 명시적인 생성·저장 옵션입니다. 동일 공유본에서는 기존 벡터를 재사용해 saved=0이어야 하며 정상 사용을 위해 실행할 필요는 없습니다. 원문이 변경된 경우 입력 해시와 #124 provenance를 함께 갱신하는 별도 재색인·검증이 필요합니다. 검색 중에는 DB·색인을 쓰거나 누락 벡터를 OpenAI로 자동 보충하지 않습니다.
+
+실제 검색·후보 후처리 검증(생성 LLM 없음):
+
+```powershell
+docker compose exec backend python tools/check_bge_search.py --output /tmp/bge-search-result.json
+docker compose cp backend:/tmp/bge-search-result.json .cache/embedding-eval/bge-search-result.json
+```
+
+규정·회사·생활 실제 검색, 12주제×Free/Crash/Challenge 36개 강좌·도서 검색, 가격·스킬·사용 가능 범위·원래 입력 보존, 고정 응답 기반 추천 후처리를 확인합니다. OpenAI 임베딩 호출을 차단하고 CPU 질문 임베딩을 포함한 전체 검색 시간·저장 벡터 대조·전후 DB 지문을 기록합니다. 실제 생성 LLM의 최종 추천 품질·전체 브라우저 대화·동시 사용자 성능과 구분합니다. #124의 RTX 3060 GPU 속도 수치를 현재 CPU 성능으로 사용하지 않습니다.
+
+단위 검사는 `backend/`에서 `python -m unittest discover -s tests -q`로 실행합니다. 기존 규정·회사·BM25 검사와 `test_shared_bge_database.py`, 자료 추천의 Free/Crash/Challenge 정책 검사를 함께 수행합니다.
+
+### 2026-11-06 실제 FP32 Docker 연결·검증
+
+PR #129 브랜치에서 최신 main `26f3867`을 반영하고 공유 백업을 별도 DB에 복원했습니다. `docker compose up -d --build --wait --wait-timeout 180` 후 실제 서버의 `device=cpu`, `precision=float32`, `normalization_dtype=float32`, 모델 revision·가중치 해시·CLS·L2를 확인했습니다. 화면 8816·API 문서 8815의 HTTP 200, DB 계약 검사 4,832개 유효를 확인했습니다. 기존 OpenAI `growpath` DB의 **79개 테이블 전체 행 수·내용 지문은 전환 전후 동일**했습니다. 동일 백업 재복원은 건너뛰고 규정·회사 색인 명령의 명시적 재실행도 `saved=0`이었습니다.
+
+CPU FP32와 공유 GPU FP16 저장 벡터를 짧은 규정·회사/생활 원문 4개로 대조한 최소 코사인 유사도는 **0.9999988443**이었습니다. 같은 모델·입력 계약으로 기존 벡터를 재사용했으며 재임베딩은 수행하지 않았습니다. 이 표본 대조를 전체 장문 문서의 수치 동등성·검색 품질 평가로 확대하지 않습니다.
+
+OpenAI 임베딩 호출을 실패하도록 막은 실제 복원 DB 검사에서 규정·회사·생활 검색과 별도로 구성한 **12주제×3코스 36건의 강좌·도서 후보 검색**이 모두 성공했습니다. 최소 강좌 4개·도서 3개였고, Free 유료 강좌·스킬/사용 가능 범위 이탈은 없었습니다. 고정 응답 기반 추천 후처리도 모든 사례에서 강좌·도서 각각 최소 1개를 반환했고 허용 후보 밖을 선택하지 않았습니다. 기존 Crash 필수 기술·핵심 범위·Challenge 정책 단위 검사도 함께 통과했습니다. 실제 생성 LLM은 호출하지 않았습니다.
+
+동일 Docker CPU FP32 서버의 모델 로딩 후 순차 실행에서 질문 임베딩 캐시는 사례마다 초기화했습니다. 강좌·도서 검색(질문 임베딩+SQL+후보 후처리) 36건은 **중앙값 985.75ms, p95 1,315.57ms, 범위 721.25~1,501.34ms**였습니다. 사내 도우미 첫 규정 검색은 BM25/규정 캐시 준비를 포함해 4,182.43ms, 이후 회사 321.33ms·생활 401.19ms였습니다. 각각 표본이며 LLM/HTTP 전체·동접 성능이 아닙니다. #124의 GPU 수치나 서로 다른 OpenAI 스냅샷과 개선율을 계산하지 않았습니다.
+
+AI가 구현·검사를 직접 실행했습니다. 네트워크 차단·소스 읽기 전용 Docker의 `python -m unittest discover -s tests -q`는 **901개 실행·898개 통과·외부 카탈로그 스냅샷 미지정 3개 제외**였습니다. 고정 `ROADMAP_TOKENIZER_PATH=/srv/growpath/tokenizer_assets/qwen38.json`을 지정했습니다. 로그·원본 DB 지문·실제 검색 결과·FP32 health는 Git 제외 `.cache/embedding-eval/backend-shared-bge-fp32-tests.log`, `original-db-before-124.json`, `original-db-after-124.json`, `shared-bge-fp32-integration.json`, `shared-bge-fp32-health.json`에 보존했습니다. 실행 중간 FP16 검사 기록은 현재 FP32 결과와 구분합니다. 최종 검색 품질 평가·실제 LLM 추천·전체 브라우저 대화·사람 리뷰·후속 직군 #128 수정은 남아 있습니다.
+
+### 복구와 이전 기록
+
+전체 OpenAI 경로로 복구하려면 보존한 `growpath` DB와 그 모델/1,536차원 계약을 지원하는 이전 코드(예: 이번 전환 전 main `26f3867`)를 함께 사용합니다. 현재 전체 BGE 코드에서 DB 이름만 OpenAI DB로 바꾸면 모델/차원 검사가 실패하는 것이 정상입니다. 일반 restart는 환경변수를 다시 읽지 않으므로 변경 후 컨테이너를 재생성합니다. 원본 DB와 볼륨을 삭제하지 않습니다.
+
+이전 PR의 sidecar/GGUF·1,848개 벡터·자료 추천 OpenAI 경로는 현재 설치 방식이 아닙니다. 과거 실험과 실제 실행 기록은 #122·#125·#126 및 PR #129의 이전 커밋 `da95632`에서 확인합니다. 현재 변경은 같은 PR #129에서 #124 공유 백업을 연결하는 작업입니다. #128 직군별 공통 규정 준용·가데이터 분기는 해결 완료로 표시하지 않습니다.
 
 ## 목표 후보 사전 준비
 

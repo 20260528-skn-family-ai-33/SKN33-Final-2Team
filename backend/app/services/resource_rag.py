@@ -7,12 +7,13 @@ import json
 import math
 from time import perf_counter
 from app import db, llm
+from app import regulation_embeddings as embeddings
 from app.agents.resource_recommendations import RecommendationError, candidate_pools
 from app.services import book_candidates, resource_evidence
 
-MODEL = 'text-embedding-3-small'
-DIMENSIONS = 1536
-VERSION = 'resource-pgvector-rag/v17-english-boundaries'
+MODEL = embeddings.BGE_MODEL
+DIMENSIONS = embeddings.BGE_DIMENSIONS
+VERSION = 'resource-pgvector-rag/v18-bge-m3-shared-db'
 PER_KIND = 6
 COURSE_REVIEW = 20
 FIELDS = ('id','title','provider','cost','hours','estimated','image','url','skills','content','curriculum')
@@ -46,17 +47,13 @@ def validate_vectors(vectors, count):
         if (not isinstance(vector,(list,tuple)) or len(vector)!=DIMENSIONS or
             not all(isinstance(value,(int,float)) and not isinstance(value,bool) and math.isfinite(value) for value in vector) or
             not any(vector)):
-            raise RecommendationError('자료 검색 임베딩은 유효한 1536차원 벡터여야 해요.')
+            raise RecommendationError('자료 검색 임베딩은 유효한 BGE-M3 1024차원 벡터여야 해요.')
     return vectors
 
 
 @lru_cache(maxsize=128)
 def cached_vectors(texts: tuple[str,...]):
-    if llm.embed_model()!=MODEL:
-        raise RecommendationError('자료 검색에는 저장된 벡터와 같은 text-embedding-3-small 모델이 필요해요.')
-    if not llm.embed_ready():
-        raise RecommendationError('자료 검색 임베딩에 필요한 OpenAI 키가 없어요.')
-    return tuple(tuple(vector) for vector in validate_vectors(llm.embed(list(texts)),len(texts)))
+    return tuple(tuple(vector) for vector in validate_vectors(embeddings.embed(list(texts)),len(texts)))
 
 
 def search_vectors(resource_type, ids, vector, limit, free_only):
@@ -65,13 +62,17 @@ def search_vectors(resource_type, ids, vector, limit, free_only):
     return db.all_("""SELECT e.resource_id, m.cost_won AS current_cost,
             1-(e.embedding <=> CAST(:query AS vector)) AS similarity
         FROM public.learning_resource_embeddings e
+        JOIN growpath_bge_meta.inputs p ON p.kind=e.resource_type AND p.source_id=e.resource_id
+            AND p.source_sha256=e.input_sha256 AND p.model_revision=:revision
         JOIN app_ext.resource_meta m ON m.resource_key =
             CASE WHEN e.resource_type='books' THEN 'book_' || e.resource_id ELSE e.resource_id END
         WHERE e.resource_type=:kind AND e.resource_id=ANY(:ids)
             AND e.embedding_model=:model AND e.dimensions=:dims AND e.embedding IS NOT NULL
+            AND e.input_version='db-resource-fields-and-skill-links/v1'
             AND (NOT :free_only OR m.cost_won=0)
         ORDER BY e.embedding <=> CAST(:query AS vector), e.resource_id LIMIT :limit""",
-        query=json.dumps(vector,allow_nan=False),kind=resource_type,ids=ids,model=MODEL,dims=DIMENSIONS,limit=limit,free_only=free_only)
+        query=json.dumps(vector,allow_nan=False),kind=resource_type,ids=ids,model=MODEL,dims=DIMENSIONS,
+        revision=embeddings.PROVENANCE['model_revision'],limit=limit,free_only=free_only)
 
 
 def retrieve(project, selection, items, course=None, *, embed=None, search=None):

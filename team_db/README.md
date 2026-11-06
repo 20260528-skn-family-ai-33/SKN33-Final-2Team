@@ -2,9 +2,17 @@
 
 이 폴더의 백업 파일은 Git에 올리지 않아요(`.gitignore`). 이 안내 파일만 올라가요.
 
+## 현재 기본: #124 공유 BGE DB
+
+`growpath_bge_m3_embedding.dump`(36,077,485바이트, SHA-256 `d96c16ceeca8f8d6de8015d2f40903b9f7d6ccecddc8fc33f1e7213bd2a48c4b`)와 동반 manifest를 이 폴더에 둡니다. 저장소 루트에서 `docker compose up -d --wait db` 후 `./scripts/restore-bge-db.ps1 -Apply`로 **별도 `growpath_bge_m3`**에 복원합니다. 도구는 이름·크기·해시·모델 계약을 확인하고 기존 DB 덮어쓰기를 거부합니다. 동일 백업 재실행은 DB를 바꾸지 않습니다.
+
+현재 앱의 `GP5_APP_DB_NAME`은 이 BGE DB입니다. 기존 `growpath` OpenAI DB와 백업은 보존하며 `down -v`로 볼륨을 지우지 않습니다. [전체 검색 연결·모델 준비·재실행 안내](../backend/README.md#공유-bge-m3-db-연결-124)를 따릅니다. BGE는 2026-11-06 로컬 스냅샷, 기존 Drive OpenAI 공유본은 2026-11-04이므로 모델만 다른 동일 데이터로 비교하지 않습니다.
+
+## 이전 OpenAI 백업 보관
+
 - 넣을 파일: `growpath_latest.dump` (pg_dump custom 형식). 직원·부서·보유 스킬·자격·학력이 모두 이 백업에 들어 있어요(따로 받는 직원 엑셀 없음). 새 판도 같은 이름으로 올라와요.
 - 받는 곳: 팀 산출물 드라이브의 `데이터 수집 및 저장 › DB` 폴더(DB 담당). 백업과 함께 올라온 `growpath_latest.manifest.json`도 받아 이 폴더에 두고, 백업의 크기·SHA-256이 그 manifest와 같은지 확인해요. 저장소의 `database/data/exports/growpath_latest.manifest.json`은 DB 담당이 갱신하기 전까지 이전 판일 수 있어요.
-- 넣은 뒤: 저장소 맨 위에서 `docker compose up -d --build` → DB가 비어 있을 때만 이 파일로 복원해요. 새 판으로 바꿀 때는 `docker compose down -v`로 DB 볼륨을 지운 뒤 다시 올려요(그 DB에 쌓인 시험 기록도 지워져요).
+- 이전 OpenAI 복원 서비스는 `legacy-openai` 프로필로 분리했으며 기본 BGE 설치에서 실행하지 않습니다. 백업 교체 시에도 기존 DB·볼륨을 지우지 않고 별도 DB를 사용합니다.
 - 이름이 다른 백업을 쓰려면 `.env`의 `TEAM_DB_FILE`을 그 이름으로 고쳐요.
 
 ## 규정 원문 PDF (`regulations/`)

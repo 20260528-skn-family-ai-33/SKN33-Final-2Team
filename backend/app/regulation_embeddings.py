@@ -1,4 +1,4 @@
-"""사내 도우미 공용 BGE-M3 연결. CLS pooling·정규화 dense 1024차원 서버를 사용한다."""
+"""규정·회사·생활·학습 자료 공용 BGE-M3 연결. 고정 revision·CLS·L2·1024차원을 검사한다."""
 from __future__ import annotations
 
 import json
@@ -9,13 +9,12 @@ from urllib.parse import urlparse
 
 from . import llm
 from .config import env
+from .bge_model import MODEL as BGE_MODEL, DIMENSIONS as BGE_DIMENSIONS, PROVENANCE
 
-BGE_MODEL = 'BAAI/bge-m3'
-BGE_DIMENSIONS = 1024
 
 
 def search_provider() -> str:
-    provider = env('REGULATION_EMBED_PROVIDER', 'openai').strip().lower()
+    provider = env('REGULATION_EMBED_PROVIDER', 'bge-m3').strip().lower()
     if provider not in ('openai', 'bge-m3'):
         raise llm.LlmError('BGE-M3 설정: REGULATION_EMBED_PROVIDER는 openai 또는 bge-m3여야 해요')
     return provider
@@ -86,7 +85,7 @@ def _bge_request(texts: list[str]) -> list[list[float]]:
     except (ValueError, UnicodeError):
         raise llm.LlmError('BGE-M3 응답 형식: 올바른 JSON이 아니에요') from None
     try:
-        if result['model'] != BGE_MODEL:
+        if result['model'] != BGE_MODEL or any(result.get(key) != value for key, value in PROVENANCE.items()):
             raise ValueError
         rows = result['data']
         if len(rows) != len(texts) or any(type(row['index']) is not int for row in rows):

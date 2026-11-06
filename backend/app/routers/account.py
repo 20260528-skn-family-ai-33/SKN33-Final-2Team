@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import JSONResponse
 
-from .. import db, llm
+from .. import db, llm, regulation_embeddings
 from ..agents import runtime as rt
 from ..auth import Account, end_session, login, require_account, require_employee, start_session
 from ..config import S, level_ok
@@ -131,13 +131,13 @@ def api_providers(a: Account = Depends(require_account)):
     cur = _settings(a.id)['aiProvider'] if a.type == 'employee' else 'ollama'
     return {'current': cur, 'demoMode': S.demo_mode, 'providers': [
         {'id': 'ollama', 'label': 'RunPod-Ollama', 'available': llm.available('ollama'), 'reason': unavailable_reason('ollama'), 'target': S.ollama_target if S.ollama_url else '',
-         'models': dict({r: llm.model_name('ollama', r) for r in ('default', 'roadmap', 'regulation', 'vision')}, embed=llm.embed_model()),
+         'models': dict({r: llm.model_name('ollama', r) for r in ('default', 'roadmap', 'regulation', 'vision')}, embed=regulation_embeddings.model()),
          'timeout': S.ollama_timeout,
          # 추론 정도(진단·로드맵 모델 · 규정 모델은 늘 끔): default 는 .env 기본값(비면 null = 모델 기본값).
          # Ollama 단계는 모델마다 달라 연결 확인(/ai/status)의 진단·로드맵 모델 models[].think 로 준다
          'reasoning': {'levels': None, 'default': S.ollama_think}},
         {'id': 'openai', 'label': 'OpenAI API', 'available': llm.available('openai'), 'reason': unavailable_reason('openai'),
-         'models': {'default': S.openai_model, 'roadmap': S.openai_model, 'regulation': S.openai_model, 'embed': S.openai_embed, 'vision': S.openai_vision},
+         'models': {'default': S.openai_model, 'roadmap': S.openai_model, 'regulation': S.openai_model, 'embed': regulation_embeddings.model(), 'vision': S.openai_vision},
          # modelDefault: 보내지 않을 때 모델이 쓰는 값(기본 모델 gpt-6-luna 만 코드에 있음 · 화면 '기본값 · 보통' 표시용)
          'reasoning': {'levels': list(S.openai_reasoning_levels), 'default': S.openai_reasoning, 'modelDefault': S.openai_model_reasoning}}],
         'docLibs': {'pdf': _has('pypdf'), 'hwp': _has('olefile')}}

@@ -114,6 +114,7 @@ class KnowledgeEmbeddingTest(unittest.TestCase):
         source = chunk('긴 원문' * 2000)
         for stored in ([], [{'chunk_id': 'c1', 'input_sha256': 'old', 'dimensions': 1024}]):
             transaction = Mock()
+            transaction.run.return_value = 1
 
             @contextmanager
             def tx():
@@ -122,8 +123,8 @@ class KnowledgeEmbeddingTest(unittest.TestCase):
             with self.subTest(stored=stored), patch.object(search.db, 'all_', return_value=stored), patch.object(embeddings, 'embed', return_value=[VECTOR]) as embed, patch.object(search.db, 'tx', tx):
                 self.assertEqual(search.ensure_vectors([source]), 1)
             embed.assert_called_once_with([source['chunk_text']])
-            self.assertIn('INSERT INTO app_ext.knowledge_chunk_vectors', transaction.run.call_args.args[0])
-            self.assertNotIn('UPDATE knowledge.chunks', transaction.run.call_args.args[0])
+            self.assertIn('UPDATE knowledge.chunks', transaction.run.call_args.args[0])
+            self.assertNotIn('INSERT INTO', transaction.run.call_args.args[0])
             self.assertEqual(transaction.run.call_args.kwargs['dims'], 1024)
 
     def test_bad_source_hash_and_invalid_vectors_never_write(self):
@@ -145,6 +146,7 @@ class KnowledgeEmbeddingTest(unittest.TestCase):
         def save(sql, **params):
             stored[params['id']] = {'chunk_id': params['id'], 'dimensions': params['dims'],
                                     'input_sha256': params['sha']}
+            return 1
 
         transaction.run.side_effect = save
 

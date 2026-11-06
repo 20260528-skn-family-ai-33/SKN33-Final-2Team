@@ -25,6 +25,9 @@ class EmployeeChatbotTest(unittest.TestCase):
     job_id = '00000000-0000-4000-8000-000000000001'
 
     def setUp(self):
+        settings = patch.dict(os.environ, REGULATION_EMBED_PROVIDER='openai')
+        settings.start()
+        self.addCleanup(settings.stop)
         app = FastAPI()
         app.include_router(work.r)
         app.add_exception_handler(ApiError, api_error_handler)

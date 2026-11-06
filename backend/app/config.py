@@ -52,7 +52,7 @@ def _local_db_url() -> str:
     password = env('GP5_DB_PASSWORD')
     if not password:
         return ''
-    user, name = quote(env('GP5_DB_USER', 'growpath'), safe=''), env('GP5_DB_NAME', 'growpath')
+    user, name = quote(env('GP5_DB_USER', 'growpath'), safe=''), env('GP5_APP_DB_NAME', 'growpath_bge_m3')
     return f"postgresql+psycopg://{user}:{quote(password, safe='')}@127.0.0.1:{env('GP5_DB_PORT', '55435')}/{name}"
 
 

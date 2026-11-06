@@ -71,7 +71,7 @@ flowchart TB
     API --> AGENTS["진단·로드맵 계획·규정 에이전트"]
     API --> DB["PostgreSQL + pgvector<br/>프로필·계획·자료·기록·벡터"]
     AGENTS --> LLM["RunPod-Ollama / OpenAI<br/>문항·계획·근거 답변 생성"]
-    AGENTS --> EMBED["검색<br/>사내 도우미 BM25 + BGE-M3 + RRF<br/>학습 자료 OpenAI"]
+    AGENTS --> EMBED["검색<br/>전체 BGE-M3 1024차원<br/>사내 도우미 BM25 + RRF"]
     EMBED --> DB
 ```
 
@@ -85,14 +85,14 @@ flowchart TB
 | 팀 파인튜닝 27B · Q4_K_M | 목표·스킬·문항·로드맵 등 학습 계획 생성. Ollama 이름은 `growpath-27b`입니다. |
 | 팀 파인튜닝 4B · BF16 | 규정·회사 답변과 지원 조건 해석. Ollama 이름은 `growpath-regulation-4b`이며 추론 모드는 항상 끕니다. |
 | OpenAI 생성 모드 | 화면에서 선택할 수 있는 대체 생성 경로. 사용할 모델은 서버 설정으로 지정합니다. |
-| `text-embedding-3-small` | 학습 자료 추천의 1,536차원 임베딩과 사내 도우미 검색의 수동 복구 경로입니다. 이 경로에는 OpenAI 키가 필요합니다. |
-| `BAAI/bge-m3` | 사내규정·수자원공사 정보·사내 생활 검색용 1,024차원 임베딩입니다. `bge-m3` 컨테이너에서 질문을 임베딩하고 같은 모델로 저장한 벡터를 검색합니다. |
+| `text-embedding-3-small` | 보존한 이전 OpenAI DB의 1,536차원 모델입니다. 현재 공유 BGE DB의 검색에는 사용하지 않습니다. |
+| `BAAI/bge-m3` | 규정·회사 정보·사내 생활·강좌·도서 등 전체 검색용 1,024차원 모델입니다. 공식 고정 revision의 CPU 서버에서 기본 FP32 추론·CLS·FP32 L2 정규화로 질문을 임베딩합니다. |
 
 [분류 모델 연결](backend/classification.md) · [27B 모델 안내](backend/models/fine_tunning/README.md) · [RunPod 연결·27B/4B 모델 준비](backend/RunPod_Ollama_연결_절차.md)
 
-서버·규정 색인은 [BGE-M3 규정 검색·색인](backend/README.md#bge-m3-규정-검색색인-122), 회사·생활 자료 DB 생성은 [회사 정보·사내 생활 BGE-M3 색인](backend/README.md#회사-정보사내-생활-bge-m3-색인-125)을 참고합니다. 생성 모델 선택과 별개로 세 범주 모두 BGE-M3를 사용합니다.
+현재 설치·DB 연결은 [공유 BGE-M3 DB 연결](backend/README.md#공유-bge-m3-db-연결-124)을 따릅니다. #124 공유 백업을 별도 `growpath_bge_m3`에 복원하고 4,832개 벡터를 재사용합니다. 생성 LLM은 기존 선택을 유지합니다.
 
-사내 도우미 검색은 **BM25 키워드 검색 + BGE-M3 pgvector 검색 → RRF 순위 합치기 → 규정의 같은 부모 조항 문맥 보충**을 기본으로 사용합니다. [하이브리드 검색·복구 안내](backend/README.md#bm25pgvector-하이브리드-검색-126)를 참고합니다. 기존 벡터를 재생성하지 않습니다.
+사내 도우미는 **BM25 + BGE-M3 pgvector → RRF → 같은 부모 조항 문맥 보충**, 학습 자료 추천은 기존 가격·스킬·코스 범위를 유지한 BGE-M3 pgvector 검색을 사용합니다. 기존 벡터를 재생성하지 않습니다.
 
 ## 5. AI 에이전트
 
@@ -186,12 +186,15 @@ Docker Desktop과 Compose v2를 준비합니다. 로컬에서 화면을 개발�
 아래 1~4번은 최초 설치 절차입니다. 이미 설치한 환경의 코드·설정을 바꿀 때는 [기존 설치의 설정 변경과 업데이트](#기존-설치의-설정-변경과-업데이트)를 따르세요.
 
 1. 저장소 루트의 `.env.example`을 `.env`로 복사하고 DB용 `GP5_DB_PASSWORD`, 직원 시연용 `GP5_DEMO_PASSWORD`, 신규 관리자용 `GP5_ADMIN_PASSWORD`를 각각 설정합니다. 관리자 비밀번호는 직원 초기 비밀번호와 다른 값을 사용합니다.
-2. 팀 백업 `growpath_latest.dump`와 동반 manifest를 받아 해시를 확인한 뒤 `team_db/`에 두고, 규정 PDF를 `team_db/regulations/`에 준비합니다.
-3. [분류 모델 파일](backend/classification.md)을 `backend/models/`에 준비합니다. 생성에는 [RunPod-Ollama 연결](backend/RunPod_Ollama_연결_절차.md) 또는 OpenAI 설정이 필요하며, 공통 검색용 `OPENAI_API_KEY`도 설정합니다. 키·비밀번호는 저장소에 넣지 않습니다.
-4. 저장소 루트에서 실행합니다.
+2. #124의 `growpath_bge_m3_embedding.dump`와 동반 manifest를 `team_db/`에 두고, 아래 명령으로 별도 DB에 복원합니다. 기존 OpenAI DB는 보존합니다. 규정 PDF는 `team_db/regulations/`에 준비합니다.
+3. [분류 모델 파일](backend/classification.md)과 [공식 BGE 가중치](backend/README.md#공유-bge-m3-db-연결-124)를 준비합니다. 생성에는 기존 RunPod-Ollama 또는 OpenAI 설정을 사용합니다. BGE 검색에는 OpenAI 키가 필요하지 않습니다.
+4. 저장소 루트에서 실행합니다(복원 도구는 PowerShell).
 
-```bash
-docker compose up -d --build
+```powershell
+docker compose up -d --wait db
+./scripts/restore-bge-db.ps1 -Apply
+docker compose up -d --build --wait --wait-timeout 180
+docker compose exec backend python tools/verify_bge_database.py --server
 ```
 
 | 주소 | 용도 |
@@ -199,13 +202,15 @@ docker compose up -d --build
 | <http://localhost:8816> | React 서비스 화면 |
 | <http://localhost:8815/api/docs> | FastAPI 문서 |
 
-Compose는 **DB → 빈 DB의 백업 복원 → 보충 자료·보조 스키마 준비 → API → 화면** 순서로 실행합니다. 이미 데이터가 있으면 최초 백업 복원은 건너뜁니다. `docker compose down`으로 종료하며 DB와 업로드 파일은 볼륨에 남습니다.
+Compose는 **DB → 복원된 BGE DB 읽기 전용 검사·BGE 서버 준비 → API → 화면** 순서로 실행합니다. 복원은 별도 명령이며 동일 백업 재실행은 건너뜁니다. 공유 DB에는 기존 OpenAI 보충·비밀번호 초기화 도구를 실행하지 않습니다. `docker compose down`은 DB·업로드 볼륨을 보존합니다.
 
 ### 베타 설치·시연 설정 (#63, #64)
 
 Windows·macOS·Linux 모두 Docker Engine/Desktop과 Compose v2가 필요합니다. macOS·Linux에서는 저장소 루트에서 `cp .env.example .env`로 복사한 뒤 위 1~4번을 진행하세요. Windows에서는 `Copy-Item .env.example .env`를 사용합니다. 기존 `.env`는 덮어쓰지 마세요.
 
-직원이 아직 AI를 선택하지 않았다면 기본값은 **RunPod-Ollama(`ollama`)**입니다(#58의 기본값 변경은 진행하지 않기로 결정). 기존에 저장한 선택은 유지합니다. RunPod 연결을 준비하거나 화면의 AI 모델 메뉴에서 OpenAI를 직접 선택하세요. `OPENAI_API_KEY`만 입력해도 직원의 선택이 OpenAI로 바뀌지는 않습니다. 키는 OpenAI 생성과 두 모드의 공통 규정 검색 임베딩에 사용하며, 키가 없으면 OpenAI는 사용 불가로 표시됩니다. 예시 파일의 키는 빈 값이고 이전 `sk-example-not-a-real-key`를 복사했다면 지우세요. 기존 환경의 키·설정 변경은 아래 [앱만 다시 만드는 절차](#기존-설치의-설정-변경과-업데이트)로 반영합니다.
+위 복원 스크립트는 PowerShell이 필요합니다. PowerShell을 사용하지 않는 환경은 [공유 DB 수동 복원 안내](backend/README.md#공유-파일과-복원)를 따릅니다.
+
+직원이 아직 AI를 선택하지 않았다면 생성 모델의 기본값은 **RunPod-Ollama(`ollama`)**입니다. 기존 선택은 유지합니다. OpenAI 키는 OpenAI 생성 모드에만 필요하며, 전체 검색은 별도 BGE-M3를 사용합니다. 키·설정 변경은 아래 앱 재생성 절차로 반영합니다.
 
 베타 동안은 루트 `.env`의 **`GP5_BETA_ACCOUNT_PICKER=on`**으로 로그인 화면의 DB 직원 고르기를 유지합니다. 기존 `.env`를 쓰는 경우 이 값을 추가하세요. 로그인 전 이름·사번·부서·부서장 여부가 표시되며, 선택하면 사번만 채워지고 비밀번호는 직접 입력합니다. 이 설정은 가데이터·시연 도구와 독립적이며 미설정 기본값은 `off`입니다.
 
@@ -233,14 +238,16 @@ docker compose exec -T backend python -c "from app import db; print(db.val('SELE
 
 결과가 0이 아니면 작업 완료를 기다린 뒤 다시 확인하세요. 백엔드가 내려가 있다면 DB 연결 도구에서 `SELECT count(*) FROM app_ext.jobs WHERE status = 'running';`을 실행합니다. 조회 뒤 새 작업이 시작되지 않도록 요청 유입도 멈춰야 합니다. 진행 중 작업을 남긴 채 재시작하면 일부 중단 작업이 자동 복구되면서 실제 모델 호출·비용이 발생할 수 있습니다.
 
-선택한 실제 모델의 연결·비용 설정을 확인하고, 기존 DB가 실행 중인 상태에서 앱만 다시 만듭니다. 이 절차는 DB 스키마 변경이 없는 앱·설정 갱신에 사용하며, DB 변경이 포함된 버전은 해당 마이그레이션 안내도 따릅니다.
+**이전 OpenAI DB에서 이번 공유 BGE DB로 처음 전환할 때는 앱만 다시 만드는 아래 명령으로 충분하지 않습니다.** [공유 DB 복원·공식 모델 준비](backend/README.md#공유-bge-m3-db-연결-124)를 먼저 완료하고, 기존 `.env`의 `GP5_DB_NAME`은 유지한 채 `GP5_APP_DB_NAME=growpath_bge_m3`, `REGULATION_EMBED_PROVIDER=bge-m3`, `KNOWLEDGE_EMBED_PROVIDER=bge-m3`, `BGE_M3_MODEL_DIR=./.cache/bge-m3-official-5617a9f`, `BGE_M3_DTYPE=float32`를 반영합니다. 최초 전환은 위 1~4번의 전체 Compose 실행·검증 명령을 사용합니다. 기존 OpenAI DB의 로컬 변경분을 공유 백업으로 자동 이관하지 않으며, 원본 DB와 볼륨은 보존합니다.
+
+이미 공유 BGE DB로 전환한 환경은 선택한 실제 모델의 연결·비용 설정을 확인하고, DB·BGE 서버가 실행 중인 상태에서 앱만 다시 만듭니다. 아래 절차는 DB 스키마·검색 서버 변경이 없는 앱·설정 갱신에 사용합니다.
 
 ```bash
 docker compose build backend frontend
 docker compose up -d --no-deps --force-recreate backend frontend
 ```
 
-이 경로는 DB 복원·설치기를 재실행하지 않아 기존 가데이터 결과·직원 선택·비밀번호를 보존합니다. 일반 `docker compose up -d --build`로 설치기가 다시 실행되고 `GP5_DEMO_PASSWORD`가 설정되어 있으면, 보존 옵션 없이 실행되는 `team_passwords`가 사번 있는 직원의 다른 비밀번호를 그 값으로 바꿀 수 있습니다. 이는 시연 off 여부와 무관하므로 기존 설치 갱신에는 위 `--no-deps` 절차를 사용하세요. 설치기의 비밀번호 변경 정책은 #77의 별도 후속 범위입니다.
+이 경로는 DB 복원·설치기를 재실행하지 않아 기존 가데이터 결과·직원 선택·비밀번호를 보존합니다. 현재 공유 BGE DB의 `backend-setup`은 읽기 전용 검사기이며 비밀번호를 초기화하지 않습니다. 이전 OpenAI 설치기의 보충·팀 테스트 비밀번호 초기화 작업은 공유 BGE DB에 적용하지 않습니다.
 
 모델 연결은 직원의 목표 화면 첫 진입 전에 준비하세요. 저장된 후보가 없고 프로필에 추천 근거가 있는 계정은 첫 진입에서 생성을 시도하며, 모델이 미연결이면 실패 상태가 남을 수 있습니다. 모델을 연결한 뒤에는 목표 후보의 **다시 시도**를 눌러 재생성합니다. 자동 재시도는 하지 않습니다. 기존 가데이터 후보는 삭제되지 않아 계속 가데이터 태그와 함께 보일 수 있습니다.
 
@@ -259,13 +266,15 @@ docker compose up -d --no-deps --force-recreate backend frontend
 | `OLLAMA_BASE_URL` · `OLLAMA_API_KEY` | RunPod-Ollama 서버 주소와 인증키입니다. |
 | `OLLAMA_MODEL` · `OLLAMA_MODEL_REGULATION` | 비워 두면 각각 `growpath-27b`(진단·로드맵), `growpath-regulation-4b`(규정)를 사용합니다. Pod에서 준비한 Ollama 모델 이름을 사용합니다. |
 | `OLLAMA_THINK` | 예시값은 `off`입니다. 27B는 사용자 선택이 우선하며, 이 값을 비우면 모델 기본값을 따릅니다. 규정 4B의 Ollama 호출은 이 설정과 관계없이 생각 모드를 끕니다. |
-| `OPENAI_API_KEY` | OpenAI 생성·학습 자료 추천과 OpenAI 검색 복구용입니다. 기본 BGE-M3 검색에는 쓰지 않습니다. |
+| `OPENAI_API_KEY` | OpenAI 생성 및 이전 OpenAI DB 복구용입니다. 현재 전체 BGE 검색에는 쓰지 않습니다. |
 | `OPENAI_MODEL` | OpenAI 생성 모드에서 사용할 모델입니다. 서버 설정으로 지정합니다. |
-| `OPENAI_EMBED_MODEL` | 팀 DB 벡터와 같은 `text-embedding-3-small`(1,536차원)을 사용합니다. |
-| `REGULATION_EMBED_PROVIDER` | 규정 검색 선택. Docker 기본은 `bge-m3`, 기존 벡터로 복구할 때는 `openai`입니다. |
-| `KNOWLEDGE_EMBED_PROVIDER` | 회사 정보·사내 생활 검색 선택. 기본 `bge-m3`, 기존 벡터로 복구할 때는 `openai`입니다. |
+| `OPENAI_EMBED_MODEL` | 이전 OpenAI DB 복구용 `text-embedding-3-small`(1,536차원) 설정입니다. 현재 BGE 검색 모델을 바꾸지 않습니다. |
+| `REGULATION_EMBED_PROVIDER` | 현재 공유 DB의 규정 검색은 `bge-m3`입니다. 전체 OpenAI 복구에는 보존한 DB와 이전 코드가 함께 필요합니다. |
+| `KNOWLEDGE_EMBED_PROVIDER` | 현재 공유 DB의 회사 정보·사내 생활 검색은 `bge-m3`입니다. [OpenAI 복구 안내](backend/README.md#복구와-이전-기록)를 따릅니다. |
 | `ASSISTANT_SEARCH_MODE` | 세 범주의 BGE 검색은 기본 `hybrid`(BM25+pgvector+RRF)입니다. `vector`는 기존 벡터 단독 복구용입니다. |
-| `BGE_M3_MODEL_FILE` | Docker가 읽을 외부 F16 GGUF 파일입니다. 기본은 `.cache/embedding-eval/bge-m3-f16.gguf`이며 Git에 포함되지 않습니다. |
+| `GP5_APP_DB_NAME` | 앱 연결 DB. 기본 `growpath_bge_m3`이며 기존 `GP5_DB_NAME=growpath` DB를 보존합니다. |
+| `BGE_M3_MODEL_DIR` | 고정 revision의 공식 가중치·토크나이저 폴더. 기본 `.cache/bge-m3-official-5617a9f`, Git 제외입니다. |
+| `BGE_M3_DTYPE` | CPU 추론 기본 `float32`. 메모리를 절약할 때만 `float16`을 명시합니다. 정규화·출력은 FP32입니다. |
 
 ### Python 직접 실행
 

@@ -3,26 +3,17 @@ from __future__ import annotations
 
 import hashlib
 import json
-from pathlib import Path
 
 from . import db, hybrid_search, llm, regulation_embeddings as embeddings
 
-TABLE = 'app_ext.knowledge_chunk_vectors'
+TABLE = 'knowledge.chunks'
 CATEGORIES = ('수자원공사 정보', '사내 생활안내')
 
 
 def install_schema() -> None:
-    """명시적인 사전 색인 작업에서만 스키마를 적용한다. 검색은 DDL을 실행하지 않는다."""
-    sql = (Path(__file__).resolve().parents[1] / 'db/03_knowledge_bge.sql').read_text(encoding='utf-8')
-    raw = db.engine.raw_connection()
-    try:
-        raw.cursor().execute(sql)
-        raw.commit()
-    except Exception:
-        raw.rollback()
-        raise
-    finally:
-        raw.close()
+    """공유 DB를 사용한다. OpenAI 스키마를 BGE DB에 적용하거나 새 sidecar를 만들지 않는다."""
+    if not db.val('SELECT to_regclass(:table)', table=TABLE):
+        raise llm.LlmError('BGE-M3 색인: #124 공유 BGE DB를 먼저 복원해 주세요')
 
 
 def source_chunks(category: str | None = None) -> list[dict]:
@@ -54,14 +45,13 @@ def ensure_vectors(chunks: list[dict]) -> int:
                                       len(part), embeddings.BGE_DIMENSIONS)
         with db.tx() as transaction:
             for chunk, vector in zip(part, vectors, strict=True):
-                transaction.run(f'''INSERT INTO {TABLE}
-                    (chunk_id,embedding_model,dimensions,input_sha256,embedding)
-                    VALUES (:id,:model,:dims,:sha,CAST(:vector AS vector))
-                    ON CONFLICT (chunk_id,embedding_model) DO UPDATE SET
-                    dimensions=EXCLUDED.dimensions,input_sha256=EXCLUDED.input_sha256,
-                    embedding=EXCLUDED.embedding,updated_at=now()''',
+                changed = transaction.run(f'''UPDATE {TABLE} SET embedding_model=:model,dimensions=:dims,
+                    input_sha256=:sha,embedding=CAST(:vector AS vector),embedded_at=now()
+                    WHERE chunk_id=:id AND chunk_text_sha256=:sha''',
                     id=chunk['chunk_id'], model=embeddings.BGE_MODEL, dims=embeddings.BGE_DIMENSIONS,
                     sha=chunk['chunk_text_sha256'], vector=json.dumps(vector, allow_nan=False))
+                if changed != 1:
+                    raise llm.LlmError('BGE-M3 색인: 색인 중 자료 원문이 바뀌었어요. 다시 확인해 주세요')
     return len(missing)
 
 

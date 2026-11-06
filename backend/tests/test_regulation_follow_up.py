@@ -15,6 +15,9 @@ from app.llm import LlmError
 
 class RegulationFollowUpTest(unittest.TestCase):
     def setUp(self):
+        settings = patch.dict(os.environ, REGULATION_EMBED_PROVIDER='openai')
+        settings.start()
+        self.addCleanup(settings.stop)
         self.ctx = rt.Ctx(employee_id=1, me={'empGroup': '일반직'})
         regs = [{'key': 'edu', 'name': '인재개발규정'}, {'key': 'work', 'name': '취업규칙'}]
         for item in regs:

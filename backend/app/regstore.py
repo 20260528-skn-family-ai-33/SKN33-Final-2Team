@@ -84,6 +84,7 @@ def art_of(c: dict, reg: dict) -> dict:
             'page': pages[0] if pages else None, 'text': text, 'type': c['chunk_type'], 'node': c['regulation_node_id'],
             'path': c['context_path'], 'group': reg['employee_group'], 'overseas': reg['overseas_only'],
             'order': c.get('display_order', 0),
+            'chunkText': c['chunk_text'],
             'parent': c.get('parent_node_id') if c['node_type'] == 'paragraph' and c['p_type'] == 'article' else None}
 
 

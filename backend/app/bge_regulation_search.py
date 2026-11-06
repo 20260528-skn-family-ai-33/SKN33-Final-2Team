@@ -5,14 +5,13 @@ import hashlib
 
 from . import db, hybrid_search, llm, regulation_embeddings as embeddings, regstore
 
-TABLE = 'app_ext.rag_chunk_vectors'
-INPUT_VERSION = 'bge-regulation-full-text-v1'
+TABLE = 'regulations.rag_chunk_embeddings'
+INPUT_VERSION = 'context_path+blank_line+chunk_text/v1'
 
 
 def input_text(article: dict) -> str:
     """기존 조·항 청크의 문맥과 본문 전체를 넣는다. 6,000자 절단은 적용하지 않는다."""
-    reg = regstore.data()['regs'].get(article['reg']) or {}
-    return f"「{reg.get('name', '')}」 {article['no']}({article['title']}) {article['chapter']}\n{article['text']}"
+    return (article['path'] + '\n\n' + article['chunkText']).replace('\x00', '')
 
 
 def _inputs(ids: list[str]) -> dict[str, tuple[str, str]]:
@@ -21,14 +20,15 @@ def _inputs(ids: list[str]) -> dict[str, tuple[str, str]]:
 
 
 def _stored(ids: list[str]) -> dict[str, dict]:
-    rows = db.all_(f'''SELECT rag_chunk_id,dimensions,input_sha256 FROM {TABLE}
+    rows = db.all_(f'''SELECT rag_chunk_id,dimensions,input_sha256,input_version FROM {TABLE}
         WHERE embedding_model=:m AND rag_chunk_id=ANY(:i)''', m=embeddings.BGE_MODEL, i=ids)
     return {row['rag_chunk_id']: row for row in rows}
 
 
 def _missing(inputs: dict, stored: dict) -> list[str]:
     return [i for i, (_, sha) in inputs.items() if i not in stored or
-            stored[i]['dimensions'] != embeddings.BGE_DIMENSIONS or stored[i]['input_sha256'] != sha]
+            stored[i]['dimensions'] != embeddings.BGE_DIMENSIONS or stored[i]['input_sha256'] != sha
+            or stored[i].get('input_version') != INPUT_VERSION]
 
 
 def ensure_vectors(ids: list[str]) -> int:
@@ -41,13 +41,13 @@ def ensure_vectors(ids: list[str]) -> int:
         with db.tx() as transaction:
             for aid, vector in zip(part, vectors, strict=True):
                 transaction.run(f'''INSERT INTO {TABLE}
-                    (rag_chunk_id,embedding_model,dimensions,embedding,input_sha256)
-                    VALUES (:i,:m,:d,CAST(:v AS vector),:s)
+                    (rag_chunk_id,embedding_model,dimensions,embedding,input_sha256,input_version)
+                    VALUES (:i,:m,:d,CAST(:v AS vector),:s,:iv)
                     ON CONFLICT (rag_chunk_id,embedding_model) DO UPDATE SET
                     dimensions=EXCLUDED.dimensions,embedding=EXCLUDED.embedding,
-                    input_sha256=EXCLUDED.input_sha256,updated_at=now()''',
+                    input_sha256=EXCLUDED.input_sha256,input_version=EXCLUDED.input_version,updated_at=now()''',
                     i=aid, m=embeddings.BGE_MODEL, d=embeddings.BGE_DIMENSIONS,
-                    v=regstore._vec(vector), s=inputs[aid][1])
+                    v=regstore._vec(vector), s=inputs[aid][1], iv=INPUT_VERSION)
     return len(missing)
 
 
@@ -64,9 +64,9 @@ def search(query: str, k: int, group: str | None, *, all_groups: bool = False) -
         raise llm.LlmError('BGE-M3 색인이 없거나 원문과 달라요. index_regulations.py --apply를 먼저 실행해 주세요')
     vector = embeddings.validate(embeddings.embed([query]), 1, embeddings.BGE_DIMENSIONS)[0]
     rows = db.all_(f'''SELECT rag_chunk_id,1-(embedding <=> CAST(:q AS vector)) AS score FROM {TABLE}
-        WHERE embedding_model=:m AND dimensions=:d AND rag_chunk_id=ANY(:i)
+        WHERE embedding_model=:m AND dimensions=:d AND input_version=:iv AND rag_chunk_id=ANY(:i)
         ORDER BY embedding <=> CAST(:q AS vector),rag_chunk_id LIMIT :k''',
-        q=regstore._vec(vector), m=embeddings.BGE_MODEL, d=embeddings.BGE_DIMENSIONS, i=ids,
+        q=regstore._vec(vector), m=embeddings.BGE_MODEL, d=embeddings.BGE_DIMENSIONS, iv=INPUT_VERSION, i=ids,
         k=max(k, hybrid_search.CANDIDATES) if hybrid else k)
     dense = [{'id': row['rag_chunk_id'], 'score': float(row['score'])} for row in rows]
     if not hybrid:

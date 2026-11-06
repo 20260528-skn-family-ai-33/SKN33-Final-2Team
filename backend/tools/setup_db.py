@@ -202,6 +202,8 @@ def goals() -> None:
 
 
 def main() -> None:
+    if db.engine.url.database.startswith('growpath_bge_m3'):
+        raise SystemExit('공유 BGE DB에는 기존 보충·OpenAI 설치 작업을 실행하지 않습니다. tools/verify_bge_database.py로 확인해 주세요.')
     ap = argparse.ArgumentParser()
     ap.add_argument('--supplement-only', action='store_true')
     ap.add_argument('--keep-team-passwords', action='store_true')
