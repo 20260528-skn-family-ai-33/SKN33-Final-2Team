@@ -24,6 +24,19 @@ class AppVersionTests(unittest.TestCase):
             path.write_text('1.12.3\n', encoding='utf-8')
             self.assertEqual(read_project_version(path), '1.12.3')
 
+    def test_reads_utf8_bom_with_windows_newline(self):
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / 'VERSION'
+            path.write_bytes(b'\xef\xbb\xbf0.2.0\r\n')
+            self.assertEqual(read_project_version(path), '0.2.0')
+
+    def test_bom_does_not_allow_invalid_version(self):
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / 'VERSION'
+            path.write_bytes(b'\xef\xbb\xbfv0.2.0\r\n')
+            with self.assertRaisesRegex(ValueError, 'X.Y.Z'):
+                read_project_version(path)
+
     def test_missing_version_stops_startup(self):
         with TemporaryDirectory() as directory:
             path = Path(directory) / 'VERSION'
@@ -51,7 +64,7 @@ class AppVersionTests(unittest.TestCase):
     def test_openapi_uses_repository_version(self):
         from app.main import app
 
-        expected = (Path(__file__).resolve().parents[2] / 'VERSION').read_text(encoding='utf-8').strip()
+        expected = (Path(__file__).resolve().parents[2] / 'VERSION').read_text(encoding='utf-8-sig').strip()
         self.assertEqual(VERSION_PATH, Path(__file__).resolve().parents[2] / 'VERSION')
         self.assertEqual(app.version, expected)
         self.assertEqual(app.openapi()['info']['version'], expected)

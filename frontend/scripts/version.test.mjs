@@ -25,3 +25,13 @@ test('누락·잘못된 VERSION은 기본값 없이 실패한다', (t) => {
     assert.throws(() => readVersion(path), /X.Y.Z 형식/);
   }
 });
+
+test('UTF-8 BOM과 Windows 줄바꿈을 허용하고 버전 형식 검사는 유지한다', (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'growpath-version-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const path = join(dir, 'VERSION');
+  writeFileSync(path, '\uFEFF0.2.0\r\n');
+  assert.equal(readVersion(path), '0.2.0');
+  writeFileSync(path, '\uFEFFv0.2.0\r\n');
+  assert.throws(() => readVersion(path), /X.Y.Z 형식/);
+});
