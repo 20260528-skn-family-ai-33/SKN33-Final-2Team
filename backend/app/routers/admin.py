@@ -122,6 +122,7 @@ def api_goals_all(body: dict | None = None, a: Account = Depends(require_admin))
     from ..services import goals
     b = body or {}
     mode = b.get('mode') if b.get('mode') in ('mock', 'ollama', 'openai') else None
+    goals.validate_mode(mode)
     if mode in ('ollama', 'openai') and not llm.available(mode):
         raise ApiError(409, 'AI_UNAVAILABLE', f'{provider_label(mode)}를 지금 쓸 수 없어요', unavailable_reason(mode) or '.env 설정을 확인해 주세요', kind='config')
     ids = [x['employee_id'] for x in db.all_(_ACTIVE_SQL)]

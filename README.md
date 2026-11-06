@@ -178,7 +178,7 @@ Docker Compose는 VERSION을 프런트 빌드와 백엔드 이미지에 함께 �
 
 Docker Desktop과 Compose v2를 준비합니다. 로컬에서 화면을 개발할 때는 Node.js 20.19 이상(24 권장), Python 직접 실행은 3.12를 사용합니다.
 
-1. 저장소 루트의 `.env.example`을 `.env`로 복사하고 `GP5_DB_PASSWORD`·`GP5_DEMO_PASSWORD`를 설정합니다.
+1. 저장소 루트의 `.env.example`을 `.env`로 복사하고 DB용 `GP5_DB_PASSWORD`, 직원 시연용 `GP5_DEMO_PASSWORD`, 신규 관리자용 `GP5_ADMIN_PASSWORD`를 각각 설정합니다. 관리자 비밀번호는 직원 초기 비밀번호와 다른 값을 사용합니다.
 2. 팀 백업 `growpath_latest.dump`와 동반 manifest를 받아 해시를 확인한 뒤 `team_db/`에 두고, 규정 PDF를 `team_db/regulations/`에 준비합니다.
 3. [분류 모델 파일](backend/classification.md)을 `backend/models/`에 준비합니다. 생성에는 [RunPod-Ollama 연결](backend/RunPod_Ollama_연결_절차.md) 또는 OpenAI 설정이 필요하며, 공통 검색용 `OPENAI_API_KEY`도 설정합니다. 키·비밀번호는 저장소에 넣지 않습니다.
 4. 저장소 루트에서 실행합니다.
@@ -198,13 +198,15 @@ Compose는 **DB → 빈 DB의 백업 복원 → 보충 자료·보조 스키마 
 
 Windows·macOS·Linux 모두 Docker Engine/Desktop과 Compose v2가 필요합니다. macOS·Linux에서는 저장소 루트에서 `cp .env.example .env`로 복사한 뒤 위 1~4번을 진행하세요. Windows에서는 `Copy-Item .env.example .env`를 사용합니다. 기존 `.env`는 덮어쓰지 마세요.
 
-OpenAI가 직원의 기본 AI입니다. 실제 생성 전에 `.env`의 `OPENAI_API_KEY`에 유효한 키를 입력하세요. 예시 파일은 빈 값이며 키가 없으면 OpenAI는 사용 불가로 표시됩니다. 이전 예시의 `sk-example-not-a-real-key`를 복사했다면 지우세요. 값을 바꾼 뒤 `docker compose up -d --build`로 반영합니다.
+직원이 아직 AI를 선택하지 않았다면 기본값은 **RunPod-Ollama(`ollama`)**입니다(#58의 기본값 변경은 진행하지 않기로 결정). 기존에 저장한 선택은 유지합니다. RunPod 연결을 준비하거나 화면의 AI 모델 메뉴에서 OpenAI를 직접 선택하세요. `OPENAI_API_KEY`만 입력해도 직원의 선택이 OpenAI로 바뀌지는 않습니다. 키는 OpenAI 생성과 두 모드의 공통 규정 검색 임베딩에 사용하며, 키가 없으면 OpenAI는 사용 불가로 표시됩니다. 예시 파일의 키는 빈 값이고 이전 `sk-example-not-a-real-key`를 복사했다면 지우세요. 값을 바꾼 뒤 `docker compose up -d --build`로 반영합니다.
 
-`GP5_DEMO_MODE=off`에서는 직원 목록(`/demo/accounts`), 시연 초기화(`/demo/reset`), 단계 이동(`/demo/jump`), 시연 설정(`/me/demo-settings`) API가 404를 반환합니다. 직원 고르기는 숨겨지고 사번 직접 입력은 유지됩니다. 외부 베타는 예시 파일의 `off`를 유지하세요. 설정을 생략하면 기존 시연 호환을 위해 `on`입니다.
+`GP5_DEMO_MODE=off`에서는 직원 목록(`/demo/accounts`), 시연 초기화(`/demo/reset`), 단계 이동(`/demo/jump`), 시연 설정(`/me/demo-settings`), 전체 직원 AI 기록(`/ai/log`) API가 인증·조회 전에 404를 반환합니다. 직원 고르기는 숨겨지고 사번 직접 입력은 유지됩니다. 관리자 목표 생성에서 가데이터를 지정한 요청도 저장·작업 시작 전에 `409 / DEMO_DISABLED`로 거절하며 실제 모델로 자동 전환하지 않습니다. 설치 과정의 시연 목표 후보 생성은 건너뜁니다. 외부 베타는 예시 파일의 `off`를 유지하세요. 설정을 생략하면 기존 시연 호환을 위해 `on`입니다.
 
 `off`에서는 DB에 저장된 직원별 가데이터(`demo_mock`)·실패 시연(`fail_sim`) 설정도 내 정보 응답과 모델 실행에서 무시합니다. 선택한 AI 제공자와 추론 정도는 유지하며, 모델을 사용할 수 없으면 가데이터로 대신하지 않고 오류를 반환합니다. DB의 시연 설정은 삭제하지 않으므로 서버를 `on`으로 다시 실행하면 저장된 값이 다시 적용됩니다.
 
-키 없이 로컬 시연할 때만 `GP5_DEMO_MODE=on`으로 켜고 화면 시연 도구의 ‘가데이터로 보기’를 사용하세요. 프런트 시연 도구 표시는 기존 `VITE_DEMO_TOOLS` 설정을 따릅니다. 비밀번호는 API·화면·직원 엑셀 안내문으로 배포하지 않으며 관리자가 별도로 전달합니다. 직원별 초기 비밀번호와 첫 로그인 변경은 별도 후속 범위입니다.
+Compose는 루트 `.env`의 `VITE_DEMO_TOOLS`를 프런트 빌드 인자로 전달하며 기본값은 `off`입니다. 키 없이 로컬 시연할 때만 `GP5_DEMO_MODE=on`과 `VITE_DEMO_TOOLS=on`으로 설정한 뒤 `docker compose up -d --build`로 다시 빌드하세요. 화면은 빌드 설정이 on이고 서버가 `/ai/providers`의 `demoMode: true`를 반환할 때만 시연 도구·관리자 가데이터 선택지를 표시합니다. 프런트 단독 개발에서는 `frontend/.env.local`의 `VITE_DEMO_TOOLS`를 사용합니다.
+
+관리자 초기 비밀번호는 루트 `.env`의 `GP5_ADMIN_PASSWORD`에서 정합니다. 신규 관리자를 만들 때만 사용하며 빈 값·공백만 있는 값·`GP5_DEMO_PASSWORD`와 같은 값은 거절합니다. **이미 존재하는 관리자 계정은 자동 갱신하지 않으므로**, 이 설정만 바꾸거나 설치기를 다시 실행해도 기존 비밀번호가 바뀌지 않습니다. 기존 공유 비밀번호를 쓰는 계정의 변경은 배포 담당자가 별도로 처리해야 합니다. 비밀번호는 API·화면·직원 엑셀 안내문으로 배포하지 않으며 관리자가 별도로 전달합니다. 직원별 초기 비밀번호와 첫 로그인 변경 기능은 별도 후속 범위입니다.
 
 이번 베타에서는 제출본 전용 `setup.ps1`·`scripts/fetch_model.py`·`model-fetch` 반영을 제외했습니다. 분류 모델과 DB 백업은 위 안내대로 별도 준비해야 합니다.
 

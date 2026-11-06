@@ -59,6 +59,7 @@ class Settings:
     demo_mode: bool
     demo_password: str
     admin_login: str
+    admin_password: str
     var_dir: Path
     regulation_files_dir: Path
     # OpenAI
@@ -145,6 +146,7 @@ def load() -> Settings:
         demo_mode=env('GP5_DEMO_MODE', 'on').lower() == 'on',
         demo_password=env('GP5_DEMO_PASSWORD'),
         admin_login=env('GP5_ADMIN_LOGIN', 'admin'),
+        admin_password=env('GP5_ADMIN_PASSWORD'),
         var_dir=Path(env('GP5_VAR_DIR', str(ROOT / 'var'))),
         # 팀 규정 묶음 폴더(그 안의 source/…/….pdf 가 팀 DB regulation_files.storage_key) · 관리자 '지금 규정' 내려받기에 쓴다
         regulation_files_dir=Path(env('GP5_REGULATION_FILES_DIR', str(ROOT.parent / 'team_db' / 'regulations'))),

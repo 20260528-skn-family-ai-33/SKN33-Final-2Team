@@ -1,19 +1,18 @@
 /* 시연 도구 (5차 gp-core.js modeBox·jump·reset·agent-log) — 로그인한 계정의 서버 기록만 바꾼다.
    '에이전트 동작 보기'는 시연·디버그 전용이라 누가 호출했든 모든 계정의 호출을 보여 준다(직원·관리자 화면 공통 · 2026-10-26).
-   운영 빌드에서는 VITE_DEMO_TOOLS=off 로 통째로 뺀다 — 직원·부서장·관리자 모두 쓰지 않음(백엔드의 시연 API 끄기는 백엔드 담당 · 백엔드 요청 이슈 B-1) */
+   VITE_DEMO_TOOLS=on이고 서버도 demoMode:true를 알릴 때만 표시한다. 서버 조회 실패·구버전 응답은 숨긴다. */
 import { legacyToPath, paths } from '@/app/paths';
 import { aiApi, demoApi, type AgentLogEntry } from '@/api/endpoints/account';
 import { reloadWorkspace } from '@/features/draft/draftSync';
 import { useGo } from '@/shared/hooks/useGo';
 import { failToast } from '@/shared/lib/fail';
+import { canUseDemo } from '@/shared/lib/demoAccess';
 import { ai, ping, PROV, resetConn, setDemoMock, setFailSim, useAi, useAiMode } from '@/shared/state/ai';
 import { dataReset } from '@/shared/state/events';
 import { isSup, useMe } from '@/shared/state/session';
 import { closeSheet, openSheet, toast } from '@/shared/state/ui';
 import { updateWs, useWs } from '@/shared/state/workspace';
 import { Icon } from '@/shared/ui/Icon';
-
-export const DEMO_TOOLS = import.meta.env.VITE_DEMO_TOOLS !== 'off';
 
 export const JUMPS: [string, string][] = [
   ['start', '처음부터'],
@@ -109,7 +108,7 @@ function serverLine(status: { checked: boolean; server?: boolean }): string {
 /** 관리자 화면의 시연 도구: 관리자에게 맞는 것만(모델 연결 상태 · 에이전트 동작 보기). 가데이터·실패 시연·단계 이동은 직원 계정 기능이라 뺀다 */
 export function AdminDemoTools() {
   const status = useAi((s) => s.status);
-  if (!DEMO_TOOLS) return null;
+  if (!canUseDemo(status.demoMode)) return null;
   return (
     <details className="demo">
       <summary>
@@ -138,7 +137,7 @@ export function DemoTools() {
   const status = useAi((s) => s.status);
   const failSim = useAi((s) => s.settings.failSim);
   const open = useWs((s) => s.demoOpen);
-  if (!DEMO_TOOLS || !me) return null;
+  if (!canUseDemo(status.demoMode) || !me) return null;
   const fs = { ...ai.failSim(), ...failSim };
   const srv = serverLine(status);
 

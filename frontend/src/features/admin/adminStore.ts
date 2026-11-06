@@ -5,6 +5,7 @@ import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import type { AdminColumn, AdminRow, AdminRows, DatasetId, EditRow, RowView, SheetInfo } from '@/api/types/admin';
 import { onDataReset } from '@/shared/state/events';
+import { ApiError } from '@/api/client';
 import { DS } from './datasets';
 
 type Vals = Record<string, string>;
@@ -72,7 +73,7 @@ const fresh = (): AdminUi => ({
   edit: null,
   pending: null,
   saving: false,
-  choice: { goalsAll: 'mock', editGoal: 'employee', applyGoal: 'mock' },
+  choice: { goalsAll: 'ollama', editGoal: 'employee', applyGoal: 'employee' },
   goal: { target: 'all', picked: [], q: '' },
 });
 
@@ -86,6 +87,12 @@ onDataReset(() => useAdmin.setState(fresh(), true));
 export const curSheet = (s: AdminUi, ds: DatasetId): string => s.tab[ds] || DS[ds].sheets[0];
 export const qKey = (ds: string, sheet: string) => ds + sheet;
 export const setChoice = (k: Choice, v: string) => setAdm((s) => void (s.choice[k] = v));
+/** 남아 있는 가데이터 선택을 실제 모델 호출로 바꾸지 않고, 사용자가 다시 고르게 한다. */
+export function requireDemoGoalAllowed(mode: string, demoAllowed: boolean): void {
+  if (mode === 'mock' && !demoAllowed) {
+    throw new ApiError(409, { code: 'DEMO_DISABLED', message: '시연 모드가 꺼져 있어요. 사용할 AI 모드를 다시 골라 주세요.' });
+  }
+}
 export const setGoal = (v: Partial<GoalPick>) => setAdm((s) => void Object.assign(s.goal, v));
 /** 직원 고르기: ids 를 모두 넣거나(on) 모두 뺀다 */
 export const pickGoal = (ids: number[], on: boolean) =>

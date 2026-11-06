@@ -36,13 +36,13 @@ export interface Conn {
 }
 
 interface AiState {
-  status: { checked: boolean; server?: boolean; docLibs: Record<string, boolean>; providers: Record<string, ProviderInfo> };
+  status: { checked: boolean; server?: boolean; demoMode?: boolean; docLibs: Record<string, boolean>; providers: Record<string, ProviderInfo> };
   settings: UserSettings;
   conn: Conn;
 }
 
 export const useAi = create<AiState>(() => ({
-  status: { checked: false, providers: {}, docLibs: {} },
+  status: { checked: false, demoMode: false, providers: {}, docLibs: {} },
   settings: { aiProvider: 'ollama', demoMock: false, failSim: {}, reasoning: {} },
   conn: { state: 'idle', provider: '', at: 0 },
 }));
@@ -55,6 +55,7 @@ const modeOf = (s: AiState): Mode => {
 };
 
 export const ai = {
+  demoAllowed: (): boolean => g().status.demoMode === true,
   choice: (): UiProvider => toUi(g().settings.aiProvider || 'ollama'),
   demoMock: (): boolean => !!g().settings.demoMock,
   available: (p: string): boolean => !!prov(p).available,
@@ -101,12 +102,17 @@ export const useAiMode = (): { mode: Mode; choice: UiProvider; demo: boolean; ch
 export const DOC_CHARS = 6000;
 export const SIM_KINDS = ['goal', 'doc', 'quiz', 'diag', 'gen', 'sup', 'report', 'reg', 'rev'];
 
+let statusRequest = 0;
 export async function checkStatus(): Promise<void> {
+  const request = ++statusRequest;
+  useAi.setState((s) => ({ status: { ...s.status, demoMode: false } }));
   try {
     const j = await aiApi.providers();
-    useAi.setState({ status: { checked: true, server: true, docLibs: j.docLibs || {}, providers: Object.fromEntries(j.providers.map((p) => [p.id, p])) } });
+    if (request !== statusRequest) return;
+    useAi.setState({ status: { checked: true, server: true, demoMode: j.demoMode === true, docLibs: j.docLibs || {}, providers: Object.fromEntries(j.providers.map((p) => [p.id, p])) } });
   } catch {
-    useAi.setState((s) => ({ status: { ...s.status, checked: true, server: false } }));
+    if (request !== statusRequest) return;
+    useAi.setState((s) => ({ status: { ...s.status, checked: true, server: false, demoMode: false } }));
   }
 }
 

@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from app.routers import account
 from app.errors import ApiError, api_error_handler
-from app import config, llm
+from app import auth, config, llm
 from app.admin_io import hr
 from app.agents import runtime as rt
 
@@ -22,11 +22,41 @@ class DemoAccessTests(unittest.TestCase):
         self.client = TestClient(app)
 
     def test_disabled_routes_are_404_before_auth_or_database(self):
-        with patch.object(account, 'S', replace(account.S, demo_mode=False)), patch.object(account.profile, 'accounts') as query:
-            for method, path in [('get', '/demo/accounts'), ('post', '/demo/reset'), ('post', '/demo/jump'), ('put', '/me/demo-settings')]:
+        with patch.object(account, 'S', replace(account.S, demo_mode=False)), \
+             patch.object(account.profile, 'accounts') as query, \
+             patch.object(auth, 'account_of') as authentication, \
+             patch.object(rt, 'all_logs') as logs, patch.object(account.db, 'all_') as database:
+            for method, path in [('get', '/demo/accounts'), ('post', '/demo/reset'), ('post', '/demo/jump'), ('put', '/me/demo-settings'), ('get', '/ai/log')]:
                 with self.subTest(path=path):
                     self.assertEqual(self.client.request(method, '/api/v1'+path).status_code, 404)
             query.assert_not_called()
+            authentication.assert_not_called()
+            logs.assert_not_called()
+            database.assert_not_called()
+
+    def test_enabled_ai_log_requires_login_and_preserves_authenticated_access(self):
+        with patch.object(account, 'S', replace(account.S, demo_mode=True)), \
+             patch.object(rt, 'all_logs', return_value=[{'employeeId': 1, 't': 10, 'output': 'test'}]) as logs, \
+             patch.object(account.db, 'all_', return_value=[{'employee_id': 1, 'name': '시험 직원'}]):
+            self.assertEqual(self.client.get('/api/v1/ai/log').status_code, 401)
+            logs.assert_not_called()
+            for role in ('employee', 'admin'):
+                with self.subTest(role=role), patch.object(auth, 'account_of', return_value=auth.Account(role, 1, 'test')):
+                    response = self.client.get('/api/v1/ai/log')
+                    self.assertEqual(response.status_code, 200)
+                    self.assertEqual(response.json()['log'], [{'employeeId': 1, 'output': 'test', 'employee': '시험 직원'}])
+
+    def test_providers_reports_demo_mode_to_authenticated_accounts(self):
+        self.assertEqual(self.client.get('/api/v1/ai/providers').status_code, 401)
+        for enabled in (False, True):
+            for role in ('employee', 'admin'):
+                with self.subTest(enabled=enabled, role=role), \
+                     patch.object(account, 'S', replace(account.S, demo_mode=enabled)), \
+                     patch.object(auth, 'account_of', return_value=auth.Account(role, 1, 'test')), \
+                     patch.object(account, '_settings', return_value={'aiProvider': 'openai'}):
+                    response = self.client.get('/api/v1/ai/providers')
+                    self.assertEqual(response.status_code, 200)
+                    self.assertIs(response.json()['demoMode'], enabled)
 
     def test_enabled_accounts_never_return_password(self):
         with patch.object(account, 'S', replace(account.S, demo_mode=True, demo_password='SECRET_SENTINEL')), patch.object(account.profile, 'accounts', return_value=[{'code': '123'}]):
@@ -37,6 +67,10 @@ class DemoAccessTests(unittest.TestCase):
             self.assertNotIn('SECRET_SENTINEL', response.text)
 
     def test_demo_default_and_explicit_off(self):
+        with patch.dict(os.environ), patch.dict(config._FILE):
+            os.environ.pop('GP5_DEMO_MODE', None)
+            config._FILE.pop('GP5_DEMO_MODE', None)
+            self.assertTrue(config.load().demo_mode)
         with patch.dict(os.environ, {'GP5_DEMO_MODE': 'off'}):
             self.assertFalse(config.load().demo_mode)
         with patch.dict(os.environ, {'GP5_DEMO_MODE': 'on'}):

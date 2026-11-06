@@ -124,7 +124,7 @@ def api_goals_ensure(a: Account = Depends(require_employee)):
 @r.get('/ai/providers')
 def api_providers(a: Account = Depends(require_account)):
     cur = _settings(a.id)['aiProvider'] if a.type == 'employee' else 'ollama'
-    return {'current': cur, 'providers': [
+    return {'current': cur, 'demoMode': S.demo_mode, 'providers': [
         {'id': 'ollama', 'label': 'RunPod-Ollama', 'available': llm.available('ollama'), 'reason': unavailable_reason('ollama'), 'target': S.ollama_target if S.ollama_url else '',
          'models': dict({r: llm.model_name('ollama', r) for r in ('default', 'roadmap', 'regulation', 'vision')}, embed=llm.embed_model()),
          'timeout': S.ollama_timeout,
@@ -190,7 +190,7 @@ def api_status(provider: str = 'ollama', a: Account = Depends(require_account)):
         return JSONResponse({'error': {'code': c['code'], 'message': c['user'], 'kind': c['kind'], 'cause': c['text'], 'hint': c['hint'], 'raw': c['raw'], 'retryable': c['retryable']}}, status_code=502)
 
 
-@r.get('/ai/log')
+@r.get('/ai/log', dependencies=[Depends(require_demo_mode)])
 def api_log(a: Account = Depends(require_account)):
     """에이전트 동작 보기(시연·디버그 도구 · 운영에서는 아무도 쓰지 않음): 누가 호출했든 모든 계정의 최근 호출, 서버 메모리에만 있다.
     employee 는 그 호출이 누구의 일이었는지, by 는 관리자 화면에서 시작했는지"""
