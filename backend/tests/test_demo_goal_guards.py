@@ -87,9 +87,10 @@ class DemoGoalGuardTests(unittest.TestCase):
                      patch.object(goals, 'S', replace(goals.S, demo_mode=enabled)), \
                      patch.object(goals.db, 'tx') as transaction, \
                      patch.object(goals, '_request', return_value='job') as request:
-                    transaction.return_value.__enter__.return_value.one.return_value = {}
+                    active_transaction = transaction.return_value.__enter__.return_value
+                    active_transaction.one.return_value = {}
                     self.assertEqual(goals.request(1, 'manual', mode=mode), 'job')
-                    request.assert_called_once_with(1, 'manual', None, mode)
+                    request.assert_called_once_with(1, 'manual', None, mode, t=active_transaction)
 
     def test_enabled_seed_retains_existing_empty_database_behavior(self):
         with patch.object(goals, 'S', replace(goals.S, demo_mode=True)), \
