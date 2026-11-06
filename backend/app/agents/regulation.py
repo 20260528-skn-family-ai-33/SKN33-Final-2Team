@@ -14,7 +14,7 @@ import copy
 import json
 import re
 
-from .. import hybrid_search, knowledge, llm, question_classifier, regulation_embeddings, regstore
+from .. import hybrid_search, knowledge, llm, question_classifier, regstore
 from ..errors import AgentError
 from . import runtime as rt
 from . import grounded_answer
@@ -492,7 +492,7 @@ def _api_answer(ctx: rt.Ctx, inp: dict, label: str) -> dict:
         return _empty_evidence_answer(ctx, 'regulation', inp, history=history)
     if documents_only:
         ids += regstore.referenced_paragraphs(ids, limit=min(3, 7 - len(ids)))
-        if ctx.mode in ('ollama', 'openai') and regulation_embeddings.search_provider() == 'bge-m3' and hybrid_search.enabled():
+        if ctx.mode in ('ollama', 'openai') and hybrid_search.enabled():
             ids += regstore.parent_context(ids, group, q, limit=min(2, 7 - len(ids)))
     requested = {'where': ref['where'], 'focus': ref['focus'], 'note': ref['note']} if ref else None
     result = grounded_answer.generate(ctx, 'regulation', q, [_art_in(regstore.article(value)) for value in ids],

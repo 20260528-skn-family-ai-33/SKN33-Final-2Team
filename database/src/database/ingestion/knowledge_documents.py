@@ -6,7 +6,7 @@ import math
 from pathlib import Path
 
 from psycopg.types.json import Jsonb
-from src.database.vectors.regulation_vectors import MODEL, DIMENSIONS, embed_texts, vector_values
+from src.shared.bge_embeddings import MODEL, DIMENSIONS, embed_texts, vector_values
 
 CATEGORIES = ('수자원공사 정보', '사내 생활안내')
 FILES = {'company_info_chunks.jsonl': (137, CATEGORIES[0]),

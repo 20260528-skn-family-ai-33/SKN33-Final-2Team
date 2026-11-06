@@ -8,12 +8,9 @@
 
 현재 앱의 `GP5_APP_DB_NAME`은 이 BGE DB입니다. 기존 `growpath` OpenAI DB와 백업은 보존하며 `down -v`로 볼륨을 지우지 않습니다. [전체 검색 연결·모델 준비·재실행 안내](../backend/README.md#공유-bge-m3-db-연결-124)를 따릅니다. BGE는 2026-11-06 로컬 스냅샷, 기존 Drive OpenAI 공유본은 2026-11-04이므로 모델만 다른 동일 데이터로 비교하지 않습니다.
 
-## 이전 OpenAI 백업 보관
+## 백업 사용 기준
 
-- 넣을 파일: `growpath_latest.dump` (pg_dump custom 형식). 직원·부서·보유 스킬·자격·학력이 모두 이 백업에 들어 있어요(따로 받는 직원 엑셀 없음). 새 판도 같은 이름으로 올라와요.
-- 받는 곳: 팀 산출물 드라이브의 `데이터 수집 및 저장 › DB` 폴더(DB 담당). 백업과 함께 올라온 `growpath_latest.manifest.json`도 받아 이 폴더에 두고, 백업의 크기·SHA-256이 그 manifest와 같은지 확인해요. 저장소의 `database/data/exports/growpath_latest.manifest.json`은 DB 담당이 갱신하기 전까지 이전 판일 수 있어요.
-- 이전 OpenAI 복원 서비스는 `legacy-openai` 프로필로 분리했으며 기본 BGE 설치에서 실행하지 않습니다. 백업 교체 시에도 기존 DB·볼륨을 지우지 않고 별도 DB를 사용합니다.
-- 이름이 다른 백업을 쓰려면 `.env`의 `TEAM_DB_FILE`을 그 이름으로 고쳐요.
+현재 코드가 복원·사용하는 백업은 위 BGE 공유본뿐입니다. 이전 백업 복원 서비스·환경변수·스크립트는 제거했습니다. `.env`에는 앱과 DB 서비스의 공통 이름 `GP5_APP_DB_NAME=growpath_bge_m3`를 사용합니다. 실제 이전 백업·DB 데이터는 코드 정리와 별개이며 자동 삭제하지 않습니다.
 
 ## 규정 원문 PDF (`regulations/`)
 

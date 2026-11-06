@@ -7,14 +7,12 @@ from datetime import date
 import hashlib
 import json
 import math
-import os
 from pathlib import Path
 import sys
 
 from ..deployment import connect
 
-MODEL = 'text-embedding-3-small'
-DIMENSIONS = 1536
+from src.shared.bge_embeddings import MODEL, DIMENSIONS, embed_texts, vector_values
 TABLE = 'regulations.rag_chunk_embeddings'
 INPUT_VERSION = 'context_path+blank_line+chunk_text/v1'
 DDL = '''
@@ -22,10 +20,10 @@ SET LOCAL search_path TO public, extensions;
 CREATE TABLE IF NOT EXISTS regulations.rag_chunk_embeddings (
     rag_chunk_id VARCHAR(64) NOT NULL REFERENCES regulations.rag_chunks(rag_chunk_id) ON DELETE CASCADE,
     embedding_model TEXT NOT NULL,
-    dimensions INTEGER NOT NULL CHECK (dimensions = 1536),
+    dimensions INTEGER NOT NULL CHECK (dimensions = 1024),
     input_version TEXT NOT NULL,
     input_sha256 TEXT NOT NULL CHECK (length(input_sha256) = 64),
-    embedding vector(1536) NOT NULL CHECK (vector_norm(embedding) > 0),
+    embedding vector(1024) NOT NULL CHECK (vector_norm(embedding) > 0),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (rag_chunk_id, embedding_model)
@@ -64,7 +62,7 @@ SEARCH_SQL = '''WITH eligible AS MATERIALIZED (
     FROM regulations.rag_chunk_embeddings e
     JOIN regulations.rag_chunks c USING (rag_chunk_id)
     JOIN regulations.regulation_versions v USING (regulation_version_id)
-    WHERE e.embedding_model=%s AND e.dimensions=1536 AND e.input_version=%s
+    WHERE e.embedding_model=%s AND e.dimensions=1024 AND e.input_version=%s
       AND e.input_sha256=''' + HASH_SQL + '''
       AND c.search_status IN ('active','pending_review','needs_review')
       AND (%s OR (c.search_status='active' AND v.review_status='approved'
@@ -98,26 +96,8 @@ def input_text(row):
     return (row['context_path']+'\n\n'+row['chunk_text']).replace('\x00', '')
 
 
-def embedding_api_text(text, max_utf8_bytes=8000):
-    """Bound text sent to OpenAI embedding API while keeping full source text & hash in DB."""
-    cleaned = text.replace('\x00', '').strip()
-    encoded = cleaned.encode('utf-8')
-    if len(encoded) <= max_utf8_bytes:
-        return cleaned
-    return encoded[:max_utf8_bytes].decode('utf-8', errors='ignore').strip()
-
-
 def input_hash(row):
     return hashlib.sha256(input_text(row).encode('utf-8')).hexdigest()
-
-
-def vector_values(value):
-    values = json.loads(value) if isinstance(value,str) else value
-    if not isinstance(values,list) or len(values)!=DIMENSIONS or any(
-        isinstance(x,bool) or not isinstance(x,(int,float)) or not math.isfinite(x) for x in values
-    ) or not any(x!=0 for x in values):
-        raise ValueError('Invalid regulation vector: expected 1536 finite values and nonzero norm')
-    return values
 
 
 def table_exists(conn):
@@ -153,25 +133,6 @@ def status(conn):
             'database_changes':False,'embedding_api_called':False}
 
 
-def embed_texts(texts, client=None):
-    # UTF-8 byte length is a conservative token upper bound; callers bound or re-chunk first.
-    if not texts or any(not isinstance(t, str) or not t.strip() or len(t.encode('utf-8'))>8000 for t in texts):
-        raise ValueError('Empty or oversized input; re-chunk inputs over 8000 UTF-8 bytes first.')
-    if client is None:
-        from openai import OpenAI
-        key = os.getenv('OPENAI_API_KEY')
-        if not key:
-            raise ValueError('OPENAI_API_KEY is required for embed/search; status and export do not need it.')
-        client = OpenAI(api_key=key,base_url='https://api.openai.com/v1',timeout=30,max_retries=2)
-    response = client.embeddings.create(model=MODEL,input=texts,dimensions=DIMENSIONS,encoding_format='float')
-    if response.model!=MODEL or len(response.data)!=len(texts):
-        raise ValueError('Embedding API model/count mismatch; nothing from this batch was stored.')
-    items = sorted(response.data,key=lambda item:item.index)
-    if [item.index for item in items]!=list(range(len(texts))):
-        raise ValueError('Embedding API response indices do not match the inputs.')
-    return [vector_values(item.embedding) for item in items]
-
-
 def store_rows(conn, entries):
     for entry in entries:
         current = conn.execute('''SELECT rag_chunk_id,chunk_text,context_path
@@ -196,14 +157,12 @@ def embed(conn, batch_size=16):
     pending = [r for r in rows if needs_embedding(r,previous)]
     if not rows:
         raise ValueError('No real regulation chunks loaded.')
-    if pending and not os.getenv('OPENAI_API_KEY'):
-        raise ValueError('OPENAI_API_KEY is required for embedding.')
     conn.execute(DDL,prepare=False)
     conn.commit()
     saved = 0
     for offset in range(0,len(pending),batch_size):
         batch = pending[offset:offset+batch_size]
-        vectors = embed_texts([embedding_api_text(input_text(row)) for row in batch])
+        vectors = embed_texts([input_text(row) for row in batch])
         with conn.transaction():
             conn.execute('SET LOCAL search_path TO public, extensions')
             store_rows(conn,[{'rag_chunk_id':row['rag_chunk_id'],'input_sha256':input_hash(row),'embedding':vector}
@@ -220,7 +179,7 @@ def search(conn,query,limit=5,threshold=0.25,include_review=False,as_of=None,ver
     if not table_exists(conn):
         raise ValueError('Run embed to create regulation vectors first.')
     day = as_of or date.today()
-    vector = json.dumps(embed_texts([embedding_api_text(query)])[0])
+    vector = json.dumps(embed_texts([query])[0])
     conn.execute('SET LOCAL search_path TO public, extensions')
     rows = conn.execute(SEARCH_SQL,(MODEL,INPUT_VERSION,include_review,version_id,version_id,
                                    day,include_review,day,day,day,vector,threshold,limit)).fetchall()
@@ -290,7 +249,7 @@ def main(argv=None):
     parser.add_argument('--db-env',default='SUPABASE_DB_URL')
     commands = parser.add_subparsers(dest='command',required=True)
     commands.add_parser('status',help='Read-only counts and remaining work; no API call')
-    emb = commands.add_parser('embed',help='Create vector table and embed real chunks; API charges apply')
+    emb = commands.add_parser('embed',help='Embed real chunks with the fixed BGE-M3 server')
     emb.add_argument('--batch-size',type=int,default=16)
     query = commands.add_parser('search',help='Embed query and search the regulation vectors')
     query.add_argument('--query',required=True)

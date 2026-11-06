@@ -43,7 +43,7 @@ class SharedBgeContractTest(unittest.TestCase):
     def test_resource_queries_use_bge_and_never_openai(self):
         resource_rag.cached_vectors.cache_clear()
         self.addCleanup(resource_rag.cached_vectors.cache_clear)
-        with patch.object(embeddings, 'embed', return_value=[VECTOR]) as bge, patch.object(llm, 'embed', side_effect=AssertionError('OpenAI called')):
+        with patch.object(embeddings, 'embed', return_value=[VECTOR]) as bge, patch.object(llm, 'openai', side_effect=AssertionError('OpenAI called')):
             self.assertEqual(resource_rag.cached_vectors(('query',)), (tuple(VECTOR),))
         bge.assert_called_once_with(['query'])
 

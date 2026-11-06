@@ -85,7 +85,6 @@ flowchart TB
 | 팀 파인튜닝 27B · Q4_K_M | 목표·스킬·문항·로드맵 등 학습 계획 생성. Ollama 이름은 `growpath-27b`입니다. |
 | 팀 파인튜닝 4B · BF16 | 규정·회사 답변과 지원 조건 해석. Ollama 이름은 `growpath-regulation-4b`이며 추론 모드는 항상 끕니다. |
 | OpenAI 생성 모드 | 화면에서 선택할 수 있는 대체 생성 경로. 사용할 모델은 서버 설정으로 지정합니다. |
-| `text-embedding-3-small` | 보존한 이전 OpenAI DB의 1,536차원 모델입니다. 현재 공유 BGE DB의 검색에는 사용하지 않습니다. |
 | `BAAI/bge-m3` | 규정·회사 정보·사내 생활·강좌·도서 등 전체 검색용 1,024차원 모델입니다. 공식 고정 revision의 CPU 서버에서 기본 FP32 추론·CLS·FP32 L2 정규화로 질문을 임베딩합니다. |
 
 [분류 모델 연결](backend/classification.md) · [27B 모델 안내](backend/models/fine_tunning/README.md) · [RunPod 연결·27B/4B 모델 준비](backend/RunPod_Ollama_연결_절차.md)
@@ -238,7 +237,7 @@ docker compose exec -T backend python -c "from app import db; print(db.val('SELE
 
 결과가 0이 아니면 작업 완료를 기다린 뒤 다시 확인하세요. 백엔드가 내려가 있다면 DB 연결 도구에서 `SELECT count(*) FROM app_ext.jobs WHERE status = 'running';`을 실행합니다. 조회 뒤 새 작업이 시작되지 않도록 요청 유입도 멈춰야 합니다. 진행 중 작업을 남긴 채 재시작하면 일부 중단 작업이 자동 복구되면서 실제 모델 호출·비용이 발생할 수 있습니다.
 
-**이전 OpenAI DB에서 이번 공유 BGE DB로 처음 전환할 때는 앱만 다시 만드는 아래 명령으로 충분하지 않습니다.** [공유 DB 복원·공식 모델 준비](backend/README.md#공유-bge-m3-db-연결-124)를 먼저 완료하고, 기존 `.env`의 `GP5_DB_NAME`은 유지한 채 `GP5_APP_DB_NAME=growpath_bge_m3`, `REGULATION_EMBED_PROVIDER=bge-m3`, `KNOWLEDGE_EMBED_PROVIDER=bge-m3`, `BGE_M3_MODEL_DIR=./.cache/bge-m3-official-5617a9f`, `BGE_M3_DTYPE=float32`를 반영합니다. 최초 전환은 위 1~4번의 전체 Compose 실행·검증 명령을 사용합니다. 기존 OpenAI DB의 로컬 변경분을 공유 백업으로 자동 이관하지 않으며, 원본 DB와 볼륨은 보존합니다.
+**이전 OpenAI DB에서 이번 공유 BGE DB로 처음 전환할 때는 앱만 다시 만드는 아래 명령으로 충분하지 않습니다.** [공유 DB 복원·공식 모델 준비](backend/README.md#공유-bge-m3-db-연결-124)를 먼저 완료하고, 기존 `.env`에 `GP5_APP_DB_NAME=growpath_bge_m3`, `BGE_M3_MODEL_DIR=./.cache/bge-m3-official-5617a9f`, `BGE_M3_DTYPE=float32`를 반영합니다. 최초 전환은 위 1~4번의 전체 Compose 실행·검증 명령을 사용합니다. 삭제된 이전 임베딩 모델·제공자 선택 설정은 `.env`에서 제거합니다. 이전 DB의 로컬 변경분을 공유 백업으로 자동 이관하지 않으며, 실제 원본 DB와 볼륨은 보존합니다.
 
 이미 공유 BGE DB로 전환한 환경은 선택한 실제 모델의 연결·비용 설정을 확인하고, DB·BGE 서버가 실행 중인 상태에서 앱만 다시 만듭니다. 아래 절차는 DB 스키마·검색 서버 변경이 없는 앱·설정 갱신에 사용합니다.
 
@@ -266,13 +265,10 @@ docker compose up -d --no-deps --force-recreate backend frontend
 | `OLLAMA_BASE_URL` · `OLLAMA_API_KEY` | RunPod-Ollama 서버 주소와 인증키입니다. |
 | `OLLAMA_MODEL` · `OLLAMA_MODEL_REGULATION` | 비워 두면 각각 `growpath-27b`(진단·로드맵), `growpath-regulation-4b`(규정)를 사용합니다. Pod에서 준비한 Ollama 모델 이름을 사용합니다. |
 | `OLLAMA_THINK` | 예시값은 `off`입니다. 27B는 사용자 선택이 우선하며, 이 값을 비우면 모델 기본값을 따릅니다. 규정 4B의 Ollama 호출은 이 설정과 관계없이 생각 모드를 끕니다. |
-| `OPENAI_API_KEY` | OpenAI 생성 및 이전 OpenAI DB 복구용입니다. 현재 전체 BGE 검색에는 쓰지 않습니다. |
+| `OPENAI_API_KEY` | OpenAI 답변 생성용입니다. 임베딩에는 쓰지 않습니다. |
 | `OPENAI_MODEL` | OpenAI 생성 모드에서 사용할 모델입니다. 서버 설정으로 지정합니다. |
-| `OPENAI_EMBED_MODEL` | 이전 OpenAI DB 복구용 `text-embedding-3-small`(1,536차원) 설정입니다. 현재 BGE 검색 모델을 바꾸지 않습니다. |
-| `REGULATION_EMBED_PROVIDER` | 현재 공유 DB의 규정 검색은 `bge-m3`입니다. 전체 OpenAI 복구에는 보존한 DB와 이전 코드가 함께 필요합니다. |
-| `KNOWLEDGE_EMBED_PROVIDER` | 현재 공유 DB의 회사 정보·사내 생활 검색은 `bge-m3`입니다. [OpenAI 복구 안내](backend/README.md#복구와-이전-기록)를 따릅니다. |
 | `ASSISTANT_SEARCH_MODE` | 세 범주의 BGE 검색은 기본 `hybrid`(BM25+pgvector+RRF)입니다. `vector`는 기존 벡터 단독 복구용입니다. |
-| `GP5_APP_DB_NAME` | 앱 연결 DB. 기본 `growpath_bge_m3`이며 기존 `GP5_DB_NAME=growpath` DB를 보존합니다. |
+| `GP5_APP_DB_NAME` | 앱과 DB 서비스가 사용하는 공유 BGE DB 이름. 기본 `growpath_bge_m3`입니다. |
 | `BGE_M3_MODEL_DIR` | 고정 revision의 공식 가중치·토크나이저 폴더. 기본 `.cache/bge-m3-official-5617a9f`, Git 제외입니다. |
 | `BGE_M3_DTYPE` | CPU 추론 기본 `float32`. 메모리를 절약할 때만 `float16`을 명시합니다. 정규화·출력은 FP32입니다. |
 

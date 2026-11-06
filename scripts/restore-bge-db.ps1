@@ -7,15 +7,17 @@ param(
 $ErrorActionPreference = 'Stop'
 if ($Database -notmatch '^growpath_bge_m3(?:_[a-z0-9_]+)?$') { throw '복원 대상은 별도 growpath_bge_m3 DB여야 합니다.' }
 $info = Get-Content -LiteralPath $Manifest -Raw -Encoding UTF8 | ConvertFrom-Json
+$contractPath = Join-Path $PSScriptRoot '../database/src/shared/bge_model.json'
+$contract = Get-Content -LiteralPath $contractPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $archiveFile = Get-Item -LiteralPath $Archive
 if ($archiveFile.Name -ne $info.archive -or $archiveFile.Length -ne $info.bytes -or
     (Get-FileHash -LiteralPath $Archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $info.sha256) {
   throw '백업 이름·크기·SHA-256이 manifest와 다릅니다.'
 }
-if ($info.embedding_model -ne 'BAAI/bge-m3' -or $info.embedding_dimensions -ne 1024 -or
-    $info.model_provenance.revision -ne '5617a9f61b028005a4858fdac845db406aefb181' -or
-    $info.model_provenance.sha256 -ne 'b5e0ce3470abf5ef3831aa1bd5553b486803e83251590ab7ff35a117cf6aad38' -or
-    $info.model_provenance.pooling -ne 'CLS' -or $info.model_provenance.normalization -ne 'L2') {
+if ($info.embedding_model -ne $contract.model -or $info.embedding_dimensions -ne $contract.dimensions -or
+    $info.model_provenance.revision -ne $contract.model_revision -or
+    $info.model_provenance.sha256 -ne $contract.weights_sha256 -or
+    $info.model_provenance.pooling -ne $contract.pooling -or $info.model_provenance.normalization -ne $contract.normalization) {
   throw '지원하는 BGE 모델·revision·가중치·pooling·정규화 계약과 다릅니다.'
 }
 Write-Output "백업 검증 완료: $($info.archive), $($info.bytes) bytes, 대상 $Database"

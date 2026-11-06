@@ -1,6 +1,6 @@
 # GrowPath 통합 개발 환경 · docker compose
 #
-#   docker compose up -d --build        DB → 팀 DB 백업 복원 → 보충 자료 → 참고용 백엔드 → 화면(nginx)까지 모두 켬
+#   docker compose up -d --build        복원된 BGE DB 검사 → BGE 서버·백엔드 → 화면(nginx)까지 모두 켬
 #   docker compose up -d backend        화면은 로컬에서 개발할 때(frontend 폴더에서 npm run dev): DB·백엔드만 켬
 #   docker compose down                 끄기 (데이터는 볼륨에 남음) · down -v 는 DB까지 지움
 #
@@ -19,8 +19,6 @@ x-backend: &backend
     # 규정 원문 PDF(팀 규정 묶음의 source/ · team_db/README.md) — 관리자 '지금 규정' 내려받기
     GP5_REGULATION_FILES_DIR: /srv/growpath/regulation_files
     # 모든 검색은 #124 공유 BGE DB와 같은 1024차원 모델을 사용한다. 생성 LLM은 별도다.
-    REGULATION_EMBED_PROVIDER: ${REGULATION_EMBED_PROVIDER:-bge-m3}
-    KNOWLEDGE_EMBED_PROVIDER: ${KNOWLEDGE_EMBED_PROVIDER:-bge-m3}
     ASSISTANT_SEARCH_MODE: ${ASSISTANT_SEARCH_MODE:-hybrid}
     BGE_M3_BASE_URL: ${BGE_M3_BASE_URL:-http://bge-m3:8080/v1}
 
@@ -56,7 +54,7 @@ services:
   db:
     image: pgvector/pgvector:pg17
     environment:
-      POSTGRES_DB: ${GP5_DB_NAME:-growpath}
+      POSTGRES_DB: ${GP5_APP_DB_NAME:-growpath_bge_m3}
       POSTGRES_USER: ${GP5_DB_USER:-growpath}
       POSTGRES_PASSWORD: ${GP5_DB_PASSWORD:?.env 에 GP5_DB_PASSWORD 를 넣어 주세요}
     ports:
@@ -69,26 +67,7 @@ services:
       timeout: 3s
       retries: 30
 
-  # 빈 DB일 때만 팀 DB 전체 백업(team_db/)을 복원한다. 이미 표가 있으면 건너뜀(여러 번 켜도 같은 결과)
-  db-restore:
-    profiles: [legacy-openai]
-    image: pgvector/pgvector:pg17
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      PGHOST: db
-      PGUSER: ${GP5_DB_USER:-growpath}
-      PGPASSWORD: ${GP5_DB_PASSWORD}
-      PGDATABASE: ${GP5_DB_NAME:-growpath}
-      TEAM_DB_FILE: ${TEAM_DB_FILE:-growpath_latest.dump}
-    volumes:
-      - ./team_db:/dump:ro
-      - ./scripts/db-restore.sh:/db-restore.sh:ro
-    entrypoint: ["sh", "/db-restore.sh"]
-    restart: "no"
-
-  # 보조 스키마(app_ext)·관리자 계정·학습 자료 보조 값·규정 묶음·목표 후보 (참고용 백엔드의 tools/setup_db.py)
+  # 복원된 공유 BGE DB를 읽기 전용으로 검사한다.
   backend-setup:
     <<: *backend
     depends_on:

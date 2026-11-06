@@ -15,9 +15,6 @@ from app.llm import LlmError
 
 class RegulationFollowUpTest(unittest.TestCase):
     def setUp(self):
-        settings = patch.dict(os.environ, REGULATION_EMBED_PROVIDER='openai')
-        settings.start()
-        self.addCleanup(settings.stop)
         self.ctx = rt.Ctx(employee_id=1, me={'empGroup': '일반직'})
         regs = [{'key': 'edu', 'name': '인재개발규정'}, {'key': 'work', 'name': '취업규칙'}]
         for item in regs:
@@ -28,7 +25,8 @@ class RegulationFollowUpTest(unittest.TestCase):
                               ('work', 2, '직원에게 적용한다.'), ('work', 9, '근무를 기록한다.')]:
             aid = f'{key}-{no}'
             self.articles[aid] = {'id': aid, 'reg': key, 'no': f'제{no}조', 'text': text,
-                                  'title': '', 'chapter': '', 'type': 'article', 'path': ''}
+                                  'title': '', 'chapter': '', 'type': 'article', 'path': '',
+                                  'group': '일반직', 'overseas': False}
         data = {'regs': {item['key']: item for item in regs}, 'arts': self.articles,
                 'sets': {'일반직': {'regs': regs}}}
         for target, name, value in [(reg.regstore, 'data', data), (reg.llm, 'available', True),
@@ -84,7 +82,8 @@ class RegulationFollowUpTest(unittest.TestCase):
             ('work-24-1', 'work', '제24조 제1항', '다른 규정의 같은 번호다.'),
         ):
             self.articles[aid] = {'id': aid, 'reg': key, 'no': no, 'text': text, 'title': '',
-                                  'chapter': '', 'type': 'paragraph', 'path': ''}
+                                  'chapter': '', 'type': 'paragraph', 'path': '',
+                                  'group': '일반직', 'overseas': False}
         self.search.return_value = [{'id': 'edu-24-5'}, {'id': 'edu-9'}]
         with (patch.object(rt, '_log'), patch.object(rt, 'llm_json', return_value={
             'status': 'partial', 'summary': '지급기준은 따로 확인해야 해요.', 'sourceIds': ['S003'],
@@ -112,7 +111,7 @@ class RegulationFollowUpTest(unittest.TestCase):
         sibling = paragraph('edu-24-1', 1, '승인 조건은 담당 부서에 확인한다.')
         self.articles.update({hit['id']: hit, sibling['id']: sibling})
         self.search.return_value = [{'id': hit['id']}, {'id': 'edu-9'}]
-        with patch.object(reg.regulation_embeddings, 'search_provider', return_value='bge-m3'), patch.object(reg.hybrid_search, 'enabled', return_value=True), patch.object(reg.regstore, 'pool', return_value=[hit, sibling]), patch.object(rt, '_log'), patch.object(rt, 'llm_json', return_value={'status': 'partial', 'summary': '승인 조건은 담당 부서에 확인해요.', 'sourceIds': ['S003']}) as model:
+        with patch.object(reg.hybrid_search, 'enabled', return_value=True), patch.object(reg.regstore, 'pool', return_value=[hit, sibling]), patch.object(rt, '_log'), patch.object(rt, 'llm_json', return_value={'status': 'partial', 'summary': '승인 조건은 담당 부서에 확인해요.', 'sourceIds': ['S003']}) as model:
             answer = reg.answer(self.ctx, '교육비 지원 조건', [], {}, documents_only=True)
         self.assertEqual(answer['retrieved'], ['edu-24-2', 'edu-9', 'edu-24-1'])
         self.assertEqual(answer['basis'], ['edu-24-1'])

@@ -46,7 +46,7 @@ def main():
     started = perf_counter()
     items = catalog.items()
     result['catalog_warmup_ms'] = (perf_counter() - started) * 1000
-    with patch.object(llm, 'embed', side_effect=AssertionError('OpenAI 임베딩 호출 금지')):
+    with patch.object(llm, 'openai', side_effect=AssertionError('OpenAI 임베딩 호출 금지')):
         for topic, query, fn in (
             ('regulation', '미사용 연차를 이월할 수 있나요?', lambda q: regstore.search(q, 5, '일반직', 'ollama')),
             ('company', '한국수자원공사는 어떤 일을 하나요?', knowledge.search_company),

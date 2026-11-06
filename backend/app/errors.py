@@ -59,7 +59,6 @@ CAUSES = [
     (r'요청이 너무 커요', 'docbig', '파일이 너무 커요 (15MB까지)'),
     (r'비전 모델 설정이 없', 'visioncfg', '이미지를 읽는 비전 모델이 없어요(RunPod-Ollama 팀 모델은 이미지를 읽지 않음 · OpenAI는 .env의 OPENAI_VISION_MODEL)'),
     (r'Ollama 설정이 없|OLLAMA_BASE_URL', 'config', '.env에 Ollama 주소(OLLAMA_BASE_URL)가 없어요'),
-    (r'규정 검색 임베딩', 'config', '규정 검색 임베딩(text-embedding-3-small)에 쓰는 OpenAI 키(OPENAI_API_KEY)가 .env에 없어요 · RunPod-Ollama 모드도 필요해요'),
     (r'OPENAI_API_KEY', 'config', '.env에 OpenAI 키(OPENAI_API_KEY)가 없어요'),
     (r'RunPod 프록시 524', 'timeout', 'RunPod 프록시의 응답 시간 제한(약 100초)을 넘었어요'),
     # Pod 앞의 nginx 가 키를 확인하는 구성(RunPod Pod 연결 절차) · 401 = 키 없음·틀림

@@ -22,39 +22,28 @@ def chunk(text='등록 자료 원문'):
 
 class KnowledgeEmbeddingTest(unittest.TestCase):
     def setUp(self):
-        settings = patch.dict(os.environ, KNOWLEDGE_EMBED_PROVIDER='bge-m3', ASSISTANT_SEARCH_MODE='vector')
+        settings = patch.dict(os.environ, ASSISTANT_SEARCH_MODE='vector')
         settings.start()
         self.addCleanup(settings.stop)
 
     def test_both_categories_use_bge_without_openai(self):
-        with patch.object(search, 'search', return_value=[]) as bge, patch.object(llm, 'embed') as old:
+        with patch.object(search, 'search', return_value=[]) as bge, patch.object(llm, 'openai') as old:
             knowledge.search_company('회사 소개')
             knowledge.search_life('식당 안내')
         self.assertEqual(bge.call_args_list[0].args, ('회사 소개', knowledge.CATEGORY))
         self.assertEqual(bge.call_args_list[1].args, ('식당 안내', knowledge.LIFE_CATEGORY))
         old.assert_not_called()
 
-    def test_unknown_provider_fails(self):
-        with patch.dict(os.environ, KNOWLEDGE_EMBED_PROVIDER='typo'):
-            with self.assertRaisesRegex(llm.LlmError, '설정'):
-                knowledge.search_company('질문')
-
     def test_default_provider_is_bge(self):
         with patch.dict(os.environ, {}, clear=True), patch.object(config, '_FILE', {}), patch.object(search, 'search', return_value=[]) as bge:
             self.assertEqual(knowledge.search_company('질문'), [])
         bge.assert_called_once_with('질문', knowledge.CATEGORY)
 
-    def test_explicit_openai_rollback_routes_existing_search(self):
-        with patch.dict(os.environ, KNOWLEDGE_EMBED_PROVIDER='openai'), patch.object(knowledge, '_search_openai', return_value=[]) as old, patch.object(search, 'search') as bge:
-            knowledge.search_company('질문')
-        old.assert_called_once_with('질문', knowledge.CATEGORY)
-        bge.assert_not_called()
-
     def test_search_keeps_categories_provenance_and_virtual_filter(self):
         for category, real_only in ((knowledge.CATEGORY, True), (knowledge.LIFE_CATEGORY, False)):
             hit = {'chunk_id': 'c1', 'category': category, 'is_virtual': not real_only,
                    'metadata': {'source': '원문'}, 'document_title': '자료'}
-            with self.subTest(category=category), patch.object(search.db, 'val', return_value=search.TABLE), patch.object(search.db, 'one', return_value={'total': 2, 'indexed': 2}), patch.object(embeddings, 'embed', return_value=[VECTOR]), patch.object(search.db, 'all_', return_value=[hit]) as sql, patch.object(search.db, 'tx') as write, patch.object(llm, 'embed') as old:
+            with self.subTest(category=category), patch.object(search.db, 'val', return_value=search.TABLE), patch.object(search.db, 'one', return_value={'total': 2, 'indexed': 2}), patch.object(embeddings, 'embed', return_value=[VECTOR]), patch.object(search.db, 'all_', return_value=[hit]) as sql, patch.object(search.db, 'tx') as write, patch.object(llm, 'openai') as old:
                 self.assertEqual(search.search('질문', category), [hit])
             self.assertEqual(sql.call_args.kwargs['category'], category)
             self.assertEqual(sql.call_args.kwargs['real_only'], real_only)
@@ -84,7 +73,7 @@ class KnowledgeEmbeddingTest(unittest.TestCase):
                 embed.assert_not_called()
 
     def test_connection_failure_has_no_fallback(self):
-        with patch.object(search.db, 'val', return_value=search.TABLE), patch.object(search.db, 'one', return_value={'total': 1, 'indexed': 1}), patch.object(embeddings, 'embed', side_effect=llm.LlmError('BGE-M3 연결 실패')), patch.object(knowledge, '_search_openai') as old:
+        with patch.object(search.db, 'val', return_value=search.TABLE), patch.object(search.db, 'one', return_value={'total': 1, 'indexed': 1}), patch.object(embeddings, 'embed', side_effect=llm.LlmError('BGE-M3 연결 실패')), patch.object(llm, 'openai') as old:
             with self.assertRaisesRegex(llm.LlmError, '연결 실패'):
                 knowledge.search_company('질문')
         old.assert_not_called()

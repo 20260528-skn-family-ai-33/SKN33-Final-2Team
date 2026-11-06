@@ -7,6 +7,7 @@ COPY requirements.txt ./
 COPY database/requirements.txt database/requirements-db.txt ./database/
 RUN pip install --no-cache-dir -r requirements.txt
 COPY VERSION /srv/VERSION
+COPY database/src/shared/bge_model.json /srv/database/src/shared/bge_model.json
 COPY backend/app ./app
 COPY backend/web ./web
 COPY backend/db ./db

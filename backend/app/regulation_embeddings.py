@@ -13,13 +13,6 @@ from .bge_model import MODEL as BGE_MODEL, DIMENSIONS as BGE_DIMENSIONS, PROVENA
 
 
 
-def search_provider() -> str:
-    provider = env('REGULATION_EMBED_PROVIDER', 'bge-m3').strip().lower()
-    if provider not in ('openai', 'bge-m3'):
-        raise llm.LlmError('BGE-M3 설정: REGULATION_EMBED_PROVIDER는 openai 또는 bge-m3여야 해요')
-    return provider
-
-
 def model() -> str:
     return BGE_MODEL
 
@@ -47,7 +40,7 @@ def embed(texts: list[str]) -> list[list[float]]:
     vectors, batch, byte_size = [], [], 0
     for text in texts:
         size = len(text.encode('utf-8'))
-        # llama.cpp의 비인과 임베딩 배치가 문맥 8192를 넘지 않도록 묶음을 제한한다.
+        # CPU 서버의 요청당 입력 수와 긴 문서 배치의 메모리 사용을 제한한다.
         if batch and (len(batch) >= 4 or byte_size + size > 17000):
             vectors.extend(_bge_request(batch))
             batch, byte_size = [], 0

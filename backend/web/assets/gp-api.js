@@ -144,7 +144,6 @@
       discard: uploadId => API.del(`/admin/uploads/${enc(uploadId)}`),
       uploads: ds => API.get(`/admin/uploads?dataset=${enc(ds || '')}`),
       goalsAll: mode => API.post('/admin/goal-suggestions/regenerate-all', { mode: mode || null }),
-      buildIndex: provider => API.post('/admin/regulations/index', { provider }, { async: true, wait: false }),
       downloadUrl: (ds, fmt, sheet) => `${BASE}/admin/datasets/${enc(ds)}/export?` + new URLSearchParams({ format: fmt, sheet: sheet || '' }).toString(),
       templateUrl: (ds, fmt, sheet) => `${BASE}/admin/datasets/${enc(ds)}/template?` + new URLSearchParams({ format: fmt, sheet: sheet || '' }).toString()
     }

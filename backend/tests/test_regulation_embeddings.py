@@ -19,7 +19,7 @@ VECTOR = [1.0] + [0.0] * 1023
 
 class RegulationEmbeddingTest(unittest.TestCase):
     def setUp(self):
-        self.settings = patch.dict(os.environ, BGE_M3_BASE_URL='http://127.0.0.1:18671/v1', BGE_M3_TIMEOUT='15', REGULATION_EMBED_PROVIDER='openai', ASSISTANT_SEARCH_MODE='vector')
+        self.settings = patch.dict(os.environ, BGE_M3_BASE_URL='http://127.0.0.1:18671/v1', BGE_M3_TIMEOUT='15', ASSISTANT_SEARCH_MODE='vector')
         self.settings.start()
         self.addCleanup(self.settings.stop)
 
@@ -36,9 +36,11 @@ class RegulationEmbeddingTest(unittest.TestCase):
         self.assertEqual(http.call_args.args[3], 15)
         openai.assert_not_called()
 
-    def test_bge_setting_does_not_change_other_search_models(self):
+    def test_removed_openai_embedding_client_and_setting(self):
+        self.assertFalse(hasattr(llm, 'embed'))
+        self.assertFalse(hasattr(llm, 'embed_model'))
+        self.assertFalse(hasattr(config.S, 'openai_embed'))
         self.assertEqual(embeddings.model(), embeddings.BGE_MODEL)
-        self.assertEqual(llm.embed_model(), config.S.openai_embed)
 
     def test_full_body_is_not_truncated_at_6000_characters(self):
         article = {'reg': 'test', 'no': '제1조', 'title': '긴 조항', 'chapter': '', 'text': '본문' * 3500 + '끝'}
@@ -48,21 +50,15 @@ class RegulationEmbeddingTest(unittest.TestCase):
         self.assertTrue(text.endswith(article['text']))
         self.assertIn('규정', text)
 
-    def test_openai_option_preserves_existing_search(self):
-        with patch.object(regstore, 'pool', return_value=[{'id': 'a'}]), patch.object(llm, 'embed', return_value=[[1.0]]) as old_embed, patch.object(regstore, 'ensure_vectors'), patch.object(regstore.db, 'all_', return_value=[{'rag_chunk_id': 'a', 'score': 1}]), patch.object(embeddings, 'embed') as bge:
-            self.assertEqual(regstore.search('질문', 4, '일반직', 'ollama'), [{'id': 'a', 'score': 1.0}])
-        old_embed.assert_called_once_with(['질문'])
-        bge.assert_not_called()
-
     def test_both_generation_modes_route_regulations_to_bge(self):
         for mode in ('ollama', 'openai'):
-            with self.subTest(mode=mode), patch.dict(os.environ, REGULATION_EMBED_PROVIDER='bge-m3'), patch.object(search, 'search', return_value=[{'id': 'a', 'score': 1}]) as bge, patch.object(regstore, 'vector_search') as old:
+            with self.subTest(mode=mode), patch.object(search, 'search', return_value=[{'id': 'a', 'score': 1}]) as bge, patch.object(llm, 'openai') as old:
                 self.assertEqual(regstore.search('질문', 5, '일반직', mode, all_groups=True), [{'id': 'a', 'score': 1}])
                 bge.assert_called_once_with('질문', 5, '일반직', all_groups=True)
                 old.assert_not_called()
 
     def test_bge_failure_does_not_fallback_to_openai_or_keywords(self):
-        with patch.dict(os.environ, REGULATION_EMBED_PROVIDER='bge-m3'), patch.object(search, 'search', side_effect=llm.LlmError('BGE-M3 연결 실패')), patch.object(regstore, 'vector_search') as old, patch.object(regstore, 'keyword_search') as keyword:
+        with patch.object(search, 'search', side_effect=llm.LlmError('BGE-M3 연결 실패')), patch.object(llm, 'openai') as old, patch.object(regstore, 'keyword_search') as keyword:
             with self.assertRaises(llm.LlmError):
                 regstore.search('질문', 4, '일반직', 'ollama')
             old.assert_not_called()
@@ -74,10 +70,10 @@ class RegulationEmbeddingTest(unittest.TestCase):
             keyword.assert_called_once()
             bge.assert_not_called()
 
-    def test_unknown_search_provider_fails_explicitly(self):
-        with patch.dict(os.environ, REGULATION_EMBED_PROVIDER='typo'):
-            with self.assertRaises(llm.LlmError):
-                regstore.search('질문', 4, '일반직', 'ollama')
+    def test_previous_provider_setting_cannot_restore_removed_model(self):
+        with patch.dict(os.environ, REGULATION_EMBED_PROVIDER='openai'), patch.object(search, 'search', return_value=[]) as bge:
+            self.assertEqual(regstore.search('질문', 4, '일반직', 'ollama'), [])
+        bge.assert_called_once_with('질문', 4, '일반직', all_groups=False)
 
     def test_empty_inputs_do_not_request_and_blank_text_fails(self):
         with patch.object(llm, '_http') as http:
@@ -95,7 +91,7 @@ class RegulationEmbeddingTest(unittest.TestCase):
                  {'model': embeddings.BGE_MODEL, 'data': [{'index': 0, 'embedding': [float('nan')] * 1024}]},
                  {'model': embeddings.BGE_MODEL, 'data': [{'index': 0, 'embedding': [True] * 1024}]}]
         for result in cases:
-            with self.subTest(result=str(result)[:60]), self.response(result), patch.object(llm, 'embed') as fallback:
+            with self.subTest(result=str(result)[:60]), self.response(result), patch.object(llm, 'openai') as fallback:
                 with self.assertRaises(llm.LlmError):
                     embeddings.embed(['질문'])
                 fallback.assert_not_called()

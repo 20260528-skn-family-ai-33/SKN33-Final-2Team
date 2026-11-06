@@ -84,36 +84,17 @@ class SetupPasswordTests(unittest.TestCase):
         self.hash_password.assert_not_called()
         self.transaction.run.assert_not_called()
 
-    def test_setup_checks_admin_even_without_employee_initial_password(self):
-        with patch.object(setup_db, 'S', replace(setup_db.S, admin_password='admin-test', demo_password='')), \
-             patch('sys.argv', ['setup_db.py', '--supplement-only']), \
-             patch.object(setup_db, 'apply_app_ext'), \
-             patch.object(setup_db, 'team_passwords') as team_passwords, \
-             patch.object(setup_db, 'resources'), \
-             patch.object(setup_db, 'regulations'), \
-             patch.object(setup_db, 'goals'), \
-             patch('builtins.print'):
+    def test_setup_only_verifies_bge_database_without_writes(self):
+        with patch('tools.verify_bge_database.verify', return_value={'vectors': 4832}) as verify, patch('builtins.print'):
             setup_db.main()
-        self.hash_password.assert_called_once_with('admin-test')
-        self.transaction.run.assert_called_once()
-        team_passwords.assert_not_called()
+        verify.assert_called_once_with()
+        self.hash_password.assert_not_called()
+        self.transaction.run.assert_not_called()
 
-    def test_invalid_new_admin_stops_before_employee_password_changes(self):
-        for password in ('', 'employee-test'):
-            with self.subTest(blank=not password), \
-                 patch.object(setup_db, 'S', replace(setup_db.S, admin_password=password, demo_password='employee-test')), \
-                 patch('sys.argv', ['setup_db.py']), \
-                 patch.object(setup_db, 'db_is_empty', return_value=False), \
-                 patch.object(setup_db, 'apply_app_ext'), \
-                 patch.object(setup_db, 'team_passwords') as team_passwords, \
-                 patch.object(setup_db, 'resources') as resources, \
-                 patch.object(setup_db, 'regulations'), \
-                 patch.object(setup_db, 'goals'), \
-                 patch('builtins.print'):
-                with self.assertRaises(SystemExit):
-                    setup_db.main()
-                team_passwords.assert_not_called()
-                resources.assert_not_called()
+    def test_setup_propagates_invalid_bge_database(self):
+        with patch('tools.verify_bge_database.verify', side_effect=ValueError('BGE DB 입력 계약 오류')):
+            with self.assertRaisesRegex(ValueError, 'BGE DB'):
+                setup_db.main()
         self.transaction.run.assert_not_called()
 
 
