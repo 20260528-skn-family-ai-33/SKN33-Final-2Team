@@ -1,6 +1,7 @@
 """공유 BGE DB 검증 진입점. 기존 계정·자료 보충 함수는 자동 실행하지 않는다."""
 from __future__ import annotations
 
+import argparse
 import re
 import sys
 from pathlib import Path
@@ -32,6 +33,8 @@ def admin_account() -> None:
 
 
 def team_passwords() -> None:
+    if not S.demo_password.strip():
+        raise ValueError('직원 비밀번호 초기화에는 비어 있지 않은 GP5_DEMO_PASSWORD가 필요해요.')
     n = 0
     with db.tx() as t:
         # 사번 없는 행은 로그인할 수 없고, 팀 DB 의 사번 필수 제약(NOT VALID)이 그런 행의 어떤 수정도 막는다
@@ -39,7 +42,7 @@ def team_passwords() -> None:
             if not verify_password(e['password_hash'], S.demo_password):
                 t.run('UPDATE public.employees SET password_hash = :h WHERE employee_id = :i', h=hash_password(S.demo_password), i=e['employee_id'])
                 n += 1
-    say(f'팀 시험 직원 비밀번호(로컬 사본만 · 사번 있는 계정): {n}명 바꿈')
+    say(f'팀 시험 직원 비밀번호 명시적 초기화(로컬 사본만 · 사번 있는 계정): {n}명 바꿈')
 
 
 # ── 3. 학습 자료 보조 값 ──
@@ -139,8 +142,12 @@ def goals() -> None:
     say(f'목표 후보 첫 생성(가데이터 규칙·기본 후보): {n}명')
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
     """이전 설치·자동 보충 없이 복원된 공유 BGE DB만 읽기 전용으로 검사한다."""
+    parser = argparse.ArgumentParser(
+        description='공유 BGE DB 읽기 전용 검사. 이전 보충·비밀번호 초기화 옵션은 지원하지 않습니다.',
+    )
+    parser.parse_args(argv)
     import json
     from tools.verify_bge_database import verify
     print(json.dumps(verify(), ensure_ascii=False, indent=2))
