@@ -74,7 +74,9 @@ docker compose up -d backend
 
 복원한 직원은 백업 제공자·관리자에게 별도로 전달받은 기존 비밀번호로 로그인해요. 설치기는 NULL·잘못된 형식까지 포함해 기존 해시를 그대로 보존하고, `GP5_DEMO_PASSWORD`만 설정해도 덮어쓰지 않아요. 관리자 화면에서 새 직원을 만들 때의 초기 비밀번호는 계속 `GP5_DEMO_PASSWORD`를 사용하며, 신규 관리자용 `GP5_ADMIN_PASSWORD`와는 별개예요.
 
-로컬 시험 사본에서 사번 있는 전체 직원의 비밀번호를 바꿀 때만 [직원 비밀번호 초기화 명령](../README.md#로컬-시험-사본의-직원-비밀번호-초기화-선택)에 따라 `--reset-team-passwords`를 명시해요. `--keep-team-passwords`는 기존 명령 호환용으로 남고, `--supplement-only`도 보존을 유지해요. 초기화 옵션과 이 두 옵션의 조합, 초기화 시 빈 값·공백뿐인 `GP5_DEMO_PASSWORD`는 DB 작업 전에 거절해요. 일반 앱 업데이트는 [DB 복원·보충을 제외하는 절차](../README.md#기존-설치의-설정-변경과-업데이트)를 따라요.
+기존 베타 DB의 해시 보존이 로그인 가능 여부나 새 배포 승인을 뜻하지는 않아요. NULL·잘못된 해시·비밀번호 미상 계정은 배포 전에 확인해야 하며, 새 배포의 비밀번호 전달·로그인 확인 담당자와 완료 여부는 현재 미정이에요.
+
+로컬 시험 사본에서 사번 있는 전체 직원의 비밀번호를 바꿀 때만 [직원 비밀번호 초기화 명령](../README.md#로컬-시험-사본의-직원-비밀번호-초기화-선택)의 `run --build`로 최신 설치기 이미지를 준비하고 `--reset-team-passwords`를 명시해요. 베타 전체 계정의 비밀번호 배포에는 사용하지 않아요. `--keep-team-passwords`는 기존 명령 호환용으로 남고, `--supplement-only`도 보존을 유지해요. 초기화 옵션과 이 두 옵션의 조합, 초기화 시 빈 값·공백뿐인 `GP5_DEMO_PASSWORD`는 DB 작업 전에 거절해요. 일반 앱 업데이트는 [DB 복원·보충을 제외하는 절차](../README.md#기존-설치의-설정-변경과-업데이트)로 세 이미지(`backend`·`backend-setup`·`frontend`)를 빌드하고, 설치기 실행 없이 API·화면만 `up --no-deps`로 다시 만들어요.
 
 챗봇 파인튜닝 모델(`growpath-regulation-4b` · `qwen35-4b-diagnosis-agent` · `role=regulation`)은 `options.num_gpu=-1`로 Ollama 실행 서버의 GPU·VRAM에 맞춰 자동 선택해요. 사용할 GPU가 없으면 서버가 CPU로 실행하며, 모델에 저장된 CPU 강제 설정도 요청 값으로 덮어써요. 같은 모델을 쓰는 안별 지원 조건 확인에도 적용돼요. GPU 드라이버·컨테이너 장치 노출은 **모델 실행 서버**에서 준비해야 해요. 실제 사용 여부는 서버의 `ollama ps` 또는 `/api/ps`의 `size_vram`으로 확인해요. [Ollama GPU 문서](https://docs.ollama.com/gpu), [자동 선택 옵션 원본](https://github.com/ollama/ollama/blob/main/api/types.go)을 참고해요.
 

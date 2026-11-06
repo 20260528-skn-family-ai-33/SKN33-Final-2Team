@@ -198,15 +198,17 @@ Compose는 **DB → 빈 DB의 백업 복원 → 보충 자료·보조 스키마 
 
 복원한 직원 계정은 **기존 비밀번호**로 로그인합니다. 비밀번호는 백업 제공자·관리자에게 별도로 전달받으세요. 설치기는 직원 비밀번호 해시를 기본으로 보존하며, `GP5_DEMO_PASSWORD`를 설정하거나 설치기를 다시 실행해도 기존 직원 비밀번호를 바꾸지 않습니다. 해시가 NULL이거나 잘못된 형식이어도 임의로 초기화하지 않습니다.
 
+이는 기존 베타 DB의 비밀번호를 유지하는 정책이며, NULL·잘못된 해시나 비밀번호를 모르는 계정을 배포 가능한 것으로 판단한 것은 아닙니다. 새 배포 전 비밀번호 전달·로그인 확인은 담당자가 완료해야 하며, 담당자와 완료 여부는 현재 미정입니다.
+
 ### 로컬 시험 사본의 직원 비밀번호 초기화 (선택)
 
 최초 설치가 끝나 DB가 실행 중인 **로컬 시험 사본**에서만 사용합니다. 루트 `.env`에 비어 있지 않은 `GP5_DEMO_PASSWORD`를 설정하고 아래 명령을 명시적으로 실행하면, 사번이 있는 전체 직원의 비밀번호가 그 값으로 바뀝니다. 일반 앱 업데이트에는 이 명령을 사용하지 않습니다.
 
 ```bash
-docker compose run --rm --no-deps backend-setup python tools/setup_db.py --reset-team-passwords
+docker compose run --rm --build --no-deps backend-setup python tools/setup_db.py --reset-team-passwords
 ```
 
-이 명령은 설치기의 보조 스키마·보충 자료 준비도 함께 실행합니다. `--reset-team-passwords`는 `--keep-team-passwords` 또는 `--supplement-only`와 함께 사용할 수 없습니다. 이 옵션 조합과 빈 값·공백뿐인 초기화 비밀번호는 모두 DB 작업 전에 거절합니다. 기존 `--keep-team-passwords`와 `--supplement-only`는 직원 비밀번호 보존을 유지합니다. 관리자 비밀번호는 이 초기화 대상에 포함되지 않습니다.
+이 명령은 최신 설치기 이미지를 빌드한 뒤 보조 스키마·보충 자료 준비도 함께 실행합니다. 베타 전체 계정의 비밀번호 배포 수단으로 사용하지 않습니다. `--reset-team-passwords`는 `--keep-team-passwords` 또는 `--supplement-only`와 함께 사용할 수 없습니다. 이 옵션 조합과 빈 값·공백뿐인 초기화 비밀번호는 모두 DB 작업 전에 거절합니다. 기존 `--keep-team-passwords`와 `--supplement-only`는 직원 비밀번호 보존을 유지합니다. 관리자 비밀번호는 이 초기화 대상에 포함되지 않습니다.
 
 ### 베타 설치·시연 설정 (#63, #64)
 
@@ -243,11 +245,11 @@ docker compose exec -T backend python -c "from app import db; print(db.val('SELE
 선택한 실제 모델의 연결·비용 설정을 확인하고, 기존 DB가 실행 중인 상태에서 앱만 다시 만듭니다. 이 절차는 DB 스키마 변경이 없는 앱·설정 갱신에 사용하며, DB 변경이 포함된 버전은 해당 마이그레이션 안내도 따릅니다.
 
 ```bash
-docker compose build backend frontend
+docker compose build backend backend-setup frontend
 docker compose up -d --no-deps --force-recreate backend frontend
 ```
 
-이 경로는 DB 복원·설치기를 재실행하지 않아 기존 가데이터 결과·직원 선택·비밀번호를 보존합니다. 설치기를 다시 실행하더라도 직원 비밀번호는 기본으로 보존하며, `GP5_DEMO_PASSWORD` 설정만으로 바꾸지 않습니다. 위 `--no-deps` 절차는 일반 앱 업데이트에서 DB 복원·보충 자료 준비까지 다시 실행하지 않도록 유지합니다. 로컬 시험 사본의 직원 비밀번호 초기화가 필요할 때만 위의 명시적 `--reset-team-passwords` 명령을 사용하세요.
+`build`는 설치기(`backend-setup`) 이미지도 최신 코드로 갱신하지만 실행하지 않습니다. `up --no-deps`는 API·화면만 다시 만들어 DB 복원·설치기를 재실행하지 않으며, 기존 가데이터 결과·직원 선택·비밀번호를 보존합니다. 설치기를 다시 실행하더라도 직원 비밀번호는 기본으로 보존하며, `GP5_DEMO_PASSWORD` 설정만으로 바꾸지 않습니다. 로컬 시험 사본의 직원 비밀번호 초기화가 필요할 때만 위의 명시적 `--reset-team-passwords` 명령을 사용하세요.
 
 모델 연결은 직원의 목표 화면 첫 진입 전에 준비하세요. 저장된 후보가 없고 프로필에 추천 근거가 있는 계정은 첫 진입에서 생성을 시도하며, 모델이 미연결이면 실패 상태가 남을 수 있습니다. 모델을 연결한 뒤에는 목표 후보의 **다시 시도**를 눌러 재생성합니다. 자동 재시도는 하지 않습니다. 기존 가데이터 후보는 삭제되지 않아 계속 가데이터 태그와 함께 보일 수 있습니다.
 
