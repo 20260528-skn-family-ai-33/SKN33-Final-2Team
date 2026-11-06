@@ -72,7 +72,7 @@
      직원: 사번 + 비밀번호(시연 초기 비밀번호 · .env 의 GP5_DEMO_PASSWORD) · 관리자: 관리자 아이디(직원과 별개 계정 · 2026-10-21 사용자 결정).
      계정은 로그아웃한 뒤 다시 로그인해야만 바뀐다. 부서장 권한·소속 직원은 서버가 부서 계층으로 정한다 */
   GP.ACCOUNT = null;        // {accountType: 'employee'|'admin', user?, admin?}
-  GP.ACCTS = [];            // 로그인 화면 '직원 고르기'(시연 전용)
+  GP.ACCTS = [];            // 로그인 화면 '직원 고르기'(베타용)
   GP.TEAM = null;           // 부서장: 소속 직원 목록(서버)
   GP.MEMBERS = {};          // 부서장: 소속 직원 기록(서버 · 공개 범위만)
   GP.me = () => (GP.ACCOUNT && GP.ACCOUNT.accountType === 'employee' ? GP.ACCOUNT.user : null);

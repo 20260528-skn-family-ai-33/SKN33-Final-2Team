@@ -1,6 +1,6 @@
 /* 로그인 (API-01 · 5차 gp-app.js scr.login)
    팀 DB 직원(사번)과 관리자 전용 계정(직원과 별개)이 같은 칸으로 로그인한다. 비밀번호는 서버가 argon2 로 확인한다.
-   '직원 고르기'(시연용)는 부서별로 묶고, 팀이 넣은 테스트 계정은 따로 묶는다 */
+   '직원 고르기'(베타용)는 부서별로 묶고, 팀이 넣은 테스트 계정은 따로 묶는다 */
 import { useRef, useState, type FormEvent } from 'react';
 import { ApiError } from '@/api/client';
 import { accountApi } from '@/api/endpoints/account';
@@ -13,6 +13,7 @@ import { toast } from '@/shared/state/ui';
 import { ws } from '@/shared/state/workspace';
 import { Icon } from '@/shared/ui/Icon';
 import { Note } from '@/shared/ui/parts';
+import { AppVersion } from '@/shared/ui/AppVersion';
 
 const Feat = ({ ic, t, d }: { ic: string; t: string; d: string }) => (
   <div className="feat">
@@ -47,7 +48,6 @@ export function LoginPage() {
   const demo = useSession((s) => s.demo);
   const go = useGo();
   const accts = demo?.accounts || [];
-  const demoPw = demo?.demoPassword || '';
   const [code, setCode] = useState('');
   const [pw, setPw] = useState('');
   const [keep, setKeep] = useState(true);
@@ -106,9 +106,9 @@ export function LoginPage() {
         </h1>
         <p className="lead">AI 활용·개발 역량 성장 로드맵을 이어서 만들어 보세요.</p>
         <form id="loginForm" noValidate onSubmit={submit}>
-          <div className="field lg-pick">
+          {accts.length > 0 && <div className="field lg-pick">
             <label htmlFor="lgPick">
-              직원 고르기 <span className="muted small">시연용 · 고르면 사번을 채워요</span>
+              직원 고르기 <span className="muted small">베타용 · 고르면 사번을 채워요</span>
             </label>
             <select
               className="input"
@@ -140,7 +140,7 @@ export function LoginPage() {
                 </optgroup>
               ) : null}
             </select>
-          </div>
+          </div>}
           <div className="field">
             <label htmlFor="lgId">사번 또는 관리자 아이디</label>
             <input
@@ -180,7 +180,7 @@ export function LoginPage() {
             <button
               type="button"
               className="link quiet"
-              onClick={() => toast(`시연에서는 비밀번호 찾기를 연결하지 않았어요. 초기 비밀번호는 ${demoPw || '.env에 정한 값'}이에요`)}
+              onClick={() => toast('비밀번호는 관리자에게 문의해 주세요. 관리자에게 받은 초기 비밀번호로 로그인해 주세요.')}
             >
               비밀번호 찾기
             </button>
@@ -197,12 +197,11 @@ export function LoginPage() {
           <Icon name="users" />
           기관 통합인증(SSO)으로 로그인
         </button>
-        {accts.length ? null : <Note>직원 목록을 불러오지 못했어요. 백엔드와 DB가 켜져 있는지 확인해 주세요(docker compose ps).</Note>}
         <Note>
-          시연용 화면이에요. 기관 통합인증은 연결하지 않았어요. 팀 DB(PostgreSQL) 직원의 사번으로 들어올 수 있고, 시연 환경의 초기 비밀번호는 모두{' '}
-          {demoPw || '.env에 정한 값'}이에요. 비밀번호는 서버가 해시로만 확인해요. 관리자 화면은 관리자 전용 계정으로 들어가요. 다른 계정으로 바꾸려면 로그아웃한 뒤 다시
-          로그인해 주세요.
+          관리자에게 받은 초기 비밀번호로 로그인해 주세요. 관리자 화면은 관리자 전용 계정으로 들어가요.
+          다른 계정으로 바꾸려면 로그아웃한 뒤 다시 로그인해 주세요.
         </Note>
+        <AppVersion />
       </section>
       <aside className="login-side">
         <span className="pill">

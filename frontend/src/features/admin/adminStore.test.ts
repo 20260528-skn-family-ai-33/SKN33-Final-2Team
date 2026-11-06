@@ -1,7 +1,9 @@
 /* 관리자 한 건 고치기: 서버에 보낼 값(고칠 때는 바뀐 칸만, 추가할 때는 적은 칸만)과 오류 붙이기 */
 import { describe, expect, it } from 'vitest';
 import type { AdminColumn, AdminRows } from '@/api/types/admin';
-import { dirty, editRows, newEdit, norm, placeErrors } from './adminStore';
+import { ApiError } from '@/api/client';
+import { dataReset } from '@/shared/state/events';
+import { adm, dirty, editRows, newEdit, norm, placeErrors, requireDemoGoalAllowed, setChoice } from './adminStore';
 
 const col = (field: string, header: string, o: Partial<AdminColumn> = {}): AdminColumn => ({
   field,
@@ -26,6 +28,32 @@ const rows = (sheet: string, columns: AdminColumn[], autoKey = false): AdminRows
 });
 const emp = rows('직원', [col('code', '사번', { key: true }), col('name', '이름', { required: true }), col('task', '주요 담당 업무', { kind: 'list' }), col('dept_name', '부서 이름', { readonly: true })]);
 const row = { code: '20220001', name: '조은호', task: 'RAG; 문서 검색', dept_name: '업무시스템팀' };
+
+describe('관리자 목표 후보 모드', () => {
+  it('초기화 후 일괄 생성은 Ollama, 인사 저장·반영은 직원 선택으로 시작한다', () => {
+    setChoice('goalsAll', 'mock');
+    setChoice('applyGoal', 'mock');
+    dataReset();
+    expect(adm().choice).toEqual({ goalsAll: 'ollama', editGoal: 'employee', applyGoal: 'employee' });
+  });
+
+  it.each(['goalsAll', 'editGoal', 'applyGoal'] as const)('서버 시연이 꺼지면 %s의 기존 mock을 실제 모델로 바꾸지 않고 재선택을 요구한다', (choice) => {
+    setChoice(choice, 'mock');
+    expect(() => requireDemoGoalAllowed(adm().choice[choice], false)).toThrow(ApiError);
+    try { requireDemoGoalAllowed(adm().choice[choice], false); }
+    catch (err) { expect((err as ApiError).code).toBe('DEMO_DISABLED'); }
+    expect(adm().choice[choice]).toBe('mock');
+    setChoice(choice, 'employee');
+    expect(() => requireDemoGoalAllowed(adm().choice[choice], false)).not.toThrow();
+  });
+
+  it('시연 on의 mock과 off의 명시적 실제 모델 선택은 허용한다', () => {
+    expect(() => requireDemoGoalAllowed('mock', true)).not.toThrow();
+    for (const mode of ['employee', 'ollama', 'openai']) {
+      expect(() => requireDemoGoalAllowed(mode, false)).not.toThrow();
+    }
+  });
+});
 
 describe('norm', () => {
   it('세미콜론·줄바꿈 목록과 공백 차이는 같은 값으로 본다', () => {

@@ -6,12 +6,13 @@ import type { AdminOverview, GoalMode } from '@/api/types/admin';
 import { paths } from '@/app/paths';
 import { useGo } from '@/shared/hooks/useGo';
 import { failToast } from '@/shared/lib/fail';
+import { canUseDemo } from '@/shared/lib/demoAccess';
 import { ai, useAi } from '@/shared/state/ai';
 import { closeSheet, openSheet, toast } from '@/shared/state/ui';
 import { Icon } from '@/shared/ui/Icon';
 import { Loading, Note, Page } from '@/shared/ui/parts';
 import { refreshGoals, useGoalEmployees, useOverview } from './adminData';
-import { adm, pickGoal, setChoice, setGoal, useAdmin } from './adminStore';
+import { adm, pickGoal, requireDemoGoalAllowed, setChoice, setGoal, useAdmin } from './adminStore';
 import { DS, EDU_KIND, REG } from './datasets';
 import { FailBox, Num, UploadList } from './parts';
 
@@ -86,7 +87,7 @@ function GoalsAllBody({ active }: { active: number }) {
   const v = useAdmin((s) => s.choice.goalsAll);
   const target = useAdmin((s) => s.goal.target);
   // 모델 사용 가능 여부는 서버 설정(/ai/providers)에서 받으므로 받은 뒤 다시 그린다
-  useAi((s) => s.status);
+  const status = useAi((s) => s.status);
   const mode = (value: string, label: string, note: string, ok = true, why = '') => (
     <label className={`radio${ok ? '' : ' off'}`}>
       <input type="radio" name="admGoalMode" value={value} checked={v === value} disabled={!ok} onChange={() => setChoice('goalsAll', value)} />
@@ -118,11 +119,12 @@ function GoalsAllBody({ active }: { active: number }) {
         <b>어떤 모델로</b>
       </p>
       <div className="stack" style={{ gap: 6 }}>
-        {mode('mock', '시연용 가데이터', '비용 없음 · 바로 끝나요')}
+        {canUseDemo(status.demoMode) ? mode('mock', '시연용 가데이터', '비용 없음 · 바로 끝나요') : null}
         {mode('employee', '각 직원이 고른 AI 모드', '실제 모델 호출(OpenAI API는 비용이 들어요) · 모드가 설정되지 않은 직원은 실패로 남아요')}
         {mode('ollama', withModel('RunPod-Ollama', ai.ollamaInfo().model), '직원이 고른 모드와 관계없이 이 모델로 만들어요 · 직원 설정은 바꾸지 않아요', ai.available('ollama'), ai.unavailableWhy('ollama'))}
         {mode('openai', withModel('OpenAI API', ai.openaiModel()), '직원 한 명마다 한 번 호출해서 비용이 들어요 · 직원 설정은 바꾸지 않아요', ai.available('api'), ai.unavailableWhy('api'))}
       </div>
+      {v === 'mock' && !canUseDemo(status.demoMode) ? <Note>시연 모드가 꺼져 있어요. 사용할 AI 모드를 다시 골라 주세요.</Note> : null}
     </>
   );
 }
@@ -132,8 +134,9 @@ async function goalsAllOk() {
   const m = s.choice.goalsAll;
   const pick = s.goal.target === 'pick' ? s.goal.picked : undefined;
   if (pick && !pick.length) return;
-  closeSheet();
   try {
+    requireDemoGoalAllowed(m, canUseDemo(ai.demoAllowed()));
+    closeSheet();
     const r = await adminApi.goalsAll(m === 'employee' ? null : (m as GoalMode), pick);
     toast(`직원 ${r.employees}명 · 작업 ${r.started}개 시작 · 기본 후보 ${r.defaults}명 저장 · ${MODE_LABEL[r.mode] || r.mode}`);
     /* 작업이 조금 진행된 뒤에 개수를 다시 받는다 */
@@ -145,12 +148,15 @@ async function goalsAllOk() {
 
 function GoalsAllFoot() {
   const empty = useAdmin((s) => s.goal.target === 'pick' && !s.goal.picked.length);
+  const mode = useAdmin((s) => s.choice.goalsAll);
+  const status = useAi((s) => s.status);
+  const unavailable = mode === 'mock' ? !canUseDemo(status.demoMode) : (mode === 'ollama' || mode === 'openai') && !ai.available(mode);
   return (
     <>
       <button className="btn line" onClick={closeSheet}>
         취소
       </button>
-      <button className="btn pri" disabled={empty} title={empty ? '다시 만들 직원을 골라 주세요' : undefined} onClick={() => void goalsAllOk()}>
+      <button className="btn pri" disabled={empty || unavailable} title={empty ? '다시 만들 직원을 골라 주세요' : unavailable ? '사용할 수 있는 AI 모드를 골라 주세요' : undefined} onClick={() => void goalsAllOk()}>
         다시 만들기
       </button>
     </>
@@ -158,7 +164,7 @@ function GoalsAllFoot() {
 }
 
 function openGoalsAll(o: AdminOverview) {
-  setChoice('goalsAll', 'mock');
+  setChoice('goalsAll', 'ollama');
   setGoal({ target: 'all', picked: [], q: '' });
   openSheet({
     title: '목표 후보를 다시 만들까요?',

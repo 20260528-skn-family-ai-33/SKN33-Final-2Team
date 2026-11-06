@@ -4,11 +4,13 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { adminApi } from '@/api/endpoints/admin';
 import type { AdminColumn, AdminRows, DatasetId, EditCheck, RowView } from '@/api/types/admin';
 import { failToast } from '@/shared/lib/fail';
+import { canUseDemo } from '@/shared/lib/demoAccess';
 import { closeSheet, openSheet, toast } from '@/shared/state/ui';
+import { ai, useAi } from '@/shared/state/ai';
 import { Icon } from '@/shared/ui/Icon';
 import { Note } from '@/shared/ui/parts';
 import { refreshAdmin } from './adminData';
-import { adm, dirty, editable, editRows, newEdit, placeErrors, setAdm, setChoice, setVal, splitList, useAdmin, type EditState } from './adminStore';
+import { adm, dirty, editable, editRows, newEdit, placeErrors, requireDemoGoalAllowed, setAdm, setChoice, setVal, splitList, useAdmin, type EditState } from './adminStore';
 import { DEL_ASK, DS, LONG } from './datasets';
 import { ChangeCard } from './parts';
 
@@ -88,6 +90,7 @@ async function submitEdit(del: boolean): Promise<void> {
 
 function EditGoalBody() {
   const v = useAdmin((s) => s.choice.editGoal);
+  const demoAllowed = useAi((s) => canUseDemo(s.status.demoMode));
   return (
     <div className="stack adm-goal">
       <span className="small muted">저장한 뒤 이 직원의 목표 후보를 다시 만들 때</span>
@@ -97,20 +100,25 @@ function EditGoalBody() {
           그 직원이 고른 AI 모드로 만들기 <span className="small muted">· 실제 모델을 한 번 불러요(OpenAI API는 비용이 들어요) · 모드가 설정되지 않았으면 실패로 남아요</span>
         </span>
       </label>
-      <label className="radio">
-        <input type="radio" name="admEditGoal" value="mock" checked={v === 'mock'} onChange={() => setChoice('editGoal', 'mock')} />
-        <span>
-          시연용 가데이터로 만들기 <span className="small muted">· 비용 없음 · 화면에 ‘가데이터’로 보여요</span>
-        </span>
-      </label>
+      {demoAllowed ? (
+        <label className="radio">
+          <input type="radio" name="admEditGoal" value="mock" checked={v === 'mock'} onChange={() => setChoice('editGoal', 'mock')} />
+          <span>
+            시연용 가데이터로 만들기 <span className="small muted">· 비용 없음 · 화면에 ‘가데이터’로 보여요</span>
+          </span>
+        </label>
+      ) : null}
+      {v === 'mock' && !demoAllowed ? <Note>시연 모드가 꺼져 있어요. 사용할 AI 모드를 다시 골라 주세요.</Note> : null}
     </div>
   );
 }
 
 function SaveButton({ label }: { label: string }) {
   const saving = useAdmin((s) => s.saving);
+  const mode = useAdmin((s) => s.choice.editGoal);
+  const demoAllowed = useAi((s) => canUseDemo(s.status.demoMode));
   return (
-    <button className="btn pri" disabled={saving} onClick={() => void saveEdit()}>
+    <button className="btn pri" disabled={saving || (mode === 'mock' && !demoAllowed)} onClick={() => void saveEdit()}>
       {saving ? (
         <>
           <span className="sp" />
@@ -174,6 +182,7 @@ async function saveEdit(): Promise<void> {
   if (!p) return;
   setAdm((s) => void (s.saving = true));
   try {
+    requireDemoGoalAllowed(choice.editGoal, canUseDemo(ai.demoAllowed()));
     const r = await adminApi.save(p.ds, p.rows, p.token, choice.editGoal === 'mock' ? 'mock' : null);
     setAdm((s) => {
       s.saving = false;

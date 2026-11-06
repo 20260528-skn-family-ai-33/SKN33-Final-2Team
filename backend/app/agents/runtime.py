@@ -64,7 +64,10 @@ def context(employee_id: int, me: dict | None = None) -> Ctx:
     if me is None:
         from ..services import profile
         me = profile.view(employee_id)
-    return Ctx(employee_id, s.get('ai_provider') or 'ollama', bool(s.get('demo_mock')), s.get('fail_sim') or {}, me or {}, reasoning=s.get('reasoning') or {})
+    # 시연 API를 차단한 뒤에도 저장된 옵션이 실제 모델 호출을 바꾸지 않게 한다.
+    demo = S.demo_mode and bool(s.get('demo_mock'))
+    fail_sim = (s.get('fail_sim') or {}) if S.demo_mode else {}
+    return Ctx(employee_id, s.get('ai_provider') or 'ollama', demo, fail_sim, me or {}, reasoning=s.get('reasoning') or {})
 
 
 def reset_tries(employee_id: int) -> None:

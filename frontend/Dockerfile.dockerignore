@@ -1,0 +1,12 @@
+# 프런트 빌드에는 VERSION과 프런트 소스만 전달한다.
+**
+!VERSION
+!frontend/
+!frontend/**
+frontend/node_modules
+frontend/dist
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+frontend/**/*.log
+frontend/coverage

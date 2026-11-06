@@ -56,8 +56,11 @@ class Settings:
     db_timezone: str
     host: str
     port: int
+    demo_mode: bool
+    beta_account_picker: bool
     demo_password: str
     admin_login: str
+    admin_password: str
     var_dir: Path
     regulation_files_dir: Path
     # OpenAI
@@ -141,8 +144,11 @@ def load() -> Settings:
         host=env('GP5_HOST', '127.0.0.1'),
         port=int(env('GP5_PORT', '8785')),
         # 공개 저장소라 기본값을 두지 않는다(팀 database/RESTORE.md: 공용 기본 비밀번호 없음 · 2026-10-26). 비우면 시연 비밀번호를 쓰는 준비 단계를 건너뛴다
+        demo_mode=env('GP5_DEMO_MODE', 'on').lower() == 'on',
+        beta_account_picker=env('GP5_BETA_ACCOUNT_PICKER', 'off').lower() == 'on',
         demo_password=env('GP5_DEMO_PASSWORD'),
         admin_login=env('GP5_ADMIN_LOGIN', 'admin'),
+        admin_password=env('GP5_ADMIN_PASSWORD'),
         var_dir=Path(env('GP5_VAR_DIR', str(ROOT / 'var'))),
         # 팀 규정 묶음 폴더(그 안의 source/…/….pdf 가 팀 DB regulation_files.storage_key) · 관리자 '지금 규정' 내려받기에 쓴다
         regulation_files_dir=Path(env('GP5_REGULATION_FILES_DIR', str(ROOT.parent / 'team_db' / 'regulations'))),

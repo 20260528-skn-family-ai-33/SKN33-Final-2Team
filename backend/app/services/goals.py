@@ -14,13 +14,21 @@ import json
 from .. import db, jobs
 from ..agents import goals as G
 from ..agents import runtime as rt
-from ..errors import cause
+from ..config import S
+from ..errors import ApiError, cause
 from . import profile
 from app.learner_knowledge import VERSION as KNOWLEDGE_VERSION
 
 
 def _hash(inp: dict) -> str:
     return hashlib.sha256(json.dumps([G.PROMPT_VERSION,KNOWLEDGE_VERSION,inp['profile']], ensure_ascii=False, sort_keys=True).encode('utf-8')).hexdigest()[:16]
+
+
+def validate_mode(mode: str | None) -> None:
+    """가데이터를 명시한 요청은 저장·작업 등록 전에 검사한다."""
+    if mode == 'mock' and not S.demo_mode:
+        raise ApiError(409, 'DEMO_DISABLED', '시연 모드가 꺼져 있어 가데이터로 만들 수 없어요',
+                       '사용할 AI 모드를 직접 선택해 주세요', kind='config')
 
 
 def get(employee_id: int) -> dict:
@@ -70,6 +78,7 @@ def _run_state(t: db.Tx, employee_id: int, **v) -> None:
 def request(employee_id: int, trigger: str, avoid: list[str] | None = None, mode: str | None = None,
             *, only_if_stale: bool = False) -> str | None:
     """같은 직원의 동시 요청은 작업을 공유한다. 같은 입력의 실패는 수동으로만 재시도한다."""
+    validate_mode(mode)
     with db.tx() as t:
         t.val('SELECT pg_advisory_xact_lock(:ns, :e)', ns=1196443475, e=employee_id)
         run = t.one('SELECT * FROM app_ext.goal_suggestion_runs WHERE employee_id=:e', e=employee_id) or {}
@@ -92,6 +101,7 @@ def _request(employee_id: int, trigger: str, avoid: list[str] | None, mode: str 
     """미리 만들기·다시 만들기 작업을 시작한다. 사내/본인 입력 근거가 전혀 없을 때만 기본 후보를 저장한다.
     mode 'mock' 은 관리자가 고른 '시연용 가데이터로 만들기', 'ollama'·'openai' 는 관리자가 고른 모델(직원이 고른 AI 모드 대신 ·
     직원 설정은 바꾸지 않음 · 실패 시연 없음). 없으면 그 직원이 고른 모드"""
+    validate_mode(mode)
     me = profile.view(employee_id)
     if not me:
         return None
@@ -158,6 +168,7 @@ def regenerate(employee_id: int) -> str | None:
 
 def seed_all() -> int:
     """DB 준비(setup_db.py) 때 한 번: 가데이터 규칙으로 바로 만든다(에이전트 기록·지연 없음). 이미 후보가 있으면 건너뛴다"""
+    validate_mode('mock')
     n = 0
     for r in db.all_('SELECT employee_id FROM public.employees WHERE employee_id NOT IN (SELECT employee_id FROM app_ext.goal_suggestion_runs)'):
         eid = r['employee_id']

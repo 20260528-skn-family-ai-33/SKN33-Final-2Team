@@ -108,6 +108,8 @@ def preview(ds: str, admin_id: int, file_name: str, raw: bytes, sheet_hint: str 
 
 
 def apply(upload_id: str, admin_id: int, goal_mode: str | None = None) -> dict:
+    from ..services import goals
+    goals.validate_mode(goal_mode)
     up = db.one('SELECT * FROM app_ext.admin_uploads WHERE upload_id = CAST(:u AS uuid)', u=upload_id)
     if not up:
         raise ApiError(404, 'NO_UPLOAD', '미리보기 기록을 찾을 수 없어요')
@@ -196,6 +198,8 @@ def _check_edit(mod, items: list[dict]) -> tuple[dict[str, list[base.Row]], dict
 
 def edit(ds: str, admin_id: int, items: list, save: bool = False, token: str | None = None, goal_mode: str | None = None) -> dict:
     """save=False: 확인(바뀌는 칸·태그·오류와 token). save=True: 같은 계산을 다시 해서 token 이 같을 때만 한 트랜잭션으로 반영하고 이력을 남긴다"""
+    from ..services import goals
+    goals.validate_mode(goal_mode)
     mod = get(ds)
     if not isinstance(items, list) or not items or len(items) > 10 or not all(isinstance(x, dict) for x in items):
         raise ApiError(400, 'BAD_EDIT', '고칠 행을 보내 주세요')
