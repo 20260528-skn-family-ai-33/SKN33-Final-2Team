@@ -14,8 +14,9 @@ export interface ResourceQuery {
 
 export const catalogApi = {
   certifications: () => http.get<CertGroup[]>('/certifications'),
-  resources: (q: ResourceQuery) =>
-    http.get<ResourceSearch>('/resources?' + new URLSearchParams(Object.entries(q).map(([k, v]) => [k, String(v ?? '')])).toString()),
+  /** signal: 검색어가 바뀌어 필요 없어진 요청을 끊는다(입력하는 대로 찾기 #102) */
+  resources: (q: ResourceQuery, signal?: AbortSignal) =>
+    http.get<ResourceSearch>('/resources?' + new URLSearchParams(Object.entries(q).map(([k, v]) => [k, String(v ?? '')])).toString(), { signal }),
   resource: (id: string) => http.get<Resource>(`/resources/${enc(id)}`),
   lookup: (ids: string[]) => http.post<ResourceMap>('/resources/lookup', { ids }),
   regSets: () => http.get<RegSets>('/regulations/sets'),
