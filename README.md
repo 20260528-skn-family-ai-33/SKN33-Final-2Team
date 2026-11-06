@@ -180,7 +180,7 @@ Docker Desktop과 Compose v2를 준비합니다. 로컬에서 화면을 개발�
 
 아래 1~4번은 최초 설치 절차입니다. 이미 설치한 환경의 코드·설정을 바꿀 때는 [기존 설치의 설정 변경과 업데이트](#기존-설치의-설정-변경과-업데이트)를 따르세요.
 
-1. 저장소 루트의 `.env.example`을 `.env`로 복사하고 DB용 `GP5_DB_PASSWORD`, 직원 시연용 `GP5_DEMO_PASSWORD`, 신규 관리자용 `GP5_ADMIN_PASSWORD`를 각각 설정합니다. 관리자 비밀번호는 직원 초기 비밀번호와 다른 값을 사용합니다.
+1. 저장소 루트의 `.env.example`을 `.env`로 복사하고 DB용 `GP5_DB_PASSWORD`, 신규 관리자용 `GP5_ADMIN_PASSWORD`를 설정합니다. 관리자 화면에서 새 직원을 추가하거나 로컬 시험 사본의 직원 비밀번호를 초기화할 때는 `GP5_DEMO_PASSWORD`도 설정합니다. 관리자 비밀번호는 직원 초기 비밀번호와 다른 값을 사용합니다.
 2. 팀 백업 `growpath_latest.dump`와 동반 manifest를 받아 해시를 확인한 뒤 `team_db/`에 두고, 규정 PDF를 `team_db/regulations/`에 준비합니다.
 3. [분류 모델 파일](backend/classification.md)을 `backend/models/`에 준비합니다. 생성에는 [RunPod-Ollama 연결](backend/RunPod_Ollama_연결_절차.md) 또는 OpenAI 설정이 필요하며, 공통 검색용 `OPENAI_API_KEY`도 설정합니다. 키·비밀번호는 저장소에 넣지 않습니다.
 4. 저장소 루트에서 실행합니다.
@@ -195,6 +195,18 @@ docker compose up -d --build
 | <http://localhost:8815/api/docs> | FastAPI 문서 |
 
 Compose는 **DB → 빈 DB의 백업 복원 → 보충 자료·보조 스키마 준비 → API → 화면** 순서로 실행합니다. 이미 데이터가 있으면 최초 백업 복원은 건너뜁니다. `docker compose down`으로 종료하며 DB와 업로드 파일은 볼륨에 남습니다.
+
+복원한 직원 계정은 **기존 비밀번호**로 로그인합니다. 비밀번호는 백업 제공자·관리자에게 별도로 전달받으세요. 설치기는 직원 비밀번호 해시를 기본으로 보존하며, `GP5_DEMO_PASSWORD`를 설정하거나 설치기를 다시 실행해도 기존 직원 비밀번호를 바꾸지 않습니다. 해시가 NULL이거나 잘못된 형식이어도 임의로 초기화하지 않습니다.
+
+### 로컬 시험 사본의 직원 비밀번호 초기화 (선택)
+
+최초 설치가 끝나 DB가 실행 중인 **로컬 시험 사본**에서만 사용합니다. 루트 `.env`에 비어 있지 않은 `GP5_DEMO_PASSWORD`를 설정하고 아래 명령을 명시적으로 실행하면, 사번이 있는 전체 직원의 비밀번호가 그 값으로 바뀝니다. 일반 앱 업데이트에는 이 명령을 사용하지 않습니다.
+
+```bash
+docker compose run --rm --no-deps backend-setup python tools/setup_db.py --reset-team-passwords
+```
+
+이 명령은 설치기의 보조 스키마·보충 자료 준비도 함께 실행합니다. `--reset-team-passwords`는 `--keep-team-passwords` 또는 `--supplement-only`와 함께 사용할 수 없습니다. 이 옵션 조합과 빈 값·공백뿐인 초기화 비밀번호는 모두 DB 작업 전에 거절합니다. 기존 `--keep-team-passwords`와 `--supplement-only`는 직원 비밀번호 보존을 유지합니다. 관리자 비밀번호는 이 초기화 대상에 포함되지 않습니다.
 
 ### 베타 설치·시연 설정 (#63, #64)
 
@@ -235,7 +247,7 @@ docker compose build backend frontend
 docker compose up -d --no-deps --force-recreate backend frontend
 ```
 
-이 경로는 DB 복원·설치기를 재실행하지 않아 기존 가데이터 결과·직원 선택·비밀번호를 보존합니다. 일반 `docker compose up -d --build`로 설치기가 다시 실행되고 `GP5_DEMO_PASSWORD`가 설정되어 있으면, 보존 옵션 없이 실행되는 `team_passwords`가 사번 있는 직원의 다른 비밀번호를 그 값으로 바꿀 수 있습니다. 이는 시연 off 여부와 무관하므로 기존 설치 갱신에는 위 `--no-deps` 절차를 사용하세요. 설치기의 비밀번호 변경 정책은 #77의 별도 후속 범위입니다.
+이 경로는 DB 복원·설치기를 재실행하지 않아 기존 가데이터 결과·직원 선택·비밀번호를 보존합니다. 설치기를 다시 실행하더라도 직원 비밀번호는 기본으로 보존하며, `GP5_DEMO_PASSWORD` 설정만으로 바꾸지 않습니다. 위 `--no-deps` 절차는 일반 앱 업데이트에서 DB 복원·보충 자료 준비까지 다시 실행하지 않도록 유지합니다. 로컬 시험 사본의 직원 비밀번호 초기화가 필요할 때만 위의 명시적 `--reset-team-passwords` 명령을 사용하세요.
 
 모델 연결은 직원의 목표 화면 첫 진입 전에 준비하세요. 저장된 후보가 없고 프로필에 추천 근거가 있는 계정은 첫 진입에서 생성을 시도하며, 모델이 미연결이면 실패 상태가 남을 수 있습니다. 모델을 연결한 뒤에는 목표 후보의 **다시 시도**를 눌러 재생성합니다. 자동 재시도는 하지 않습니다. 기존 가데이터 후보는 삭제되지 않아 계속 가데이터 태그와 함께 보일 수 있습니다.
 
