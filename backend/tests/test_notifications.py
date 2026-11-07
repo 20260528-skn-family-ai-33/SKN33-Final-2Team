@@ -125,6 +125,7 @@ class ServiceTests(unittest.TestCase):
         with patch.object(NT.db, 'all_', return_value=rows) as q, patch.object(NT.db, 'val', return_value=3):
             out = NT.inbox(7)
         self.assertIn(NT.HEAD_SEES, q.call_args.args[0])  # 부서 이동한 직원의 알림은 부서장에게 보이지 않게 거른다
+        self.assertIn('n.read_at IS NULL', q.call_args.args[0])  # 읽은 알림은 목록에서 뺀다(#96)
         self.assertEqual(out['unread'], 3)
         self.assertEqual(out['items'][0], {'id': NID, 'kind': 'report', 'audience': 'head', 'employee': {'id': '8', 'name': '김직원'}, 'planId': RID,
                                            'planTitle': 'SQL 분석', 'track': 'A2', 'reportId': NID, 'createdAt': at.isoformat(), 'read': False})

@@ -2,9 +2,11 @@
    30초마다(창이 보일 때만)·화면을 옮길 때·창을 열 때 새로 받는다. 누르면 읽음으로 바꾸고 그 로드맵·보고서 화면으로 간다.
    부서장(#96): 내 알림을 위, 소속 직원 알림을 아래에 나눠 두고, 소속 직원 알림은 직원별 한 줄로 묶는다.
    묶음을 누르면 창 안에서 그 직원의 알림을 건별로 보여 주고(2단계), 건을 누르면 바로 그 화면으로 간다.
+   목록에는 읽지 않은 알림만 온다(#96 · 읽으면 목록에서 빠짐). 새 알림은 화면 아래에도 띄우고, 누르면 같은 방식으로 그 화면으로 간다(notificationFloat.ts).
    서버 동기화(직원별 캐시·다른 로그인의 늦은 응답 버리기·없는 대상 기록만 받기)는 notificationActions.ts */
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router';
 import { notificationsApi } from '@/api/endpoints/notifications';
 import type { AppNotification } from '@/api/types/notification';
@@ -13,6 +15,7 @@ import { failToast } from '@/shared/lib/fail';
 import { useMe } from '@/shared/state/session';
 import { Icon } from '@/shared/ui/Icon';
 import { currentSignIn, markRead, notificationKey, refreshTarget, stillSignedIn } from './notificationActions';
+import { clearFloats, dismissFloat, FLOAT_MAX, holdFloats, noteInbox, resetFloats, useFloats } from './notificationFloat';
 import { notificationSub, notificationTarget, notificationTime, notificationTitle, splitNotifications, staffGroupSub, type StaffGroup } from './notificationView';
 
 const POLL_MS = 30_000;
@@ -45,6 +48,16 @@ export function NotificationBell() {
     }
     void qc.invalidateQueries({ queryKey: notificationKey(owner) });
   }, [pathname, qc, owner]);
+
+  // 새 알림 하단 플로팅(#96): 목록을 새로 받을 때마다 처음 보는 알림을 띄운다. 창이 열려 있거나 그 화면을 이미 보고 있으면 띄우지 않는다
+  const data = q.data;
+  useEffect(() => {
+    const t = currentSignIn();
+    if (!data || !t || t.id !== owner) return;
+    noteInbox(`${t.id}:${t.seq}`, data.items, (n) => open || notificationTarget(n) === pathname);
+  }, [data, owner, open, pathname]);
+  useEffect(() => resetFloats, []);
+  const floats = useFloats((s) => s.items);
 
   useEffect(() => {
     if (!open) return;
@@ -118,13 +131,24 @@ export function NotificationBell() {
     }
   };
 
+  // 창을 열면 띄운 알림은 내린다(창 목록에 같은 알림이 있다)
+  const openPanel = () => {
+    clearFloats();
+    void q.refetch();
+    setOpen(true);
+  };
+
   const toggle = () => {
     if (open) {
       close();
       return;
     }
-    void q.refetch();
-    setOpen(true);
+    openPanel();
+  };
+
+  const openFloat = (n: AppNotification) => {
+    dismissFloat(n.id);
+    void openItem(n);
   };
 
   /** bare: 직원 묶음 안(2단계)이라 직원 이름을 빼고 보여 준다 */
@@ -174,9 +198,7 @@ export function NotificationBell() {
           </button>
           <span className="notif-who">
             <b id="notif-who">{group.employee.name} 님의 알림</b>
-            <small>
-              {group.items.length}건{group.unread ? ` · 읽지 않음 ${group.unread}건` : ''}
-            </small>
+            <small>읽지 않은 알림 {group.items.length}건</small>
           </span>
         </div>
         <ul className="notif-list">{group.items.map((n) => itemRow(n, true))}</ul>
@@ -206,8 +228,53 @@ export function NotificationBell() {
     // 부서장이 아니거나 소속 직원 알림이 없으면 예전처럼 한 목록
     body = <ul className="notif-list">{items.map((n) => itemRow(n))}</ul>;
   } else {
-    body = q.isError ? null : <p className="notif-empty">{q.isPending ? '불러오는 중…' : '알림이 없어요'}</p>;
+    body = q.isError ? null : <p className="notif-empty">{q.isPending ? '불러오는 중…' : '새 알림이 없어요'}</p>;
   }
+
+  // 가장 최근 FLOAT_MAX 건만 보이고, 그보다 많으면 위에 '더 보기'(알림 창 열기)를 둔다. 상단 띠 밖(본문 위)에 그리려고 body 로 옮긴다
+  const shown = floats.slice(-FLOAT_MAX);
+  const more = floats.length - shown.length;
+  const floatBox = createPortal(
+    <div
+      className="nfloat"
+      aria-live="polite"
+      aria-relevant="additions"
+      onMouseEnter={() => holdFloats(true)}
+      onMouseLeave={() => holdFloats(false)}
+      onFocus={() => holdFloats(true)}
+      onBlur={(event) => {
+        if (!(event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget))) holdFloats(false);
+      }}
+    >
+      {more ? (
+        <button type="button" className="toast nfloat-more" onClick={openPanel}>
+          새 알림 {more}건 더 보기
+        </button>
+      ) : null}
+      {shown.map((n) => {
+        const sub = notificationSub(n);
+        return (
+          <div key={n.id} className="toast nfloat-it">
+            <button type="button" className="nfloat-go" onClick={() => openFloat(n)}>
+              <Icon name="bell" />
+              <span className="nfloat-tx">
+                <b>{notificationTitle(n)}</b>
+                {sub ? <small>{sub}</small> : null}
+              </span>
+              <span className="nfloat-cta">
+                보기
+                <Icon name="right" />
+              </span>
+            </button>
+            <button type="button" className="nfloat-x" aria-label="이 알림 닫기" onClick={() => dismissFloat(n.id)}>
+              <Icon name="x" />
+            </button>
+          </div>
+        );
+      })}
+    </div>,
+    document.body,
+  );
 
   return (
     <div className="api-picker notif" ref={boxRef}>
@@ -259,6 +326,7 @@ export function NotificationBell() {
           {body}
         </div>
       ) : null}
+      {floatBox}
     </div>
   );
 }
