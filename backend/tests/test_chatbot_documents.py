@@ -12,7 +12,7 @@ os.environ.setdefault('DATABASE_URL', 'postgresql+psycopg://test:test@127.0.0.1:
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app import auth, jobs, knowledge, regstore
+from app import auth, jobs, knowledge, regstore, bge_knowledge_search, bge_regulation_search, regulation_embeddings
 from app.agents import regulation as reg
 from app.agents import runtime as rt
 from app.errors import AgentError, ApiError, api_error_handler
@@ -25,6 +25,9 @@ class EmployeeChatbotTest(unittest.TestCase):
     job_id = '00000000-0000-4000-8000-000000000001'
 
     def setUp(self):
+        parents = patch.object(regstore, 'parent_context', return_value=[])
+        parents.start()
+        self.addCleanup(parents.stop)
         app = FastAPI()
         app.include_router(work.r)
         app.add_exception_handler(ApiError, api_error_handler)
@@ -91,7 +94,7 @@ class EmployeeChatbotTest(unittest.TestCase):
                     for dependency in (classify, search, model):
                         dependency.assert_not_called()
                 else:
-                    search.assert_called_once_with('교육비 지원을 받을 수 있나요?', 4, '일반직', provider)
+                    search.assert_called_once_with('교육비 지원을 받을 수 있나요?', 5, '일반직', provider)
                     ctx, _, payload = model.call_args.args
                     self.assertEqual(ctx.reasoning, {provider: 'low'})
                     self.assertEqual(payload['user'], {})
@@ -147,7 +150,7 @@ class EmployeeChatbotTest(unittest.TestCase):
         )
         ctx = rt.Ctx(self.employee.id, demo=True)
         with (patch.object(rt, '_log'), patch.object(rt.time, 'sleep'),
-              patch.object(reg.llm, 'embed', side_effect=AssertionError('유료 임베딩 호출 금지')),
+              patch.object(reg.llm, 'openai', side_effect=AssertionError('유료 임베딩 호출 금지')),
               patch.object(rt, 'llm_json', side_effect=AssertionError('모델 호출 금지'))):
             for question, topic in suggestions:
                 with self.subTest(question=question):
@@ -163,6 +166,11 @@ class EmployeeChatbotTest(unittest.TestCase):
 
 
 class DocumentScopeTest(unittest.TestCase):
+    def setUp(self):
+        parents = patch.object(regstore, 'parent_context', return_value=[])
+        parents.start()
+        self.addCleanup(parents.stop)
+
     def test_documents_only_discards_even_a_supplied_profile_context(self):
         ctx = rt.Ctx(employee_id=1, me={'name': 'private', 'empGroup': '실무직', 'grade': '4급'})
         def run(ctx, agent, task, inp, *args, **kwargs):
@@ -211,8 +219,11 @@ class DocumentScopeTest(unittest.TestCase):
         with patch.object(regstore, 'data', return_value={'arts': {'a': article}}):
             self.assertEqual([hit['id'] for hit in regstore.search('교육', 4, '실무직', 'mock')], ['a'])
             self.assertEqual(regstore.search('교육', 4, '일반직', 'mock'), [])
-            with (patch.object(regstore.llm, 'embed', return_value=[[1.0]]),
-                  patch.object(regstore, 'ensure_vectors'),
+            vector = [1.] + [0.] * 1023
+            with (patch.object(regulation_embeddings, 'embed', return_value=[vector]),
+                  patch.object(bge_regulation_search, '_inputs', return_value={'a': ('text', 'sha')}),
+                  patch.object(bge_regulation_search, '_stored', return_value={'a': {'dimensions': 1024, 'input_sha256': 'sha', 'input_version': bge_regulation_search.INPUT_VERSION}}),
+                  patch.dict(os.environ, ASSISTANT_SEARCH_MODE='vector'),
                   patch.object(regstore.db, 'all_', return_value=[{'rag_chunk_id': 'a', 'score': 1}]) as query):
                 self.assertEqual(regstore.search('교육', 4, '일반직', 'ollama'), [])
                 query.assert_not_called()
@@ -231,29 +242,31 @@ class DocumentScopeTest(unittest.TestCase):
         self.assertEqual(found['ids'], ['practice'])
 
     def test_life_search_uses_its_category_and_keeps_virtual_sources(self):
-        with (patch.object(knowledge.llm, 'embed_model', return_value=knowledge.MODEL),
-              patch.object(knowledge.llm, 'embed_ready', return_value=True),
-              patch.object(knowledge.llm, 'embed', return_value=[[1.0] * knowledge.DIMENSIONS]),
-              patch.object(knowledge.db, 'one', return_value={'total': 1, 'indexed': 1}) as count,
-              patch.object(knowledge.db, 'all_', return_value=[{'is_virtual': True}]) as query):
-            self.assertEqual(knowledge.search_life('식당 위치'), [{'is_virtual': True}])
+        hit = {'is_virtual': True}
+        with (patch.dict(os.environ, ASSISTANT_SEARCH_MODE='vector'),
+              patch.object(bge_knowledge_search.db, 'val', return_value=bge_knowledge_search.TABLE),
+              patch.object(regulation_embeddings, 'embed', return_value=[[1.] + [0.] * 1023]),
+              patch.object(bge_knowledge_search.db, 'one', return_value={'total': 1, 'indexed': 1}) as count,
+              patch.object(bge_knowledge_search.db, 'all_', return_value=[hit])):
+            self.assertEqual(knowledge.search_life('식당 위치'), [hit])
         self.assertEqual(count.call_args.kwargs['category'], knowledge.LIFE_CATEGORY)
-        self.assertFalse(query.call_args.kwargs['real_only'])
+        self.assertFalse(count.call_args.kwargs['real_only'])
 
     def test_company_search_still_excludes_virtual_sources(self):
-        with (patch.object(knowledge.llm, 'embed_model', return_value=knowledge.MODEL),
-              patch.object(knowledge.db, 'one', return_value={'total': 0}) as count,
-              patch.object(knowledge.llm, 'embed') as embed):
+        with (patch.object(bge_knowledge_search.db, 'val', return_value=bge_knowledge_search.TABLE),
+              patch.object(bge_knowledge_search.db, 'one', return_value={'total': 0}) as count,
+              patch.object(regulation_embeddings, 'embed') as embed):
             self.assertEqual(knowledge.search_company('회사 소개'), [])
         self.assertEqual(count.call_args.kwargs['category'], knowledge.CATEGORY)
         self.assertTrue(count.call_args.kwargs['real_only'])
         embed.assert_not_called()
 
     def test_life_missing_vectors_is_an_error_not_empty_success(self):
-        with (patch.object(knowledge.llm, 'embed_model', return_value=knowledge.MODEL),
-              patch.object(knowledge.db, 'one', return_value={'total': 1, 'indexed': 0})):
-            with self.assertRaisesRegex(LlmError, '사내 생활 검색 임베딩이 준비되지'):
+        with (patch.object(bge_knowledge_search.db, 'val', return_value=bge_knowledge_search.TABLE),
+              patch.object(bge_knowledge_search.db, 'one', return_value={'total': 1, 'indexed': 0})):
+            with self.assertRaisesRegex(LlmError, '벡터가 없거나 원문과 달라요'):
                 knowledge.search_life('식당 위치')
+
 
     def test_life_cannot_use_company_category_or_fabricated_numbers(self):
         hit = {'category': knowledge.CATEGORY, 'is_virtual': False}

@@ -25,7 +25,8 @@ class RegulationFollowUpTest(unittest.TestCase):
                               ('work', 2, '직원에게 적용한다.'), ('work', 9, '근무를 기록한다.')]:
             aid = f'{key}-{no}'
             self.articles[aid] = {'id': aid, 'reg': key, 'no': f'제{no}조', 'text': text,
-                                  'title': '', 'chapter': '', 'type': 'article', 'path': ''}
+                                  'title': '', 'chapter': '', 'type': 'article', 'path': '',
+                                  'group': '일반직', 'overseas': False}
         data = {'regs': {item['key']: item for item in regs}, 'arts': self.articles,
                 'sets': {'일반직': {'regs': regs}}}
         for target, name, value in [(reg.regstore, 'data', data), (reg.llm, 'available', True),
@@ -81,7 +82,8 @@ class RegulationFollowUpTest(unittest.TestCase):
             ('work-24-1', 'work', '제24조 제1항', '다른 규정의 같은 번호다.'),
         ):
             self.articles[aid] = {'id': aid, 'reg': key, 'no': no, 'text': text, 'title': '',
-                                  'chapter': '', 'type': 'paragraph', 'path': ''}
+                                  'chapter': '', 'type': 'paragraph', 'path': '',
+                                  'group': '일반직', 'overseas': False}
         self.search.return_value = [{'id': 'edu-24-5'}, {'id': 'edu-9'}]
         with (patch.object(rt, '_log'), patch.object(rt, 'llm_json', return_value={
             'status': 'partial', 'summary': '지급기준은 따로 확인해야 해요.', 'sourceIds': ['S003'],
@@ -99,6 +101,21 @@ class RegulationFollowUpTest(unittest.TestCase):
         self.assertIn('학습시간을 인정해요.', self.classify.call_args.args[0])
         self.assertTrue(inp['_classification']['usedHistory'])
         self.assert_summary_history(model)
+
+    def test_hybrid_chatbot_supplies_sibling_context_with_original_citation_ids(self):
+        def paragraph(identifier, number, text):
+            return {'id': identifier, 'reg': 'edu', 'no': f'제24조 제{number}항', 'text': text,
+                    'title': '', 'chapter': '', 'type': 'paragraph', 'path': '',
+                    'parent': 'actual-article-node', 'order': number, 'group': '일반직', 'overseas': False}
+        hit = paragraph('edu-24-2', 2, '교육비 지원은 승인된 과정에 적용한다.')
+        sibling = paragraph('edu-24-1', 1, '승인 조건은 담당 부서에 확인한다.')
+        self.articles.update({hit['id']: hit, sibling['id']: sibling})
+        self.search.return_value = [{'id': hit['id']}, {'id': 'edu-9'}]
+        with patch.object(reg.hybrid_search, 'enabled', return_value=True), patch.object(reg.regstore, 'pool', return_value=[hit, sibling]), patch.object(rt, '_log'), patch.object(rt, 'llm_json', return_value={'status': 'partial', 'summary': '승인 조건은 담당 부서에 확인해요.', 'sourceIds': ['S003']}) as model:
+            answer = reg.answer(self.ctx, '교육비 지원 조건', [], {}, documents_only=True)
+        self.assertEqual(answer['retrieved'], ['edu-24-2', 'edu-9', 'edu-24-1'])
+        self.assertEqual(answer['basis'], ['edu-24-1'])
+        self.assertEqual(model.call_args.args[2]['sources'][2]['no'], '제24조 제1항')
 
     def test_long_and_topic_keyword_follow_ups_use_summary_throughout_route(self):
         questions = ('그 규정에서 교육 신청을 취소하는 절차도 알려 주세요',

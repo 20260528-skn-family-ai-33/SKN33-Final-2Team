@@ -326,45 +326,12 @@ def _migrate_legacy(conn):
     return {'applied': done, 'tables_verified': len(CATALOG), 'legacy_archive': legacy_archive}
 
 
-def _prepare_legacy_vector_tables(conn):
-    """Earlier releases created vector tables lazily; bootstrap must create them too."""
-    from .vectors.regulation_vectors import DDL as regulation_ddl
-    from .final_schema import RENAMES
-    for old,new in sorted(RENAMES.items(),key=lambda item:len(item[1]),reverse=True):
-        regulation_ddl=regulation_ddl.replace(new,old)
-    regulation_ddl=regulation_ddl.replace('SCHEMA regulations','SCHEMA hr_regulation_pilot')
-    conn.execute(regulation_ddl,prepare=False)
-    from .schema_components import AUDIT_DDL
-    conn.execute(AUDIT_DDL,prepare=False)
-    conn.execute("""SET LOCAL search_path TO public,extensions;
-    CREATE TABLE IF NOT EXISTS public.learning_resource_embedding(
-     resource_type text NOT NULL CHECK(resource_type IN ('skills','courses','certifications','books')),
-     resource_id text NOT NULL,embedding_model text NOT NULL,
-     dimensions integer NOT NULL CHECK(dimensions=1536),input_version text NOT NULL,
-     input_sha256 text NOT NULL CHECK(length(input_sha256)=64),
-     embedding vector(1536) NOT NULL CHECK(vector_norm(embedding)>0),
-     updated_at timestamptz NOT NULL DEFAULT now(),
-     PRIMARY KEY(resource_type,resource_id,embedding_model));""",prepare=False)
-
-
 def migrate(conn):
-    from .final_schema import active, migrate as migrate_final
-    if not active(conn) and not conn.execute("SELECT to_regclass('public.users') AS id").fetchone()['id']:
-        _migrate_legacy(conn)
-    if not active(conn):
-        _prepare_legacy_vector_tables(conn)
+    """공유 BGE 백업을 복원한 DB만 사용한다. 구형 임베딩 DB를 새로 설치하지 않는다."""
+    if not conn.execute("SELECT to_regclass('growpath_bge_meta.inputs') AS id").fetchone()['id']:
+        raise ValueError('공유 BGE-M3 DB를 먼저 복원하세요. backend/README.md의 복원 절차를 따릅니다.')
+    from .final_schema import migrate as migrate_final
     return migrate_final(conn)
-
-
-def record_model(conn, table, model):
-    conn.execute('''CREATE TABLE IF NOT EXISTS growpath_meta.embedding_provenance (
-        table_name text PRIMARY KEY, model_name text NOT NULL, dimensions int NOT NULL,
-        recorded_at timestamptz NOT NULL DEFAULT now())''')
-    old = conn.execute('SELECT model_name FROM growpath_meta.embedding_provenance WHERE table_name=%s',(table,)).fetchone()
-    if old and old['model_name'] != model:
-        raise ValueError(f'Embedding model mismatch for {table}')
-    conn.execute('''INSERT INTO growpath_meta.embedding_provenance(table_name,model_name,dimensions)
-        VALUES (%s,%s,1536) ON CONFLICT(table_name) DO NOTHING''',(table,model))
 
 
 def validate_skill_identity(current, incoming):
@@ -680,12 +647,7 @@ def import_data(conn, directory):
         if canonical and vector_cols:
             skipped_legacy_vectors[table]=sum(any(r[col] is not None for col in vector_cols) for r in tables[table])
         elif vector_cols and any(r[c] is not None for r in tables[table] for c in vector_cols):
-            old = conn.execute('SELECT to_regclass(%s) AS id',('growpath_meta.embedding_provenance',)).fetchone()['id']
-            known = conn.execute('SELECT model_name FROM growpath_meta.embedding_provenance WHERE table_name=%s',(table,)).fetchone() if old else None
-            populated = conn.execute(f"SELECT EXISTS(SELECT 1 FROM {table_sql(table)} WHERE {ident(vector_cols[0])} IS NOT NULL) AS found").fetchone()['found']
-            if populated and not known:
-                raise ValueError(f'{table} already has vectors with unknown model provenance. Import into an empty target or record verified model provenance first.')
-            record_model(conn,table,manifest['embedding_model'])
+            raise ValueError('이전 인라인 벡터는 적재하지 않습니다. 공유 BGE-M3 DB를 사용하세요.')
         counts[table] = upsert_rows(conn,table,tables[table])
     sync_sequences(conn,tables)
     return {'loaded': counts, 'embedding_model':manifest['embedding_model'],

@@ -64,7 +64,7 @@ class KnowledgeDocumentTests(unittest.TestCase):
         for kwargs in ({'limit': 0}, {'threshold': float('nan')}):
             with self.assertRaises(ValueError):
                 search(conn, '문의', category='사내 생활안내', client=client, **kwargs)
-        client.embeddings.create.assert_not_called()
+        client.assert_not_called()
         conn.execute.assert_not_called()
 
     def test_existing_source_change_stops_before_write(self):
@@ -72,7 +72,7 @@ class KnowledgeDocumentTests(unittest.TestCase):
         changed = copy.deepcopy(row)
         changed['source_limits'] = '다른 출처'
         old = {**row, 'metadata': {k: row[k] for k in ('source_url', 'source_limits', 'training_split', 'topic_id')},
-               'embedding': '[1]', 'embedding_model': 'text-embedding-3-small', 'input_sha256': row['chunk_text_sha256']}
+               'embedding': '[1]', 'embedding_model': 'BAAI/bge-m3', 'input_sha256': row['chunk_text_sha256']}
         conn = MagicMock()
         conn.execute.return_value.fetchone.return_value = {'id': 'knowledge.chunks'}
         conn.execute.return_value.fetchall.side_effect = [[old], [{'document_id': row['document_id'], 'category': row['category'], 'title': row['document_title'], 'document_kind': row['document_kind']}]]

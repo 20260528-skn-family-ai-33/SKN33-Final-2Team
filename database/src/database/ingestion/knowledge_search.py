@@ -6,7 +6,7 @@ import math
 import re
 import unicodedata
 
-from src.database.vectors.regulation_vectors import MODEL, DIMENSIONS, vector_values
+from src.shared.bge_embeddings import MODEL, DIMENSIONS, vector_values
 
 VERSION = 'knowledge-bm25-rrf-site/v1'
 POOL_SIZE = 20

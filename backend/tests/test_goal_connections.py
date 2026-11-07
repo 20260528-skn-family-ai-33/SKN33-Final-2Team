@@ -164,4 +164,3 @@ class GoalConnectionTests(unittest.TestCase):
             cancel.assert_not_called()
         owner.__exit__.assert_called_once_with(None, None, None)
         self.assertEqual(events, ['rolled-back', 'connection-released'])
-

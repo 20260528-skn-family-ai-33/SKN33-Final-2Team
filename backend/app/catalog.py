@@ -197,8 +197,8 @@ def search(kind: str = '', q: str = '', stage_min: int = 0, exclude: list | None
 
 
 # ── 에이전트에게 넘길 자료 목록 ──
-# 자료가 수천 건이라 목표·진단 내용과 관련된 스킬로 먼저 고른다(팀 DB 스킬 태그·연결표 사용). 임베딩 검색은 OpenAI 모드에서만
-# 가능해(팀 DB 자료 벡터가 text-embedding-3-small) 5차는 스킬 규칙으로 고른다.
+# 목표·진단의 스킬 태그와 연결표로 검색 범위를 먼저 고른다.
+# 자료 후보의 BGE-M3 벡터 검색은 services/resource_rag.py가 수행한다.
 SKILL_RULES = [
     (r'RAG|검색|질의응답|챗봇|문서|지식|근거|규정', ['RAG & 생성형 AI 에이전트', '자연어 처리(NLP) & LLM 기초']),
     (r'LLM|생성형|GPT|프롬프트|언어 ?모델|에이전트|AI 활용|인공지능|AI', ['자연어 처리(NLP) & LLM 기초', 'RAG & 생성형 AI 에이전트']),

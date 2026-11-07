@@ -52,7 +52,7 @@ def _local_db_url() -> str:
     password = env('GP5_DB_PASSWORD')
     if not password:
         return ''
-    user, name = quote(env('GP5_DB_USER', 'growpath'), safe=''), env('GP5_DB_NAME', 'growpath')
+    user, name = quote(env('GP5_DB_USER', 'growpath'), safe=''), env('GP5_APP_DB_NAME', 'growpath_bge_m3')
     return f"postgresql+psycopg://{user}:{quote(password, safe='')}@127.0.0.1:{env('GP5_DB_PORT', '55435')}/{name}"
 
 
@@ -72,7 +72,6 @@ class Settings:
     # OpenAI
     openai_key: str
     openai_model: str
-    openai_embed: str
     openai_base: str
     openai_json: bool
     openai_vision: str
@@ -160,8 +159,6 @@ def load() -> Settings:
         regulation_files_dir=Path(env('GP5_REGULATION_FILES_DIR', str(ROOT.parent / 'team_db' / 'regulations'))),
         openai_key=env('OPENAI_API_KEY'),
         openai_model=openai_model,
-        # 규정 검색 임베딩: RunPod-Ollama·OpenAI 모드 공통(팀 합의 2026-10-26) · 팀 DB 벡터와 같은 모델이어야 한다
-        openai_embed=env('OPENAI_EMBED_MODEL', 'text-embedding-3-small'),
         openai_base=env('OPENAI_BASE_URL', 'https://api.openai.com/v1').rstrip('/'),
         openai_json=env('OPENAI_JSON_MODE', 'on').lower() != 'off',
         openai_vision=env('OPENAI_VISION_MODEL'),

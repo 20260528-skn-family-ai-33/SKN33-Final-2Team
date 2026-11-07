@@ -24,18 +24,19 @@ class RegulationVectorTests(unittest.TestCase):
         expected_hash = hashlib.sha256(cleaned.encode("utf-8")).hexdigest()
         self.assertEqual(rv.input_hash(row), expected_hash)
 
-    def test_embedding_api_text_bounds_utf8_bytes_to_8000(self):
-        long_text = "가나다라마바사아자차카타파하 " * 400  # > 10,000 UTF-8 bytes
-        self.assertGreater(len(long_text.encode("utf-8")), 8000)
-        bounded = rv.embedding_api_text(long_text, max_utf8_bytes=8000)
-        self.assertLessEqual(len(bounded.encode("utf-8")), 8000)
-        self.assertIsInstance(bounded.encode("utf-8").decode("utf-8"), str)
+    def test_long_bge_input_is_not_truncated(self):
+        from src.shared.bge_embeddings import MODEL, PROVENANCE, embed_texts
+        text = '가나다라마바사아자차카타파하 ' * 400
+        client = MagicMock(return_value={'model': MODEL, **PROVENANCE,
+            'data': [{'index': 0, 'embedding': [1.] + [0.] * 1023}]})
+        embed_texts([text], client=client)
+        self.assertEqual(client.call_args.args[0]['input'], [text])
 
     def test_vector_values_validation(self):
-        valid = [0.01] * 1536
-        self.assertEqual(len(rv.vector_values(valid)), 1536)
-        self.assertEqual(len(rv.vector_values(json.dumps(valid))), 1536)
-        for invalid in ([0.0] * 1536, [0.1] * 10, [float("nan")] * 1536):
+        valid = [0.01] * 1024
+        self.assertEqual(len(rv.vector_values(valid)), 1024)
+        self.assertEqual(len(rv.vector_values(json.dumps(valid))), 1024)
+        for invalid in ([0.0] * 1024, [0.1] * 10, [float("nan")] * 1024):
             with self.assertRaisesRegex(ValueError, "Invalid regulation vector"):
                 rv.vector_values(invalid)
 

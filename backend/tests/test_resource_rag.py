@@ -43,7 +43,7 @@ class ResourceRagTests(unittest.TestCase):
   for vectors in ([[1.0]],[[0.0]*DIMENSIONS],[[float('nan')]+VECTOR[1:]],[],[[True]+VECTOR[1:]]):
    with self.subTest(vectors=len(vectors)),self.assertRaises(RecommendationError):validate_vectors(vectors,1)
  def test_embedding_cache_reuses_same_query_without_db_writes(self):
-  with patch('app.services.resource_rag.llm.embed_model',return_value=MODEL),patch('app.services.resource_rag.llm.embed_ready',return_value=True),patch('app.services.resource_rag.llm.embed',return_value=[VECTOR]) as embed:
+  with patch('app.services.resource_rag.embeddings.embed',return_value=[VECTOR]) as embed,patch('app.services.resource_rag.llm.openai',side_effect=AssertionError('OpenAI embedding called')):
    cached_vectors(('query',));cached_vectors(('query',));embed.assert_called_once()
  def test_sql_only_reads_and_filters_before_limit(self):
   with patch('app.services.resource_rag.db.all_',return_value=[]) as query:

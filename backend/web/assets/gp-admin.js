@@ -56,8 +56,8 @@
           ${o.hr.noNumber ? `<p class="small muted" style="margin:0">사번이 없는 팀 테스트 계정 ${o.hr.noNumber}명은 엑셀로 다루지 않아요.</p>` : ''}
           ${o.hr.transfers.length ? `<p class="small" style="margin:8px 0 0"><b>최근 인사이동·권한 변경</b></p><ul class="plain-list small">${o.hr.transfers.map(t => `<li>${esc(t.at)} · ${esc(t.name)} · ${esc(t.from || '없음')} → ${esc(t.to || '없음')}${t.headBefore !== t.headAfter ? ` · ${t.headAfter ? '부서장 지정' : '부서장 해제'}` : ''}</li>`).join('')}</ul>` : ''}`)}
         ${card('regulations', `<div class="adm-num">${num('검색하는 조항', o.regulations.chunks)}${o.regulations.sets.map(s => num(s.group, `${s.count}건`)).join('')}</div>
-          <p class="small muted" style="margin:0">벡터 색인: ${vec.length ? vec.map(v => `${esc(v.model)} ${v.count}개`).join(' · ') : '없음'} · 벡터가 없는 조항은 키워드 검색으로 찾아요</p>
-          <div class="actions" style="margin-top:10px"><button class="btn line sm" data-act="adm-index">${icon('spark')}규정 색인 만들기</button></div>`)}
+          <p class="small muted" style="margin:0">벡터 색인: ${vec.length ? vec.map(v => `${esc(v.model)} ${v.count}개`).join(' · ') : '없음'} · 색인이 없거나 원문과 다르면 검색 오류로 알립니다.</p>
+          <p class="muted small">규정 검색은 공유 BGE-M3 색인을 사용합니다.</p>`)}
         ${card('education', `<div class="adm-num">${['course', 'book', 'cert'].map(k => num({ course: '강좌', book: '도서', cert: '자격증' }[k], (e[k] || {}).count)).join('')}</div>
           <p class="small muted" style="margin:0">추정 값이 남은 자료: ${['course', 'book', 'cert'].map(k => `${{ course: '강좌', book: '도서', cert: '자격증' }[k]} ${(e[k] || {}).estimated || 0}`).join(' · ')}</p>`)}
         <div class="card"><div class="sec-h"><h2 class="st">${icon('spark')} 목표 후보</h2></div>
@@ -84,21 +84,6 @@
     try { const r = await ADM.goalsAll(m === 'mock' ? 'mock' : null); GP.toast(`직원 ${r.employees}명 · 작업 ${r.started}개 시작 · 기본 후보 ${r.defaults}명 저장`); st.overview = null; setTimeout(() => { if (S().route === 'admin') GP.render(false); }, 1500); }
     catch (err) { GP.fail(err, '목표 후보를 다시 만들지 못했어요'); }
   };
-  GP.act['adm-index'] = () => {
-    const pv = (st.overview && st.overview.regulations.providers) || {};
-    const opts = ['openai', 'ollama'].filter(p => pv[p] && pv[p].available && pv[p].embed);
-    if (!opts.length) { GP.sheet(`<p style="margin-top:0">임베딩 모델이 설정된 AI 모드가 없어요. 지금은 도우미가 키워드 검색으로 조항을 찾아요.</p>${note('.env에 OPENAI_API_KEY와 OPENAI_EMBED_MODEL(팀 DB 벡터와 같은 text-embedding-3-small), 또는 OLLAMA_BASE_URL과 OLLAMA_EMBED_MODEL을 넣고 서버를 다시 실행하면 색인을 만들 수 있어요.')}`, { title: '규정 색인을 만들 수 없어요' }); return; }
-    GP.sheet(`<p style="margin-top:0">벡터가 없는 조항만 임베딩해서 저장해요(1536차원이면 팀 DB 표, 아니면 보조 표). 조항 수만큼 임베딩 모델을 호출해요.</p>
-      <div class="stack">${opts.map((p, i) => `<label class="radio"><input type="radio" name="admIdx" value="${p}" ${i ? '' : 'checked'}>${p === 'openai' ? 'OpenAI API' : 'RunPod-Ollama'} · ${esc(pv[p].embed)}</label>`).join('')}</div>`,
-    { title: '규정 색인을 만들까요?', foot: '<button class="btn line" data-act="sheet-close">취소</button><button class="btn pri" data-act="adm-index-ok">만들기</button>' });
-  };
-  GP.act['adm-index-ok'] = async () => {
-    const p = (document.querySelector('input[name="admIdx"]:checked') || {}).value; GP.closeSheet();
-    GP.toast('규정 색인을 만드는 중이에요…');
-    try { const j = await ADM.buildIndex(p); const r = await API.job(j.jobId); GP.toast(`규정 색인: 새로 ${r.added}개 · 전체 ${r.total}개 (${r.dimensions}차원)`); st.overview = null; if (S().route === 'admin') GP.render(false); }
-    catch (err) { GP.fail(err, '규정 색인을 만들지 못했어요'); }
-  };
-
   /* ── 데이터 화면: 내려받기 · 올리기 · 지금 데이터 표 ── */
   const ck = (ds, sheet) => `${ds}|${sheet}|${st.q[ds + sheet] || ''}|${st.page[ds + sheet] || 0}`;
   async function loadRows(ds, sheet) {

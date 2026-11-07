@@ -32,83 +32,43 @@ class SetupPasswordTests(unittest.TestCase):
 
     @contextmanager
     def isolated_setup_steps(self):
-        """명령행 정책 검사에서 복원·스키마·자료·모델 작업을 모두 격리한다."""
+        """읽기 전용 진입점이 계정·자료 보충 함수를 호출하지 않는지 검사한다."""
         with ExitStack() as stack:
             steps = {name: stack.enter_context(patch.object(setup_db, name)) for name in (
-                'db_is_empty', 'restore', 'apply_app_ext', 'admin_account',
-                'team_passwords', 'resources', 'regulations', 'goals',
+                'admin_account', 'team_passwords', 'resources', 'regulations', 'goals',
             )}
-            steps['db_is_empty'].return_value = False
             stack.enter_context(patch('builtins.print'))
             yield steps
 
-    def test_setup_preserves_employee_passwords_by_default_and_with_keep_options(self):
-        options = ([], ['--keep-team-passwords'], ['--supplement-only'],
-                   ['--supplement-only', '--keep-team-passwords'])
+    def test_setup_preserves_passwords_and_skips_supplements_in_both_demo_modes(self):
         for enabled in (False, True):
             for password in ('', '   ', 'employee-test', 'changed-test'):
-                for args in options:
-                    for empty_database in (False, True):
-                        with self.subTest(demo_mode=enabled, password_case=password,
-                                          args=args, empty_database=empty_database), \
-                             patch.object(setup_db, 'S', replace(
-                                 setup_db.S, demo_mode=enabled, demo_password=password,
-                             )), patch('sys.argv', ['setup_db.py', *args]), \
-                             self.isolated_setup_steps() as steps:
-                            steps['db_is_empty'].return_value = empty_database
-                            setup_db.main()
-                            steps['team_passwords'].assert_not_called()
-                            steps['admin_account'].assert_called_once_with()
-                            for step in ('apply_app_ext', 'resources', 'regulations', 'goals'):
-                                steps[step].assert_called_once_with()
-                            if '--supplement-only' in args:
-                                steps['db_is_empty'].assert_not_called()
-                                steps['restore'].assert_not_called()
-                            else:
-                                steps['db_is_empty'].assert_called_once_with()
-                                self.assertEqual(steps['restore'].call_count, int(empty_database))
-        self.db_tx.assert_not_called()
-        self.hash_password.assert_not_called()
-
-    def test_setup_resets_employee_passwords_only_with_explicit_option_in_both_modes(self):
-        for enabled in (False, True):
-            with self.subTest(demo_mode=enabled), \
-                 patch.object(setup_db, 'S', replace(
-                     setup_db.S, demo_mode=enabled, demo_password='employee-test',
-                 )), patch('sys.argv', ['setup_db.py', '--reset-team-passwords']), \
-                 self.isolated_setup_steps() as steps:
-                setup_db.main()
-                steps['team_passwords'].assert_called_once_with()
-                steps['admin_account'].assert_called_once_with()
-
-    def test_setup_rejects_conflicting_reset_options_before_any_database_step(self):
-        for conflict in ('--keep-team-passwords', '--supplement-only'):
-            for args in (['--reset-team-passwords', conflict], [conflict, '--reset-team-passwords']):
-                with self.subTest(args=args), \
-                     patch.object(setup_db, 'S', replace(setup_db.S, demo_password='employee-test')), \
-                     patch('sys.argv', ['setup_db.py', *args]), \
-                     patch('sys.stderr', new_callable=StringIO) as error_output, \
-                     self.isolated_setup_steps() as steps:
-                    with self.assertRaises(SystemExit) as failure:
-                        setup_db.main()
-                    self.assertEqual(failure.exception.code, 2)
-                    self.assertNotIn('employee-test', error_output.getvalue())
+                with self.subTest(demo_mode=enabled, password_case=password), \
+                     patch.object(setup_db, 'S', replace(
+                         setup_db.S, demo_mode=enabled, demo_password=password,
+                     )), self.isolated_setup_steps() as steps, \
+                     patch('tools.verify_bge_database.verify', return_value={'vectors': 4832}) as verify:
+                    setup_db.main([])
+                    setup_db.main([])
+                    self.assertEqual(verify.call_count, 2)
                     for step in steps.values():
                         step.assert_not_called()
         self.db_tx.assert_not_called()
         self.hash_password.assert_not_called()
 
-    def test_setup_rejects_reset_without_nonblank_password_before_any_database_step(self):
-        for password in ('', '   ', '\t\r\n'):
-            with self.subTest(password_case=repr(password)), \
-                 patch.object(setup_db, 'S', replace(setup_db.S, demo_password=password)), \
-                 patch('sys.argv', ['setup_db.py', '--reset-team-passwords']), \
-                 patch('sys.stderr', new_callable=StringIO) as error_output, \
-                 self.isolated_setup_steps() as steps:
+    def test_setup_rejects_legacy_options_before_verifying_or_writing_database(self):
+        options = (['--reset-team-passwords'], ['--keep-team-passwords'],
+                   ['--supplement-only'], ['--reset-team-passwords', '--keep-team-passwords'],
+                   ['--reset-team-passwords', '--supplement-only'])
+        for args in options:
+            with self.subTest(args=args), self.isolated_setup_steps() as steps, \
+                 patch('tools.verify_bge_database.verify') as verify, \
+                 patch('sys.stderr', new_callable=StringIO) as errors:
                 with self.assertRaises(SystemExit) as failure:
-                    setup_db.main()
+                    setup_db.main(args)
                 self.assertEqual(failure.exception.code, 2)
-                self.assertIn('GP5_DEMO_PASSWORD', error_output.getvalue())
+                self.assertIn(args[0], errors.getvalue())
+                verify.assert_not_called()
                 for step in steps.values():
                     step.assert_not_called()
         self.db_tx.assert_not_called()
@@ -219,36 +179,17 @@ class SetupPasswordTests(unittest.TestCase):
         self.hash_password.assert_not_called()
         self.transaction.run.assert_not_called()
 
-    def test_setup_checks_admin_even_without_employee_initial_password(self):
-        with patch.object(setup_db, 'S', replace(setup_db.S, admin_password='admin-test', demo_password='')), \
-             patch('sys.argv', ['setup_db.py', '--supplement-only']), \
-             patch.object(setup_db, 'apply_app_ext'), \
-             patch.object(setup_db, 'team_passwords') as team_passwords, \
-             patch.object(setup_db, 'resources'), \
-             patch.object(setup_db, 'regulations'), \
-             patch.object(setup_db, 'goals'), \
-             patch('builtins.print'):
-            setup_db.main()
-        self.hash_password.assert_called_once_with('admin-test')
-        self.transaction.run.assert_called_once()
-        team_passwords.assert_not_called()
+    def test_setup_only_verifies_bge_database_without_writes(self):
+        with patch('tools.verify_bge_database.verify', return_value={'vectors': 4832}) as verify, patch('builtins.print'):
+            setup_db.main([])
+        verify.assert_called_once_with()
+        self.hash_password.assert_not_called()
+        self.transaction.run.assert_not_called()
 
-    def test_invalid_new_admin_stops_before_employee_password_changes(self):
-        for password in ('', 'employee-test'):
-            with self.subTest(blank=not password), \
-                 patch.object(setup_db, 'S', replace(setup_db.S, admin_password=password, demo_password='employee-test')), \
-                 patch('sys.argv', ['setup_db.py', '--reset-team-passwords']), \
-                 patch.object(setup_db, 'db_is_empty', return_value=False), \
-                 patch.object(setup_db, 'apply_app_ext'), \
-                 patch.object(setup_db, 'team_passwords') as team_passwords, \
-                 patch.object(setup_db, 'resources') as resources, \
-                 patch.object(setup_db, 'regulations'), \
-                 patch.object(setup_db, 'goals'), \
-                 patch('builtins.print'):
-                with self.assertRaises(SystemExit):
-                    setup_db.main()
-                team_passwords.assert_not_called()
-                resources.assert_not_called()
+    def test_setup_propagates_invalid_bge_database(self):
+        with patch('tools.verify_bge_database.verify', side_effect=ValueError('BGE DB 입력 계약 오류')):
+            with self.assertRaisesRegex(ValueError, 'BGE DB'):
+                setup_db.main([])
         self.transaction.run.assert_not_called()
 
 

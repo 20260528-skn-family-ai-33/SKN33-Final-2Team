@@ -18,9 +18,8 @@
 | `app/auth.py` | 로그인 쿠키 이름을 `GP5_SESSION_COOKIE`로 설정(기본값은 원본과 같은 `gp5_session`) | 같은 PC·같은 브라우저에서 다른 환경과 번갈아 열 때 로그인이 서로 덮이지 않게 |
 | `tools/setup_db.py` | 복원 대상 컨테이너 이름을 `COMPOSE_PROJECT_NAME`으로(기본값은 원본과 같은 `gp5`) | 고정값이면 다른 compose 프로젝트의 DB에 복원할 수 있어서 |
 | `app/config.py`, `app/auth.py`(설명), `web/assets/gp-core.js`(주석) | 직원 초기 비밀번호를 코드에 적힌 기본값 없이 `.env`의 `GP5_DEMO_PASSWORD`로만 받음 | 공개 저장소에 공용 기본 비밀번호를 두지 않는 팀 원칙(`database/RESTORE.md`) |
-| `app/config.py`, `tools/setup_db.py` | 신규 관리자는 별도 `GP5_ADMIN_PASSWORD`로 생성하고 빈 값·공백만 있는 값·직원 초기값과 같은 비밀번호는 거절. 기존 관리자는 변경하지 않음 | 비밀번호는 저장소 밖에서 정해요. 설정을 바꾸거나 설치기를 다시 실행해도 기존 관리자 비밀번호가 바뀌지는 않아요 |
+| `app/config.py`, `tools/setup_db.py` | 관리자 생성 유틸리티는 별도 `GP5_ADMIN_PASSWORD`를 검사하고 기존 관리자는 변경하지 않음. BGE 설치 진입점에서는 이 함수를 실행하지 않음 | 복원된 관리자 계정을 사용하며 검사기 재실행으로 계정을 만들거나 비밀번호를 바꾸지 않아요 |
 | `app/admin_io/hr.py` | 시연 비밀번호가 비어 있으면 새 직원 추가를 막고 안내 | 빈 비밀번호로 계정이 생기지 않게 |
-| `app/llm.py`, `app/regstore.py`, `app/agents/regulation.py`, `app/routers/admin.py`·`account.py`, `app/config.py`, `app/errors.py` | 규정 검색 임베딩을 RunPod-Ollama·OpenAI 모드 모두 OpenAI `text-embedding-3-small`(`OPENAI_EMBED_MODEL`)로 통일하고 `OLLAMA_EMBED_MODEL`을 없앰. OpenAI 키가 없으면 키워드로 바꾸지 않고 오류로 알림(가데이터만 키워드). 관리자 색인 만들기는 모드를 고르지 않음(받은 `provider`는 무시 · 색인 만들기는 뒤에 아래 '규정 원문 PDF' 줄에서 없앰) | 팀 합의(2026-10-26): 팀 DB 벡터가 그 모델로 만들어져 있음. 원본은 모드별 임베딩이라 Ollama 모드가 키워드 검색으로 떨어져 조항을 못 찾는 일이 있었음 |
 | `app/agents/regulation.py`, `app/agents/grounded_answer.py` | 현재 실제 모델 모드는 사용자 요청에 따라 되묻기(`clarify`)를 생성하지 않음. RoBERTa가 질문 유형을 결정하고 LLM은 근거 상태·요약·출처만 생성 | 2026-10-26에는 `REG_SYS`의 되묻기 조건을 넓혔으나 이후 흐름으로 대체됨. 가데이터의 고정 되묻기와 이전 대화 표시는 호환 유지. 현재 기준은 [챗봇 질문 분류 안내](classification.md#답변-상태와-오류-2026-11-03-사용자-요청-반영) |
 | `app/agents/regulation.py`(규정 답변 검증) | 현재 실제 모델 답변은 인용 출처와 요약의 숫자를 검사하고, 검증 실패는 오류로 표시. 확인된 일부 내용만 답하는 `partial` 상태와 구분 | 2026-10-26의 선택지 정리(`clean_option`)·추가 안내 검사(`check_more`)는 과거 구현 이력이며 현재 실제 모델 답변 경로에서는 사용하지 않음 |
 | `app/agents/runtime.py`, `app/routers/account.py`, `app/services/goals.py` | '에이전트 동작 보기'(`GET /ai/log`)가 본인 호출 대신 모든 계정의 호출을 줌(직원·관리자 계정 모두). 기록마다 누구의 일인지(`employee`)와 관리자 화면에서 시작했는지(`by`)를 붙이고, 시각은 설정 시간대(`GP5_DB_TIMEZONE`)로 적음 | 시연·디버그 전용 기능이라 누가 호출했든 다 보이게(2026-10-26 사용자 결정 · 운영에서는 아무도 쓰지 않음 → B-1로 꺼야 함) · 컨테이너 시계가 UTC라 기록 시각이 9시간 어긋났음 |
@@ -39,7 +38,7 @@
 | 파일 | 바꾼 것 | 이유 |
 | --- | --- | --- |
 | `tools/setup_db.py`, `Dockerfile` | 직원 가데이터 엑셀(2.9.0) 단계와 `data/seed/` 폴더를 없앰. 기본 백업을 `team_db/growpath_latest.dump`로 | 최신 백업에 시험 직원 100명·부서장 5명·스킬·자격·학력이 들어 있고, 예전 가데이터 16명은 부서장 중복(`employees_one_department_head`)으로 들어가지 않음 |
-| `tools/setup_db.py` | 복원한 직원 비밀번호 해시는 기본으로 보존. 로컬 시험 사본에서 `--reset-team-passwords`를 명시할 때만 사번 있는 전체 직원을 `GP5_DEMO_PASSWORD`로 초기화 | 환경변수 설정·설치기 재실행만으로 기존 비밀번호를 바꾸지 않음. 사번 없는 `REAL_USER` 행은 초기화 대상에서 제외 |
+| `tools/setup_db.py` | 복원된 BGE DB 읽기 전용 검사만 실행. 이전 보충·비밀번호 초기화 옵션은 DB 검사 전에 거절 | #77의 기존 비밀번호 보존 원칙을 유지하며 환경변수 변경·검사기 재실행으로 계정과 자료를 변경하지 않음 |
 | `app/services/profile.py` | 업무 설명은 `employees.planned_project_description`, 경험·개발 경력·기술·프로젝트·교육은 `employee_input_profiles`, 자격은 `employee_certifications` + `employees.unlisted_certifications`. 업무·프로젝트는 각각 선택. `app_ext.employee_self_inputs`에는 처음 값·입력 상태·설명 변경 해시만 저장. 구판 설명은 읽기 호환 유지 | 팀 직원 입력 양식과 같은 표·열에 저장. 새 표/열 없음. 선택 이관 SQL은 `db/migrate_self_work_descriptions.sql` |
 | `app/services/profile.py`, `app/admin_io/hr.py` | 입사일·현재 근무 시작일을 `employees.hire_date`·`department_start_date`에서 읽고 관리자 인적 데이터 반영도 그 열에 씀. 직원 구분이 비면 직급 이름('일반직 4급')의 앞부분 | 최신 DB 에 생긴 열 · 직원 구분은 규정 묶음 선택에 씀 |
 
@@ -76,7 +75,7 @@ docker compose up -d backend
 
 기존 베타 DB의 해시 보존이 로그인 가능 여부나 새 배포 승인을 뜻하지는 않아요. NULL·잘못된 해시·비밀번호 미상 계정은 배포 전에 확인해야 하며, 새 배포의 비밀번호 전달·로그인 확인 담당자와 완료 여부는 현재 미정이에요.
 
-로컬 시험 사본에서 사번 있는 전체 직원의 비밀번호를 바꿀 때만 [직원 비밀번호 초기화 명령](../README.md#로컬-시험-사본의-직원-비밀번호-초기화-선택)의 `run --build`로 최신 설치기 이미지를 준비하고 `--reset-team-passwords`를 명시해요. 베타 전체 계정의 비밀번호 배포에는 사용하지 않아요. `--keep-team-passwords`는 기존 명령 호환용으로 남고, `--supplement-only`도 보존을 유지해요. 초기화 옵션과 이 두 옵션의 조합, 초기화 시 빈 값·공백뿐인 `GP5_DEMO_PASSWORD`는 DB 작업 전에 거절해요. 일반 앱 업데이트는 [DB 복원·보충을 제외하는 절차](../README.md#기존-설치의-설정-변경과-업데이트)로 세 이미지(`backend`·`backend-setup`·`frontend`)를 빌드하고, 설치기 실행 없이 API·화면만 `up --no-deps`로 다시 만들어요.
+BGE 설치기는 관리자 생성·직원 비밀번호 초기화·보충 자료 적재를 실행하지 않아요. 이전 `--reset-team-passwords`, `--keep-team-passwords`, `--supplement-only`는 DB 검사 전에 거절해요. [BGE 설치기의 계정 보존](../README.md#bge-설치기의-계정-보존)을 참고하세요. 일반 앱 업데이트는 [DB 복원·보충을 제외하는 절차](../README.md#기존-설치의-설정-변경과-업데이트)로 세 이미지(`backend`·`backend-setup`·`frontend`)를 빌드하고, 검사기 실행 없이 API·화면만 `up --no-deps`로 다시 만들어요.
 
 챗봇 파인튜닝 모델(`growpath-regulation-4b` · `qwen35-4b-diagnosis-agent` · `role=regulation`)은 `options.num_gpu=-1`로 Ollama 실행 서버의 GPU·VRAM에 맞춰 자동 선택해요. 사용할 GPU가 없으면 서버가 CPU로 실행하며, 모델에 저장된 CPU 강제 설정도 요청 값으로 덮어써요. 같은 모델을 쓰는 안별 지원 조건 확인에도 적용돼요. GPU 드라이버·컨테이너 장치 노출은 **모델 실행 서버**에서 준비해야 해요. 실제 사용 여부는 서버의 `ollama ps` 또는 `/api/ps`의 `size_vram`으로 확인해요. [Ollama GPU 문서](https://docs.ollama.com/gpu), [자동 선택 옵션 원본](https://github.com/ollama/ollama/blob/main/api/types.go)을 참고해요.
 
@@ -104,6 +103,122 @@ python -m uvicorn app.main:app --port 8815
 로그인한 직원의 챗봇은 로드맵과 같은 계정별 AI 설정을 따릅니다. 실제 모드는 규정·회사 정보·사내 생활 DB만 답변 근거로 검색하고, 시연 모드는 추천 질문에 가데이터 예시를 제공합니다. 실제 모드에서는 RoBERTa가 질문을 분류하고 답변 모델은 근거 상태·요약·출처를 반환합니다. 화면에서 근거 원문과 생활 자료의 가상 여부를 확인할 수 있습니다. 결과 조회·취소는 요청한 직원에게만 허용합니다. 자세한 동작은 [분류 안내](classification.md)를 참고하세요.
 
 실제 모델 모드의 되묻기는 삭제했습니다. 규정 답변의 확인된 내용·적용 조건·부족한 근거는 요약에 담으며, ‘내 상황에 적용’(`apply`)·‘추가로 확인할 것’(`more`)·‘등록되지 않은 기준’(`missing`)을 별도 생성 항목으로 요청하지 않습니다. 해당 필드와 되묻기 카드 표시는 가데이터·이전 대화 호환을 위해 유지합니다. 질문의 일부만 답할 수 있어도 유효한 출처를 인용하면 화면에 `근거 확인`을 표시합니다. 확인이 필요한 조건은 답변 본문에서 설명합니다.
+
+## 공유 BGE-M3 DB 연결 (#124)
+
+임베딩 단일화 후속은 #133에서 관리합니다. 현재 검색과 DB 벡터 도구는 BGE-M3만 사용합니다. 아래 기존 실행 기록은 해당 실행 시점의 검증이며 #133 변경 뒤의 재검증과 구분합니다.
+
+현재 기본 검색은 #124 공유 DB입니다. PR #129의 이전 sidecar/GGUF 방식에서 **공유 DB의 원래 저장 위치·공식 가중치**를 직접 사용하는 방식으로 바꿨습니다. 생성 LLM·계정별 모델 선택은 변경하지 않습니다. 강좌·도서 추천도 BGE-M3를 사용하며 OpenAI 임베딩 호출이 필요하지 않습니다.
+
+| 검색 자료 | 저장 위치 | 벡터 수 | 입력 계약 |
+|---|---|---:|---|
+| 강좌·도서·스킬 등 | `public.learning_resource_embeddings` | 2,984 | `db-resource-fields-and-skill-links/v1`, provenance의 source/actual input 해시 구분 |
+| 규정 | `regulations.rag_chunk_embeddings` | 1,406 | `context_path + 빈 줄 + chunk_text`, `context_path+blank_line+chunk_text/v1` |
+| 회사·사내 생활 | `knowledge.chunks` | 442 | 원래 `chunk_text` 전체와 SHA-256 |
+
+이전 PR의 `app_ext.rag_chunk_vectors`는 이 백업에서 비어 있고 `app_ext.knowledge_chunk_vectors`는 없습니다. 새로 채우거나 OpenAI 1,536차원 제약을 제거해 통과시키지 않습니다. 검색은 모델·1,024차원·입력 형식/해시·provenance revision을 확인합니다. 규정·회사·생활의 BM25/RRF와 직원 구분·국외·가상 자료 필터, 강좌·도서의 Free/Crash/Challenge 기존 정책을 유지합니다. #128의 직군별 준용 검색 제한은 여전히 별도 수정 중입니다.
+
+### 공유 파일과 복원
+
+- [BGE dump](https://drive.google.com/file/d/10dbnIx2YhhyB8-QeicvZqwofiPayJbyy/view)
+- [동반 manifest](https://drive.google.com/file/d/1LIombPvvEt3tp76Gj5BboDUOb1qg7nks/view)
+- [모델별 복원·사용 안내](https://drive.google.com/file/d/1xBtcHVlSVKQvx4twNnEBZGAre6Pxqt1c/view)
+
+백업은 `team_db/growpath_bge_m3_embedding.dump`, manifest는 같은 이름의 `.manifest.json`에 둡니다. 크기 36,077,485바이트, SHA-256 `d96c16ceeca8f8d6de8015d2f40903b9f7d6ccecddc8fc33f1e7213bd2a48c4b`입니다. 2026-11-06 로컬 작업 DB의 전체 백업이며 기존 Drive OpenAI 공유본(2026-11-04)과 모델만 다른 동일 스냅샷으로 간주하지 않습니다.
+
+PowerShell에서 저장소 루트 기준:
+
+```powershell
+docker compose up -d --wait db
+./scripts/restore-bge-db.ps1             # 이름·크기·해시·모델 계약 검사, DB 쓰기 없음
+./scripts/restore-bge-db.ps1 -Apply      # 별도 growpath_bge_m3 생성·원자적 복원
+```
+
+도구는 기존 DB 덮어쓰기를 거부하고 `--single-transaction --exit-on-error --no-owner --no-acl`로 복원합니다. 역할·권한은 로컬 DB 소유자 기준으로 매핑하며 기존 OpenAI DB를 변경하지 않습니다. 동일 백업 재실행은 restore_state의 archive SHA-256으로 건너뜁니다. 실패 시 기존 DB는 그대로이며 빈 대상 DB에서 재시도할 수 있습니다. 수동 복원한 기존 DB나 다른 백업 해시가 있으면 자동 덮어쓰지 않습니다.
+
+다른 운영체제에서 PowerShell을 사용하지 않을 때는 PostgreSQL 17 클라이언트로 해시를 검증하고 **새 DB에만** `createdb` 후 `pg_restore --single-transaction --exit-on-error --no-owner --no-acl -d growpath_bge_m3 ...dump`로 복원합니다. DB 접속 값·역할 매핑은 환경에 맞게 지정합니다. 같은 BGE DB 확인 도구로 사후 검사하며 원본 DB나 볼륨을 삭제하지 않습니다.
+
+### 공식 모델과 FP32 Docker 기본값
+
+공유본과 같은 `BAAI/bge-m3` revision `5617a9f61b028005a4858fdac845db406aefb181`, `pytorch_model.bin` SHA-256 `b5e0ce3470abf5ef3831aa1bd5553b486803e83251590ab7ff35a117cf6aad38`를 사용합니다. 서버는 시작할 때 가중치 해시를 확인하고 요청 응답에 revision·가중치 해시·CLS·L2 계약을 반환하며 클라이언트가 검사합니다. GGUF 변환본으로 대체하지 않습니다.
+
+다음 파일을 공식 revision에서 Git 제외 폴더에 준비합니다(가중치 약 2.27GB).
+
+```powershell
+$revision = '5617a9f61b028005a4858fdac845db406aefb181'
+New-Item -ItemType Directory -Force .cache/bge-m3-official-5617a9f | Out-Null
+foreach ($file in @('config.json','tokenizer.json','tokenizer_config.json','special_tokens_map.json','pytorch_model.bin')) {
+  curl.exe -L --fail "https://huggingface.co/BAAI/bge-m3/resolve/$revision/$file" -o ".cache/bge-m3-official-5617a9f/$file"
+  if ($LASTEXITCODE -ne 0) { throw "다운로드 실패: $file" }
+}
+```
+
+`BGE_M3_MODEL_DIR` 기본값은 위 폴더입니다. **CPU 추론 기본은 `BGE_M3_DTYPE=float32`**, 정규화·출력도 FP32입니다. 사용자가 명시적으로 `float16`을 선택할 수 있지만 자동으로 정밀도를 낮추지 않습니다. CPU/GPU 선택과 정밀도는 별개이며 현재 서비스는 CPU입니다. 공유 DB는 GPU FP16 추론·FP32 정규화/저장으로 생성됐습니다. 모델·revision·입력·정규화가 같은 상태에서 CPU FP32와 저장 벡터의 수치 일치도를 별도 확인해 재사용합니다. FP32가 최종 검색 정답률 향상을 보장하는 것은 아닙니다.
+
+서버는 로컬 파일만 읽고 `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`로 실행합니다. 8,192토큰 초과 입력은 조용히 자르지 않고 오류입니다. CPU 스레드는 `BGE_M3_THREADS`(기본 4)로 조절합니다. 장문 임베딩의 메모리·시간은 입력 길이에 따라 별도 확인해야 합니다.
+
+```powershell
+docker compose up -d --build --wait --wait-timeout 180
+docker compose ps
+docker compose exec backend python tools/verify_bge_database.py --server
+```
+
+화면은 `http://localhost:8816`, API 문서는 `http://localhost:8815/api/docs`입니다. DB와 검색 서버는 서로 다른 컨테이너이며 BGE API는 Docker 내부에서만 열립니다. 확인 명령의 `database=growpath_bge_m3`, `vectors=4832`, `server.precision=float32`, `normalization_dtype=float32`를 확인합니다. `backend-setup`이 0으로 종료되는 것은 읽기 전용 검증을 마친 정상 상태입니다.
+
+`GP5_APP_DB_NAME=growpath_bge_m3` 하나로 앱·DB 서비스의 이름을 맞춥니다. 모든 검색은 BGE-M3 고정 계약이며 이전 임베딩 모델·제공자 선택 설정은 제거했습니다. 구형 백업 복원 서비스와 sidecar SQL을 실행하는 설치 경로도 제거했고 공유 DB에는 기존 보충·비밀번호 초기화 도구를 실행하지 않습니다. 실제 이전 DB·백업 파일은 이번 코드 정리에서 삭제하지 않습니다.
+
+### 사전 색인·재실행·검증
+
+공유본은 이미 4,832개가 색인되어 있으므로 **재임베딩이 필요하지 않습니다.** 규정의 재구성 본문 입력을 그대로 사용하지 않고 원래 공유 입력 계약으로 맞췄습니다. 처음에는 다음 읽기 전용 검사를 사용합니다.
+
+```powershell
+docker compose exec backend python tools/verify_bge_database.py --server
+docker compose exec backend python tools/index_regulations.py
+docker compose exec backend python tools/index_knowledge.py
+```
+
+`index_*.py --apply`는 명시적인 생성·저장 옵션입니다. 동일 공유본에서는 기존 벡터를 재사용해 saved=0이어야 하며 정상 사용을 위해 실행할 필요는 없습니다. 원문이 변경된 경우 입력 해시와 #124 provenance를 함께 갱신하는 별도 재색인·검증이 필요합니다. 검색 중에는 DB·색인을 쓰거나 누락 벡터를 OpenAI로 자동 보충하지 않습니다.
+
+실제 검색·후보 후처리 검증(생성 LLM 없음):
+
+```powershell
+docker compose exec backend python tools/check_bge_search.py --output /tmp/bge-search-result.json
+docker compose cp backend:/tmp/bge-search-result.json .cache/embedding-eval/bge-search-result.json
+```
+
+규정·회사·생활 실제 검색, 12주제×Free/Crash/Challenge 36개 강좌·도서 검색, 가격·스킬·사용 가능 범위·원래 입력 보존, 고정 응답 기반 추천 후처리를 확인합니다. OpenAI 임베딩 호출을 차단하고 CPU 질문 임베딩을 포함한 전체 검색 시간·저장 벡터 대조·전후 DB 지문을 기록합니다. 실제 생성 LLM의 최종 추천 품질·전체 브라우저 대화·동시 사용자 성능과 구분합니다. #124의 RTX 3060 GPU 속도 수치를 현재 CPU 성능으로 사용하지 않습니다.
+
+단위 검사는 `backend/`에서 `python -m unittest discover -s tests -q`로 실행합니다. 기존 규정·회사·BM25 검사와 `test_shared_bge_database.py`, 자료 추천의 Free/Crash/Challenge 정책 검사를 함께 수행합니다.
+
+### 2026-11-06 실제 FP32 Docker 연결·검증
+
+PR #129 브랜치에서 최신 main `26f3867`을 반영하고 공유 백업을 별도 DB에 복원했습니다. `docker compose up -d --build --wait --wait-timeout 180` 후 실제 서버의 `device=cpu`, `precision=float32`, `normalization_dtype=float32`, 모델 revision·가중치 해시·CLS·L2를 확인했습니다. 화면 8816·API 문서 8815의 HTTP 200, DB 계약 검사 4,832개 유효를 확인했습니다. 기존 OpenAI `growpath` DB의 **79개 테이블 전체 행 수·내용 지문은 전환 전후 동일**했습니다. 동일 백업 재복원은 건너뛰고 규정·회사 색인 명령의 명시적 재실행도 `saved=0`이었습니다.
+
+CPU FP32와 공유 GPU FP16 저장 벡터를 짧은 규정·회사/생활 원문 4개로 대조한 최소 코사인 유사도는 **0.9999988443**이었습니다. 같은 모델·입력 계약으로 기존 벡터를 재사용했으며 재임베딩은 수행하지 않았습니다. 이 표본 대조를 전체 장문 문서의 수치 동등성·검색 품질 평가로 확대하지 않습니다.
+
+OpenAI 임베딩 호출을 실패하도록 막은 실제 복원 DB 검사에서 규정·회사·생활 검색과 별도로 구성한 **12주제×3코스 36건의 강좌·도서 후보 검색**이 모두 성공했습니다. 최소 강좌 4개·도서 3개였고, Free 유료 강좌·스킬/사용 가능 범위 이탈은 없었습니다. 고정 응답 기반 추천 후처리도 모든 사례에서 강좌·도서 각각 최소 1개를 반환했고 허용 후보 밖을 선택하지 않았습니다. 기존 Crash 필수 기술·핵심 범위·Challenge 정책 단위 검사도 함께 통과했습니다. 실제 생성 LLM은 호출하지 않았습니다.
+
+동일 Docker CPU FP32 서버의 모델 로딩 후 순차 실행에서 질문 임베딩 캐시는 사례마다 초기화했습니다. 강좌·도서 검색(질문 임베딩+SQL+후보 후처리) 36건은 **중앙값 985.75ms, p95 1,315.57ms, 범위 721.25~1,501.34ms**였습니다. 사내 도우미 첫 규정 검색은 BM25/규정 캐시 준비를 포함해 4,182.43ms, 이후 회사 321.33ms·생활 401.19ms였습니다. 각각 표본이며 LLM/HTTP 전체·동접 성능이 아닙니다. #124의 GPU 수치나 서로 다른 OpenAI 스냅샷과 개선율을 계산하지 않았습니다.
+
+AI가 구현·검사를 직접 실행했습니다. 네트워크 차단·소스 읽기 전용 Docker의 `python -m unittest discover -s tests -q`는 **901개 실행·898개 통과·외부 카탈로그 스냅샷 미지정 3개 제외**였습니다. 고정 `ROADMAP_TOKENIZER_PATH=/srv/growpath/tokenizer_assets/qwen38.json`을 지정했습니다. 로그·원본 DB 지문·실제 검색 결과·FP32 health는 Git 제외 `.cache/embedding-eval/backend-shared-bge-fp32-tests.log`, `original-db-before-124.json`, `original-db-after-124.json`, `shared-bge-fp32-integration.json`, `shared-bge-fp32-health.json`에 보존했습니다. 실행 중간 FP16 검사 기록은 현재 FP32 결과와 구분합니다. 최종 검색 품질 평가·실제 LLM 추천·전체 브라우저 대화·사람 리뷰·후속 직군 #128 수정은 남아 있습니다.
+
+### BGE 단일 경로와 복구
+
+규정·회사·생활·자료의 실행 경로에는 small 임베딩 클라이언트나 제공자 선택 분기가 없습니다. 생성 LLM의 OpenAI 선택은 유지합니다. 백엔드와 DB 도구의 모델·revision·가중치·CLS·L2 계약은 `database/src/shared/bge_model.json` 한 곳에서 관리합니다. Docker 이미지에도 같은 파일을 포함합니다.
+
+이전 백업 복원 서비스·스크립트, sidecar SQL 자동 적용 경로, 검색 중 임베딩 자동 보충 코드는 제거했습니다. 이미 적용된 `backend/db/` SQL은 원본 바이트를 보존하고 현재 설치에서 실행하지 않습니다. `tools/setup_db.py` 진입점도 읽기 전용 BGE 검증만 실행합니다. `database/`의 벡터 생성·검색 도구도 BGE-M3 1024차원만 사용합니다. 원래 규정 입력과 해시는 보존하고 서버가 8,192토큰을 넘는 입력을 거절하면 원문을 조용히 자르지 않습니다. 새 임베딩 DB 설치는 위 공유 백업 복원 절차로 통일하며 이전 스키마에서 시작하는 설치는 거절합니다.
+
+복구가 필요하면 검증된 BGE 백업을 새 BGE DB에 복원하고 같은 모델 계약의 코드·서버를 함께 사용합니다. 일반 restart는 환경변수를 다시 읽지 않으므로 변경 후 컨테이너를 재생성합니다. 기존 데이터 볼륨을 삭제하지 않습니다. 과거 실험 수치와 원본 manifest·적용된 마이그레이션은 이력 검증용이며 현재 설치 절차가 아닙니다. #128 직군별 검색 문제는 별도 작업입니다.
+
+### 임베딩 단일화 검증 (#133, 2026-11-06)
+
+AI가 small 클라이언트·검색 분기·제공자 선택·자동 색인 보충과 구형 복원 서비스를 제거하고 검사했습니다. 소스 읽기 전용·네트워크 차단 Docker의 백엔드 전체 `python -m unittest discover -s tests -q`는 **898개 실행·895개 통과·카탈로그 스냅샷 미지정 3개 제외**입니다. 소스를 `/src`에 마운트해 검사할 때는 공통 모델 계약도 `/database/src/shared/bge_model.json`으로 읽을 수 있도록 저장소 `database/`를 `/database:ro`에 함께 마운트합니다. 기존 제공자 설정이 남아 있어도 삭제한 모델로 돌아가지 않는 것과 BGE 실패·잘못된 모델/벡터를 오류로 유지하는 것을 확인했습니다.
+
+DB의 `python -m unittest tests.test_db_deployment tests.test_catalog_expansion tests.test_regulation_vectors tests.test_import_package tests.test_knowledge_search tests.test_knowledge_documents tests.test_resource_refresh tests.test_bge_embeddings -q`는 **83개 실행·79개 통과·외부 원본 묶음 미제공 4개 제외**입니다. `docs/`가 필요한 검사를 위해 저장소 문서를 함께 마운트한 임시 사본에서 실행했습니다. 새 BGE 클라이언트의 원문·순서 보존, 1024차원, 모델 provenance, 실패 전파, 이전 DB 설치 거절을 검사했습니다. 변경 Python을 포함한 275개 파일 문법, 이전 화면 JS 두 파일 `node --check`, `docker compose config --quiet`, 복원 스크립트의 쓰기 없는 미리보기·백업 해시, `git diff --check`도 통과했습니다. 적용된 SQL·원본 manifest·catalog 바이트는 변경하지 않았습니다.
+
+새 이미지 빌드 후 일회용 `docker compose run --rm --no-deps -T backend`에서 `tools/verify_bge_database.py --server`와 `tools/check_bge_search.py --output ...`를 실행했습니다. 4,832개 계약 유효, 세 범주 검색·12주제×3코스 36개 자료 검색과 고정 응답 추천 후처리가 통과했고, OpenAI 호출 차단·전후 DB 지문 동일을 확인했습니다. DB 도구의 새 BGE 클라이언트도 OpenAI 키를 비운 상태에서 실제 서버로 1024차원·L2 벡터를 받았습니다. 로그와 결과는 Git 제외 `.cache/embedding-eval/backend-bge-only-tests.log`, `database-bge-only-tests.log`, `bge-only-build.log`, `bge-only-integration.json`에 보존했습니다.
+
+이번 확인에서 실제 DB·백업 삭제·전체 재임베딩·신규 자료 적재 쓰기·생성 LLM·실행 중 서비스 재생성·전체 브라우저 흐름은 수행하지 않았습니다. 이전 관리자 화면의 삭제된 임베딩 버튼은 JS 구문 검사만 했고 실제 화면 확인은 남아 있습니다. 사람 리뷰·원격 CI·후속 커밋/푸시는 별도입니다.
 
 ## 목표 후보 사전 준비
 
@@ -204,7 +319,7 @@ Free Course만 후보 순위·개수 제한·본문 용량 배분 전에 강좌�
 
 ### 코스별 RAG 추천·주차 (#47)
 - 추천/선택: `GET/POST /api/v2/drafts/{project_id}/recommendations?course=A1|A2|A3`, `PUT .../recommendations/choices`, `POST .../recommendations/durations`. 코스 미지정은 점검 결과의 공통 스킬용 추천입니다.
-- 검색: 기존 `public.learning_resource_embeddings`의 `text-embedding-3-small` 1536차원 벡터를 읽습니다. 새 표·벡터 쓰기·로컬 색인은 추가하지 않습니다. 프로젝트 요약·희망 역량·스킬·코스를 배치 임베딩하고 메모리 캐시합니다. 후보 조건과 최신 0원 조건을 먼저 적용한 뒤 종류별 상위 6개를 AI에 전달합니다. Crash 강좌는 아래 단기 강좌 정책으로 최대 20개를 검토한 뒤 6개로 줄입니다.
+- 검색: 공유 `public.learning_resource_embeddings`의 BGE-M3 1024차원 벡터를 읽습니다. 새 표·벡터 쓰기·로컬 색인은 추가하지 않습니다. 프로젝트 요약·희망 역량·스킬·코스를 배치 임베딩하고 메모리 캐시합니다. 후보 조건과 최신 0원 조건을 먼저 적용한 뒤 종류별 상위 6개를 AI에 전달합니다. Crash 강좌는 아래 단기 강좌 정책으로 최대 20개를 검토한 뒤 6개로 줄입니다.
 - Free는 예산과 관계없이 강좌만 0원으로 제한합니다. 도서는 유료·가격 미확인도 허용하며, 확정 비용에는 확인된 도서 가격을 더하고 미확인 가격은 표시합니다. Crash는 포함한 역량 우선순위 상위 3개, Challenge는 기존 최대 5개를 유지합니다. 코스별 추천·자료 선택·기간·활동은 초안 JSON 안에서 구분합니다.
 - 주차는 선택한 고유 강좌 ID별 시간을 한 번만 합산한 뒤 주당 학습시간으로 나누어 전체에서 한 번 올림하고, 고유 도서 ID당 1주를 더합니다. 같은 강좌·도서를 여러 스킬에서 쓰면 같은 주차를 참조합니다. 시간이 미확인이면 해당 강좌 1주를 가정했다고 표시하고, 숫자로 확보된 추정 시간은 추정 표시와 함께 계산합니다. 주차 모델 호출은 없습니다.
 - 활동 API: `GET/POST /api/v2/drafts/{project_id}/activities`, `PUT .../activities/selection`. 제안은 명시적 요청에서만 생성하며 기본 전체 선택, 불필요한 활동 제외를 지원합니다. 자료·코스가 바뀌면 이전 제안은 무효가 됩니다.
@@ -419,7 +534,7 @@ PR #57 HEAD `64b020b`를 기준으로 수정했다. 아래 내용은 로컬 수�
 
 로드맵 확정(`services/drafts.confirm`)과 결과 보고서 저장(`services/plans.report_start` 작업)의 같은 트랜잭션에서 `services/notifications.py`가 작성한 직원 본인과 같은 부서의 부서장(`profile.members_of`와 같은 조건)에게 알림을 넣는다. 저장이 실패하거나 보고서 작성이 실패하면 알림도 남지 않는다. 부서장 본인의 로드맵·보고서는 본인에게만 간다.
 
-- 저장: `db/02_app_ext.sql`의 `app_ext.notifications`(새 표). 기존 DB는 `python tools/setup_db.py`(compose 는 `backend-setup`) 재실행으로 만들어진다. 되돌릴 때는 `DROP TABLE app_ext.notifications;` 한 줄이며 다른 표는 바뀌지 않는다.
+- 저장: `db/02_app_ext.sql`에 정의된 `app_ext.notifications`이며 현재 공유 BGE 백업에 포함된다. 현재 `tools/setup_db.py`와 `backend-setup`은 읽기 전용 검사이므로 재실행으로 표를 생성하지 않는다. 이전 SQL 적용 이력은 보존한다.
 - 확인 전 보고서를 다시 만들면 이전 보고서를 지우므로 그 알림도 `report_id ON DELETE CASCADE`로 함께 지워지고 새 보고서 알림만 남는다. 로드맵이 지워질 때도 같다.
 - API: `GET /api/v1/notifications`·`POST /api/v1/notifications/{id}/read`·`POST /api/v1/notifications/read-all`(직원 계정만 · `routers/notifications.py`). 부서장 알림은 그 직원이 지금도 같은 부서일 때만 목록·읽지 않은 수에 들어간다.
 - 시연 도구의 '단계로 바로 이동'은 확정·보고서 작성 함수를 거치지 않고 기록을 직접 만들어서 알림을 남기지 않는다.

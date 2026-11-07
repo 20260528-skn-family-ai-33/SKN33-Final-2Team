@@ -4,13 +4,11 @@
   국외근무 전용 규정은 국외근무를 묻는 질문에만 넣는다. 맞는 묶음이 없으면 '적용 대상 아님'.
 - 검색 단위는 팀 DB 검색 청크(rag_chunks · search_status='active')다. 화면의 '규정 근거'는 청크 하나를 조항처럼 보여 준다
   (조항 청크 = 「규정」 제7조(제목), 별표 행 청크 = 「규정」 별표 1(구분)).
-- 검색: 실제 모델 모드(RunPod-Ollama·OpenAI)는 모두 OpenAI 임베딩(text-embedding-3-small) 벡터로 pgvector 코사인 거리를 쓴다
-  (팀 합의 2026-10-26 · 팀 DB 벡터가 그 모델로 만들어짐). OpenAI 키가 없으면 키워드로 바꾸지 않고 오류로 알린다(사용자 결정).
-  가데이터 모드만 키워드(4차 규칙). 1536차원이면 ERD rag_chunk_embeddings, 아니면 app_ext.rag_chunk_vectors 에 저장한다.
+- 검색: 실제 모델 모드는 BGE-M3와 BM25/RRF만 사용한다.
+  실패 시 대체 검색 없이 오류로 알리며 가데이터 모드만 키워드 검색을 사용한다.
 """
 from __future__ import annotations
 
-import hashlib
 import re
 import threading
 import time
@@ -21,8 +19,6 @@ OVERSEAS = re.compile(r'(국외|해외|외국|주재국|국외사무소)\s*(근�
 _lock = threading.Lock()
 _cache: dict = {'at': 0.0}
 TTL_S = 300
-EMBED_TEXT_MAX = 6000
-INPUT_VERSION = 'gp5-chunk-text-v1'
 
 
 def _strip_path(text: str, path: str) -> str:
@@ -55,7 +51,7 @@ def _load() -> dict:
 
 
 CHUNK_SQL = """SELECT c.rag_chunk_id, c.regulation_version_id, c.chunk_type, c.context_path, c.chunk_text, c.search_status,
-            n.regulation_node_id, n.node_type, n.label, n.title, n.body_text, n.path, n.source_locator, n.display_order,
+            n.regulation_node_id, n.parent_node_id, n.node_type, n.label, n.title, n.body_text, n.path, n.source_locator, n.display_order,
             p.node_type AS p_type, p.label AS p_label, p.title AS p_title
         FROM regulations.rag_chunks c
         JOIN regulations.rag_chunk_sources s ON s.rag_chunk_id = c.rag_chunk_id AND s.source_role = 'primary'
@@ -82,7 +78,10 @@ def art_of(c: dict, reg: dict) -> dict:
     chapter = f"{c['p_label']} {c['p_title'] or ''}".strip() if c['p_type'] == 'chapter' else next((x for x in segs[1:2] if re.match(r'^제\d+장', x)), '')
     return {'id': c['rag_chunk_id'], 'reg': reg['short_key'], 'no': no, 'title': title, 'chapter': chapter,
             'page': pages[0] if pages else None, 'text': text, 'type': c['chunk_type'], 'node': c['regulation_node_id'],
-            'path': c['context_path'], 'group': reg['employee_group'], 'overseas': reg['overseas_only']}
+            'path': c['context_path'], 'group': reg['employee_group'], 'overseas': reg['overseas_only'],
+            'order': c.get('display_order', 0),
+            'chunkText': c['chunk_text'],
+            'parent': c.get('parent_node_id') if c['node_type'] == 'paragraph' and c['p_type'] == 'article' else None}
 
 
 def data() -> dict:
@@ -198,59 +197,12 @@ def _vec(v: list[float]) -> str:
     return '[' + ','.join(f'{x:.7f}' for x in v) + ']'
 
 
-def _table(dims: int) -> str:
-    return 'regulations.rag_chunk_embeddings' if dims == 1536 else 'app_ext.rag_chunk_vectors'
-
-
-def ensure_vectors(ids: list[str], dims: int) -> int:
-    """이 모델의 벡터가 없는 청크만 계산해 저장한다(처음 검색할 때 · 운영팀이 벡터 없이 넣은 조항의 안전망)"""
-    model = llm.embed_model()
-    table = _table(dims)
-    have = {r['rag_chunk_id'] for r in db.all_(f'SELECT rag_chunk_id FROM {table} WHERE embedding_model = :m AND rag_chunk_id = ANY(:i)', m=model, i=ids)}
-    miss = [i for i in ids if i not in have]
-    done = 0
-    for n in range(0, len(miss), 64):
-        part = miss[n:n + 64]
-        texts = [_embed_text(article(i)) for i in part]
-        vecs = llm.embed(texts)
-        with db.tx() as t:
-            for i, txt, v in zip(part, texts, vecs):
-                sha = hashlib.sha256(txt.encode('utf-8')).hexdigest()
-                if table == 'regulations.rag_chunk_embeddings':
-                    t.run("""INSERT INTO regulations.rag_chunk_embeddings(rag_chunk_id, embedding_model, dimensions, input_version, input_sha256, embedding, created_at, updated_at)
-                             VALUES(:i, :m, :d, :iv, :s, CAST(:v AS vector), now(), now()) ON CONFLICT (rag_chunk_id, embedding_model) DO NOTHING""",
-                          i=i, m=model, d=len(v), iv=INPUT_VERSION, s=sha, v=_vec(v))
-                else:
-                    t.run("""INSERT INTO app_ext.rag_chunk_vectors(rag_chunk_id, embedding_model, dimensions, embedding, input_sha256)
-                             VALUES(:i, :m, :d, CAST(:v AS vector), :s) ON CONFLICT (rag_chunk_id, embedding_model) DO NOTHING""",
-                          i=i, m=model, d=len(v), v=_vec(v), s=sha)
-        done += len(part)
-    return done
-
-
-def _embed_text(a: dict) -> str:
-    reg = data()['regs'].get(a['reg']) or {}
-    return f"「{reg.get('name', '')}」 {a['no']}({a['title']}) {a['chapter']}\n{a['text'][:EMBED_TEXT_MAX]}"
-
-
-def vector_search(query: str, k: int, group: str | None, *, all_groups: bool = False) -> list[dict]:
-    model = llm.embed_model()
-    ids = [a['id'] for a in pool(group, query, all_groups=all_groups)]
-    if not ids:
-        return []
-    qv = llm.embed([query])[0]   # 키가 없으면 여기서 LlmError (빈 결과로 넘기지 않음)
-    ensure_vectors(ids, len(qv))
-    table = _table(len(qv))
-    rows = db.all_(f"""SELECT rag_chunk_id, 1 - (embedding <=> CAST(:q AS vector)) AS score FROM {table}
-                       WHERE embedding_model = :m AND dimensions = :d AND rag_chunk_id = ANY(:i)
-                       ORDER BY embedding <=> CAST(:q AS vector) LIMIT :k""", q=_vec(qv), m=model, d=len(qv), i=ids, k=k)
-    return [{'id': r['rag_chunk_id'], 'score': round(float(r['score']), 4)} for r in rows]
-
-
 def search(query: str, k: int, group: str | None, mode: str, *, all_groups: bool = False) -> list[dict]:
-    """실제 모델 모드는 벡터(어느 모드든 같은 OpenAI 임베딩), 가데이터는 키워드"""
+    """생성 모델과 독립적인 BGE-M3 검색. 가데이터만 키워드를 사용한다."""
     if mode in ('ollama', 'openai'):
-        return vector_search(query, k, group, all_groups=all_groups)
+        # BGE 모듈은 조항 읽기 함수를 재사용하므로 호출 시점에 가져온다.
+        from . import bge_regulation_search
+        return bge_regulation_search.search(query, k, group, all_groups=all_groups)
     return keyword_search(query, k, group, all_groups=all_groups)
 
 
@@ -280,6 +232,26 @@ PARAGRAPH_RANGE = re.compile(
     r'(?:(제\s*\d+\s*조(?:\s*의\s*\d+)?)\s*)?'
     r'제\s*(\d{1,3})\s*항(?:\s*(?:부터|내지|[~～])\s*제\s*(\d{1,3})\s*항)?'
 )
+
+
+def parent_context(ids: list[str], group: str | None, query: str, *, limit: int) -> list[str]:
+    """선택된 자식과 같은 실제 조 노드의 활성 항을 보충한다. 검색 범위 밖 항은 넣지 않는다."""
+    if limit <= 0:
+        return []
+    allowed = {item['id']: item for item in pool(group, query)}
+    seen, result = set(ids), []
+    for identifier in ids:
+        child = allowed.get(identifier)
+        if not child or not child.get('parent'):
+            continue
+        siblings = [item for item in allowed.values() if item['id'] not in seen
+                    and item['reg'] == child['reg'] and item.get('parent') == child['parent']]
+        for item in sorted(siblings, key=lambda item: (item.get('order', 0), item.get('path', ''), item['id'])):
+            result.append(item['id'])
+            seen.add(item['id'])
+            if len(result) == limit:
+                return result
+    return result
 
 
 def referenced_paragraphs(ids: list[str], *, limit: int) -> list[str]:

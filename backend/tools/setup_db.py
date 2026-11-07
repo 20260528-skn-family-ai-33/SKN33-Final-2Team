@@ -1,24 +1,8 @@
-"""5차 목업 DB 준비: 팀원 전체 백업 복원 → 보조 스키마(app_ext) → 보충 자료.
-
-  python tools/setup_db.py            # 빈 Docker DB면 복원부터(백업 기본 위치 team_db/), 아니면 보충만 (여러 번 실행해도 같은 결과)
-  python tools/setup_db.py --supplement-only   # 팀원이 운영하는 DB(복사본)에 붙을 때: 복원 없이 보조 스키마·보충만 · 그 DB 팀 표에 데이터를 쓴다
-  python tools/setup_db.py --reset-team-passwords   # 로컬 시험 사본에서만: 사번 있는 직원 비밀번호를 GP5_DEMO_PASSWORD로 일괄 초기화
-
-보충 자료 (2026-10-21 사용자 결정 · 2026-10-27 팀 최신 DB 기준으로 정리):
-  - 관리자 전용 계정 1개(아이디 .env GP5_ADMIN_LOGIN · 신규 비밀번호 GP5_ADMIN_PASSWORD · 기존 계정은 변경하지 않음)
-  - 직원·부서·보유 스킬·자격·학력은 팀 DB(#22 최신 백업)의 것을 그대로 쓴다. 예전 직원 가데이터 엑셀(2.9.0)은 쓰지 않는다
-  - 복원된 직원의 비밀번호는 기본으로 보존한다. 로컬 시험 사본에서 --reset-team-passwords를 명시할 때만
-    사번 있는 직원의 비밀번호를 GP5_DEMO_PASSWORD로 맞춘다. 사번 없는 계정(REAL_USER)은 건드리지 않는다
-    (--keep-team-passwords는 기존 명령 호환용 · --supplement-only에서는 초기화 불가)
-  - 학습 자료 보조 값(형식·시간·단계·비용)을 규칙으로 채우고 '추정'으로 표시, 자격증 분야 묶음
-  - 규정 묶음(적용 직원 구분·국외근무 전용·짧은 키)
-  - 시연 모드일 때 목표 후보 첫 생성(가데이터 규칙 · 본인 입력이 없으면 기본 후보)
-"""
+"""공유 BGE DB 검증 진입점. 기존 계정·자료 보충 함수는 자동 실행하지 않는다."""
 from __future__ import annotations
 
 import argparse
 import re
-import subprocess
 import sys
 from pathlib import Path
 
@@ -29,53 +13,8 @@ from app import db  # noqa: E402
 from app.auth import hash_password, verify_password  # noqa: E402
 from app.config import S, env  # noqa: E402
 
-# 복원 대상 컨테이너 = '{compose 이름}-db-1'. 고정값이면 다른 compose 프로젝트의 DB에 복원할 수 있어 설정으로 뺐다(2026-10-26)
-COMPOSE_PROJECT = env('COMPOSE_PROJECT_NAME', 'gp5')
-# 팀 DB 백업 기본 위치(.env TEAM_DB_DUMP 가 비면): 팀원이 받은 파일을 이 폴더 team_db/ 에 넣기만 하면 되게(2026-10-23 사용자 결정)
-DUMP_DEFAULT = 'team_db/growpath_latest.dump'
-
-
 def say(msg: str) -> None:
     print('  ' + msg, flush=True)
-
-
-# ── 1. 복원 ──
-def db_is_empty() -> bool:
-    return db.val("SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'") == 0
-
-
-def dump_path() -> Path:
-    p = Path(env('TEAM_DB_DUMP', DUMP_DEFAULT))
-    return p if p.is_absolute() else (ROOT / p).resolve()
-
-
-def restore(dump: Path) -> None:
-    if not dump.is_file():
-        others = sorted(x.name for x in (ROOT / 'team_db').glob('*.dump'))
-        raise SystemExit('\n'.join([
-            f'팀 DB 백업 파일이 없어요: {dump}',
-            f'  · 팀 DB 담당 팀원에게 백업 파일({dump.name})을 받아 위 위치에 넣고 다시 실행하세요. 기본 위치는 이 폴더의 team_db/ 예요.',
-            '  · 다른 곳에 두었다면 .env 의 TEAM_DB_DUMP 에 그 위치를 적으세요.',
-            *([f"  · team_db/ 에 있는 다른 백업: {', '.join(others)} — 이 파일을 쓰려면 TEAM_DB_DUMP 를 그 이름으로 고치세요(판이 다르면 시연 자료가 안 맞을 수 있어요)."] if others else []),
-        ]))
-    user, name = env('GP5_DB_USER', 'growpath'), env('GP5_DB_NAME', 'growpath')
-    container = f'{COMPOSE_PROJECT}-db-1'
-    say(f'팀원 백업 복원: {dump.name} → {container}')
-    subprocess.run(['docker', 'cp', str(dump), f'{container}:/tmp/team.dump'], check=True)
-    subprocess.run(['docker', 'exec', container, 'pg_restore', '-U', user, '-d', name, '--no-owner', '--no-privileges', '--exit-on-error', '/tmp/team.dump'], check=True)
-    subprocess.run(['docker', 'exec', container, 'rm', '-f', '/tmp/team.dump'], check=True)
-
-
-def apply_app_ext() -> None:
-    sql = (ROOT / 'db/02_app_ext.sql').read_text(encoding='utf-8')
-    # 매개변수 없이 보내야 SQL 안의 '%'(LIKE)를 자리표시자로 읽지 않는다
-    raw = db.engine.raw_connection()
-    try:
-        raw.cursor().execute(sql)
-        raw.commit()
-    finally:
-        raw.close()
-    say('보조 스키마 app_ext 적용')
 
 
 # ── 2. 계정 ──
@@ -203,36 +142,15 @@ def goals() -> None:
     say(f'목표 후보 첫 생성(가데이터 규칙·기본 후보): {n}명')
 
 
-def main() -> None:
-    ap = argparse.ArgumentParser()
-    ap.add_argument('--supplement-only', action='store_true', help='복원 없이 보충만 실행하고 직원 비밀번호는 보존')
-    passwords = ap.add_mutually_exclusive_group()
-    passwords.add_argument('--keep-team-passwords', action='store_true', help='기존 명령 호환용: 기본 동작도 직원 비밀번호 보존')
-    passwords.add_argument('--reset-team-passwords', action='store_true', help='로컬 시험 사본의 사번 있는 직원 비밀번호를 GP5_DEMO_PASSWORD로 일괄 초기화')
-    args = ap.parse_args()
-    # 잘못된 초기화 요청은 복원·스키마 적용·관리자 생성 등 DB 쓰기 전에 거절한다.
-    if args.reset_team_passwords and args.supplement_only:
-        ap.error('--reset-team-passwords와 --supplement-only는 함께 사용할 수 없어요.')
-    if args.reset_team_passwords and not S.demo_password.strip():
-        ap.error('--reset-team-passwords에는 비어 있지 않은 GP5_DEMO_PASSWORD가 필요해요.')
-    print('GrowPath 5차 DB 준비')
-    if not args.supplement_only:
-        if db_is_empty():
-            restore(dump_path())
-        else:
-            say('DB에 이미 표가 있어 복원은 건너뜀')
-    apply_app_ext()
-    # 관리자 최초 생성은 직원의 공통 초기값과 독립적이다. 기존 관리자 계정은 그대로 둔다.
-    admin_account()
-    # .env 변경이나 설치기 재실행이 기존 계정의 비밀번호를 바꾸지 않게 한다.
-    if args.reset_team_passwords:
-        team_passwords()
-    else:
-        say('팀 직원 비밀번호: 기존 값 보존(초기화는 로컬 시험 사본에서 --reset-team-passwords를 명시)')
-    resources()
-    regulations()
-    goals()
-    print('완료')
+def main(argv: list[str] | None = None) -> None:
+    """이전 설치·자동 보충 없이 복원된 공유 BGE DB만 읽기 전용으로 검사한다."""
+    parser = argparse.ArgumentParser(
+        description='공유 BGE DB 읽기 전용 검사. 이전 보충·비밀번호 초기화 옵션은 지원하지 않습니다.',
+    )
+    parser.parse_args(argv)
+    import json
+    from tools.verify_bge_database import verify
+    print(json.dumps(verify(), ensure_ascii=False, indent=2))
 
 
 if __name__ == '__main__':

@@ -1,5 +1,11 @@
 # 외부 DB 자료와 복원 · 2026-11-04
 
+## 현재 임베딩 DB·실행 기준 (#133)
+
+앱과 DB 벡터 도구는 BGE-M3 1024차원만 사용합니다. 현재 공유 백업 복원·공식 모델 준비·검증은 [백엔드 BGE DB 안내](../backend/README.md#공유-bge-m3-db-연결-124)를 따릅니다. 모델 계약 원본은 `src/shared/bge_model.json`이며 임베딩에는 OpenAI 키가 필요하지 않습니다.
+
+이 문서 아래의 이전 백업·건수·실행 기록은 당시 이력입니다. 새 설치에 이전 백업이나 구형 임베딩 스키마를 사용하지 않습니다. `db.py migrate`는 공유 BGE 백업을 복원한 DB에서만 실행할 수 있습니다. 원본 import manifest·과거 산출물 manifest·이미 적용된 SQL은 해시 검증을 위해 보존하며 현재 임베딩 실행 설정으로 읽지 않습니다.
+
 현재 공유본은 [growpath_latest.dump](https://drive.google.com/file/d/1hqEq-TSZhkPny9uOll9H_SdM8R5FU9GT/view?usp=drivesdk)와 [growpath_latest.manifest.json](https://drive.google.com/file/d/1ryFpLp9AgVN3b4TY5CpLxmsmhp7JDnXG/view?usp=drivesdk)이다. 기존 Drive 파일 ID와 공유 위치를 유지했다. 덤프 SHA-256 `e166efe51e34883d82997f24f5c182e9bffb0229253ee2633df487eb9321f968`, 42,892,937바이트이며 업로드 후 두 파일을 다시 내려받아 원본 해시와 일치함을 확인했다.
 
 도서는 **334→849권(+515권)**, 도서 스킬 연결은 636건 추가했다. 36개 스킬 모두 연결 도서가 3권 이상이다. 신규 도서의 출처·벡터·앱 메타데이터도 포함한다. 최신 Drive 백업(교체 전 SHA-256 `218533512a098a21b95f79ce0d63a00cfacb727504976833d3266e38f0ca054b`)을 기준으로 추가했으며 기존 직원 105명·프롬프트·로드맵·기타 모든 행을 보존했다. 오래된 도서 검증 DB 전체로 공유본을 덮지 않았다.

@@ -97,15 +97,6 @@ def model_name(provider: str, role: str = 'default') -> str:
     return ''
 
 
-def embed_model() -> str:
-    """규정 검색 임베딩 모델. AI 모드와 관계없이 OpenAI 모델 하나를 쓴다(팀 합의 2026-10-26 · 팀 DB 벡터가 text-embedding-3-small)"""
-    return S.openai_embed
-
-
-def embed_ready() -> bool:
-    return bool(S.openai_key and S.openai_embed)
-
-
 def _with_images(messages: list, provider: str) -> list:
     out = []
     for m in messages:
@@ -201,14 +192,6 @@ def chat(provider: str, messages: list, role: str = 'default', json_mode: bool =
     timeout = S.openai_roadmap_timeout if role == 'roadmap' else 90
     res = openai('chat/completions', payload, timeout=timeout)
     return {'content': res['choices'][0]['message'].get('content') or '', 'model': res.get('model', model), 'provider': 'openai', 'loadMs': 0, 'totalMs': 0}
-
-
-def embed(texts: list[str]) -> list[list[float]]:
-    """RunPod-Ollama 모드에서도 OpenAI 로 임베딩한다. 키가 없으면 키워드 검색으로 몰래 바꾸지 않고 오류로 알린다(사용자 결정)"""
-    if not embed_ready():
-        raise LlmError('규정 검색 임베딩에 필요한 OpenAI 키가 없어요 (.env 의 OPENAI_API_KEY)')
-    res = openai('embeddings', {'model': S.openai_embed, 'input': texts})
-    return [d['embedding'] for d in sorted(res['data'], key=lambda d: d['index'])]
 
 
 def think_levels(name: str) -> dict | None:

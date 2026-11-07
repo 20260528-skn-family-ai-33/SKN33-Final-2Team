@@ -13,8 +13,7 @@ import hashlib
 import json
 
 from ..deployment import connect
-# Reuse the already validated OpenAI batch client and vector validator.
-from .regulation_vectors import MODEL, DIMENSIONS, embed_texts, vector_values
+from src.shared.bge_embeddings import MODEL, DIMENSIONS, embed_texts, vector_values
 
 TABLE = 'public.learning_resource_embeddings'
 INPUT_VERSION = 'db-resource-fields-and-skill-links/v1'
@@ -38,10 +37,10 @@ CREATE TABLE IF NOT EXISTS public.learning_resource_embeddings (
     resource_type TEXT NOT NULL CHECK (resource_type IN ('skills','courses','certifications','books','jobs','majors')),
     resource_id TEXT NOT NULL,
     embedding_model TEXT NOT NULL,
-    dimensions INTEGER NOT NULL CHECK (dimensions = 1536),
+    dimensions INTEGER NOT NULL CHECK (dimensions = 1024),
     input_version TEXT NOT NULL,
     input_sha256 TEXT NOT NULL CHECK (length(input_sha256) = 64),
-    embedding vector(1536) NOT NULL CHECK (vector_norm(embedding) > 0),
+    embedding vector(1024) NOT NULL CHECK (vector_norm(embedding) > 0),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     skill_id integer REFERENCES public.skill_tags(skill_id) ON DELETE CASCADE,
     course_id varchar(255) REFERENCES public.courses(course_id) ON DELETE CASCADE,
@@ -273,7 +272,7 @@ def main(argv=None):
     except Exception as exc:
         # Connection errors can include host/credentials; do not dump raw exceptions.
         print(json.dumps({'status': 'FAILED', 'error_type': type(exc).__name__,
-                          'message': str(exc) if isinstance(exc, RefreshPlanError) else 'DB 연결·원본 테이블·OPENAI_API_KEY·임베딩 한도를 확인하세요. 기존 데이터는 유지됩니다.'},
+                          'message': str(exc) if isinstance(exc, RefreshPlanError) else 'DB 연결·원본 테이블·BGE_M3_BASE_URL·임베딩 한도를 확인하세요. 기존 데이터는 유지됩니다.'},
                          ensure_ascii=False))
         raise SystemExit(1)
 

@@ -1,7 +1,7 @@
 """Behavior checks for frozen-chunk hybrid search; no paid requests."""
 import unittest
 from unittest.mock import MagicMock, patch
-from types import SimpleNamespace
+from src.shared.bge_embeddings import MODEL, PROVENANCE
 
 from src.database.ingestion.knowledge_search import rank_records, inferred_site, lexical_scores, hybrid_search_vector
 from src.database.ingestion.knowledge_documents import search
@@ -69,17 +69,16 @@ class KnowledgeSearchTests(unittest.TestCase):
         conn=MagicMock()
         for kwargs in ({'query':'','category':'사내 생활안내'}, {'query':'문의','category':'규정'},
                        {'query':'문의','category':'사내 생활안내','limit':0}):
-            with self.assertRaises(ValueError):hybrid_search_vector(conn,[1.0]+[0.0]*1535,**kwargs)
+            with self.assertRaises(ValueError):hybrid_search_vector(conn,[1.0]+[0.0]*1023,**kwargs)
         conn.execute.assert_not_called()
 
     def test_public_search_embeds_once_and_passes_question_to_hybrid(self):
         conn,client=MagicMock(),MagicMock()
-        response=SimpleNamespace(model='text-embedding-3-small',data=[SimpleNamespace(index=0,embedding=[1.0]+[0.0]*1535)])
-        client.embeddings.create.return_value=response
+        client.return_value={'model': MODEL, **PROVENANCE, 'data': [{'index': 0, 'embedding': [1.0]+[0.0]*1023}]}
         with patch('src.database.ingestion.knowledge_search.hybrid_search_vector',return_value=[{'chunk_id':'x'}]) as hybrid:
             result=search(conn,'교육원 식당 위치',category='사내 생활안내',client=client)
         self.assertEqual(result,[{'chunk_id':'x'}])
-        self.assertEqual(client.embeddings.create.call_count,1)
+        self.assertEqual(client.call_count,1)
         self.assertEqual(hybrid.call_args.kwargs['query'],'교육원 식당 위치')
 
 
