@@ -13,10 +13,13 @@ import type { AppNotification } from '@/api/types/notification';
 import { useGo } from '@/shared/hooks/useGo';
 import { failToast } from '@/shared/lib/fail';
 import { useMe } from '@/shared/state/session';
+import { toast } from '@/shared/state/ui';
+import { ws } from '@/shared/state/workspace';
 import { Icon } from '@/shared/ui/Icon';
 import { currentSignIn, markRead, notificationKey, refreshTarget, stillSignedIn } from './notificationActions';
 import { clearFloats, dismissFloat, FLOAT_MAX, holdFloats, noteInbox, resetFloats, useFloats } from './notificationFloat';
-import { notificationSub, notificationTarget, notificationTime, notificationTitle, splitNotifications, staffGroupSub, type StaffGroup } from './notificationView';
+import { useReadOnView } from './notificationReadOnView';
+import { isOtherDraft, notificationSub, notificationTarget, notificationTime, notificationTitle, splitNotifications, staffGroupSub, type StaffGroup } from './notificationView';
 
 const POLL_MS = 30_000;
 
@@ -36,6 +39,7 @@ export function NotificationBell() {
   const items = q.data?.items || [];
   const unread = q.data?.unread || 0;
   const { mine, staff } = splitNotifications(items);
+  useReadOnView(items, pathname);
   // 새로 받은 목록에 그 직원의 알림이 없어졌으면 처음 단계를 보여 준다
   const group = staffId ? staff.find((g) => g.employee.id === staffId) : undefined;
 
@@ -54,7 +58,7 @@ export function NotificationBell() {
   useEffect(() => {
     const t = currentSignIn();
     if (!data || !t || t.id !== owner) return;
-    noteInbox(`${t.id}:${t.seq}`, data.items, (n) => open || notificationTarget(n) === pathname);
+    noteInbox(`${t.id}:${t.seq}`, data.items, (n) => open || (notificationTarget(n) === pathname && !isOtherDraft(n, ws().draftId)));
   }, [data, owner, open, pathname]);
   useEffect(() => resetFloats, []);
   const floats = useFloats((s) => s.items);
@@ -127,7 +131,13 @@ export function NotificationBell() {
     } catch (err) {
       if (stillSignedIn(t)) failToast(err, '최신 기록을 불러오지 못했어요');
     }
-    if (stillSignedIn(t)) go(notificationTarget(n));
+    if (!stillSignedIn(t)) return;
+    // 작성 화면 주소는 문서마다 같다. 다른 문서의 알림으로 지금 작성 중인 문서를 열지 않는다(PR #139 리뷰)
+    if (isOtherDraft(n, ws().draftId)) {
+      toast('이 알림의 로드맵은 지금 작성 중인 로드맵이 아니에요');
+      return;
+    }
+    go(notificationTarget(n));
   };
 
   const readAll = async () => {

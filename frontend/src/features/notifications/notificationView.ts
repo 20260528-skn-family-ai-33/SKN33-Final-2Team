@@ -1,17 +1,49 @@
 /* 완료 알림(#82)의 문구·이동할 주소 — 서버는 종류·받는 쪽·대상 id 만 보내고 화면이 정한다 */
-import type { AppNotification } from '@/api/types/notification';
+import type { AppNotification, NotificationJobKind } from '@/api/types/notification';
 import { paths } from '@/app/paths';
 import { trackName } from '@/shared/constants/data';
 
-/** 누르면 갈 곳: 본인은 내 로드맵·결과 보고서, 부서장은 그 직원의 로드맵·결과 보고서 */
+/** 작업 알림을 누르면 갈 곳(결과를 보거나 다시 시도하는 화면) */
+function jobTarget(kind: NotificationJobKind | null, planId: string): string {
+  if (kind === 'materials') return paths.newMaterials;
+  if (kind === 'revision') return paths.revise(planId);
+  if (kind === 'report') return paths.post(planId);
+  return paths.newOptions;
+}
+
+/** 누르면 갈 곳: 본인은 내 로드맵·결과 보고서, 부서장은 그 직원의 로드맵·결과 보고서, 코멘트는 받은 코멘트, 작업은 그 작업의 화면 */
 export function notificationTarget(n: AppNotification): string {
+  const planId = n.planId ?? '';
+  if (n.kind === 'job') return jobTarget(n.jobKind, planId);
+  if (n.kind === 'comment') return paths.comments(planId);
   const head = n.audience === 'head';
   if (n.kind === 'report' && n.reportId) return head ? paths.memberReport(n.employee.id, n.reportId) : paths.report(n.reportId);
-  return head ? paths.memberPlan(n.employee.id, n.planId) : paths.roadmap(n.planId);
+  return head ? paths.memberPlan(n.employee.id, planId) : paths.roadmap(planId);
 }
+
+/** 로드맵 확정 전 작업의 알림이 지금 작성 중인 문서가 아닌 다른 문서의 것인지. 작성 화면 주소는 문서마다 같아 주소만으로는 구분되지 않는다(PR #139 리뷰) */
+export function isOtherDraft(n: AppNotification, currentDraftId: string | null): boolean {
+  return n.kind === 'job' && !n.planId && n.draftId !== currentDraftId;
+}
+
+/** 지금 보고 있는 화면을 가리키는 읽지 않은 알림(#96). 이미 본 일이 알림 창에 쌓이지 않게 읽음으로 바꾼다.
+ *  부서장 알림은 기록이 실제로 화면에 보일 때 useMarkSeen 이 처리하므로 뺀다 */
+export function viewedNow(items: AppNotification[], pathname: string, currentDraftId: string | null): AppNotification[] {
+  return items.filter((n) => !n.read && n.audience !== 'head' && notificationTarget(n) === pathname && !isOtherDraft(n, currentDraftId));
+}
+
+const JOB_TITLE: Record<NotificationJobKind, { done: string; failed: string }> = {
+  options: { done: '로드맵 3안 작성이 끝났어요', failed: '로드맵 3안 중 만들지 못한 안이 있어요' },
+  regenerate: { done: '다시 만든 안이 준비됐어요', failed: '안을 다시 만들지 못했어요' },
+  materials: { done: '학습 자료 추천이 끝났어요', failed: '학습 자료를 추천하지 못했어요' },
+  revision: { done: '수정안 작성이 끝났어요', failed: '수정안을 만들지 못했어요' },
+  report: { done: '결과 보고서 작성이 끝났어요', failed: '결과 보고서를 작성하지 못했어요' },
+};
 
 /** bare: 직원별 묶음 안처럼 직원 이름이 위에 이미 보이면 이름을 뺀다(#96) */
 export function notificationTitle(n: AppNotification, bare = false): string {
+  if (n.kind === 'job') return n.jobKind ? JOB_TITLE[n.jobKind][n.jobStatus === 'failed' ? 'failed' : 'done'] : '작업이 끝났어요';
+  if (n.kind === 'comment') return `${n.employee.name} 님이 로드맵에 코멘트를 보냈어요`;
   if (n.audience === 'head' && !bare)
     return n.kind === 'report' ? `${n.employee.name} 님의 결과 보고서 작성이 끝났어요` : `${n.employee.name} 님이 새 로드맵 작성을 마쳤어요`;
   return n.kind === 'report' ? '결과 보고서 작성이 끝났어요' : '새 로드맵 작성을 마쳤어요';

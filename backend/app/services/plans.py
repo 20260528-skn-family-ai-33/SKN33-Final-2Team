@@ -573,6 +573,7 @@ def send_comment(head_id: int, member_id: int, roadmap_id: str, body: dict) -> s
                         b=_comment_body(f['fit'], f['fitText'], f['level'], f['levelText'], f['free'])))
         t.run("""INSERT INTO app_ext.comment_meta(comment_id, fit, fit_text, level, level_text, free_text, status) VALUES(CAST(:c AS uuid), :f, :ft, :l, :lt, :fr, 'new')""",
               c=cid, f=f['fit'], ft=f['fitText'], l=f['level'], lt=f['levelText'], fr=f['free'])
+        NT.comment_sent(t, head_id, member_id, str(row['roadmap_id']), cid)  # 새 코멘트 알림(#96). 고칠 때는 보내지 않는다
     return cid
 
 

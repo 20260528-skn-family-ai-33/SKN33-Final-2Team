@@ -5,13 +5,15 @@
       없을 때만 받는다. 보고서 알림은 그 로드맵의 보고서 목록만 받아 바꾼다 */
 import type { QueryClient } from '@tanstack/react-query';
 import { notificationsApi } from '@/api/endpoints/notifications';
-import type { AppNotification, NotificationInbox, NotificationKind } from '@/api/types/notification';
+import type { AppNotification, NotificationInbox, NotificationTargetKind } from '@/api/types/notification';
+import type { PlanRecord } from '@/api/types/plan';
 import { plansApi } from '@/api/endpoints/plans';
+import { pullDraftOrThrow } from '@/features/draft/draftSync';
 import { memberKey, memberKeyAll, teamKey } from '@/features/team/teamData';
 import { mergeReg, mergeRes } from '@/shared/state/catalog';
 import { me, signInSeq } from '@/shared/state/session';
-import { putRec, updateWs, ws } from '@/shared/state/workspace';
-import { mergeReports } from './notificationView';
+import { putRec, updateWs, ws, type WsState } from '@/shared/state/workspace';
+import { isOtherDraft, mergeReports } from './notificationView';
 
 /** 알림 캐시 키: 로그인한 직원마다 따로(로그아웃 뒤 다른 직원이 이전 직원 알림을 보지 않게) */
 export const notificationKey = (owner: string) => ['notifications', owner] as const;
@@ -50,7 +52,7 @@ export async function markRead(qc: QueryClient, t: SignIn, id?: string): Promise
 /** 그 로드맵·보고서의 내 알림을 모두 읽음으로(#96). 같은 로그인이면 바뀐 목록을 그 직원 캐시에 넣고 true.
  *  실제로 읽음이 된 알림이 있으면 소속 직원 목록·직원 기록 캐시도 무효화한다. 읽음 응답보다 먼저 끝난 목록 조회가
  *  '새 로드맵·보고서' 표시와 우선 정렬을 옛 값으로 남기지 않게(PR #107 리뷰). 보고 있는 화면의 캐시는 바로 다시 받는다 */
-export async function markTargetRead(qc: QueryClient, t: SignIn, kind: NotificationKind, id: string): Promise<boolean> {
+export async function markTargetRead(qc: QueryClient, t: SignIn, kind: NotificationTargetKind, id: string): Promise<boolean> {
   const res = await notificationsApi.readTarget(kind, id);
   if (!stillSignedIn(t)) return false;
   qc.setQueryData<NotificationInbox>(notificationKey(t.id), { items: res.items, unread: res.unread });
@@ -58,20 +60,40 @@ export async function markTargetRead(qc: QueryClient, t: SignIn, kind: Notificat
   return true;
 }
 
+/** 받아 온 로드맵을 작업 공간에 넣는다. 없는 로드맵은 그대로 넣고(받는 사이 다른 곳에서 넣었으면 그것을 둔다),
+ *  이미 있으면 그 알림이 바꾼 부분만 고친다: 저장 전 사후 점검 입력(post)을 덮지 않게(#96) */
+function takeNotified(s: WsState, n: AppNotification, fresh: PlanRecord): void {
+  const old = s.plans[fresh.id];
+  if (!old) {
+    putRec(s, fresh);
+    return;
+  }
+  if (n.kind === 'comment' || n.jobKind === 'revision') putRec(s, { ...fresh, post: old.post });
+  else if (n.jobKind === 'report') old.post = { ...old.post, running: fresh.post.running, fail: fresh.post.fail, jobId: fresh.post.jobId };
+}
+
 /** 알림 대상의 최신 기록을 받는다.
  *  부서장: 그 직원 기록 캐시를 화면에 쓰지 않는 중이어도 새로 받는다(캐시에 남은 옛 기록으로 '보고서 없음 → 목록으로' 되지 않게).
  *    부르는 쪽은 기다리지 않고 바로 이동한다. 이동한 화면은 받는 동안 '불러오는 중'을 보여 준다(TeamPages).
- *  본인: 작업 공간에 없는 로드맵만 받아 넣는다(있는 로드맵을 서버 값으로 덮으면 저장 전 입력이 사라진다).
+ *  로드맵 확정 전 작업: 작성 중인 로드맵을 서버에서 다시 읽는다.
+ *  본인·직원: 작업 공간에 없는 로드맵만 받아 넣는다(있는 로드맵을 서버 값으로 덮으면 저장 전 입력이 사라진다).
+ *    코멘트·작업 알림은 그 내용이 작업 공간에 아직 없으므로 있는 로드맵도 받아 바뀐 부분만 고친다.
  *    보고서 알림이면 그 로드맵의 보고서 목록만 바꾼다. 로그인이 바뀌었으면 넣지 않는다. 부르는 쪽은 기다린 뒤 이동한다 */
 export async function refreshTarget(qc: QueryClient, t: SignIn, n: AppNotification): Promise<void> {
   if (n.audience === 'head') {
     await qc.invalidateQueries({ queryKey: memberKey(n.employee.id), refetchType: 'all' });
     return;
   }
-  const loaded = !!ws().plans[n.planId];
+  const planId = n.planId;
+  if (!planId) {
+    // 다른 문서의 알림이면 지금 작성 중인 문서를 다시 읽을 이유가 없다
+    if (!isOtherDraft(n, ws().draftId)) await pullDraftOrThrow();
+    return;
+  }
+  const stale = n.kind === 'comment' || n.kind === 'job';
   const [plan, reports] = await Promise.all([
-    loaded ? Promise.resolve(null) : plansApi.get(n.planId),
-    n.kind === 'report' ? plansApi.reports(n.planId) : Promise.resolve(null),
+    ws().plans[planId] && !stale ? Promise.resolve(null) : plansApi.get(planId),
+    n.kind === 'report' ? plansApi.reports(planId) : Promise.resolve(null),
   ]);
   if (!stillSignedIn(t) || ws().owner !== t.id) return;
   if (plan) {
@@ -79,8 +101,15 @@ export async function refreshTarget(qc: QueryClient, t: SignIn, n: AppNotificati
     mergeReg(plan.reg);
   }
   updateWs((s) => {
-    // 받는 사이 다른 곳에서 그 로드맵을 넣었으면 그것을 둔다
-    if (plan && !s.plans[n.planId]) putRec(s, plan.plan);
-    if (reports) s.reports = mergeReports(s.reports, n.planId, reports);
+    if (plan) takeNotified(s, n, plan.plan);
+    if (reports) s.reports = mergeReports(s.reports, planId, reports);
   });
+}
+
+/** 보고 있는 화면의 알림을 처리한다: 최신 내용을 받은 뒤, 같은 로그인이 같은 화면에 있을 때만 읽음으로 바꾼다.
+ *  받기가 실패하면 예외를 그대로 던져 알림을 남긴다(새 내용을 못 본 채 읽음이 되지 않게 · PR #139 리뷰) */
+export async function readViewed(qc: QueryClient, t: SignIn, n: AppNotification, stillHere: () => boolean): Promise<boolean> {
+  await refreshTarget(qc, t, n);
+  if (!stillSignedIn(t) || !stillHere()) return false;
+  return markRead(qc, t, n.id);
 }

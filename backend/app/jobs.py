@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 from contextlib import nullcontext
+import logging
 import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor
@@ -16,6 +17,7 @@ from typing import Any, Callable
 from . import db
 from .errors import AgentError, ApiError, cause
 
+logger = logging.getLogger(__name__)
 POOL = ThreadPoolExecutor(max_workers=8, thread_name_prefix='gp5-job')
 WAIT_MAX_S = 15
 
@@ -30,6 +32,15 @@ class JobCtx:
 
     def cancelled(self) -> bool:
         return db.val('SELECT status FROM app_ext.jobs WHERE job_id = :j', j=self.job_id) == 'cancelled'
+
+
+def _notify_finished(kind: str, employee_id: int, ref: str, status: str, resume: dict | None, job_id: str) -> None:
+    """끝난 작업의 알림(#96). 작업 결과는 이미 저장됐으므로 알림을 못 넣어도 작업을 실패로 바꾸지 않고 기록만 남긴다"""
+    from .services import notifications
+    try:
+        notifications.job_finished(kind, employee_id, ref, status, resume)
+    except Exception:  # noqa: BLE001 - 위 설명
+        logger.exception('작업 완료 알림 저장 실패: job=%s kind=%s', job_id, kind)
 
 
 def start(kind: str, employee_id: int | None, ref: str, fn: Callable[[JobCtx], Any], progress: dict | None = None,
@@ -68,8 +79,11 @@ def start(kind: str, employee_id: int | None, ref: str, fn: Callable[[JobCtx], A
             traceback.print_exc()
             status, error = 'failed', cause(f'서버 오류: {e}')
         with db.tx() as t:
-            t.run("UPDATE app_ext.jobs SET status = :s, result = :r, error = :e, updated_at = now() WHERE job_id = :j AND status = 'running'",
-                  s=status, r=db.J(result), e=db.J(error), j=jid)
+            changed = t.run("UPDATE app_ext.jobs SET status = :s, result = :r, error = :e, updated_at = now() WHERE job_id = :j AND status = 'running'",
+                            s=status, r=db.J(result), e=db.J(error), j=jid)
+        # 사용자가 멈춘 작업(취소·stopped)은 알리지 않는다
+        if changed and employee_id is not None and not (error or {}).get('stopped'):
+            _notify_finished(kind, employee_id, ref, status, descriptor if isinstance(descriptor, dict) else None, jid)
 
     def work() -> None:
         try:
