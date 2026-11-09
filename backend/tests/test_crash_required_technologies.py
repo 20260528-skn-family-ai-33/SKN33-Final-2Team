@@ -124,8 +124,10 @@ class CrashRequiredTechnologiesTests(unittest.TestCase):
         inp['request'] = 'Django 사용 필수'
         inp['plan']['def']['learningSkills'] = [target()]
         before = deepcopy(inp)
-        with self.assertRaisesRegex(llm.LlmError, '(?i)django'):
+        with self.assertRaises(ApiError) as caught:
             helper.revise_input(inp, [target('Django')])
+        self.assertEqual((caught.exception.status, caught.exception.code), (422, 'CRASH_CORE_REQUIREMENT_CONFLICT'))
+        self.assertIn('django', caught.exception.extra['cause'].casefold())
         self.assertEqual(inp, before)
 
     def test_revision_constraints_from_user_notes_cannot_bypass_validation(self):

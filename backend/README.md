@@ -540,8 +540,8 @@ Crash 생성·재생성·확정 계획 수정과 구형 계획의 학습 기준 
 
 `Django 사용 필수`, `장고를 반드시 사용`, `must use Django`, `필수 기술: Docker, PostgreSQL`처럼 명시적인 의무 표현을 인식한다. 해당 기술은 적어도 한 스킬의 `coreOutcome` 또는 `coreCriteria`에 남아야 하며 application·followUpScope에만 있거나 비교·제외·후속 학습으로만 나타나면 실패한다. 오류는 누락 기술을 알려 주고 기존 계획은 보존한다. 서버가 기술명을 임의로 핵심 기준에 끼워 넣거나 자동 재호출하지 않는다. 가데이터 경로도 같은 검증을 적용하므로 요구를 충족하지 못하는 고정 예시는 실패할 수 있다.
 
-`FastAPI 구현 후 Django 비교`처럼 의무로 명시하지 않은 비교는 Django를 필수로 만들지 않는다. 핵심에서 Django 구현을 보장하면서 ORM 심화를 후속으로 남기는 것은 허용한다. 유효한 핵심만 기존 자료 검색·적합성 판정으로 전달하며, 전체 목표나 후속 학습을 검색 조건에 다시 합치지 않는다. 같은 코스 수정은 저장된 핵심 기준을 유지하므로 새 필수 기술이 기존 기준에 없으면 해당 수정은 실패한다. 기존 계획을 읽는 것만으로 재생성하거나 저장 값을 변경하지 않는다.
+`Django 또는 FastAPI 필수`는 두 기술 중 하나를 사용하면 충족한다. `Django와 FastAPI 필수`는 두 기술을 모두 사용해야 한다. `FastAPI 대신 Django로 구현`은 Django 구현을 요구하고, 강좌의 목차·소개에서도 Django 학습 근거를 확인한다. `Django 소개 영상 시청`이나 `Django 문서 참고`만으로는 구현 근거가 부족하다.
 
-`Django 5.2 사용 필수`는 Django를 요구한다. 버전 자체의 일치 여부는 검사하지 않는다. `FastAPI 대신 Django로 구현`은 Django를 충족하고 FastAPI를 충족하지 않는다. 목표·요구사항·수정 요청에서 검사하는 텍스트가 합계 65,536자를 넘으면 뒷부분을 버리지 않고 모델 호출 전에 오류를 반환한다.
+`Django 5.2 사용 필수`에서 검증하는 대상은 Django 사용 여부다. 구형 생성 경로에서도 모델이 반환한 학습 스킬과 핵심 기준을 검증해 보관한다. 이미 확정한 Crash의 시간·활동만 수정할 때는 저장 당시 기준을 유지한다. 수정 요청에서 새로 요구하거나 명시적으로 다시 요구한 기술이 고정된 핵심에 없으면 모델 호출 전에 누락 기술과 조치를 안내한다. 다른 코스에서 Crash로 전환하면 현재 요구 전체를 검사한다.
 
-검증 규칙은 `app/services/crash_requirements.py`에 모았다. 영문 기술명·등록한 한글 별칭·명시적 의무 구문을 대상으로 하는 규칙 기반 검사이며, 모든 자연어 표현이나 임의의 다중 단어 기술명을 이해하는 의미 평가가 아니다. 한글 별칭·부정문·Java/JavaScript 경계·필수 목록·코스 전환·선택적 비교와 검색 전달은 `tests/test_crash_requirement_parser.py`, `tests/test_crash_required_technologies.py`로 검사한다. 전체 검사는 `backend/`에서 `python -m unittest discover -s tests -q`로 실행한다. 실제 모델 생성 품질 확인은 모의 응답 검사와 별도로 수행해야 한다.
+현재 요구사항은 `app/services/crash_requirements.py`가 읽고, 기술의 실제 적용 근거는 `app/services/technology_mentions.py`가 판정한다. 직접 입력이 합계 65,536자를 넘으면 초안·재생성·수정안에 해당 오류 코드와 조치를 기록한다. 명시적 의무 표현과 알려진 별칭을 사용하는 규칙 기반 검사다. 전체 백엔드 검사는 `backend/`에서 `python -m unittest discover -s tests -q`로 실행한다.

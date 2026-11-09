@@ -7,6 +7,7 @@ import unicodedata
 from app import catalog_candidates as evidence
 from app.english_patterns import english_token as _en
 from app.services.course_skills import crash_core_fields
+from app.services.technology_mentions import applied_technologies, technology_pattern
 
 
 _generic = {'기초', '실무', '활용', '학습', '이해', '환경', '프로그래밍', '아키텍처', '컴퓨팅',
@@ -156,6 +157,20 @@ def _target_texts(skill: dict, core: dict) -> list[str]:
             + [str(value) for value in skill.get('completionCriteria') or []])
 
 
+def _core_stack_names(texts: list[str]) -> set[str]:
+    """Crash 요구와 자료의 적용 기술을 같은 경계·문맥 규칙으로 읽는다."""
+    found = set()
+    for text in texts:
+        text = normalize(text).casefold()
+        patterns = {}
+        for name in _stack_names(text):
+            # 정규식 별칭(Spring Boot·Express.js 등)은 유지하고 단어 경계는 생성 검증과 맞춘다.
+            variants = tuple(sorted({match[0] for match in _stack_patterns[name].finditer(text)}))
+            patterns[name] = technology_pattern(variants[0], variants[1:])
+        found.update(applied_technologies([text], patterns))
+    return found
+
+
 def _skill_context(skill: dict) -> str:
     return normalize(' '.join(_target_texts(skill, crash_core_scope(skill)))).casefold()
 
@@ -236,8 +251,9 @@ def _stack_evidence(text: str, applied: list[str], project: dict, skill: dict, s
     core = crash_core_scope(skill)
     local = normalize(' '.join(_target_texts(skill, core))).casefold()
     context = local if core else normalize(project.get('goal')) + ' ' + local
-    requested = _stack_names(context)
-    actual = _stack_names(text)
+    requested = _core_stack_names(_target_texts(skill, core)) if core else _stack_names(context)
+    # Crash는 요구 단계의 긍정적 학습 근거만 기술 충족과 런타임 충돌에 사용한다.
+    actual = _core_stack_names(applied) if core else _stack_names(text)
     name = normalize(skill['name'])
     web_skill = bool(re.search(r'웹\s*프레임워크|RESTful|API|백엔드', name, re.I))
     programming = bool(re.search(r'Python|파이썬|프로그래밍', name, re.I))
@@ -257,7 +273,7 @@ def _stack_evidence(text: str, applied: list[str], project: dict, skill: dict, s
             required |= requested & {'aws', 'azure', 'gcp'}
         if re.search(r'pytorch|tensorflow|파이토치|텐서플로', name, re.I):
             required |= _stack_names(local) & {'pytorch', 'tensorflow'}
-    taught = set().union(*(_stack_names(value) for value in applied))
+    taught = actual if core else set().union(*(_stack_names(value) for value in applied))
     missing = required - taught
     conflicts = set()
     # RAG 구현은 다른 언어의 개념을 전이할 수 있으나 전용 구현을 동일한 실습으로 세지 않는다.
@@ -360,15 +376,15 @@ def _profile(skill: dict, project: dict, rows: list, descriptions: list[str], te
         build_stacks, security_stacks = set(), set()
         for target in _target_texts(skill, core):
             if _security.search(target):
-                security_stacks.update(_stack_names(target))
+                security_stacks.update(_core_stack_names([target]))
             elif target == core['coreOutcome'] or _build.search(target):
-                build_stacks.update(_stack_names(target))
+                build_stacks.update(_core_stack_names([target]))
         separate_stacks = set(missing) & (build_stacks - security_stacks)
         if separate_stacks:
             build_units, build_claims = applied_evidence('build')
             practice = [value for _, value in build_units] + build_claims
-            taught = set().union(*(_stack_names(value) for value in practice
-                                   if not _concept.search(value) or _practice.search(value)))
+            taught = _core_stack_names([value for value in practice
+                                        if not _concept.search(value) or _practice.search(value)])
             missing = sorted(set(missing) - (separate_stacks & taught))
     conceptual = [value for value in learning if _concept.search(value) or _design.search(value)
                   or _foundations.search(value) or _security.search(value)

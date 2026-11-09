@@ -793,11 +793,11 @@ def _run_option(employee_id: int, draft_id: str, pid: str, *, expected_key: str 
         h, key, tries = info['h'], info['key'], info['tries']
         ctx = rt.context(employee_id)
         sim = rt.SIM_ERR['openai' if ctx.provider == 'openai' else 'ollama'][pid] if ctx.fail_sim.get('gen') and pid in ('A2', 'A3') and tries == 1 else None
-        out, err = None, None
+        out, failure = None, None
         try:
             out = RM.option(ctx, {'pid': pid, 'handoff': h}, sim=sim)
-        except AgentError as e:
-            err = e.info
+        except (AgentError, ApiError) as error:
+            failure = error
 
         def save(t, w2):
             r = w2['draft'].get('genRun')
@@ -806,7 +806,7 @@ def _run_option(employee_id: int, draft_id: str, pid: str, *, expected_key: str 
             row = r['rows'][pid]
             if row.get('jobId') != job.job_id or row.get('tries') != tries:
                 return
-            row.update(st='ok' if out else 'fail', out=out, err=err, jobId=None)
+            row.update(st='ok' if out else 'fail', out=out, err=jobs.error_info(failure) if failure else None, jobId=None)
             rows = [r['rows'][x] for x in D['optionOrder']]
             d2 = w2['draft']
             current = d2.get('gen')
@@ -820,8 +820,8 @@ def _run_option(employee_id: int, draft_id: str, pid: str, *, expected_key: str 
             from app.services.material_preparation import prepare as prepare_materials
             prepare_materials(employee_id,draft_id)
         _maybe_support(employee_id, draft_id)
-        if err:
-            raise AgentError(err['raw'] or err['text'])
+        if failure:
+            raise failure
         return {'pid': pid}
     try:
         work._resume = {'operation':'drafts.option_retry','kwargs':{'employee_id':employee_id,'draft_id':draft_id,'pid':pid},'inputKey':expected_key}
@@ -982,12 +982,13 @@ def regenerate(employee_id: int, draft_id: str, pid: str, req: dict | None) -> d
             o = RM.option(ctx, {'pid': pid, 'handoff': info['handoff'], 'variant': info['variant'], 'request': req, 'previousDef': prev,
                                 'previous': {'tagline': prev['tagline'], 'acts': [dict({'key': a['id'], 'stage': a['stage'], 'title': a['title'], 'res': a.get('res'), 'hours': a.get('hours')},
                                                                                        **({} if a.get('res') else {'skills': a.get('skills') or []})) for a in prev['acts']]}})
-        except AgentError as e:
+        except (AgentError, ApiError) as error:
+            err = jobs.error_info(error)
             def fail(t, w):
                 g = w['draft'].get('gen')
                 if g and g['key'] == info['key']:
                     (g.get('regenRun') or {}).pop(pid, None)
-                    g.setdefault('regenErr', {})[pid] = e.info
+                    g.setdefault('regenErr', {})[pid] = err
             _mutate(employee_id, draft_id, fail)
             raise
         req_text = ' · '.join(x for x in [req.get('wish') if req else '', ', '.join((req or {}).get('quick') or []),
