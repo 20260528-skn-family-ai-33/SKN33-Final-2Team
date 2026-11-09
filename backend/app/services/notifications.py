@@ -145,8 +145,10 @@ def job_finished(kind: str, employee_id: int, ref: str | None, status: str, resu
         return
     with db.tx() as t:
         t.val('SELECT pg_advisory_xact_lock(hashtext(:k))', k=f'notification:{employee_id}:{group}:{draft_id or roadmap_id}')
-        # 확정 뒤에 끝난 작업(남아 있던 자료 준비 등)은 볼 화면이 없다. 문서가 지워졌어도 알리지 않는다(PR #139 리뷰)
-        if draft_id and t.val('SELECT status FROM public.projects WHERE project_id = CAST(:d AS uuid)', d=draft_id) != 'DRAFTING':
+        # 확정 뒤에 끝난 작업(남아 있던 자료 준비 등)은 볼 화면이 없다. 문서가 지워졌어도 알리지 않는다(PR #139 리뷰).
+        # FOR SHARE: 진행 중인 확정(drafts.confirm 의 FOR UPDATE)이 끝나기를 기다렸다가 확정된 상태를 읽는다. 잠금 없이 읽으면
+        # 커밋 전의 DRAFTING 을 보고 알림을 넣어, 확정이 정리(draft_confirmed)한 뒤에 읽지 않은 알림이 다시 남는다
+        if draft_id and t.val('SELECT status FROM public.projects WHERE project_id = CAST(:d AS uuid) FOR SHARE', d=draft_id) != 'DRAFTING':
             return
         result = _group_status(t, employee_id, kind, status, draft_id, resume)
         if result is None:

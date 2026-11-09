@@ -262,6 +262,7 @@ class JobFinishedTests(unittest.TestCase):
             t, _ = self.finish('option', f'{DID}:A1', 'done', ['done'], draft_status=draft_status)
             self.assertEqual(self.inserted(t), [])
             self.assertIn('public.projects', t.val.call_args.args[0])
+            self.assertIn('FOR SHARE', t.val.call_args.args[0])  # 진행 중인 확정과 순서를 맞춘다(PR #139 리뷰)
         # 로드맵에 매인 작업은 작성 문서를 보지 않는다
         t, _ = self.finish('revision', RID, 'done', draft_status='IN_PROGRESS')
         self.assertEqual(len(self.inserted(t)), 1)

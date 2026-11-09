@@ -165,8 +165,8 @@ function readDependency(st: WsState) {
     st.draft.chosen ? st.draft.gen?.options[st.draft.chosen]?.learningSkillsKey : null]);
 }
 
-/** 서버 상태를 다시 읽는다(진행 중인 작업 확인용). 바뀌었으면 true */
-export async function pullDraft(): Promise<boolean> {
+/** 서버 상태를 다시 읽는다. 바뀌었으면 true. 문서가 없어졌으면(404) 비우고, 그 밖의 조회 실패는 예외로 던진다(내용을 받았는지 알아야 하는 쪽을 위해) */
+export async function pullDraftOrThrow(): Promise<boolean> {
   const st = ws();
   if (!st.draftId) return false;
   const before = JSON.stringify([st.draft, st.draftPlan]);
@@ -176,15 +176,24 @@ export async function pullDraft(): Promise<boolean> {
     if (ws().owner !== st.owner || readDependency(ws()) !== dependency) return false;
     takeDraft(response, true);
   } catch (err) {
-    if (err instanceof ApiError && err.status === 404)
-      updateWs((s) => {
-        s.draftId = null;
-        s.draft = freshDraft();
-      });
+    if (!(err instanceof ApiError && err.status === 404)) throw err;
+    updateWs((s) => {
+      s.draftId = null;
+      s.draft = freshDraft();
+    });
     return true;
   }
   const after = ws();
   return JSON.stringify([after.draft, after.draftPlan]) !== before;
+}
+
+/** 진행 중인 작업 확인용으로 서버 상태를 다시 읽는다. 조회 실패는 다음 확인에 맡기고 넘어간다 */
+export async function pullDraft(): Promise<boolean> {
+  try {
+    return await pullDraftOrThrow();
+  } catch {
+    return true;
+  }
 }
 
 /** 작성 중인 로드맵 서버 호출: 입력을 먼저 저장하고(작성 시작 포함) 부른 뒤, 응답(작성 문서)을 상태에 넣는다 */

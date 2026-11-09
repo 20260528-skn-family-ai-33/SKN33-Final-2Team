@@ -8,7 +8,7 @@ import { notificationsApi } from '@/api/endpoints/notifications';
 import type { AppNotification, NotificationInbox, NotificationTargetKind } from '@/api/types/notification';
 import type { PlanRecord } from '@/api/types/plan';
 import { plansApi } from '@/api/endpoints/plans';
-import { pullDraft } from '@/features/draft/draftSync';
+import { pullDraftOrThrow } from '@/features/draft/draftSync';
 import { taskKey } from '@/features/report/taskData';
 import { memberKey, memberKeyAll, teamKey } from '@/features/team/teamData';
 import { mergeReg, mergeRes } from '@/shared/state/catalog';
@@ -89,7 +89,7 @@ export async function refreshTarget(qc: QueryClient, t: SignIn, n: AppNotificati
   const planId = n.planId;
   if (!planId) {
     // 다른 문서의 알림이면 지금 작성 중인 문서를 다시 읽을 이유가 없다
-    if (!isOtherDraft(n, ws().draftId)) await pullDraft();
+    if (!isOtherDraft(n, ws().draftId)) await pullDraftOrThrow();
     return;
   }
   const stale = n.kind === 'comment' || n.kind === 'job';
