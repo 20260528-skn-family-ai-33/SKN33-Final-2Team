@@ -12,9 +12,11 @@ import sys
 
 from ..deployment import connect
 
-from src.shared.bge_embeddings import MODEL, DIMENSIONS, embed_texts, vector_values
+from src.shared.bge_embeddings import MODEL, DIMENSIONS, PROVENANCE, embed_texts, vector_values
 TABLE = 'regulations.rag_chunk_embeddings'
+META_TABLE = 'growpath_bge_meta.inputs'
 INPUT_VERSION = 'context_path+blank_line+chunk_text/v1'
+PROTOCOL = 'bge-m3/cls-l2-fp16/v1'
 DDL = '''
 SET LOCAL search_path TO public, extensions;
 CREATE TABLE IF NOT EXISTS regulations.rag_chunk_embeddings (
@@ -110,17 +112,34 @@ def sources(conn):
     return conn.execute(SOURCE_SQL).fetchall()
 
 
+def require_meta_table(conn):
+    if not conn.execute('SELECT to_regclass(%s) AS id', (META_TABLE,)).fetchone()['id']:
+        raise ValueError('Restore the shared BGE-M3 database with growpath_bge_meta.inputs first.')
+
+
 def stored(conn):
+    require_meta_table(conn)
     if not table_exists(conn):
         return {}
     return {r['rag_chunk_id']:r for r in conn.execute(
-        f'SELECT rag_chunk_id,input_sha256,input_version FROM {TABLE} WHERE embedding_model=%s',
+        f'''SELECT e.rag_chunk_id,e.input_sha256,e.input_version,e.dimensions,
+                   p.source_sha256 AS meta_sha256,p.actual_input_sha256,p.model_revision,
+                   p.protocol,p.token_count
+            FROM {TABLE} e
+            LEFT JOIN {META_TABLE} p ON p.kind='regulations' AND p.source_id=e.rag_chunk_id
+            WHERE e.embedding_model=%s''',
         (MODEL,)).fetchall()}
 
 
 def needs_embedding(row, previous):
     old = previous.get(row['rag_chunk_id'])
-    return not old or old['input_version']!=INPUT_VERSION or old['input_sha256']!=input_hash(row)
+    sha = input_hash(row)
+    return (not old or old['input_version'] != INPUT_VERSION or old['input_sha256'] != sha
+            or old.get('dimensions') != DIMENSIONS or old.get('meta_sha256') != sha
+            or old.get('actual_input_sha256') != sha
+            or old.get('model_revision') != PROVENANCE['model_revision']
+            or old.get('protocol') != PROTOCOL
+            or not 1 <= (old.get('token_count') or 0) <= 8192)
 
 
 def status(conn):
@@ -134,6 +153,7 @@ def status(conn):
 
 
 def store_rows(conn, entries):
+    require_meta_table(conn)
     for entry in entries:
         current = conn.execute('''SELECT rag_chunk_id,chunk_text,context_path
             FROM regulations.rag_chunks WHERE rag_chunk_id=%s FOR SHARE''',
@@ -148,6 +168,15 @@ def store_rows(conn, entries):
               dimensions=EXCLUDED.dimensions,input_version=EXCLUDED.input_version,
               input_sha256=EXCLUDED.input_sha256,embedding=EXCLUDED.embedding,updated_at=now()''',
             (entry['rag_chunk_id'],MODEL,DIMENSIONS,INPUT_VERSION,entry['input_sha256'],vector))
+        conn.execute(f'''INSERT INTO {META_TABLE}
+            (kind,source_id,source_sha256,actual_input_sha256,protocol,model_revision,token_count)
+            VALUES ('regulations',%s,%s,%s,%s,%s,%s)
+            ON CONFLICT (kind,source_id) DO UPDATE SET
+              source_sha256=EXCLUDED.source_sha256,actual_input_sha256=EXCLUDED.actual_input_sha256,
+              protocol=EXCLUDED.protocol,model_revision=EXCLUDED.model_revision,
+              token_count=EXCLUDED.token_count,created_at=now()''',
+            (entry['rag_chunk_id'],entry['input_sha256'],entry['input_sha256'],PROTOCOL,
+             PROVENANCE['model_revision'],max(1,min(len(input_text(current).split()),8192))))
 
 
 def embed(conn, batch_size=16):
@@ -208,12 +237,13 @@ def export_vectors(conn,output):
         WHERE e.embedding_model=%s AND e.input_version=%s AND e.input_sha256={HASH_SQL}
           AND c.search_status NOT IN ('superseded', 'not_for_answer')
         ORDER BY e.rag_chunk_id''',(MODEL,INPUT_VERSION)).fetchall()
-    if len(rows)!=len(sources(conn)):
-        raise ValueError('Some regulation vectors are missing/stale; finish embed before export.')
+    source_rows, previous = sources(conn), stored(conn)
+    if len(rows)!=len(source_rows) or any(needs_embedding(row,previous) for row in source_rows):
+        raise ValueError('Some regulation vectors or metadata are missing/stale; finish embed before export.')
     for row in rows:
         row['embedding'] = vector_values(row['embedding'])
-    payload = {'format_version':1,'kind':'regulation_vectors','model':MODEL,'dimensions':DIMENSIONS,
-               'input_version':INPUT_VERSION,'rows':rows}
+    payload = {'format_version':2,'kind':'regulation_vectors','model':MODEL,'dimensions':DIMENSIONS,
+               'input_version':INPUT_VERSION,'provenance':PROVENANCE,'rows':rows}
     data = json.dumps(payload,ensure_ascii=False,sort_keys=True,allow_nan=False)
     wrapper = {'sha256':hashlib.sha256(data.encode('utf-8')).hexdigest(),'payload':data}
     output.parent.mkdir(parents=True,exist_ok=True)
@@ -228,8 +258,10 @@ def import_vectors(conn,path):
     if hashlib.sha256(data.encode('utf-8')).hexdigest()!=wrapper['sha256']:
         raise ValueError('Regulation vector export checksum mismatch')
     payload = json.loads(data)
+    if payload.get('format_version') != 2 or payload.get('provenance') != PROVENANCE:
+        raise ValueError('Regulation vector export provenance missing/mismatched; rerun embed and export.')
     if (payload['format_version'],payload['kind'],payload['model'],payload['dimensions'],payload['input_version']) != (
-            1,'regulation_vectors',MODEL,DIMENSIONS,INPUT_VERSION):
+            2,'regulation_vectors',MODEL,DIMENSIONS,INPUT_VERSION):
         raise ValueError('Regulation vector export format/model mismatch')
     rows = payload['rows']
     if len({r['rag_chunk_id'] for r in rows})!=len(rows):
@@ -239,8 +271,10 @@ def import_vectors(conn,path):
         vector_values(row['embedding'])
         if row['rag_chunk_id'] not in current or input_hash(current[row['rag_chunk_id']])!=row['input_sha256']:
             raise ValueError('Restore matching regulation source data before vector import.')
-    conn.execute(DDL,prepare=False)
-    store_rows(conn,rows)
+    require_meta_table(conn)
+    with conn.transaction():
+        conn.execute(DDL,prepare=False)
+        store_rows(conn,rows)
     return {'imported_vectors':len(rows),'model':MODEL,'embedding_api_called':False}
 
 
