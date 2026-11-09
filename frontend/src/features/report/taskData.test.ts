@@ -48,6 +48,42 @@ describe('putTasks', () => {
     expect(qc.getQueryData(taskKey('p1'))).toEqual(submitted);
   });
 
+  describe('같은 보고서의 과제를 동시에 제출할 때', () => {
+    const notYet = [task('a'), task('b')];
+    const onlyA = [task('a', '2026-11-09'), task('b')];
+    const both = [task('a', '2026-11-09'), task('b', '2026-11-09')];
+
+    it('응답이 역순으로 와도 제출한 과제를 제출 전으로 되돌리지 않는다', async () => {
+      const qc = new QueryClient();
+      qc.setQueryData(taskKey('p1'), notYet);
+
+      await putTasks(qc, 'p1', both);
+      await putTasks(qc, 'p1', onlyA);
+
+      expect(qc.getQueryData(taskKey('p1'))).toEqual(both);
+    });
+
+    it('응답이 순서대로 오면 차례로 반영한다', async () => {
+      const qc = new QueryClient();
+      qc.setQueryData(taskKey('p1'), notYet);
+
+      await putTasks(qc, 'p1', onlyA);
+      expect(qc.getQueryData(taskKey('p1'))).toEqual(onlyA);
+
+      await putTasks(qc, 'p1', both);
+      expect(qc.getQueryData(taskKey('p1'))).toEqual(both);
+    });
+  });
+
+  it('아직 제출하지 않은 과제는 제출 전으로 두고, 새로 온 과제도 넣는다', async () => {
+    const qc = new QueryClient();
+    qc.setQueryData(taskKey('p1'), [task('a')]);
+
+    await putTasks(qc, 'p1', [task('a'), task('new')]);
+
+    expect(qc.getQueryData(taskKey('p1'))).toEqual([task('a'), task('new')]);
+  });
+
   it('다른 보고서의 조회는 취소하지 않는다', async () => {
     const qc = new QueryClient();
     const other = deferred<ReportTask[]>();
