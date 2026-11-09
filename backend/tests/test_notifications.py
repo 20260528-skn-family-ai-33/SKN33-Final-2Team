@@ -140,6 +140,7 @@ class ServiceTests(unittest.TestCase):
         self.assertIn(NT.HEAD_SEES, sql)  # 부서 이동한 직원의 알림은 부서장에게 보이지 않게 거른다
         self.assertIn("n.audience IN ('self', 'member')", sql)
         self.assertIn('LEFT JOIN public.roadmaps r', sql)  # 로드맵 확정 전 작업 알림도 나와야 한다
+        self.assertIn('n.read_at IS NULL', sql)  # 읽은 알림은 목록에서 뺀다(#96)
         self.assertEqual(out['unread'], 3)
         self.assertEqual(out['items'][0], {'id': NID, 'kind': 'report', 'audience': 'head', 'employee': {'id': '8', 'name': '김직원'}, 'planId': RID,
                                            'planTitle': 'SQL 분석', 'track': 'A2', 'reportId': NID, 'draftId': None, 'commentId': None,
