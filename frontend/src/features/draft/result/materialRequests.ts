@@ -3,7 +3,7 @@ import type { BookDiagnostic, CourseDiagnostic, MaterialResource } from '@/api/t
 import { flush } from '../draftSync';
 import type { Choices, DurationEstimate } from './skillOrder';
 
-export type Resource = Pick<MaterialResource, 'id' | 'title' | 'unverifiedTargetTopics'> & { provider?: string; image?: string; url?: string; cost: number | null; hours?: number | null; timeStatus?: string; estimated?: string[]; why: string; knowledge: string; aiRecommended: boolean };
+export type Resource = Pick<MaterialResource, 'id' | 'title' | 'unverifiedTargetTopics' | 'difficulty' | 'difficultyEstimated' | 'difficultyBasis' | 'difficultySource'> & { provider?: string; image?: string; url?: string; cost: number | null; hours?: number | null; timeStatus?: string; estimated?: string[]; why: string; knowledge: string; aiRecommended: boolean };
 type Skill = {
   name: string; courses: Resource[]; books: Resource[]; selectedCourse: string | null; selectedBooks: string[];
   courseDiagnostic?: CourseDiagnostic;

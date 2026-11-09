@@ -13,7 +13,13 @@ from app.config import env
 
 def verify(*, check_counts: bool = True) -> dict:
     result = {}
-    for table, expected in (('public.learning_resource_embeddings', 2984),
+    internal = db.val("SELECT count(*) FROM public.courses WHERE record_source='INTERNAL_TRAINING_PILOT'")
+    missing = db.val("""SELECT count(*) FROM public.courses c WHERE c.record_source='INTERNAL_TRAINING_PILOT'
+        AND NOT EXISTS (SELECT 1 FROM public.learning_resource_embeddings e WHERE e.resource_type='courses'
+            AND e.resource_id=c.course_id AND e.course_id=c.course_id AND e.embedding_model=:model)""", model=MODEL)
+    if missing:
+        raise ValueError(f'사내교육 BGE 벡터 누락: {missing}개')
+    for table, expected in (('public.learning_resource_embeddings', 2984 + internal),
                             ('regulations.rag_chunk_embeddings', 1406), ('knowledge.chunks', 442)):
         row = db.one(f'''SELECT count(*) AS total,count(*) FILTER(WHERE embedding_model=:model
             AND dimensions=1024 AND vector_dims(embedding)=1024
@@ -45,8 +51,9 @@ def verify(*, check_counts: bool = True) -> dict:
         FROM growpath_bge_meta.inputs''', revision=REVISION)
     if bad_regulations or bad_knowledge or bad_resources or provenance['total'] != provenance['valid']:
         raise ValueError(f'BGE DB 입력 계약 오류: bad_reg={bad_regulations}, bad_know={bad_knowledge}, bad_res={bad_resources}, prov={provenance}')
-    if check_counts and provenance != {'total': 4832, 'valid': 4832}:
-        raise ValueError(f'BGE DB 시드 메타 개수 불일치: {provenance} (기대치: 4832)')
+    expected_inputs = 4832 + internal
+    if check_counts and provenance != {'total': expected_inputs, 'valid': expected_inputs}:
+        raise ValueError(f'BGE DB 시드 메타 개수 불일치: {provenance} (기대치: {expected_inputs})')
     return {'database': db.engine.url.database, 'model': MODEL, 'revision': REVISION,
             'vectors': provenance['total'], 'tables': result, 'provenance': provenance, 'database_writes': 0}
 

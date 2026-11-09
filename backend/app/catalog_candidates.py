@@ -111,7 +111,7 @@ def cached_index(records: dict[str, dict]) -> dict:
                               'units': [(text.casefold(), {name for name, rx in _actions.items() if rx.search(text)},
                                          {name for name, rx in _depth_actions.items() if rx.search(text)}
                                          if not _intro_lesson.search(text) else set()) for text in units],
-                              'query_profiles': {},
+                              'query_profiles': {}, 'topic_scores': {},
                               'outline': '\n'.join(row[2] for row in rows),
                               'dedup': (' '.join(r['title'].casefold().split()), r.get('provider', '').casefold(), r.get('type'))}
             _source, _index = records, index
@@ -206,7 +206,7 @@ def track_fit(x: dict, terms: list[re.Pattern], track: str, topics: list[re.Patt
         depth = min(profile['depthUnits'], 4) / 4 * (.5 + .5 * len(profile['depthActions']) / 3)
         # 난이도 표시는 보조 근거다. 확인된 심화 단원이 둘 이상일 때만 가산한다.
         difficulty = str(x['record'].get('difficulty') or '').upper()
-        level = {'INTERMEDIATE': .8, 'ADVANCED': 1}.get(difficulty, 0)
+        level = {'INTERMEDIATE': .8, 'UPPER_INTERMEDIATE': .9, 'ADVANCED': 1}.get(difficulty, 0)
         level_bonus = .25 * level * depth if x['rows'] and profile['depthUnits'] >= 2 else 0
         confidence = 1 if x['rows'] else .25
         fit = confidence * (.1 * lifecycle + .1 * practice + .55 * depth) + level_bonus
@@ -343,6 +343,13 @@ def entry(r: dict, selection: Selection) -> dict:
         result['curriculumCoverage'] = outline.get('coverage') or 'description_only'
     if r.get('difficulty'):
         result['difficulty'] = r['difficulty']
+        result['difficultyEstimated'] = bool(r.get('difficultyEstimated') or 'difficulty' in (r.get('estimated') or []))
+        result['difficultySource'] = ('reviewed' if r.get('difficultyBasis') == '목차 검토로 중상 확정'
+                                      else r.get('difficultySource') or ('estimated' if result['difficultyEstimated'] else 'original'))
+        if result['difficultyEstimated']:
+            result['estimated'] = ['difficulty']
+        if r.get('difficultyBasis'):
+            result['difficultyBasis'] = str(r['difficultyBasis'])[:160]
     if r.get('format') and 'format' not in (r.get('estimated') or []):
         result['format'] = r['format']
     if r.get('durationKind'):

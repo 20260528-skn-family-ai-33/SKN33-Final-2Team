@@ -1,4 +1,4 @@
-"""#111 재현 1·2: 기존 핵심 유지, 새 의무 사전 거절, 구형 생성 결과의 검증·보존."""
+"""#111 재현 1·2: 기존 핵심 유지와 구형 생성 결과의 형식 검증·보존."""
 from contextlib import contextmanager
 from copy import deepcopy
 from types import SimpleNamespace
@@ -7,9 +7,7 @@ from unittest.mock import patch
 
 from app import llm
 from app.agents import roadmap
-from app.errors import ApiError
 from app.services.course_skills import recommendation_key, validate_recommendations
-from app.services.crash_requirements import MAX_REQUIREMENT_CHARS
 from test_crash_required_technologies import target
 from test_recommendation_suitability import WEB
 
@@ -100,46 +98,14 @@ class CrashLegacyRevisionsTests(unittest.TestCase):
                     self.assertEqual([act['key'] for act in result['acts']], ['task-1'] if delete else ['task-1', 'task-2'])
                     self.assertTrue(inp['plan']['acts'][0]['done'])
 
-    def test_new_requirement_from_each_user_source_is_rejected_without_model_call(self):
-        for source in (*REQUIREMENT_FIELDS, 'request'):
-            for legacy in (False, True):
-                with self.subTest(source=source, legacy=legacy):
-                    inp = self.revision_input(legacy=legacy, goal='웹 API 구현')
-                    if source == 'request':
-                        inp['request'] = 'Django 사용 필수'
-                    else:
-                        value = ['Django 사용 필수'] if source == 'userNotes' else \
-                            {'environment': 'Django 사용 필수'} if source == 'details' else 'Django 사용 필수'
-                        inp['handoff'][source] = value
-                    with self.model_boundary(inp, self.revision_answer(inp)) as (model, _):
-                        with self.assertRaises(ApiError) as caught:
-                            roadmap.revise(SimpleNamespace(mode='openai'), inp)
-                        model.assert_not_called()
-                    error = caught.exception
-                    self.assertEqual((error.status, error.code), (422, 'CRASH_CORE_REQUIREMENT_CONFLICT'))
-                    self.assertIn('새 Crash 로드맵', error.message)
-                    self.assertIn('django', error.message.casefold())
-                    self.assertNotIn('다시 생성해 주세요', error.message)
-                    self.assertIn('django', error.extra['cause'].casefold())
-                    self.assertFalse(error.retryable)
-
-    def test_existing_missing_obligation_does_not_hide_new_missing_obligation(self):
-        inp = self.revision_input()
-        inp['request'] = 'PostgreSQL 사용 필수'
-        with self.model_boundary(inp, self.revision_answer(inp)) as (model, _):
-            with self.assertRaises(ApiError) as caught:
-                roadmap.revise(SimpleNamespace(mode='openai'), inp)
-            model.assert_not_called()
-        self.assertIn('postgresql', caught.exception.extra['cause'].casefold())
-
-    def test_directly_repeated_missing_obligation_is_not_silently_ignored(self):
+    def test_direct_request_reaches_model_even_when_saved_core_uses_another_stack(self):
         inp = self.revision_input()
         inp['request'] = 'Django 사용 필수'
-        with self.model_boundary(inp, self.revision_answer(inp)) as (model, _):
-            with self.assertRaises(ApiError) as caught:
-                roadmap.revise(SimpleNamespace(mode='openai'), inp)
-            model.assert_not_called()
-        self.assertEqual(caught.exception.code, 'CRASH_CORE_REQUIREMENT_CONFLICT')
+        with self.model_boundary(inp, self.revision_answer(inp)) as (model, captured):
+            result = roadmap.revise(SimpleNamespace(mode='openai'), inp)
+            model.assert_called_once()
+        self.assertEqual(captured['payload']['request'], inp['request'])
+        self.assertEqual(result['learningSkills'], inp['plan']['def']['learningSkills'])
 
     def test_existing_missing_obligation_allows_new_requirement_covered_by_saved_core(self):
         inp = self.revision_input()
@@ -161,20 +127,6 @@ class CrashLegacyRevisionsTests(unittest.TestCase):
             model.assert_called_once()
         self.assertNotIn('learningSkills', result)
 
-    def test_unknown_previous_requirements_do_not_exempt_current_requirements(self):
-        for baseline in ('missing', None, {}, 'invalid'):
-            with self.subTest(baseline=baseline):
-                inp = self.revision_input(legacy=True)
-                if baseline == 'missing':
-                    inp.pop('previousHandoff')
-                else:
-                    inp['previousHandoff'] = baseline
-                with self.model_boundary(inp, self.revision_answer(inp)) as (model, _):
-                    with self.assertRaises(ApiError) as caught:
-                        roadmap.revise(SimpleNamespace(mode='openai'), inp)
-                    model.assert_not_called()
-                self.assertEqual(caught.exception.code, 'CRASH_CORE_REQUIREMENT_CONFLICT')
-
     def test_legacy_direct_call_without_requirements_still_allows_revision(self):
         inp = self.revision_input(legacy=True, goal='웹 API 구현')
         inp.pop('previousHandoff')
@@ -194,26 +146,6 @@ class CrashLegacyRevisionsTests(unittest.TestCase):
             model.assert_called_once()
         self.assertEqual(result['learningSkills'], [target('Django')])
 
-    def test_oversized_same_course_request_is_rejected_without_model_call(self):
-        inp = self.revision_input()
-        inp['request'] = '가' * MAX_REQUIREMENT_CHARS
-        with self.model_boundary(inp, self.revision_answer(inp)) as (model, _):
-            with self.assertRaises(ApiError) as caught:
-                roadmap.revise(SimpleNamespace(mode='openai'), inp)
-            model.assert_not_called()
-        self.assertEqual((caught.exception.status, caught.exception.code), (422, 'CRASH_REQUIREMENTS_TOO_LONG'))
-
-    def test_switch_to_crash_checks_all_requirements_even_with_previous_snapshot(self):
-        inp = self.revision_input()
-        inp['plan']['opt'] = 'A1'
-        inp['changes'] = {'perspective': 'A2'}
-        raw = self.revision_answer(inp)
-        raw['learningSkills'] = [target()]
-        with self.model_boundary(inp, raw) as (model, _):
-            with self.assertRaisesRegex(llm.LlmError, '(?i)django'):
-                roadmap.revise(SimpleNamespace(mode='openai'), inp)
-            model.assert_called_once()
-
     def test_legacy_generation_validates_and_preserves_model_core(self):
         inp, raw = self.generation_input(), self.generation_answer()
         raw['learningSkills'][0]['modelOnlyField'] = '저장 금지'
@@ -226,8 +158,7 @@ class CrashLegacyRevisionsTests(unittest.TestCase):
         self.assertEqual(result['learningSkillsKey'], recommendation_key(result))
         self.assertEqual(captured['payload']['handoff'], {'goal': 'Django 사용 필수'})
         self.assertEqual(captured['payload']['skillTags'], [WEB])
-        self.assertIn('[구형 Crash 필수 기술 응답 계약]', model.call_args.args[1])
-        self.assertIn('coreCriteria', model.call_args.args[1])
+        self.assertNotIn('[사용자가 명시한 필수 기술]', model.call_args.args[1])
 
     def test_legacy_generation_rejects_names_outside_registered_tags_including_empty_tags(self):
         for registered_names in ([], ['다른 등록 스킬']):
@@ -248,22 +179,13 @@ class CrashLegacyRevisionsTests(unittest.TestCase):
                 roadmap.option(SimpleNamespace(mode='openai'), inp)
             model.assert_called_once()
 
-    def test_legacy_generation_without_required_technologies_keeps_existing_option_behavior(self):
-        for rows in ('missing', [target('Django')], None, [{'name': '알 수 없는 스킬'}]):
-            with self.subTest(rows=rows):
-                inp, raw = self.generation_input(), self.generation_answer()
-                inp['handoff']['goal'] = '웹 API 구현'
-                if rows == 'missing':
-                    raw.pop('learningSkills')
-                else:
-                    raw['learningSkills'] = rows
-                with self.model_boundary(inp, raw) as (model, _):
-                    result = roadmap.option(SimpleNamespace(mode='openai'), inp)
-                    model.assert_called_once()
-                for field in roadmap.LEARNING_SKILL_FIELDS:
-                    self.assertNotIn(field, result)
-                self.assertEqual(result['acts'][0]['title'], raw['acts'][0]['title'])
-                self.assertNotIn('[구형 Crash 필수 기술 응답 계약]', model.call_args.args[1])
+    def test_legacy_activity_only_response_is_accepted_with_a_user_requirement(self):
+        inp, raw = self.generation_input(), self.generation_answer()
+        del raw['learningSkills']
+        with self.model_boundary(inp, raw):
+            result = roadmap.option(SimpleNamespace(mode='openai'), inp)
+        self.assertNotIn('learningSkills', result)
+        self.assertEqual(result['acts'][0]['title'], raw['acts'][0]['title'])
 
     def test_legacy_generation_rejects_invalid_model_skill_list(self):
         invalid = (None, [], '원시 문자열', [target('Django', name='알 수 없는 스킬')],
@@ -275,20 +197,6 @@ class CrashLegacyRevisionsTests(unittest.TestCase):
                 raw['learningSkills'] = rows
                 with self.model_boundary(inp, raw) as (model, _):
                     with self.assertRaises(llm.LlmError):
-                        roadmap.option(SimpleNamespace(mode='openai'), inp)
-                    model.assert_called_once()
-
-    def test_legacy_generation_cannot_skip_missing_core_or_inherit_requirement_exemption(self):
-        for omit in (False, True):
-            with self.subTest(omit=omit):
-                inp, raw = self.generation_input(), self.generation_answer()
-                inp['previousHandoff'] = {'goal': inp['handoff']['goal']}
-                if omit:
-                    raw.pop('learningSkills')
-                else:
-                    raw['learningSkills'] = [target()]
-                with self.model_boundary(inp, raw) as (model, _):
-                    with self.assertRaisesRegex(llm.LlmError, '(?i)django'):
                         roadmap.option(SimpleNamespace(mode='openai'), inp)
                     model.assert_called_once()
 

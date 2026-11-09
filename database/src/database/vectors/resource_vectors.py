@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Iterable
+from functools import partial
 import hashlib
 import json
 
@@ -106,10 +107,15 @@ def embedding_text(kind, record):
     return text
 
 
-def sources(conn):
+def sources(conn, *, retained_course_ids=()):
     """Only whitelisted real DB fields and real relation rows enter the index."""
     from src.shared.catalog_eligibility import eligible_keys
     allowed, _ = eligible_keys(conn)
+    if retained_course_ids:
+        # 유지보수 시 이미 저장된 벡터만 동기화한다. 일반 수집·추천 적격성은 별도로 판정한다.
+        retained = conn.execute(f"""SELECT resource_id FROM {TABLE} WHERE resource_type='courses'
+                AND embedding_model=%s AND resource_id=ANY(%s)""", (MODEL, list(retained_course_ids)))
+        allowed.update(('courses', row['resource_id']) for row in retained)
     result = {}
     skill_names = {r['skill_id']: r['name'] for r in conn.execute(
         'SELECT skill_id,name FROM public.skill_tags').fetchall()}
@@ -224,10 +230,18 @@ def plan(conn, resource_types: Iterable[str] | None = None,
 
 
 def embed(conn, client=None, *, resource_types: Iterable[str] | None = None,
-          resource_ids: Iterable[str] | None = None, max_records: int | None = None) -> dict:
+          resource_ids: Iterable[str] | None = None, max_records: int | None = None,
+          include_stored_courses: bool = False) -> dict:
     """Atomic, repeatable ingestion; missing/stale records only, batches of 32."""
+    read_sources = sources
+    if include_stored_courses:
+        resource_ids = tuple(resource_ids or ())
+        resource_types = tuple(resource_types or ())
+        if resource_types != ('courses',) or not resource_ids:
+            raise RefreshPlanError('Stored course maintenance requires explicit course IDs.')
+        read_sources = partial(sources, retained_course_ids=resource_ids)
     with conn.transaction():
-        rows, previous = sources(conn), stored(conn)
+        rows, previous = read_sources(conn), stored(conn)
         selected, pending = pending_sources(rows, previous, resource_types, resource_ids, max_records)
         if pending:
             conn.execute(DDL)
@@ -257,7 +271,7 @@ def embed(conn, client=None, *, resource_types: Iterable[str] | None = None,
                     created_at=EXCLUDED.created_at''',
                     (kind, str(rid), row['hash'], actual_sha, PROTOCOL, PROVENANCE['model_revision'],
                      max(1, min(len(row['text'].split()), 8192))))
-        if {k: v['hash'] for k, v in sources(conn).items()} != {k: v['hash'] for k, v in rows.items()}:
+        if {k: v['hash'] for k, v in read_sources(conn).items()} != {k: v['hash'] for k, v in rows.items()}:
             raise ValueError('DB sources changed during embedding. Rolled back; retry with stable sources.')
         result = status(conn)
         result.update(selected_count=len(selected), embedded_count=len(pending), database_changes=bool(pending),

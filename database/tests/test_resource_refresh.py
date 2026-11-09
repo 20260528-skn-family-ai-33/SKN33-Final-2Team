@@ -19,6 +19,24 @@ def current(value):
 
 
 class ResourceRefreshTests(unittest.TestCase):
+    def test_retained_course_refresh_requires_explicit_course_ids(self):
+        conn = MagicMock()
+        for kinds, ids in [(['books'], ['001']), (['courses'], []), (None, ['001'])]:
+            with self.subTest(kinds=kinds, ids=ids), self.assertRaises(vectors.RefreshPlanError):
+                vectors.embed(conn, resource_types=kinds, resource_ids=ids, include_stored_courses=True)
+        conn.execute.assert_not_called()
+
+    def test_retained_current_course_keeps_its_vector(self):
+        rows = {('courses', 'old'): source('same')}
+        previous = {('courses', 'old'): current('same')}
+        with patch.object(vectors, 'sources', return_value=rows) as read, \
+                patch.object(vectors, 'stored', return_value=previous), patch.object(vectors, 'status', return_value={}), \
+                patch.object(vectors, 'embed_texts') as model:
+            result = vectors.embed(MagicMock(), resource_types=['courses'], resource_ids=['old'], include_stored_courses=True)
+        self.assertEqual(result['embedded_count'], 0)
+        self.assertEqual(read.call_args.kwargs['retained_course_ids'], ('old',))
+        model.assert_not_called()
+
     def setUp(self):
         self.rows = {('books', str(i)): source(f'new-{i}') for i in range(25)}
         self.rows[('books', 'current')] = source('same')

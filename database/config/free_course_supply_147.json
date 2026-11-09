@@ -1,0 +1,152 @@
+{
+  "reviewed_links": [
+    {
+      "course": "MS_f72119f10609",
+      "title": "Azure Database for PostgreSQL을 사용하여 벡터 검색 구현",
+      "skill": "SQL 쿼리 튜닝 & 인덱스 최적화",
+      "unit": "인덱스 수명 주기 및 임베딩 업데이트 관리",
+      "objective": "검색 성능을 최적화하기 위해 벡터 인덱스 만들기 및 관리"
+    }
+  ],
+  "skill": "웹 프레임워크 (FastAPI/Django)",
+  "courses": [
+    {
+      "id": "INTERNAL_CRASH_2401",
+      "title": "Django REST API 실습 · 주문 조회와 페이지 나누기",
+      "difficulty": "BEGINNER",
+      "outcome": "주문 목록과 단일 주문을 JSON으로 조회하고 페이지 경계를 확인한다.",
+      "units": [
+        {
+          "title": "주문 조회 엔드포인트",
+          "minutes": 15,
+          "description": "Django 프로젝트에서 주문 모델을 만들고 DRF ModelSerializer로 응답 필드를 제한한다."
+        },
+        {
+          "title": "목록과 상세 응답",
+          "minutes": 20,
+          "description": "ListAPIView와 RetrieveAPIView로 GET /orders/와 GET /orders/{id}/를 구현하고 없는 주문은 404로 처리한다."
+        },
+        {
+          "title": "페이지 경계 테스트",
+          "minutes": 15,
+          "description": "APIClient로 다음 페이지 링크, 빈 목록, 마지막 페이지 중복을 확인해 결과를 표로 남긴다."
+        }
+      ]
+    },
+    {
+      "id": "INTERNAL_CRASH_2402",
+      "title": "Django REST API 실습 · 요청 검증과 주문 등록",
+      "difficulty": "BEGINNER",
+      "outcome": "POST 요청의 입력 오류와 정상 등록을 분리해 응답 계약을 만든다.",
+      "units": [
+        {
+          "title": "주문 요청 스키마",
+          "minutes": 15,
+          "description": "Django REST Framework의 Serializer로 상품과 수량 필드를 선언하고 빈 값, 음수, 없는 상품을 검증한다."
+        },
+        {
+          "title": "POST 엔드포인트 구현",
+          "minutes": 25,
+          "description": "CreateAPIView에서 검증된 값으로 주문을 저장하고 정상 요청은 201, 검증 실패는 필드별 400 JSON으로 응답한다."
+        },
+        {
+          "title": "오류 사례 검증",
+          "minutes": 15,
+          "description": "APIClient로 정상 주문 한 건과 오류 세 건을 보내 상태 코드·응답 필드·DB 저장 여부를 확인한다."
+        }
+      ]
+    },
+    {
+      "id": "INTERNAL_CRASH_2403",
+      "title": "Django REST API 실습 · 사용자별 접근 권한",
+      "difficulty": "INTERMEDIATE",
+      "outcome": "내 주문 API에서 다른 사용자의 조회와 변경을 차단한다.",
+      "units": [
+        {
+          "title": "요청 사용자 분리",
+          "minutes": 15,
+          "description": "Django REST Framework에서 사용자 두 명과 주문을 준비하고 인증된 요청만 받는 ViewSet을 구성한다."
+        },
+        {
+          "title": "소유자 권한 구현",
+          "minutes": 30,
+          "description": "get_queryset으로 목록을 사용자별로 제한하고 객체 권한으로 상세 조회와 수정을 보호한다."
+        },
+        {
+          "title": "권한 회귀 테스트",
+          "minutes": 20,
+          "description": "DRF APIClient에서 비로그인·소유자·다른 사용자 요청을 비교하여 접근 결과와 데이터 미변경을 검증한다."
+        }
+      ]
+    },
+    {
+      "id": "INTERNAL_CRASH_2404",
+      "title": "Django REST API 실습 · 재시도해도 중복 없는 접수",
+      "difficulty": "INTERMEDIATE",
+      "outcome": "같은 요청 키로 두 번 보낸 접수가 한 건만 저장되도록 API를 구현한다.",
+      "units": [
+        {
+          "title": "접수 요청 계약",
+          "minutes": 15,
+          "description": "Django REST Framework의 APIView에서 요청 키와 접수 내용을 검증하고 DB에 키 유일 제약을 둔다."
+        },
+        {
+          "title": "중복 요청 처리",
+          "minutes": 30,
+          "description": "Django의 transaction.atomic과 유일 제약으로 접수를 저장한다. 같은 키·같은 본문은 원래 결과를, 다른 본문은 409 응답을 반환한다."
+        },
+        {
+          "title": "재시도 검증",
+          "minutes": 20,
+          "description": "APIClient로 정상 접수, 동일 재시도, 충돌 재시도를 재현하고 응답 JSON과 실제 행 수를 대조한다."
+        }
+      ]
+    },
+    {
+      "id": "INTERNAL_CRASH_2405",
+      "title": "Django REST API 실습 · 버전 충돌을 막는 부분 수정",
+      "difficulty": "INTERMEDIATE",
+      "outcome": "재고 변경 API에서 오래된 버전의 PATCH 요청이 앞선 변경을 덮어쓰지 않게 한다.",
+      "units": [
+        {
+          "title": "부분 수정 요청",
+          "minutes": 15,
+          "description": "Django REST Framework의 Serializer에서 PATCH에 보낸 필드만 검증하고 수량과 버전의 응답 형식을 정한다."
+        },
+        {
+          "title": "조건부 수정 구현",
+          "minutes": 30,
+          "description": "버전이 일치하는 레코드만 단일 UPDATE로 갱신하고 수정 행 수가 0이면 충돌 응답을 반환한다."
+        },
+        {
+          "title": "두 클라이언트로 검증",
+          "minutes": 20,
+          "description": "APIClient 두 개로 같은 버전의 재고를 읽고 차례로 수정한다. 첫 요청만 성공하는지 상태 코드와 최종 수량을 확인한다."
+        }
+      ]
+    },
+    {
+      "id": "INTERNAL_CRASH_2406",
+      "title": "Django REST API 실습 · CSV 업로드와 행별 오류 응답",
+      "difficulty": "INTERMEDIATE",
+      "outcome": "상품 CSV를 multipart 요청으로 받아 일괄 등록하고 오류 행을 JSON으로 돌려준다.",
+      "units": [
+        {
+          "title": "파일 수신 엔드포인트",
+          "minutes": 15,
+          "description": "Django REST Framework의 MultiPartParser와 APIView로 CSV 파일을 받고 누락된 파일·잘못된 헤더를 거절한다."
+        },
+        {
+          "title": "행 단위 검증 구현",
+          "minutes": 25,
+          "description": "행마다 Serializer 검증을 실행해 행 번호와 잘못된 필드를 모은다. 전체가 유효할 때만 트랜잭션에서 일괄 저장한다."
+        },
+        {
+          "title": "업로드 API 테스트",
+          "minutes": 20,
+          "description": "APIClient로 정상 파일, 혼합 오류 파일, 빈 파일을 전송해 성공 건수·행별 오류·부분 저장 방지를 검증한다."
+        }
+      ]
+    }
+  ]
+}

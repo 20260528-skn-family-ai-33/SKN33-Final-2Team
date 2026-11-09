@@ -148,5 +148,5 @@ export function actMeta(a: Pick<Activity, 'task' | 'res'>): string {
   if (a.task) return '직접 수행 과제';
   const r = resOf(a.res);
   if (!r) return '등록 자료 (정보를 불러오지 못했어요)';
-  return `${r.kind} · ${resourceSource(r)}${r.real ? '' : ' · 가상'} · ${costText(r)}`;
+  return `${r.kind} · ${resourceSource(r)}${r.real || r.platform === '사내교육' ? '' : ' · 가상'} · ${costText(r)}`;
 }

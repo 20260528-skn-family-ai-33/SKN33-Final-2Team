@@ -1,11 +1,12 @@
 /* 학습 자료 (API-53·54 · 팀 DB 강좌·도서·자격증, 검색·쪽 나누기 · 5차 scr.resources · scr.res) */
 import { keepPreviousData, useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useParams, useSearchParams } from 'react-router';
 import { catalogApi } from '@/api/endpoints/catalog';
 import type { Resource } from '@/api/types/catalog';
 import { paths } from '@/app/paths';
 import { resourceTime } from '@/shared/lib/resourceTime';
+import { courseDifficulty, courseDifficultyLevel } from '@/shared/lib/courseDifficulty';
 import { resourceSource } from '@/shared/lib/resourceSource';
 import { costText, stageName } from '@/shared/lib/plan';
 import { searchTerm } from '@/shared/lib/search';
@@ -14,7 +15,8 @@ import { mergeRes, resourceDetailQuery, useRes } from '@/shared/state/catalog';
 import { Icon } from '@/shared/ui/Icon';
 import { Est, Loading, Note, Page, Thumb } from '@/shared/ui/parts';
 
-export function ResKv({ r }: { r: Resource }) {
+export function ResKv({ r, showCurriculum = false }: { r: Resource; showCurriculum?: boolean }) {
+  const guideUrl = r.platform === '사내교육' && r.url === paths.resourceCurriculum(r.id) ? r.url : null;
   return (
     <dl className="kv" style={{ marginTop: 4 }}>
       {r.audience ? (
@@ -39,12 +41,13 @@ export function ResKv({ r }: { r: Resource }) {
       ) : null}
       {r.type === 'course' ? (
         <>
+          <dt>난이도</dt><dd>{courseDifficultyLevel(r.difficulty)}</dd>
           <dt>커리큘럼</dt>
           <dd>
             {r.curriculum?.items?.length ? (
-              <details>
+              <details open={showCurriculum || undefined}>
                 <summary className="link">
-                  {r.curriculum.coverage === 'sample' ? '확인용 샘플' : r.curriculum.coverage === 'partial_outline' ? '일부 공개 목차' : '공개 목차'} {r.curriculum.items.length}개 보기
+                  {r.platform === '사내교육' ? '실습 목차' : r.curriculum.coverage === 'sample' ? '확인용 샘플' : r.curriculum.coverage === 'partial_outline' ? '일부 공개 목차' : '공개 목차'} {r.curriculum.items.length}개 보기
                 </summary>
                 <ol style={{ maxHeight: 360, overflowY: 'auto', paddingLeft: 24, marginTop: 8 }}>
                   {r.curriculum.items.map((item, index) => (
@@ -91,7 +94,7 @@ export function ResKv({ r }: { r: Resource }) {
       <dd>
         {r.source}
         {r.checked ? ` · 확인일 ${r.checked}` : ''}
-        {r.url ? (
+        {guideUrl ? (!showCurriculum && <><br /><Link className="link" to={guideUrl}>사내교육 안내 보기</Link></>) : r.url ? (
           <>
             <br />
             <a className="link" href={r.url} target="_blank" rel="noopener">
@@ -219,10 +222,10 @@ export function ResourcesPage() {
                 <span className="grow">
                   <b>{r.title}</b>
                   <small className="muted" style={{ display: 'block', fontWeight: 400, fontSize: 13 }}>
-                    {r.kind} · {resourceSource(r)} · <span title={r.timeNote || undefined}>{resourceTime(r)}</span> · {costText(r)}
+                    {r.kind} · {resourceSource(r)}{r.type === 'course' && ` · ${courseDifficulty(r)}`} · <span title={r.timeNote || undefined}>{resourceTime(r)}</span> · {costText(r)}
                   </small>
                 </span>
-                {r.real ? <span className="tag line">실제 자료</span> : <span className="tag dash">가상</span>}
+                {r.platform !== '사내교육' && (r.real ? <span className="tag line">실제 자료</span> : <span className="tag dash">가상</span>)}
               </summary>
               <ResKv r={r} />
             </details>
@@ -251,15 +254,18 @@ export function ResourcesPage() {
 
 export function ResourcePage() {
   const { id = '' } = useParams();
+  const [params] = useSearchParams();
   const r = useRes(id);
   /* 저장된 상세가 있어도 재진입 때 최신 내용을 받는다. */
   useQuery(resourceDetailQuery(id));
   if (!r?.detailsLoaded) return <Page back={paths.resources} title="자료를 불러오는 중이에요" />;
+  const guide = r.platform === '사내교육' && params.get('view') === 'curriculum';
   return (
-    <Page back={paths.resources} eyebrow={`${r.kind} · ${r.real ? '실제 자료' : '가상 자료'}`} title={r.title} lead={resourceSource(r)}>
+    <Page back={paths.resources} eyebrow={guide ? '사내교육 안내' : r.platform === '사내교육' ? r.kind : `${r.kind} · ${r.real ? '실제 자료' : '가상 자료'}`} title={r.title} lead={resourceSource(r)}>
+      {guide && <p className="muted">이 과정은 사내교육입니다. 아래 교육비·학습 시간·실습 목차를 확인하고 교육 담당자에게 수강 방법을 문의해 주세요.</p>}
       <div className={`card res-card ${r.type || ''}`}>
         <Thumb r={r} size="lg" />
-        <ResKv r={r} />
+        <ResKv r={r} showCurriculum={guide} />
       </div>
     </Page>
   );

@@ -44,11 +44,11 @@ CRASH_CORE = CRASH_CORE_MARKER + """
 선정 스킬은 모두 유지하되 각 스킬은 최소 기능판 결과물에 필요한 부분만 다룬다.
 coreOutcome은 이 스킬로 최소 기능판에서 만들 결과, coreCriteria는 그 결과의 완료를 확인하는 핵심 기준 1~3개다.
 목표 문장에 직접 나온 일과 품질·보안 확인은 핵심 기준에 남긴다. 그 밖의 전체 목표 범위는 followUpScope(후속 학습 0~3개)로 옮긴다.
-계획·자료 추천·과제 완료 판단은 같은 coreOutcome·coreCriteria를 기준으로 한다. 후속 학습 범위를 자료·과제의 필수 조건으로 만들지 않는다.
+계획과 과제 완료 판단에 같은 coreOutcome·coreCriteria를 적용한다. 후속 학습 범위는 다음 과제로 남긴다.
 """
 CRASH_STAGES = {
  'plan': 'learningSkills 각 항목에 coreOutcome(최소 기능판에서 이 스킬로 만들 결과 문자열), coreCriteria(서로 다른 핵심 완료 기준 문자열 1~3개), followUpScope(이번 Crash에서 빼고 후속 학습으로 넘기는 전체 목표 범위 문자열 0~3개)를 추가한다. 필드 생략·본문 대체 금지. 활동은 핵심 기준 충족에 필요한 자료·실습만 편성하고 scope에는 핵심 결과물과 후속 학습을 한 줄로 쓴다.',
- 'resources': 'course.learningSkills의 coreOutcome·coreCriteria를 충족하는 자료 중 중복 제외 학습시간이 짧은 조합을 우선한다. followUpScope를 다룬다는 이유로 더 긴 자료를 고르지 않고, 핵심 기준을 충족하지 못하는 짧은 자료도 고르지 않는다.',
+ 'resources': '직원 목표와 선정 스킬에 맞는 강좌를 제목과 학습 단원에서 확인한다. 제공된 후보 중 같은 강좌의 시간을 한 번만 합산해 짧은 조합을 우선한다.',
  'tasks': 'skillTargets의 coreOutcome·coreCriteria를 이어받는다. 스킬별 과제의 만들 것은 coreOutcome의 최소 기능판, 평가 기준은 coreCriteria와 대응하는 관찰 가능한 통과 기준으로 쓴다. followUpScope는 필수 항목·평가 기준에 넣지 않는다.',
  'summary': '선택 자료가 뒷받침하는 coreCriteria 범위의 수행 능력으로 요약한다. followUpScope 범위를 획득한 역량으로 쓰지 않는다.',
 }
@@ -56,7 +56,10 @@ CRASH_STAGES = {
 
 def crash_guidance(course,stage):
     course_id=course.get('id') if isinstance(course,dict) else course
-    return '\n'+CRASH_CORE+CRASH_STAGES[stage] if course_id=='A2' else ''
+    if course_id != 'A2':
+        return ''
+    prefix = '' if stage == 'resources' else CRASH_CORE
+    return '\n' + prefix + CRASH_STAGES[stage]
 
 
 def course_guidance(course,stage):

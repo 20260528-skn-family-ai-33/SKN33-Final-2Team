@@ -6,7 +6,6 @@ from unittest.mock import Mock, patch
 
 from app.errors import ApiError
 from app.services import drafts, plans
-from app.services.crash_requirements import MAX_REQUIREMENT_CHARS, prompt_requirements
 
 
 class CrashRequirementJobStateTests(unittest.TestCase):
@@ -14,8 +13,8 @@ class CrashRequirementJobStateTests(unittest.TestCase):
         self.work = None
         self.tx = Mock()
         self.job = SimpleNamespace(job_id='job')
-        self.error_code = 'CRASH_REQUIREMENTS_TOO_LONG'
-        self.long_note = '가' * (MAX_REQUIREMENT_CHARS + 1)
+        self.error_code = 'SKILLS_INVALID'
+        self.note = '주 2시간으로 바꿔 주세요'
         self.enterContext(patch.object(drafts.jobs, 'start', side_effect=self.start))
         self.enterContext(patch.object(drafts.rt, 'context', return_value=Mock(fail_sim={})))
 
@@ -35,11 +34,11 @@ class CrashRequirementJobStateTests(unittest.TestCase):
 
     @staticmethod
     def check_input(ctx, inp, **kwargs):
-        return prompt_requirements(inp['handoff'], inp.get('request'))
+        raise ApiError(422, 'SKILLS_INVALID', '선정 스킬 이름을 확인해 주세요.')
 
     def test_option_error_remains_visible_after_job_finishes(self):
         rows = {pid: {'st': 'fail', 'tries': 0} for pid in drafts.D['optionOrder']}
-        state = {'draft': {'handoff': {'goal': self.long_note}, 'genRun': {'key': 'k', 'rows': rows}}}
+        state = {'draft': {'handoff': {'goal': self.note}, 'genRun': {'key': 'k', 'rows': rows}}}
         self.draft_state(state)
         drafts._run_option(1, 'draft', 'A2')
         with self.assertRaises(ApiError) as caught:
@@ -55,7 +54,7 @@ class CrashRequirementJobStateTests(unittest.TestCase):
         state = {'draft': {'handoff': {}, 'gen': gen}}
         self.draft_state(state)
         with patch.object(drafts, 'present', return_value={}):
-            drafts.regenerate(1, 'draft', 'A2', {'wish': self.long_note})
+            drafts.regenerate(1, 'draft', 'A2', {'wish': self.note})
         with self.assertRaises(ApiError):
             self.work(self.job)
         drafts._heal(self.tx, state)
@@ -77,12 +76,11 @@ class CrashRequirementJobStateTests(unittest.TestCase):
                 with patch.object(plans, '_owned', return_value=row), patch.object(plans.db, 'all_', return_value=[]), \
                      patch.object(plans.db, 'tx', side_effect=lambda: nullcontext(self.tx)), \
                      patch.object(plans.rt, 'sim_once', return_value=None), patch.object(plans.RM, 'revise', side_effect=revise):
-                    opts = {'on': {'etc': change}, 'v': {'etc': ''}, 'note': self.long_note}
+                    opts = {'on': {'etc': change}, 'v': {'etc': ''}, 'note': self.note}
                     plans.revise_start(1, 'rid', {'rev': opts})
                     with self.assertRaises(ApiError):
                         self.work(self.job)
                 self.assertEqual(self.tx.run.call_args.kwargs['e'].obj['cause']['code'], self.error_code)
-                self.assertEqual(actual['previousHandoff'], original)
                 self.assertEqual(actual['handoff']['userNotes'], expected)
                 self.assertEqual(actual['handoff']['details']['etc'], 'Django 필수' if expected else '')
                 self.assertEqual(actual['handoff']['details']['goalType'], 'api')

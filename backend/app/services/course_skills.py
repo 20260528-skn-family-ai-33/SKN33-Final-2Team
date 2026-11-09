@@ -159,13 +159,9 @@ def initialize(employee_id,project_id,course):
         if not ctx.live:raise ApiError(422,'LIVE_MODEL_REQUIRED','역량 추천에는 연결된 AI 모델이 필요해요.')
         from app.track_policy import course_guidance
         from app.learner_knowledge import POLICY
-        from app.services.crash_requirements import prompt_requirements, validate_core_requirements
-        required_prompt = prompt_requirements(payload['handoff']) if course == 'A2' else ''
-        raw=runtime.llm_json(ctx,CONTRACT+POLICY+course_guidance(course,'plan')+required_prompt+'\n기존 로드맵 existingPlan은 바꾸지 않고, 그 계획에서 익히게 될 learningSkills만 반환한다.',payload,role='roadmap')
+        raw=runtime.llm_json(ctx,CONTRACT+POLICY+course_guidance(course,'plan')+'\n기존 로드맵 existingPlan은 바꾸지 않고, 그 계획에서 익히게 될 learningSkills만 반환한다.',payload,role='roadmap')
         try:
             rows=validate_recommendations(raw.get('learningSkills') if isinstance(raw,dict) else None,{row['name'] for row in candidates},course,require_depth=True)
-            if course == 'A2':
-                validate_core_requirements(rows, payload['handoff'])
         except ValueError as e:raise ApiError(422,'SKILLS_INVALID',str(e)) from e
         def apply(t,current):
             pre=recommendation_context(t,employee_id,project_id)

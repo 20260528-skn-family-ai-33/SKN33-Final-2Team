@@ -5,6 +5,7 @@ import { ResourceImage } from '@/shared/ui/ResourceImage';
 import { TaskDescription } from '@/shared/ui/TaskDescription';
 import { Skeleton } from '@/shared/ui/Skeleton';
 import { durationLabel, type DurationEstimate } from '../result/skillOrder';
+import { courseDifficulty } from '@/shared/lib/courseDifficulty';
 import type { MaterialResource } from '@/api/types/draft';
 export type ReviewResource = MaterialResource & { provider?: string; image?: string; url?: string; cost?: number | null; timeNote?: string; knowledge?: string; competencySummary?: string[]; content?: string };
 export type ReviewMaterials = { recommendations: { skills: { name: string; courses: ReviewResource[]; books: ReviewResource[] }[] } | null; choices: Record<string, { course: string | null; courses?: string[]; books: string[]; enabled?: boolean }>; skillOrder?: string[]; skillDetails?: { name: string; application: string; competencySummary?: string[] }[]; durationEstimates?: Record<string, DurationEstimate> };
@@ -30,10 +31,10 @@ export function ReviewSkillBlocks({ materials, acts, selectedIds, busy, onToggle
               {resource.url ? <a className="review-cover-link" href={resource.url} target="_blank" rel="noreferrer" aria-label={`${resource.title} ${kind} 바로가기 (새 창)`}>
                 <ResourceImage image={resource.image} type={kind === '도서' ? 'book' : 'course'} alt={`${resource.title} 표지`} />
               </a> : <ResourceImage image={resource.image} type={kind === '도서' ? 'book' : 'course'} alt={`${resource.title} 표지`} />}
-              <div><span className="small muted"><span className="review-kind-badge">{kind}</span> · {resource.provider || '출처 미확인'}</span><h4>{confirmed && onOpenResource && !busy ? <button type="button" className="review-resource-title" aria-label={`${resource.title} 실행 기록 열기`} onClick={() => onOpenResource(name, resource.id)}>{resource.title}</button> : resource.title}</h4>
+              <div><span className="small muted"><span className="review-kind-badge">{kind}</span> · {resource.provider || '출처 미확인'}{kind === '강좌' && resource.difficulty && ` · ${courseDifficulty(resource)}`}</span><h4>{confirmed && onOpenResource && !busy ? <button type="button" className="review-resource-title" aria-label={`${resource.title} 실행 기록 열기`} onClick={() => onOpenResource(name, resource.id)}>{resource.title}</button> : resource.title}</h4>
                 <span className="small muted">{resource.cost == null ? '가격 미확인' : resource.cost === 0 ? '무료' : `${resource.cost.toLocaleString()}원`}</span>
                 {activity && <div className="small muted" title={activityTime(activity).title}>{activityTime(activity).text}</div>}
-                {resource.url && <a href={resource.url} target="_blank" rel="noreferrer" className="review-material-link">바로가기 ↗</a>}
+                {resource.url && <a href={resource.url} target="_blank" rel="noreferrer" className="review-material-link">{resource.provider === '사내교육' ? '사내교육 안내 보기' : '바로가기'} ↗</a>}
               </div>
             </div>
 

@@ -164,6 +164,15 @@ def eligible_keys(conn):
             key = (kind, str(fields[pk]))
             body = '\n'.join(str(fields.get(f) or '') for f in ('title','syllabus_summary','description','test_subjects','curriculum','ncs_units'))
             count += 1
+            if kind == 'courses' and fields.get('record_source') == 'INTERNAL_TRAINING_PILOT':
+                curriculum = fields.get('curriculum') or {}
+                if (key[1].startswith('INTERNAL_') and fields.get('platform') == '사내교육'
+                        and fields.get('content_status') == 'ready' and curriculum.get('source') == 'internal_training_pilot_v1'
+                        and curriculum.get('outcome') and curriculum.get('items')):
+                    eligible.add(key)
+                else:
+                    reasons['incomplete_internal_curriculum'] += 1
+                continue
             if not scoped_matches(matcher, fields):
                 reasons['no_it_skill_evidence'] += 1
                 continue

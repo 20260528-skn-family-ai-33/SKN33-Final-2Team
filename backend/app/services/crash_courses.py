@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import math
+from app import course_levels
+from app.services.course_focus import distinct_courses
 from copy import deepcopy
-from app.services.resource_evidence import facts, hours, suitable, suitability_key, target_gaps
+from app.services.resource_evidence import course_applicable, facts, focus_priority, hours, suitable, suitability_key, target_gaps
 
-VERSION = 'crash-short-courses/v13-core-evidence-selection'
+VERSION = 'crash-short-courses/v15-preserve-valid-model-choices'
 
 
 def is_crash(course) -> bool:
@@ -27,11 +29,14 @@ def time_certainty(row: dict) -> str:
 def rank(rows: list[dict], project: dict, selection: dict, skill: dict, *, limit: int | None = None,
          cache: dict | None = None) -> list[dict]:
     """필수 근거를 충족한 후보는 벡터 점수로 제거하지 않는다."""
-    rows = list(rows)
+    rows = [row for row in rows if course_levels.eligible(row, 'A2')]
     cache = cache if cache is not None else {}
     for row in rows:
         if row['id'] not in cache:
             cache[row['id']] = facts(row, project, selection)
+    def topic_quality(row):
+        info = cache[row['id']]
+        return (not suitable(info, skill['name']), *suitability_key(info, skill['name']))
     def key(row):
         info = cache[row['id']]
         duration = hours(row)
@@ -39,25 +44,13 @@ def rank(rows: list[dict], project: dict, selection: dict, skill: dict, *, limit
         coverage = max(1, sum(suitable(info, selected['name']) for selected in selection['skills']))
         # 여러 스킬의 학습 근거가 있을 때만 같은 강좌를 공유할 수 있는 효율을 인정한다.
         effective = duration / coverage if duration is not None else math.inf
-        return (*quality(info, skill['name']), len(target_gaps(info, skill['name'])),
-                certainty, effective, duration or math.inf, -coverage,
+        return (*topic_quality(row), certainty, effective, duration if duration is not None else math.inf, -coverage,
                 -float(row.get('retrievalScore') or 0), str(row.get('title') or ''), row['id'])
 
     rows.sort(key=key)
-    if limit is None or len(rows) <= limit:
+    if limit is None:
         return rows
-    # 짧은 자료만으로 여섯 칸을 채워 기존의 의미상 가까운 강좌를 모두 잃지 않게 한다.
-    # 같은 학습 근거·기술 조건 안에서 최대 두 칸을 벡터 상위 후보에 남긴다.
-    best = quality(cache[rows[0]['id']], skill['name'])
-    grounded = [row for row in rows if quality(cache[row['id']], skill['name']) == best
-                and row.get('retrievalScore') is not None]
-    semantic = sorted(grounded, key=lambda row: (-float(row['retrievalScore']), row['id']))[:min(2, limit)]
-    chosen = {row['id']: row for row in semantic}
-    for row in rows:
-        if len(chosen) >= limit:
-            break
-        chosen.setdefault(row['id'], row)
-    return sorted(chosen.values(), key=key)
+    return distinct_courses(rows)[:limit]
 
 
 def shortest_bundle(pools: list[dict], project: dict, selection: dict, cache: dict) -> dict[str, dict]:
@@ -67,6 +60,8 @@ def shortest_bundle(pools: list[dict], project: dict, selection: dict, cache: di
     for pool in pools:
         applicable = []
         for row in pool['courses']:
+            if not course_levels.eligible(row, 'A2'):
+                continue
             rid = row['id']
             if rid not in cache:
                 cache[rid] = facts(row, project, selection)
@@ -75,6 +70,8 @@ def shortest_bundle(pools: list[dict], project: dict, selection: dict, cache: di
         # 명시한 세부 대상을 가장 많이 확인한 강좌만 남긴다. 더 적게 다루는 짧은 강좌로 시간을 줄이지 않는다.
         fewest = min((len(target_gaps(cache[row['id']], pool['name'])) for row in applicable), default=0)
         applicable = [row for row in applicable if len(target_gaps(cache[row['id']], pool['name'])) == fewest]
+        focused = [row for row in applicable if focus_priority(cache[row['id']], pool['name'])]
+        applicable = focused or applicable
         if not applicable:
             continue
         bit = 1 << len(names)
@@ -112,19 +109,22 @@ def align_shared_courses(pools: list[dict], project: dict, selection: dict, cach
 
 def share_candidates(pools: list[dict], project: dict, selection: dict, sources: dict, *, cache: dict) -> list[dict]:
     """이미 제공된 강좌를 실제 학습 근거가 맞는 스킬에 공유해 총시간을 비교한다."""
-    provided = {row['id']: (pool['name'], row) for pool in pools for row in pool['courses']}
+    provided = {row['id']: (pool['name'], row) for pool in pools for row in pool['courses']
+                if course_levels.eligible(row, 'A2')}
     for rid, (_, row) in provided.items():
         if rid not in cache:
             cache[rid] = facts(sources.get(rid, row), project, selection)
     result = []
+    skill_specs = {skill['name']: skill for skill in selection['skills']}
     for pool in pools:
-        local = {row['id']: row for row in pool['courses']}
+        local = {row['id']: row for row in pool['courses'] if course_levels.eligible(row, 'A2')}
         shared = list(local.values())
         for rid, (origin, row) in provided.items():
             source = sources.get(rid) or {}
             info = cache[rid]
             if (rid in local or source.get('type') != 'course' or not source.get('usable')
-                    or pool['name'] not in (source.get('skills') or []) or not suitable(info, pool['name'])):
+                    or pool['name'] not in (source.get('skills') or []) or not suitable(info, pool['name'])
+                    or not course_applicable(info, skill_specs[pool['name']])):
                 continue
             card = deepcopy(row)
             card.pop('retrievalScore', None)
@@ -136,8 +136,11 @@ def share_candidates(pools: list[dict], project: dict, selection: dict, sources:
     for pool in aligned:
         rows = pool['courses']
         ordered = rank(rows, project, selection, {'name': pool['name']}, limit=6, cache=cache)
-        if rows and suitable(cache[rows[0]['id']], pool['name']):
-            ordered = [rows[0]] + [row for row in ordered if row['id'] != rows[0]['id']]
+        if (rows and ordered and course_levels.eligible(rows[0], 'A2')
+                and (len(pools) > 1 or rows[0]['id'] in {r['id'] for r in ordered})
+                and suitable(cache[rows[0]['id']], pool['name'])
+                and focus_priority(cache[rows[0]['id']], pool['name']) >= focus_priority(cache[ordered[0]['id']], pool['name'])):
+            ordered = distinct_courses([rows[0], *ordered, *rows])
         shortlist.append({**pool, 'courses': ordered[:6]})
     return shortlist
 
@@ -152,7 +155,8 @@ def study_plan(pools: list[dict], project: dict, selection: dict, references: di
                 cache[row['id']] = facts(row, project, selection)
     aligned = align_shared_courses(pools, project, selection, cache)
     picked = [pool['courses'][0] for pool in aligned]
-    if any(not suitable(cache[row['id']], pool['name']) for pool, row in zip(aligned, picked)):
+    if any(not course_levels.eligible(row, 'A2') or not suitable(cache[row['id']], pool['name'])
+           for pool, row in zip(aligned, picked)):
         return None
     unique = {row['id']: row for row in picked}
     statuses = {time_certainty(row) for row in unique.values()}

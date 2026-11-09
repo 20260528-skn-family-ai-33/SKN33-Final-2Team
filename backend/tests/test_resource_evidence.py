@@ -26,8 +26,9 @@ class ResourceEvidenceTests(unittest.TestCase):
             self.assertLessEqual(len(units),3)
             return {'skills':[{'name':'SQL','courses':[{'key':'S1-C1'}],'books':[]}]}
         for pid in ('A1','A2','A3'):
-            pools=[{'name':'SQL','application':self.skill['application'],'courses':[row],'books':[]}]
-            result=recommend_resources(self.project,self.selection,{'sql':row},generate,course={'id':pid},retrieved_pools=pools)
+            active=dict(row,difficulty='ADVANCED' if pid=='A3' else 'INTERMEDIATE')
+            pools=[{'name':'SQL','application':self.skill['application'],'courses':[active],'books':[]}]
+            result=recommend_resources(self.project,self.selection,{'sql':active},generate,course={'id':pid},retrieved_pools=pools)
             self.assertEqual(result['skills'][0]['selectedCourse'],'sql')
         self.assertEqual(row,original)
 
@@ -50,7 +51,7 @@ class ResourceEvidenceTests(unittest.TestCase):
         self.assertEqual(evidence.outline(row,self.project,self.selection,self.skill),[])
 
     def test_course_scope_and_depth_reach_model_without_repeated_old_activity_payload(self):
-        row=resource([{'title':'SQL 결과 검증'}])
+        row=dict(resource([{'title':'SQL 조인 결과 검증'}]),difficulty='ADVANCED')
         target={'name':'SQL','application':'조인 정합성 검증','targetOutcome':'SQL 대안 비교',
                 'completionCriteria':['동일 결과 확인','실행 계획 비교']}
         course={'id':'A3','name':'Challenge','scope':'SQL 결과 검증','learningSkills':[target],
@@ -98,14 +99,13 @@ class ResourceEvidenceTests(unittest.TestCase):
         pools,_=rag.retrieve(self.project,self.selection,rows,{'id':'A1'},
                             embed=lambda texts:[[1.]+[0.]*(rag.DIMENSIONS-1) for _ in texts],search=search)
         self.assertEqual(search.call_args.args[3],20)
-        self.assertEqual(len(pools[0]['courses']),6)
-        self.assertEqual(pools[0]['courses'][0]['id'],'6')
+        self.assertEqual([row['id'] for row in pools[0]['courses']], ['6'])
 
-    def test_challenge_prefers_grounded_comparison_evidence_without_a_difficulty_quota(self):
+    def test_challenge_prefers_grounded_comparison_within_the_allowed_difficulty(self):
         rows={'basic':resource([{'title':'SQL 조인 실행'}]),
               'deep':resource([{'title':'SQL 조인 결과 검증과 실행 계획 비교'}]),
               'unrelated':resource([{'title':'이미지 분류 성능 최적화'}])}
-        for key,row in rows.items():row.update(id=key,retrievalScore=.8,hours=2)
+        for key,row in rows.items():row.update(id=key,retrievalScore=.8,hours=2,difficulty='ADVANCED')
         self.skill.update(targetOutcome='SQL 조인 대안 비교',completionCriteria=['SQL 결과 검증','실행 계획 비교'])
         result=evidence.rank_applicable(list(rows.values()),self.project,self.selection,self.skill,{'id':'A3'},limit=6,sources=rows,cache={})
         self.assertEqual(result[0]['id'],'deep')
@@ -132,7 +132,7 @@ class ResourceEvidenceTests(unittest.TestCase):
                 boilerplate = dict(resource([{'title': generic}] * 12), id='generic', title=f'{name} 고급',
                                    skills=[name], retrievalScore=.93, difficulty='ADVANCED')
                 substantive = dict(resource([{'title': '과정 안내'}]), id='actual', title=f'{name} 자료',
-                                   skills=[name], retrievalScore=.74, difficulty='BEGINNER',
+                                   skills=[name], retrievalScore=.74, difficulty='ADVANCED',
                                    content='과정 안내\n' + '일반 수강 안내. ' * 80 + '\n' + actual)
                 sources = {row['id']: row for row in (boilerplate, substantive)}
                 for track in ('A1', 'A3'):
@@ -155,6 +155,8 @@ class ResourceEvidenceTests(unittest.TestCase):
                              title=f'Python 기초 {i}', retrievalScore=.99 - i * .005) for i in range(8)}
         rows['8'] = dict(resource([{'title': 'Asyncio 코루틴 작업 취소 실습'}]), id='8', title='Python 동시성',
                          skills=[name], retrievalScore=.7)
+        for row in rows.values():
+            row['difficulty'] = 'ADVANCED'
         ranked = evidence.rank_applicable(list(rows.values()), project, selection, skill, 'A3', limit=6,
                                           sources=rows, cache={})
         self.assertEqual(ranked[0]['id'], '8')

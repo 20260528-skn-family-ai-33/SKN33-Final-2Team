@@ -15,7 +15,7 @@ from .base import Col, Row, Sheet, merged
 NAME, TITLE = 'education', '교육 데이터'
 EST = {'format': '형식', 'hours': '시간', 'stage': '단계', 'cost': '비용'}
 EST_IN = {v: k for k, v in EST.items()}
-DIFF = {'BEGINNER': '초급', 'INTERMEDIATE': '중급', 'ADVANCED': '고급'}
+DIFF = {'BEGINNER': '초급', 'INTERMEDIATE': '중급', 'UPPER_INTERMEDIATE': '중상', 'ADVANCED': '고급'}
 DIFF_IN = {v: k for k, v in DIFF.items()}
 CERT_ST = {'ready': '진행', 'retiring': '폐지 예정', 'retired': '폐지', 'needs_enrichment': '정보 보강 필요', 'availability_needs_review': '시행 여부 확인 필요',
            'excluded': '추천 제외', 'deleted': '삭제됨'}

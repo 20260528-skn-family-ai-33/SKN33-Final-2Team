@@ -38,7 +38,8 @@ def main(argv=None):
                 'tests.test_local_runtime','tests.test_snapshot_compatibility','tests.test_course_supplement',
                 'tests.test_knowledge_documents','tests.test_knowledge_search','tests.test_course_sources',
                 'tests.test_instructional_content','tests.test_ingestion_execution','tests.test_resource_refresh',
-                'tests.test_course_duration','tests.test_course_curriculum','tests.test_synthetic_employee_profiles']
+                'tests.test_course_duration','tests.test_course_curriculum','tests.test_synthetic_employee_profiles',
+                'tests.test_internal_training.PackageTests']
     with patch.dict(os.environ,{'EMPLOYEE_FORM_TEST_DB_URL':''}):
         unit=run_tests(unit_names,out/'unit_tests.log')
     report={'checked_at_utc':datetime.now(timezone.utc).isoformat(),'unit':unit,'paid_api_calls':0}

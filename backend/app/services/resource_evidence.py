@@ -5,6 +5,7 @@ import math
 import re
 import unicodedata
 from app import catalog_candidates as evidence
+from app import course_levels
 from app.english_patterns import english_token as _en
 from app.services.course_skills import crash_core_fields
 from app.services.technology_mentions import applied_technologies, canonical_versions, technology_pattern
@@ -32,7 +33,11 @@ _aliases = {
     'RDBMS': ('rdbms', '모델링', '정규화', '관계형', '데이터베이스 설계'),
     'SQL': ('sql', '조인', '쿼리'),
     'EDA': ('eda', '탐색적', '전처리', 'pandas', '판다스', '데이터 분석'),
-    'ETL': ('etl', 'elt', 'dbt', '데이터 파이프라인', 'data pipeline', '데이터 적재', '데이터 수집', '데이터 변환'),
+    'ETL': ('etl', 'elt', 'dbt', 'airflow', '에어플로우', '데이터 파이프라인', 'data pipeline', '데이터 적재', '데이터 수집', '데이터 변환'),
+    '대용량 트래픽': ('캐시', '캐싱', 'cache', 'caching', '트래픽', '부하 테스트', 'load balancing'),
+    '웨어하우스': ('olap', '웨어하우스', 'warehouse', '차원 모델', '차원 키', '분석 마트', 'scd', '데이터 계보'),
+    'POSIX': ('posix', '시스템 호출', '시스템 콜', 'ipc', 'fork', 'waitpid', 'mmap', 'sem_wait', 'sem_post', '세마포어', '공유 메모리'),
+    '시스템 & OS 보안': ('os 보안', '시스템 보안', '하드닝', '보안 강화', '권한 변경', '파일 권한', '감사 로그', 'linux audit', 'auditd', '접근 제어'),
     '리눅스': ('linux', '리눅스', 'bash', 'shell', '쉘'),
     '멀티스레딩': ('멀티스레딩', '스레드', '동시성', 'threading', 'multithreading', 'concurrency', 'asyncio',
                 'race condition', '경쟁 상태', '경쟁 조건', '동기화', 'synchronization'),
@@ -93,6 +98,8 @@ _etl_targets = tuple((re.compile(request, re.I), re.compile(unit, re.I)) for req
 # 스킬 태그가 넓어도 명시된 기술/학습 대상은 실제 학습 근거에서 찾는다.
 # label이 있는 대상은 요구 단계의 학습 근거에서 다시 확인한다. dbt는 아래 세부 대상으로 확인한다.
 _scope_topics = (
+    ('데이터 계보', r'웨어하우스|거버넌스', r'계보|' + _en('lineage'), r'계보|변환 경로|' + _en('lineage')),
+    (None, r'POSIX|동시성', r'세마포어|' + _en('semaphores?'), r'세마포어|' + _en('semaphores?|sem_wait|sem_post')),
     (None, r'ETL|파이프라인', _dbt.pattern, _dbt.pattern),
     ('SQL 조인', r'SQL|RDBMS', r'조인|' + _en(r'joins?'), r'조인|' + _en(r'joins?')),
     ('토큰화', r'RAG|NLP|자연어', r'토큰화|' + _en(r'tokeniz\w*'), r'토큰|' + _en(r'tokens?|tokeniz\w*')),
@@ -109,7 +116,8 @@ _stacks = {
     'python': r'python|파이썬|asyncio', 'java': r'java|자바(?!스크립트)',
     'javascript': r'javascript|typescript|node\.?js|자바스크립트|타입스크립트',
     'aws': r'aws|아마존\s*웹', 'azure': r'azure|애저', 'gcp': r'gcp|google\s*cloud',
-    'pytorch': r'pytorch|파이토치', 'tensorflow': r'tensorflow|텐서플로(?:우)?',
+    'pytorch': r'pytorch|파이토치|torchvision|torch\.(?:nn|optim|utils\.data)',
+    'tensorflow': r'tensorflow|텐서플로(?:우)?',
 }
 _stack_patterns = {name: re.compile(r'(?<![a-z0-9])(?:' + pattern + r')(?![a-z0-9])', re.I)
                    for name, pattern in _stacks.items()}
@@ -139,6 +147,15 @@ def _stack_names(text: str) -> set[str]:
 def normalize(value: object) -> str:
     """조합형 한글도 검색과 원문 발췌에서 같은 문자로 비교한다."""
     return unicodedata.normalize('NFKC', str(value or ''))
+
+
+_sql_engines = {
+    'postgresql': re.compile(r'postgres(?:ql)?|포스트그레', re.I),
+    'mysql': re.compile(r'mysql|마이에스큐엘', re.I),
+    'oracle': re.compile(r'oracle|오라클', re.I),
+    'sqlserver': re.compile(r'mssql|sql\s*server|transact.sql', re.I),
+    'sqlite': re.compile(r'sqlite', re.I),
+}
 
 
 def crash_core_scope(skill: dict) -> dict:
@@ -173,6 +190,33 @@ def _core_stack_names(texts: list[str]) -> set[str]:
 
 def _skill_context(skill: dict) -> str:
     return normalize(' '.join(_target_texts(skill, crash_core_scope(skill)))).casefold()
+
+
+def course_selection(project: dict, selection: dict, course: dict | None) -> dict:
+    """강좌 관련성은 직원의 목표와 스킬로 판단한다. 생성된 코스 문장은 정렬·설명용이다."""
+    skill_labels = {normalize(skill['name']).casefold() for skill in selection['skills']}
+    goal = ' '.join(dict.fromkeys(str(project.get(k) or '').strip()
+                                  for k in ('goal', 'desiredCompetencies', 'projectSummary')
+                                  if k != 'desiredCompetencies'
+                                  or normalize(project.get(k)).casefold() not in skill_labels)).strip()
+    # 구버전 초안은 코스별 스킬이 생기기 전에 정한 공통 적용 범위를 가지고 있다.
+    scoped = bool((course or {}).get('learningSkills'))
+    return {'skills': [{'name': skill['name'], 'fromEmployeeGoal': scoped,
+                        'application': goal if scoped else skill.get('application') or goal}
+                       for skill in selection['skills']]}
+
+
+def requested_topics(skill):
+    from app.services import course_focus
+    return course_focus.requested(skill['name'], _skill_context(skill))
+
+
+def focus_priority(info, name):
+    profile = info.get('suitability', {}).get(name, {})
+    if (name not in info['supported'] or not info.get('scopeEvidence', {}).get(name, True)
+            or profile.get('missingStack') or profile.get('conflictingStack') or target_gaps(info, name)):
+        return 0
+    return info.get('focusScores', {}).get(name, 0)
 
 
 def _goal_context(project: dict, skill: dict) -> str:
@@ -251,15 +295,16 @@ def _stack_evidence(text: str, applied: list[str], project: dict, skill: dict, s
     core = crash_core_scope(skill)
     local = normalize(' '.join(_target_texts(skill, core))).casefold()
     context = local if core else normalize(project.get('goal')) + ' ' + local
-    requested = _core_stack_names(_target_texts(skill, core)) if core else _stack_names(context)
+    employee_scope = skill.get('fromEmployeeGoal')
+    requested = _core_stack_names(_target_texts(skill, core)) if core or employee_scope else _stack_names(context)
     # Crash는 요구 단계의 긍정적 학습 근거만 기술 충족과 런타임 충돌에 사용한다.
-    actual = _core_stack_names(applied) if core else _stack_names(text)
+    actual = _core_stack_names(applied) if core or employee_scope else _stack_names(text)
     name = normalize(skill['name'])
     web_skill = bool(re.search(r'웹\s*프레임워크|RESTful|API|백엔드', name, re.I))
     programming = bool(re.search(r'Python|파이썬|프로그래밍', name, re.I))
     cloud_skill = bool(re.search(r'클라우드|cloud', name, re.I))
     # 다른 스킬의 구현 스택은 개념 학습에 전파하지 않는다. 자체 도구를 명시한 학습은 예외다.
-    if not core and stage in ('conceptual', 'design', 'security'):
+    if not core and not employee_scope and stage in ('conceptual', 'design', 'security'):
         required = _stack_names(local) & ({'aws', 'azure', 'gcp'} if cloud_skill else set())
         return sorted(required), sorted(required - set().union(*(_stack_names(value) for value in applied))), []
     if core:
@@ -273,7 +318,7 @@ def _stack_evidence(text: str, applied: list[str], project: dict, skill: dict, s
             required |= requested & {'aws', 'azure', 'gcp'}
         if re.search(r'pytorch|tensorflow|파이토치|텐서플로', name, re.I):
             required |= _stack_names(local) & {'pytorch', 'tensorflow'}
-    taught = actual if core else set().union(*(_stack_names(value) for value in applied))
+    taught = actual if core or employee_scope else set().union(*(_stack_names(value) for value in applied))
     missing = required - taught
     conflicts = set()
     # RAG 구현은 다른 언어의 개념을 전이할 수 있으나 전용 구현을 동일한 실습으로 세지 않는다.
@@ -295,6 +340,16 @@ def suitable(info: dict, skill: str) -> bool:
             and not (info.get('hasAnchors') and not info.get('anchorHits')))
 
 
+def course_applicable(info: dict, skill: dict) -> bool:
+    """세 코스가 공유하는 목표·스킬·실제 학습 근거 문턱. 계획의 코스별 예시는 요구하지 않는다."""
+    name = skill['name']
+    profile = info['suitability'][name]
+    return bool(name in info['supported'] and info['scopeEvidence'][name]
+                and not profile['missingStack'] and not profile['conflictingStack']
+                and profile['evidenceLevel'] in ('applied', 'conceptual')
+                and (not requested_topics(skill) or info.get('focusScores', {}).get(name, 0)))
+
+
 def suitability_key(info: dict, skill: str) -> tuple:
     profile = (info.get('suitability') or {}).get(skill)
     if profile is None:
@@ -305,7 +360,7 @@ def suitability_key(info: dict, skill: str) -> tuple:
 
 
 def _profile(skill: dict, project: dict, rows: list, descriptions: list[str], text: str, supported: bool, scope: bool,
-             *, discussion_context: bool = False) -> dict:
+             *, discussion_context: bool = False, focused_units=frozenset()) -> dict:
     stage = _stage(project, skill)
     terms = skill_terms(skill)
     name = normalize(skill['name'])
@@ -319,7 +374,7 @@ def _profile(skill: dict, project: dict, rows: list, descriptions: list[str], te
         if linux_security:
             return bool(not _windows.search(value + ' ' + section)
                         and (_linux_controls.search(value) or _os_controls.search(value)))
-        if evidence.matches(value, terms):
+        if value in focused_units or evidence.matches(value, terms):
             return True
         if course_related and concurrency_skill and re.search(_async_io, value, re.I):
             return True
@@ -342,6 +397,10 @@ def _profile(skill: dict, project: dict, rows: list, descriptions: list[str], te
     def satisfies(value, stage):
         if stage in ('build', 'operate', 'security') and _intro_only.search(value) and not _practice.search(value):
             return False
+        # 구체적인 주제와 작업을 함께 가르치는 차시는 '설계/구현'이라는 특정 낱말 없이도 근거다.
+        # 보안·운영은 별도의 실제 검증·운영 행동 검사를 유지한다.
+        if value in focused_units and stage in ('conceptual', 'design', 'build'):
+            return True
         if stage == 'security':
             if linux_security:
                 return bool((_os_controls.search(value) or _linux_controls.search(value))
@@ -352,10 +411,15 @@ def _profile(skill: dict, project: dict, rows: list, descriptions: list[str], te
         if stage == 'design':
             return bool(_design.search(value))
         if stage == 'build':
+            if value in focused_units and re.search(r'웹\s*프레임워크|RESTful', name, re.I):
+                from app.services.course_focus import drf_practice
+                if drf_practice(value):
+                    return True
             return bool(_build.search(value) or (re.search(_async_io, value, re.I)
                         and (re.search(r'사용|취소|병렬\s*처리|' + _en(r'(?:cancell?\w*|await|asyncio\.\w+)'), value, re.I)
                              or (concurrency_skill and _io_workload.search(value) and _async_comparison.search(value)))))
         return bool(_concept.search(value) or _design.search(value) or _foundations.search(value)
+                    or re.search(r'정합성 검증|성능 측정|부하 테스트|변경 모델링', value)
                     or _discussion.search(value) or _question.search(value)
                     or _build.search(value) or _operate.search(value) or _security.search(value))
     # '구현이 궁금해요'라는 질문과 '개발 팁'이라는 발표 소개는 구현 수업의 증거가 아니다.
@@ -452,6 +516,7 @@ def learning_rows(item: dict) -> list[tuple[int, dict, str]]:
     return result
 
 def facts(item: dict, project: dict, selection: dict) -> dict:
+    from app.services.course_focus import claims, lesson_score
     rows = learning_rows(item)
     # 수집 소개문에는 전체 목차가 붙기도 한다. 섹션명·중단 단원이 소개 근거로 재진입하지 않게 한다.
     outline_lines = {line.strip() for row in (item.get('curriculum') or {}).get('items') or [] if isinstance(row, dict)
@@ -465,6 +530,17 @@ def facts(item: dict, project: dict, selection: dict) -> dict:
                   and any(_dbt_facets(row, value, targets) for _, row, value in rows)}
     supported = [skill['name'] for skill in selection['skills'] if skill['name'] in (item.get('skills') or [])
                  and (skill['name'] in dbt_scoped or evidence.matches(text, skill_terms(skill)))]
+    focused = {}
+    focus_scores = {}
+    for skill in selection['skills']:
+        name = skill['name']
+        topics = requested_topics(skill)
+        units = [row[2] for row in rows] + list(claims(descriptions)) if topics else []
+        scores = [(lesson_score(topics, title, unit), unit) for unit in units] if topics else []
+        focus_scores[name] = max((score for score, _ in scores), default=0)
+        focused[name] = {unit for score, unit in scores if score}
+        if focused[name] and name in (item.get('skills') or []) and name not in supported:
+            supported.append(name)
     topics = project_terms(project)
     hits = evidence.matches(text, topics)
     goal = normalize(project.get('goal')).casefold()
@@ -476,6 +552,18 @@ def facts(item: dict, project: dict, selection: dict) -> dict:
         context = _goal_context(project, skill) + ' ' + _skill_context(skill)
         scoped_analysis = bool(re.search(r'python|파이썬|EDA|탐색적', skill['name'], re.I) and _analysis_scope.search(context))
         scope[skill['name']] = not scoped_analysis or bool(_analysis_evidence.search(text))
+        if skill.get('fromEmployeeGoal') and re.search(r'SQL|RDBMS', skill['name'], re.I):
+            wanted = {k for k, pattern in _sql_engines.items() if pattern.search(context)}
+            if wanted:
+                covered = {k for k, pattern in _sql_engines.items() if pattern.search(text)}
+                # 제품 비교 한 차시가 주된 실습 환경을 뒤집지 않게 제목·개별 차시를 확인한다.
+                teaching = [title, *(value for _, _, value in rows)] if rows else [title, *descriptions]
+                primary = {next(iter(engines)) for unit in teaching
+                           if len(engines := {k for k in covered if _sql_engines[k].search(unit)}) == 1}
+                platforms = primary or covered
+                scope[skill['name']] &= not platforms or bool(wanted & platforms)
+                if wanted & primary and focus_scores[skill['name']]:
+                    focus_scores[skill['name']] += 1
         if re.search(r'python|파이썬', skill['name'], re.I) and _log_topic.search(context):
             scope[skill['name']] &= bool(_log_learning.search(text))
         if re.search(r'RAG|NLP|자연어', skill['name'], re.I) and _document_target.search(_skill_context(skill)):
@@ -506,10 +594,11 @@ def facts(item: dict, project: dict, selection: dict) -> dict:
     discussion_context = bool(_discussion.search(normalize(item.get('title')) + '\n' + '\n'.join(descriptions)))
     profiles = {skill['name']: _profile(skill, project, rows, descriptions, text,
                                        skill['name'] in supported, scope[skill['name']],
-                                       discussion_context=discussion_context) for skill in selection['skills']}
+                                       discussion_context=discussion_context, focused_units=focused[skill['name']]) for skill in selection['skills']}
     for name in document_gaps:
         profiles[name]['unverifiedTargetTopics'] = [*target_gaps({'suitability': profiles}, name), '문서 입력·전처리']
     return {'rows': rows, 'descriptions': descriptions, 'title': title, 'supported': supported,
+            'focusScores': focus_scores, 'focusedUnits': focused,
             'scopeEvidence': scope, 'suitability': profiles, 'topicHits': hits,
             'topicCoverage': hits / len(topics) if topics else 1,
             'hasAnchors': bool(anchor_terms), 'anchorHits': evidence.matches(text, anchor_terms)}
@@ -560,11 +649,12 @@ def outline(item: dict, project: dict, selection: dict, skill: dict, course=None
         text = row[2]
         focused, tagged = evidence.matches(text, local), evidence.matches(text, terms)
         targeted = facets.get(row[0], set())
-        related = focused or tagged or targeted or evidence.matches(text, topic) or row[0] in stage_units
+        direct = text in info.get('focusedUnits', {}).get(skill['name'], ())
+        related = direct or focused or tagged or targeted or evidence.matches(text, topic) or row[0] in stage_units
         depth = len(_depth.findall(text)) if challenge and (focused or tagged) and _depth_evidence(text) else 0
         return (4 * min(focused, 4) + 2 * min(tagged, 2) + min(evidence.matches(text, topic), 3)
                 + 3 * min(depth, 2) + 4 * (row[0] in stage_units) + 6 * len(targeted)
-                + 3 * bool(targeted and not _concept.search(text))) if related else 0
+                + 3 * bool(targeted and not _concept.search(text)) + 4 * direct) if related else 0
 
     remaining = [row for row in info['rows'] if score(row) > 0]
     ordered, covered, covered_facets = [], set(), set()
@@ -640,8 +730,22 @@ def rank_applicable(rows: list[dict], project: dict, selection: dict, skill: dic
             cache[row['id']] = facts(sources.get(row['id'], row), project, selection)
         info = cache[row['id']]
         focus, depth, title = _rank_signals(info, project, skill, challenge)
-        return (not suitable(info, skill['name']), *suitability_key(info, skill['name']),
-                len(target_gaps(info, skill['name'])), -focus, -depth,
+        band = course_levels.preference(sources.get(row['id'], row), 'A3') if challenge else 0
+        practice = focus_priority(info, skill['name'])
+        # 같은 목표 실습을 다루면 Challenge에서는 키워드 일치 횟수보다 심화 차시와 수준을 앞세운다.
+        return (band, not bool(practice), not suitable(info, skill['name']), -depth, -practice, *suitability_key(info, skill['name']),
+                len(target_gaps(info, skill['name'])), -focus,
                 -float(row.get('retrievalScore') or 0), -title, row['id'])
 
-    return sorted(rows, key=key)[:limit]
+    from app.services.course_focus import distinct_courses
+    track = (course.get('id') if isinstance(course, dict) else course)
+    eligible = []
+    for row in rows:
+        source = {**sources.get(row['id'], row), 'cost': row.get('cost')}
+        if not course_levels.eligible(source, track):
+            continue
+        if row['id'] not in cache:
+            cache[row['id']] = facts(sources.get(row['id'], row), project, selection)
+        if course_applicable(cache[row['id']], skill):
+            eligible.append(row)
+    return distinct_courses(sorted(eligible, key=key))[:limit]

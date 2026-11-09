@@ -7,7 +7,9 @@ from app.agents.resource_recommendations import recommend_resources, Recommendat
 
 def item(key, skills, kind='book', **extra):
     return {'id':key,'type':kind,'usable':True,'skills':skills,'title':key,'cost':100,'hours':2,
-            'content':'학습 설명 '+('소개 '*1000),**extra}
+            'content':'학습 설명 '+('소개 '*1000),
+            **({'difficulty':'ADVANCED','curriculum':{'items':[{'title':'RAG 문서 검색 구현과 NLP 토큰화 원리'}]}}
+               if kind=='course' else {}),**extra}
 
 
 class BookCandidateTests(unittest.TestCase):

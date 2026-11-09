@@ -191,6 +191,14 @@ def record(row: dict, for_mgr: bool = False) -> dict:
     rid = str(row['roadmap_id'])
     plan = dict(row['content'], rid=rid)
     versions = [dict(v['plan'], rid=rid) for v in db.all_('SELECT plan FROM app_ext.roadmap_versions WHERE roadmap_id = :r ORDER BY version', r=row['roadmap_id'])] or [plan]
+    for snapshot in [plan, *versions]:
+        definition = snapshot.get('def') or {}
+        report = definition.get('learningReport') or {}
+        recs = report.get('recommendations') or {}
+        if recs.get('skills'):
+            skills = [dict(skill, books=catalog.refresh_book_links(skill.get('books') or []),
+                           courses=catalog.refresh_course_levels(skill.get('courses') or [])) for skill in recs['skills']]
+            snapshot['def'] = dict(definition, learningReport=dict(report, recommendations=dict(recs, skills=skills)))
     prog = {}
     for p in db.all_('SELECT activity_id, status, memo, attachment, updated_at FROM app_ext.activity_progress WHERE roadmap_id = :r', r=row['roadmap_id']):
         prog[p['activity_id']] = {'status': p['status'], 'at': _d(p['updated_at'])} if for_mgr else {'status': p['status'], 'memo': p['memo'] or '', 'file': p['attachment'], 'at': _d(p['updated_at'])}
@@ -395,9 +403,7 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
                        details={**(previous_handoff.get('details') or {}), 'etc': constraint})
     req = str(rev.get('note') or '').strip()
     done = {p['activity_id'] for p in db.all_("SELECT activity_id FROM app_ext.activity_progress WHERE roadmap_id = :r AND status = 'done'", r=row['roadmap_id'])}
-    requirement_fields = ('goal', 'projectSummary', 'desiredCompetencies', 'details', 'userNotes')
     inp = {'pid': ch['pid'], 'handoff': handoff,
-           'previousHandoff': {k: previous_handoff[k] for k in requirement_fields if k in previous_handoff},
            'changes': ch['c'], 'request': req or None, 'fromComment': rev.get('fromComment') or False,
            'plan': {k: base.get(k) for k in ('opt', 'name', 'tagline', 'def', 'hours', 'start')} | {'acts': [dict(a, done=a['id'] in done) for a in base['acts']]}}
     with db.tx() as t:

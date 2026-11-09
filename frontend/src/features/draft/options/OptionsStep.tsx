@@ -11,7 +11,6 @@ import { materialVersionKey } from '../result/materialVersion';
 import { usePrepareMaterials, ResourceSelection, type ResourceSelectionHandle, type MaterialTotals } from '../result/ResultStep';
 import { completeMaterialSelection } from '../materials/materialTransition';
 import { OptionSummary } from './OptionSummary';
-import { crashCore, crashCoreExpandable } from './crashCore';
 import { comparisonEvidence } from './comparisonEvidence';
 import { trackName } from '@/shared/constants/data';
 /* 5. 3안 비교표 (10/14 · 5차 scr['new-options']): 열 순서는 A1·A2·A3 고정.
@@ -350,8 +349,7 @@ export function OptionsStep() {
           <button type="button" className="course-regenerate" disabled={busy} onClick={() => void regenerateWithMaterials(p.opt)}>{busy ? '계획 생성 중…' : '해당 계획 다시 생성'}</button>
         </div>
         <small className="course-tagline">{planDescription(p.tagline)}</small>
-        <OptionSummary id={`course-summary-${p.opt}`} reason={p.def.reason} pros={p.def.pros} expanded={summariesOpen}
-          core={p.opt === 'A2' ? crashCore(p.def.learningSkills) : null} />
+        <OptionSummary id={`course-summary-${p.opt}`} reason={p.def.reason} pros={p.def.pros} expanded={summariesOpen} />
         <Ver p={p} />
         {err && !busy ? (
           <>
@@ -417,8 +415,7 @@ export function OptionsStep() {
                     </button></div></th>;
                 })}
               </tr>
-              {ps.some(plan => optionSummary(plan.def.reason, plan.def.pros).expandable
-                || (plan.opt === 'A2' && crashCoreExpandable(crashCore(plan.def.learningSkills)))) &&<tr><th /><th colSpan={3} style={{ textAlign: 'center', padding: '2px 8px 7px', fontWeight: 400 }}><button type="button" className="course-more" aria-expanded={summariesOpen} aria-controls={ps.map(plan => `course-summary-${plan.opt}`).join(' ')} onClick={() => setSummariesOpen(open => !open)}>{summariesOpen ? '접기' : '더보기'}</button></th></tr>}
+              {ps.some(plan => optionSummary(plan.def.reason, plan.def.pros).expandable) &&<tr><th /><th colSpan={3} style={{ textAlign: 'center', padding: '2px 8px 7px', fontWeight: 400 }}><button type="button" className="course-more" aria-expanded={summariesOpen} aria-controls={ps.map(plan => `course-summary-${plan.opt}`).join(' ')} onClick={() => setSummariesOpen(open => !open)}>{summariesOpen ? '접기' : '더보기'}</button></th></tr>}
             </thead>
             <tbody>
               {row('자료 학습 예상 기간', (p) => (

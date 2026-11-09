@@ -121,7 +121,7 @@ function Preview() {
                       <b>{r.title}</b>{' '}
                       <span className="small muted">
                         {r.kind} · {resourceSource(r)}
-                        {r.real ? '' : ' · 가상'}
+                        {r.real || r.platform === '사내교육' ? '' : ' · 가상'}
                       </span>
                     </span>
                   </li>

@@ -25,6 +25,23 @@ if ($info.embedding_model -ne $contract.model -or $info.embedding_dimensions -ne
     $info.model_provenance.pooling -ne $contract.pooling -or $info.model_provenance.normalization -ne $contract.normalization) {
   throw '지원하는 BGE 모델·revision·가중치·pooling·정규화 계약과 다릅니다.'
 }
+$expected = @{
+  'public.learning_resource_embeddings' = 2984
+  'regulations.rag_chunk_embeddings' = 1406
+  'knowledge.chunks' = 442
+}
+if ($null -ne $info.vector_tables) {
+  if (@($info.vector_tables).Count -ne $expected.Count) { throw 'manifest의 벡터 표 목록이 다릅니다.' }
+  foreach ($table in @($expected.Keys)) {
+    $rows = @($info.vector_tables | Where-Object { $_.table -eq $table })
+    if ($rows.Count -ne 1 -or [long]$rows[0].n -le 0 -or $rows[0].embedding_model -ne $contract.model -or
+        $rows[0].dimensions -ne $contract.dimensions -or $rows[0].actual_dims -ne $contract.dimensions -or
+        $rows[0].invalid -ne 0) { throw "manifest 벡터 내역 오류: $table" }
+    $expected[$table] = [long]$rows[0].n
+  }
+}
+$vectorCount = ($expected.Values | Measure-Object -Sum).Sum
+if ($null -ne $info.vectors -and $info.vectors -ne $vectorCount) { throw 'manifest 벡터 합계가 다릅니다.' }
 Write-Output "백업 검증 완료: $($info.archive), $($info.bytes) bytes, 대상 $Database"
 if (-not $Apply) { Write-Output '미리보기: DB 생성·복원을 수행하지 않았습니다. 실제 적용은 -Apply'; exit 0 }
 function Invoke-BgePg([string[]]$SqlArgs) {
@@ -56,8 +73,8 @@ if ($exists.Trim() -eq '0') {
 } else {
   $marker = Invoke-BgePg -SqlArgs @('-d',$Database,'-Atc',"SELECT to_regclass('growpath_bge_meta.restore_state')")
   if ($marker -and $marker.Trim() -ne '') {
-    $restoredHash = Invoke-BgePg -SqlArgs @('-d',$Database,'-Atc','SELECT archive_sha256 FROM growpath_bge_meta.restore_state LIMIT 1')
-    if ($restoredHash.Trim() -eq $info.sha256) { Write-Output '동일 백업이 이미 복원되어 있습니다. DB를 변경하지 않습니다.'; exit 0 }
+    $matchesArchive = Invoke-BgePg -SqlArgs @('-d',$Database,'-Atc',"SELECT count(*) FROM growpath_bge_meta.restore_state WHERE archive_sha256='$($info.sha256)'")
+    if ($matchesArchive.Trim() -eq '1') { Write-Output '동일 백업이 이미 복원되어 있습니다. DB를 변경하지 않습니다.'; exit 0 }
     throw '기존 복원 DB의 백업 해시가 다릅니다. 덮어쓰지 않습니다.'
   }
   $tables = Invoke-BgePg -SqlArgs @('-d',$Database,'-Atc',"SELECT count(*) FROM information_schema.tables WHERE table_schema NOT IN ('pg_catalog','information_schema') AND table_type='BASE TABLE'")
@@ -69,10 +86,11 @@ if ($LASTEXITCODE -ne 0) { throw '백업 파일 복사가 실패했습니다.' }
 & docker compose exec -T db sh -c 'exec pg_restore -U "$POSTGRES_USER" --single-transaction --exit-on-error --no-owner --no-acl -d "$1" "$2"' sh $Database $containerFile
 if ($LASTEXITCODE -ne 0) { throw '복원이 실패했습니다. 원본 DB는 변경하지 않았습니다.' }
 $verification = @"
+SET search_path=public,extensions;
 DO `$verify`$ BEGIN
-IF (SELECT count(*) FROM public.learning_resource_embeddings WHERE embedding_model='BAAI/bge-m3' AND dimensions=1024 AND vector_dims(embedding)=1024) <> 2984
-OR (SELECT count(*) FROM regulations.rag_chunk_embeddings WHERE embedding_model='BAAI/bge-m3' AND dimensions=1024 AND vector_dims(embedding)=1024) <> 1406
-OR (SELECT count(*) FROM knowledge.chunks WHERE embedding_model='BAAI/bge-m3' AND dimensions=1024 AND vector_dims(embedding)=1024) <> 442
+IF (SELECT count(*) FROM public.learning_resource_embeddings WHERE embedding_model='BAAI/bge-m3' AND dimensions=1024 AND vector_dims(embedding)=1024) <> $($expected['public.learning_resource_embeddings'])
+OR (SELECT count(*) FROM regulations.rag_chunk_embeddings WHERE embedding_model='BAAI/bge-m3' AND dimensions=1024 AND vector_dims(embedding)=1024) <> $($expected['regulations.rag_chunk_embeddings'])
+OR (SELECT count(*) FROM knowledge.chunks WHERE embedding_model='BAAI/bge-m3' AND dimensions=1024 AND vector_dims(embedding)=1024) <> $($expected['knowledge.chunks'])
 THEN RAISE EXCEPTION 'BGE vector counts differ from manifest'; END IF;
 END `$verify`$;
 CREATE TABLE IF NOT EXISTS growpath_bge_meta.restore_state(archive_sha256 text PRIMARY KEY, restored_at timestamptz NOT NULL DEFAULT now());
@@ -81,4 +99,4 @@ INSERT INTO growpath_bge_meta.restore_state(archive_sha256) VALUES ('$($info.sha
 Invoke-BgePg -SqlArgs @('-d',$Database,'-c',$verification)
 & docker compose exec -T db rm -f $containerFile
 if ($LASTEXITCODE -ne 0) { throw '복원은 완료됐으나 임시 백업 파일 정리에 실패했습니다.' }
-Write-Output "별도 $Database 복원 완료: BGE-M3 1024차원 4832개. 기존 DB는 보존했습니다."
+Write-Output "별도 $Database 복원 완료: BGE-M3 1024차원 $vectorCount 개."

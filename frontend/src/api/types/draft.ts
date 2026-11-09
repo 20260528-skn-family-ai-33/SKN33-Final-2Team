@@ -1,7 +1,7 @@
 /* 작성 중인 로드맵 (API-14~35) — 서버(drafts.present)가 돌려주는 작성 문서.
    화면이 고치는 칸(goal·project·prefs·detailsOk·answers·deep*·chosen·edit)과 서버만 쓰는 칸(quiz·diag·handoff·gen·…Run·…Fail·doc)이 섞여 있다.
    에이전트 결과 안쪽은 모델 출력이라 칸이 늘 수 있어 필요한 칸만 적는다 */
-import type { RegBundle, ResourceMap } from './catalog';
+import type { DifficultySource, RegBundle, ResourceMap } from './catalog';
 import type { StoredCause } from './common';
 
 /** 세부 사항(학습 여건) — 비우면 '알아서' */
@@ -182,7 +182,7 @@ export interface OptionDef {
   displayTitle?: string;
 }
 
-export type MaterialResource = { id: string; title: string; hours?: number | null; estimated?: string[]; timeStatus?: string; unverifiedTargetTopics?: string[]; [key: string]: unknown };
+export type MaterialResource = { difficulty?: string | null; difficultyEstimated?: boolean; difficultyBasis?: string; difficultySource?: DifficultySource; id: string; title: string; hours?: number | null; estimated?: string[]; timeStatus?: string; unverifiedTargetTopics?: string[]; [key: string]: unknown };
 type DiagnosticText = { detail: string; displayDetail?: string };
 export type BookDiagnostic = DiagnosticText & { reason: 'no_candidates' | 'insufficient_evidence' | 'scope_gap' };
 export type CourseDiagnostic = DiagnosticText & { reason: BookDiagnostic['reason'] | 'stack_mismatch' | 'longer_for_coverage' };

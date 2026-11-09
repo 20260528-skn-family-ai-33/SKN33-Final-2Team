@@ -1,10 +1,11 @@
 import { useState } from 'react';
+import { resourceImageUrl } from '@/shared/lib/resourceImageUrl';
 
 export function ResourceImage({ image, type, alt = '', className }: {
   image?: string | null; type: string; alt?: string; className?: string;
 }) {
   const [failed, setFailed] = useState<string | null>(null);
-  const original = image && /^https?:\/\//i.test(image) ? image : '';
+  const original = resourceImageUrl(image);
   const kind = type === 'book' || type === 'cert' ? type : 'course';
   const fallback = `/images/resource-${kind}.svg?v=20261101`;
   const src = original && failed !== original ? original : fallback;

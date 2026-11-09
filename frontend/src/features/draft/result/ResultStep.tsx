@@ -1,5 +1,6 @@
 import { MaterialBasis } from '@/shared/ui/MaterialBasis';
 import { hrs } from '@/shared/lib/format';
+import { courseDifficulty } from '@/shared/lib/courseDifficulty';
 import { materialVersionKey } from './materialVersion';
 import { loadRecommendations, recommendationUrl, requestMaterials as request, type Resource, type Result } from './materialRequests';
 import { MaterialReason } from './MaterialReason';
@@ -43,9 +44,11 @@ function ResourceCard({ resource, kind, checked, disabled, onChange, weeklyHours
       <span><b title={resource.title}>{resource.title}</b>{resource.aiRecommended && <span className="tag acc">AI 추천</span>}</span>
     </label>
     <div className="v2-resource-meta"><span>{resource.provider || '출처 미확인'} · {resource.cost == null ? '가격 미확인' : resource.cost === 0 ? '무료' : `${Number(resource.cost).toLocaleString()}원`}</span>
+    {kind === 'course' && resource.difficulty && <span>{courseDifficulty(resource)}</span>}
     <span>{kind === 'book' ? `도서 1주 배정 · ${hrs(weeklyHours)}` : resource.hours && resource.hours > 0 && resource.timeStatus !== 'unknown' ? `${hrs(resource.hours)}${resource.timeStatus === 'estimated' || resource.estimated?.includes('hours') ? ' (추정)' : ''}` : '시간 미확인 · 일정 1주 가정'}</span></div>
     {kind === 'course' && <UnverifiedTargets topics={resource.unverifiedTargetTopics} />}</div>
-    {resource.url && <a className="v2-resource-link" href={resource.url} draggable={false} target="_blank" rel="noreferrer" aria-label={`${resource.title} 바로가기`}>바로가기 ↗</a>}
+    {resource.url && <a className="v2-resource-link" href={resource.url} draggable={false} target="_blank" rel="noreferrer" aria-label={`${resource.title} 바로가기`}>{resource.provider === '사내교육' ? '사내교육 안내 보기' : '바로가기'} ↗</a>}
+    {kind === 'course' && resource.provider === '사내교육' && !resource.url && <a className="v2-resource-link" href={paths.resource(resource.id)} target="_blank" rel="noreferrer">과정 상세 보기</a>}
   </article>;
 
 }

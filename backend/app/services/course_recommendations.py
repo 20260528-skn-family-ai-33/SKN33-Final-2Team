@@ -107,8 +107,8 @@ def available_recommendations(recommendations: dict, course: str | None, *, refr
 
     filtered = []
     for row in rows:
-        courses = [item for item in row['courses'] if available(item, 'course')]
-        books = [item for item in row['books'] if available(item, 'book')]
+        courses = catalog.refresh_course_levels([item for item in row['courses'] if available(item, 'course')], items)
+        books = catalog.refresh_book_links([item for item in row['books'] if available(item, 'book')], items)
         result = dict(row, courses=courses, books=books)
         if 'selectedCourse' in row and not any(item['id'] == row['selectedCourse'] for item in courses):
             result['selectedCourse'] = None

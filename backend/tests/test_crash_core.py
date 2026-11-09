@@ -33,13 +33,17 @@ def course(key, hours, title, items):
 
 
 class CrashCoreTests(unittest.TestCase):
-    def test_guidance_is_crash_only_and_shared_by_every_stage(self):
+    def test_plan_core_governs_plans_and_tasks_while_resources_use_the_shared_goal(self):
         for stage in ('plan', 'resources', 'tasks', 'summary'):
-            self.assertIn(track_policy.CRASH_CORE_MARKER, track_policy.crash_guidance('A2', stage))
+            self.assertEqual(track_policy.CRASH_CORE_MARKER in track_policy.crash_guidance('A2', stage), stage != 'resources')
             self.assertEqual(track_policy.crash_guidance('A1', stage), '')
             self.assertEqual(track_policy.crash_guidance('A3', stage), '')
             self.assertEqual(track_policy.course_guidance('A3', stage), track_policy.challenge_guidance('A3', stage))
-        for text in (resource_instructions({'id': 'A2'}), task_instructions('A2'), summary_instructions('A2'),
+        resources = resource_instructions({'id': 'A2'})
+        self.assertNotIn(track_policy.CRASH_CORE_MARKER, resources)
+        self.assertNotIn('coreOutcome·coreCriteria를 충족', resources)
+        self.assertIn('직원 목표와 선정 스킬', resources)
+        for text in (task_instructions('A2'), summary_instructions('A2'),
                      generation('A2'), revision('A2')):
             self.assertEqual(text.count(track_policy.CRASH_CORE_MARKER), 1)
         for text in (resource_instructions({'id': 'A1'}), task_instructions('A3'), generation('A3'), revision('A1')):
@@ -62,7 +66,7 @@ class CrashCoreTests(unittest.TestCase):
                 course_skills.validate_recommendations([bad], {ETL}, 'A2', require_depth=True)
             self.assertEqual(cause(str(error.exception))['kind'], 'format')
 
-    def test_integrated_prompt_also_requests_learning_skills_for_required_legacy_crash(self):
+    def test_legacy_prompt_contract_is_independent_of_goal_wording(self):
         def system_for(handoff):
             captured = {}
             def model(ctx, value, payload, **kw):
@@ -77,8 +81,7 @@ class CrashCoreTests(unittest.TestCase):
                     patch.object(roadmap.rt, 'run', side_effect=lambda ctx, name, task, inp, mock, api, **kw: api(None)):
                 roadmap.option(SimpleNamespace(mode='openai'), {'pid': 'A2', 'handoff': handoff})
             return captured['system']
-        self.assertIn('[구형 Crash 필수 기술 응답 계약]', system_for({'goal': 'Django 사용 필수'}))
-        self.assertNotIn('[구형 Crash 필수 기술 응답 계약]', system_for({'goal': 'ETL 학습'}))
+        self.assertEqual(system_for({'goal': 'Django 사용 필수'}), system_for({'goal': 'ETL 학습'}))
 
     def test_previously_installed_integrated_prompt_receives_crash_contract_once(self):
         handoff = {'goal': 'dbt 증분 모델', 'assessmentGenerationId': 'g', 'selectedSkillsFixed': True,

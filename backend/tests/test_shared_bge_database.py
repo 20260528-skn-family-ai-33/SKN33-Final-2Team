@@ -176,6 +176,16 @@ class SharedBgeContractTest(unittest.TestCase):
             res = vbd.verify(check_counts=False)
             self.assertEqual(res['vectors'], 30)
 
+    def test_expanded_seed_requires_one_vector_per_internal_course(self):
+        from tools import verify_bge_database as vbd
+        with patch.object(vbd.db, 'val', side_effect=[406, 1]):
+            with self.assertRaisesRegex(ValueError, '사내교육 BGE 벡터 누락'):
+                vbd.verify()
+        counts = [3390, 1406, 442, 5238]
+        with patch.object(vbd.db, 'val', side_effect=[406, 0, 0, 0, 0]), \
+             patch.object(vbd.db, 'one', side_effect=[{'total': n, 'valid': n} for n in counts]):
+            self.assertEqual(vbd.verify()['vectors'], 5238)
+
     def test_knowledge_search_aborts_when_vectors_or_meta_are_incomplete(self):
         # 정상 1건, 누락 1건 (total=2, indexed=1)일 때 에러 발생 검증
         with patch.object(knowledge.db, 'val', return_value='knowledge.chunks'), \

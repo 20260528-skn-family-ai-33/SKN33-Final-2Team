@@ -6,14 +6,14 @@ from functools import lru_cache
 import json
 import math
 from time import perf_counter
-from app import db, llm
+from app import db
 from app import regulation_embeddings as embeddings
 from app.agents.resource_recommendations import RecommendationError, candidate_pools
-from app.services import book_candidates, resource_evidence
+from app.services import book_candidates, course_focus, resource_evidence
 
 MODEL = embeddings.BGE_MODEL
 DIMENSIONS = embeddings.BGE_DIMENSIONS
-VERSION = 'resource-pgvector-rag/v18-bge-m3-shared-db'
+VERSION = 'resource-pgvector-rag/v30-grounded-target-evidence'
 PER_KIND = 6
 COURSE_REVIEW = 20
 FIELDS = ('id','title','provider','cost','hours','estimated','image','url','skills','content','curriculum')
@@ -78,25 +78,63 @@ def search_vectors(resource_type, ids, vector, limit, free_only):
 def retrieve(project, selection, items, course=None, *, embed=None, search=None):
     started=perf_counter()
     free_only=bool(course and course.get('id')=='A1')
-    # 조건을 먼저 적용한다. 코스별 강좌는 벡터 상위 20개를 재평가하고 최종 후보는 종류별 6개다.
-    all_pools=candidate_pools(project,selection,items,limit=max(1,len(items)),free_only=free_only,course=course,rank_courses=False)
-    active=[index for index,pool in enumerate(all_pools) if pool['courses'] or pool['books']]
-    pools=[{'name':pool['name'],'application':pool['application'],'courses':[],'books':[]} for pool in all_pools]
+    track = (course or {}).get('id')
+    shared = resource_evidence.course_selection(project, selection, course)
+    all_pools = candidate_pools(dict(project, selectedCourse=None), selection, items,
+                                limit=max(1, len(items)), rank_courses=False)
+    active = [i for i, pool in enumerate(all_pools) if pool['courses'] or pool['books']]
+    pools = [dict(name=pool['name'], application=pool['application'], courses=[], books=[]) for pool in all_pools]
     if not active:
         return pools,{'version':version_for(course),'model':MODEL,'perKind':PER_KIND,'perCourse':PER_KIND,
                       'maxUniqueBooks':book_candidates.LIMIT,'matches':[],'elapsedMs':round((perf_counter()-started)*1000)}
-    texts=tuple(query_text(project,selection['skills'][index],course) for index in active)
-    vectors=validate_vectors((embed or cached_vectors)(texts),len(texts))
-    search=search or search_vectors
-    matches=[]
+    queries = {}
+    for i in active:
+        if all_pools[i]['courses']:
+            spec = shared['skills'][i]
+            queries[i, 'courses'] = json.dumps({'goal': project.get('goal'), 'skill': spec['name'],
+                                                'desiredCompetencies': project.get('desiredCompetencies'),
+                                                'projectSummary': project.get('projectSummary')},
+                                               ensure_ascii=False, sort_keys=True)
+        if all_pools[i]['books']:
+            queries[i, 'books'] = query_text(project, selection['skills'][i], course)
+    texts = tuple(dict.fromkeys(queries.values()))
+    vectors = dict(zip(texts, validate_vectors((embed or cached_vectors)(texts), len(texts)), strict=True))
+    search = search or search_vectors
+    matches = []
     from app.services import crash_courses
     crash_cache = {}
-    for index,vector in zip(active,vectors):
-        for key,kind,prefix in [('courses','courses',''),('books','books','book_')]:
-            allowed={row['id'][len(prefix):] if prefix and row['id'].startswith(prefix) else row['id']: row for row in all_pools[index][key]}
-            scoped_course = isinstance(course, dict) and course.get('id') in ('A1', 'A2', 'A3')
+    def has_learning_evidence(rid, name):
+        if rid not in crash_cache:
+            crash_cache[rid] = resource_evidence.facts(items[rid], project, shared)
+        info = crash_cache[rid]
+        spec = next(skill for skill in shared['skills'] if skill['name'] == name)
+        return resource_evidence.course_applicable(info, spec)
+
+    for index in active:
+        for key, kind, prefix in [('courses','courses',''), ('books','books','book_')]:
+            allowed = {row['id'].removeprefix(prefix): row for row in all_pools[index][key]}
+            if not allowed:
+                continue
+            vector = vectors[queries[index, key]]
+            scoped_course = track in ('A1', 'A2', 'A3')
             review_limit = (COURSE_REVIEW if key == 'courses' else book_candidates.REVIEW_LIMIT) if scoped_course else PER_KIND
-            rows=search(kind,list(allowed),vector,review_limit,free_only and key == 'courses') if allowed else []
+            limit = len(allowed) if scoped_course and key == 'courses' else review_limit
+            rows = search(kind, list(allowed), vector, limit, False)
+            if not rows:
+                raise RecommendationError('조건에 맞는 자료의 검색 벡터를 찾지 못했어요. 등록된 임베딩 상태를 확인해 주세요.')
+            if scoped_course and key == 'courses':
+                unique_ids = set()
+                for row in rows:
+                    rid = row['resource_id']
+                    if rid not in allowed or rid in unique_ids:
+                        raise RecommendationError('벡터 검색 결과가 허용된 자료와 일치하지 않아요.')
+                    unique_ids.add(rid)
+                    if not isinstance(row.get('similarity'), (int, float)) or not math.isfinite(row['similarity']):
+                        raise RecommendationError('자료 검색 유사도가 올바르지 않아요.')
+                rows = [dict(row, current_cost=row.get('current_cost', allowed[row['resource_id']].get('cost'))) for row in rows]
+                spec = shared['skills'][index]
+                rows = course_focus.course_window(rows, items, spec['name'], resource_evidence.requested_topics(spec),
+                                                  track, review_limit, has_learning_evidence)
             seen=set()
             found = []
             for match in rows[:review_limit]:
@@ -108,24 +146,22 @@ def retrieve(project, selection, items, course=None, *, embed=None, search=None)
                 if score is None or not math.isfinite(float(score)):raise RecommendationError('자료 검색 유사도가 올바르지 않아요.')
                 seen.add(rid)
                 found.append({**{field:row.get(field) for field in FIELDS},'retrievalScore':float(score),
-                              **({'timeStatus':row.get('timeStatus')} if key == 'courses' and crash_courses.is_crash(course) else {})})
+                              **({'difficulty':row.get('difficulty')} if key == 'courses' else {}),
+                              **({'timeStatus':items[rid].get('timeStatus')} if key == 'courses' and crash_courses.is_crash(course) else {})})
             if key == 'courses' and crash_courses.is_crash(course):
                 for row in found:
                     if row['id'] not in crash_cache:
-                        crash_cache[row['id']] = crash_courses.facts(items[row['id']], project, selection)
+                        crash_cache[row['id']] = crash_courses.facts(items[row['id']], project, shared)
                 # 20개 검토 결과를 스킬별로 먼저 6개로 자르면 공통 단기 강좌를 잃을 수 있다.
-                found = crash_courses.rank(found, project, selection, selection['skills'][index], cache=crash_cache)
+                found = crash_courses.rank(found, project, shared, shared['skills'][index], cache=crash_cache)
             elif key == 'courses' and scoped_course:
-                found = resource_evidence.rank_applicable(found, project, selection, selection['skills'][index], course,
+                found = resource_evidence.rank_applicable(found, project, shared, shared['skills'][index], course,
                                                           limit=PER_KIND, sources=items, cache=crash_cache)
             pools[index][key] = found
             for row in found:
                 matches.append({'skill':pools[index]['name'],'resourceId':row['id'],'similarity':row['retrievalScore']})
-            if allowed and not rows:
-                # 벡터가 없는 자료를 키워드 검색으로 몰래 대체하지 않는다.
-                raise RecommendationError('조건에 맞는 자료의 검색 벡터를 찾지 못했어요. 등록된 임베딩 상태를 확인해 주세요.')
     if crash_courses.is_crash(course):
-        pools = crash_courses.share_candidates(pools, project, selection, items, cache=crash_cache)
+        pools = crash_courses.share_candidates(pools, project, shared, items, cache=crash_cache)
         matches = [{'skill':pool['name'],'resourceId':row['id'],'similarity':row.get('retrievalScore'),
                     **({'sourceSkill':row['sourceSkill'],'sharedCandidate':True} if row.get('sharedCandidate') else {})}
                    for pool in pools for key in ('courses','books') for row in pool[key]]
