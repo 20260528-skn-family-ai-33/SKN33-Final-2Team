@@ -1,7 +1,7 @@
 /* 완료 알림(#82): 받는 쪽(본인·부서장)과 종류(로드맵·보고서)에 따라 문구와 이동할 주소가 맞는지 */
 import { describe, expect, it } from 'vitest';
 import type { AppNotification } from '@/api/types/notification';
-import { mergeReports, notificationSub, notificationTarget, notificationTime, notificationTitle, splitNotifications, staffGroupSub } from './notificationView';
+import { mergeReports, notificationSub, notificationTarget, notificationTime, notificationTitle, splitNotifications, staffGroupSub, viewedNow } from './notificationView';
 
 const base: AppNotification = {
   id: 'n1',
@@ -12,6 +12,10 @@ const base: AppNotification = {
   planTitle: 'SQL 분석 역량',
   track: 'A2',
   reportId: null,
+  draftId: null,
+  commentId: null,
+  jobKind: null,
+  jobStatus: null,
   createdAt: '2026-11-04T09:00:00+09:00',
   read: false,
 };
@@ -122,5 +126,44 @@ describe('splitNotifications (#96)', () => {
     expect(staffGroupSub(onlyRoad)).toBe('로드맵 1건');
     const onlyReport = splitNotifications([inbox[2]]).staff[0];
     expect(staffGroupSub(onlyReport)).toBe('결과 보고서 1건');
+  });
+});
+
+describe('작업·코멘트 알림 (#96)', () => {
+  const job = (jobKind: AppNotification['jobKind'], jobStatus: AppNotification['jobStatus'] = 'done', planId: string | null = null) =>
+    n({ kind: 'job', jobKind, jobStatus, planId, draftId: planId ? null : 'd1' });
+  const comment = n({ kind: 'comment', audience: 'member', commentId: 'c1', employee: { id: '3', name: '박부서장' } });
+
+  it('작업마다 결과를 보거나 다시 시도할 화면으로 간다', () => {
+    expect(notificationTarget(job('options'))).toBe('/new/options');
+    expect(notificationTarget(job('regenerate', 'failed'))).toBe('/new/options');
+    expect(notificationTarget(job('materials'))).toBe('/new/materials');
+    expect(notificationTarget(job('revision', 'done', 'p1'))).toBe('/roadmaps/p1/revise');
+    expect(notificationTarget(job('report', 'failed', 'p1'))).toBe('/roadmaps/p1/post');
+  });
+
+  it('코멘트 알림은 받은 코멘트 화면으로 간다', () => {
+    expect(notificationTarget(comment)).toBe('/roadmaps/p1/comments');
+  });
+
+  it('성공과 실패 문구가 다르고, 코멘트는 보낸 부서장 이름을 쓴다', () => {
+    expect(notificationTitle(job('options'))).toBe('로드맵 3안 작성이 끝났어요');
+    expect(notificationTitle(job('options', 'failed'))).toBe('로드맵 3안 중 만들지 못한 안이 있어요');
+    expect(notificationTitle(job('revision', 'failed', 'p1'))).toBe('수정안을 만들지 못했어요');
+    expect(notificationTitle(job('report', 'failed', 'p1'))).toBe('결과 보고서를 작성하지 못했어요');
+    expect(notificationTitle(comment)).toBe('박부서장 님이 로드맵에 코멘트를 보냈어요');
+  });
+
+  it('직원에게 온 코멘트는 내 알림 쪽에 묶인다', () => {
+    const { mine, staff } = splitNotifications([comment, job('options')]);
+    expect(mine).toHaveLength(2);
+    expect(staff).toEqual([]);
+  });
+
+  it('지금 보는 화면을 가리키는 읽지 않은 본인·직원 알림만 고른다', () => {
+    const items = [job('options'), job('materials'), n({ kind: 'job', jobKind: 'options', jobStatus: 'done', read: true, id: 'old' }), n({ audience: 'head', employee: { id: '4', name: '오직원' } })];
+    expect(viewedNow(items, '/new/options').map((x) => x.jobKind)).toEqual(['options']);
+    expect(viewedNow(items, '/team/4/plans/p1')).toEqual([]); // 부서장 알림은 기록이 화면에 보일 때 따로 처리한다
+    expect(viewedNow(items, '/roadmaps')).toEqual([]);
   });
 });

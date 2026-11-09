@@ -167,7 +167,16 @@
 
 ### 완료 알림 — `notifications.ts` (설계서 밖 추가 · #82)
 
-로드맵 확정(`POST /drafts/{id}/confirm`)과 결과 보고서 작성 작업이 끝나 보고서가 저장된 때(`POST /plans/{id}/reports`의 작업 성공) 서버가 작성한 직원 본인(`audience: 'self'`)과 같은 부서의 부서장(`'head'`)에게 알림을 남겨요. 부서장 본인의 로드맵·보고서는 본인에게만 가요. 직원 계정만 쓸 수 있어요(관리자 403).
+어떤 일이 생기면 누구에게 알릴지는 서버가 정해요(#96). 직원 계정만 쓸 수 있어요(관리자 403).
+
+| 일 | 받는 사람(`audience`) | `kind` |
+| --- | --- | --- |
+| 로드맵 확정(`POST /drafts/{id}/confirm`) | 같은 부서의 부서장(`head`). 본인에게는 보내지 않아요 | `roadmap` |
+| 결과 보고서 작성 작업이 끝나 저장됨(`POST /plans/{id}/reports`) | 본인(`self`)·부서장(`head`). 부서장 본인의 보고서는 본인에게만 | `report` |
+| 오래 걸리는 작업이 끝남·실패(`jobKind`: 3안 `options`·다시 만들기 `regenerate`·학습 자료 `materials`·수정안 `revision`, 보고서 `report`는 실패만) | 본인(`self`) | `job` |
+| 부서장이 새 코멘트를 보냄(고칠 때는 보내지 않아요) | 그 직원(`member`) | `comment` |
+
+3안·학습 자료처럼 안·코스별로 나뉜 작업은 모두 끝났을 때 한 번만 알려요. 사용자가 멈춘 작업은 알리지 않아요. 로드맵을 수정해도(수정안 확정) 부서장에게 알리지 않아요.
 
 | 요청 | 쓰는 곳 |
 | --- | --- |
@@ -175,7 +184,7 @@
 | `POST /notifications/{id}/read` · `POST /notifications/read-all` | 한 건 읽음(내 알림이 아니면 404) · 모두 읽음. 둘 다 바뀐 목록을 그대로 돌려줌 |
 | `POST /notifications/read-target` `{kind: 'roadmap'\|'report', id}` | 부서장이 직원의 로드맵·보고서 화면을 열 때(#96). 그 대상의 내 알림을 모두 읽음으로 바꾸고 바뀐 목록과 `changed`(바뀐 수)를 돌려줌. 잘못된 종류 400 · 형식이 틀린 id 404 · 읽을 알림이 없으면 `changed: 0` |
 
-`AppNotification`은 `{id, kind: 'roadmap'|'report', audience: 'self'|'head', employee: {id, name}, planId, planTitle, track, reportId, createdAt, read}`예요. 문구와 이동할 주소는 화면이 정해요(`features/notifications/notificationView.ts`): 본인은 `/roadmaps/{planId}`·`/reports/{reportId}`, 부서장은 `/team/{employee.id}/plans/{planId}`·`/team/{employee.id}/reports/{reportId}`. 확인 전 보고서를 다시 만들면 이전 보고서 알림은 지워지고 새 보고서 알림만 남아요. 부서장 알림은 그 직원이 지금도 같은 부서일 때만 보여요.
+`AppNotification`은 `{id, kind: 'roadmap'|'report'|'job'|'comment', audience: 'self'|'head'|'member', employee: {id, name}, planId, planTitle, track, reportId, draftId, commentId, jobKind, jobStatus: 'done'|'failed'|null, createdAt, read}`예요. `employee`는 알림을 일으킨 사람이고(코멘트 알림이면 보낸 부서장), `planId`는 로드맵 확정 전 작업(`options`·`regenerate`·`materials`)만 `null`이에요. 문구와 이동할 주소는 화면이 정해요(`features/notifications/notificationView.ts`): 본인은 `/roadmaps/{planId}`·`/reports/{reportId}`, 부서장은 `/team/{employee.id}/plans/{planId}`·`/team/{employee.id}/reports/{reportId}`, 코멘트는 `/roadmaps/{planId}/comments`, 작업은 `/new/options`·`/new/materials`·`/roadmaps/{planId}/revise`·`/roadmaps/{planId}/post`. 본인·직원 알림이 가리키는 화면을 이미 보고 있으면 화면이 바로 읽음으로 바꿔요. 확인 전 보고서를 다시 만들면 이전 보고서 알림은 지워지고 새 보고서 알림만 남아요. 부서장 알림은 그 직원이 지금도 같은 부서일 때만 보여요.
 
 ### 관리자 — `admin.ts` (5차 목업에서 추가 · 2026-10-21 사용자 결정 · 설계서 반영 여부는 사람 확인 필요)
 

@@ -13,6 +13,7 @@ import { failToast } from '@/shared/lib/fail';
 import { useMe } from '@/shared/state/session';
 import { Icon } from '@/shared/ui/Icon';
 import { currentSignIn, markRead, notificationKey, refreshTarget, stillSignedIn } from './notificationActions';
+import { useReadOnView } from './notificationReadOnView';
 import { notificationSub, notificationTarget, notificationTime, notificationTitle, splitNotifications, staffGroupSub, type StaffGroup } from './notificationView';
 
 const POLL_MS = 30_000;
@@ -33,6 +34,7 @@ export function NotificationBell() {
   const items = q.data?.items || [];
   const unread = q.data?.unread || 0;
   const { mine, staff } = splitNotifications(items);
+  useReadOnView(items, pathname);
   // 새로 받은 목록에 그 직원의 알림이 없어졌으면 처음 단계를 보여 준다
   const group = staffId ? staff.find((g) => g.employee.id === staffId) : undefined;
 

@@ -548,6 +548,39 @@ PR #57 HEAD `64b020b`를 기준으로 수정했다. 아래 내용은 로컬 수�
 - `POST /api/v1/notifications/read-target` `{kind: 'roadmap'|'report', id}`: 그 대상의 내 알림을 모두 읽음으로 바꾸고 바뀐 알림 목록과 `changed`(바뀐 수)를 돌려준다. 부서장이 직원의 로드맵·보고서 화면을 열 때 화면이 부른다. 잘못된 종류는 400, 형식이 틀린 id 는 404, 읽을 알림이 없으면 `changed: 0`.
 - 알림이 생기기 전(#82 이전)의 로드맵·보고서는 확인 전으로 세지 않는다.
 
+### 알림 발생 규칙 (#96, 2026-11-09)
+
+| 일 | 받는 사람 | 넣는 곳 |
+| --- | --- | --- |
+| 로드맵 확정 | 부서장(본인 알림 없앰) | `drafts.confirm` 트랜잭션 |
+| 결과 보고서 작성 끝남 | 본인·부서장 | `plans.report_start` 트랜잭션 |
+| 3안 생성·다시 만들기·학습 자료 준비·수정안 끝남 또는 실패, 보고서 실패 | 본인 | `jobs.start`가 작업 상태를 저장한 뒤 `notifications.job_finished` |
+| 부서장의 새 코멘트(고칠 때 제외) | 그 직원 | `plans.send_comment` 트랜잭션 |
+
+- 3안·학습 자료는 안·코스별 작업이 모두 끝났을 때 한 번만 알린다. 안·코스마다 가장 최근 작업만 보고, 하나라도 실패면 실패로 알린다. 같은 작업을 다시 돌리면 읽지 않은 이전 결과 알림은 새 결과로 바뀐다.
+- 사용자가 멈춘 작업(취소·`stopped`)은 알리지 않는다. 작업 알림을 못 넣어도 작업 결과는 그대로이고, 작업 ID와 함께 오류 기록만 남긴다.
+- 서버가 다시 켜져 끊긴 작업(`JOB_INTERRUPTED`)은 알리지 않는다. 복구 정보가 있는 작업은 다시 준비되면서 끝날 때 알린다.
+
+**DB 적용(앱을 이 버전으로 올리기 전에 DB마다 한 번):** `backend-setup`은 읽기 전용 검사라 표를 바꾸지 않는다. 저장소 루트에서 아래를 실행한다. 다시 실행해도 결과는 같고, 전체가 한 트랜잭션이라 실패하면 아무것도 바뀌지 않는다. 적용하지 않으면 알림 조회가 없는 열을 읽어 500 오류가 나므로, 앱보다 먼저 적용한다. 기존 앱은 새 열을 쓰지 않아 적용 뒤에도 그대로 동작한다.
+
+```bash
+docker compose exec -T db sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < backend/db/migrate_notification_rules.sql
+```
+
+**복구:** 앱을 이전 버전으로 되돌린 뒤 아래를 실행한다. 작업·코멘트 알림 기록은 지워진다(되돌린 앱은 이 종류를 쓰지 않는다).
+
+```sql
+BEGIN;
+DELETE FROM app_ext.notifications WHERE kind IN ('job', 'comment');
+ALTER TABLE app_ext.notifications DROP CONSTRAINT notifications_target_check, DROP CONSTRAINT notifications_comment_check, DROP CONSTRAINT notifications_job_check,
+  DROP CONSTRAINT notifications_kind_check, DROP CONSTRAINT notifications_audience_check;
+ALTER TABLE app_ext.notifications DROP COLUMN job_status, DROP COLUMN job_kind, DROP COLUMN comment_id, DROP COLUMN draft_id;
+ALTER TABLE app_ext.notifications ALTER COLUMN roadmap_id SET NOT NULL;
+ALTER TABLE app_ext.notifications ADD CONSTRAINT notifications_kind_check CHECK (kind IN ('roadmap', 'report')),
+  ADD CONSTRAINT notifications_audience_check CHECK (audience IN ('self', 'head'));
+COMMIT;
+```
+
 ### LLM 도서 후보 최소 확보 (#76)
 
 세 코스 모두 스킬별 벡터 검색 최대 30권을 검토하고, 공통 도서 입력은 중복을 제거한 최대 30권으로 유지한다. `book_candidates.common_pool`은 스킬의 application·targetOutcome·완료 기준과 제목·소개를 대조해 순위를 보완한 뒤, 각 스킬의 후보 3권을 먼저 확보하고 나머지를 교차 배분한다. 실제로 태그가 연결된 공유 도서만 다른 스킬의 후보로 사용할 수 있고, 사용 불가 자료·태그 불일치·중복 ISBN은 최소 수량에 포함하지 않는다.

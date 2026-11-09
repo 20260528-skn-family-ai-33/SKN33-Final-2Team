@@ -4,11 +4,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppNotification, NotificationInbox } from '@/api/types/notification';
 import type { PlanRecord, Report } from '@/api/types/plan';
 
-const m = vi.hoisted(() => ({ me: { id: 'A' } as { id: string } | null, seq: 1, read: vi.fn(), readAll: vi.fn(), readTarget: vi.fn(), get: vi.fn(), reports: vi.fn() }));
+const m = vi.hoisted(() => ({ me: { id: 'A' } as { id: string } | null, seq: 1, read: vi.fn(), readAll: vi.fn(), readTarget: vi.fn(), get: vi.fn(), reports: vi.fn(), pull: vi.fn() }));
 vi.mock('@/shared/state/session', () => ({ me: () => m.me, signInSeq: () => m.seq, isSup: () => true }));
 vi.mock('@/api/endpoints/notifications', () => ({ notificationsApi: { read: m.read, readAll: m.readAll, readTarget: m.readTarget } }));
 vi.mock('@/api/endpoints/plans', () => ({ plansApi: { get: m.get, reports: m.reports } }));
 vi.mock('@/shared/state/catalog', () => ({ mergeRes: vi.fn(), mergeReg: vi.fn() }));
+vi.mock('@/features/draft/draftSync', () => ({ pullDraft: m.pull }));
 
 type Actions = typeof import('./notificationActions');
 type Ws = typeof import('@/shared/state/workspace');
@@ -211,5 +212,60 @@ describe('markTargetRead (#96 · 부서장이 직원 기록 화면을 열 때)',
     expect(await pending).toBe(false);
     expect(qc.getQueryData(act.notificationKey('A'))).toBeUndefined();
     expect(qc.getQueryState(['team'])?.isInvalidated).toBe(false); // 다른 로그인의 캐시도 건드리지 않는다
+  });
+});
+
+describe('코멘트·작업 알림 (#96): 있는 로드맵은 바뀐 부분만 고친다', () => {
+  const seed = (R: PlanRecord) => wsMod.useWs.setState({ ...wsMod.freshWs('A'), plans: { p1: R } });
+  const server = (o: Partial<PlanRecord>) => ({ plan: { ...rec('p1', 'active', '서버 답변'), ...o } as PlanRecord });
+
+  it('코멘트 알림: 새 코멘트를 받되 저장 전 사후 점검 입력은 덮지 않는다', async () => {
+    seed(rec('p1', 'active', '저장 전 새 답변'));
+    m.get.mockResolvedValue(server({ comments: [{ id: 'c1' }] as unknown as PlanRecord['comments'] }));
+    await act.refreshTarget(new QueryClient(), A1, note({ kind: 'comment', audience: 'member', reportId: null }));
+    expect(wsMod.ws().plans.p1.comments?.map((c) => c.id)).toEqual(['c1']);
+    expect(essayOf(wsMod.ws().plans.p1)).toBe('저장 전 새 답변');
+    expect(m.reports).not.toHaveBeenCalled();
+  });
+
+  it('수정안 작업 알림: 수정안을 받되 저장 전 입력은 덮지 않는다', async () => {
+    seed(rec('p1', 'active', '저장 전 새 답변'));
+    m.get.mockResolvedValue(server({ comments: [{ id: 'c2' }] as unknown as PlanRecord['comments'] }));
+    await act.refreshTarget(new QueryClient(), A1, note({ kind: 'job', jobKind: 'revision', jobStatus: 'done', reportId: null }));
+    expect(m.get).toHaveBeenCalledWith('p1');
+    expect(wsMod.ws().plans.p1.comments?.map((c) => c.id)).toEqual(['c2']);
+    expect(essayOf(wsMod.ws().plans.p1)).toBe('저장 전 새 답변');
+  });
+
+  it('보고서 작성 실패 알림: 실패 상태만 고치고 입력은 그대로 둔다', async () => {
+    const R = rec('p1', 'active', '저장 전 새 답변');
+    R.post.running = true;
+    seed(R);
+    const fresh = rec('p1', 'active', '서버 답변');
+    fresh.post.running = false;
+    fresh.post.fail = { cause: '실패' } as unknown as PlanRecord['post']['fail'];
+    m.get.mockResolvedValue({ plan: fresh });
+    await act.refreshTarget(new QueryClient(), A1, note({ kind: 'job', jobKind: 'report', jobStatus: 'failed', reportId: null }));
+    const after = wsMod.ws().plans.p1.post;
+    expect(after.running).toBe(false);
+    expect(after.fail).toEqual({ cause: '실패' });
+    expect(essayOf(wsMod.ws().plans.p1)).toBe('저장 전 새 답변');
+  });
+
+  it('로드맵 확정 전 작업 알림: 작성 중인 로드맵을 다시 읽는다', async () => {
+    seed(rec('p1', 'active'));
+    await act.refreshTarget(new QueryClient(), A1, note({ kind: 'job', jobKind: 'options', jobStatus: 'done', planId: null, reportId: null }));
+    expect(m.pull).toHaveBeenCalledTimes(1);
+    expect(m.get).not.toHaveBeenCalled();
+  });
+
+  it('받는 사이 로그인이 바뀌면 넣지 않는다', async () => {
+    seed(rec('p1', 'active', '저장 전 새 답변'));
+    m.get.mockImplementation(async () => {
+      m.seq = 2;
+      return server({ comments: [{ id: 'c1' }] as unknown as PlanRecord['comments'] });
+    });
+    await act.refreshTarget(new QueryClient(), A1, note({ kind: 'comment', audience: 'member', reportId: null }));
+    expect(wsMod.ws().plans.p1.comments).toBeUndefined();
   });
 });

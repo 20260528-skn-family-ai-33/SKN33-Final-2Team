@@ -1,15 +1,16 @@
-"""완료 알림(#82): 로드맵 확정·보고서 저장과 같은 트랜잭션에서 남기는지, 실패하면 남기지 않는지, 알림 API 권한·응답 모양을 검사한다.
+"""알림(#82·#96): 로드맵 확정·보고서 저장과 같은 트랜잭션에서 남기는지, 실패하면 남기지 않는지, 작업 완료·코멘트 알림 규칙, 알림 API 권한·응답 모양을 검사한다.
 받는 사람을 고르는 SQL(본인·같은 부서 부서장)은 실제 PostgreSQL 이 있어야 해서 이 단위 검사에 넣지 않았다(PR 검증 기록 참고)."""
 from contextlib import ExitStack, contextmanager
 from datetime import datetime, timezone
+import inspect
 from types import SimpleNamespace
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app import auth
+from app import auth, jobs
 from app.agents import roadmap as rm
 from app.errors import AgentError, ApiError, api_error_handler
 from app.routers import notifications as api
@@ -17,6 +18,8 @@ from app.services import drafts, notifications as NT, plans
 
 RID = '11111111-1111-1111-1111-111111111111'
 NID = '22222222-2222-2222-2222-222222222222'
+DID = '33333333-3333-3333-3333-333333333333'
+CID = '44444444-4444-4444-4444-444444444444'
 
 
 @contextmanager
@@ -105,30 +108,45 @@ class ReportHookTests(unittest.TestCase):
 
 
 class ServiceTests(unittest.TestCase):
-    def test_insert_targets_owner_and_same_department_heads(self):
+    def test_roadmap_goes_to_heads_only_and_report_to_owner_and_heads(self):
         t = Mock()
         NT.roadmap_created(t, 7, RID)
         NT.report_created(t, 7, RID, NID)
-        (sql, ), kw = t.run.call_args_list[0]
-        self.assertIn(NT.HEAD_SEES, sql)
-        self.assertIn("'self'", sql)
-        self.assertIn("'head'", sql)
+        (roadmap_sql, ), kw = t.run.call_args_list[0]
+        self.assertIn(NT.HEAD_SEES, roadmap_sql)
+        self.assertIn("'head'", roadmap_sql)
+        self.assertNotIn("'self'", roadmap_sql)  # 본인이 직접 누른 확정은 본인에게 알리지 않는다(#96)
         self.assertEqual(kw, {'e': 7, 'k': 'roadmap', 'r': RID, 'rep': None})
-        self.assertEqual(t.run.call_args_list[1].kwargs, {'e': 7, 'k': 'report', 'r': RID, 'rep': NID})
+        (report_sql, ), kw = t.run.call_args_list[1]
+        self.assertIn(NT.HEAD_SEES, report_sql)
+        self.assertIn("'self'", report_sql)
+        self.assertIn("'head'", report_sql)
+        self.assertEqual(kw, {'e': 7, 'k': 'report', 'r': RID, 'rep': NID})
 
     def test_inbox_shape(self):
         at = datetime(2026, 11, 4, 9, 30, tzinfo=timezone.utc)
-        rows = [{'notification_id': NID, 'kind': 'report', 'audience': 'head', 'actor_id': 8, 'actor_name': '김직원', 'roadmap_id': RID,
-                 'report_id': NID, 'created_at': at, 'read_at': None, 'plan_title': 'SQL 분석', 'track': 'A2'},
-                {'notification_id': RID, 'kind': 'roadmap', 'audience': 'self', 'actor_id': 7, 'actor_name': '나', 'roadmap_id': RID,
-                 'report_id': None, 'created_at': at, 'read_at': at, 'plan_title': None, 'track': None}]
+        empty = {'draft_id': None, 'comment_id': None, 'job_kind': None, 'job_status': None}
+        rows = [dict(empty, notification_id=NID, kind='report', audience='head', actor_id=8, actor_name='김직원', roadmap_id=RID,
+                     report_id=NID, created_at=at, read_at=None, plan_title='SQL 분석', track='A2'),
+                dict(empty, notification_id=RID, kind='roadmap', audience='self', actor_id=7, actor_name='나', roadmap_id=RID,
+                     report_id=None, created_at=at, read_at=at, plan_title=None, track=None),
+                dict(empty, notification_id=CID, kind='job', audience='self', actor_id=7, actor_name='나', roadmap_id=None, report_id=None,
+                     created_at=at, read_at=None, plan_title='목표', track=None, draft_id=DID, job_kind='options', job_status='failed'),
+                dict(empty, notification_id=CID, kind='comment', audience='member', actor_id=3, actor_name='부서장', roadmap_id=RID, report_id=None,
+                     created_at=at, read_at=None, plan_title='SQL 분석', track='A2', comment_id=CID)]
         with patch.object(NT.db, 'all_', return_value=rows) as q, patch.object(NT.db, 'val', return_value=3):
             out = NT.inbox(7)
-        self.assertIn(NT.HEAD_SEES, q.call_args.args[0])  # 부서 이동한 직원의 알림은 부서장에게 보이지 않게 거른다
+        sql = q.call_args.args[0]
+        self.assertIn(NT.HEAD_SEES, sql)  # 부서 이동한 직원의 알림은 부서장에게 보이지 않게 거른다
+        self.assertIn("n.audience IN ('self', 'member')", sql)
+        self.assertIn('LEFT JOIN public.roadmaps r', sql)  # 로드맵 확정 전 작업 알림도 나와야 한다
         self.assertEqual(out['unread'], 3)
         self.assertEqual(out['items'][0], {'id': NID, 'kind': 'report', 'audience': 'head', 'employee': {'id': '8', 'name': '김직원'}, 'planId': RID,
-                                           'planTitle': 'SQL 분석', 'track': 'A2', 'reportId': NID, 'createdAt': at.isoformat(), 'read': False})
+                                           'planTitle': 'SQL 분석', 'track': 'A2', 'reportId': NID, 'draftId': None, 'commentId': None,
+                                           'jobKind': None, 'jobStatus': None, 'createdAt': at.isoformat(), 'read': False})
         self.assertEqual((out['items'][1]['reportId'], out['items'][1]['read'], out['items'][1]['planTitle']), (None, True, ''))
+        self.assertEqual((out['items'][2]['planId'], out['items'][2]['draftId'], out['items'][2]['jobKind'], out['items'][2]['jobStatus']), (None, DID, 'options', 'failed'))
+        self.assertEqual((out['items'][3]['audience'], out['items'][3]['commentId'], out['items'][3]['employee']), ('member', CID, {'id': '3', 'name': '부서장'}))
 
     def test_read_rejects_malformed_and_foreign_ids(self):
         with patch.object(NT.db, 'tx') as tx:
@@ -143,6 +161,162 @@ class ServiceTests(unittest.TestCase):
                 NT.read(7, NID)
         self.assertEqual(e.exception.status, 404)
         self.assertEqual(t.run.call_args.kwargs, {'i': NID, 'e': 7})
+
+
+class JobFinishedTests(unittest.TestCase):
+    """백그라운드 작업 완료·실패 알림(#96): 오래 걸리는 생성만, 본인에게, 나뉜 작업은 모두 끝났을 때 한 번"""
+
+    def finish(self, kind, ref, status, rows=(), resume=None):
+        t = Mock()
+        t.all.return_value = [{'status': s} for s in rows]
+        with patch.object(NT.db, 'tx', side_effect=lambda: tx_of(t)) as tx:
+            NT.job_finished(kind, 7, ref, status, resume)
+        return t, tx
+
+    @staticmethod
+    def inserted(t):
+        return [c.kwargs for c in t.run.call_args_list if 'INSERT' in c.args[0]]
+
+    def test_options_wait_until_every_proposal_is_finished(self):
+        t, _ = self.finish('option', f'{DID}:A1', 'done', ['done', 'running', 'done'])
+        self.assertEqual(self.inserted(t), [])
+
+    def test_options_notify_once_all_are_done_replacing_the_unread_result(self):
+        t, _ = self.finish('option', f'{DID}:A3', 'done', ['done', 'done', 'done'])
+        self.assertEqual(self.inserted(t), [{'e': 7, 'r': None, 'd': DID, 'g': 'options', 's': 'done'}])
+        sql = [c.args[0] for c in t.run.call_args_list]
+        self.assertIn('DELETE', sql[0])
+        self.assertIn('read_at IS NULL', sql[0])  # 이미 읽은 지난 알림은 건드리지 않는다
+        self.assertIn('INSERT', sql[1])
+        self.assertIn('pg_advisory_xact_lock', t.val.call_args.args[0])  # 동시에 끝나도 한 건만 남게 순서를 세운다
+
+    def test_options_report_failure_when_any_proposal_failed(self):
+        t, _ = self.finish('option', f'{DID}:A3', 'done', ['done', 'failed', 'done'])
+        self.assertEqual(self.inserted(t)[0]['s'], 'failed')
+
+    def test_only_the_latest_job_of_each_proposal_counts(self):
+        t, _ = self.finish('option', f'{DID}:A3', 'done', ['done'])
+        sql = t.all.call_args.args[0]
+        self.assertIn('DISTINCT ON', sql)
+        self.assertIn('created_at DESC', sql)
+        self.assertEqual(t.all.call_args.kwargs['p'], f'{DID}:%')
+
+    def test_regenerate_revision_targets(self):
+        t, _ = self.finish('regenerate', f'{DID}:A2', 'failed')
+        self.assertEqual(self.inserted(t), [{'e': 7, 'r': None, 'd': DID, 'g': 'regenerate', 's': 'failed'}])
+        t, _ = self.finish('revision', RID, 'done')
+        self.assertEqual(self.inserted(t), [{'e': 7, 'r': RID, 'd': None, 'g': 'revision', 's': 'done'}])
+
+    def test_report_notifies_only_on_failure(self):
+        # 성공은 보고서 저장과 함께 report_created 가 남긴다
+        _, tx = self.finish('report', RID, 'done')
+        tx.assert_not_called()
+        t, _ = self.finish('report', RID, 'failed')
+        self.assertEqual(self.inserted(t), [{'e': 7, 'r': RID, 'd': None, 'g': 'report', 's': 'failed'}])
+
+    def test_learning_materials_are_told_apart_by_resume_info(self):
+        t, _ = self.finish('learning_generation', f'{DID}:A1:key', 'done', ['done'], {'operation': 'materials'})
+        self.assertEqual(self.inserted(t)[0]['g'], 'materials')
+        t, _ = self.finish('learning_generation', DID, 'done', [], {'operation': 'route', 'function': 'generate_recommendations'})
+        self.assertEqual(self.inserted(t)[0]['d'], DID)
+        t, _ = self.finish('learning_generation', DID, 'done', ['running'], {'operation': 'route', 'function': 'generate_recommendations'})
+        self.assertEqual(self.inserted(t), [])  # 코스별 준비 작업이 남아 있으면 마지막 작업이 알린다
+        _, tx = self.finish('learning_generation', DID, 'done', [], {'operation': 'route', 'function': 'propose_activities'})
+        tx.assert_not_called()
+
+    def test_other_jobs_and_malformed_refs_do_not_notify(self):
+        for kind, ref in (('assistant', 'q'), ('assessment', DID), ('diagnosis', DID), ('doc-summary', DID), ('support', DID), ('revision', 'not-a-uuid'), ('option', None)):
+            _, tx = self.finish(kind, ref, 'done')
+            tx.assert_not_called()
+
+
+class JobRunnerHookTests(unittest.TestCase):
+    """작업 상태를 저장한 뒤에만 알리고, 알림 실패가 작업 결과를 바꾸지 않는다"""
+
+    def run_job(self, work, changed=1, side_effect=None, resume=None):
+        t = Mock()
+        t.val.return_value = 'job-1'
+        t.run.return_value = changed
+        if resume:
+            work._resume = resume
+        with ExitStack() as stack:
+            stack.enter_context(patch.object(jobs.db, 'tx', side_effect=lambda: tx_of(t)))
+            stack.enter_context(patch.object(jobs.db, 'val', return_value='running'))
+            stack.enter_context(patch.object(jobs.db, 'J', side_effect=lambda v: v))
+            stack.enter_context(patch.object(jobs.POOL, 'submit', side_effect=lambda f: f()))
+            notify = stack.enter_context(patch.object(NT, 'job_finished', side_effect=side_effect))
+            if resume:
+                stack.enter_context(patch('app.services.generation_lock.generation_guard', return_value=MagicMock()))
+            jobs.start('revision', 7, RID, work)
+        return notify, t
+
+    def test_success_and_failure_notify_after_status_is_saved(self):
+        notify, t = self.run_job(lambda _: {'ok': True})
+        notify.assert_called_once_with('revision', 7, RID, 'done', None)
+        self.assertIn('UPDATE app_ext.jobs', t.run.call_args.args[0])
+
+        def boom(_):
+            raise AgentError('Ollama 연결 실패')
+        notify, _ = self.run_job(boom)
+        notify.assert_called_once_with('revision', 7, RID, 'failed', None)
+
+    def test_resume_info_reaches_the_notification(self):
+        def work(_):
+            return {}
+        notify, _ = self.run_job(work, resume={'operation': 'materials'})
+        self.assertEqual(notify.call_args.args[-1], {'operation': 'materials'})
+
+    def test_user_stopped_or_cancelled_jobs_do_not_notify(self):
+        def stopped(_):
+            raise AgentError('멈춤', stopped=True)
+        notify, _ = self.run_job(stopped)
+        notify.assert_not_called()
+        notify, _ = self.run_job(lambda _: {}, changed=0)  # 그사이 사용자가 취소해 상태가 바뀌지 않음
+        notify.assert_not_called()
+
+    def test_notification_failure_is_logged_and_does_not_break_the_job(self):
+        with self.assertLogs('app.jobs', level='ERROR') as logs:
+            notify, _ = self.run_job(lambda _: {}, side_effect=RuntimeError('표 없음'))
+        notify.assert_called_once()
+        self.assertIn('job-1', logs.output[0])
+
+
+class CommentHookTests(unittest.TestCase):
+    """부서장 코멘트 알림(#96): 새 코멘트만 그 직원에게. 고칠 때와 로드맵 수정안 확정은 알리지 않는다"""
+
+    FIELDS = {'fit': 'a', 'fitText': '', 'level': 'b', 'levelText': '', 'free': '새 내용'}
+
+    def with_comment(self, t, fn):
+        with ExitStack() as stack:
+            stack.enter_context(patch.object(plans, '_comment_target', return_value={'roadmap_id': RID}))
+            stack.enter_context(patch.object(plans, '_comment_fields', return_value=self.FIELDS))
+            stack.enter_context(patch.object(plans, '_comment_body', return_value='본문'))
+            stack.enter_context(patch.object(plans.db, 'tx', side_effect=lambda: tx_of(t)))
+            notify = stack.enter_context(patch.object(NT, 'comment_sent'))
+            return fn(), notify
+
+    def test_new_comment_notifies_the_member_in_the_same_transaction(self):
+        t = Mock()
+        t.val.return_value = CID
+        out, notify = self.with_comment(t, lambda: plans.send_comment(3, 8, RID, {}))
+        self.assertEqual(out, CID)
+        notify.assert_called_once_with(t, 3, 8, RID, CID)
+
+    def test_edit_does_not_notify(self):
+        t = Mock()
+        t.one.side_effect = [{'author_employee_id': 3}, {'fit': 'x', 'fit_text': '', 'level': 'y', 'level_text': '', 'free_text': '', 'status': 'new'}]
+        _, notify = self.with_comment(t, lambda: plans.edit_comment(3, 8, RID, CID, {}))
+        notify.assert_not_called()
+
+    def test_insert_addresses_the_member_with_the_head_as_actor(self):
+        t = Mock()
+        NT.comment_sent(t, 3, 8, RID, CID)
+        (sql, ), kw = t.run.call_args
+        self.assertIn("'comment', 'member'", sql)
+        self.assertEqual(kw, {'m': 8, 'h': 3, 'r': RID, 'c': CID})
+
+    def test_accepting_a_revision_does_not_notify_the_head(self):
+        self.assertNotIn('NT.', inspect.getsource(plans.accept_revision))
 
 
 class UnseenTests(unittest.TestCase):

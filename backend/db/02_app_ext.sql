@@ -331,19 +331,31 @@ CREATE TABLE IF NOT EXISTS app_ext.regulation_uploads (
 ALTER TABLE app_ext.post_checks ADD COLUMN IF NOT EXISTS deep jsonb;
 
 -- ── 완료 알림(#82) ──
--- 로드맵 확정·결과 보고서 작성이 끝나면 작성한 직원 본인(self)과 그 직원 부서의 부서장(head)에게 남긴다(services/notifications.py).
--- 화면 문구·이동할 주소는 읽을 때 만든다. 확인 전 보고서를 다시 만들면 이전 보고서를 지우므로 그 보고서의 알림도 함께 지워진다
+-- 받는 쪽: 본인(self)·소속 직원 일을 받는 부서장(head)·부서장이 한 일을 받는 직원(member). 어떤 일에 누가 받는지는 services/notifications.py.
+-- 화면 문구·이동할 주소는 읽을 때 만든다. 확인 전 보고서를 다시 만들면 이전 보고서를 지우므로 그 보고서의 알림도 함께 지워진다.
+-- 이미 있는 DB는 이 정의가 적용되지 않는다. db/migrate_notification_rules.sql 을 실행한다(#96)
 CREATE TABLE IF NOT EXISTS app_ext.notifications (
   notification_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   recipient_id integer NOT NULL REFERENCES public.employees(employee_id) ON DELETE CASCADE,
   actor_id integer NOT NULL REFERENCES public.employees(employee_id) ON DELETE CASCADE,
-  kind text NOT NULL CHECK (kind IN ('roadmap', 'report')),
-  audience text NOT NULL CHECK (audience IN ('self', 'head')),
-  roadmap_id uuid NOT NULL REFERENCES public.roadmaps(roadmap_id) ON DELETE CASCADE,
+  kind text NOT NULL CONSTRAINT notifications_kind_check CHECK (kind IN ('roadmap', 'report', 'job', 'comment')),
+  audience text NOT NULL CONSTRAINT notifications_audience_check CHECK (audience IN ('self', 'head', 'member')),
+  roadmap_id uuid REFERENCES public.roadmaps(roadmap_id) ON DELETE CASCADE,
   report_id uuid REFERENCES public.growth_reports(report_id) ON DELETE CASCADE,
+  draft_id uuid REFERENCES public.projects(project_id) ON DELETE CASCADE,
+  comment_id uuid REFERENCES public.roadmap_comments(comment_id) ON DELETE CASCADE,
+  job_kind text,
+  job_status text,
   created_at timestamptz NOT NULL DEFAULT now(),
   read_at timestamptz,
-  CHECK ((kind = 'report') = (report_id IS NOT NULL)),
-  CHECK ((audience = 'self') = (recipient_id = actor_id))
+  CONSTRAINT notifications_check CHECK ((kind = 'report') = (report_id IS NOT NULL)),
+  CONSTRAINT notifications_check1 CHECK ((audience = 'self') = (recipient_id = actor_id)),
+  CONSTRAINT notifications_job_check CHECK (
+    (kind = 'job') = (job_kind IS NOT NULL) AND (kind = 'job') = (job_status IS NOT NULL)
+    AND (job_kind IS NULL OR job_kind IN ('options', 'regenerate', 'materials', 'revision', 'report'))
+    AND (job_status IS NULL OR job_status IN ('done', 'failed'))
+  ),
+  CONSTRAINT notifications_comment_check CHECK ((kind = 'comment') = (comment_id IS NOT NULL)),
+  CONSTRAINT notifications_target_check CHECK (roadmap_id IS NOT NULL OR (kind = 'job' AND draft_id IS NOT NULL))
 );
 CREATE INDEX IF NOT EXISTS notifications_recipient_idx ON app_ext.notifications (recipient_id, created_at DESC);
