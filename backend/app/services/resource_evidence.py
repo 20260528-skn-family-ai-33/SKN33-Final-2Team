@@ -104,7 +104,7 @@ _ETL_TARGET_LABELS = ('dbt 모델', 'dbt 품질 테스트', 'dbt 증분 처리',
 # 명시한 구현 도구만 해당 스킬에 적용한다. SQL 이론 등에 목표의 모든 영문 단어를 요구하지 않는다.
 _stacks = {
     'fastapi': r'fastapi|패스트\s*API', 'django': r'django|장고', 'flask': r'flask|플라스크',
-    'spring': r'spring(?:[ .-]*(?:boot|framework|ai|mvc|webflux|security|data|batch|cloud))?|스프링',
+    'spring': r'spring(?:[ .-]*(?:boot|framework|ai|mvc|webflux|security|data|batch|cloud))?|스프링(?:\s*(?:부트|프레임워크|시큐리티|클라우드|배치))?',
     'express': r'express(?:\.js)?|익스프레스', 'nestjs': r'nest\.?js',
     'python': r'python|파이썬|asyncio', 'java': r'java|자바(?!스크립트)',
     'javascript': r'javascript|typescript|node\.?js|자바스크립트|타입스크립트',

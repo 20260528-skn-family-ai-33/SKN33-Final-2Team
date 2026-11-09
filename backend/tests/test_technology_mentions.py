@@ -192,6 +192,48 @@ class AppliedTechnologiesTests(unittest.TestCase):
         self.assertEqual(applied_technologies(iter(['Django 비교', 'Django API 구현']), self.patterns), {'django'})
         self.assertEqual(applied_technologies(['Django는 후속 학습', 'Django API 구현'], self.patterns), {'django'})
 
+    def test_work_outside_a_verb_list_counts_unless_it_is_excluded(self):
+        for name, text in (
+            ('docker', 'Docker 이미지 빌드'), ('python', 'Python으로 CSV 파일 파싱'),
+            ('python', 'Python으로 데이터 분석'), ('python', 'Python 크롤러'),
+            ('python', 'Python 기본 문법 익히기'), ('pandas', 'pandas로 데이터 전처리'),
+            ('pytorch', 'PyTorch로 분류 모델 학습'), ('pytorch', 'Train a PyTorch model'),
+            ('langchain', 'LangChain으로 RAG 챗봇'), ('django', 'Django 게시판'),
+            ('django', 'Django 모델과 뷰 설계'), ('django', 'Django 기반 시스템'),
+            ('django', 'REST API 구현 (Django)'), ('django', 'REST API를 구현하는 Django'),
+            ('django', '구현 기술: Django'), ('django', 'Django라는 프레임워크로 게시판 작성'),
+            ('react', 'React 대시보드 화면'), ('react', 'React 컴포넌트'),
+            ('fastapi', 'FastAPI 엔드포인트 3개'), ('redis', 'Redis 캐싱'),
+            ('postgresql', 'PostgreSQL 스키마 설계'), ('git', 'Git 브랜치 관리'),
+            ('kubernetes', 'Kubernetes 클러스터 운영'), ('sql', 'SQL 조인으로 매출 집계'),
+            ('django', 'Django API 구현 및 Swagger 문서'), ('django', 'Django API 구현 및 결과 검토'),
+            ('django', 'Django로 구현한 코드 검토'), ('django', 'Django 영상 업로드 서버'),
+            ('django', 'Django, Celery로 비동기 작업 구현'), ('python', 'Python Flask 앱 컨테이너화'),
+        ):
+            with self.subTest(text=text):
+                self.assertEqual(applied_technologies([text], {name: technology_pattern(name)}), {name})
+
+    def test_scope_predicates_exclude_the_technology_but_not_its_detail(self):
+        patterns = {'django': self.patterns['django']}
+        for text in ('Django 구현 없이 FastAPI로 API 작성', 'Django 빼고 FastAPI 구현',
+                     'Django를 대체하는 FastAPI 구현', 'Django에서 FastAPI로 마이그레이션 구현',
+                     'Migrate from Django to FastAPI', 'Django 구현은 제외', 'Django 구현은 하지 않는다',
+                     'Django API 구현은 범위 밖', 'Django 구현은 다음 단계', 'Django 구현을 다음 단계로 미룸',
+                     'Django 서버는 다루지 않음', 'Django API는 필요 없음', 'Django, Celery는 제외',
+                     'Django 구현 개요', 'Django 튜토리얼 문서'):
+            with self.subTest(text=text):
+                self.assertEqual(applied_technologies([text], patterns), set())
+        for text in ('Django로 구현하되 배포는 제외', 'Django로 저장은 제외하고 조회 API 구현',
+                     'Django로 저장 없이 조회 API 구현', 'Django로 권한이 필요 없는 공개 API 구현',
+                     'Django API 구현 및 배포는 다음 단계', 'Django로 비로그인 사용자는 제외한 API 작성'):
+            with self.subTest(text=text):
+                self.assertEqual(applied_technologies([text], patterns), {'django'})
+
+    def test_outer_work_applies_to_a_bare_parenthesis_but_not_a_reference(self):
+        self.assertApplied('REST API 구현 (Django)', {'django'})
+        self.assertApplied('FastAPI 구현 (Django는 참고)', {'fastapi'})
+        self.assertApplied('FastAPI 비교 (Django)', set())
+
     def test_long_outputs_finish_in_a_killable_process_without_a_length_fail_safe(self):
         # 스레드 제한시간으로는 정규식의 GIL 점유를 끊을 수 없다.
         script = """
@@ -204,6 +246,9 @@ for count in (5000, 20000):
     assert applied_technologies(['응답 기준 ' * count + 'Django REST API'], patterns) == {'django'}
     assert applied_technologies(['Django and ' * count + 'FastAPI API 구현'], patterns) == {'django', 'fastapi'}
     assert applied_technologies(['(' * count + 'Django 비교'], patterns) == set()
+    assert applied_technologies(['Django ' + 'test' * count + '!a'], patterns) == {'django'}
+    assert applied_technologies(['Django ' + '영상 ' * count], patterns) == set()
+    assert applied_technologies(['Django, ' * count + '비교'], patterns) == set()
 """
         subprocess.run([sys.executable, '-B', '-c', script],
                        cwd=Path(__file__).resolve().parents[1], timeout=5, check=True)

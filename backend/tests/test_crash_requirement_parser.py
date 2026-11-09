@@ -61,6 +61,38 @@ assert required_technologies({}, {'wish': names + ' required'}) == {'django', 'f
                 with self.assertRaisesRegex(ValueError, expected):
                     validate_core_requirements([{'coreOutcome': '일반 API 구현'}], handoff)
 
+    def test_later_quality_conditions_do_not_cancel_a_stated_obligation(self):
+        for text in ('Django 사용 필수, 오류 없이 요청을 처리', 'Django 사용 필수, 심화는 후속 학습',
+                     'Django 필수이며 성능 개선은 나중에', '반드시 Django로 오류 없이 구현',
+                     '반드시 REST API를 Django로 구현', 'Django 필수, 나머지는 선택 사항',
+                     'Django REST API 필수', 'Django API 구현 필수'):
+            with self.subTest(text=text):
+                self.assertEqual(required_technologies({'goal': text}), {'django'})
+
+    def test_common_words_are_not_technologies_and_known_versions_keep_the_name(self):
+        for text in ('Login is required', 'Token is required', 'Authentication is required',
+                     'English 필수', 'Code review required', 'User API 필수', 'REST API 필수'):
+            with self.subTest(text=text):
+                self.assertEqual(required_technologies({'goal': text}), set())
+        for text, expected, core in (
+            ('Java17 필수', {'java'}, 'Java17 API 구현'),
+            ('Vue3 필수', {'vue'}, 'Vue.js 화면 작성'),
+            ('Spring Framework 필수', {'spring'}, 'Spring REST API 구현'),
+            ('MySQL DB 필수', {'mysql'}, 'MySQL 스키마 설계'),
+            ('Django와FastAPI 필수', {'django', 'fastapi'}, 'Django와 FastAPI로 API 구현'),
+        ):
+            with self.subTest(text=text):
+                self.assertEqual(required_technologies({'goal': text}), expected)
+                validate_core_requirements([{'coreOutcome': core}], {'goal': text})
+
+    def test_many_prefix_markers_finish_in_a_killable_process(self):
+        script = """
+from app.services.crash_requirements import required_technologies
+assert required_technologies({'goal': '반드시 django ' * 5900}) == {'django'}
+"""
+        subprocess.run([sys.executable, '-c', script], cwd=Path(__file__).resolve().parents[1],
+                       timeout=5, check=True)
+
     def test_prefix_requirement_is_not_cancelled_by_another_technology(self):
         for text in ('must use Django instead of FastAPI',
                      '반드시 Django로 구현하되 Redis는 선택 사항',

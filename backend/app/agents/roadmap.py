@@ -546,16 +546,17 @@ def option(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
             if inp['handoff'].get('courseSkillSelection'):
                 from app.services.course_skills import CONTRACT, FIXED_SELECTION_CONTRACT
                 system += FIXED_SELECTION_CONTRACT if inp['handoff'].get('selectedSkillsFixed') else CONTRACT
-            elif required_prompt:
-                system += '''\n[구형 Crash 필수 기술 응답 계약]
-활동만 반환하지 말고 learningSkills를 반드시 1~3개 함께 반환한다.
+            if inp['handoff'].get('selectedSkillsFixed'):
+                system += '\n사용자가 선정한 skillOrder는 확정이다. 이 목록과 순서를 모두 유지하고 learningSkills에 반환한다. 관점 때문에 역량을 빼거나 더하지 않는다.'
+        # 통합 프롬프트도 courseSkillSelection일 때만 learningSkills를 요구한다. 빠지면 검증이 항상 실패한다.
+        if required_prompt and not inp['handoff'].get('courseSkillSelection'):
+            system += '''\n[구형 Crash 필수 기술 응답 계약]
+courseSkillSelection 값과 무관하게 활동만 반환하지 말고 learningSkills를 반드시 1~3개 함께 반환한다.
 name은 handoff.skillOrder·skillNames가 있으면 그 목록 안에서, 없으면 skillTags의 등록 이름 안에서 고른다. 새 이름은 만들지 않는다.
 각 항목에 name·application(프로젝트 적용 범위), coreOutcome(핵심 구현 결과), coreCriteria(서로 다른 핵심 완료 기준 1~3개), followUpScope(후속 범위 0~3개)를 쓴다.
 필수 기술은 coreOutcome 또는 coreCriteria의 실제 구현에 포함한다. 후속·비교로만 넘기지 않는다.
 JSON에 "learningSkills":[{"name":"등록 스킬명","application":"적용 범위","coreOutcome":"핵심 구현 결과","coreCriteria":["완료 기준"],"followUpScope":[]}]를 추가한다.
 '''
-            if inp['handoff'].get('selectedSkillsFixed'):
-                system += '\n사용자가 선정한 skillOrder는 확정이다. 이 목록과 순서를 모두 유지하고 learningSkills에 반환한다. 관점 때문에 역량을 빼거나 더하지 않는다.'
         payload = _catalog_payload(pid, {'handoff': inp['handoff'], 'skillTags': catalog.skill_names(),
                                         'previous': inp.get('previous'), 'previousLearningSkills': (inp.get('previousDef') or {}).get('learningSkills'), 'request': inp.get('request')}, system, prev_ids,
                                    rt.S.ollama_num_ctx if ctx.mode == 'ollama' else catalog_budget.DEFAULT_CONTEXT)

@@ -62,6 +62,24 @@ class CrashCoreTests(unittest.TestCase):
                 course_skills.validate_recommendations([bad], {ETL}, 'A2', require_depth=True)
             self.assertEqual(cause(str(error.exception))['kind'], 'format')
 
+    def test_integrated_prompt_also_requests_learning_skills_for_required_legacy_crash(self):
+        def system_for(handoff):
+            captured = {}
+            def model(ctx, value, payload, **kw):
+                captured['system'] = value
+                return {'acts': [], 'learningSkills': [target(coreOutcome='Django로 ETL API 구현')]}
+            with patch.object(roadmap, '_sys', return_value='[통합 생성 계약 roadmap-generation/v1]\n계약'), \
+                    patch.object(roadmap.catalog, 'skill_names', return_value=[ETL]), \
+                    patch.object(roadmap, '_catalog_payload', side_effect=lambda pid, payload, *args: deepcopy(payload)), \
+                    patch.object(roadmap.rt, 'llm_json', side_effect=model), \
+                    patch.object(roadmap, '_validate_learning_acts'), \
+                    patch.object(roadmap, 'finish_option', return_value={'acts': []}), \
+                    patch.object(roadmap.rt, 'run', side_effect=lambda ctx, name, task, inp, mock, api, **kw: api(None)):
+                roadmap.option(SimpleNamespace(mode='openai'), {'pid': 'A2', 'handoff': handoff})
+            return captured['system']
+        self.assertIn('[구형 Crash 필수 기술 응답 계약]', system_for({'goal': 'Django 사용 필수'}))
+        self.assertNotIn('[구형 Crash 필수 기술 응답 계약]', system_for({'goal': 'ETL 학습'}))
+
     def test_previously_installed_integrated_prompt_receives_crash_contract_once(self):
         handoff = {'goal': 'dbt 증분 모델', 'assessmentGenerationId': 'g', 'selectedSkillsFixed': True,
                    'courseSkillSelection': True, 'skillNames': [ETL], 'skillOrder': [ETL],

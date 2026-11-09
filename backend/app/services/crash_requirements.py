@@ -1,6 +1,7 @@
 """명시적 필수 기술을 Crash 핵심에서 누락하지 않게 한다. 자유 문장 전체의 의미 판정은 아니다."""
 from __future__ import annotations
 
+from bisect import bisect_right
 import re
 import unicodedata
 from app.english_patterns import english_token
@@ -9,7 +10,9 @@ from app.services.technology_mentions import applied_technologies, technology_pa
 # 한글 표기와 영문 표기를 같은 요구로 읽는다. 모르는 영문 기술명도 명시적 의무 구문에서 받는다.
 ALIASES = {
     'django': ('장고', 'django 프레임워크'), 'fastapi': ('패스트API', '패스트 API'),
-    'python': ('파이썬', 'python3', 'python3.12'), 'java': ('자바',), 'javascript': ('자바스크립트',),
+    'python': ('파이썬', 'python3', 'python3.10', 'python3.11', 'python3.12', 'python3.13'),
+    'java': ('자바', 'java8', 'java11', 'java17', 'java21'), 'javascript': ('자바스크립트',),
+    'vue': ('vue.js', 'vuejs', 'vue2', 'vue3'),
     'typescript': ('타입스크립트',), 'docker': ('도커',),
     'kubernetes': ('쿠버네티스', 'k8s'), 'postgresql': ('포스트그레스큐엘', 'postgres'),
     'react': ('리액트',), 'spring': ('스프링',), 'flask': ('플라스크',),
@@ -28,11 +31,17 @@ _known = '|'.join(english_token(re.escape(alias)) if alias.isascii() else
 _name = rf'(?:(?:{_known})(?![.-][a-z0-9_+#])|CI/CD|[a-z][a-z0-9_+#]*(?:[.-][a-z0-9_+#]+)*)'
 _version = r'(?:[ \t]++v?[0-9]++(?:\.(?:[0-9]++|x))*+(?![a-z0-9_])(?:[ \t]++이상)?)?'
 _term = re.compile(rf'(?<![a-z0-9_가-힣])(?P<name>{_name}){_version}', re.I)
-_join = re.compile(r'\s*+(?:(?P<alternative>또는|이나|나|\bor\b)|,|/|·|및|와|과|\band\b|&)\s*+', re.I)
-_suffix = re.compile(
-    rf'\s*+{_particle}\s*+'
+# 구분자 뒤에서는 'Django와FastAPI'처럼 띄어쓰기 없이 이어진 다음 기술도 받는다.
+_joined_term = re.compile(rf'(?<![a-z0-9_])(?P<name>{_name}){_version}', re.I)
+_join =re.compile(r'\s*+(?:(?P<alternative>또는|이나|나|\bor\b)|,|/|·|및|와|과|\band\b|&)\s*+', re.I)
+_marker = (
     r'(?:(?:사용|활용|도입|적용|구현|개발|학습)\s*+(?:은|는|이|가)?\s*+)?'
-    r'(?:필수|반드시|꼭|해야|must\s+be\s+used|(?:is\s+)?required|(?:is\s+)?mandatory)', re.I)
+    r'(?:필수|반드시|꼭|해야|must\s+be\s+used|(?:is\s+)?required|(?:is\s+)?mandatory)')
+_suffix = re.compile(
+    rf'\s*+{_particle}\s*+(?:(?:framework|database|db|프레임워크|데이터베이스)(?![a-z0-9_])\s*+{_particle}\s*+)?{_marker}', re.I)
+# 'Django REST API 필수'는 Django의 요구다. 'User API 필수'의 user는 기술이 아니므로 아는 기술에만 넓힌다.
+_known_suffix = re.compile(
+    rf'\s*+{_particle}\s*+(?:(?:rest(?:ful)?|api|서버|앱|프로젝트)(?![a-z0-9_])\s*+)++{_particle}\s*+{_marker}', re.I)
 _prefix = re.compile(
     r'(?:반드시|꼭|필수\s*+(?:기술|스택|도구)?\s*+[:：]|must\s+(?:use|include)|required\s+(?:stack|technologies)\s*:)\s*+', re.I)
 _not_required = re.compile(
@@ -41,9 +50,18 @@ _not_required = re.compile(
     r'|필요한\s*+(?:건|것은|게|것이)?\s*+아니)', re.I)
 _negated_action = re.compile(r'\s*+(?:(?:사용|활용|구현)\s*+)?(?:하지\s*않|쓰지|안\s*)')
 _non_core = re.compile(r'후속|나중|추후|선택\s*(?:사항|적)|제외|미사용|없이|대신|사용하지|필요\s*없|쓰지|안\s*(?:함|하|해|쓰|사용)|않|아니|아닌|아닙|아님|\b(?:later|optional|without|instead|not|exclude\w*)\b', re.I)
-_clauses = re.compile(r'[\n;!?]|\.(?:\s|$)|(?:한\s*뒤|한\s*후|구현\s*후|그리고|하지만)|(?<=하고)\s+|(?<=하며)\s+|(?<=아니고)\s+|(?<=아니라)\s+')
+# 의무를 취소하는 표현은 대상 기술에 걸린 것만 본다. "오류 없이 처리"는 품질 조건이고 "Django 없이"가 제외다.
+_excluded_next = re.compile(rf'\s*+{_particle}\s*+(?:대신|없이|말고|빼고|제외|미사용|아닌)', re.I)
+_deferred_next = re.compile(rf'\s*+{_particle}\s*+(?:후속|나중|추후|\blater\b)', re.I)
+_cancelled_scope = re.compile(
+    r'후속|나중|추후|선택\s*(?:사항|적)|\(\s*선택\s*\)|(?:사용|도입|적용|구현|활용)\s*하지\s*않|쓰지|필요\s*없|'
+    r'(?<![가-힣])안\s*(?:함|하|해|쓰|사용)|\b(?:later|optional)\b', re.I)
+_clauses = re.compile(r'[\n;!?]|\.(?:\s|$)|(?:한\s*뒤|한\s*후|구현\s*후|그리고|하지만)|(?<=하고)\s+|(?<=하며)\s+|(?<=이며)\s+|(?<=이고)\s+|(?<=이지만)\s+|(?<=아니고)\s+|(?<=아니라)\s+')
 _stop = {'a', 'an', 'the', 'must', 'use', 'using', 'used', 'include', 'required', 'mandatory',
-         'is', 'be', 'not', 'and', 'or', 'of', 'api', 'key', 'db', 'framework', 'x'}
+         'is', 'be', 'not', 'and', 'or', 'of', 'api', 'key', 'db', 'framework', 'x', 'rest', 'restful',
+         'login', 'logout', 'token', 'tokens', 'auth', 'authentication', 'authorization', 'password',
+         'code', 'review', 'test', 'tests', 'testing', 'documentation', 'docs', 'english', 'korean'}
+_stop_only = re.compile(r'[\s을를은는이가의]*+')
 _excluded_before = re.compile(r'\b(?:instead\s+of|without)\s++(?:using\s++)?', re.I)
 _python_version = re.compile(r'python3(?:\.(?:[0-9]++|x))*+', re.I)
 _alias_pairs = []
@@ -105,7 +123,7 @@ def _read_list(clause: str, first: re.Match) -> tuple[list[frozenset[str]], int]
     while True:
         end = match.end()
         sep = _join.match(clause, end)
-        match = _term.match(clause, sep.end()) if sep else None
+        match = _joined_term.match(clause, sep.end()) if sep else None
         if match is None or not _is_technology(match['name']):
             return [frozenset(group) for group in groups], end
         name = _technology_name(match['name'])
@@ -125,20 +143,35 @@ def _lists(clause: str):
         yield first.start(), pos, groups
 
 
+def _prefixed(clause: str, markers: list[int], previous_end: int, start: int) -> bool:
+    """접두 표현과 기술 사이에 일반 낱말만 있으면 그 기술에 걸린다. '반드시 REST API를 Django로'."""
+    index = bisect_right(markers, start) - 1
+    if index < 0 or markers[index] < previous_end:
+        return False
+    between = _term.sub('', clause[markers[index]:start])
+    return _stop_only.fullmatch(between) is not None
+
+
 def _marked_lists(clause: str):
     lists = list(_lists(clause))
-    prefixes = {marker.end() for marker in _prefix.finditer(clause)}
+    markers = [marker.end() for marker in _prefix.finditer(clause)]
+    previous_end = 0
     for index, (start, end, groups) in enumerate(lists):
         marker = _suffix.match(clause, end)
-        if marker is None and start not in prefixes:
+        if marker is None and all(name in ALIASES for name in groups[-1]):
+            marker = _known_suffix.match(clause, end)
+        prefixed = marker is None and _prefixed(clause, markers, previous_end, start)
+        previous_end = end
+        if marker is None and not prefixed:
             continue
         # 다음 기술의 선택·제외는 앞 기술을 취소하지 않는다. 각 꼬리는 한 번만 읽는다.
         scope_end = lists[index + 1][0] if index + 1 < len(lists) else len(clause)
         tail = clause[marker.end() if marker else end:scope_end]
-        if _not_required.match(tail) or _negated_action.match(tail):
+        if _not_required.match(tail) or _negated_action.match(tail) or _deferred_next.match(tail):
             continue
-        # 영문 instead of/without은 뒤 기술을 제외한다. 한글 'Django 대신/없이'는 앞 기술을 제외한다.
-        if not _non_core.search(_excluded_before.sub('', tail)):
+        # 뒤에 붙으면 이미 말한 의무다. "Django 사용 필수, 오류 없이 처리"의 뒤 조건은 의무를 취소하지 않는다.
+        if marker is not None or not (_excluded_next.match(tail) or _cancelled_scope.search(
+                _excluded_before.sub('', tail.split(',', 1)[0]))):
             yield from groups
 
 

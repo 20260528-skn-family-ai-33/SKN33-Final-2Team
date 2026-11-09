@@ -163,6 +163,19 @@ class CrashResourceScopeTests(unittest.TestCase):
                 self.assertEqual(info['suitability'][WEB]['requiredStack'], required)
                 self.assertEqual(resource_evidence.suitable(info, WEB), suitable)
 
+    def test_applied_units_outside_a_verb_list_still_teach_the_required_stack(self):
+        for name, stack, text in (
+            ('Spring Boot', 'spring', '스프링부트 프로젝트 생성 실습'),
+            ('Spring Boot', 'spring', 'Next.js, Spring Boot 기반 웹 서비스를 구현'),
+            ('Python', 'python', 'Hands On: Dockerizing Python Flask Application'),
+        ):
+            with self.subTest(text=text):
+                self.skill.update(coreOutcome=f'{name} REST API 구현', coreCriteria=['응답 코드 확인'])
+                row = course('good', [text], skills=[WEB])
+                profile = resource_evidence.facts(row, {'goal': f'{name} 사용 필수'}, self.selection)['suitability'][WEB]
+                self.assertIn(stack, profile['requiredStack'])
+                self.assertEqual(profile['missingStack'], [])
+
     def test_applied_units_and_descriptions_do_not_teach_excluded_or_partial_names(self):
         self.skill.update(coreOutcome='Django REST API 구현', coreCriteria=['응답 코드 확인'])
         for text in ('Django 대신 FastAPI로 REST API 구현',
