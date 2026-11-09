@@ -87,6 +87,8 @@ class CrashRequiredTechnologiesTests(unittest.TestCase):
     PAIRED_CASES = (
         # (사용자 요구, 핵심 결과, 통과 여부)
         ('Django는 필수까지는 아닙니다', 'FastAPI로 REST API 구현', True),
+        ('Django가 필수라는 뜻은 아니에요', 'FastAPI로 REST API 구현', True),
+        ('Django가 필수라는 뜻이에요', 'FastAPI로 REST API 구현', False),
         ('Django를 반드시 사용해 중복 저장을 허용하지 않습니다', 'FastAPI로 REST API 구현', False),
         ('Django 사용 필수: 중복 저장은 허용하지 않습니다', 'FastAPI로 REST API 구현', False),
         ('Django 사용 필수, 중복 저장은 허용하지 않습니다', 'FastAPI로 REST API 구현', False),
@@ -144,6 +146,13 @@ class CrashRequiredTechnologiesTests(unittest.TestCase):
     def test_mock_generation_cannot_silently_drop_mandatory_technology(self):
         with self.assertRaisesRegex(llm.LlmError, '(?i)django'):
             self.option(target(), mock=True)
+
+    def test_mock_generation_treats_same_denials_alike(self):
+        for goal in ('Django는 필수까지는 아닙니다', 'Django가 필수라는 뜻은 아니에요'):
+            with self.subTest(goal=goal):
+                self.option(target(), goal=goal, mock=True)
+        with self.assertRaisesRegex(llm.LlmError, '(?i)django'):
+            self.option(target(), goal='Django가 필수라는 뜻이에요', mock=True)
 
     def test_optional_comparison_does_not_become_required(self):
         result, _ = self.option(target(), goal='FastAPI 구현 후 Django 비교')

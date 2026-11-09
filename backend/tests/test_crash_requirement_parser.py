@@ -113,11 +113,16 @@ assert required_technologies({}, {'wish': names + ' required'}) == {'django', 'f
     def test_final_denial_after_an_obligation_cancels_only_when_it_ends_that_statement(self):
         for text in ('Django는 필수까지는 아닙니다', 'Django 필수는 아닌데요', 'Django가 필수인 건 아니에요',
                      'Django 필수 요건은 아닙니다', 'Django 필수라고 보기 어렵습니다', 'Django는 꼭 필요하지 않습니다',
-                     'Django 필수까지는 없습니다', '꼭 Django일 필요는 없습니다', '반드시 Django여야 하는 건 아닙니다'):
+                     'Django 필수까지는 없습니다', '꼭 Django일 필요는 없습니다', '반드시 Django여야 하는 건 아닙니다',
+                     'Django가 필수라는 뜻은 아니에요', 'Django가 필수라는 의미는 아닙니다', 'Django가 필수란 말은 아닙니다',
+                     'Django 필수라는 건 아니에요', '꼭 Django를 써야 한다는 뜻은 아닙니다', 'Django를 사용해야 한다는 의미는 아닙니다',
+                     'Django가 꼭 필요하다는 뜻은 아닙니다'):
             with self.subTest(text=text):
                 self.assertEqual(required_technologies({'goal': text}), set())
         for text in ('Django 사용 필수 오류가 나지 않도록 구현', '반드시 Django로 인증되지 않은 요청을 차단',
-                     'Django 필수, FastAPI는 아님'):
+                     'Django 필수, FastAPI는 아님', 'Django가 필수라는 뜻이에요', 'Django를 꼭 써야 한다는 뜻입니다',
+                     'Django가 필수라는 점을 잊지 않습니다', 'Django 사용 필수, 의미 없는 로그는 남기지 않습니다',
+                     'Django 사용 필수라는 말은 중복 저장을 허용하지 않는다는 뜻입니다'):
             with self.subTest(text=text):
                 self.assertEqual(required_technologies({'goal': text}), {'django'})
 
