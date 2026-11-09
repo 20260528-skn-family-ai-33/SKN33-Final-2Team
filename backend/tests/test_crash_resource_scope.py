@@ -163,6 +163,11 @@ class CrashResourceScopeTests(unittest.TestCase):
                 self.assertEqual(info['suitability'][WEB]['requiredStack'], required)
                 self.assertEqual(resource_evidence.suitable(info, WEB), suitable)
 
+    def test_course_stack_reading_uses_the_same_version_conversion(self):
+        for text in ('Python3.14로 REST API 구현 실습', 'Python3.9 REST API 구현 실습', 'Python REST API 구현 실습'):
+            with self.subTest(text=text):
+                self.assertEqual(resource_evidence._core_stack_names([text]), {'python'})
+
     def test_applied_units_outside_a_verb_list_still_teach_the_required_stack(self):
         for name, stack, text in (
             ('Spring Boot', 'spring', '스프링부트 프로젝트 생성 실습'),

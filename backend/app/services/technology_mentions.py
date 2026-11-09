@@ -12,7 +12,10 @@ import re
 import unicodedata
 
 
-__all__ = ['technology_pattern', 'applied_technologies']
+__all__ = ['technology_pattern', 'applied_technologies', 'canonical_versions']
+
+# 이번 정책은 기술 사용 여부까지만 본다. 요구·핵심·강좌가 같은 변환을 써야 버전 표기로 어긋나지 않는다.
+_VERSIONED = re.compile(r'(?<![\w.-])(python|java|vue)[0-9]++(?:\.(?:[0-9]++|x))*+(?![a-z0-9_-])', re.I)
 
 # 조사는 기술명에 포함하지 않는다. 한글과 영문 모두 같은 양쪽 경계를 적용한다.
 _PARTICLES = (
@@ -27,6 +30,14 @@ _JOIN = re.compile(
     rf'(?:,|/|·|및|와|과|&|\+|\band\b)[ \t]*|(?:{_VERSION})?[ \t]+', re.I,
 )
 _BRACKETS = re.compile(r'[()\[\]{}]')
+# 괄호가 이 표현뿐이면 바로 앞 언급의 조건이다. "(Redis는 후속 학습)"처럼 대상을 적으면 그 대상의 조건이다.
+_CANCELLING_NOTE = re.compile(
+    r'\s*(?:(?:후속|추후|나중에?|선택(?:\s*사항)?|참고|비교|제외|후보|대안|미구현|미적용|미사용|미도입|미포함|'
+    r'optional|later|reference|comparison)'
+    r'(?:\s*(?:학습|구현|개발|적용|진행|사항|용|범위|과제|단계|예정|대상|만))*|'
+    r'(?:구현|사용|도입|적용)\s*(?:안\s*함|하지\s*않\S*|제외|예정\s*없음))\s*', re.I,
+)
+_CANCELLED_MARK = ' 후속 '
 _CLAUSES = re.compile(
     r'[\n;!?。]+|\.(?=\s|$)|(?<=하고)\s+|(?<=하며)\s+|(?<=하되)\s+|(?<=않고)\s+|'
     r'(?<=아니고)\s+|(?<=아니라)\s+|(?<=말고)\s+|'
@@ -126,6 +137,11 @@ _LATIN_WORD = re.compile(r'[A-Za-z][\w.+#-]*')
 _GENERIC_WORDS = {'rest', 'restful', 'api', 'apis', 'crud', 'http', 'https', 'jwt', 'oauth', 'web', 'json', 'ui', 'db'}
 
 
+def canonical_versions(text: str) -> str:
+    """Python3.9·Java17·Vue3처럼 붙여 쓴 버전을 뗀다. Django2 같은 다른 낱말은 건드리지 않는다."""
+    return _VERSIONED.sub(r'\1', text)
+
+
 def technology_pattern(name: str, aliases: tuple[str, ...] = ()) -> re.Pattern[str]:
     """호출자가 제공한 이름·별칭을 리터럴로 읽는 대소문자 무관 패턴을 만든다.
 
@@ -158,8 +174,9 @@ def _scopes(text: str) -> Iterator[tuple[str, str]]:
             frames.append([])
             leads.append(fragment)
         elif len(frames) > 1:
-            yield ''.join(frames.pop()), leads.pop()
-            frames[-1].append(' ')
+            inner = ''.join(frames.pop())
+            yield inner, leads.pop()
+            frames[-1].append(_CANCELLED_MARK if _CANCELLING_NOTE.fullmatch(inner) else ' ')
         else:
             frames[-1].append(' ')
         pos = match.end()
@@ -334,7 +351,7 @@ def applied_technologies(texts: Iterable[str], patterns: dict[str, re.Pattern[st
     if isinstance(texts, str):
         texts = [texts]
     for raw in texts:
-        text = unicodedata.normalize('NFKC', raw).replace('`', '')
+        text = canonical_versions(unicodedata.normalize('NFKC', raw).replace('`', ''))
         for scope, lead in _scopes(text):
             context = bool(lead) and _lead_applies(lead)
             for clause in _CLAUSES.split(scope):

@@ -5,14 +5,13 @@ from bisect import bisect_right
 import re
 import unicodedata
 from app.english_patterns import english_token
-from app.services.technology_mentions import applied_technologies, technology_pattern
+from app.services.technology_mentions import applied_technologies, canonical_versions, technology_pattern
 
 # 한글 표기와 영문 표기를 같은 요구로 읽는다. 모르는 영문 기술명도 명시적 의무 구문에서 받는다.
 ALIASES = {
     'django': ('장고', 'django 프레임워크'), 'fastapi': ('패스트API', '패스트 API'),
-    'python': ('파이썬', 'python3', 'python3.10', 'python3.11', 'python3.12', 'python3.13'),
-    'java': ('자바', 'java8', 'java11', 'java17', 'java21'), 'javascript': ('자바스크립트',),
-    'vue': ('vue.js', 'vuejs', 'vue2', 'vue3'),
+    'python': ('파이썬',), 'java': ('자바',), 'javascript': ('자바스크립트',),
+    'vue': ('vue.js', 'vuejs'),
     'typescript': ('타입스크립트',), 'docker': ('도커',),
     'kubernetes': ('쿠버네티스', 'k8s'), 'postgresql': ('포스트그레스큐엘', 'postgres'),
     'react': ('리액트',), 'spring': ('스프링',), 'flask': ('플라스크',),
@@ -48,24 +47,25 @@ _not_required = re.compile(
     rf'\s*+{_particle}\s*+(?:(?:(?:기술|도구|스택|요구사항|조건)\s*+)?(?:(?:은|는|이|가)\s*+)?(?:아니|아님|아닙|없|않|not\b)'
     r'|(?:쓸|사용할|활용할)\s*+필요\s*+(?:는|가)?\s*+없'
     r'|필요한\s*+(?:건|것은|게|것이)?\s*+아니)', re.I)
-_negated_action = re.compile(r'\s*+(?:(?:사용|활용|구현)\s*+)?(?:하지\s*않|쓰지|안\s*)')
-_non_core = re.compile(r'후속|나중|추후|선택\s*(?:사항|적)|제외|미사용|없이|대신|사용하지|필요\s*없|쓰지|안\s*(?:함|하|해|쓰|사용)|않|아니|아닌|아닙|아님|\b(?:later|optional|without|instead|not|exclude\w*)\b', re.I)
+_non_core =re.compile(r'후속|나중|추후|선택\s*(?:사항|적)|제외|미사용|없이|대신|사용하지|필요\s*없|쓰지|안\s*(?:함|하|해|쓰|사용)|않|아니|아닌|아닙|아님|\b(?:later|optional|without|instead|not|exclude\w*)\b', re.I)
 # 의무를 취소하는 표현은 대상 기술에 걸린 것만 본다. "오류 없이 처리"는 품질 조건이고 "Django 없이"가 제외다.
 _excluded_next = re.compile(rf'\s*+{_particle}\s*+(?:대신|없이|말고|빼고|제외|미사용|아닌)', re.I)
-_deferred_next = re.compile(rf'\s*+{_particle}\s*+(?:후속|나중|추후|\blater\b)', re.I)
-_cancelled_scope = re.compile(
-    r'후속|나중|추후|선택\s*(?:사항|적)|\(\s*선택\s*\)|(?:사용|도입|적용|구현|활용)\s*하지\s*않|쓰지|필요\s*없|'
-    r'(?<![가-힣])안\s*(?:함|하|해|쓰|사용)|\b(?:later|optional)\b', re.I)
-# 의무 표현 뒤에서 끝맺는 부정이다. "Django는 필수까지는 아닙니다". "않도록·않은"은 다른 대상의 조건이다.
-_denied = re.compile(r'아니|아닌|아님|아닙|않(?:음|습|아|는다|다)|어렵(?:습|다)|없(?:습|어요|다)')
+# 기술이나 의무 표현 뒤에 이 낱말만 이어진 뒤 나오는 부정·후속만 그 의무를 취소한다.
+# "필수까지는 아닙니다"는 취소하고, "필수: 중복 저장은 허용하지 않습니다"의 부정은 중복 저장을 말한다.
+_obligation_words = (
+    r'이라고|이어야|여야|해야|라고|까지|하는|사용할|활용할|사용|활용|구현|개발|도입|적용|필요|요건|요구\s*사항|'
+    r'조건|사항|기술|대상|보기|보긴|볼|쓸|건|것|게|수|일|인|하|할|으로|로|은|는|이|가|도|만|을|를'
+)
+_cancelled = re.compile(
+    rf'\s*+(?:(?:{_obligation_words})\s*+)*+'
+    r'(?:아니|아닌|아님|아닙|(?:지\s*)?않(?:음|습|아|는다|다)|쓰지|안\s*(?:함|하|해|쓰|써|사용)|어렵|없(?:습|어|음|다)|'
+    r'후속|나중|추후|선택\s*사항|\(\s*선택\s*\)|\b(?:later|optional)\b)', re.I)
 _clauses = re.compile(r'[\n;!?]|\.(?:\s|$)|(?:한\s*뒤|한\s*후|구현\s*후|그리고|하지만)|(?<=하고)\s+|(?<=하며)\s+|(?<=이며)\s+|(?<=이고)\s+|(?<=이지만)\s+|(?<=아니고)\s+|(?<=아니라)\s+')
 _stop = {'a', 'an', 'the', 'must', 'use', 'using', 'used', 'include', 'required', 'mandatory',
          'is', 'be', 'not', 'and', 'or', 'of', 'api', 'key', 'db', 'framework', 'x', 'rest', 'restful',
          'login', 'logout', 'token', 'tokens', 'auth', 'authentication', 'authorization', 'password',
          'code', 'review', 'test', 'tests', 'testing', 'documentation', 'docs', 'english', 'korean'}
 _stop_only = re.compile(r'[\s을를은는이가의]*+')
-_excluded_before = re.compile(r'\b(?:instead\s+of|without)\s++(?:using\s++)?', re.I)
-_python_version = re.compile(r'python3(?:\.(?:[0-9]++|x))*+', re.I)
 _alias_pairs = []
 for _canonical, _aliases in ALIASES.items():
     _variants = '|'.join(re.escape(alias) for alias in sorted((_canonical, *_aliases), key=len, reverse=True))
@@ -102,7 +102,7 @@ def _texts(value: object, *, limit: int | None = None):
             limit -= len(raw)
             if limit < 0:
                 raise RequirementTextTooLong(f'Crash 목표와 수정 요청의 요구사항을 합계 {MAX_REQUIREMENT_CHARS:,}자 이내로 줄여 주세요.')
-        text = unicodedata.normalize('NFKC', raw).replace('`', '')
+        text = canonical_versions(unicodedata.normalize('NFKC', raw).replace('`', ''))
         # Django(장고)처럼 동일 기술의 별칭을 괄호로 쓴 경우만 합친다. 선택/제외 설명은 보존한다.
         for name, pattern in _alias_pairs:
             text = pattern.sub(name, text)
@@ -111,7 +111,7 @@ def _texts(value: object, *, limit: int | None = None):
 
 def _technology_name(raw: str) -> str:
     name = raw.casefold()
-    return 'python' if _python_version.fullmatch(name) else _alias_names.get(name, name)
+    return _alias_names.get(name, name)
 
 
 def _is_technology(raw: str) -> bool:
@@ -169,12 +169,7 @@ def _marked_lists(clause: str):
         # 다음 기술의 선택·제외는 앞 기술을 취소하지 않는다. 각 꼬리는 한 번만 읽는다.
         scope_end = lists[index + 1][0] if index + 1 < len(lists) else len(clause)
         tail = clause[marker.end() if marker else end:scope_end]
-        if (_not_required.match(tail) or _negated_action.match(tail) or _deferred_next.match(tail)
-                or _denied.search(tail.split(',', 1)[0])):
-            continue
-        # 뒤에 붙으면 이미 말한 의무다. "Django 사용 필수, 오류 없이 처리"의 뒤 조건은 의무를 취소하지 않는다.
-        if marker is not None or not (_excluded_next.match(tail) or _cancelled_scope.search(
-                _excluded_before.sub('', tail.split(',', 1)[0]))):
+        if not (_not_required.match(tail) or _excluded_next.match(tail) or _cancelled.match(tail)):
             yield from groups
 
 

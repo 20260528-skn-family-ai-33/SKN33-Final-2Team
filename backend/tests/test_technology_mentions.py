@@ -246,6 +246,21 @@ class AppliedTechnologiesTests(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertEqual(applied_technologies([text], patterns), {'django'})
 
+    def test_parenthesis_condition_applies_to_its_named_target(self):
+        patterns = {'django': self.patterns['django']}
+        for text in ('Django API 구현 (후속 학습)', 'Django API 구현(후속 학습)', 'Django (선택 사항)로 API 구현',
+                     'Django API 구현 (선택)', 'Django API 구현 (나중에 구현)', 'Django API 구현 (참고)',
+                     'Django API 구현 (구현 안 함)', 'Django API 구현 (optional)', '(후속) Django API 구현'):
+            with self.subTest(text=text):
+                self.assertEqual(applied_technologies([text], patterns), set())
+        for text in ('Django API 구현 (Redis는 후속 학습)', 'Django API 구현 (레디스는 후속 학습)',
+                     'Django API 구현 (ORM 심화는 후속 학습)', 'Django API 구현 (선택적 필터링 포함)',
+                     'Django API 구현 (참고 자료 제공)', 'Redis 캐시 (선택 사항), Django API 구현'):
+            with self.subTest(text=text):
+                self.assertEqual(applied_technologies([text], patterns), {'django'})
+        self.assertApplied('Django API 구현 (Redis는 후속 학습)', {'django'})
+        self.assertApplied('Django 구현, FastAPI 연동 (후속)', {'django'})
+
     def test_outer_work_applies_to_a_bare_parenthesis_but_not_a_reference(self):
         patterns = {'django': self.patterns['django']}
         for text in ('REST API 구현 (Django)', 'JWT 인증 구현 (Django)', 'CRUD API 구현 (Django 5.2)',
@@ -276,6 +291,8 @@ for count in (5000, 20000):
     assert applied_technologies(['Django ' + '가' * count + '지'], patterns) == {'django'}
     assert applied_technologies(['구현 (Django) ' * count], patterns) == {'django'}
     assert applied_technologies(['Django ' + '후보 ' * count], patterns) == set()
+    assert applied_technologies(['Django API 구현 (' + '후속 ' * count + 'x)'], patterns) == {'django'}
+    assert applied_technologies(['Django 구현 (후속) ' * count], patterns) == set()
 """
         subprocess.run([sys.executable, '-B', '-c', script],
                        cwd=Path(__file__).resolve().parents[1], timeout=5, check=True)

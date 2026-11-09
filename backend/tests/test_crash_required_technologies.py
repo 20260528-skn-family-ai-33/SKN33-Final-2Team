@@ -84,6 +84,47 @@ class CrashRequiredTechnologiesTests(unittest.TestCase):
         result, _ = self.option(answer('FastAPI로 REST API 구현'), goal='Django는 필수까지는 아닙니다')
         self.assertEqual(result['learningSkills'][0]['coreOutcome'], 'FastAPI로 REST API 구현')
 
+    PAIRED_CASES = (
+        # (사용자 요구, 핵심 결과, 통과 여부)
+        ('Django는 필수까지는 아닙니다', 'FastAPI로 REST API 구현', True),
+        ('Django를 반드시 사용해 중복 저장을 허용하지 않습니다', 'FastAPI로 REST API 구현', False),
+        ('Django 사용 필수: 중복 저장은 허용하지 않습니다', 'FastAPI로 REST API 구현', False),
+        ('Django 사용 필수, 중복 저장은 허용하지 않습니다', 'FastAPI로 REST API 구현', False),
+        ('Django 사용 필수', 'Django API 구현 (Redis는 후속 학습)', True),
+        ('Django 사용 필수', 'Django API 구현 (후속 학습)', False),
+        ('Django 사용 필수', 'Django (선택 사항)로 API 구현', False),
+        ('Python3.9 사용 필수', 'Python3.9로 로그 파서 구현', True),
+        ('Python3.14 사용 필수', 'Python3.14로 로그 파서 구현', True),
+        ('Python3.14 사용 필수', 'Rust로 로그 파서 구현', False),
+    )
+
+    @staticmethod
+    def paired_core(outcome):
+        return target(coreOutcome=outcome, coreCriteria=['응답 코드 확인'])
+
+    def test_paired_cases_on_generation_path(self):
+        for goal, outcome, passes in self.PAIRED_CASES:
+            with self.subTest(goal=goal, outcome=outcome):
+                if passes:
+                    result, _ = self.option(self.paired_core(outcome), goal=goal)
+                    self.assertEqual(result['learningSkills'][0]['coreOutcome'], outcome)
+                else:
+                    with self.assertRaises(llm.LlmError):
+                        self.option(self.paired_core(outcome), goal=goal)
+
+    def test_paired_cases_on_course_transition_revision_path(self):
+        helper = revision_cases.CourseTransitionTargetsTests()
+        for goal, outcome, passes in self.PAIRED_CASES:
+            with self.subTest(goal=goal, outcome=outcome):
+                inp = helper.revision_input('A3', 'A2', names=[WEB])
+                inp['handoff']['goal'] = goal
+                if passes:
+                    result, _, _ = helper.revise_input(inp, [self.paired_core(outcome)])
+                    self.assertEqual(result['learningSkills'][0]['coreOutcome'], outcome)
+                else:
+                    with self.assertRaises(llm.LlmError):
+                        helper.revise_input(inp, [self.paired_core(outcome)])
+
     def test_oversized_request_is_rejected_before_model_generation(self):
         with self.assertRaises(ApiError) as caught:
             self.option(target(), goal='Django 필수', request={'wish': '가' * MAX_REQUIREMENT_CHARS})

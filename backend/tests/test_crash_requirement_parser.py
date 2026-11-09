@@ -69,6 +69,39 @@ assert required_technologies({}, {'wish': names + ' required'}) == {'django', 'f
             with self.subTest(text=text):
                 self.assertEqual(required_technologies({'goal': text}), {'django'})
 
+    def test_denial_targets_the_obligation_only_when_nothing_else_is_named(self):
+        fastapi = [{'coreOutcome': 'FastAPI로 REST API 구현'}]
+        handoff = {'goal': 'Django는 필수까지는 아닙니다'}
+        self.assertEqual(required_technologies(handoff), set())
+        validate_core_requirements(fastapi, handoff)
+        # 구분 기호를 바꿔도 부정의 대상은 중복 저장이다.
+        for text in ('Django를 반드시 사용해 중복 저장을 허용하지 않습니다',
+                     'Django를 반드시 사용해, 중복 저장을 허용하지 않습니다',
+                     'Django를 반드시 사용해: 중복 저장을 허용하지 않습니다',
+                     'Django 사용 필수 중복 저장은 허용하지 않습니다',
+                     'Django 사용 필수, 중복 저장은 허용하지 않습니다',
+                     'Django 사용 필수: 중복 저장은 허용하지 않습니다',
+                     '반드시 Django로 구현하되 심화는 후속 학습'):
+            with self.subTest(text=text):
+                handoff = {'goal': text}
+                self.assertEqual(required_technologies(handoff), {'django'})
+                with self.assertRaisesRegex(ValueError, 'django'):
+                    validate_core_requirements(fastapi, handoff)
+
+    def test_python_versions_share_one_conversion_on_both_sides(self):
+        for requirement, core in (('Python3.9 사용 필수', 'Python3.9로 로그 파서 구현'),
+                                  ('Python3.14 사용 필수', 'Python3.14로 로그 파서 구현'),
+                                  ('Python3.12 사용 필수', 'Python3.12로 로그 파서 구현'),
+                                  ('Python3.14 사용 필수', 'Python3.9로 로그 파서 구현'),
+                                  ('Python 사용 필수', 'python3.x로 로그 파서 구현'),
+                                  ('Python3.9 사용 필수', 'Python으로 로그 파서 구현')):
+            with self.subTest(requirement=requirement, core=core):
+                handoff = {'goal': requirement}
+                self.assertEqual(required_technologies(handoff), {'python'})
+                validate_core_requirements([{'coreOutcome': core}], handoff)
+                with self.assertRaisesRegex(ValueError, 'python'):
+                    validate_core_requirements([{'coreOutcome': 'Rust로 로그 파서 구현'}], handoff)
+
     def test_review_677786a_regressions_stay_fixed(self):
         for core in ('Django는 도입하지 않음', 'FastAPI로 REST API 구현. 후보 기술 목록 (Django)'):
             with self.subTest(core=core), self.assertRaisesRegex(ValueError, 'django'):

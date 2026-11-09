@@ -7,7 +7,7 @@ import unicodedata
 from app import catalog_candidates as evidence
 from app.english_patterns import english_token as _en
 from app.services.course_skills import crash_core_fields
-from app.services.technology_mentions import applied_technologies, technology_pattern
+from app.services.technology_mentions import applied_technologies, canonical_versions, technology_pattern
 
 
 _generic = {'기초', '실무', '활용', '학습', '이해', '환경', '프로그래밍', '아키텍처', '컴퓨팅',
@@ -161,7 +161,7 @@ def _core_stack_names(texts: list[str]) -> set[str]:
     """Crash 요구와 자료의 적용 기술을 같은 경계·문맥 규칙으로 읽는다."""
     found = set()
     for text in texts:
-        text = normalize(text).casefold()
+        text = canonical_versions(normalize(text)).casefold()
         patterns = {}
         for name in _stack_names(text):
             # 정규식 별칭(Spring Boot·Express.js 등)은 유지하고 단어 경계는 생성 검증과 맞춘다.
