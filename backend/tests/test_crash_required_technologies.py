@@ -128,7 +128,24 @@ class CrashRequiredTechnologiesTests(unittest.TestCase):
         ('Django and FastAPI are required', 'Flask로 공개 API 구현', False),
         ('Django and FastAPI are required', 'Django와 FastAPI로 공개 API 구현', True),
         ('Neither Django nor FastAPI is required', 'Flask로 공개 API 구현', True),
+        ('Django is required, neither Redis nor Flask is required', 'FastAPI로 공개 API 구현', False),
+        ('Django is required, neither Redis nor Flask is required', 'Django로 공개 API 구현', True),
+        ('그러나 Django 필수', 'Flask로 공개 API 구현', False),
+        ('언제나 Django 필수', 'Flask로 공개 API 구현', False),
     )
+
+    def test_words_before_a_requirement_do_not_cancel_it(self):
+        # 앞 낱말의 끝 글자를 연결 표현으로 읽어 필수 요구를 지우면 안 된다.
+        for word in ('그러나', '언제나', '누구나', '얼마나', '어디나', '하나', '캐시나', '분석 결과', '테스트 통과', '이번에는', '또는', '이나'):
+            for template in ('{} Django 필수', '{} Django is required', '{} 반드시 Django 사용', 'Python 필수, {} Django 필수'):
+                goal = template.format(word)
+                with self.subTest(goal=goal):
+                    self.assertIn(frozenset({'django'}), _requirement_groups({'goal': goal}))
+
+    def test_neither_only_cancels_the_list_right_after_it(self):
+        self.assertEqual(_requirement_groups({'goal': 'Django is required, neither Redis nor Flask is required'}), {frozenset({'django'})})
+        self.assertEqual(_requirement_groups({'goal': 'Python 필수, neither Django 필수'}), {frozenset({'python'})})
+        self.assertEqual(_requirement_groups({'goal': 'Django 필수, neither'}), {frozenset({'django'})})
 
     def test_quantity_words_decide_alternatives_and_obligations(self):
         one, both = {frozenset({'django', 'fastapi'})}, {frozenset({'django'}), frozenset({'fastapi'})}
@@ -138,14 +155,16 @@ class CrashRequiredTechnologiesTests(unittest.TestCase):
                   'Django 또는 FastAPI 중 1개 이상 필수', 'Django 또는 FastAPI 중 택1 필수', 'Django 또는 FastAPI 중 선택 필수',
                   'Django, FastAPI 중 하나 필수', 'Django/FastAPI 중 하나 필수', 'Django·FastAPI 택1 필수', '필수: Django, FastAPI 중 하나',
                   'Either Django or FastAPI is required', 'must use at least one of Django or FastAPI', '프로젝트는 Django, FastAPI 중 하나 필수',
-                  'Python 사용, Django 또는 FastAPI 중 하나 필수', '분석 결과 Django 또는 FastAPI 중 하나 필수')),
+                  'Python 사용, Django 또는 FastAPI 중 하나 필수', '분석 결과 Django 또는 FastAPI 중 하나 필수',
+                  'Django 혹은 FastAPI 필수', 'Django 아니면 FastAPI 중 하나 필수')),
             (both, ('Django와 FastAPI 필수', 'Django와 FastAPI 모두 필수', 'Django, FastAPI 둘 다 필수', 'Django와 FastAPI는 전부 필수',
                     '반드시 Django와 FastAPI 모두 사용', 'Both Django and FastAPI are required', 'Django and FastAPI both required')),
             (set(), ('Django 또는 FastAPI 중 하나 사용', 'Django 또는 FastAPI 중 하나는 선택', 'Django 또는 FastAPI 중 선택 사항',
                      'Django 또는 FastAPI 중 어느 쪽도 필수는 아니에요', 'Django 또는 FastAPI 중 하나가 필수라는 뜻은 아니에요',
                      'Django와 FastAPI 둘 다 필수까지는 아닙니다', 'Django and FastAPI are not required',
                      # 대안을 전부 읽지 못하면 남은 기술의 단독 의무로 단정하지 않는다.
-                     'REST 또는 GraphQL 중 하나 필수', 'REST, GraphQL 중 하나 필수', '세션 또는 Redis 필수', '세션, Redis 중 하나 필수',
+                     'REST 또는 GraphQL 중 하나 필수', 'REST, GraphQL 중 하나 필수', 'REST나 GraphQL 필수', '세션 또는 Redis 필수', '세션 혹은 Redis 필수',
+                     '세션이나 Redis 필수', '세션, Redis 중 하나 필수', '세션과 Redis 중 하나 필수', '캐시나 Redis 중 하나 필수',
                      'Django 또는 세션 중 하나 필수', 'Django 중급 필수', 'Django 전부터 필수', 'Django 모두의 필수')),
         )
         for expected, goals in cases:
