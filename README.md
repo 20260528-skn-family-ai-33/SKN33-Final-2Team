@@ -201,7 +201,7 @@ docker compose exec backend python tools/verify_bge_database.py --server
 | <http://localhost:8816> | React 서비스 화면 |
 | <http://localhost:8815/api/docs> | FastAPI 문서 |
 
-Compose는 **DB → 복원된 BGE DB 읽기 전용 검사·BGE 서버 준비 → API → 화면** 순서로 실행합니다. 복원은 별도 명령이며 동일 백업 재실행은 건너뜁니다. 공유 DB에는 기존 OpenAI 보충·비밀번호 초기화 도구를 실행하지 않습니다. `docker compose down`은 DB·업로드 볼륨을 보존합니다.
+Compose는 **DB → 복원된 BGE DB 읽기 전용 검사·BGE 서버 준비 → API → 화면** 순서로 실행합니다. 복원은 별도 명령이며 동일 백업 재실행은 건너뜁니다. 공유 DB에는 기존 OpenAI 보충·비밀번호 초기화 도구를 실행하지 않습니다. `docker compose down`은 DB·업로드 볼륨을 보존합니다. 이미 복원한 PC에서 새 공유본으로 바꿀 때는 [새 공유본으로 교체](team_db/README.md#새-공유본으로-교체) 절차를 따릅니다.
 
 복원한 직원 계정은 **기존 비밀번호**로 로그인합니다. 비밀번호는 백업 제공자·관리자에게 별도로 전달받으세요. 설치기는 직원 비밀번호 해시를 기본으로 보존하며, `GP5_DEMO_PASSWORD`를 설정하거나 설치기를 다시 실행해도 기존 직원 비밀번호를 바꾸지 않습니다. 해시가 NULL이거나 잘못된 형식이어도 임의로 초기화하지 않습니다.
 
