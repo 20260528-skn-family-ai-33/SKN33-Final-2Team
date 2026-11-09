@@ -229,10 +229,34 @@ class AppliedTechnologiesTests(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertEqual(applied_technologies([text], patterns), {'django'})
 
+    def test_unadopted_and_candidate_mentions_are_not_application(self):
+        patterns = {'django': self.patterns['django']}
+        for text in ('Django는 도입하지 않음', 'Django 도입하지 않음', 'Django는 채택하지 않음', 'Django는 포함하지 않음',
+                     'Django는 학습하지 않음', 'Django API 안 씀', 'Django 없음', 'Django 미도입', 'Django 미포함',
+                     'Django 사용 금지', 'Django 도입 불가', 'Django 도입 계획 없음',
+                     'Django는 프로젝트에 도입하지 않음', 'Django를 도입하지 않는 FastAPI 구현',
+                     'Django was not adopted', 'Do not adopt Django', 'Django will not be used',
+                     '후보 기술 목록: Django', 'Django 후보', 'Django는 후보로 둠', 'Django 후보 기술', 'Django 대안'):
+            with self.subTest(text=text):
+                self.assertEqual(applied_technologies([text], patterns), set())
+        for text in ('Django로 오류가 발생하지 않도록 구현', 'Django는 권한 없는 요청을 허용하지 않음',
+                     'Django로 저장하지 않는 조회 API 구현', 'Django로 후보 추천 API 구현',
+                     'Django로 후보 필터링', 'Django 게시글 목록', 'Django 도입', 'Django 도입 후 API 구현',
+                     '오류 없는 Django 서버', 'Django 로그 수집'):
+            with self.subTest(text=text):
+                self.assertEqual(applied_technologies([text], patterns), {'django'})
+
     def test_outer_work_applies_to_a_bare_parenthesis_but_not_a_reference(self):
-        self.assertApplied('REST API 구현 (Django)', {'django'})
-        self.assertApplied('FastAPI 구현 (Django는 참고)', {'fastapi'})
-        self.assertApplied('FastAPI 비교 (Django)', set())
+        patterns = {'django': self.patterns['django']}
+        for text in ('REST API 구현 (Django)', 'JWT 인증 구현 (Django)', 'CRUD API 구현 (Django 5.2)',
+                     'Build a REST API (Django)'):
+            with self.subTest(text=text):
+                self.assertEqual(applied_technologies([text], patterns), {'django'})
+        for text in ('FastAPI 구현 (Django는 참고)', 'FastAPI 비교 (Django)',
+                     'FastAPI로 REST API 구현. 후보 기술 목록 (Django)', 'FastAPI로 REST API 구현 (Django)',
+                     'FastAPI로 구현. (Django)', 'FastAPI로 구현, 후보 (Django)'):
+            with self.subTest(text=text):
+                self.assertEqual(applied_technologies([text], patterns), set())
 
     def test_long_outputs_finish_in_a_killable_process_without_a_length_fail_safe(self):
         # 스레드 제한시간으로는 정규식의 GIL 점유를 끊을 수 없다.
@@ -249,6 +273,9 @@ for count in (5000, 20000):
     assert applied_technologies(['Django ' + 'test' * count + '!a'], patterns) == {'django'}
     assert applied_technologies(['Django ' + '영상 ' * count], patterns) == set()
     assert applied_technologies(['Django, ' * count + '비교'], patterns) == set()
+    assert applied_technologies(['Django ' + '가' * count + '지'], patterns) == {'django'}
+    assert applied_technologies(['구현 (Django) ' * count], patterns) == {'django'}
+    assert applied_technologies(['Django ' + '후보 ' * count], patterns) == set()
 """
         subprocess.run([sys.executable, '-B', '-c', script],
                        cwd=Path(__file__).resolve().parents[1], timeout=5, check=True)

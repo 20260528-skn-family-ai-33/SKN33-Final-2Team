@@ -69,6 +69,25 @@ assert required_technologies({}, {'wish': names + ' required'}) == {'django', 'f
             with self.subTest(text=text):
                 self.assertEqual(required_technologies({'goal': text}), {'django'})
 
+    def test_review_677786a_regressions_stay_fixed(self):
+        for core in ('Django는 도입하지 않음', 'FastAPI로 REST API 구현. 후보 기술 목록 (Django)'):
+            with self.subTest(core=core), self.assertRaisesRegex(ValueError, 'django'):
+                validate_core_requirements([{'coreOutcome': core}], {'goal': 'Django 사용 필수'})
+        handoff = {'goal': 'Django는 필수까지는 아닙니다'}
+        self.assertEqual(required_technologies(handoff), set())
+        validate_core_requirements([{'coreOutcome': 'FastAPI로 REST API 구현'}], handoff)
+
+    def test_final_denial_after_an_obligation_cancels_only_when_it_ends_that_statement(self):
+        for text in ('Django는 필수까지는 아닙니다', 'Django 필수는 아닌데요', 'Django가 필수인 건 아니에요',
+                     'Django 필수 요건은 아닙니다', 'Django 필수라고 보기 어렵습니다', 'Django는 꼭 필요하지 않습니다',
+                     'Django 필수까지는 없습니다', '꼭 Django일 필요는 없습니다', '반드시 Django여야 하는 건 아닙니다'):
+            with self.subTest(text=text):
+                self.assertEqual(required_technologies({'goal': text}), set())
+        for text in ('Django 사용 필수 오류가 나지 않도록 구현', '반드시 Django로 인증되지 않은 요청을 차단',
+                     'Django 필수, FastAPI는 아님'):
+            with self.subTest(text=text):
+                self.assertEqual(required_technologies({'goal': text}), {'django'})
+
     def test_common_words_are_not_technologies_and_known_versions_keep_the_name(self):
         for text in ('Login is required', 'Token is required', 'Authentication is required',
                      'English 필수', 'Code review required', 'User API 필수', 'REST API 필수'):

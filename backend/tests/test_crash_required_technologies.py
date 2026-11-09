@@ -75,6 +75,15 @@ class CrashRequiredTechnologiesTests(unittest.TestCase):
         with self.assertRaisesRegex(llm.LlmError, '(?i)django'):
             self.option(answer('Django 대신 FastAPI로 API 구현'), goal=goal)
 
+    def test_generation_path_handles_unadopted_candidate_and_denied_requirements(self):
+        def answer(outcome):
+            return target(coreOutcome=outcome, coreCriteria=['응답 코드 확인'])
+        for outcome in ('Django는 도입하지 않음', 'FastAPI로 REST API 구현. 후보 기술 목록 (Django)'):
+            with self.subTest(outcome=outcome), self.assertRaisesRegex(llm.LlmError, '(?i)django'):
+                self.option(answer(outcome))
+        result, _ = self.option(answer('FastAPI로 REST API 구현'), goal='Django는 필수까지는 아닙니다')
+        self.assertEqual(result['learningSkills'][0]['coreOutcome'], 'FastAPI로 REST API 구현')
+
     def test_oversized_request_is_rejected_before_model_generation(self):
         with self.assertRaises(ApiError) as caught:
             self.option(target(), goal='Django 필수', request={'wish': '가' * MAX_REQUIREMENT_CHARS})

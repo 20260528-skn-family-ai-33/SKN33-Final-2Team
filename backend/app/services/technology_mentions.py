@@ -20,7 +20,8 @@ _PARTICLES = (
     r'으로|에서|에게|부터|까지|을|를|은|는|이|가|와|과|의|에|로|만|도)'
 )
 _VERSION = r'[ \t]+v?[0-9]+(?:\.[0-9]+)*(?:\.x)?(?!\w)'
-_SUBJECT = re.compile(rf'(?:{_VERSION})?[ \t]*(?:{_PARTICLES})?[ \t]*', re.I)
+# 조사 뒤에 글자가 이어지면 조사가 아니다. "Django 도입"의 도, "Docker 이미지"의 이.
+_SUBJECT = re.compile(rf'(?:{_VERSION})?[ \t]*(?:{_PARTICLES}(?!\w))?[ \t]*', re.I)
 _JOIN = re.compile(
     rf'(?:{_VERSION})?[ \t]*(?:(?:으로|로|을|를|은|는|이|가|만|도)[ \t]*)?'
     rf'(?:,|/|·|및|와|과|&|\+|\band\b)[ \t]*|(?:{_VERSION})?[ \t]+', re.I,
@@ -40,10 +41,14 @@ _EXCLUDED_BEFORE = re.compile(
     r'\b(?:instead\s+of|without)\s+(?:using\s+)?$|'
     r'\b(?:exclude|excluding|except|compare|comparing|reference)\s+(?:with\s+)?$|'
     r'\b(?:migrat\w*|mov\w*|switch\w*)\s+(?:away\s+)?from\s+$|'
-    r'\b(?:do\s+not|never|not)\s+(?:use|implement|build|deploy)\s+$', re.I,
+    r'\b(?:do\s+not|never|not)\s+(?:use|implement|build|deploy|adopt|include)\s+$', re.I,
 )
+# 기술 바로 뒤 서술어는 그 기술을 말한다. "Django는 도입하지 않음"과 달리
+# "Django는 권한 없는 요청을 허용하지 않음"의 부정은 요청을 말하므로 첫 낱말만 본다.
 _EXCLUDED_AFTER = re.compile(
-    r'(?:대신(?:에)?|(?:(?:구현|개발|사용|활용|적용)[ \t]*)?없이|말고|빼고|뺀|제거|대체|제외|미사용|미구현|미적용|아닌|후속|나중|추후|'
+    r'(?:대신(?:에)?|(?:(?:구현|개발|사용|활용|적용)[ \t]*)?없이|말고|빼고|뺀|제거|대체|제외|'
+    r'미사용|미구현|미적용|미도입|미채택|미포함|금지|불가|불필요|아닌|후속|나중|추후|'
+    r'[가-힣]+지[ \t]*않(?!는|은|도록|게)|(?:안|못)[ \t]|없(?:음|다|습니다|어요)|'
     r'범위\s*(?:밖|외)|선택\s*사항|선택만|(?:필수|필요)[^,;.!?]*?(?:아니|아님|아닙|없)|'
     r'(?:(?:is|are)\s+)?(?:not|never)\b)', re.I,
 )
@@ -55,17 +60,23 @@ _KOREAN_ACTION = (
     r'(?:구현|구축|개발|사용(?!자)|활용|적용|실행|연동|배포|실습|구성|설정|'
     r'작성|완성|생성|저장|조회|처리|만들)'
 )
+# 적용 동사는 어미와 무관하게 부정이다. "Django를 도입하지 않는 FastAPI 구현".
+# 세부 동작은 끝맺을 때만 본다. "Django로 저장하지 않는 조회 API 구현"은 Django를 쓴다.
+_APPLY_ACTION = r'(?:구현|구축|개발|사용(?!자)|활용|적용|실습|도입|채택)'
 _NEGATED_ACTION = (
-    rf'(?<![가-힣])(?:{_KOREAN_ACTION}\s*(?:하지\s*않|되지\s*않|안\s*함|'
-    rf'안\s*하|할\s*필요(?:가|는)?\s*없)|쓰지\s*않|'
-    rf'안\s+{_KOREAN_ACTION}|미(?:사용|구현|적용))|'
-    r'\b(?:not|never)\s+(?:us\w*|implement\w*|build\w*|deploy\w*)'
+    rf'(?<![가-힣])(?:{_APPLY_ACTION}\s*(?:하지\s*않|되지\s*않|안\s*함|'
+    rf'안\s*하|할\s*필요(?:가|는)?\s*없)|'
+    rf'{_KOREAN_ACTION}\s*(?:(?:하지|되지)\s*않(?:음|습|는다|아|다)|안\s*함)|쓰지\s*않|'
+    rf'안\s+{_KOREAN_ACTION}|안\s*(?:씀|쓴|쓰|씁)|'
+    r'미(?:사용|구현|적용|도입|채택|포함)(?=\s*(?:$|[,.;])))|'
+    r'\b(?:not|never)\s+(?:be\s+)?(?:us\w*|implement\w*|build\w*|built|deploy\w*|adopt\w*|includ\w*)'
 )
 # "Django 구현은 제외"처럼 기술의 적용 자체를 범위에서 빼는 술어만 본다.
 # "저장은 제외하고 조회 API 구현", "권한 없는 사용자는 제외한 API"는 구현 범위 설명이므로 막지 않는다.
 _SCOPED_OUT = (
     r'(?<![가-힣])(?:구현|구축|개발|사용(?!자)|활용|적용|실습|서버|서비스|프로젝트|앱|API)(?:은|는|을|를)[ \t]*'
     r'(?:제외(?!한)|다음\s*단계|미룸|미룬|미루|연기|보류|하지\s*않|안\s*함|안\s*하|못\s*함|못\s*하)|'
+    rf'(?<![가-힣]){_APPLY_ACTION}\s*(?:금지|불가|불필요|계획\s*(?:이|은)?\s*없)|'
     r'필요\s*(?:는|가)?\s*없(?:음|다|습니다|어요)|다루지\s*않|범위\s*(?:밖|외)|'
     r'\b(?:out\s+of\s+scope|deferred|postponed|excluded)\b'
 )
@@ -79,6 +90,7 @@ _CUES = re.compile(
     rf'(?P<negative>{_NEGATED_ACTION}|{_SCOPED_OUT})|'
     r'(?P<deferred>후속|나중|추후|선택\s*사항|\b(?:later|optional)\b)|'
     r'(?P<reference>시청|참고|수강|열람|언급|(?<![가-힣])선택(?!적)|'
+    r'후보\s*(?:기술|스택|도구|목록|군)|후보로|(?:기술|스택|도구)\s*(?:후보|대안)|대안\s*(?:기술|스택|도구)|(?:후보|대안)\s*$|'
     r'\b(?:reference\w*|mention\w*|watch\w*|select\w*|choos\w*)\b)|'
     rf'(?P<weak>{_WEAK_REFERENCE})|'
     r'(?P<compare>비교|\b(?:compar\w*|versus|vs)\b)|'
@@ -109,6 +121,9 @@ _FILLER = re.compile(
     rf'(?:{_PARTICLES})?', re.I,
 )
 _WORD = re.compile(r'[^\W\d_]{2,}[\w.+#-]*')
+_HANGUL = re.compile(r'[가-힣]')
+_LATIN_WORD = re.compile(r'[A-Za-z][\w.+#-]*')
+_GENERIC_WORDS = {'rest', 'restful', 'api', 'apis', 'crud', 'http', 'https', 'jwt', 'oauth', 'web', 'json', 'ui', 'db'}
 
 
 def technology_pattern(name: str, aliases: tuple[str, ...] = ()) -> re.Pattern[str]:
@@ -127,24 +142,30 @@ def technology_pattern(name: str, aliases: tuple[str, ...] = ()) -> re.Pattern[s
     )
 
 
-def _scopes(text: str) -> Iterator[str]:
-    """괄호 안은 독립 판정하고 바깥 문장은 이어 둔다. 중첩도 한 방향으로 소비한다."""
+def _scopes(text: str) -> Iterator[tuple[str, str]]:
+    """(범위 글, 괄호 바로 앞 글)을 낸다. 괄호 안은 독립 판정하고 바깥 문장은 이어 둔다.
+
+    중첩도 한 방향으로 소비한다.
+    """
     frames: list[list[str]] = [[]]
+    leads = ['']
     pos = 0
     for match in _BRACKETS.finditer(text):
-        frames[-1].append(text[pos:match.start()])
+        fragment = text[pos:match.start()]
+        frames[-1].append(fragment)
         if match[0] in '([{':
             frames[-1].append(' ')
             frames.append([])
+            leads.append(fragment)
         elif len(frames) > 1:
-            yield ''.join(frames.pop())
+            yield ''.join(frames.pop()), leads.pop()
             frames[-1].append(' ')
         else:
             frames[-1].append(' ')
         pos = match.end()
     frames[-1].append(text[pos:])
     while frames:
-        yield ''.join(frames.pop())
+        yield ''.join(frames.pop()), leads.pop()
 
 
 @dataclass
@@ -250,6 +271,19 @@ def _before_evidence(before: str) -> bool:
     return found
 
 
+def _lead_applies(lead: str) -> bool:
+    """괄호는 바로 앞 절의 구현을 이어받는다. "REST API 구현 (Django)".
+
+    문장이 끝났거나("구현. 후보 기술 목록 (Django)") 앞 절이 다른 도구를 말하면
+    ("FastAPI로 구현 (Django)") 이어받지 않는다.
+    """
+    clause = _CLAUSES.split(lead)[-1].rsplit(',', 1)[-1]
+    if _HANGUL.search(clause) and any(
+            word.casefold() not in _GENERIC_WORDS for word in _LATIN_WORD.findall(clause)):
+        return False
+    return _before_evidence(clause)
+
+
 def _applied_in_clause(clause: str, patterns: dict[str, re.Pattern[str]], *, context: bool = False) -> set[str]:
     groups = _groups(clause, patterns)
     if not groups:
@@ -301,11 +335,8 @@ def applied_technologies(texts: Iterable[str], patterns: dict[str, re.Pattern[st
         texts = [texts]
     for raw in texts:
         text = unicodedata.normalize('NFKC', raw).replace('`', '')
-        scopes = list(_scopes(text))
-        # 바깥 문장은 마지막에 나온다. "REST API 구현 (Django)"의 괄호는 바깥 구현을 부연한다.
-        outer = _before_evidence(scopes[-1])
-        for index, scope in enumerate(scopes):
-            inner = index < len(scopes) - 1
+        for scope, lead in _scopes(text):
+            context = bool(lead) and _lead_applies(lead)
             for clause in _CLAUSES.split(scope):
-                found.update(_applied_in_clause(clause, patterns, context=inner and outer))
+                found.update(_applied_in_clause(clause, patterns, context=context))
     return found

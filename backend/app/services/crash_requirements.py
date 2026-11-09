@@ -56,6 +56,8 @@ _deferred_next = re.compile(rf'\s*+{_particle}\s*+(?:후속|나중|추후|\blate
 _cancelled_scope = re.compile(
     r'후속|나중|추후|선택\s*(?:사항|적)|\(\s*선택\s*\)|(?:사용|도입|적용|구현|활용)\s*하지\s*않|쓰지|필요\s*없|'
     r'(?<![가-힣])안\s*(?:함|하|해|쓰|사용)|\b(?:later|optional)\b', re.I)
+# 의무 표현 뒤에서 끝맺는 부정이다. "Django는 필수까지는 아닙니다". "않도록·않은"은 다른 대상의 조건이다.
+_denied = re.compile(r'아니|아닌|아님|아닙|않(?:음|습|아|는다|다)|어렵(?:습|다)|없(?:습|어요|다)')
 _clauses = re.compile(r'[\n;!?]|\.(?:\s|$)|(?:한\s*뒤|한\s*후|구현\s*후|그리고|하지만)|(?<=하고)\s+|(?<=하며)\s+|(?<=이며)\s+|(?<=이고)\s+|(?<=이지만)\s+|(?<=아니고)\s+|(?<=아니라)\s+')
 _stop = {'a', 'an', 'the', 'must', 'use', 'using', 'used', 'include', 'required', 'mandatory',
          'is', 'be', 'not', 'and', 'or', 'of', 'api', 'key', 'db', 'framework', 'x', 'rest', 'restful',
@@ -167,7 +169,8 @@ def _marked_lists(clause: str):
         # 다음 기술의 선택·제외는 앞 기술을 취소하지 않는다. 각 꼬리는 한 번만 읽는다.
         scope_end = lists[index + 1][0] if index + 1 < len(lists) else len(clause)
         tail = clause[marker.end() if marker else end:scope_end]
-        if _not_required.match(tail) or _negated_action.match(tail) or _deferred_next.match(tail):
+        if (_not_required.match(tail) or _negated_action.match(tail) or _deferred_next.match(tail)
+                or _denied.search(tail.split(',', 1)[0])):
             continue
         # 뒤에 붙으면 이미 말한 의무다. "Django 사용 필수, 오류 없이 처리"의 뒤 조건은 의무를 취소하지 않는다.
         if marker is not None or not (_excluded_next.match(tail) or _cancelled_scope.search(
