@@ -21,10 +21,15 @@ export function notificationTarget(n: AppNotification): string {
   return head ? paths.memberPlan(n.employee.id, planId) : paths.roadmap(planId);
 }
 
+/** 로드맵 확정 전 작업의 알림이 지금 작성 중인 문서가 아닌 다른 문서의 것인지. 작성 화면 주소는 문서마다 같아 주소만으로는 구분되지 않는다(PR #139 리뷰) */
+export function isOtherDraft(n: AppNotification, currentDraftId: string | null): boolean {
+  return n.kind === 'job' && !n.planId && n.draftId !== currentDraftId;
+}
+
 /** 지금 보고 있는 화면을 가리키는 읽지 않은 알림(#96). 이미 본 일이 알림 창에 쌓이지 않게 읽음으로 바꾼다.
  *  부서장 알림은 기록이 실제로 화면에 보일 때 useMarkSeen 이 처리하므로 뺀다 */
-export function viewedNow(items: AppNotification[], pathname: string): AppNotification[] {
-  return items.filter((n) => !n.read && n.audience !== 'head' && notificationTarget(n) === pathname);
+export function viewedNow(items: AppNotification[], pathname: string, currentDraftId: string | null): AppNotification[] {
+  return items.filter((n) => !n.read && n.audience !== 'head' && notificationTarget(n) === pathname && !isOtherDraft(n, currentDraftId));
 }
 
 const JOB_TITLE: Record<NotificationJobKind, { done: string; failed: string }> = {

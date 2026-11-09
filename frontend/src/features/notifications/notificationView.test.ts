@@ -1,7 +1,7 @@
 /* 완료 알림(#82): 받는 쪽(본인·부서장)과 종류(로드맵·보고서)에 따라 문구와 이동할 주소가 맞는지 */
 import { describe, expect, it } from 'vitest';
 import type { AppNotification } from '@/api/types/notification';
-import { mergeReports, notificationSub, notificationTarget, notificationTime, notificationTitle, splitNotifications, staffGroupSub, viewedNow } from './notificationView';
+import { mergeReports, notificationSub, notificationTarget, notificationTime, notificationTitle, splitNotifications, staffGroupSub, viewedNow, isOtherDraft } from './notificationView';
 
 const base: AppNotification = {
   id: 'n1',
@@ -162,8 +162,21 @@ describe('작업·코멘트 알림 (#96)', () => {
 
   it('지금 보는 화면을 가리키는 읽지 않은 본인·직원 알림만 고른다', () => {
     const items = [job('options'), job('materials'), n({ kind: 'job', jobKind: 'options', jobStatus: 'done', read: true, id: 'old' }), n({ audience: 'head', employee: { id: '4', name: '오직원' } })];
-    expect(viewedNow(items, '/new/options').map((x) => x.jobKind)).toEqual(['options']);
-    expect(viewedNow(items, '/team/4/plans/p1')).toEqual([]); // 부서장 알림은 기록이 화면에 보일 때 따로 처리한다
-    expect(viewedNow(items, '/roadmaps')).toEqual([]);
+    expect(viewedNow(items, '/new/options', 'd1').map((x) => x.jobKind)).toEqual(['options']);
+    expect(viewedNow(items, '/team/4/plans/p1', 'd1')).toEqual([]); // 부서장 알림은 기록이 화면에 보일 때 따로 처리한다
+    expect(viewedNow(items, '/roadmaps', 'd1')).toEqual([]);
+  });
+
+  it('다른 문서의 작업 알림은 같은 주소를 보고 있어도 읽음 대상이 아니다 (PR #139 리뷰)', () => {
+    expect(viewedNow([job('materials')], '/new/materials', 'd2')).toEqual([]);
+    expect(viewedNow([job('materials')], '/new/materials', null)).toEqual([]);
+    expect(viewedNow([job('materials')], '/new/materials', 'd1')).toHaveLength(1);
+  });
+
+  it('로드맵 확정 전 작업 알림만 문서를 구분한다', () => {
+    expect(isOtherDraft(job('options'), 'd2')).toBe(true);
+    expect(isOtherDraft(job('options'), 'd1')).toBe(false);
+    expect(isOtherDraft(job('revision', 'done', 'p1'), 'd2')).toBe(false); // 로드맵에 매인 작업
+    expect(isOtherDraft(comment, 'd2')).toBe(false);
   });
 });

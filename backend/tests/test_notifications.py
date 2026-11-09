@@ -58,6 +58,10 @@ class ConfirmHookTests(unittest.TestCase):
         out, notify, t = self.confirm('A2', 100)
         self.assertEqual(out['planId'], RID)
         notify.assert_called_once_with(t, 7, RID)
+        cleanup = [c for c in t.run.call_args_list if 'app_ext.notifications' in c.args[0]]
+        self.assertEqual(len(cleanup), 1)  # 확정한 문서의 3안·학습 자료 알림을 같은 트랜잭션에서 읽음으로 바꾼다(PR #139 리뷰)
+        self.assertIn('read_at = now()', cleanup[0].args[0])
+        self.assertEqual(cleanup[0].kwargs, {'e': 7, 'd': 'draft'})
 
     def test_rejected_confirm_leaves_no_notification(self):
         # Free 트랙(A1)에 유료 자료가 있으면 저장 전에 막는다 → 알림도 없다
@@ -122,6 +126,11 @@ class ServiceTests(unittest.TestCase):
         self.assertIn("'self'", report_sql)
         self.assertIn("'head'", report_sql)
         self.assertEqual(kw, {'e': 7, 'k': 'report', 'r': RID, 'rep': NID})
+        (cleanup_sql, ), kw = t.run.call_args_list[2]  # 다시 만들어 성공하면 읽지 않은 이전 실패 알림을 지운다(PR #139 리뷰)
+        self.assertIn('DELETE', cleanup_sql)
+        self.assertIn("job_kind = 'report'", cleanup_sql)
+        self.assertIn('read_at IS NULL', cleanup_sql)
+        self.assertEqual(kw, {'e': 7, 'r': RID})
 
     def test_inbox_shape(self):
         at = datetime(2026, 11, 4, 9, 30, tzinfo=timezone.utc)
@@ -167,9 +176,10 @@ class ServiceTests(unittest.TestCase):
 class JobFinishedTests(unittest.TestCase):
     """백그라운드 작업 완료·실패 알림(#96): 오래 걸리는 생성만, 본인에게, 나뉜 작업은 모두 끝났을 때 한 번"""
 
-    def finish(self, kind, ref, status, rows=(), resume=None):
+    def finish(self, kind, ref, status, rows=(), resume=None, draft_status='DRAFTING'):
         t = Mock()
         t.all.return_value = [{'status': s} for s in rows]
+        t.val.return_value = draft_status
         with patch.object(NT.db, 'tx', side_effect=lambda: tx_of(t)) as tx:
             NT.job_finished(kind, 7, ref, status, resume)
         return t, tx
@@ -189,7 +199,7 @@ class JobFinishedTests(unittest.TestCase):
         self.assertIn('DELETE', sql[0])
         self.assertIn('read_at IS NULL', sql[0])  # 이미 읽은 지난 알림은 건드리지 않는다
         self.assertIn('INSERT', sql[1])
-        self.assertIn('pg_advisory_xact_lock', t.val.call_args.args[0])  # 동시에 끝나도 한 건만 남게 순서를 세운다
+        self.assertIn('pg_advisory_xact_lock', t.val.call_args_list[0].args[0])  # 동시에 끝나도 한 건만 남게 순서를 세운다
 
     def test_options_report_failure_when_any_proposal_failed(self):
         t, _ = self.finish('option', f'{DID}:A3', 'done', ['done', 'failed', 'done'])
@@ -215,15 +225,46 @@ class JobFinishedTests(unittest.TestCase):
         t, _ = self.finish('report', RID, 'failed')
         self.assertEqual(self.inserted(t), [{'e': 7, 'r': RID, 'd': None, 'g': 'report', 's': 'failed'}])
 
+    MATERIALS = {'operation': 'materials', 'kwargs': {'employee_id': 7, 'draft_id': DID, 'course': 'A1'}}
+    ROUTE = {'operation': 'route', 'function': 'generate_recommendations', 'kwargs': {'project_id': DID, 'course': 'A1'}}
+
     def test_learning_materials_are_told_apart_by_resume_info(self):
-        t, _ = self.finish('learning_generation', f'{DID}:A1:key', 'done', ['done'], {'operation': 'materials'})
+        t, _ = self.finish('learning_generation', f'{DID}:A1:key', 'done', ['done'], self.MATERIALS)
         self.assertEqual(self.inserted(t)[0]['g'], 'materials')
-        t, _ = self.finish('learning_generation', DID, 'done', [], {'operation': 'route', 'function': 'generate_recommendations'})
         self.assertEqual(self.inserted(t)[0]['d'], DID)
-        t, _ = self.finish('learning_generation', DID, 'done', ['running'], {'operation': 'route', 'function': 'generate_recommendations'})
-        self.assertEqual(self.inserted(t), [])  # 코스별 준비 작업이 남아 있으면 마지막 작업이 알린다
-        _, tx = self.finish('learning_generation', DID, 'done', [], {'operation': 'route', 'function': 'propose_activities'})
+        t, _ = self.finish('learning_generation', DID, 'done', ['running'], self.ROUTE)
+        self.assertEqual(self.inserted(t), [])  # 다른 코스의 준비 작업이 남아 있으면 마지막 작업이 알린다
+        _, tx = self.finish('learning_generation', DID, 'done', [], {'operation': 'route', 'function': 'propose_activities', 'kwargs': {'project_id': DID}})
         tx.assert_not_called()
+
+    def test_material_retry_counts_as_the_latest_job_of_that_course(self):
+        # 자동 준비가 실패한 코스를 화면에서 다시 받아 성공: 코스별 최신은 성공뿐이라 완료로 알린다(PR #139 리뷰)
+        t, _ = self.finish('learning_generation', DID, 'done', ['done', 'done'], self.ROUTE)
+        self.assertEqual(self.inserted(t)[0]['s'], 'done')
+        sql = t.all.call_args.args[0]
+        self.assertIn('DISTINCT ON (course)', sql)
+        self.assertIn("'{_resume,kwargs,course}'", sql)
+        self.assertIn('generate_recommendations', sql)
+        self.assertEqual(t.all.call_args.kwargs, {'e': 7, 'd': DID})
+
+    def test_recovered_material_request_finds_its_draft_from_resume_info(self):
+        t, _ = self.finish('learning_generation', 'recovery:generate_recommendations', 'done', ['done'], self.ROUTE)
+        self.assertEqual(self.inserted(t), [{'e': 7, 'r': None, 'd': DID, 'g': 'materials', 's': 'done'}])
+
+    def test_base_material_request_without_course_stands_alone(self):
+        spec = {'operation': 'route', 'function': 'generate_recommendations', 'kwargs': {'project_id': DID}}
+        t, _ = self.finish('learning_generation', DID, 'failed', [], spec)
+        t.all.assert_not_called()
+        self.assertEqual(self.inserted(t)[0]['s'], 'failed')
+
+    def test_jobs_of_a_confirmed_or_deleted_draft_do_not_notify(self):
+        for draft_status in ('IN_PROGRESS', None):
+            t, _ = self.finish('option', f'{DID}:A1', 'done', ['done'], draft_status=draft_status)
+            self.assertEqual(self.inserted(t), [])
+            self.assertIn('public.projects', t.val.call_args.args[0])
+        # 로드맵에 매인 작업은 작성 문서를 보지 않는다
+        t, _ = self.finish('revision', RID, 'done', draft_status='IN_PROGRESS')
+        self.assertEqual(len(self.inserted(t)), 1)
 
     def test_other_jobs_and_malformed_refs_do_not_notify(self):
         for kind, ref in (('assistant', 'q'), ('assessment', DID), ('diagnosis', DID), ('doc-summary', DID), ('support', DID), ('revision', 'not-a-uuid'), ('option', None)):

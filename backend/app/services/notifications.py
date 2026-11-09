@@ -48,8 +48,17 @@ def roadmap_created(t: db.Tx, employee_id: int, roadmap_id: str) -> None:
 
 def report_created(t: db.Tx, employee_id: int, roadmap_id: str, report_id: str) -> None:
     """결과 보고서 저장(plans.report_start 작업)과 같은 트랜잭션에서 부른다.
-    확인 전 보고서를 다시 만들면 이전 보고서가 지워지면서 그 알림도 함께 지워진다(report_id ON DELETE CASCADE)"""
+    확인 전 보고서를 다시 만들면 이전 보고서가 지워지면서 그 알림도 함께 지워진다(report_id ON DELETE CASCADE).
+    앞선 실패 알림은 보고서에 매이지 않아 함께 지워지지 않으므로, 다시 만들어 성공하면 읽지 않은 것을 여기서 지운다(PR #139 리뷰)"""
     t.run(f'{_COLUMNS}\n    {_TO_SELF}\n    UNION ALL\n    {_TO_HEAD}', e=employee_id, k='report', r=roadmap_id, rep=report_id)
+    t.run("""DELETE FROM app_ext.notifications WHERE recipient_id = :e AND kind = 'job' AND job_kind = 'report'
+             AND roadmap_id = CAST(:r AS uuid) AND read_at IS NULL""", e=employee_id, r=roadmap_id)
+
+
+def draft_confirmed(t: db.Tx, employee_id: int, draft_id: str) -> None:
+    """로드맵 확정(drafts.confirm)과 같은 트랜잭션에서 부른다. 확정한 문서의 3안·학습 자료 화면은 더 없으므로 그 알림은 읽음으로 바꾼다(PR #139 리뷰)"""
+    t.run("""UPDATE app_ext.notifications SET read_at = now()
+             WHERE recipient_id = :e AND kind = 'job' AND draft_id = CAST(:d AS uuid) AND read_at IS NULL""", e=employee_id, d=draft_id)
 
 
 def comment_sent(t: db.Tx, head_id: int, member_id: int, roadmap_id: str, comment_id: str) -> None:
@@ -60,7 +69,8 @@ def comment_sent(t: db.Tx, head_id: int, member_id: int, roadmap_id: str, commen
 
 def _job_target(kind: str, ref: str | None, resume: dict | None) -> tuple[str, str | None, str | None] | None:
     """(알림 묶음, 작성 문서 id, 로드맵 id). 끝나도 알리지 않는 작업이면 None.
-    학습 자료 작업은 다른 생성 작업과 kind·ref 형식이 같아 복구 정보(_resume)로 구분한다"""
+    학습 자료 작업은 다른 생성 작업과 kind·ref 형식이 같아 복구 정보(_resume)로 구분한다.
+    서버 재시작으로 복구된 화면 요청은 ref 가 recovery:함수이름 이라 문서 id 도 복구 정보에서 읽는다(PR #139 리뷰)"""
     head = (ref or '').split(':', 1)[0]
     if kind in ('option', 'regenerate'):
         group = 'options' if kind == 'option' else 'regenerate'
@@ -69,6 +79,8 @@ def _job_target(kind: str, ref: str | None, resume: dict | None) -> tuple[str, s
         if not (spec.get('operation') == 'materials' or (spec.get('operation') == 'route' and spec.get('function') == 'generate_recommendations')):
             return None
         group = 'materials'
+        arguments = spec.get('kwargs') or {}
+        head = str(arguments.get('draft_id') or arguments.get('project_id') or head)
     elif kind in ('revision', 'report'):
         group = kind
     else:
@@ -80,14 +92,27 @@ def _job_target(kind: str, ref: str | None, resume: dict | None) -> tuple[str, s
     return (group, None, target) if group in ('revision', 'report') else (group, target, None)
 
 
-def _group_status(t: db.Tx, employee_id: int, kind: str, status: str, draft_id: str | None) -> str | None:
+# 코스별 학습 자료 작업. 자동 준비(ref 문서:코스:키)와 화면에서 다시 받기(ref 문서, 복구되면 recovery:함수)는 ref 가 달라 복구 정보로 묶는다(PR #139 리뷰)
+_MATERIAL_JOBS = """SELECT DISTINCT ON (course) status FROM (
+    SELECT status, created_at, progress #>> '{_resume,kwargs,course}' AS course FROM app_ext.jobs
+     WHERE employee_id = :e AND kind = 'learning_generation' AND progress #>> '{_resume,kwargs,course}' IS NOT NULL
+       AND ((progress #>> '{_resume,operation}' = 'materials' AND progress #>> '{_resume,kwargs,draft_id}' = :d)
+         OR (progress #>> '{_resume,operation}' = 'route' AND progress #>> '{_resume,function}' = 'generate_recommendations'
+             AND progress #>> '{_resume,kwargs,project_id}' = :d))
+  ) jobs ORDER BY course, created_at DESC"""
+
+
+def _group_status(t: db.Tx, employee_id: int, kind: str, status: str, draft_id: str | None, resume: dict | None) -> str | None:
     """알릴 결과. 3안·학습 자료는 안·코스마다 작업이 나뉘므로 그 묶음이 모두 끝났을 때만 정한다(아직 도는 작업이 있으면 None).
-    안·코스마다 가장 최근 작업만 본다. 예전 회차의 실패를 이번 결과로 치지 않게"""
-    if kind not in ('option', 'learning_generation') or draft_id is None:
+    안·코스마다 가장 최근 작업만 본다. 예전 회차의 실패를 이번 결과로 치지 않고, 다시 받아 성공하면 그 코스의 실패를 대신한다"""
+    if kind == 'learning_generation' and draft_id is not None and ((resume or {}).get('kwargs') or {}).get('course'):
+        rows = t.all(_MATERIAL_JOBS, e=employee_id, d=draft_id)
+    elif kind == 'option' and draft_id is not None:
+        rows = t.all("""SELECT DISTINCT ON (split_part(ref, ':', 2)) status FROM app_ext.jobs
+                        WHERE employee_id = :e AND kind = :k AND ref LIKE :p ORDER BY split_part(ref, ':', 2), created_at DESC""",
+                     e=employee_id, k=kind, p=f'{draft_id}:%')
+    else:  # 코스를 지정하지 않은 기본 자료 요청과 묶음이 없는 작업은 그 작업의 결과로 정한다
         return status
-    rows = t.all("""SELECT DISTINCT ON (split_part(ref, ':', 2)) status FROM app_ext.jobs
-                    WHERE employee_id = :e AND kind = :k AND ref LIKE :p ORDER BY split_part(ref, ':', 2), created_at DESC""",
-                 e=employee_id, k=kind, p=f'{draft_id}:%')
     states = {r['status'] for r in rows} | {status}
     if 'running' in states:
         return None
@@ -105,7 +130,10 @@ def job_finished(kind: str, employee_id: int, ref: str | None, status: str, resu
         return
     with db.tx() as t:
         t.val('SELECT pg_advisory_xact_lock(hashtext(:k))', k=f'notification:{employee_id}:{group}:{draft_id or roadmap_id}')
-        result = _group_status(t, employee_id, kind, status, draft_id)
+        # 확정 뒤에 끝난 작업(남아 있던 자료 준비 등)은 볼 화면이 없다. 문서가 지워졌어도 알리지 않는다(PR #139 리뷰)
+        if draft_id and t.val('SELECT status FROM public.projects WHERE project_id = CAST(:d AS uuid)', d=draft_id) != 'DRAFTING':
+            return
+        result = _group_status(t, employee_id, kind, status, draft_id, resume)
         if result is None:
             return
         # 같은 작업을 다시 돌렸을 때 읽지 않은 이전 결과 알림이 쌓이지 않게 새 결과로 바꾼다

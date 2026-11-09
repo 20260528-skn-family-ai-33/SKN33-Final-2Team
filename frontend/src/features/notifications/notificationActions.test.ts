@@ -252,11 +252,58 @@ describe('코멘트·작업 알림 (#96): 있는 로드맵은 바뀐 부분만 �
     expect(essayOf(wsMod.ws().plans.p1)).toBe('저장 전 새 답변');
   });
 
-  it('로드맵 확정 전 작업 알림: 작성 중인 로드맵을 다시 읽는다', async () => {
-    seed(rec('p1', 'active'));
-    await act.refreshTarget(new QueryClient(), A1, note({ kind: 'job', jobKind: 'options', jobStatus: 'done', planId: null, reportId: null }));
+  it('로드맵 확정 전 작업 알림: 지금 작성 중인 문서면 다시 읽고, 다른 문서면 읽지 않는다 (PR #139 리뷰)', async () => {
+    wsMod.useWs.setState({ ...wsMod.freshWs('A'), draftId: 'd1' });
+    const job = note({ kind: 'job', jobKind: 'options', jobStatus: 'done', planId: null, reportId: null, draftId: 'd1' });
+    await act.refreshTarget(new QueryClient(), A1, job);
     expect(m.pull).toHaveBeenCalledTimes(1);
     expect(m.get).not.toHaveBeenCalled();
+    await act.refreshTarget(new QueryClient(), A1, { ...job, draftId: 'old' });
+    expect(m.pull).toHaveBeenCalledTimes(1);
+  });
+
+  describe('보고 있는 화면의 알림 (PR #139 리뷰): 내용을 받은 뒤에 읽음으로', () => {
+    const comment = () => note({ id: 'n9', kind: 'comment', audience: 'member', reportId: null });
+    const qcAndSeed = () => {
+      seed(rec('p1', 'active'));
+      return new QueryClient();
+    };
+
+    it('받은 다음 읽음으로 바꾼다', async () => {
+      const order: string[] = [];
+      m.get.mockImplementation(async () => {
+        order.push('get');
+        return server({});
+      });
+      m.read.mockImplementation(async () => {
+        order.push('read');
+        return { items: [], unread: 0 };
+      });
+      expect(await act.readViewed(qcAndSeed(), A1, comment(), () => true)).toBe(true);
+      expect(order).toEqual(['get', 'read']);
+      expect(m.read).toHaveBeenCalledWith('n9');
+    });
+
+    it('받기가 실패하면 읽음으로 바꾸지 않는다', async () => {
+      m.get.mockRejectedValue(new Error('network'));
+      await expect(act.readViewed(qcAndSeed(), A1, comment(), () => true)).rejects.toThrow('network');
+      expect(m.read).not.toHaveBeenCalled();
+    });
+
+    it('받는 사이 화면을 떠나면 읽음으로 바꾸지 않는다', async () => {
+      m.get.mockResolvedValue(server({}));
+      expect(await act.readViewed(qcAndSeed(), A1, comment(), () => false)).toBe(false);
+      expect(m.read).not.toHaveBeenCalled();
+    });
+
+    it('받는 사이 로그인이 바뀌면 읽음으로 바꾸지 않는다', async () => {
+      m.get.mockImplementation(async () => {
+        m.seq = 2;
+        return server({});
+      });
+      expect(await act.readViewed(qcAndSeed(), A1, comment(), () => true)).toBe(false);
+      expect(m.read).not.toHaveBeenCalled();
+    });
   });
 
   it('받는 사이 로그인이 바뀌면 넣지 않는다', async () => {

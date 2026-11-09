@@ -1112,6 +1112,7 @@ def confirm(employee_id: int, draft_id: str) -> dict:
               w=db.J({'gp5': 1, 'confirmed': True, 'roadmapId': roadmap_id}), p=draft_id)
         # 로드맵 생성 완료 알림(#82·#96): 부서장에게만. 확정과 같은 트랜잭션이라 확정이 실패하면 남지 않는다
         NT.roadmap_created(t, employee_id, roadmap_id)
+        NT.draft_confirmed(t, employee_id, draft_id)
     with _img_lock:
         _images.pop(draft_id, None)
     from app.services.post_quiz import prepare as prepare_post_quiz

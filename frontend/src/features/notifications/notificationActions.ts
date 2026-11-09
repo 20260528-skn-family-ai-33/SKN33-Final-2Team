@@ -13,7 +13,7 @@ import { memberKey, memberKeyAll, teamKey } from '@/features/team/teamData';
 import { mergeReg, mergeRes } from '@/shared/state/catalog';
 import { me, signInSeq } from '@/shared/state/session';
 import { putRec, updateWs, ws, type WsState } from '@/shared/state/workspace';
-import { mergeReports } from './notificationView';
+import { isOtherDraft, mergeReports } from './notificationView';
 
 /** 알림 캐시 키: 로그인한 직원마다 따로(로그아웃 뒤 다른 직원이 이전 직원 알림을 보지 않게) */
 export const notificationKey = (owner: string) => ['notifications', owner] as const;
@@ -86,7 +86,8 @@ export async function refreshTarget(qc: QueryClient, t: SignIn, n: AppNotificati
   }
   const planId = n.planId;
   if (!planId) {
-    await pullDraft();
+    // 다른 문서의 알림이면 지금 작성 중인 문서를 다시 읽을 이유가 없다
+    if (!isOtherDraft(n, ws().draftId)) await pullDraft();
     return;
   }
   const stale = n.kind === 'comment' || n.kind === 'job';
@@ -103,4 +104,12 @@ export async function refreshTarget(qc: QueryClient, t: SignIn, n: AppNotificati
     if (plan) takeNotified(s, n, plan.plan);
     if (reports) s.reports = mergeReports(s.reports, planId, reports);
   });
+}
+
+/** 보고 있는 화면의 알림을 처리한다: 최신 내용을 받은 뒤, 같은 로그인이 같은 화면에 있을 때만 읽음으로 바꾼다.
+ *  받기가 실패하면 예외를 그대로 던져 알림을 남긴다(새 내용을 못 본 채 읽음이 되지 않게 · PR #139 리뷰) */
+export async function readViewed(qc: QueryClient, t: SignIn, n: AppNotification, stillHere: () => boolean): Promise<boolean> {
+  await refreshTarget(qc, t, n);
+  if (!stillSignedIn(t) || !stillHere()) return false;
+  return markRead(qc, t, n.id);
 }
