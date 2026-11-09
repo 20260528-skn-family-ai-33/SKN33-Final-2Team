@@ -27,7 +27,7 @@ def verify(*, check_counts: bool = True) -> dict:
         JOIN regulations.rag_chunks c USING(rag_chunk_id)
         LEFT JOIN growpath_bge_meta.inputs p ON p.kind='regulations' AND p.source_id=e.rag_chunk_id
         WHERE e.input_version<>'context_path+blank_line+chunk_text/v1'
-          OR e.input_sha256<>encode(sha256(convert_to(c.context_path || E'\\n\\n' || c.chunk_text,'UTF8')),'hex')
+          OR e.input_sha256<>encode(sha256(convert_to(c.context_path || chr(10) || chr(10) || c.chunk_text,'UTF8')),'hex')
           OR p.source_sha256 IS DISTINCT FROM e.input_sha256
           OR p.actual_input_sha256 IS DISTINCT FROM e.input_sha256''')
     bad_knowledge = db.val('''SELECT count(*) FROM knowledge.chunks c

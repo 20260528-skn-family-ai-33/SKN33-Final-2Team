@@ -91,14 +91,14 @@ def search(question: str, category: str) -> list[dict]:
     params = dict(category=category, real_only=category == CATEGORIES[0],
                   model=embeddings.BGE_MODEL, dims=embeddings.BGE_DIMENSIONS,
                   revision=embeddings.PROVENANCE['model_revision'])
-    counts = db.one(f'''SELECT count(*) AS total,count(v.chunk_id) AS indexed
+    counts = db.one(f'''SELECT count(*) AS total,
+        count(CASE WHEN v.chunk_id IS NOT NULL AND p.source_id IS NOT NULL THEN 1 END) AS indexed
         FROM knowledge.chunks c JOIN knowledge.documents d USING(document_id)
         LEFT JOIN {TABLE} v ON v.chunk_id=c.chunk_id AND v.embedding_model=:model
             AND v.dimensions=:dims AND v.input_sha256=c.chunk_text_sha256
         LEFT JOIN {META_TABLE} p ON p.kind='knowledge' AND p.source_id=c.chunk_id
             AND p.source_sha256=c.chunk_text_sha256 AND p.model_revision=:revision
-        WHERE d.category=:category AND (NOT :real_only OR NOT c.is_virtual)
-          AND (v.chunk_id IS NOT NULL AND p.source_id IS NOT NULL)''', **params) or {}
+        WHERE d.category=:category AND (NOT :real_only OR NOT c.is_virtual)''', **params) or {}
     if not counts.get('total'):
         return []
     if counts.get('indexed') != counts['total']:
