@@ -74,7 +74,7 @@ def start(kind: str, employee_id: int | None, ref: str, fn: Callable[[JobCtx], A
         except AgentError as e:
             status, error = 'failed', dict(e.info, stopped=e.stopped)
         except ApiError as e:
-            status, error = 'failed', {'kind': 'other', 'code': e.code, 'user': e.message, 'text': e.message, 'hint': e.hint, 'raw': '', 'retryable': e.retryable}
+            status, error = 'failed', error_info(e)
         except Exception as e:  # noqa: BLE001 - 작업 스레드의 예상 못 한 오류도 실패로 남긴다(조용히 삼키지 않음)
             traceback.print_exc()
             status, error = 'failed', cause(f'서버 오류: {e}')
@@ -169,6 +169,14 @@ def mark_lost() -> int:
             if t.val('SELECT pg_try_advisory_xact_lock(:key)', key=key):
                 count += t.run("UPDATE app_ext.jobs SET status = 'failed', error = :e, updated_at = now() WHERE job_id = :j AND status = 'running'", e=db.J(err), j=row['job_id'])
         return count
+
+
+def error_info(error: AgentError | ApiError) -> dict:
+    """작업과 해당 초안·수정안에 같은 오류 코드와 사용자 메시지를 남긴다."""
+    if isinstance(error, AgentError):
+        return error.info
+    return {'kind': 'other', 'code': error.code, 'user': error.message, 'text': error.message,
+            'hint': error.hint, 'raw': '', 'retryable': error.retryable}
 
 
 def lost_cause() -> dict:

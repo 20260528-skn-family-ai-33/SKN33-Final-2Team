@@ -383,10 +383,22 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
     rev = body.get('rev') or {}
     ch = _rev_changes(rev, base)
     prefs_h = handoff_prefs(ch['raw'])
-    handoff = dict(base.get('handoff') or {}, prefs=prefs_h, startStage=ch['start'], userNotes=[ch['raw']['etc'].strip()] if str(ch['raw'].get('etc') or '').strip() else [])
+    previous_handoff = dict(base.get('handoff') or {})
+    if 'userNotes' not in previous_handoff and 'etc' not in (previous_handoff.get('details') or {}):
+        legacy_note = str((base.get('prefs') or {}).get('etc') or '').strip()
+        if legacy_note:
+            previous_handoff['userNotes'] = [legacy_note]
+    handoff = dict(previous_handoff, prefs=prefs_h, startStage=ch['start'])
+    if 'constraints' in ch['c']:
+        constraint = str(ch['raw'].get('etc') or '').strip()
+        handoff.update(userNotes=[constraint] if constraint else [],
+                       details={**(previous_handoff.get('details') or {}), 'etc': constraint})
     req = str(rev.get('note') or '').strip()
     done = {p['activity_id'] for p in db.all_("SELECT activity_id FROM app_ext.activity_progress WHERE roadmap_id = :r AND status = 'done'", r=row['roadmap_id'])}
-    inp = {'pid': ch['pid'], 'handoff': handoff, 'changes': ch['c'], 'request': req or None, 'fromComment': rev.get('fromComment') or False,
+    requirement_fields = ('goal', 'projectSummary', 'desiredCompetencies', 'details', 'userNotes')
+    inp = {'pid': ch['pid'], 'handoff': handoff,
+           'previousHandoff': {k: previous_handoff[k] for k in requirement_fields if k in previous_handoff},
+           'changes': ch['c'], 'request': req or None, 'fromComment': rev.get('fromComment') or False,
            'plan': {k: base.get(k) for k in ('opt', 'name', 'tagline', 'def', 'hours', 'start')} | {'acts': [dict(a, done=a['id'] in done) for a in base['acts']]}}
     with db.tx() as t:
         t.run("UPDATE app_ext.roadmap_revisions SET status = 'discarded', updated_at = now() WHERE roadmap_id = :r AND status IN ('running', 'ready', 'failed')", r=row['roadmap_id'])
@@ -397,10 +409,10 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
         ctx = rt.context(employee_id)
         try:
             out = RM.revise(ctx, inp, sim=rt.sim_once(ctx, 'rev', str(body.get('key') or rev_id)))
-        except AgentError as e:
+        except (AgentError, ApiError) as error:
             with db.tx() as t:
                 t.run("UPDATE app_ext.roadmap_revisions SET status = 'failed', error = :e, updated_at = now() WHERE revision_id = CAST(:i AS uuid) AND status = 'running'",
-                      e=db.J({'cause': e.info}), i=rev_id)
+                      e=db.J({'cause': jobs.error_info(error)}), i=rev_id)
             raise
         d = RM.keep_ids(out, base, base['version'] + 1)
         to = RM.build_plan(d, {'start': ch['start'], 'hours': prefs_h['weeklyHours'] or d.get('weeklyHours') or base['hours'] or D['autoHours'], 'format': prefs_h['formatKey'], 'patch': {}}, base['goal'])

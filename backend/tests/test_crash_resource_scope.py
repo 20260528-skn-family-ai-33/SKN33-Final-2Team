@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import Mock
 
 from app.agents.resource_recommendations import recommend_resources, validate_choices
-from app.services import crash_courses, resource_evidence, resource_rag
+from app.services import crash_courses, crash_requirements, resource_evidence, resource_rag
 from test_recommendation_suitability import WEB, course
 
 
@@ -79,6 +79,283 @@ class CrashResourceScopeTests(unittest.TestCase):
         self.assertIsNone(row['selectedCourse'])
         self.assertIn(row['courseDiagnostic']['reason'], ('stack_mismatch', 'insufficient_evidence'))
         validate_choices(result, {WEB: {'course': None, 'books': []}})
+
+    def test_core_replacement_uses_same_applied_technology_as_generation(self):
+        self.project['goal'] = 'Django 사용 필수'
+        self.skill['coreCriteria'] = ['응답 코드 확인']
+        for outcome in ('FastAPI 대신 Django로 REST API 구현',
+                        'FastAPI를 쓰지 않고 Django로 REST API 구현',
+                        'Django로 REST API 구현 instead of FastAPI',
+                        'Django로 REST API 구현 후 FastAPI 비교',
+                        'Spring Boot 대신 Django로 REST API 구현',
+                        'Django로 오류 없이 REST API 구현'):
+            with self.subTest(outcome=outcome):
+                self.skill['coreOutcome'] = outcome
+                original = deepcopy((self.project, self.selection))
+                crash_requirements.validate_core_requirements([self.skill], self.project)
+                good = resource_evidence.facts(self.django, self.project, self.selection)
+                wrong = resource_evidence.facts(self.short, self.project, self.selection)
+                profile = good['suitability'][WEB]
+                self.assertEqual(profile['requiredStack'], ['django'])
+                self.assertEqual(profile['missingStack'], [])
+                self.assertEqual(profile['conflictingStack'], [])
+                self.assertTrue(resource_evidence.suitable(good, WEB))
+                self.assertFalse(resource_evidence.suitable(wrong, WEB))
+                self.assertEqual(wrong['suitability'][WEB]['missingStack'], ['django'])
+                self.assertEqual((self.project, self.selection), original)
+
+    def test_replacement_retrieval_payload_and_final_recommendation(self):
+        self.project['goal'] = 'Django 사용 필수'
+        self.skill.update(coreOutcome='FastAPI 대신 Django로 REST API 구현',
+                          coreCriteria=['응답 코드 확인'])
+        self.django['hours'] = 5
+        self.short['hours'] = 1
+        original = deepcopy((self.project, self.selection, self.option))
+        crash_requirements.validate_core_requirements([self.skill], self.project)
+        items = {row['id']: row for row in (self.short, self.django)}
+        embed = Mock(return_value=[[1.0] + [0.0] * (resource_rag.DIMENSIONS - 1)])
+        search = Mock(return_value=[{'resource_id': 'short', 'similarity': .95},
+                                    {'resource_id': 'django', 'similarity': .8}])
+        pools, _ = resource_rag.retrieve(self.project, self.selection, items, self.option,
+                                         embed=embed, search=search)
+        query, = embed.call_args.args[0]
+        self.assertEqual(json.loads(query), {'course': {'id': 'A2'},
+                                             'coreOutcome': self.skill['coreOutcome'],
+                                             'coreCriteria': self.skill['coreCriteria']})
+        self.assertEqual(pools[0]['courses'][0]['id'], 'django')
+        generate = Mock(return_value={'skills': [{'name': WEB, 'books': [],
+                                                   'courses': [{'id': 'short'}, {'id': 'django'}]}]})
+        result = recommend_resources(self.project, self.selection, items, generate, course=self.option,
+                                     retrieved_pools=pools)
+        payload = generate.call_args.args[1]
+        profiles = {row['title']: row['learningEvidence'] for row in payload['skills'][0]['courses']}
+        self.assertEqual(profiles['django']['requiredStack'], ['django'])
+        self.assertTrue(profiles['django']['suitable'])
+        self.assertEqual(profiles['short']['missingStack'], ['django'])
+        self.assertFalse(profiles['short']['suitable'])
+        self.assertEqual(payload['crashStudyPlan']['uniqueHours'], 5)
+        self.assertEqual(result['skills'][0]['selectedCourse'], 'django')
+        validate_choices(result, {WEB: {'course': 'django', 'books': []}})
+
+        generate.return_value['skills'][0]['courses'] = [{'id': 'short'}]
+        result = recommend_resources(self.project, self.selection, items, generate, course=self.option,
+                                     retrieved_pools=pools)
+        self.assertEqual(result['skills'][0]['courses'], [])
+        self.assertIsNone(result['skills'][0]['selectedCourse'])
+        validate_choices(result, {WEB: {'course': None, 'books': []}})
+        self.assertEqual((self.project, self.selection, self.option), original)
+
+    def test_core_still_requires_every_applied_framework(self):
+        self.skill.update(coreOutcome='FastAPI와 Django REST API 구현', coreCriteria=['응답 코드 확인'])
+        for row, suitable in ((self.short, False), (self.django, False), (self.long, True)):
+            with self.subTest(course=row['id']):
+                info = resource_evidence.facts(row, self.project, self.selection)
+                self.assertEqual(info['suitability'][WEB]['requiredStack'], ['django', 'fastapi'])
+                self.assertEqual(resource_evidence.suitable(info, WEB), suitable)
+
+    def test_core_criteria_distinguish_comparison_from_implementation(self):
+        self.skill['coreOutcome'] = 'Django REST API 구현'
+        for criterion, required, suitable in (('FastAPI 비교', ['django'], True),
+                                               ('FastAPI REST API 구현', ['django', 'fastapi'], False)):
+            with self.subTest(criterion=criterion):
+                self.skill['coreCriteria'] = [criterion]
+                info = resource_evidence.facts(self.django, self.project, self.selection)
+                self.assertEqual(info['suitability'][WEB]['requiredStack'], required)
+                self.assertEqual(resource_evidence.suitable(info, WEB), suitable)
+
+    def test_course_stack_reading_uses_the_same_version_conversion(self):
+        for text in ('Python3.14로 REST API 구현 실습', 'Python3.9 REST API 구현 실습', 'Python REST API 구현 실습'):
+            with self.subTest(text=text):
+                self.assertEqual(resource_evidence._core_stack_names([text]), {'python'})
+
+    def test_applied_units_outside_a_verb_list_still_teach_the_required_stack(self):
+        for name, stack, text in (
+            ('Spring Boot', 'spring', '스프링부트 프로젝트 생성 실습'),
+            ('Spring Boot', 'spring', 'Next.js, Spring Boot 기반 웹 서비스를 구현'),
+            ('Python', 'python', 'Hands On: Dockerizing Python Flask Application'),
+        ):
+            with self.subTest(text=text):
+                self.skill.update(coreOutcome=f'{name} REST API 구현', coreCriteria=['응답 코드 확인'])
+                row = course('good', [text], skills=[WEB])
+                profile = resource_evidence.facts(row, {'goal': f'{name} 사용 필수'}, self.selection)['suitability'][WEB]
+                self.assertIn(stack, profile['requiredStack'])
+                self.assertEqual(profile['missingStack'], [])
+
+    def test_applied_units_and_descriptions_do_not_teach_excluded_or_partial_names(self):
+        self.skill.update(coreOutcome='Django REST API 구현', coreCriteria=['응답 코드 확인'])
+        for text in ('Django 대신 FastAPI로 REST API 구현',
+                     'Django를 쓰지 않고 FastAPI로 REST API 구현',
+                     'FastAPI REST API 구현 후 Django 비교',
+                     'FastAPI로 구현하고 Django 문서 참고',
+                     '냉장고 재고 API 구현', '장고만두 재고 API 구현'):
+            for source in ('unit', 'description'):
+                with self.subTest(text=text, source=source):
+                    row = course('wrong', [text] if source == 'unit' else [], skills=[WEB],
+                                 title='Django 비교 과정', content=text if source == 'description' else '')
+                    original = deepcopy(row)
+                    profile = resource_evidence.facts(row, self.project, self.selection)['suitability'][WEB]
+                    self.assertEqual(profile['requiredStack'], ['django'])
+                    self.assertEqual(profile['missingStack'], ['django'])
+                    self.assertFalse(profile['suitable'])
+                    self.assertEqual(row, original)
+
+        for text in ('Django REST API 구현 실습', '장고로만 REST API 구현 실습',
+                     'FastAPI 대신 Django로 REST API 구현', 'Spring Boot 대신 Django로 REST API 구현',
+                     'Django REST API 구현; express your results this spring'):
+            with self.subTest(text=text):
+                row = course('good', [text], skills=[WEB])
+                profile = resource_evidence.facts(row, self.project, self.selection)['suitability'][WEB]
+                self.assertEqual(profile['missingStack'], [])
+                self.assertEqual(profile['conflictingStack'], [])
+                self.assertTrue(profile['suitable'])
+
+    def test_core_technology_names_use_same_korean_boundaries_as_evidence(self):
+        self.skill['coreCriteria'] = ['응답 코드 확인']
+        for outcome, required in (('냉장고 재고 API 구현', []), ('장고만두 재고 API 구현', []),
+                                   ('장고로만 REST API 구현', ['django'])):
+            with self.subTest(outcome=outcome):
+                self.skill['coreOutcome'] = outcome
+                profile = resource_evidence.facts(self.django, self.project, self.selection)['suitability'][WEB]
+                self.assertEqual(profile['requiredStack'], required)
+
+    def test_core_runtime_conflict_uses_only_applied_technologies(self):
+        self.skill.update(coreOutcome='Django REST API 구현', coreCriteria=['응답 코드 확인'])
+        for text, runtime in (('Django 대신 Spring Boot로 REST API 구현 실습', 'java'),
+                               ('Django 대신 Express.js로 REST API 구현 실습', 'javascript')):
+            with self.subTest(text=text):
+                row = course('wrong', [text], skills=[WEB], title='Django 비교 과정')
+                profile = resource_evidence.facts(row, self.project, self.selection)['suitability'][WEB]
+                self.assertEqual(profile['missingStack'], ['django'])
+                self.assertEqual(profile['conflictingStack'], [runtime])
+                self.assertFalse(profile['suitable'])
+
+    def test_recommendation_rejects_excluded_technology_in_applied_evidence(self):
+        self.skill.update(coreOutcome='Django REST API 구현', coreCriteria=['응답 코드 확인'])
+        self.django['hours'] = 5
+        replacement = course('replacement', ['Django 대신 FastAPI로 REST API 구현'], skills=[WEB], hours=1)
+        partial_name = course('partial-name', ['냉장고 재고 API 구현'], skills=[WEB], hours=1)
+        items = {row['id']: row for row in (replacement, partial_name, self.django)}
+        embed = Mock(return_value=[[1.0] + [0.0] * (resource_rag.DIMENSIONS - 1)])
+        search = Mock(return_value=[{'resource_id': key, 'similarity': score}
+                                    for key, score in [('replacement', .95), ('partial-name', .9), ('django', .8)]])
+        pools, _ = resource_rag.retrieve(self.project, self.selection, items, self.option,
+                                         embed=embed, search=search)
+        self.assertEqual(pools[0]['courses'][0]['id'], 'django')
+        generate = Mock(return_value={'skills': [{'name': WEB, 'books': [],
+                                                   'courses': [{'id': key} for key in items]}]})
+        result = recommend_resources(self.project, self.selection, items, generate, course=self.option,
+                                     retrieved_pools=pools)
+        payload = generate.call_args.args[1]
+        profiles = {row['title']: row['learningEvidence'] for row in payload['skills'][0]['courses']}
+        for key in ('replacement', 'partial-name'):
+            self.assertEqual(profiles[key]['missingStack'], ['django'])
+            self.assertFalse(profiles[key]['suitable'])
+        self.assertEqual(payload['crashStudyPlan']['uniqueHours'], 5)
+        self.assertEqual(result['skills'][0]['selectedCourse'], 'django')
+        generate.return_value['skills'][0]['courses'] = [{'id': 'replacement'}, {'id': 'partial-name'}]
+        result = recommend_resources(self.project, self.selection, items, generate, course=self.option,
+                                     retrieved_pools=pools)
+        self.assertEqual(result['skills'][0]['courses'], [])
+        self.assertIsNone(result['skills'][0]['selectedCourse'])
+
+    def test_core_keeps_english_framework_context_rules(self):
+        self.skill['coreCriteria'] = ['응답 코드 확인']
+        for outcome in ('FastAPI REST API 구현; express your results this spring',
+                        'FastAPI REST API 구현 - spring semester'):
+            with self.subTest(outcome=outcome):
+                self.skill['coreOutcome'] = outcome
+                profile = resource_evidence.facts(self.short, self.project, self.selection)['suitability'][WEB]
+                self.assertEqual(profile['requiredStack'], ['fastapi'])
+                self.assertTrue(profile['suitable'])
+        name = 'RESTful API 설계'
+        for outcome, stack in (('Spring API 구현', 'spring'), ('Spring Boot REST API 구현', 'spring'),
+                               ('Spring AI REST API 구현', 'spring'), ('Express API 구현', 'express'),
+                               ('Express.js REST API 구현', 'express')):
+            with self.subTest(outcome=outcome):
+                skill = dict(self.skill, name=name, coreOutcome=outcome)
+                row = course('framework', [outcome + ' 실습'], skills=[name])
+                profile = resource_evidence.facts(row, self.project, {'skills': [skill]})['suitability'][name]
+                self.assertEqual(profile['requiredStack'], [stack])
+                self.assertEqual(profile['missingStack'], [])
+                self.assertTrue(profile['suitable'])
+
+    def test_replacement_keeps_implementation_and_security_evidence_separate(self):
+        self.skill.update(coreOutcome='FastAPI 대신 Django로 REST API 구현',
+                          coreCriteria=['JWT 권한 경계 검증'])
+        row = course('secure', ['Django REST API 구현 실습', 'JWT 권한 경계 검증 실습'], skills=[WEB])
+        profile = resource_evidence.facts(row, self.project, self.selection)['suitability'][WEB]
+        self.assertEqual(profile['requiredStage'], 'security')
+        self.assertEqual(profile['requiredStack'], ['django'])
+        self.assertEqual(profile['missingStack'], [])
+        self.assertTrue(profile['suitable'])
+
+        self.skill['coreCriteria'] = ['FastAPI 대신 Django에서 JWT 권한 경계 검증']
+        profile = resource_evidence.facts(row, self.project, self.selection)['suitability'][WEB]
+        self.assertEqual(profile['requiredStack'], ['django'])
+        self.assertEqual(profile['missingStack'], ['django'])
+        self.assertFalse(profile['suitable'])
+        row['curriculum']['items'][1]['title'] = 'Django에서 JWT 권한 경계 검증 실습'
+        profile = resource_evidence.facts(row, self.project, self.selection)['suitability'][WEB]
+        self.assertTrue(profile['suitable'])
+
+    def test_security_only_technology_requirement_needs_its_own_security_unit(self):
+        self.skill['coreOutcome'] = 'REST API'
+        for technology, stack in (('FastAPI', 'fastapi'), ('Django', 'django')):
+            with self.subTest(technology=technology):
+                self.skill['coreCriteria'] = [f'{technology}에서 JWT 권한 경계 검증']
+                crash_requirements.validate_core_requirements([self.skill], {'goal': f'{technology} 사용 필수'})
+                row = course('secure', [f'{technology} REST API 구현 실습', 'JWT 권한 경계 검증 실습'],
+                             skills=[WEB])
+                profile = resource_evidence.facts(row, self.project, self.selection)['suitability'][WEB]
+                self.assertEqual(profile['requiredStack'], [stack])
+                self.assertEqual(profile['missingStack'], [stack])
+                self.assertEqual(profile['unitIndices'], [1])
+                self.assertFalse(profile['suitable'])
+
+                row['curriculum']['items'][1]['title'] = f'{technology}에서 JWT 권한 경계 검증 실습'
+                profile = resource_evidence.facts(row, self.project, self.selection)['suitability'][WEB]
+                self.assertEqual(profile['missingStack'], [])
+                self.assertTrue(profile['suitable'])
+
+    def test_security_replacement_does_not_require_excluded_stack_in_security_unit(self):
+        self.skill.update(coreOutcome='FastAPI REST API 구현',
+                          coreCriteria=['FastAPI 대신 Django에서 JWT 권한 경계 검증'])
+        row = course('secure', ['FastAPI REST API 구현 실습', 'Django에서 JWT 권한 경계 검증 실습'],
+                     skills=[WEB])
+        profile = resource_evidence.facts(row, self.project, self.selection)['suitability'][WEB]
+        self.assertEqual(profile['requiredStack'], ['django', 'fastapi'])
+        self.assertEqual(profile['missingStack'], [])
+        self.assertTrue(profile['suitable'])
+
+        row['curriculum']['items'][1]['title'] = 'FastAPI에서 JWT 권한 경계 검증 실습'
+        profile = resource_evidence.facts(row, self.project, self.selection)['suitability'][WEB]
+        self.assertEqual(profile['missingStack'], ['django'])
+        self.assertFalse(profile['suitable'])
+
+    def test_security_evidence_does_not_teach_excluded_or_partial_technology_names(self):
+        self.skill.update(coreOutcome='Django REST API 구현', coreCriteria=['Django에서 JWT 권한 경계 검증'])
+        for security in ('Django 대신 FastAPI에서 JWT 권한 경계 검증 실습',
+                         'FastAPI에서 JWT 권한 경계 검증 실습 후 Django 비교',
+                         '냉장고 재고 API 구현 및 권한 경계 검증 실습'):
+            with self.subTest(security=security):
+                row = course('wrong', ['Django REST API 구현 실습', security], skills=[WEB])
+                profile = resource_evidence.facts(row, self.project, self.selection)['suitability'][WEB]
+                self.assertEqual(profile['requiredStack'], ['django'])
+                self.assertEqual(profile['missingStack'], ['django'])
+                self.assertFalse(profile['suitable'])
+        row = course('good', ['Django REST API 구현 실습', '장고에서 JWT 권한 경계 검증 실습'], skills=[WEB])
+        self.assertTrue(resource_evidence.suitable(resource_evidence.facts(row, self.project, self.selection), WEB))
+
+    def test_separate_build_evidence_does_not_teach_excluded_or_partial_technology_names(self):
+        self.skill.update(coreOutcome='Django REST API 구현', coreCriteria=['JWT 권한 경계 검증'])
+        for build in ('Django 대신 FastAPI로 REST API 구현 실습', '냉장고 재고 API 구현 실습'):
+            with self.subTest(build=build):
+                row = course('wrong', [build, 'JWT 권한 경계 검증 실습'], skills=[WEB])
+                profile = resource_evidence.facts(row, self.project, self.selection)['suitability'][WEB]
+                self.assertEqual(profile['missingStack'], ['django'])
+                self.assertFalse(profile['suitable'])
+        row = course('good', ['장고로만 REST API 구현 실습', 'JWT 권한 경계 검증 실습'], skills=[WEB])
+        self.assertTrue(resource_evidence.suitable(resource_evidence.facts(row, self.project, self.selection), WEB))
 
     def test_core_security_stage_and_explicit_stack_still_required(self):
         self.skill['coreCriteria'] = ['FastAPI 보안 개념과 권한 경계를 검증']
