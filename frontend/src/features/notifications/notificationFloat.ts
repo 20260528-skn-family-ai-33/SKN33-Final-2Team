@@ -46,7 +46,9 @@ interface FloatState {
 export const useFloats = create<FloatState>(() => ({ items: [] }));
 
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
-let held = false;
+/** 지금 알림을 붙잡고 있는 것. 마우스와 키보드 초점은 따로 들고 나므로 나눠서 센다 */
+export type FloatHold = 'hover' | 'focus';
+const holds = new Set<FloatHold>();
 let seen: { who: string; arrivals: Arrivals } | null = null;
 
 function arm(id: string): void {
@@ -69,21 +71,24 @@ export function dismissFloat(id: string): void {
   const items = useFloats.getState().items.filter((n) => n.id !== id);
   useFloats.setState({ items });
   // 누른 알림이 사라지면 마우스가 그 자리에 있어도 mouseleave 가 오지 않을 수 있어, 다 내리면 멈춤도 푼다
-  if (!items.length) held = false;
+  if (!items.length) holds.clear();
 }
 
 /** 모두 내린다(알림 창을 열 때·로그인이 바뀔 때) */
 export function clearFloats(): void {
   stopTimers();
-  held = false;
+  holds.clear();
   useFloats.setState({ items: [] });
 }
 
-/** 마우스·초점이 들어와 있는 동안 내리지 않고, 나가면 남은 알림을 처음부터 다시 잰다 */
-export function holdFloats(on: boolean): void {
-  if (held === on) return;
-  held = on;
-  if (on) stopTimers();
+/** 마우스나 초점이 들어와 있는 동안 내리지 않고, 둘 다 나가면 남은 알림을 처음부터 다시 잰다 */
+export function holdFloats(hold: FloatHold, on: boolean): void {
+  const before = holds.size > 0;
+  if (on) holds.add(hold);
+  else holds.delete(hold);
+  const after = holds.size > 0;
+  if (before === after) return;
+  if (after) stopTimers();
   else useFloats.getState().items.forEach((n) => arm(n.id));
 }
 
@@ -103,7 +108,7 @@ export function noteInbox(who: string, items: AppNotification[], skip: (n: AppNo
   const ids = new Set(show.map((n) => n.id));
   // 서버는 최근 것 먼저 보낸다 → 뒤집어 오래된 것부터 쌓는다
   useFloats.setState((s) => ({ items: [...s.items.filter((n) => !ids.has(n.id)), ...[...show].reverse()] }));
-  if (!held) show.forEach((n) => arm(n.id));
+  if (!holds.size) show.forEach((n) => arm(n.id));
 }
 
 /** 알림 버튼이 사라질 때(로그아웃 등) 기준과 띄운 알림을 모두 버린다 */

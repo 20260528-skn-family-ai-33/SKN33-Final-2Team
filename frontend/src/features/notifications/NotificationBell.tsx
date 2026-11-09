@@ -58,6 +58,15 @@ export function NotificationBell() {
   }, [data, owner, open, pathname]);
   useEffect(() => resetFloats, []);
   const floats = useFloats((s) => s.items);
+  const floatRef = useRef<HTMLDivElement>(null);
+  // 초점이 있던 카드를 닫으면 그 버튼이 DOM 에서 바로 빠지는데, React 는 DOM 을 바꾸는 동안 이벤트를 전달하지 않아 blur 가 오지 않는다.
+  // 카드가 바뀔 때마다 실제 마우스·초점 위치로 맞춰, 남은 카드의 자동 닫힘이 멈춘 채로 남지 않게 한다(PR #134 리뷰)
+  useEffect(() => {
+    const box = floatRef.current;
+    if (!box) return;
+    holdFloats('focus', box.contains(document.activeElement));
+    holdFloats('hover', box.matches(':hover'));
+  }, [floats]);
 
   useEffect(() => {
     if (!open) return;
@@ -236,14 +245,15 @@ export function NotificationBell() {
   const more = floats.length - shown.length;
   const floatBox = createPortal(
     <div
+      ref={floatRef}
       className="nfloat"
       aria-live="polite"
       aria-relevant="additions"
-      onMouseEnter={() => holdFloats(true)}
-      onMouseLeave={() => holdFloats(false)}
-      onFocus={() => holdFloats(true)}
+      onMouseEnter={() => holdFloats('hover', true)}
+      onMouseLeave={() => holdFloats('hover', false)}
+      onFocus={() => holdFloats('focus', true)}
       onBlur={(event) => {
-        if (!(event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget))) holdFloats(false);
+        if (!(event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget))) holdFloats('focus', false);
       }}
     >
       {more ? (

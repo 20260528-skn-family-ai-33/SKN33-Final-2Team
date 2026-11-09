@@ -77,14 +77,14 @@ describe('noteInbox', () => {
     noteInbox('7:1', [note('a', T1)], never);
     vi.advanceTimersByTime(FLOAT_MS - 1);
     expect(ids()).toEqual(['a']);
-    holdFloats(true);
+    holdFloats('hover', true);
     vi.advanceTimersByTime(FLOAT_MS * 2);
     expect(ids()).toEqual(['a']);
     // 멈춘 동안 온 알림도 시간을 재지 않는다
     noteInbox('7:1', [note('b', T2), note('a', T1)], never);
     vi.advanceTimersByTime(FLOAT_MS * 2);
     expect(ids()).toEqual(['a', 'b']);
-    holdFloats(false);
+    holdFloats('hover', false);
     vi.advanceTimersByTime(FLOAT_MS - 1);
     expect(ids()).toEqual(['a', 'b']);
     vi.advanceTimersByTime(1);
@@ -94,12 +94,53 @@ describe('noteInbox', () => {
   it('닫으면 그 알림만 내리고, 다 내리면 멈춤도 풀린다', () => {
     noteInbox('7:1', [], never);
     noteInbox('7:1', [note('b', T2), note('a', T1)], never);
-    holdFloats(true);
+    holdFloats('hover', true);
     dismissFloat('a');
     expect(ids()).toEqual(['b']);
     dismissFloat('b');
     noteInbox('7:1', [note('c', T3)], never);
     vi.advanceTimersByTime(FLOAT_MS);
+    expect(ids()).toEqual([]);
+  });
+
+  it('마우스와 초점은 따로 센다: 하나가 나가도 다른 하나가 남아 있으면 계속 멈춘다 (PR #134 리뷰)', () => {
+    noteInbox('7:1', [], never);
+    noteInbox('7:1', [note('a', T1)], never);
+    holdFloats('hover', true);
+    holdFloats('focus', true);
+    holdFloats('hover', false); // 마우스만 나감 → 초점이 안에 있으니 그대로
+    vi.advanceTimersByTime(FLOAT_MS * 2);
+    expect(ids()).toEqual(['a']);
+    holdFloats('hover', true);
+    holdFloats('focus', false); // 초점만 나감 → 마우스가 안에 있으니 그대로
+    vi.advanceTimersByTime(FLOAT_MS * 2);
+    expect(ids()).toEqual(['a']);
+    holdFloats('hover', false); // 둘 다 나감 → 처음부터 다시 잰다
+    vi.advanceTimersByTime(FLOAT_MS - 1);
+    expect(ids()).toEqual(['a']);
+    vi.advanceTimersByTime(1);
+    expect(ids()).toEqual([]);
+  });
+
+  it('초점이 있던 카드를 닫은 뒤 실제 상태로 맞추면(blur 없음) 남은 카드의 시간을 다시 잰다 (PR #134 리뷰)', () => {
+    noteInbox('7:1', [], never);
+    noteInbox('7:1', [note('b', T2), note('a', T1)], never);
+    holdFloats('focus', true);
+    dismissFloat('b'); // 키보드로 닫음. 카드가 남아 있어 멈춤은 그대로이고, DOM 에서 빠진 버튼의 blur 는 오지 않는다
+    vi.advanceTimersByTime(FLOAT_MS * 2);
+    expect(ids()).toEqual(['a']);
+    holdFloats('focus', false); // NotificationBell 이 카드가 바뀐 뒤 document.activeElement 를 보고 부른다
+    vi.advanceTimersByTime(FLOAT_MS);
+    expect(ids()).toEqual([]);
+  });
+
+  it('이미 같은 상태면 시간을 다시 재지 않는다(카드가 바뀔 때마다 실제 상태로 맞춰도 시간이 늘어나지 않게)', () => {
+    noteInbox('7:1', [], never);
+    noteInbox('7:1', [note('a', T1)], never);
+    vi.advanceTimersByTime(FLOAT_MS - 1);
+    holdFloats('focus', false);
+    holdFloats('hover', false);
+    vi.advanceTimersByTime(1);
     expect(ids()).toEqual([]);
   });
 
