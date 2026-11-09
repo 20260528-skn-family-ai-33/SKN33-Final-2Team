@@ -10,8 +10,8 @@ import { mergeReg } from '@/shared/state/catalog';
 import { onDataReset } from '@/shared/state/events';
 import { meOf, useSession } from '@/shared/state/session';
 
-/** 말풍선: {me, t} 내 질문 · {q, a} 답 · {q, wait} 답 쓰는 중 · {q, fail} 실패 · {q, stop, cut} 멈춤(cut: 새로 고쳐 끊김) */
-export type Msg = { me: true; t: string } | { q: string; a?: AssistantAnswer; mlLabel?: string; demo?: boolean; wait?: boolean; fail?: Cause; stop?: boolean; cut?: boolean; me?: undefined };
+/** 말풍선: {me, t} 내 질문 · {q, group, a} 답 · {q, wait} 답 쓰는 중 · {q, fail} 실패 · {q, stop, cut} 멈춤(cut: 새로 고쳐 끊김) */
+export type Msg = { me: true; t: string } | { q: string; group?: string; a?: AssistantAnswer; mlLabel?: string; demo?: boolean; wait?: boolean; fail?: Cause; stop?: boolean; cut?: boolean; me?: undefined };
 
 const LOG_KEY = 'log';
 const DRAFT_KEY = 'draft';
@@ -114,12 +114,31 @@ export function setInput(v: string): void {
   ss.set(DRAFT_KEY, v);
 }
 
+const ALL_EMPLOYEE_GROUPS = ['일반직', '실무직', '운영직', '전문직', '특정직', '청원경찰', '특수직', '기간제근로자'];
+
+const isGroupOption = (val: string) =>
+  ALL_EMPLOYEE_GROUPS.includes(val) || val.endsWith('직') || val === '청원경찰' || val === '기간제근로자';
+
+function findPreviousQuestion(): string {
+  const logs = get().log;
+  for (let idx = logs.length - 1; idx >= 0; idx--) {
+    const m = logs[idx];
+    if (m.me && m.t && !isGroupOption(m.t.trim())) {
+      return m.t.trim();
+    }
+    if (!m.me && m.q && !isGroupOption(m.q.trim())) {
+      return m.q.trim();
+    }
+  }
+  return '';
+}
+
 /** i 번째 말풍선 자리에 답을 채운다 (다시 시도하면 그 자리에 그대로). 멈추면 기다리기를 그만두고 서버 작업도 멈춘다 */
-async function answer(q: string, i: number): Promise<void> {
+async function answer(q: string, i: number, group?: string): Promise<void> {
   const ctrl = new AbortController();
   run = { i, ctrl, job: null };
   const log = get().log.slice();
-  log[i] = { q, wait: true };
+  log[i] = { q, group, wait: true };
   setLog(log);
   useAssistant.setState({ running: true });
   let a: AssistantAnswer | null = null;
@@ -127,14 +146,14 @@ async function answer(q: string, i: number): Promise<void> {
   let demo = false;
   let err: unknown = null;
   try {
-    const j = await assistantApi.ask(q, historyBefore(i), ctrl.signal);
+    const j = await assistantApi.ask(q, historyBefore(i), group, ctrl.signal);
     if (run?.ctrl !== ctrl) return;
     run.job = j.jobId;
     const out = await waitJob<AssistantResult>(j.jobId, { signal: ctrl.signal });
     if (run?.ctrl !== ctrl) return;
     mergeReg(out.reg);
     a = out.answer;
-    mlLabel = out.meta?.classification?.label;
+    mlLabel = out.meta?.classification?.label ?? ((out.answer as unknown as { ml_label?: string })?.ml_label);
     demo = out.meta?.mode === 'mock';
   } catch (e) {
     err = e;
@@ -143,22 +162,36 @@ async function answer(q: string, i: number): Promise<void> {
   if (ctrl.signal.aborted || !run || run.ctrl !== ctrl) return;
   run = null;
   const next = get().log.slice();
-  next[i] = err ? { q, fail: cause(err) } : { q, a: a as AssistantAnswer, mlLabel, demo };
+  next[i] = err ? { q, group, fail: cause(err) } : { q, group, a: a as AssistantAnswer, mlLabel, demo };
   setLog(next);
   useAssistant.setState({ running: false, hint: '', fresh: !get().open });
 }
 
 /** 보내기. 답을 쓰는 중이면 보내지 않고 입력창에 남겨 둔다(지우지 않음) */
-export function ask(q: string): boolean {
+export function ask(q: string, group?: string, displayText?: string): boolean {
   q = String(q || '').trim();
   if (!q || employeeId === undefined) return false;
   if (run) {
     setHint('지금 앞 질문의 답을 쓰고 있어요. 다 쓰면 보낼 수 있어요. 멈추려면 ■를 누르세요.');
     return false;
   }
-  const log = get().log.concat([{ me: true, t: q }, { q, wait: true }]);
+
+  // 직군 선택 카드가 떠 있는 상태에서는 채팅 직접 입력으로 진행하지 않고 직군 선택 버튼을 누르도록 유도
+  const logs = get().log;
+  const lastBotMsg = [...logs].reverse().find((m) => !m.me && m.a);
+  if (!group && lastBotMsg && !lastBotMsg.me && lastBotMsg.a?.kind === 'clarify') {
+    setHint('위에서 직군을 먼저 선택해 주세요.');
+    return false;
+  }
+
+  // 직군 파라미터(group)는 버튼 '선택' 시에만 전달되며, 채팅 입력 시에는 질문 텍스트 그대로 전송
+  const effectiveQ = q;
+  const effectiveGroup = group;
+  const showText = displayText || q;
+
+  const log = get().log.concat([{ me: true, t: showText }, { q: effectiveQ, group: effectiveGroup, wait: true }]);
   setLog(log);
-  void answer(q, log.length - 1);
+  void answer(effectiveQ, log.length - 1, effectiveGroup);
   return true;
 }
 
@@ -167,10 +200,10 @@ export function stop(): void {
   const { i, ctrl, job } = run;
   run = null;
   ctrl.abort();
-  if (job) cancelJob(job).catch(() => {});
+  if (job) cancelJob(job).catch(() => { });
   const log = get().log.slice();
   const m = log[i];
-  if (m && !m.me) log[i] = { q: m.q, stop: true };
+  if (m && !m.me) log[i] = { q: m.q, group: m.group, stop: true };
   setLog(log);
   useAssistant.setState({ running: false, hint: '' });
 }
@@ -182,24 +215,35 @@ export function retry(i: number): void {
     setHint('지금 다른 질문의 답을 쓰고 있어요. 다 쓴 뒤에 다시 시도해 주세요.');
     return;
   }
-  void answer(m.q, i);
+  void answer(m.q, i, m.group);
 }
 
-/** 되묻기에서 고른 질문을 보낸다(답을 쓰는 중이면 입력창에 넣어 둠) */
+/** 되묻기에서 직군 선택 버튼이나 추천 질문을 선택했을 때 실행 (선택 시에만 group 파라미터 적용) */
 export function pick(q: string): void {
-  if (!run) {
-    ask(q);
+  const trimmed = String(q || '').trim();
+  if (run) {
+    if (!get().input.trim()) setInput(trimmed);
+    setHint('앞 질문의 답을 쓰는 중이에요. 다 쓰면 보내 주세요.');
     return;
   }
-  if (!get().input.trim()) setInput(q);
-  setHint('앞 질문의 답을 쓰는 중이에요. 다 쓰면 보내 주세요.');
+
+  if (isGroupOption(trimmed)) {
+    const prevQ = findPreviousQuestion();
+    if (prevQ) {
+      // 직군 버튼을 선택했을 때만 검색 대상 group에 직군을 전달하고, 검색어는 원래 질문(prevQ) 유지
+      ask(prevQ, trimmed, trimmed);
+      return;
+    }
+  }
+
+  ask(trimmed);
 }
 
 /** 대화 지우기: 쓰는 중인 답은 멈추고, 입력창에 써 둔 글은 남긴다 */
 export function clearLog(): void {
   if (run) {
     run.ctrl.abort();
-    if (run.job) cancelJob(run.job).catch(() => {});
+    if (run.job) cancelJob(run.job).catch(() => { });
     run = null;
   }
   setLog([]);

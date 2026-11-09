@@ -5,6 +5,9 @@ export function answerStatus(answer: AssistantAnswer): [string, string] {
   if (answer.kind === 'out' || answer.evidenceStatus === 'refused' || answer.level === 'refused') {
     return ['답변 불가', 'fail'];
   }
+  if (answer.kind === 'clarify') {
+    return ['', ''];
+  }
   const hasCitation = Boolean(answer.kind === 'regulation' ? answer.basis?.length : answer.knowledgeSources?.length);
   const status: EvidenceStatus = answer.evidenceStatus ?? (answer.level === 'ok' || hasCitation ? 'found' : 'not_found');
   const displayStatus = status === 'partial' ? (hasCitation ? 'found' : 'not_found') : status;

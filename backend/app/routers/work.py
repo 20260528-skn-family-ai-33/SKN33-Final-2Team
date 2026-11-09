@@ -384,10 +384,11 @@ def api_ask(request: Request, body: dict, a: Account = Depends(require_employee)
     if not q:
         raise ApiError(400, 'EMPTY_QUESTION', '질문을 적어 주세요')
     hist = body.get('history') or []
+    group = str(body.get('group') or body.get('empGroup') or '').strip() or None
 
     def work(job: jobs.JobCtx):
-        ctx = rt.context(a.id, me={'empGroup': profile.employee_group(a.id)})
-        ans = REG.answer(ctx, q, hist, {}, sim=rt.sim_once(ctx, 'reg', q), documents_only=True)
+        ctx = rt.context(a.id, me={'empGroup': group} if group else {})
+        ans = REG.answer(ctx, q, hist, group=group)
         ids = list(ans.get('basis') or []) + list(ans.get('ref') or [])
         return {'answer': ans, 'reg': regstore.bundle(ids), 'meta': ctx.meta}
     jid = jobs.start('assistant', a.id, q[:120], work)

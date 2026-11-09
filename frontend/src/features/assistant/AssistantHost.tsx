@@ -78,6 +78,65 @@ function AnswerLabels({ mlLabel, label, style }: { mlLabel?: string; label: stri
   );
 }
 
+function ClarifyGroupPicker({ options, onSelect }: { options: string[]; onSelect: (group: string) => void }) {
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 3;
+  const totalPages = Math.max(1, Math.ceil(options.length / PAGE_SIZE));
+  const currentOptions = options.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+  return (
+    <div className="clar-carousel-box">
+      <div className="clar-carousel">
+        <button
+          type="button"
+          className="clar-nav-btn clar-prev"
+          onClick={() => setPage((p) => (p > 0 ? p - 1 : totalPages - 1))}
+          disabled={totalPages <= 1}
+          aria-label="이전 직군 목록"
+          title="이전 직군 목록"
+        >
+          <Icon name="left" />
+        </button>
+
+        <div className="clar-chips-col">
+          {currentOptions.map((o) => (
+            <button
+              type="button"
+              className="clar-chip"
+              key={o}
+              onClick={() => onSelect(o)}
+            >
+              <span className="clar-chip-text">{o}</span>
+            </button>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          className="clar-nav-btn clar-next"
+          onClick={() => setPage((p) => (p < totalPages - 1 ? p + 1 : 0))}
+          disabled={totalPages <= 1}
+          aria-label="다음 직군 목록"
+          title="다음 직군 목록"
+        >
+          <Icon name="right" />
+        </button>
+      </div>
+
+      {totalPages > 1 && (
+        <div className="clar-footer">
+          <div className="clar-dots">
+            {Array.from({ length: totalPages }).map((_, i) => (
+              <span key={i} className={`clar-dot ${i === page ? 'on' : ''}`} />
+            ))}
+          </div>
+          <span className="clar-page-num">{page + 1} / {totalPages}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function RegCard({ a, mlLabel, demo }: { a: AssistantAnswer; mlLabel?: string; demo?: boolean }) {
   const go = useGo();
   useCatalog((s) => s.articles);
@@ -119,19 +178,13 @@ export function RegCard({ a, mlLabel, demo }: { a: AssistantAnswer; mlLabel?: st
       <div className="ans">
         <div className="who">
           <Icon name="chat" />
-          사내 생활 도우미 <span className={`tag ${statusStyle}`}>{statusLabel}</span>
+          사내 생활 도우미 {mlLabel ? <span className="tag line" title="ML 질문 분류">{mlLabel}</span> : null}
         </div>
         <p className="sum">{a.question}</p>
         {a.options && a.options.length ? (
-          <div className="clar">
-            {a.options.map((o) => (
-              <button className="chip" key={o} onClick={() => pick(o)}>
-                {o}
-              </button>
-            ))}
-          </div>
+          <ClarifyGroupPicker options={a.options} onSelect={pick} />
         ) : null}
-        <p className="small muted">아니면 조금 더 구체적으로 적어 주세요.</p>
+        <p className="small muted">조회할 직군을 위에서 선택해 주세요.</p>
       </div>
     );
   if (a.kind === 'regulation' && a.level === 'scope') {
@@ -328,7 +381,7 @@ function Bubble({ m, i }: { m: Msg; i: number }) {
   );
 }
 
-function SuggestedQuestions({ running }: { running: boolean }) {
+function SuggestedQuestions({ running, disabled }: { running: boolean; disabled?: boolean }) {
   const listRef = useRef<HTMLDivElement>(null);
   const [canGoBack, setCanGoBack] = useState(false);
   const [canGoForward, setCanGoForward] = useState(false);
@@ -357,17 +410,17 @@ function SuggestedQuestions({ running }: { running: boolean }) {
 
   return (
     <div className="sugs-row" role="group" aria-label="추천 질문">
-      <button type="button" className="sugs-arrow" aria-label="이전 추천 질문" aria-controls="regSuggestions" disabled={!canGoBack} onClick={() => scroll(-1)}>
+      <button type="button" className="sugs-arrow" aria-label="이전 추천 질문" aria-controls="regSuggestions" disabled={!canGoBack || disabled} onClick={() => scroll(-1)}>
         <Icon name="left" />
       </button>
       <div className="sugs" id="regSuggestions" ref={listRef} onScroll={updateArrows}>
         {SUGS.map((s) => (
-          <button type="button" className="chip" key={s} disabled={running} onClick={() => ask(s)}>
+          <button type="button" className="chip" key={s} disabled={running || disabled} onClick={() => ask(s)}>
             {s}
           </button>
         ))}
       </div>
-      <button type="button" className="sugs-arrow" aria-label="다음 추천 질문" aria-controls="regSuggestions" disabled={!canGoForward} onClick={() => scroll(1)}>
+      <button type="button" className="sugs-arrow" aria-label="다음 추천 질문" aria-controls="regSuggestions" disabled={!canGoForward || disabled} onClick={() => scroll(1)}>
         <Icon name="right" />
       </button>
     </div>
@@ -384,6 +437,8 @@ export function AssistantHost() {
     if (b) b.scrollTop = b.scrollHeight;
   }, [st.log, st.hint, st.open]);
   const turns = st.log.filter((m) => !m.me && m.a).length;
+  const lastBotMsg = [...st.log].reverse().find((m) => !m.me && (m.a || m.wait));
+  const isClarifying = !st.running && !!lastBotMsg && !lastBotMsg.me && lastBotMsg.a?.kind === 'clarify';
   return (
     <>
       <button
@@ -459,17 +514,31 @@ export function AssistantHost() {
           <p className="reg-long" id="regLong" hidden={turns < LONG_TURNS}>
             대화가 길어졌어요. 앞 대화를 모두 함께 보내서 답이 느려질 수 있고, 모델에 따라 앞부분을 놓칠 수 있어요. 주제가 바뀌었다면 ‘새 대화’로 시작해 보세요.
           </p>
-          <SuggestedQuestions running={st.running} />
+          <SuggestedQuestions running={st.running} disabled={isClarifying} />
           <form
             className="chat-in"
             id="regForm"
             onSubmit={(e) => {
               e.preventDefault();
+              if (isClarifying) {
+                toast('위에서 직군을 먼저 선택해 주세요');
+                return;
+              }
               if (ask(st.input)) setInput('');
             }}
           >
-            <input className="input" id="regIn" ref={inRef} placeholder="규정·수자원공사·사내 생활을 물어보세요" autoComplete="off" aria-label="질문" value={st.input} onChange={(e) => setInput(e.target.value)} />
-            <button className="btn pri" id="regSend" aria-label="보내기" hidden={st.running}>
+            <input
+              className="input"
+              id="regIn"
+              ref={inRef}
+              placeholder={isClarifying ? '위에서 직군을 먼저 선택해 주세요' : '규정·수자원공사·사내 생활을 물어보세요'}
+              autoComplete="off"
+              aria-label="질문"
+              disabled={isClarifying}
+              value={isClarifying ? '' : st.input}
+              onChange={(e) => setInput(e.target.value)}
+            />
+            <button className="btn pri" id="regSend" aria-label="보내기" hidden={st.running} disabled={isClarifying}>
               <Icon name="send" />
             </button>
             <button type="button" className="btn line stop" id="regStop" aria-label="답변 멈추기" title="답변 멈추기" hidden={!st.running} onClick={stop}>

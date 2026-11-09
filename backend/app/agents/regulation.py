@@ -209,7 +209,8 @@ def _mock_general(q: str) -> dict:
     return ans(**copy.deepcopy(base))
 
 
-def _mock_documents(inp: dict) -> dict:
+def temp_mock_documents(inp: dict) -> dict:
+    """시연용 임시(temp) 가데이터 문서 답변"""
     question = inp['question']
     if OUT_HINT.search(question):
         return ans(kind='out', level='out')
@@ -218,6 +219,8 @@ def _mock_documents(inp: dict) -> dict:
             return ans(kind='regulation' if topic == 'regulation' else 'general', topic=topic,
                        source={'regulation': '', 'company': 'work', 'life': 'intranet'}[topic], summary=summary)
     return ans(summary='시연용 가데이터에 준비된 답변이 없어요. 화면의 추천 질문을 선택해 주세요.')
+
+_mock_documents = temp_mock_documents
 
 
 def _prev_reg(prev: dict | None) -> str | None:
@@ -247,7 +250,8 @@ def _ref_answer(ref: dict, me: dict) -> dict:
                more=['내 상황에 그대로 적용되는지는 담당 부서에 확인해 주세요.'], basis=ref['ids'], retrieved=ref['ids'])
 
 
-def _mock(inp: dict) -> dict:
+def temp_mock(inp: dict) -> dict:
+    """시연용 임시(temp) 가데이터 답변"""
     q, me, hist = inp['question'], inp['me'], inp.get('history') or []
     group = me.get('empGroup')
     hits = regstore.keyword_search(q, 3, group, all_groups=False)
@@ -290,6 +294,9 @@ def _mock(inp: dict) -> dict:
                more=['내 상황에 그대로 적용되는지는 담당 부서에 확인해 주세요.'], basis=[h['id'] for h in hits], retrieved=[h['id'] for h in hits])
 
 
+_mock = temp_mock
+
+
 def _mock_follow(q: str, prev: dict, me: dict) -> dict:
     a, head = prev['a'], f"앞에서 물으신 ‘{prev['q']}’에 이어서 답할게요."
     if a.get('kind') != 'regulation' or a.get('level') in ('none', 'scope'):
@@ -324,6 +331,9 @@ def _history_answer(turn: dict) -> str:
         # 이전 메뉴형 안내는 본문 대신 화면에 표시한 메뉴 정보를 전달한다.
         summary = ' / '.join(f"{item['menu']}: {item['covers']}" for item in D['intranet']
                              if item['id'] in answer['intranet'])
+    if not summary and answer.get('question'):
+        # 직군 선택(clarify) 역질문의 경우 역질문 문구를 대화 맥락으로 전달한다.
+        summary = answer['question']
     return summary
 
 
@@ -355,15 +365,52 @@ def _context_query(q: str, history: list, *, classify: bool = False) -> str:
     return f'현재 질문: {q}\n앞 대화:\n{context}'
 
 
+# ── [1단계] 사용자의 입력을 받아서 분류하는 함수 ──
+def classify_user_question(question: str, history: list | None = None, me: dict | None = None) -> dict:
+    """[1단계] 사용자의 질문을 RoBERTa 모델로 4가지 라벨 중 하나로 분류한다:
+    - '사내 규정'
+    - '사내 생활안내'
+    - '수자원공사 정보'
+    - '범위 밖'
+    """
+    follow_history = _follow_history(question, history or [], me or {})
+    context_query = _context_query(question, follow_history, classify=True)
+    raw_classification = question_classifier.classify(context_query)
+    return {
+        **raw_classification,
+        'usedHistory': bool(follow_history),
+        'contextQuery': context_query,
+        'followHistory': follow_history,
+    }
+
+
+# ── [3단계] 준비된 근거를 LLM이 받아서 최종 근거와 답변을 찾는 함수 ──
+def generate_llm_grounded_answer(ctx: rt.Ctx, topic: str, question: str, sources: list[dict], context: dict,
+                                 history: list | None = None, requested: dict | None = None) -> dict:
+    """[3단계] 라벨별로 수집된 근거(sources)를 LLM에게 넘겨 질문에 직접 답하는 문장과 근거 ID를 추출한다."""
+    return grounded_answer.generate(ctx, topic, question, sources, context, history=history, requested=requested)
+
+
 def _api(ctx: rt.Ctx, inp: dict) -> dict:
-    q, hist = inp['question'], inp.get('history') or []
-    history = _follow_history(q, hist, inp['me'])
-    inp['_history'] = history
-    classification = question_classifier.classify(_context_query(q, history, classify=True))
-    inp['_classification'] = dict(classification, usedHistory=bool(history))
-    if classification['label'] == '범위 밖':
-        return ans(kind='out', level='out')
-    return _api_answer(ctx, inp, classification['label'])
+    q, hist, me = inp['question'], inp.get('history') or [], inp.get('me') or {}
+    # 1단계: 사용자의 입력을 받아서 분류한다.
+    classification = classify_user_question(q, hist, me)
+    inp['_history'] = classification['followHistory']
+    inp['_classification'] = {
+        'label': classification['label'],
+        'confidence': classification['confidence'],
+        'model': classification['model'],
+        'ms': classification['ms'],
+        'usedHistory': classification['usedHistory'],
+    }
+    label = classification['label']
+
+    # 2단계: 분류된 것들을 받는 함수(규정, 회사정보, 생활정보, 범위밖)로 각각 다르게 처리하고,
+    #        필요한 경우 3단계 LLM 함수로 넘겨 근거 기반 답변을 생성한다.
+    res = handle_classified_question(ctx, inp, label)
+    if isinstance(res, dict):
+        res.setdefault('ml_label', label)
+    return res
 
 
 def _no_evidence(topic: str, retrieved: list | None = None, note: str = '') -> dict:
@@ -420,8 +467,8 @@ def _knowledge_answer(ctx: rt.Ctx, inp: dict, topic: str) -> dict:
                         'location': meta.get('location'), 'asOf': meta.get('as_of'),
                         'sourceLimits': meta.get('source_limits'), 'isVirtual': hit['is_virtual'],
                         'text': hit['chunk_text'][:3000], 'textTruncated': len(hit['chunk_text']) > 3000})
-    result = grounded_answer.generate(ctx, topic, q, sources, inp['context'],
-                                     history=_hist_msgs(history))
+    result = generate_llm_grounded_answer(ctx, topic, q, sources, inp['context'],
+                                          history=_hist_msgs(history))
     if result['status'] == 'refused':
         return _refused(topic)
     if result['status'] == 'not_found':
@@ -448,19 +495,83 @@ def _knowledge_answer(ctx: rt.Ctx, inp: dict, topic: str) -> dict:
                summary=summary, knowledgeSources=provenance)
 
 
-def _api_answer(ctx: rt.Ctx, inp: dict, label: str) -> dict:
-    if label == '수자원공사 정보':
-        return _company_answer(ctx, inp)
-    if label == '사내 생활안내':
-        return _life_answer(ctx, inp)
-    if label != '사내 규정':
-        raise llm.LlmError('답변 형식 오류: 알 수 없는 질문 분류 결과예요')
-    q, me, hist = inp['question'], inp['me'], inp.get('history') or []
-    group = me.get('empGroup')
+REPRESENTATIVE_GROUPS = ['일반직', '실무직', '운영직']
+ALL_EMPLOYEE_GROUPS = ['일반직', '실무직', '운영직', '전문직', '특정직', '청원경찰', '특수직', '기간제근로자']
+
+
+def clarify_options() -> list[str]:
+    """등록된 규정 직군 목록을 대표 직군 우선 순서로 반환한다."""
+    registered = regstore.groups()
+    base = [g for g in ALL_EMPLOYEE_GROUPS if g in registered]
+    others = [g for g in registered if g not in base]
+    return (base + others) if (base or others) else REPRESENTATIVE_GROUPS
+
+
+def detect_employee_group(question: str, history: list | None = None, me: dict | None = None) -> str | None:
+    """질문, 이전 대화 기록, 또는 사용자 정보에서 대상 직군을 판별한다."""
+    if me and me.get('empGroup'):
+        return me['empGroup']
+    for g in REPRESENTATIVE_GROUPS:
+        if g in question:
+            return g
+    m = re.search(r'([가-힣]+직)', question)
+    if m:
+        return m.group(1)
+    for turn in reversed(history or []):
+        q_text = turn.get('q') or ''
+        for g in REPRESENTATIVE_GROUPS:
+            if g in q_text:
+                return g
+        m = re.search(r'([가-힣]+직)', q_text)
+        if m:
+            return m.group(1)
+    return None
+
+
+def make_group_clarify_answer(label: str = '사내 규정') -> dict:
+    """사내 규정 질문 시 직군이 확인되지 않을 때 사용자에게 직군 선택을 요청하는 역질문 답변을 생성한다."""
+    res = ans(
+        kind='clarify',
+        level='clarify',
+        topic='regulation',
+        question='어떤 직군의 규정을 확인하시겠어요? 아래에서 직군을 선택해 주세요.',
+        options=clarify_options(),
+    )
+    res['ml_label'] = label
+    return res
+
+
+# ── [2단계] 분류된 것들을 받는 함수 (규정, 회사정보, 생활정보, 범위밖 각각 다른 처리) ──
+def process_out_of_scope_query(inp: dict) -> dict:
+    """[2단계-범위밖] 업무·사내 생활과 관련 없는 질문 처리"""
+    res = ans(kind='out', level='out')
+    res['ml_label'] = '범위 밖'
+    return res
+
+
+def process_company_query(ctx: rt.Ctx, inp: dict) -> dict:
+    """[2단계-회사정보] 수자원공사 정보 DB 검색 및 근거 수집 후 3단계 LLM으로 전달"""
+    return _knowledge_answer(ctx, inp, 'company')
+
+
+def process_life_query(ctx: rt.Ctx, inp: dict) -> dict:
+    """[2단계-생활정보] 사내 생활안내 DB 검색 및 근거 수집 후 3단계 LLM으로 전달"""
+    return _knowledge_answer(ctx, inp, 'life')
+
+
+def process_regulation_query(ctx: rt.Ctx, inp: dict) -> dict:
+    """[2단계-사내규정] 사내 규정 처리:
+    - 직군(일반직/실무직/운영직) 확인:
+      사용자가 화면에서 직접 '선택'한 group 파라미터를 최우선으로 적용한다.
+      직군 미선택 시 채팅 텍스트 추정으로 인한 오인식을 방지하고 clarify 역질문(선택 옵션)을 반환한다.
+    - 직군 확인 시 규정 DB 검색 후 3단계 LLM 함수로 전달
+    """
+    q, me, hist = inp['question'], inp.get('me') or {}, inp.get('history') or []
+    group = inp.get('group') or me.get('empGroup')
+    if not (group or '').strip():
+        return make_group_clarify_answer(label='사내 규정')
+
     follow_history = inp.get('_history') or []
-    documents_only = inp.get('documents_only')
-    if documents_only and not (group or '').strip():
-        raise AgentError('로그인한 직원의 직원 구분을 확인할 수 없어요')
     ref = regstore.explicit_ref(q, group)
     # 규정 이름이 없는 조항 질문은 일반 이어 묻기 판별과 별도로 직전 규정을 참조한다.
     if ref is None and hist and regstore.REF_ART.search(q):
@@ -471,8 +582,11 @@ def _api_answer(ctx: rt.Ctx, inp: dict, label: str) -> dict:
                 follow_history = [hist[-1]]
     prev = follow_history[-1] if follow_history else None
     history = _hist_msgs(follow_history)
-    alone = regstore.search(q, 5, group, ctx.mode)
-    joined = regstore.search(_context_query(q, follow_history), 5, group, ctx.mode) if prev else []
+    # 직군 선택(칩 클릭 등 짧은 직군 응답)인 경우, 질문 내용은 앞 턴의 원래 질문(prev['q'])을 계승한다.
+    # (검색 텍스트에 직군명을 덧붙이면 별표의 직무역량표가 검색을 교란하므로, group 필터만 적용하고 검색 텍스트는 원래 질문을 유지한다)
+    effective_q = prev['q'] if (prev and (len(q.strip()) <= 6 or q.strip() in REPRESENTATIVE_GROUPS)) else q
+    alone = regstore.search(effective_q, 5, group, ctx.mode)
+    joined = regstore.search(_context_query(effective_q, follow_history), 5, group, ctx.mode) if prev else []
     mix = []
     for index in range(max(len(alone), len(joined))):
         if index < len(joined):
@@ -481,6 +595,7 @@ def _api_answer(ctx: rt.Ctx, inp: dict, label: str) -> dict:
             mix.append(alone[index]['id'])
     ref_ids = (ref or {}).get('ids') or []
     previous_ids = list((prev or {}).get('a', {}).get('basis') or [])
+    documents_only = inp.get('documents_only', True)
     if documents_only:
         # 브라우저에서 전달한 이전 근거는 현재 직원 구분에서 다시 확인한다.
         previous_ids = [aid for aid in previous_ids if (source := regstore.article(aid)) and source.get('group') == group]
@@ -493,22 +608,43 @@ def _api_answer(ctx: rt.Ctx, inp: dict, label: str) -> dict:
     if documents_only:
         ids += regstore.referenced_paragraphs(ids, limit=min(3, 7 - len(ids)))
         if ctx.mode in ('ollama', 'openai') and hybrid_search.enabled():
-            ids += regstore.parent_context(ids, group, q, limit=min(2, 7 - len(ids)))
+            ids += regstore.parent_context(ids, group, effective_q, limit=min(2, 7 - len(ids)))
     requested = {'where': ref['where'], 'focus': ref['focus'], 'note': ref['note']} if ref else None
-    result = grounded_answer.generate(ctx, 'regulation', q, [_art_in(regstore.article(value)) for value in ids],
-                                     inp['context'], history=history, requested=requested)
+
+    # [3단계] LLM이 받아서 근거를 찾아온다 (직군 버튼 클릭 시 앞 질문과 합쳐진 effective_q를 전달)
+    result = generate_llm_grounded_answer(ctx, 'regulation', effective_q, [_art_in(regstore.article(value)) for value in ids],
+                                          inp['context'], history=history, requested=requested)
     if result['status'] == 'refused':
         return _refused('regulation')
     if result['status'] == 'not_found':
         return _no_evidence('regulation', ids)
     basis, summary = result['sourceIds'], result['summary']
-    if not hr_stated(q, basis):
+    if not hr_stated(effective_q, basis):
         return _no_evidence('regulation', ids)
     if not nums_ok(summary, basis, ctx_nums(inp['context'])):
         raise llm.LlmError('답변 형식 오류: 규정 답변의 숫자가 인용 조항에 없어요')
     return ans(kind='regulation', topic='regulation', evidenceStatus=result['status'],
                level='ok' if result['status'] == 'found' else 'unclear', summary=summary,
                basis=basis, retrieved=ids)
+
+
+def handle_classified_question(ctx: rt.Ctx, inp: dict, label: str) -> dict:
+    """[2단계 라우팅] 1단계에서 분류된 라벨에 따라 각각 다른 처리 함수를 실행한다."""
+    if label == '사내 규정':
+        return process_regulation_query(ctx, inp)
+    if label == '수자원공사 정보':
+        return process_company_query(ctx, inp)
+    if label == '사내 생활안내':
+        return process_life_query(ctx, inp)
+    if label == '범위 밖':
+        return process_out_of_scope_query(inp)
+    raise llm.LlmError(f'답변 형식 오류: 알 수 없는 질문 분류 결과예요 ({label})')
+
+
+_company_answer = process_company_query
+_life_answer = process_life_query
+_regulation_answer = process_regulation_query
+_api_answer = handle_classified_question
 
 
 def scope_answer(a: dict, me: dict) -> dict:
@@ -519,22 +655,31 @@ def scope_answer(a: dict, me: dict) -> dict:
                ref=list(a.get('basis') or [])[:3], retrieved=a.get('retrieved') or [])
 
 
-def answer(ctx: rt.Ctx, question: str, history: list, context: dict, sim: str | None = None,
-           *, documents_only: bool = False) -> dict:
-    """history는 답을 받은 질문·답 [{q, a}]이다. 이어 묻기에는 최대 5턴을 사용한다."""
-    me = {'empGroup': ctx.me.get('empGroup')} if documents_only else ctx.me
-    context = {} if documents_only else context
-    inp = {'question': question, 'history': history or [], 'context': context, 'me': me,
-           'documents_only': documents_only}
+def answer(ctx: rt.Ctx, question: str, history: list | None = None, context: dict | None = None,
+           sim: str | None = None, *, documents_only: bool = True, group: str | None = None) -> dict:
+    """1단계: 요청 접수
+    - 사내 직원 인증은 API(work.py)에서 완료되었으므로 me(개인정보)는 배제합니다.
+    - 직군(group)이 지정된 경우 대상 직군 규정 검색에 활용합니다.
+    - 시스템 공통 런타임(rt.run)을 통해 실행 시간 측정 및 로깅을 유지합니다.
+    - '가데이터로 보기' 모드에서는 temp_mock_documents 함수가 호출됩니다.
+    - 실제 AI 모드에서는 _api 파이프라인이 호출됩니다.
+    """
+    inp = {
+        'question': str(question or '').strip(),
+        'history': history or [],
+        'context': context or {},
+        'me': {'empGroup': group} if group else (ctx.me or {}),
+        'group': group,
+        'documents_only': documents_only,
+    }
     task = f"사내 생활 질문 분류·답변{f' (앞 대화 {len(history)}턴 포함)' if history else ''}"
-    mock = _mock_documents if documents_only else _mock
-    a = rt.run(ctx, '규정 에이전트', task, inp, mock, lambda i: _api(ctx, i), role='regulation', sim=sim, mock_delay=0.38,
-               log_input={'question': question, 'context': context, 'history': history or []})
+    mock = temp_mock_documents if documents_only else temp_mock
+    a = rt.run(ctx, '규정 에이전트', task, inp, mock, lambda i: _api(ctx, i),
+               role='regulation', sim=sim, mock_delay=0.38,
+               log_input={'question': question, 'context': context or {}, 'history': history or []})
     if inp.get('_classification'):
         ctx.meta['classification'] = inp['_classification']
-    if documents_only:
-        return a
-    return scope_answer(a, me) if a['kind'] == 'regulation' and a.get('evidenceStatus') != 'refused' and not regstore.set_for(me.get('empGroup')) else a
+    return a
 
 
 def reg_context(me: dict, plans: list, drafting: dict | None) -> dict:

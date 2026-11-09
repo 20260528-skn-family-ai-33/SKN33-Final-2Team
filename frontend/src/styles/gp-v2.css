@@ -465,6 +465,8 @@ details.ops.sm .ops-b { padding: 8px 10px; gap: 6px; }
 .reg-confirm .btn { height: 32px; }
 .chat-in .btn.stop { color: var(--ink); border-color: var(--line-2); }
 .chat-in .btn.stop svg { width: 16px; height: 16px; fill: currentColor; }
+.chat-in .input:disabled { background: var(--surface-2, #f1f5f9); color: var(--ink-3, #94a3b8); cursor: not-allowed; border-color: var(--line, #e2e8f0); }
+.chat-in button.btn.pri:disabled { opacity: .45; cursor: not-allowed; pointer-events: none; }
 .sugs .chip:disabled { opacity: .45; cursor: not-allowed; }
 .reg-hint { margin: -2px 2px 0; font-size: 12.5px; color: var(--warn); }
 .reg-long { margin: 0; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); font-size: 12px; line-height: 1.5; color: var(--ink-3); }
@@ -525,6 +527,124 @@ details.ops.sm .ops-b { padding: 8px 10px; gap: 6px; }
 .ans ul.intra small { font-size: 12px; color: var(--ink-3); }
 .ans .clar { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 8px; }
 .ans .clar .chip { min-height: 32px; padding: 4px 12px; font-size: 13px; text-align: left; }
+.ans .clar-carousel-box { margin: 10px 0 8px; width: 100%; }
+.ans .clar-carousel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+}
+.ans button.clar-nav-btn {
+  all: unset;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  max-width: 32px;
+  max-height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--line, #e2e8f0);
+  background: var(--surface-1, #ffffff);
+  color: var(--ink-2, #334155);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all .16s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+.ans button.clar-nav-btn:hover:not(:disabled) {
+  background: var(--accent-soft2, #f0f6ff);
+  border-color: var(--accent, #2563eb);
+  color: var(--accent, #2563eb);
+  transform: scale(1.08);
+}
+.ans button.clar-nav-btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+.ans button.clar-nav-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.ans button.clar-nav-btn svg.i {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2.2;
+}
+.ans .clar-chips-col {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+}
+.ans .clar-chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 12px;
+  background: var(--surface-1, #ffffff);
+  border: 1.5px solid var(--line, #e2e8f0);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all .16s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+.ans .clar-chip:hover {
+  background: var(--accent-soft2, #f0f6ff);
+  border-color: var(--accent, #2563eb);
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.12);
+  transform: translateY(-1px);
+}
+.ans .clar-chip:active {
+  transform: translateY(0);
+}
+.ans .clar-chip-text {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink-1, #1e293b);
+  letter-spacing: -0.2px;
+}
+.ans .clar-chip:hover .clar-chip-text {
+  color: var(--accent, #2563eb);
+}
+.ans .clar-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.ans .clar-dots {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.ans .clar-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--line, #cbd5e1);
+  transition: all .16s ease;
+}
+.ans .clar-dot.on {
+  width: 14px;
+  border-radius: 3px;
+  background: var(--accent, #2563eb);
+}
+.ans .clar-page-num {
+  font-size: 11px;
+  color: var(--ink-3, #94a3b8);
+  font-weight: 500;
+}
 @media (max-width: 760px) { .gs-fail { flex-wrap: wrap; } }
 
 /* ── 계정·내 정보 (10/15) ── */

@@ -70,5 +70,6 @@ export interface HistoryTurn {
 }
 
 export const assistantApi = {
-  ask: (question: string, history: HistoryTurn[], signal?: AbortSignal) => http.post<JobStarted>('/assistant/ask', { question, history }, { async: true, signal }),
+  ask: (question: string, history: HistoryTurn[], group?: string, signal?: AbortSignal) =>
+    http.post<JobStarted>('/assistant/ask', { question, history, ...(group ? { group } : {}) }, { async: true, signal }),
 };

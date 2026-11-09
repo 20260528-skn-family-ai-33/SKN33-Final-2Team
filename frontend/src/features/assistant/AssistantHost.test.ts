@@ -91,4 +91,19 @@ describe('사내 생활 DB 근거 카드', () => {
       expect(html).toContain('>답변 불가</span>');
     }
   });
+
+  it('직군 확인(clarify) 카드는 근거 확인 불가를 표시하지 않고 ML 라벨만 표시한다', () => {
+    const a = makeAnswer({
+      kind: 'clarify',
+      question: '어떤 직군의 규정을 확인하시겠어요? 아래에서 선택하시거나 그 외 직군은 직접 입력해 주세요.',
+      options: ['일반직', '실무직', '운영직'],
+    });
+    const html = renderToStaticMarkup(createElement(MemoryRouter, null, createElement(RegCard, { a, mlLabel: '사내 규정' })));
+    expect(html).toContain('title="ML 질문 분류">사내 규정</span>');
+    expect(html).not.toContain('근거 확인');
+    expect(html).toContain('어떤 직군의 규정을 확인하시겠어요?');
+    expect(html).toContain('일반직');
+    expect(html).toContain('실무직');
+    expect(html).toContain('운영직');
+  });
 });
