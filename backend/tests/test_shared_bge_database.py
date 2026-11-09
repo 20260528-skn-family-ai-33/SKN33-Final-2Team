@@ -4,7 +4,8 @@ import io
 import json
 import os
 import unittest
-from unittest.mock import MagicMock, Mock, patch
+from contextlib import nullcontext
+from unittest.mock import Mock, patch
 
 os.environ.setdefault('DATABASE_URL', 'postgresql+psycopg://test:test@127.0.0.1:1/test')
 from app import bge_model, bge_regulation_search as regulations, bge_knowledge_search as knowledge, llm, regulation_embeddings as embeddings
@@ -191,28 +192,43 @@ class SharedBgeContractTest(unittest.TestCase):
 
     def test_regulation_reindex_matches_current_sha(self):
         aid = 'chunk_1'
-        sample_input = ('취업규칙 > 제1조\n\n제1조 본문', hashlib.sha256('취업규칙 > 제1조\n\n제1조 본문'.encode('utf-8')).hexdigest())
+        article = {'path': '취업규칙 > 제1조', 'chunkText': '제1조 본문'}
+        text = article['path'] + '\n\n' + article['chunkText']
+        sha = hashlib.sha256(text.encode('utf-8')).hexdigest()
         tx_mock = Mock(spec=regulations.db.Tx)
-        tx_mock.all.return_value = [{'rag_chunk_id': aid, 'current_sha': sample_input[1]}]
-        tx_mock.run.return_value = None
-        with patch.object(regulations, '_inputs', return_value={aid: sample_input}), \
-             patch.object(regulations, '_missing', return_value=[aid]), \
-             patch.object(regulations.embeddings, 'embed', return_value=[[0.1] * 1024]), \
-             patch.object(regulations.embeddings, 'validate', return_value=[[0.1] * 1024]), \
-             patch.object(regulations.db, 'tx', return_value=MagicMock(__enter__=Mock(return_value=tx_mock), __exit__=Mock())):
-            regulations.ensure_vectors([aid])
-            self.assertTrue(tx_mock.all.called)
+        tx_mock.all.return_value = [{'rag_chunk_id': aid, 'current_sha': sha}]
+        tx_mock.run.return_value = 1
+        with patch.object(regulations.regstore, 'article', return_value=article), \
+             patch.object(regulations, '_stored', return_value={}), \
+             patch.object(embeddings, 'embed', return_value=[VECTOR]) as embed, \
+             patch.object(regulations.db, 'tx', return_value=nullcontext(tx_mock)):
+            updated = regulations.ensure_vectors([aid])
 
-    def test_regulation_reindex_matches_current_sha(self):
+        self.assertEqual(updated, 1)
+        embed.assert_called_once_with([text])
+        tx_mock.all.assert_called_once()
+        self.assertEqual(tx_mock.run.call_count, 2)
+        for write in tx_mock.run.call_args_list:
+            self.assertEqual(write.kwargs['s'], sha)
+
+    def test_regulation_reindex_propagates_storage_errors(self):
         aid = 'chunk_1'
-        sample_input = ('취업규칙 > 제1조\n\n제1조 본문', hashlib.sha256('취업규칙 > 제1조\n\n제1조 본문'.encode('utf-8')).hexdigest())
-        tx_mock = Mock(spec=regulations.db.Tx)
-        tx_mock.all.return_value = [{'rag_chunk_id': aid, 'current_sha': sample_input[1]}]
-        tx_mock.run.return_value = None
-        with patch.object(regulations, '_inputs', return_value={aid: sample_input}), \
-             patch.object(regulations, '_missing', return_value=[aid]), \
-             patch.object(regulations.embeddings, 'embed', return_value=[[0.1] * 1024]), \
-             patch.object(regulations.embeddings, 'validate', return_value=[[0.1] * 1024]), \
-             patch.object(regulations.db, 'tx', return_value=MagicMock(__enter__=Mock(return_value=tx_mock), __exit__=Mock())):
-            regulations.ensure_vectors([aid])
-            self.assertTrue(tx_mock.all.called)
+        article = {'path': '취업규칙 > 제1조', 'chunkText': '제1조 본문'}
+        text = article['path'] + '\n\n' + article['chunkText']
+        sha = hashlib.sha256(text.encode('utf-8')).hexdigest()
+        for failed_write, target in enumerate(('meta', 'vector'), start=1):
+            with self.subTest(target=target):
+                error = RuntimeError(f'{target} write failed')
+                tx_mock = Mock(spec=regulations.db.Tx)
+                tx_mock.all.return_value = [{'rag_chunk_id': aid, 'current_sha': sha}]
+                tx_mock.run.side_effect = [1] * (failed_write - 1) + [error]
+                with patch.object(regulations.regstore, 'article', return_value=article), \
+                     patch.object(regulations, '_stored', return_value={}), \
+                     patch.object(embeddings, 'embed', return_value=[VECTOR]), \
+                     patch.object(regulations.db, 'tx', return_value=nullcontext(tx_mock)):
+                    with self.assertRaises(RuntimeError) as raised:
+                        regulations.ensure_vectors([aid])
+
+                self.assertIs(raised.exception, error)
+                tx_mock.all.assert_called_once()
+                self.assertEqual(tx_mock.run.call_count, failed_write)
