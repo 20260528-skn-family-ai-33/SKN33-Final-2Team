@@ -727,6 +727,29 @@ details.more[open] > summary { margin-bottom: 12px; }
 @media (max-width: 600px) {
   .notif-l { display: none; }
 }
+/* 새 알림 하단 플로팅(#96) — 화면 아래 문구(.toast)와 같은 자리. 카드에 .toast 를 함께 붙여 테마마다 정한 토스트 색·모서리를 그대로 받고,
+   위치·여백만 여기서 바꾼다. 글자·구분선은 currentColor 를 써서 밝은 토스트 테마에서도 읽힌다. 토스트가 떠 있으면 그 위로 비켜 선다 */
+.nfloat {
+  position: fixed; z-index: 45; bottom: 88px; left: calc(var(--side-w) + (100% - var(--side-w)) / 2); transform: translateX(-50%);
+  width: min(420px, calc(100% - var(--side-w) - 48px)); display: flex; flex-direction: column; align-items: stretch; gap: 8px; pointer-events: none;
+}
+body:has(#toast:not([hidden])) .nfloat { bottom: 140px; }
+.nfloat .toast { position: static; left: auto; bottom: auto; transform: none; padding: 0; white-space: normal; pointer-events: auto; }
+.nfloat-it { display: flex; align-items: stretch; overflow: hidden; }
+.nfloat-go { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 11px 8px 11px 14px; border: 0; background: none; text-align: left; }
+.nfloat-go:hover, .nfloat-x:hover, .nfloat-more:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
+.nfloat-go > svg.i { width: 16px; height: 16px; flex: none; }
+.nfloat-tx { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.nfloat-tx b { font-size: 14px; font-weight: 650; overflow-wrap: anywhere; }
+.nfloat-tx small { overflow: hidden; font-size: 12px; opacity: .75; text-overflow: ellipsis; white-space: nowrap; }
+.nfloat-cta { display: inline-flex; flex: none; align-items: center; gap: 2px; font-size: 13px; font-weight: 600; }
+.nfloat-cta svg.i, .nfloat-x svg.i { width: 14px; height: 14px; }
+.nfloat-x { flex: none; width: 40px; display: grid; place-items: center; border: 0; border-left: 1px solid color-mix(in srgb, currentColor 18%, transparent); background: none; opacity: .8; }
+.nfloat-x:hover { opacity: 1; }
+.nfloat .nfloat-more { align-self: center; padding: 6px 14px; font-size: 12.5px; border-radius: 99px; }
+@media (max-width: 900px) {
+  .nfloat { left: 50%; width: calc(100% - 32px); }
+}
 
 .reg-check {
   display: flex;
