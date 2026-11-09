@@ -11,7 +11,7 @@ from app.agents import roadmap, runtime
 from app.errors import ApiError
 from app.routers import preassessment
 from app.services import course_skills, drafts, resource_evidence, resource_rag
-from app.services.crash_requirements import required_technologies, validate_core_requirements
+from app.services.crash_requirements import MAX_REQUIREMENT_CHARS, required_technologies, validate_core_requirements
 import test_revision_course_targets as revision_cases
 from test_recommendation_suitability import WEB, course
 
@@ -62,6 +62,23 @@ class CrashRequiredTechnologiesTests(unittest.TestCase):
         self.assertEqual(result['learningSkills'][0]['coreCriteria'], ['Django REST API 구현과 테스트'])
         self.assertIn('필수 기술', captured['system'])
         self.assertIn('django', captured['system'].casefold())
+
+    def test_versioned_requirement_and_substitution_reach_final_generation_validation(self):
+        goal = 'Django 5.2 사용 필수'
+
+        def answer(outcome):
+            return target(coreOutcome=outcome, coreCriteria=['응답 코드 확인'])
+
+        result, captured = self.option(answer('FastAPI 대신 Django로 API 구현'), goal=goal)
+        self.assertIn('django', captured['system'].casefold())
+        self.assertEqual(result['learningSkills'][0]['coreOutcome'], 'FastAPI 대신 Django로 API 구현')
+        with self.assertRaisesRegex(llm.LlmError, '(?i)django'):
+            self.option(answer('Django 대신 FastAPI로 API 구현'), goal=goal)
+
+    def test_oversized_request_is_rejected_before_model_generation(self):
+        with self.assertRaises(ApiError) as caught:
+            self.option(target(), goal='Django 필수', request={'wish': '가' * MAX_REQUIREMENT_CHARS})
+        self.assertEqual((caught.exception.status, caught.exception.code), (422, 'CRASH_REQUIREMENTS_TOO_LONG'))
 
     def test_regeneration_does_not_replace_previous_plan_when_new_requirement_missing(self):
         previous = {'id': 'A2', 'acts': [], 'learningSkills': [target('Django')], 'version': 'old'}

@@ -1,10 +1,66 @@
 """필수 기술의 명시적 표현과 선택·부정·후속 범위를 구분한다."""
 from copy import deepcopy
+from pathlib import Path
+import subprocess
+import sys
 import unittest
-from app.services.crash_requirements import required_technologies, validate_core_requirements
+from app.services.crash_requirements import (
+    MAX_REQUIREMENT_CHARS, RequirementTextTooLong, required_technologies, validate_core_requirements,
+)
 
 
 class CrashRequirementParserTests(unittest.TestCase):
+    def test_long_technology_lists_finish_with_and_without_an_obligation(self):
+        # 별도 프로세스여야 정규식 회귀로 GIL이 막혀도 테스트 자체를 중단할 수 있다.
+        script = """
+from app.services.crash_requirements import required_technologies
+names = 'django and ' * 1000 + 'FastAPI'
+assert required_technologies({}, {'wish': names}) == set()
+assert required_technologies({}, {'wish': names + ' required'}) == {'django', 'fastapi'}
+"""
+        subprocess.run([sys.executable, '-c', script], cwd=Path(__file__).resolve().parents[1],
+                       timeout=5, check=True)
+
+    def test_versions_preserve_the_technology_but_are_not_separate_requirements(self):
+        for text, expected in (
+            ('Django 5.2 사용 필수', {'django'}),
+            ('Python 3.12 및 Django 5.2는 필수', {'python', 'django'}),
+            ('필수 기술: Spring Boot 3.4, Node.js v22, C++', {'spring boot', 'node.js', 'c++'}),
+            ('django-filter 24.3 required', {'django-filter'}),
+            ('Django 5.2는 필수가 아님', set()),
+            ('Python 3.12로 구현 후 Django 5.2 비교', set()),
+        ):
+            with self.subTest(text=text):
+                self.assertEqual(required_technologies({'goal': text}), expected)
+
+    def test_input_budget_includes_nested_requirements_and_does_not_truncate_the_end(self):
+        wish = 'Django 필수'
+        project = {'details': {'scope': '가' * (MAX_REQUIREMENT_CHARS - len(wish))},
+                   'profile': {'workDesc': '가' * MAX_REQUIREMENT_CHARS}}
+        self.assertEqual(required_technologies(project, {'wish': wish}), {'django'})
+        with self.assertRaises(RequirementTextTooLong):
+            required_technologies(project, {'wish': wish + '!'})
+
+    def test_only_the_chosen_side_of_a_substitution_counts_as_core(self):
+        for text, chosen, excluded in (
+            ('FastAPI 대신 Django로 REST API 구현', 'Django', ['FastAPI']),
+            ('Django 대신에 FastAPI로 REST API 구현', 'FastAPI', ['Django']),
+            ('Flask, FastAPI를 제외하고 장고로 구현', 'Django', ['Flask', 'FastAPI']),
+            ('FastAPI 없이 Django로 구현', 'Django', ['FastAPI']),
+            ('Implement Django instead of FastAPI', 'Django', ['FastAPI']),
+            ('Use Django instead of FastAPI and Flask', 'Django', ['FastAPI', 'Flask']),
+        ):
+            rows = [{'coreOutcome': text}]
+            with self.subTest(text=text):
+                validate_core_requirements(rows, {'goal': f'{chosen} 사용 필수'})
+                for name in excluded:
+                    with self.assertRaisesRegex(ValueError, name.casefold()):
+                        validate_core_requirements(rows, {'goal': f'{name} 사용 필수'})
+        for text in ('FastAPI 대신 Django 비교', '나중에 FastAPI 대신 Django로 구현',
+                     'FastAPI 대신 Django를 사용하지 않음', 'Using Django without FastAPI is optional'):
+            with self.subTest(text=text), self.assertRaisesRegex(ValueError, 'django'):
+                validate_core_requirements([{'coreCriteria': [text]}], {'goal': 'Django 필수'})
+
     def test_explicit_requirements_and_aliases(self):
         cases = {
             'Django 사용 필수': {'django'},
