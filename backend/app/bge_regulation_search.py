@@ -59,7 +59,7 @@ def ensure_vectors(ids: list[str]) -> int:
         part = missing[offset:offset + 4]
         vectors = embeddings.validate(embeddings.embed([inputs[i][0] for i in part]), len(part), embeddings.BGE_DIMENSIONS)
         with db.tx() as transaction:
-            current_rows = transaction.all_('''
+            current_rows = transaction.all('''
                 SELECT rag_chunk_id, encode(sha256(convert_to(context_path || E'\\n\\n' || chunk_text, 'UTF8')), 'hex') AS current_sha
                 FROM regulations.rag_chunks WHERE rag_chunk_id = ANY(:ids)''', ids=part)
             current_shas = {r['rag_chunk_id']: r['current_sha'] for r in current_rows}

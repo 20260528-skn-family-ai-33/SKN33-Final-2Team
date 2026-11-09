@@ -71,8 +71,8 @@ class SharedBgeContractTest(unittest.TestCase):
         sha = 'abc' * 21 + 'a'
         article = {'path': '취업규칙 > 제1조', 'chunkText': '본문', 'id': 'aid'}
         calls = []
-        tx_mock = Mock()
-        tx_mock.all_.return_value = [{'rag_chunk_id': 'aid', 'current_sha': sha}]
+        tx_mock = Mock(spec=regulations.db.Tx)
+        tx_mock.all.return_value = [{'rag_chunk_id': 'aid', 'current_sha': sha}]
         tx_mock.run.side_effect = lambda sql, **kw: calls.append((sql, kw))
 
         from contextlib import contextmanager
@@ -100,8 +100,8 @@ class SharedBgeContractTest(unittest.TestCase):
 
     def test_regulation_source_change_aborts_with_error(self):
         article = {'path': '취업규칙 > 제1조', 'chunkText': '본문', 'id': 'aid'}
-        tx_mock = Mock()
-        tx_mock.all_.return_value = [{'rag_chunk_id': 'aid', 'current_sha': 'different_sha'}]
+        tx_mock = Mock(spec=regulations.db.Tx)
+        tx_mock.all.return_value = [{'rag_chunk_id': 'aid', 'current_sha': 'different_sha'}]
 
         from contextlib import contextmanager
         @contextmanager
@@ -135,7 +135,7 @@ class SharedBgeContractTest(unittest.TestCase):
         sha = regulations.hashlib.sha256(text.encode()).hexdigest()
         chunk_obj = {'chunk_id': 'k1', 'chunk_text': text, 'chunk_text_sha256': sha}
         calls = []
-        tx_mock = Mock()
+        tx_mock = Mock(spec=regulations.db.Tx)
         tx_mock.run.side_effect = lambda sql, **kw: calls.append((sql, kw)) or 1
 
         from contextlib import contextmanager
