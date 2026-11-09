@@ -17,7 +17,7 @@ export function notificationTarget(n: AppNotification): string {
   if (n.kind === 'job') return jobTarget(n.jobKind, planId);
   if (n.kind === 'comment') return paths.comments(planId);
   const head = n.audience === 'head';
-  if (n.kind === 'report' && n.reportId) return head ? paths.memberReport(n.employee.id, n.reportId) : paths.report(n.reportId);
+  if ((n.kind === 'report' || n.kind === 'task' || n.kind === 'task_result') && n.reportId) return head ? paths.memberReport(n.employee.id, n.reportId) : paths.report(n.reportId);
   return head ? paths.memberPlan(n.employee.id, planId) : paths.roadmap(planId);
 }
 
@@ -27,9 +27,9 @@ export function isOtherDraft(n: AppNotification, currentDraftId: string | null):
 }
 
 /** 지금 보고 있는 화면을 가리키는 읽지 않은 알림(#96). 이미 본 일이 알림 창에 쌓이지 않게 읽음으로 바꾼다.
- *  부서장 알림은 기록이 실제로 화면에 보일 때 useMarkSeen 이 처리하므로 뺀다 */
+ *  부서장의 로드맵·보고서 알림은 기록이 실제로 화면에 보일 때 useMarkSeen 이 처리하므로 뺀다 */
 export function viewedNow(items: AppNotification[], pathname: string, currentDraftId: string | null): AppNotification[] {
-  return items.filter((n) => !n.read && n.audience !== 'head' && notificationTarget(n) === pathname && !isOtherDraft(n, currentDraftId));
+  return items.filter((n) => !n.read && (n.audience !== 'head' || n.kind === 'task_result') && notificationTarget(n) === pathname && !isOtherDraft(n, currentDraftId));
 }
 
 const JOB_TITLE: Record<NotificationJobKind, { done: string; failed: string }> = {
@@ -44,6 +44,8 @@ const JOB_TITLE: Record<NotificationJobKind, { done: string; failed: string }> =
 export function notificationTitle(n: AppNotification, bare = false): string {
   if (n.kind === 'job') return n.jobKind ? JOB_TITLE[n.jobKind][n.jobStatus === 'failed' ? 'failed' : 'done'] : '작업이 끝났어요';
   if (n.kind === 'comment') return `${n.employee.name} 님이 로드맵에 코멘트를 보냈어요`;
+  if (n.kind === 'task') return `${n.employee.name} 님이 과제를 보냈어요`;
+  if (n.kind === 'task_result') return bare ? '과제 결과를 제출했어요' : `${n.employee.name} 님이 과제 결과를 제출했어요`;
   if (n.audience === 'head' && !bare)
     return n.kind === 'report' ? `${n.employee.name} 님의 결과 보고서 작성이 끝났어요` : `${n.employee.name} 님이 새 로드맵 작성을 마쳤어요`;
   return n.kind === 'report' ? '결과 보고서 작성이 끝났어요' : '새 로드맵 작성을 마쳤어요';
@@ -81,9 +83,9 @@ export function splitNotifications(items: AppNotification[]): { mine: AppNotific
 
 /** 묶음 줄의 부제: 종류별 건수(없는 종류는 뺀다) */
 export function staffGroupSub(g: StaffGroup): string {
-  const roadmaps = g.items.filter((n) => n.kind === 'roadmap').length;
-  const reports = g.items.length - roadmaps;
-  return [roadmaps ? `로드맵 ${roadmaps}건` : '', reports ? `결과 보고서 ${reports}건` : ''].filter(Boolean).join(' · ');
+  const count = (kind: AppNotification['kind']) => g.items.filter((n) => n.kind === kind).length;
+  const parts: [string, number][] = [['로드맵', count('roadmap')], ['결과 보고서', count('report')], ['과제 결과', count('task_result')]];
+  return parts.filter(([, n]) => n).map(([label, n]) => `${label} ${n}건`).join(' · ');
 }
 
 export function notificationSub(n: AppNotification): string {

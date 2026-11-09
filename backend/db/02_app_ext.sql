@@ -334,16 +334,33 @@ ALTER TABLE app_ext.post_checks ADD COLUMN IF NOT EXISTS deep jsonb;
 -- 받는 쪽: 본인(self)·소속 직원 일을 받는 부서장(head)·부서장이 한 일을 받는 직원(member). 어떤 일에 누가 받는지는 services/notifications.py.
 -- 화면 문구·이동할 주소는 읽을 때 만든다. 확인 전 보고서를 다시 만들면 이전 보고서를 지우므로 그 보고서의 알림도 함께 지워진다.
 -- 이미 있는 DB는 이 정의가 적용되지 않는다. db/migrate_notification_rules.sql 을 실행한다(#96)
+-- 결과 보고서 과제(#96): 부서장이 낸 과제와 직원의 제출 결과. 보고서를 다시 만들어도 남도록 로드맵에 묶는다(services/report_tasks.py).
+-- 이미 있는 DB는 db/migrate_report_tasks.sql 을 실행한다
+CREATE TABLE IF NOT EXISTS app_ext.report_tasks (
+  task_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  roadmap_id uuid NOT NULL REFERENCES public.roadmaps(roadmap_id) ON DELETE CASCADE,
+  employee_id integer NOT NULL REFERENCES public.employees(employee_id) ON DELETE CASCADE,
+  head_id integer NOT NULL REFERENCES public.employees(employee_id) ON DELETE CASCADE,
+  body text NOT NULL CHECK (length(btrim(body)) BETWEEN 1 AND 2000),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  submitted_at timestamptz,
+  answer text CHECK (answer IS NULL OR length(answer) <= 4000),
+  attachment jsonb,
+  CONSTRAINT report_tasks_submission_check CHECK (submitted_at IS NOT NULL OR (answer IS NULL AND attachment IS NULL))
+);
+CREATE INDEX IF NOT EXISTS report_tasks_roadmap_idx ON app_ext.report_tasks (roadmap_id, created_at);
+
 CREATE TABLE IF NOT EXISTS app_ext.notifications (
   notification_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   recipient_id integer NOT NULL REFERENCES public.employees(employee_id) ON DELETE CASCADE,
   actor_id integer NOT NULL REFERENCES public.employees(employee_id) ON DELETE CASCADE,
-  kind text NOT NULL CONSTRAINT notifications_kind_check CHECK (kind IN ('roadmap', 'report', 'job', 'comment')),
+  kind text NOT NULL CONSTRAINT notifications_kind_check CHECK (kind IN ('roadmap', 'report', 'job', 'comment', 'task', 'task_result')),
   audience text NOT NULL CONSTRAINT notifications_audience_check CHECK (audience IN ('self', 'head', 'member')),
   roadmap_id uuid REFERENCES public.roadmaps(roadmap_id) ON DELETE CASCADE,
   report_id uuid REFERENCES public.growth_reports(report_id) ON DELETE CASCADE,
   draft_id uuid REFERENCES public.projects(project_id) ON DELETE CASCADE,
   comment_id uuid REFERENCES public.roadmap_comments(comment_id) ON DELETE CASCADE,
+  task_id uuid REFERENCES app_ext.report_tasks(task_id) ON DELETE CASCADE,
   job_kind text,
   job_status text,
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -356,6 +373,7 @@ CREATE TABLE IF NOT EXISTS app_ext.notifications (
     AND (job_status IS NULL OR job_status IN ('done', 'failed'))
   ),
   CONSTRAINT notifications_comment_check CHECK ((kind = 'comment') = (comment_id IS NOT NULL)),
+  CONSTRAINT notifications_task_check CHECK ((kind IN ('task', 'task_result')) = (task_id IS NOT NULL)),
   CONSTRAINT notifications_target_check CHECK (roadmap_id IS NOT NULL OR (kind = 'job' AND draft_id IS NOT NULL))
 );
 CREATE INDEX IF NOT EXISTS notifications_recipient_idx ON app_ext.notifications (recipient_id, created_at DESC);

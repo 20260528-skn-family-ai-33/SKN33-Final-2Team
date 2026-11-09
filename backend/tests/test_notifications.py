@@ -134,7 +134,7 @@ class ServiceTests(unittest.TestCase):
 
     def test_inbox_shape(self):
         at = datetime(2026, 11, 4, 9, 30, tzinfo=timezone.utc)
-        empty = {'draft_id': None, 'comment_id': None, 'job_kind': None, 'job_status': None}
+        empty = {'draft_id': None, 'comment_id': None, 'task_id': None, 'job_kind': None, 'job_status': None}
         rows = [dict(empty, notification_id=NID, kind='report', audience='head', actor_id=8, actor_name='김직원', roadmap_id=RID,
                      report_id=NID, created_at=at, read_at=None, plan_title='SQL 분석', track='A2'),
                 dict(empty, notification_id=RID, kind='roadmap', audience='self', actor_id=7, actor_name='나', roadmap_id=RID,
@@ -152,7 +152,7 @@ class ServiceTests(unittest.TestCase):
         self.assertIn('n.read_at IS NULL', sql)  # 읽은 알림은 목록에서 뺀다(#96)
         self.assertEqual(out['unread'], 3)
         self.assertEqual(out['items'][0], {'id': NID, 'kind': 'report', 'audience': 'head', 'employee': {'id': '8', 'name': '김직원'}, 'planId': RID,
-                                           'planTitle': 'SQL 분석', 'track': 'A2', 'reportId': NID, 'draftId': None, 'commentId': None,
+                                           'planTitle': 'SQL 분석', 'track': 'A2', 'reportId': NID, 'draftId': None, 'commentId': None, 'taskId': None,
                                            'jobKind': None, 'jobStatus': None, 'createdAt': at.isoformat(), 'read': False})
         self.assertEqual((out['items'][1]['reportId'], out['items'][1]['read'], out['items'][1]['planTitle']), (None, True, ''))
         self.assertEqual((out['items'][2]['planId'], out['items'][2]['draftId'], out['items'][2]['jobKind'], out['items'][2]['jobStatus']), (None, DID, 'options', 'failed'))

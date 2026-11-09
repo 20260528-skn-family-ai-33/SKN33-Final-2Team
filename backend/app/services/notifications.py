@@ -5,9 +5,11 @@
 | 결과 보고서 작성 끝남 | 본인·부서장 |
 | 오래 걸리는 작업 끝남·실패(3안·다시 만들기·학습 자료·수정안, 보고서는 실패만) | 본인 |
 | 부서장이 코멘트를 보냄 (고칠 때는 보내지 않음) | 그 직원 |
+| 부서장이 결과 보고서 과제를 보냄 | 그 직원 |
+| 직원이 과제 결과를 제출함 | 과제를 낸 부서장 |
 로드맵을 수정해도(수정안 확정) 부서장에게 알리지 않는다.
 
-저장: app_ext.notifications. 받는 사람(recipient)·일으킨 사람(actor)·종류(roadmap|report|job|comment)·받는 쪽(self|head|member)·대상 id 만 두고,
+저장: app_ext.notifications. 받는 사람(recipient)·일으킨 사람(actor)·종류(roadmap|report|job|comment|task|task_result)·받는 쪽(self|head|member)·대상 id 만 두고,
 화면 문구와 이동할 주소는 화면이 만든다(로드맵 제목이 바뀌어도 알림이 따라간다).
 부서장 범위는 services/profile.members_of 와 같다: 같은 부서의 부서장만 그 부서 직원을 보고, 부서장 본인의 계획은 본인만 본다.
 로드맵·보고서·코멘트 알림은 그것을 저장하는 트랜잭션(t) 안에서 넣는다. 저장이 실패하면 알림도 남지 않는다.
@@ -65,6 +67,19 @@ def comment_sent(t: db.Tx, head_id: int, member_id: int, roadmap_id: str, commen
     """부서장의 새 코멘트(plans.send_comment)와 같은 트랜잭션에서 부른다. 고칠 때는 부르지 않는다"""
     t.run("""INSERT INTO app_ext.notifications(recipient_id, actor_id, kind, audience, roadmap_id, comment_id)
              VALUES(:m, :h, 'comment', 'member', CAST(:r AS uuid), CAST(:c AS uuid))""", m=member_id, h=head_id, r=roadmap_id, c=comment_id)
+
+
+def task_sent(t: db.Tx, head_id: int, member_id: int, roadmap_id: str, task_id: str) -> None:
+    """부서장이 과제를 보낼 때(report_tasks.send) 같은 트랜잭션에서 부른다"""
+    t.run("""INSERT INTO app_ext.notifications(recipient_id, actor_id, kind, audience, roadmap_id, task_id)
+             VALUES(:m, :h, 'task', 'member', CAST(:r AS uuid), CAST(:i AS uuid))""", m=member_id, h=head_id, r=roadmap_id, i=task_id)
+
+
+def task_submitted(t: db.Tx, member_id: int, head_id: int, roadmap_id: str, task_id: str) -> None:
+    """직원이 결과를 제출할 때(report_tasks.submit) 같은 트랜잭션에서 부른다. 과제를 낸 부서장에게 보낸다.
+    부서가 바뀌었으면 다른 부서장 알림처럼 목록에 보이지 않는다(_VISIBLE)"""
+    t.run("""INSERT INTO app_ext.notifications(recipient_id, actor_id, kind, audience, roadmap_id, task_id)
+             VALUES(:h, :m, 'task_result', 'head', CAST(:r AS uuid), CAST(:i AS uuid))""", h=head_id, m=member_id, r=roadmap_id, i=task_id)
 
 
 def _job_target(kind: str, ref: str | None, resume: dict | None) -> tuple[str, str | None, str | None] | None:
@@ -153,6 +168,7 @@ def _item(n: dict) -> dict:
             'planId': str(n['roadmap_id']) if n['roadmap_id'] else None, 'planTitle': n['plan_title'] or '', 'track': n['track'] or '',
             'reportId': str(n['report_id']) if n['report_id'] else None,
             'draftId': str(n['draft_id']) if n['draft_id'] else None, 'commentId': str(n['comment_id']) if n['comment_id'] else None,
+            'taskId': str(n['task_id']) if n['task_id'] else None,
             'jobKind': n['job_kind'], 'jobStatus': n['job_status'],
             'createdAt': n['created_at'].isoformat(), 'read': n['read_at'] is not None}
 
@@ -160,7 +176,10 @@ def _item(n: dict) -> dict:
 def inbox(employee_id: int, limit: int = LIMIT) -> dict:
     """내 읽지 않은 알림(최근 limit 건)과 읽지 않은 수. 읽지 않은 수는 목록 길이와 관계없이 전체를 센다.
     읽은 알림은 목록에서만 뺀다(#96). 기록은 지우지 않고 read_at 으로 남긴다"""
-    rows = db.all_(f"""SELECT n.notification_id, n.kind, n.audience, n.actor_id, w.name AS actor_name, n.roadmap_id, n.report_id, n.draft_id, n.comment_id,
+    rows = db.all_(f"""SELECT n.notification_id, n.kind, n.audience, n.actor_id, w.name AS actor_name, n.roadmap_id, n.draft_id, n.comment_id, n.task_id,
+                              CASE WHEN n.kind IN ('task', 'task_result')  -- 과제는 로드맵에 묶여 있다. 보고서를 다시 만들어도 지금 보고서로 간다
+                                   THEN (SELECT g.report_id FROM public.growth_reports g WHERE g.roadmap_id = n.roadmap_id ORDER BY g.created_at DESC LIMIT 1)
+                                   ELSE n.report_id END AS report_id,
                               n.job_kind, n.job_status, n.created_at, n.read_at,
                               coalesce(nullif(r.content->>'displayTitle', ''), r.content->>'goal', p.draft_choices->'draft'->>'goal', p.project_name) AS plan_title,
                               r.content->>'opt' AS track

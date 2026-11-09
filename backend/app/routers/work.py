@@ -19,7 +19,9 @@ from ..errors import ApiError, not_found
 from ..services import drafts as DR
 from ..services import plans as PL
 from ..services import profile
+from ..services import report_tasks as RT
 from . import job_response
+from .team import attachment_response
 
 r = APIRouter(prefix='/api/v1')
 MAX_DOC = 15_000_000
@@ -243,6 +245,25 @@ async def api_attach(plan_id: str, act_id: str, file: UploadFile = File(...), a:
     folder.mkdir(parents=True, exist_ok=True)
     (folder / fid).write_bytes(raw)
     return {'fileId': fid, 'name': file.filename, 'size': len(raw)}
+
+
+# 결과 보고서 과제(#96). 본인 로드맵만(PL._owned)
+@r.get('/plans/{plan_id}/tasks')
+def api_tasks(plan_id: str, a: Account = Depends(require_employee)):
+    return {'tasks': RT.mine(a.id, plan_id)}
+
+
+@r.post('/plans/{plan_id}/tasks/{task_id}/submit')
+async def api_task_submit(plan_id: str, task_id: str, answer: str = Form(''), file: UploadFile | None = File(None), a: Account = Depends(require_employee)):
+    raw = await file.read(RT.MAX_FILE + 1) if file else None
+    from starlette.concurrency import run_in_threadpool
+    return {'tasks': await run_in_threadpool(RT.submit, a.id, plan_id, task_id, answer, file.filename if file else None, raw)}
+
+
+@r.get('/plans/{plan_id}/tasks/{task_id}/file')
+def api_task_file(plan_id: str, task_id: str, a: Account = Depends(require_employee)):
+    PL._owned(a.id, plan_id)
+    return attachment_response(*RT.attachment_of(a.id, plan_id, task_id))
 
 
 @r.get('/plans/{plan_id}/versions')

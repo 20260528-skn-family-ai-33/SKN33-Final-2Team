@@ -1,6 +1,6 @@
 /* 완료 알림 (#82 · 설계서 밖 추가) — 로드맵 확정·결과 보고서 작성이 끝나면 작성한 직원 본인(self)과 그 직원 부서의 부서장(head)에게 남는다 */
 
-export type NotificationKind = 'roadmap' | 'report' | 'job' | 'comment';
+export type NotificationKind = 'roadmap' | 'report' | 'job' | 'comment' | 'task' | 'task_result';
 /** 대상 읽음(POST /notifications/read-target)에 쓰는 종류 */
 export type NotificationTargetKind = 'roadmap' | 'report';
 /** self: 본인 일 · head: 소속 직원 일을 받는 부서장 · member: 부서장이 한 일을 받는 직원(#96) */
@@ -20,12 +20,14 @@ export interface AppNotification {
   planTitle: string;
   /** 코스 id(A1~A3) */
   track: string;
-  /** kind 가 report 일 때만 */
+  /** kind 가 report 일 때와, task·task_result 의 지금 보고서 */
   reportId: string | null;
   /** 로드맵 확정 전 작업의 작성 문서 */
   draftId: string | null;
   /** kind 가 comment 일 때만 */
   commentId: string | null;
+  /** kind 가 task(부서장이 낸 과제)·task_result(직원이 제출한 결과)일 때만 */
+  taskId: string | null;
   /** kind 가 job 일 때만 */
   jobKind: NotificationJobKind | null;
   jobStatus: 'done' | 'failed' | null;

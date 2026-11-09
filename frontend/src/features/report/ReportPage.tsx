@@ -11,6 +11,7 @@ import { toast } from '@/shared/state/ui';
 import { useWs } from '@/shared/state/workspace';
 import { Note, Page } from '@/shared/ui/parts';
 import { ReportBody, ReportDeep } from './ReportBody';
+import { MemberReportTasks } from './ReportTasks';
 
 export function ReportPage() {
   const { rid } = useParams();
@@ -50,6 +51,7 @@ export function ReportPage() {
         )
       }
     >
+      <MemberReportTasks planId={r.planId} />
       <ReportBody r={r} />
       <ReportDeep r={r} R={R} />
       {sup ? <Note>이 보고서는 내 계획을 보는 부서장 {sup.name} 님도 볼 수 있어요.</Note> : null}

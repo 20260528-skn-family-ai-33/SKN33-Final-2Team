@@ -14,6 +14,7 @@ const base: AppNotification = {
   reportId: null,
   draftId: null,
   commentId: null,
+  taskId: null,
   jobKind: null,
   jobStatus: null,
   createdAt: '2026-11-04T09:00:00+09:00',
@@ -178,5 +179,37 @@ describe('작업·코멘트 알림 (#96)', () => {
     expect(isOtherDraft(job('options'), 'd1')).toBe(false);
     expect(isOtherDraft(job('revision', 'done', 'p1'), 'd2')).toBe(false); // 로드맵에 매인 작업
     expect(isOtherDraft(comment, 'd2')).toBe(false);
+  });
+});
+
+describe('과제 알림 (#96)', () => {
+  const task = n({ kind: 'task', audience: 'member', taskId: 't1', reportId: 'r1', employee: { id: '3', name: '박부서장' } });
+  const result = n({ kind: 'task_result', audience: 'head', taskId: 't1', reportId: 'r1', employee: { id: '8', name: '김직원' } });
+
+  it('직원은 내 보고서로, 부서장은 그 직원의 보고서로 간다', () => {
+    expect(notificationTarget(task)).toBe('/reports/r1');
+    expect(notificationTarget(result)).toBe('/team/8/reports/r1');
+  });
+
+  it('보고서가 없으면 로드맵으로 간다', () => {
+    expect(notificationTarget({ ...task, reportId: null })).toBe('/roadmaps/p1');
+    expect(notificationTarget({ ...result, reportId: null })).toBe('/team/8/plans/p1');
+  });
+
+  it('문구: 보낸 사람 이름, 직원 묶음 안에서는 이름을 뺀다', () => {
+    expect(notificationTitle(task)).toBe('박부서장 님이 과제를 보냈어요');
+    expect(notificationTitle(result)).toBe('김직원 님이 과제 결과를 제출했어요');
+    expect(notificationTitle(result, true)).toBe('과제 결과를 제출했어요');
+  });
+
+  it('직원 묶음의 부제에 과제 결과를 따로 센다', () => {
+    const { staff } = splitNotifications([result, n({ audience: 'head', employee: { id: '8', name: '김직원' } })]);
+    expect(staffGroupSub(staff[0])).toBe('로드맵 1건 · 과제 결과 1건');
+  });
+
+  it('보고 있는 보고서 화면이면 부서장의 과제 결과 알림도 바로 읽음 대상이다', () => {
+    expect(viewedNow([result], '/team/8/reports/r1', null)).toHaveLength(1);
+    expect(viewedNow([task], '/reports/r1', null)).toHaveLength(1);
+    expect(viewedNow([n({ kind: 'report', audience: 'head', reportId: 'r1', employee: { id: '8', name: '김직원' } })], '/team/8/reports/r1', null)).toEqual([]);
   });
 });

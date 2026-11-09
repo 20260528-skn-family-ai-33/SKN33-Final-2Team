@@ -9,6 +9,7 @@ import type { AppNotification, NotificationInbox, NotificationTargetKind } from 
 import type { PlanRecord } from '@/api/types/plan';
 import { plansApi } from '@/api/endpoints/plans';
 import { pullDraftOrThrow } from '@/features/draft/draftSync';
+import { taskKey } from '@/features/report/taskData';
 import { memberKey, memberKeyAll, teamKey } from '@/features/team/teamData';
 import { mergeReg, mergeRes } from '@/shared/state/catalog';
 import { me, signInSeq } from '@/shared/state/session';
@@ -82,6 +83,7 @@ function takeNotified(s: WsState, n: AppNotification, fresh: PlanRecord): void {
 export async function refreshTarget(qc: QueryClient, t: SignIn, n: AppNotification): Promise<void> {
   if (n.audience === 'head') {
     await qc.invalidateQueries({ queryKey: memberKey(n.employee.id), refetchType: 'all' });
+    if (n.kind === 'task_result' && n.planId) await qc.invalidateQueries({ queryKey: taskKey(n.planId) }, { throwOnError: true });
     return;
   }
   const planId = n.planId;
@@ -93,7 +95,7 @@ export async function refreshTarget(qc: QueryClient, t: SignIn, n: AppNotificati
   const stale = n.kind === 'comment' || n.kind === 'job';
   const [plan, reports] = await Promise.all([
     ws().plans[planId] && !stale ? Promise.resolve(null) : plansApi.get(planId),
-    n.kind === 'report' ? plansApi.reports(planId) : Promise.resolve(null),
+    n.kind === 'report' || n.kind === 'task' ? plansApi.reports(planId) : Promise.resolve(null),
   ]);
   if (!stillSignedIn(t) || ws().owner !== t.id) return;
   if (plan) {
@@ -104,6 +106,8 @@ export async function refreshTarget(qc: QueryClient, t: SignIn, n: AppNotificati
     if (plan) takeNotified(s, n, plan.plan);
     if (reports) s.reports = mergeReports(s.reports, planId, reports);
   });
+  // throwOnError: 다시 받기가 실패하면 알려서, 과제를 못 본 채 알림이 읽음이 되지 않게 한다(PR #140 리뷰)
+  if (n.kind === 'task') await qc.invalidateQueries({ queryKey: taskKey(planId) }, { throwOnError: true });
 }
 
 /** 보고 있는 화면의 알림을 처리한다: 최신 내용을 받은 뒤, 같은 로그인이 같은 화면에 있을 때만 읽음으로 바꾼다.
