@@ -172,14 +172,16 @@ function SubmitForm({ task }: { task: ReportTask }) {
 /** 직원의 결과 보고서 화면. 받은 과제가 없으면 아무것도 그리지 않는다 */
 export function MemberReportTasks({ planId }: { planId: string }) {
   const q = useQuery({ queryKey: taskKey(planId), queryFn: () => tasksApi.mine(planId).then((r) => r.tasks) });
-  if (q.isError) return <LoadFailed retry={() => void q.refetch()} />;
+  // 이미 받은 목록이 있으면 다시 받기가 실패해도 목록을 유지한다. 폼이 사라지면 쓰던 답변과 고른 파일을 잃는다(PR #140 리뷰)
+  const failed = q.isError ? <LoadFailed retry={() => void q.refetch()} /> : null;
   const tasks = q.data || [];
-  if (!tasks.length) return null;
+  if (!tasks.length) return failed;
   return (
     <div className="sec">
       <div className="sec-h">
         <h2 className="st">부서장 과제 {tasks.length}</h2>
       </div>
+      {failed}
       <div className="stack">
         {tasks.map((task) => (
           <TaskItem key={task.id} task={task} asHead={false}>

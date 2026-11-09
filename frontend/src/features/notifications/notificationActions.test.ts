@@ -1,5 +1,5 @@
 /* PR #84 리뷰: 다른 로그인의 늦은 응답(P1·P3) · 부서장 직원 기록 캐시 갱신(P2) · 본인 알림이 작성 중인 초안·저장 전 사후 점검 입력을 덮지 않음(P2) */
-import { QueryClient } from '@tanstack/react-query';
+import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppNotification, NotificationInbox } from '@/api/types/notification';
 import type { PlanRecord, Report } from '@/api/types/plan';
@@ -271,14 +271,14 @@ describe('코멘트·작업 알림 (#96): 있는 로드맵은 바뀐 부분만 �
     expect(m.get).not.toHaveBeenCalled();
     expect(wsMod.ws().reports.map((r) => r.id)).toEqual(['r-new']);
     expect(essayOf(wsMod.ws().plans.p1)).toBe('저장 전 새 답변');
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['report-tasks', 'p1'] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['report-tasks', 'p1'] }, { throwOnError: true });
   });
 
   it('과제 결과 알림: 부서장은 그 직원 기록과 과제를 새로 받는다 (#96)', async () => {
     const qc = new QueryClient();
     const spy = vi.spyOn(qc, 'invalidateQueries');
     await act.refreshTarget(qc, A1, note({ kind: 'task_result', audience: 'head', reportId: 'r1', taskId: 't1' }));
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['report-tasks', 'p1'] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['report-tasks', 'p1'] }, { throwOnError: true });
     expect(m.reports).not.toHaveBeenCalled();
   });
 
@@ -315,6 +315,27 @@ describe('코멘트·작업 알림 (#96): 있는 로드맵은 바뀐 부분만 �
       m.pull.mockRejectedValue(new Error('network'));
       const job = note({ id: 'n8', kind: 'job', jobKind: 'options', jobStatus: 'done', planId: null, reportId: null, draftId: 'd1' });
       await expect(act.readViewed(new QueryClient(), A1, job, () => true)).rejects.toThrow('network');
+      expect(m.read).not.toHaveBeenCalled();
+    });
+
+    // 화면에 있는 과제 목록의 다시 받기가 실패하는 상황
+    const failingTasks = () => {
+      const qc = qcAndSeed();
+      qc.setQueryData(['report-tasks', 'p1'], []);
+      new QueryObserver(qc, { queryKey: ['report-tasks', 'p1'], queryFn: () => Promise.reject(new Error('tasks down')), retry: false }).subscribe(() => {});
+      return qc;
+    };
+
+    it('직원: 과제 목록을 다시 받지 못하면 읽음으로 바꾸지 않는다 (PR #140 리뷰)', async () => {
+      m.reports.mockResolvedValue([rep('r1', 'p1')]);
+      const task = note({ id: 'n7', kind: 'task', audience: 'member', reportId: 'r1', taskId: 't1' });
+      await expect(act.readViewed(failingTasks(), A1, task, () => true)).rejects.toThrow('tasks down');
+      expect(m.read).not.toHaveBeenCalled();
+    });
+
+    it('부서장: 과제 목록을 다시 받지 못하면 읽음으로 바꾸지 않는다 (PR #140 리뷰)', async () => {
+      const result = note({ id: 'n6', kind: 'task_result', audience: 'head', reportId: 'r1', taskId: 't1' });
+      await expect(act.readViewed(failingTasks(), A1, result, () => true)).rejects.toThrow('tasks down');
       expect(m.read).not.toHaveBeenCalled();
     });
 

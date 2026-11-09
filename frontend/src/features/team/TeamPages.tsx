@@ -512,7 +512,8 @@ export function MemberReportPage() {
       <Note>
         {e.name} 님이 {r.confirmed ? '확인한' : '아직 확인하지 않은'} 보고서예요. 보고서 내용은 읽기만 할 수 있어요.
       </Note>
-      <HeadReportTasks planId={r.planId} memberName={e.name} />
+      {/* 같은 화면을 재사용해 다른 보고서로 옮겨도 쓰던 과제가 넘어가지 않게 로드맵별로 분리한다(PR #140 리뷰) */}
+      <HeadReportTasks key={r.planId} planId={r.planId} memberName={e.name} />
     </Page>
   );
 }

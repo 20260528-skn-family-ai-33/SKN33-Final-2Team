@@ -6,6 +6,7 @@
 """
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 import uuid
 
@@ -15,6 +16,7 @@ from ..errors import ApiError, bad, not_found
 from . import notifications as NT
 from . import plans as PL
 
+logger = logging.getLogger(__name__)
 BODY_MAX = 2000
 ANSWER_MAX = 4000
 MAX_FILE = 15_000_000
@@ -28,6 +30,14 @@ def _view(r: dict) -> dict:
     return {'id': str(r['task_id']), 'planId': str(r['roadmap_id']), 'body': r['body'], 'createdAt': PL._d(r['created_at']),
             'head': {'id': str(r['head_id']), 'name': r['head_name']}, 'submittedAt': PL._d(r['submitted_at']), 'answer': r['answer'] or '',
             'file': {'name': file['name'], 'size': file['size']} if file else None}
+
+
+def _discard(path: Path, task_id: str) -> None:
+    """저장에 실패한 제출의 파일을 지운다. 지우지 못해도 원래 오류를 가리지 않고 기록만 남긴다"""
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        logger.exception('제출 실패 뒤 첨부 파일을 지우지 못했어요: task=%s', task_id)
 
 
 def _task_uuid(task_id: str) -> str:
@@ -95,7 +105,10 @@ def submit(employee_id: int, roadmap_id: str, task_id: str, answer: object, name
             file_id = uuid.uuid4().hex
             folder = S.var_dir / 'uploads'
             folder.mkdir(parents=True, exist_ok=True)
-            (folder / file_id).write_bytes(raw)
+            path = folder / file_id
+            # 저장이 실패하면 DB만 되돌아가고 파일이 남는다. 재시도마다 쌓이지 않게 함께 지운다(PR #140 리뷰)
+            t.after_rollback.append(lambda: _discard(path, tid))
+            path.write_bytes(raw)
             attachment = {'fileId': file_id, 'name': name or 'file', 'size': len(raw)}
         t.run("""UPDATE app_ext.report_tasks SET submitted_at = now(), answer = :a, attachment = :f WHERE task_id = CAST(:t AS uuid)""",
               a=text or None, f=db.J(attachment) if attachment else None, t=tid)

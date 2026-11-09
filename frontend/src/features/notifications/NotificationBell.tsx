@@ -122,7 +122,9 @@ export function NotificationBell() {
     if (n.audience === 'head') {
       // 직원 기록을 새로 받기 시작한 뒤 기다리지 않고 바로 옮긴다. 기다리면 지금 보고 있는 옛 보고서 화면이 새 기록(옛 보고서가
       // 지워진)으로 먼저 다시 그려져 직원 목록으로 튕긴다. 옮긴 화면은 받는 동안 '불러오는 중'을 보여 준다(TeamPages)
-      void refreshTarget(qc, t, n);
+      refreshTarget(qc, t, n).catch((err) => {
+        if (stillSignedIn(t)) failToast(err, '최신 기록을 불러오지 못했어요');
+      });
       go(notificationTarget(n));
       return;
     }

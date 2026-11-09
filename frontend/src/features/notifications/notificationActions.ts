@@ -83,7 +83,7 @@ function takeNotified(s: WsState, n: AppNotification, fresh: PlanRecord): void {
 export async function refreshTarget(qc: QueryClient, t: SignIn, n: AppNotification): Promise<void> {
   if (n.audience === 'head') {
     await qc.invalidateQueries({ queryKey: memberKey(n.employee.id), refetchType: 'all' });
-    if (n.kind === 'task_result' && n.planId) await qc.invalidateQueries({ queryKey: taskKey(n.planId) });
+    if (n.kind === 'task_result' && n.planId) await qc.invalidateQueries({ queryKey: taskKey(n.planId) }, { throwOnError: true });
     return;
   }
   const planId = n.planId;
@@ -106,7 +106,8 @@ export async function refreshTarget(qc: QueryClient, t: SignIn, n: AppNotificati
     if (plan) takeNotified(s, n, plan.plan);
     if (reports) s.reports = mergeReports(s.reports, planId, reports);
   });
-  if (n.kind === 'task') await qc.invalidateQueries({ queryKey: taskKey(planId) });
+  // throwOnError: 다시 받기가 실패하면 알려서, 과제를 못 본 채 알림이 읽음이 되지 않게 한다(PR #140 리뷰)
+  if (n.kind === 'task') await qc.invalidateQueries({ queryKey: taskKey(planId) }, { throwOnError: true });
 }
 
 /** 보고 있는 화면의 알림을 처리한다: 최신 내용을 받은 뒤, 같은 로그인이 같은 화면에 있을 때만 읽음으로 바꾼다.

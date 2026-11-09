@@ -105,6 +105,48 @@ class SubmitTests(unittest.TestCase):
                 RT.submit(8, RID, 'not-a-uuid', '결과')
         self.assertEqual(e.exception.status, 404)
 
+    def rolling(self, t):
+        """실패하면 after_rollback 을 부르는 실제 db.tx 와 같은 트랜잭션"""
+        @contextmanager
+        def tx():
+            t.after_rollback = []
+            try:
+                yield t
+            except BaseException:
+                for callback in reversed(t.after_rollback):
+                    callback()
+                raise
+        return tx
+
+    def failing_submit(self, t, notify_error=None):
+        t.one.return_value = {'head_id': 3, 'submitted_at': None}
+        with patch.object(RT.PL, '_owned', return_value={}), patch.object(RT.db, 'tx', side_effect=self.rolling(t)), patch.object(RT.db, 'J', side_effect=lambda v: v), \
+                patch.object(NT, 'task_submitted', side_effect=notify_error), patch.object(RT, 'S', SimpleNamespace(var_dir=self.var)), self.assertRaises(RuntimeError):
+            RT.submit(8, RID, TID, '', '결과.txt', b'data')
+
+    def test_failed_save_removes_the_uploaded_file_every_time(self):
+        # 알림 저장이 실패해 되돌아간 제출을 두 번 다시 시도해도 파일이 남지 않는다(PR #140 리뷰)
+        for _ in range(2):
+            self.failing_submit(Mock(), RuntimeError('알림 저장 실패'))
+        self.assertEqual(list((self.var / 'uploads').iterdir()), [])
+        t = Mock()
+        t.run.side_effect = RuntimeError('저장 실패')
+        self.failing_submit(t)
+        self.assertEqual(list((self.var / 'uploads').iterdir()), [])
+
+    def test_successful_save_keeps_the_file(self):
+        t = Mock()
+        t.one.return_value = {'head_id': 3, 'submitted_at': None}
+        with patch.object(RT.PL, '_owned', return_value={}), patch.object(RT.db, 'tx', side_effect=self.rolling(t)), patch.object(RT.db, 'J', side_effect=lambda v: v), \
+                patch.object(RT, 'of_plan', return_value=[]), patch.object(NT, 'task_submitted'), patch.object(RT, 'S', SimpleNamespace(var_dir=self.var)):
+            RT.submit(8, RID, TID, '', '결과.txt', b'data')
+        self.assertEqual(len(list((self.var / 'uploads').iterdir())), 1)
+
+    def test_a_file_that_cannot_be_removed_is_logged_without_hiding_the_error(self):
+        with patch.object(Path, 'unlink', side_effect=PermissionError('잠김')), self.assertLogs('app.services.report_tasks', level='ERROR') as logs:
+            RT._discard(self.var / 'x', TID)
+        self.assertIn(TID, logs.output[0])
+
     def test_failed_save_leaves_no_notification(self):
         t = Mock()
         t.one.return_value = {'head_id': 3, 'submitted_at': None}
