@@ -12,6 +12,22 @@
 
 전체 **78표·29,246행**을 새 격리 DB에 복원해 전 행 지문, 함수, 열·제약조건 및 시퀀스를 대조했다. 기본 복원 도구의 `inventory`는 기준 53표·25,102행이고 `app_ext`를 포함한 전체 지문은 `all_schema_table_fingerprints`에 있다. 스키마 변경은 없으며 ERD는 행 수만 갱신했다. 로컬 앱 DB는 변경하지 않았다.
 
+## 규정 벡터와 검증 기록 갱신 (#136)
+
+공유 BGE DB를 가리키는 연결 환경변수를 확인한 뒤 `database/`에서 실행한다. `growpath_bge_meta.inputs`가 없는 DB는 먼저 현재 공유 백업으로 복원해야 한다. 도구가 빈 메타 테이블을 임의로 만들지는 않는다.
+
+```powershell
+python -m src.database.vectors.regulation_vectors --db-env SUPABASE_DB_URL status
+python -m src.database.vectors.regulation_vectors --db-env SUPABASE_DB_URL embed --batch-size 16
+python -m src.database.vectors.regulation_vectors --db-env SUPABASE_DB_URL status
+```
+
+`embed`는 원문·벡터·검증 기록의 해시와 모델 revision을 확인하고 누락·불일치한 규정만 재생성한다. 벡터와 메타는 같은 배치 트랜잭션에서 저장한다. 실패한 배치는 함께 롤백하며, 이미 완료된 이전 배치는 유지된다. 원인을 해결한 뒤 재실행하면 정상인 행은 건너뛴다. `import`는 파일 전체의 벡터·메타를 하나의 트랜잭션에서 저장한다. 스키마 변경이나 새 마이그레이션은 없으며, 원문·기존 벡터를 이전 상태로 되돌려야 한다면 갱신 전 검증 백업을 별도 DB에 복원해 확인한 뒤 연결을 전환한다.
+
+규정 벡터 `export` 파일은 모델 provenance를 포함하는 **format_version 2**다. 메타가 누락되거나 오래된 상태에서는 내보내기를 거절한다. 모델 revision을 확인할 수 없는 구형 version 1 파일과 provenance가 다른 파일은 가져오지 않는다. 원본 공유 DB에서 `embed` 후 새로 `export`하거나, 대상 DB의 규정 원문에서 `embed`를 실행한다. 기존 공유 DB 백업 형식은 바꾸지 않는다. 프로토콜 문자열과 공백 기준 토큰 수 기록은 현재 검증기와 호환되도록 유지하며, 실제 추론 정밀도·토큰 수 기록 개선은 후속 #144 범위다.
+
+외부 연결 없는 단위 검사는 `python -m unittest tests.test_regulation_vectors -v`다. 실제 SQL 검사는 비어 있는 일회용 pgvector DB(이름 접두사 `growpath_regulation_test_`)의 URL을 `BGE_REGULATION_TEST_DB_URL`에 지정하고, 저장소의 `backend/`·`database/`를 `PYTHONPATH`에 넣어 `python -m unittest tests.test_regulation_vector_metadata -v`로 실행한다. 이 검사는 테스트 표를 만들고 커밋하므로 운영 DB에 연결하지 않는다. 임베딩 응답만 모의 처리하며 실제 모델 품질 검사는 포함하지 않는다.
+
 ## 새 DB 복원
 
 PostgreSQL 17·pgvector, Python 3.12와 [README](README.md)의 의존성이 필요하다. 검증 서버는 PostgreSQL 17.11 (Debian 17.11-1.pgdg12+2)이다. `database/`에서 다음을 실행한다.
