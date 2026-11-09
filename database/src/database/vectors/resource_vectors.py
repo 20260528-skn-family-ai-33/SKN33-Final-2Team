@@ -157,8 +157,12 @@ def stored(conn):
 def is_current(source, previous):
     if not previous or previous['input_sha256'] != source['hash'] or previous['input_version'] != INPUT_VERSION or previous['dimensions'] != DIMENSIONS:
         return False
-    if 'meta_sha256' in previous and (previous['meta_sha256'] != source['hash'] or previous.get('actual_input_sha256') != source['hash'] or previous.get('model_revision') != PROVENANCE['model_revision']):
-        return False
+    if 'meta_sha256' in previous:
+        actual_sha = hashlib.sha256(source['text'].encode('utf-8')).hexdigest()
+        if (previous['meta_sha256'] != source['hash'] or
+                previous.get('actual_input_sha256') != actual_sha or
+                previous.get('model_revision') != PROVENANCE['model_revision']):
+            return False
     return True
 
 
@@ -233,6 +237,7 @@ def embed(conn, client=None, *, resource_types: Iterable[str] | None = None,
             for ((kind, rid), row), vector in zip(batch, vectors):
                 fk={'skills':'skill_id','courses':'course_id','books':'isbn','certifications':'certification_id','jobs':'job_id','majors':'major_id'}[kind]
                 source_id=rid if kind in ('courses','books') else int(rid)
+                actual_sha = hashlib.sha256(row['text'].encode('utf-8')).hexdigest()
                 conn.execute(f'''INSERT INTO {TABLE}
                     (resource_type,resource_id,embedding_model,dimensions,input_version,input_sha256,embedding,{fk})
                     VALUES (%s,%s,%s,%s,%s,%s,%s::vector,%s)
@@ -250,7 +255,7 @@ def embed(conn, client=None, *, resource_types: Iterable[str] | None = None,
                     model_revision=EXCLUDED.model_revision,
                     token_count=EXCLUDED.token_count,
                     created_at=EXCLUDED.created_at''',
-                    (kind, str(rid), row['hash'], row['hash'], PROTOCOL, PROVENANCE['model_revision'],
+                    (kind, str(rid), row['hash'], actual_sha, PROTOCOL, PROVENANCE['model_revision'],
                      max(1, min(len(row['text'].split()), 8192))))
         if {k: v['hash'] for k, v in sources(conn).items()} != {k: v['hash'] for k, v in rows.items()}:
             raise ValueError('DB sources changed during embedding. Rolled back; retry with stable sources.')

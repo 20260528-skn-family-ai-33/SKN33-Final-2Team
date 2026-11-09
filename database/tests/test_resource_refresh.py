@@ -1,6 +1,7 @@
 """Refresh selection, preflight limits and rollback guards without a DB or API."""
 from contextlib import redirect_stdout
 from io import StringIO
+import hashlib
 import json
 import unittest
 from unittest.mock import MagicMock, patch
@@ -52,6 +53,8 @@ class ResourceRefreshTests(unittest.TestCase):
         self.assertEqual(len(meta_writes), 25)
         self.assertEqual({c.args[1][1] for c in meta_writes}, {str(i) for i in range(25)})
         self.assertTrue(all(c.args[1][0] == 'books' and c.args[1][2] == f'new-{c.args[1][1]}' for c in meta_writes))
+        expected_actual = hashlib.sha256('private source text'.encode('utf-8')).hexdigest()
+        self.assertTrue(all(c.args[1][3] == expected_actual for c in meta_writes))
         self.assertTrue(all(c.args[1][4] == vectors.PROTOCOL and c.args[1][5] == vectors.PROVENANCE['model_revision'] for c in meta_writes))
 
     def test_count_growth_aborts_before_ddl_and_paid_calls(self):
@@ -124,6 +127,43 @@ class ResourceRefreshTests(unittest.TestCase):
                 with self.assertRaises(SystemExit):
                     vectors.main(args)
                 connect.assert_not_called()
+
+
+    def test_truncated_input_separates_source_and_actual_sha_and_is_current(self):
+        # 전체 원문(소개 10000자)과 축약된 실제 입력 텍스트
+        full_json_hash = 'full_json_hash_value'
+        truncated_text = 'shortened representation of long text'
+        actual_sha = hashlib.sha256(truncated_text.encode('utf-8')).hexdigest()
+        src = {'hash': full_json_hash, 'text': truncated_text, 'record': {}}
+
+        # 1. source_sha와 actual_sha가 서로 다른 정상 기존 메타에 대해 is_current는 True
+        stored_good = {
+            'input_sha256': full_json_hash,
+            'input_version': vectors.INPUT_VERSION,
+            'dimensions': vectors.DIMENSIONS,
+            'meta_sha256': full_json_hash,
+            'actual_input_sha256': actual_sha,
+            'model_revision': vectors.PROVENANCE['model_revision']
+        }
+        self.assertTrue(vectors.is_current(src, stored_good))
+
+        # 2. actual_input_sha256가 다르면 False
+        stored_bad_actual = dict(stored_good, actual_input_sha256='wrong_sha')
+        self.assertFalse(vectors.is_current(src, stored_bad_actual))
+
+        # 3. embed() 시 source_sha256에는 full_json_hash, actual_input_sha256에는 actual_sha가 기록됨
+        rows = {('books', 'long1'): src}
+        previous = {('books', 'long1'): current('old')}
+        with patch.object(vectors, 'sources', return_value=rows), \
+             patch.object(vectors, 'stored', return_value=previous), \
+             patch.object(vectors, 'status', return_value={}), \
+             patch.object(vectors, 'embed_texts', return_value=[[1.0] * vectors.DIMENSIONS]):
+            vectors.embed(self.conn, client='mock-client', resource_types=['books'])
+
+        meta_writes = [c for c in self.conn.execute.call_args_list if c.args[0].startswith(f'INSERT INTO {vectors.META_TABLE}')]
+        self.assertEqual(len(meta_writes), 1)
+        self.assertEqual(meta_writes[0].args[1][2], full_json_hash)
+        self.assertEqual(meta_writes[0].args[1][3], actual_sha)
 
 
 if __name__ == '__main__':
