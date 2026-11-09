@@ -11,7 +11,7 @@ from app.agents import roadmap, runtime
 from app.errors import ApiError
 from app.routers import preassessment
 from app.services import course_skills, drafts, resource_evidence, resource_rag
-from app.services.crash_requirements import MAX_REQUIREMENT_CHARS, required_technologies, validate_core_requirements
+from app.services.crash_requirements import MAX_REQUIREMENT_CHARS, _requirement_groups, required_technologies, validate_core_requirements
 import test_revision_course_targets as revision_cases
 from test_recommendation_suitability import WEB, course
 
@@ -110,7 +110,73 @@ class CrashRequiredTechnologiesTests(unittest.TestCase):
         ('Python3.9 사용 필수', 'Python3.9로 로그 파서 구현', True),
         ('Python3.14 사용 필수', 'Python3.14로 로그 파서 구현', True),
         ('Python3.14 사용 필수', 'Rust로 로그 파서 구현', False),
+        ('Django 또는 FastAPI 중 하나 필수', 'Django로 공개 API 구현', True),
+        ('Django 또는 FastAPI 중 하나 필수', 'FastAPI로 공개 API 구현', True),
+        ('Django 또는 FastAPI 중 하나 필수', 'Flask로 공개 API 구현', False),
+        ('Django와 FastAPI 중 하나 필수', 'FastAPI로 공개 API 구현', True),
+        ('Django와 FastAPI 중 하나 필수', 'Flask로 공개 API 구현', False),
+        ('반드시 Django와 FastAPI 중 하나 사용', 'FastAPI로 공개 API 구현', True),
+        ('Django 또는 FastAPI 중 하나 필수는 아닙니다', 'Flask로 공개 API 구현', True),
+        ('Django 또는 FastAPI 중 하나 필수, Redis 필수', 'FastAPI로 공개 API 구현', False),
+        ('Django 또는 FastAPI 중 하나와 Redis 필수', 'FastAPI로 공개 API 구현', False),
+        ('Django와 FastAPI 모두 필수', 'FastAPI로 공개 API 구현', False),
+        ('Django와 FastAPI 모두 필수', 'Django와 FastAPI로 공개 API 구현', True),
+        ('Django와 FastAPI 모두 필수는 아닙니다', 'Flask로 공개 API 구현', True),
+        ('세션 또는 Redis 중 하나 필수', '세션 기반 로그인 구현', True),
+        ('must use one of Django or FastAPI', 'FastAPI로 공개 API 구현', True),
+        ('must use one of Django or FastAPI', 'Flask로 공개 API 구현', False),
+        ('Django and FastAPI are required', 'Flask로 공개 API 구현', False),
+        ('Django and FastAPI are required', 'Django와 FastAPI로 공개 API 구현', True),
+        ('Neither Django nor FastAPI is required', 'Flask로 공개 API 구현', True),
+        ('Django is required, neither Redis nor Flask is required', 'FastAPI로 공개 API 구현', False),
+        ('Django is required, neither Redis nor Flask is required', 'Django로 공개 API 구현', True),
+        ('그러나 Django 필수', 'Flask로 공개 API 구현', False),
+        ('언제나 Django 필수', 'Flask로 공개 API 구현', False),
     )
+
+    def test_words_before_a_requirement_do_not_cancel_it(self):
+        # 앞 낱말의 끝 글자를 연결 표현으로 읽어 필수 요구를 지우면 안 된다.
+        for word in ('그러나', '언제나', '누구나', '얼마나', '어디나', '하나', '캐시나', '분석 결과', '테스트 통과', '이번에는', '또는', '이나'):
+            for template in ('{} Django 필수', '{} Django is required', '{} 반드시 Django 사용', 'Python 필수, {} Django 필수'):
+                goal = template.format(word)
+                with self.subTest(goal=goal):
+                    self.assertIn(frozenset({'django'}), _requirement_groups({'goal': goal}))
+
+    def test_neither_only_cancels_the_list_right_after_it(self):
+        self.assertEqual(_requirement_groups({'goal': 'Django is required, neither Redis nor Flask is required'}), {frozenset({'django'})})
+        self.assertEqual(_requirement_groups({'goal': 'Python 필수, neither Django 필수'}), {frozenset({'python'})})
+        self.assertEqual(_requirement_groups({'goal': 'Django 필수, neither'}), {frozenset({'django'})})
+
+    def test_quantity_words_decide_alternatives_and_obligations(self):
+        one, both = {frozenset({'django', 'fastapi'})}, {frozenset({'django'}), frozenset({'fastapi'})}
+        cases = (
+            (one, ('Django 또는 FastAPI 필수', 'Django 또는 FastAPI 중 하나는 필수', 'Django 또는 FastAPI 중 하나를 사용해야 합니다',
+                  'Django 또는 FastAPI 둘 중 하나 필수', 'Django 또는 FastAPI 가운데 하나 필수', 'Django 또는 FastAPI 중 최소 하나 필수',
+                  'Django 또는 FastAPI 중 1개 이상 필수', 'Django 또는 FastAPI 중 택1 필수', 'Django 또는 FastAPI 중 선택 필수',
+                  'Django, FastAPI 중 하나 필수', 'Django/FastAPI 중 하나 필수', 'Django·FastAPI 택1 필수', '필수: Django, FastAPI 중 하나',
+                  'Either Django or FastAPI is required', 'must use at least one of Django or FastAPI', '프로젝트는 Django, FastAPI 중 하나 필수',
+                  'Python 사용, Django 또는 FastAPI 중 하나 필수', '분석 결과 Django 또는 FastAPI 중 하나 필수',
+                  'Django 혹은 FastAPI 필수', 'Django 아니면 FastAPI 중 하나 필수')),
+            (both, ('Django와 FastAPI 필수', 'Django와 FastAPI 모두 필수', 'Django, FastAPI 둘 다 필수', 'Django와 FastAPI는 전부 필수',
+                    '반드시 Django와 FastAPI 모두 사용', 'Both Django and FastAPI are required', 'Django and FastAPI both required')),
+            (set(), ('Django 또는 FastAPI 중 하나 사용', 'Django 또는 FastAPI 중 하나는 선택', 'Django 또는 FastAPI 중 선택 사항',
+                     'Django 또는 FastAPI 중 어느 쪽도 필수는 아니에요', 'Django 또는 FastAPI 중 하나가 필수라는 뜻은 아니에요',
+                     'Django와 FastAPI 둘 다 필수까지는 아닙니다', 'Django and FastAPI are not required',
+                     # 대안을 전부 읽지 못하면 남은 기술의 단독 의무로 단정하지 않는다.
+                     'REST 또는 GraphQL 중 하나 필수', 'REST, GraphQL 중 하나 필수', 'REST나 GraphQL 필수', '세션 또는 Redis 필수', '세션 혹은 Redis 필수',
+                     '세션이나 Redis 필수', '세션, Redis 중 하나 필수', '세션과 Redis 중 하나 필수', '캐시나 Redis 중 하나 필수',
+                     'Django 또는 세션 중 하나 필수', 'Django 중급 필수', 'Django 전부터 필수', 'Django 모두의 필수')),
+        )
+        for expected, goals in cases:
+            for goal in goals:
+                with self.subTest(goal=goal):
+                    self.assertEqual(_requirement_groups({'goal': goal}), expected)
+        self.assertEqual(_requirement_groups({'goal': 'Django 또는 FastAPI 중 하나와 Redis 또는 Flask 중 하나 필수'}),
+                         {frozenset({'django', 'fastapi'}), frozenset({'redis', 'flask'})})
+
+    def test_chosen_requirement_reaches_the_model_as_an_alternative(self):
+        _, captured = self.option(target('FastAPI'), goal='Django와 FastAPI 중 하나 필수')
+        self.assertIn('(django 또는 fastapi 중 하나)', captured['system'].casefold())
 
     @staticmethod
     def paired_core(outcome):

@@ -32,10 +32,25 @@ _version = r'(?:[ \t]++v?[0-9]++(?:\.(?:[0-9]++|x))*+(?![a-z0-9_])(?:[ \t]++이�
 _term = re.compile(rf'(?<![a-z0-9_가-힣])(?P<name>{_name}){_version}', re.I)
 # 구분자 뒤에서는 'Django와FastAPI'처럼 띄어쓰기 없이 이어진 다음 기술도 받는다.
 _joined_term = re.compile(rf'(?<![a-z0-9_])(?P<name>{_name}){_version}', re.I)
-_join =re.compile(r'\s*+(?:(?P<alternative>또는|이나|나|\bor\b)|,|/|·|및|와|과|\band\b|&)\s*+', re.I)
+_join =re.compile(r'\s*+(?:(?P<alternative>또는|혹은|아니면|내지|이나|나|\bor\b|\bnor\b)|,|/|·|및|와|과|\band\b|&)\s*+', re.I)
 _marker = (
     r'(?:(?:사용|활용|도입|적용|구현|개발|학습)\s*+(?:은|는|이|가)?\s*+)?'
-    r'(?:필수|반드시|꼭|해야|must\s+be\s+used|(?:is\s+)?required|(?:is\s+)?mandatory)')
+    r'(?:필수|반드시|꼭|해야|must\s+be\s+used|(?:(?:is|are)\s+)?required|(?:(?:is|are)\s+)?mandatory)')
+# 목록과 의무 표현 사이의 수량 표현. "A, B 중 하나"는 구분자와 관계없이 목록 전체가 대안이고 "A와 B 모두"는 각각의 의무다.
+_choice_count = (
+    r'(?:(?:최소|적어도)\s*+)?(?:(?:어느\s*+)?하나|한\s*+(?:개|가지)|1\s*+(?:개|가지)|아무거나|어느\s*+쪽이든)(?:\s*+이상)?')
+# among은 여럿 중에서 고른다는 표현이다. 읽은 기술이 하나뿐이면 읽지 못한 다른 대안이 있다는 뜻이다.
+_quantity = re.compile(
+    rf'\s*+{_particle}\s*+(?:(?P<choice>(?P<among>(?:(?:둘|셋|넷)\s*+)?(?:중(?:에서|에)?|가운데)\s*+'
+    rf'(?:{_choice_count}|택\s*+1|택일|선택|택(?![가-힣]))|택\s*+1|택일)|{_choice_count})'
+    r'|(?:모두|전부|둘\s*+다|\bboth\b)(?:가|를|은|는)?(?=\s|$|필수))', re.I)
+_neither_before = re.compile(r'\bneither\s*+$', re.I)
+# "세션 또는 Redis 필수"의 세션처럼 기술로 읽지 못한 대안이 앞에 있으면 Redis의 단독 의무로 단정하지 않는다.
+# 한글 낱말의 끝 글자는 구분자로 보지 않는다. "그러나", "언제나", "결과"의 끝은 연결 표현이 아니다.
+_alternative_before = re.compile(
+    r'[^\s,](?:\s*+(?:또는|혹은|아니면|내지|\bor\b)|(?<=[가-힣])(?<![차엇])이나|(?<=[a-z0-9+#])나)\s*+$', re.I)
+_listing_before = re.compile(r'(?:[,/·&]|및|(?<=[a-z0-9+#])(?:와|과)|\band\b)\s*+$', re.I)
+_requirement_word = re.compile(r'필수|사용|활용|반드시|꼭|해야|required|mandatory', re.I)
 _suffix = re.compile(
     rf'\s*+{_particle}\s*+(?:(?:framework|database|db|프레임워크|데이터베이스)(?![a-z0-9_])\s*+{_particle}\s*+)?{_marker}', re.I)
 # 'Django REST API 필수'는 Django의 요구다. 'User API 필수'의 user는 기술이 아니므로 아는 기술에만 넓힌다.
@@ -63,7 +78,8 @@ _cancelled = re.compile(
     r'후속|나중|추후|선택\s*사항|\(\s*선택\s*\)|\b(?:later|optional)\b)', re.I)
 _clauses = re.compile(r'[\n;!?]|\.(?:\s|$)|(?:한\s*뒤|한\s*후|구현\s*후|그리고|하지만)|(?<=하고)\s+|(?<=하며)\s+|(?<=이며)\s+|(?<=이고)\s+|(?<=이지만)\s+|(?<=아니고)\s+|(?<=아니라)\s+')
 _stop = {'a', 'an', 'the', 'must', 'use', 'using', 'used', 'include', 'required', 'mandatory',
-         'is', 'be', 'not', 'and', 'or', 'of', 'api', 'key', 'db', 'framework', 'x', 'rest', 'restful',
+         'is', 'are', 'be', 'not', 'and', 'or', 'of', 'one', 'either', 'both', 'neither', 'nor', 'all', 'any', 'only', 'at', 'least',
+         'api', 'key', 'db', 'framework', 'x', 'rest', 'restful',
          'login', 'logout', 'token', 'tokens', 'auth', 'authentication', 'authorization', 'password',
          'code', 'review', 'test', 'tests', 'testing', 'documentation', 'docs', 'english', 'korean'}
 _stop_only = re.compile(r'[\s을를은는이가의]*+')
@@ -159,19 +175,49 @@ def _marked_lists(clause: str):
     lists = list(_lists(clause))
     markers = [marker.end() for marker in _prefix.finditer(clause)]
     previous_end = 0
+    # "A 또는 B 중 하나와 C 필수"의 앞 선택지는 뒤 목록의 의무 표현을 함께 받는다.
+    waiting: list[frozenset[str]] = []
     for index, (start, end, groups) in enumerate(lists):
+        scope_end = lists[index + 1][0] if index + 1 < len(lists) else len(clause)
+        quantity = _quantity.match(clause, end)
+        chosen = quantity is not None and quantity['choice'] is not None
+        if quantity:
+            end = quantity.end()
+        gap = clause[previous_end:start]
+        names = frozenset().union(*groups)
+        unrelated = _requirement_word.search(gap) is not None
+        if _neither_before.search(gap):
+            groups = []
+        elif not unrelated and _alternative_before.search(gap):
+            groups = [] if chosen else groups[1:]
+        elif chosen and len(names) == 1 and quantity['among']:
+            groups = []
+        elif chosen and not waiting and not unrelated and _listing_before.search(gap):
+            groups = []
+        elif chosen:
+            groups = [names]
+        if not groups:
+            previous_end = end
+            waiting.clear()
+            continue
         marker = _suffix.match(clause, end)
         if marker is None and all(name in ALIASES for name in groups[-1]):
             marker = _known_suffix.match(clause, end)
         prefixed = marker is None and _prefixed(clause, markers, previous_end, start)
         previous_end = end
         if marker is None and not prefixed:
+            joined = _join.match(clause, end) if chosen else None
+            if joined and joined.end() == scope_end:
+                waiting.extend(groups)
+            else:
+                waiting.clear()
             continue
         # 다음 기술의 선택·제외는 앞 기술을 취소하지 않는다. 각 꼬리는 한 번만 읽는다.
-        scope_end = lists[index + 1][0] if index + 1 < len(lists) else len(clause)
         tail = clause[marker.end() if marker else end:scope_end]
         if not (_not_required.match(tail) or _excluded_next.match(tail) or _cancelled.match(tail)):
+            yield from waiting
             yield from groups
+        waiting.clear()
 
 
 def _requirement_groups(handoff: dict, request: object = None) -> set[frozenset[str]]:
