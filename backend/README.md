@@ -120,11 +120,10 @@ python -m uvicorn app.main:app --port 8815
 
 ### 공유 파일과 복원
 
-- [BGE dump](https://drive.google.com/file/d/10dbnIx2YhhyB8-QeicvZqwofiPayJbyy/view)
-- [동반 manifest](https://drive.google.com/file/d/1LIombPvvEt3tp76Gj5BboDUOb1qg7nks/view)
+- BGE dump와 동반 manifest: 팀 공유 드라이브의 2026-11-09판
 - [모델별 복원·사용 안내](https://drive.google.com/file/d/1xBtcHVlSVKQvx4twNnEBZGAre6Pxqt1c/view)
 
-백업은 `team_db/growpath_bge_m3_embedding.dump`, manifest는 같은 이름의 `.manifest.json`에 둡니다. 크기 36,077,485바이트, SHA-256 `d96c16ceeca8f8d6de8015d2f40903b9f7d6ccecddc8fc33f1e7213bd2a48c4b`입니다. 2026-11-06 로컬 작업 DB의 전체 백업이며 기존 Drive OpenAI 공유본(2026-11-04)과 모델만 다른 동일 스냅샷으로 간주하지 않습니다.
+백업은 `team_db/growpath_bge_m3_embedding.dump`, manifest는 같은 이름의 `.manifest.json`에 둡니다. 크기 36,082,540바이트, SHA-256 `ed693fe99054ccac2811c3a7d62f21ee10b0500e2c58be43ed73d0a600c9c178`입니다. 2026-11-07판에 알림 규칙·결과 보고서 과제 표를 더한 2026-11-09판 전체 백업이며 기존 Drive OpenAI 공유본(2026-11-04)과 모델만 다른 동일 스냅샷으로 간주하지 않습니다. 이미 복원한 PC는 [새 공유본으로 교체](../team_db/README.md#새-공유본으로-교체) 절차를 따릅니다.
 
 PowerShell에서 저장소 루트 기준:
 
@@ -567,7 +566,7 @@ PR #57 HEAD `64b020b`를 기준으로 수정했다. 아래 내용은 로컬 수�
 - 사용자가 멈춘 작업(취소·`stopped`)은 알리지 않는다. 작업 알림을 못 넣어도 작업 결과는 그대로이고, 작업 ID와 함께 오류 기록만 남긴다.
 - 서버가 다시 켜져 끊긴 작업(`JOB_INTERRUPTED`)은 알리지 않는다. 복구 정보가 있는 작업은 다시 준비되면서 끝날 때 알린다.
 
-**DB 적용(앱을 이 버전으로 올리기 전에 DB마다 한 번):** `backend-setup`은 읽기 전용 검사라 표를 바꾸지 않는다. 저장소 루트에서 아래를 실행한다. 다시 실행해도 결과는 같고, 전체가 한 트랜잭션이라 실패하면 아무것도 바뀌지 않는다. 적용하지 않으면 알림 조회가 없는 열을 읽어 500 오류가 나므로, 앱보다 먼저 적용한다. 기존 앱은 새 열을 쓰지 않아 적용 뒤에도 그대로 동작한다.
+**DB 적용(앱을 이 버전으로 올리기 전에 DB마다 한 번):** `backend-setup`은 읽기 전용 검사라 표를 바꾸지 않는다. 저장소 루트에서 아래를 실행한다. 다시 실행해도 결과는 같고, 전체가 한 트랜잭션이라 실패하면 아무것도 바뀌지 않는다. 적용하지 않으면 알림 조회가 없는 열을 읽어 500 오류가 나므로, 앱보다 먼저 적용한다. 기존 앱은 새 열을 쓰지 않아 적용 뒤에도 그대로 동작한다. 2026-11-09판 공유본을 복원한 DB에는 이미 적용돼 있어 실행하지 않는다.
 
 ```bash
 docker compose exec -T db sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < backend/db/migrate_notification_rules.sql
@@ -597,7 +596,7 @@ COMMIT;
 - 제출은 글이나 파일 중 하나가 있어야 하고 한 번만 할 수 있다. 첨부는 활동·사후 점검 첨부와 같은 곳(`var/uploads`)에 같은 제한(15MB)으로 둔다. 저장 이름은 서버가 만들고, 내려받을 때는 `attachment`·`nosniff`로 보내 브라우저에서 열지 않는다.
 - 알림: 과제를 보내면 그 직원에게(`task`), 결과를 제출하면 과제를 낸 부서장에게(`task_result`) 저장과 같은 트랜잭션에서 넣는다. 누르면 그 로드맵의 지금 보고서로 간다.
 
-**DB 적용(앱을 이 버전으로 올리기 전에 DB마다 한 번):** `migrate_notification_rules.sql`을 먼저 적용한 DB에서 저장소 루트 기준으로 실행한다. 다시 실행해도 결과는 같고, 전체가 한 트랜잭션이다.
+**DB 적용(앱을 이 버전으로 올리기 전에 DB마다 한 번):** `migrate_notification_rules.sql`을 먼저 적용한 DB에서 저장소 루트 기준으로 실행한다. 다시 실행해도 결과는 같고, 전체가 한 트랜잭션이다. 2026-11-09판 공유본을 복원한 DB에는 이미 적용돼 있어 실행하지 않는다.
 
 ```bash
 docker compose exec -T db sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < backend/db/migrate_report_tasks.sql
