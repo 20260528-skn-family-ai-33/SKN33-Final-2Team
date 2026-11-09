@@ -262,6 +262,26 @@ describe('코멘트·작업 알림 (#96): 있는 로드맵은 바뀐 부분만 �
     expect(m.pull).toHaveBeenCalledTimes(1);
   });
 
+  it('과제 알림: 보고서 목록과 그 로드맵의 과제를 새로 받는다 (#96)', async () => {
+    seed(rec('p1', 'active', '저장 전 새 답변'));
+    m.reports.mockResolvedValue([rep('r-new', 'p1')]);
+    const qc = new QueryClient();
+    const spy = vi.spyOn(qc, 'invalidateQueries');
+    await act.refreshTarget(qc, A1, note({ kind: 'task', audience: 'member', reportId: 'r-new', taskId: 't1' }));
+    expect(m.get).not.toHaveBeenCalled();
+    expect(wsMod.ws().reports.map((r) => r.id)).toEqual(['r-new']);
+    expect(essayOf(wsMod.ws().plans.p1)).toBe('저장 전 새 답변');
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['report-tasks', 'p1'] });
+  });
+
+  it('과제 결과 알림: 부서장은 그 직원 기록과 과제를 새로 받는다 (#96)', async () => {
+    const qc = new QueryClient();
+    const spy = vi.spyOn(qc, 'invalidateQueries');
+    await act.refreshTarget(qc, A1, note({ kind: 'task_result', audience: 'head', reportId: 'r1', taskId: 't1' }));
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['report-tasks', 'p1'] });
+    expect(m.reports).not.toHaveBeenCalled();
+  });
+
   describe('보고 있는 화면의 알림 (PR #139 리뷰): 내용을 받은 뒤에 읽음으로', () => {
     const comment = () => note({ id: 'n9', kind: 'comment', audience: 'member', reportId: null });
     const qcAndSeed = () => {

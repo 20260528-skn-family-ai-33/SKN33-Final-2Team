@@ -9,6 +9,7 @@ import type { Comment, PlanRecord, Report } from '@/api/types/plan';
 import type { TeamMember, TeamUser } from '@/api/types/team';
 import { paths } from '@/app/paths';
 import { ReportBody } from '@/features/report/ReportBody';
+import { HeadReportTasks } from '@/features/report/ReportTasks';
 import { MemberRoadView } from './MemberRoadView';
 import { CmItem, CmTag, cmMine } from '@/features/roadmap/comments';
 import { D } from '@/shared/constants/data';
@@ -509,8 +510,9 @@ export function MemberReportPage() {
     <Page back={R ? paths.memberPlan(uid, R.id) : paths.member(uid)} eyebrow={`${who(e)} · 결과 보고서 · ${trackName(r.opt)} v${r.version} · ${r.createdAt}`} title="학습 결과 보고서" lead={r.goal}>
       <ReportBody r={r} />
       <Note>
-        {e.name} 님이 {r.confirmed ? '확인한' : '아직 확인하지 않은'} 보고서예요. 부서장은 읽기만 할 수 있어요.
+        {e.name} 님이 {r.confirmed ? '확인한' : '아직 확인하지 않은'} 보고서예요. 보고서 내용은 읽기만 할 수 있어요.
       </Note>
+      <HeadReportTasks planId={r.planId} memberName={e.name} />
     </Page>
   );
 }

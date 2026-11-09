@@ -587,6 +587,34 @@ ALTER TABLE app_ext.notifications ADD CONSTRAINT notifications_kind_check CHECK 
 COMMIT;
 ```
 
+### 결과 보고서 과제 (#96, 2026-11-09)
+
+부서장이 직원의 결과 보고서를 보고 후속 과제를 내고, 직원이 글·파일로 결과를 제출한다. 로드맵 계획을 조정하는 코멘트와는 별개다.
+
+- 저장: `app_ext.report_tasks`(`services/report_tasks.py`). 보고서 id는 다시 만들 때마다 바뀌므로 과제는 로드맵에 묶어, 확인 전 보고서를 다시 만들어도 남는다. 한 보고서에 여러 과제를 낼 수 있다.
+- 부서장 API(소속 직원의 로드맵만): `GET·POST /api/v1/team/plans/{id}/tasks`, `GET .../tasks/{taskId}/file`
+- 직원 API(본인 로드맵만): `GET /api/v1/plans/{id}/tasks`, `POST .../tasks/{taskId}/submit`(multipart `answer`·`file`), `GET .../tasks/{taskId}/file`
+- 제출은 글이나 파일 중 하나가 있어야 하고 한 번만 할 수 있다. 첨부는 활동·사후 점검 첨부와 같은 곳(`var/uploads`)에 같은 제한(15MB)으로 둔다. 저장 이름은 서버가 만들고, 내려받을 때는 `attachment`·`nosniff`로 보내 브라우저에서 열지 않는다.
+- 알림: 과제를 보내면 그 직원에게(`task`), 결과를 제출하면 과제를 낸 부서장에게(`task_result`) 저장과 같은 트랜잭션에서 넣는다. 누르면 그 로드맵의 지금 보고서로 간다.
+
+**DB 적용(앱을 이 버전으로 올리기 전에 DB마다 한 번):** `migrate_notification_rules.sql`을 먼저 적용한 DB에서 저장소 루트 기준으로 실행한다. 다시 실행해도 결과는 같고, 전체가 한 트랜잭션이다.
+
+```bash
+docker compose exec -T db sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < backend/db/migrate_report_tasks.sql
+```
+
+**복구:** 앱을 이전 버전으로 되돌린 뒤 실행한다. 과제와 제출 기록, 과제 알림이 지워진다(올린 파일은 `var/uploads`에 남는다).
+
+```sql
+BEGIN;
+DELETE FROM app_ext.notifications WHERE kind IN ('task', 'task_result');
+ALTER TABLE app_ext.notifications DROP CONSTRAINT notifications_task_check, DROP CONSTRAINT notifications_kind_check;
+ALTER TABLE app_ext.notifications DROP COLUMN task_id;
+ALTER TABLE app_ext.notifications ADD CONSTRAINT notifications_kind_check CHECK (kind IN ('roadmap', 'report', 'job', 'comment'));
+DROP TABLE app_ext.report_tasks;
+COMMIT;
+```
+
 ### LLM 도서 후보 최소 확보 (#76)
 
 세 코스 모두 스킬별 벡터 검색 최대 30권을 검토하고, 공통 도서 입력은 중복을 제거한 최대 30권으로 유지한다. `book_candidates.common_pool`은 스킬의 application·targetOutcome·완료 기준과 제목·소개를 대조해 순위를 보완한 뒤, 각 스킬의 후보 3권을 먼저 확보하고 나머지를 교차 배분한다. 실제로 태그가 연결된 공유 도서만 다른 스킬의 후보로 사용할 수 있고, 사용 불가 자료·태그 불일치·중복 ISBN은 최소 수량에 포함하지 않는다.
