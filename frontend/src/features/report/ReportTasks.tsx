@@ -7,7 +7,7 @@ import type { ReportTask } from '@/api/types/task';
 import { failToast } from '@/shared/lib/fail';
 import { toast } from '@/shared/state/ui';
 import { Icon } from '@/shared/ui/Icon';
-import { TASK_ANSWER_MAX, TASK_BODY_MAX, TASK_FILE_MAX, taskKey } from './taskData';
+import { putTasks, TASK_ANSWER_MAX, TASK_BODY_MAX, TASK_FILE_MAX, taskKey } from './taskData';
 
 function TaskItem({ task, asHead, children }: { task: ReportTask; asHead: boolean; children?: React.ReactNode }) {
   return (
@@ -59,7 +59,7 @@ export function HeadReportTasks({ planId, memberName }: { planId: string; member
     setSending(true);
     try {
       const res = await tasksApi.send(planId, text.trim());
-      qc.setQueryData(taskKey(planId), res.tasks);
+      await putTasks(qc, planId, res.tasks);
       setText('');
       toast(`${memberName} 님에게 과제를 보냈어요`);
     } catch (err) {
@@ -122,7 +122,7 @@ function SubmitForm({ task }: { task: ReportTask }) {
     setBusy(true);
     try {
       const res = await tasksApi.submit(task.planId, task.id, answer.trim(), file);
-      qc.setQueryData(taskKey(task.planId), res.tasks);
+      await putTasks(qc, task.planId, res.tasks);
       toast('과제 결과를 제출했어요 · 부서장에게 알림이 갔어요');
     } catch (err) {
       failToast(err, '과제 결과를 제출하지 못했어요');
