@@ -1,12 +1,14 @@
-param(
+﻿param(
   [string]$Archive = 'team_db/growpath_bge_m3_embedding.dump',
   [string]$Manifest = 'team_db/growpath_bge_m3_embedding.manifest.json',
   [string]$Database = 'growpath_bge_m3',
   [switch]$Apply
 )
 $ErrorActionPreference = 'Stop'
+# 이 파일은 BOM 포함 UTF-8 로 둔다. BOM 이 없으면 Windows PowerShell 5.1 이 한글을 시스템 코드페이지로 읽어 안내가 깨진다
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$OutputEncoding = [System.Text.Encoding]::UTF8
+# BOM 있는 인코딩으로 파이프하면 psql 입력 앞에 BOM 이 붙는다. 터미널 없이 실행하면 두 번 붙어 첫 SQL 이 실패한다
+$OutputEncoding = New-Object System.Text.UTF8Encoding $false
 
 if ($Database -notmatch '^growpath_bge_m3(?:_[a-z0-9_]+)?$') { throw '복원 대상은 별도 growpath_bge_m3 DB여야 합니다.' }
 $info = Get-Content -LiteralPath $Manifest -Raw -Encoding UTF8 | ConvertFrom-Json
