@@ -40,7 +40,7 @@ _CANCELLING_NOTE = re.compile(
 _CANCELLED_MARK = ' 후속 '
 _CLAUSES = re.compile(
     r'[\n;!?。]+|\.(?=\s|$)|(?<=하고)\s+|(?<=하며)\s+|(?<=하되)\s+|(?<=않고)\s+|'
-    r'(?<=아니고)\s+|(?<=아니라)\s+|(?<=말고)\s+|'
+    r'(?<=아니고)\s+|(?<=아니라)\s+|(?<=말고)\s+|(?<=빼고)\s+|(?<=미루고)\s+|(?<=남기고)\s+|(?<=넘기고)\s+|'
     r'(?<=\s)(?:후|뒤)\s+|(?<=구현)후(?=\s|$)|'
     r'(?<!\w)(?:그리고|하지만|반면에?|and\s+then|but|then)(?!\w)', re.I,
 )
@@ -135,6 +135,9 @@ _WORD = re.compile(r'[^\W\d_]{2,}[\w.+#-]*')
 _HANGUL = re.compile(r'[가-힣]')
 _LATIN_WORD = re.compile(r'[A-Za-z][\w.+#-]*')
 _GENERIC_WORDS = {'rest', 'restful', 'api', 'apis', 'crud', 'http', 'https', 'jwt', 'oauth', 'web', 'json', 'ui', 'db'}
+_PARTICLE_END = re.compile(rf'{_PARTICLES}$')
+# "FastAPI로 공개 API 구현"처럼 뒤 절이 다른 도구로 이어지면 앞 기술의 구현이 아니다.
+_OTHER_TOOL = re.compile(r'(?<![\w.+#-])([A-Za-z][A-Za-z0-9.+#-]*)[ \t]*(?:으로|로|을|를|기반|사용|활용)')
 
 
 def canonical_versions(text: str) -> str:
@@ -275,6 +278,43 @@ def _has_evidence(tail: str, *, context: bool) -> bool:
     return not blocked and (action or artifact or content is not None)
 
 
+def _names_feature(head: str) -> bool:
+    """제외 표현 앞에 기술 사용이 아닌 기능 이름이 있는지 본다. "관리자 API는"은 기능, "서버 구현은"은 사용이다."""
+    words = _WORD.findall(head)
+    nouns = [_PARTICLE_END.sub('', word) for word in words]
+    # "Django와 FastAPI는 제외"처럼 영문 낱말이 제외의 직접 대상이면 기능이 아니라 다른 기술이다.
+    # "Admin API는 제외"의 Admin은 띄어 쓴 수식어라 기능 이름이다. FastAPI의 API는 표현 위치가 낱말 중간이다.
+    if len(words) == 1 and not _HANGUL.search(nouns[0]) and (words[0] != nouns[0] or not head[-1:].isspace()):
+        return False
+    for noun in nouns:
+        known = _CUES.match(noun)
+        if not (known and known.lastgroup in ('action', 'finished', 'artifact')
+                or _FILLER.fullmatch(noun) or noun.casefold() in _GENERIC_WORDS):
+            return True
+    return False
+
+
+def _feature_scope_reduced(tail: str, following: str) -> bool:
+    """기술을 쓰면서 기능 일부만 뺀 문장인지 본다. "Django로 관리자 API는 제외하고 공개 API 구현".
+
+    뒤 절이 같은 기술로 구현을 이어 갈 때만 인정한다. 뒤 절이 없거나 다른 도구를 쓰면 기술의 구현 근거가 없다.
+    """
+    if not following.strip():
+        return False
+    for cue in _CUES.finditer(tail):
+        if cue.lastgroup in ('reference', 'compare'):
+            return False
+        if cue.lastgroup in ('negative', 'deferred'):
+            if not _names_feature(tail[:cue.start()]):
+                return False
+            break
+    else:
+        return False
+    if any(tool.casefold() not in _GENERIC_WORDS for tool in _OTHER_TOOL.findall(following)):
+        return False
+    return _has_evidence(following, context=False)
+
+
 def _before_evidence(before: str) -> bool:
     """기술 앞의 구현 표현을 읽는다. "REST API를 구현하는 Django", "구현 기술: Django"."""
     if _EXCLUDED_LIST.search(before):
@@ -301,7 +341,8 @@ def _lead_applies(lead: str) -> bool:
     return _before_evidence(clause)
 
 
-def _applied_in_clause(clause: str, patterns: dict[str, re.Pattern[str]], *, context: bool = False) -> set[str]:
+def _applied_in_clause(clause: str, patterns: dict[str, re.Pattern[str]], *, context: bool = False,
+                       following: str = '') -> set[str]:
     groups = _groups(clause, patterns)
     if not groups:
         return set()
@@ -333,7 +374,7 @@ def _applied_in_clause(clause: str, patterns: dict[str, re.Pattern[str]], *, con
         # "Use B instead of A"의 instead of는 A만 제외한다.
         if exclusion := _EXCLUDED_BEFORE.search(tail):
             tail = tail[:exclusion.start()]
-        if _has_evidence(tail, context=context or _before_evidence(before)):
+        if _has_evidence(tail, context=context or _before_evidence(before)) or _feature_scope_reduced(tail, listed or following):
             found.update(group.names)
     return found
 
@@ -354,6 +395,8 @@ def applied_technologies(texts: Iterable[str], patterns: dict[str, re.Pattern[st
         text = canonical_versions(unicodedata.normalize('NFKC', raw).replace('`', ''))
         for scope, lead in _scopes(text):
             context = bool(lead) and _lead_applies(lead)
-            for clause in _CLAUSES.split(scope):
-                found.update(_applied_in_clause(clause, patterns, context=context))
+            clauses = _CLAUSES.split(scope)
+            for index, clause in enumerate(clauses):
+                following = clauses[index + 1] if index + 1 < len(clauses) else ''
+                found.update(_applied_in_clause(clause, patterns, context=context, following=following))
     return found

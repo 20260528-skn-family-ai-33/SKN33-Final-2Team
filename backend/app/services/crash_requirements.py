@@ -229,4 +229,5 @@ def prompt_requirements(handoff: dict, request: object = None) -> str:
     return ('\n[사용자가 명시한 필수 기술]\n' + ', '.join(sorted(_group_label(group) for group in groups))
             + '\n각 항목은 모두 충족한다. 괄호의 대안은 그중 하나 이상을 충족하면 된다. '
             '단독 기술과 대안 그룹에서 선택한 기술은 관련 스킬의 coreOutcome 또는 coreCriteria에 실제 사용하는 핵심으로 남긴다. '
+            '기술 이름을 문장에 그대로 적고 Dockerfile·Deployment 같은 구성 요소 이름으로 대신하지 않는다. '
             'application·followUpScope나 비교만으로 대신하지 않는다. 선택적 비교·후속 확장은 별도로 유지한다.\n')

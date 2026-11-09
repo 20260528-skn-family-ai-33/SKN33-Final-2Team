@@ -229,6 +229,27 @@ class AppliedTechnologiesTests(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertEqual(applied_technologies([text], patterns), {'django'})
 
+    def test_excluding_a_feature_keeps_the_technology_but_excluding_the_technology_does_not(self):
+        patterns = {'django': self.patterns['django']}
+        for text in ('Django로 관리자 API는 제외하고 공개 API 구현', 'Django로 관리자 API는 제외하고, 공개 API 구현',
+                     'Django로 관리자 API를 제외하고 공개 API를 구현한다', 'Django로 관리자 API는 구현하지 않고 공개 API 구현',
+                     'Django로 관리자 API는 후속으로 미루고 공개 API 구현', 'Django로 관리자 API는 다음 단계로 넘기고 공개 API 구현',
+                     'Django로 결제 기능은 구현하지 않고 조회 API만 구현', 'Django 관리자 API는 제외하고 공개 API 구현',
+                     'Django로 Admin API는 제외하고 Public API 구현'):
+            with self.subTest(text=text):
+                self.assertEqual(applied_technologies([text], patterns), {'django'})
+        for text in ('Django는 제외하고 FastAPI로 공개 API 구현', 'Django를 제외하고 FastAPI로 공개 API 구현',
+                     'Django로 관리자 API는 제외하고 FastAPI로 공개 API 구현',
+                     'Django로 관리자 API는 구현하지 않고 FastAPI를 사용해 공개 API 구현',
+                     'Django API는 제외하고 공개 API 구현', 'Django 구현은 제외하고 공개 API 구현',
+                     'Django 서버 구현은 제외하고 공개 API 구현', 'Django 프레임워크 사용은 제외하고 공개 API 구현',
+                     'Django로 API는 구현하지 않고 공개 API 구현', 'Django로 구현하지 않고 공개 API 구현',
+                     'Django와 FastAPI는 제외하고 공개 API 구현', 'Django와 FastAPI는 구현하지 않고 공개 API 구현',
+                     'Django 비교는 제외하고 공개 API 구현', 'Django 관리자 API는 제외',
+                     'Django는 후속 학습으로 미루고 공개 API 구현', 'Django API는 후속으로 미루고 공개 API 구현'):
+            with self.subTest(text=text):
+                self.assertEqual(applied_technologies([text], patterns), set())
+
     def test_unadopted_and_candidate_mentions_are_not_application(self):
         patterns = {'django': self.patterns['django']}
         for text in ('Django는 도입하지 않음', 'Django 도입하지 않음', 'Django는 채택하지 않음', 'Django는 포함하지 않음',

@@ -62,6 +62,14 @@ class CrashRequiredTechnologiesTests(unittest.TestCase):
         self.assertEqual(result['learningSkills'][0]['coreCriteria'], ['Django REST API 구현과 테스트'])
         self.assertIn('필수 기술', captured['system'])
         self.assertIn('django', captured['system'].casefold())
+        self.assertIn('기술 이름을 문장에 그대로', captured['system'])
+
+    def test_core_must_name_the_technology_not_only_its_components(self):
+        # 실제 모델 응답에서 나온 두 문장이다. 기술 이름이 없으면 거절하므로 프롬프트가 이름을 요구한다.
+        for goal, outcome in (('Docker 사용 필수', '웹 서비스 Dockerfile로 실행 가능한 이미지를 생성해요.'),
+                              ('Kubernetes 필수', '샘플 서비스를 Deployment와 Service로 배포해요.')):
+            with self.subTest(goal=goal), self.assertRaises(llm.LlmError):
+                self.option(self.paired_core(outcome), goal=goal)
 
     def test_versioned_requirement_and_substitution_reach_final_generation_validation(self):
         goal = 'Django 5.2 사용 필수'
@@ -92,6 +100,10 @@ class CrashRequiredTechnologiesTests(unittest.TestCase):
         ('Django를 반드시 사용해 중복 저장을 허용하지 않습니다', 'FastAPI로 REST API 구현', False),
         ('Django 사용 필수: 중복 저장은 허용하지 않습니다', 'FastAPI로 REST API 구현', False),
         ('Django 사용 필수, 중복 저장은 허용하지 않습니다', 'FastAPI로 REST API 구현', False),
+        ('Django 사용 필수', 'Django로 공개 API 구현', True),
+        ('Django 사용 필수', 'Django는 제외하고 FastAPI로 공개 API 구현', False),
+        ('Django 사용 필수', 'Django로 관리자 API는 제외하고 공개 API 구현', True),
+        ('Django 사용 필수', 'Django로 관리자 API는 제외하고 FastAPI로 공개 API 구현', False),
         ('Django 사용 필수', 'Django API 구현 (Redis는 후속 학습)', True),
         ('Django 사용 필수', 'Django API 구현 (후속 학습)', False),
         ('Django 사용 필수', 'Django (선택 사항)로 API 구현', False),
