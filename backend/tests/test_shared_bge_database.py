@@ -66,3 +66,110 @@ class SharedBgeContractTest(unittest.TestCase):
         with patch.object(knowledge.db, 'val', return_value=knowledge.TABLE), patch.object(knowledge.db.engine, 'raw_connection') as write:
             knowledge.install_schema()
         write.assert_not_called()
+
+    def test_regulation_ensure_vectors_updates_meta_inputs_atomically(self):
+        sha = 'abc' * 21 + 'a'
+        article = {'path': '취업규칙 > 제1조', 'chunkText': '본문', 'id': 'aid'}
+        calls = []
+        tx_mock = Mock()
+        tx_mock.all_.return_value = [{'rag_chunk_id': 'aid', 'current_sha': sha}]
+        tx_mock.run.side_effect = lambda sql, **kw: calls.append((sql, kw))
+
+        from contextlib import contextmanager
+        @contextmanager
+        def fake_tx():
+            yield tx_mock
+
+        with patch.object(regulations.regstore, 'article', return_value=article), \
+             patch.object(regulations, 'input_text', return_value='규정 본문'), \
+             patch.object(regulations.hashlib, 'sha256') as h_mock, \
+             patch.object(regulations, '_stored', return_value={}), \
+             patch.object(embeddings, 'embed', return_value=[VECTOR]), \
+             patch.object(regulations.db, 'tx', fake_tx):
+            h_mock.return_value.hexdigest.return_value = sha
+            updated = regulations.ensure_vectors(['aid'])
+
+        self.assertEqual(updated, 1)
+        self.assertEqual(len(calls), 2)
+        meta_call = next(c for c in calls if 'growpath_bge_meta.inputs' in c[0])
+        vector_call = next(c for c in calls if 'regulations.rag_chunk_embeddings' in c[0])
+        self.assertEqual(meta_call[1]['s'], sha)
+        self.assertEqual(meta_call[1]['proto'], 'bge-m3/cls-l2-fp16/v1')
+        self.assertEqual(meta_call[1]['rev'], bge_model.REVISION)
+        self.assertEqual(vector_call[1]['s'], sha)
+
+    def test_regulation_source_change_aborts_with_error(self):
+        article = {'path': '취업규칙 > 제1조', 'chunkText': '본문', 'id': 'aid'}
+        tx_mock = Mock()
+        tx_mock.all_.return_value = [{'rag_chunk_id': 'aid', 'current_sha': 'different_sha'}]
+
+        from contextlib import contextmanager
+        @contextmanager
+        def fake_tx():
+            yield tx_mock
+
+        with patch.object(regulations.regstore, 'article', return_value=article), \
+             patch.object(regulations, '_stored', return_value={}), \
+             patch.object(embeddings, 'embed', return_value=[VECTOR]), \
+             patch.object(regulations.db, 'tx', fake_tx):
+            with self.assertRaisesRegex(llm.LlmError, '규정 원문이 바뀌었어요'):
+                regulations.ensure_vectors(['aid'])
+
+    def test_regulation_meta_mismatch_detected_as_missing(self):
+        inputs = {'c': ('raw', 'hash_val')}
+        # 벡터는 일치하지만 메타 레코드 해시가 다른 경우
+        stored_bad_meta = {'c': {'dimensions': 1024, 'input_sha256': 'hash_val',
+                                 'input_version': regulations.INPUT_VERSION,
+                                 'meta_sha256': 'old_hash', 'actual_input_sha256': 'hash_val',
+                                 'model_revision': bge_model.REVISION}}
+        self.assertEqual(regulations._missing(inputs, stored_bad_meta), ['c'])
+        # 메타 레코드 해시까지 일치하면 missing 없음
+        stored_good_meta = {'c': {'dimensions': 1024, 'input_sha256': 'hash_val',
+                                  'input_version': regulations.INPUT_VERSION,
+                                  'meta_sha256': 'hash_val', 'actual_input_sha256': 'hash_val',
+                                  'model_revision': bge_model.REVISION}}
+        self.assertEqual(regulations._missing(inputs, stored_good_meta), [])
+
+    def test_knowledge_ensure_vectors_updates_meta_inputs_atomically(self):
+        text = '자료 원문'
+        sha = regulations.hashlib.sha256(text.encode()).hexdigest()
+        chunk_obj = {'chunk_id': 'k1', 'chunk_text': text, 'chunk_text_sha256': sha}
+        calls = []
+        tx_mock = Mock()
+        tx_mock.run.side_effect = lambda sql, **kw: calls.append((sql, kw)) or 1
+
+        from contextlib import contextmanager
+        @contextmanager
+        def fake_tx():
+            yield tx_mock
+
+        with patch.object(knowledge.db, 'all_', return_value=[]), \
+             patch.object(embeddings, 'embed', return_value=[VECTOR]), \
+             patch.object(knowledge.db, 'tx', fake_tx):
+            updated = knowledge.ensure_vectors([chunk_obj])
+
+        self.assertEqual(updated, 1)
+        self.assertEqual(len(calls), 2)
+        meta_call = next(c for c in calls if 'growpath_bge_meta.inputs' in c[0])
+        chunk_call = next(c for c in calls if 'UPDATE knowledge.chunks' in c[0])
+        self.assertEqual(meta_call[1]['sha'], sha)
+        self.assertEqual(meta_call[1]['proto'], 'bge-m3/cls-l2-fp16/v1')
+        self.assertEqual(meta_call[1]['rev'], bge_model.REVISION)
+        self.assertEqual(chunk_call[1]['sha'], sha)
+
+    def test_verify_bge_database_supports_skipping_seed_counts(self):
+        from tools import verify_bge_database as vbd
+        # DB mock: valid == total 이지만 시드 개수(2984 등)와 다른 경우
+        with patch.object(vbd.db, 'one', side_effect=[
+            {'total': 10, 'valid': 10},  # 첫 호출: check_counts=True 시 첫 테이블에서 바로 예외
+            {'total': 10, 'valid': 10},  # 두 번째 호출: learning_resources
+            {'total': 10, 'valid': 10},  # regulations
+            {'total': 10, 'valid': 10},  # knowledge
+            {'total': 30, 'valid': 30},  # provenance
+        ]), patch.object(vbd.db, 'val', return_value=0):
+            # check_counts=True 일 때 시드 개수 불일치 오류
+            with self.assertRaisesRegex(ValueError, '시드 데이터 개수 불일치'):
+                vbd.verify(check_counts=True)
+            # check_counts=False 일 때 정상 통과
+            res = vbd.verify(check_counts=False)
+            self.assertEqual(res['vectors'], 30)

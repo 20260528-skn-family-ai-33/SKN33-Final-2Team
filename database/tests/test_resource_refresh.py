@@ -44,10 +44,15 @@ class ResourceRefreshTests(unittest.TestCase):
         self.assertEqual(result['embedded_count'], 25)
         self.assertTrue(result['embedding_api_called'])
         self.assertEqual(len(api.call_args.args[0]), 25)
-        writes = [c for c in self.conn.execute.call_args_list if c.args[0].startswith('INSERT')]
+        writes = [c for c in self.conn.execute.call_args_list if c.args[0].startswith(f'INSERT INTO {vectors.TABLE}')]
         self.assertEqual(len(writes), 25)
         self.assertEqual({c.args[1][1] for c in writes}, {str(i) for i in range(25)})
         self.assertTrue(all(c.args[1][0] == 'books' and c.args[1][5] == f'new-{c.args[1][1]}' for c in writes))
+        meta_writes = [c for c in self.conn.execute.call_args_list if c.args[0].startswith(f'INSERT INTO {vectors.META_TABLE}')]
+        self.assertEqual(len(meta_writes), 25)
+        self.assertEqual({c.args[1][1] for c in meta_writes}, {str(i) for i in range(25)})
+        self.assertTrue(all(c.args[1][0] == 'books' and c.args[1][2] == f'new-{c.args[1][1]}' for c in meta_writes))
+        self.assertTrue(all(c.args[1][4] == vectors.PROTOCOL and c.args[1][5] == vectors.PROVENANCE['model_revision'] for c in meta_writes))
 
     def test_count_growth_aborts_before_ddl_and_paid_calls(self):
         for cap in (24, 0, -1):

@@ -6,7 +6,9 @@ import hashlib
 from . import db, hybrid_search, llm, regulation_embeddings as embeddings, regstore
 
 TABLE = 'regulations.rag_chunk_embeddings'
+META_TABLE = 'growpath_bge_meta.inputs'
 INPUT_VERSION = 'context_path+blank_line+chunk_text/v1'
+PROTOCOL = 'bge-m3/cls-l2-fp16/v1'
 
 
 def input_text(article: dict) -> str:
@@ -20,15 +22,33 @@ def _inputs(ids: list[str]) -> dict[str, tuple[str, str]]:
 
 
 def _stored(ids: list[str]) -> dict[str, dict]:
-    rows = db.all_(f'''SELECT rag_chunk_id,dimensions,input_sha256,input_version FROM {TABLE}
-        WHERE embedding_model=:m AND rag_chunk_id=ANY(:i)''', m=embeddings.BGE_MODEL, i=ids)
+    rows = db.all_(f'''SELECT e.rag_chunk_id,e.dimensions,e.input_sha256,e.input_version,
+            p.source_sha256 AS meta_sha256, p.actual_input_sha256, p.model_revision
+        FROM {TABLE} e
+        LEFT JOIN {META_TABLE} p ON p.kind='regulations' AND p.source_id=e.rag_chunk_id
+        WHERE e.embedding_model=:m AND e.rag_chunk_id=ANY(:i)''', m=embeddings.BGE_MODEL, i=ids)
     return {row['rag_chunk_id']: row for row in rows}
 
 
 def _missing(inputs: dict, stored: dict) -> list[str]:
-    return [i for i, (_, sha) in inputs.items() if i not in stored or
-            stored[i]['dimensions'] != embeddings.BGE_DIMENSIONS or stored[i]['input_sha256'] != sha
-            or stored[i].get('input_version') != INPUT_VERSION]
+    from .bge_model import REVISION
+    missing = []
+    for i, (_, sha) in inputs.items():
+        if i not in stored:
+            missing.append(i)
+            continue
+        row = stored[i]
+        if (row['dimensions'] != embeddings.BGE_DIMENSIONS
+                or row['input_sha256'] != sha
+                or row.get('input_version') != INPUT_VERSION):
+            missing.append(i)
+            continue
+        if ('meta_sha256' in row and (row['meta_sha256'] != sha
+                or row.get('actual_input_sha256') != sha
+                or row.get('model_revision') != REVISION)):
+            missing.append(i)
+            continue
+    return missing
 
 
 def ensure_vectors(ids: list[str]) -> int:
@@ -39,7 +59,26 @@ def ensure_vectors(ids: list[str]) -> int:
         part = missing[offset:offset + 4]
         vectors = embeddings.validate(embeddings.embed([inputs[i][0] for i in part]), len(part), embeddings.BGE_DIMENSIONS)
         with db.tx() as transaction:
+            current_rows = transaction.all_('''
+                SELECT rag_chunk_id, encode(sha256(convert_to(context_path || E'\\n\\n' || chunk_text, 'UTF8')), 'hex') AS current_sha
+                FROM regulations.rag_chunks WHERE rag_chunk_id = ANY(:ids)''', ids=part)
+            current_shas = {r['rag_chunk_id']: r['current_sha'] for r in current_rows}
+            if current_shas and any(current_shas.get(aid) != inputs[aid][1] for aid in part if aid in current_shas):
+                raise llm.LlmError('BGE-M3 색인: 색인 중 규정 원문이 바뀌었어요. 다시 확인해 주세요')
             for aid, vector in zip(part, vectors, strict=True):
+                transaction.run(f'''INSERT INTO {META_TABLE}
+                    (kind,source_id,source_sha256,actual_input_sha256,protocol,model_revision,token_count,created_at)
+                    VALUES ('regulations',:i,:s,:s,:proto,:rev,:tokens,now())
+                    ON CONFLICT (kind,source_id) DO UPDATE SET
+                    source_sha256=EXCLUDED.source_sha256,
+                    actual_input_sha256=EXCLUDED.actual_input_sha256,
+                    protocol=EXCLUDED.protocol,
+                    model_revision=EXCLUDED.model_revision,
+                    token_count=EXCLUDED.token_count,
+                    created_at=EXCLUDED.created_at''',
+                    i=aid, s=inputs[aid][1], proto=PROTOCOL,
+                    rev=embeddings.PROVENANCE['model_revision'],
+                    tokens=max(1, min(len(inputs[aid][0].split()), 8192)))
                 transaction.run(f'''INSERT INTO {TABLE}
                     (rag_chunk_id,embedding_model,dimensions,embedding,input_sha256,input_version)
                     VALUES (:i,:m,:d,CAST(:v AS vector),:s,:iv)

@@ -7,7 +7,9 @@ import json
 from . import db, hybrid_search, llm, regulation_embeddings as embeddings
 
 TABLE = 'knowledge.chunks'
+META_TABLE = 'growpath_bge_meta.inputs'
 CATEGORIES = ('수자원공사 정보', '사내 생활안내')
+PROTOCOL = 'bge-m3/cls-l2-fp16/v1'
 
 
 def install_schema() -> None:
@@ -32,19 +34,40 @@ def ensure_vectors(chunks: list[dict]) -> int:
     for chunk in chunks:
         if hashlib.sha256(chunk['chunk_text'].encode('utf-8')).hexdigest() != chunk['chunk_text_sha256']:
             raise llm.LlmError('BGE-M3 색인: 자료 원문 해시가 달라요')
+    from .bge_model import REVISION
     stored = {row['chunk_id']: row for row in db.all_(f'''
-        SELECT chunk_id,input_sha256,dimensions FROM {TABLE}
-        WHERE embedding_model=:model AND chunk_id=ANY(:ids)''',
+        SELECT c.chunk_id,c.input_sha256,c.dimensions,
+               p.source_sha256 AS meta_sha256, p.actual_input_sha256, p.model_revision
+        FROM {TABLE} c
+        LEFT JOIN {META_TABLE} p ON p.kind='knowledge' AND p.source_id=c.chunk_id
+        WHERE c.embedding_model=:model AND c.chunk_id=ANY(:ids)''',
         model=embeddings.BGE_MODEL, ids=[chunk['chunk_id'] for chunk in chunks])}
     missing = [chunk for chunk in chunks if chunk['chunk_id'] not in stored
                or stored[chunk['chunk_id']]['input_sha256'] != chunk['chunk_text_sha256']
-               or stored[chunk['chunk_id']]['dimensions'] != embeddings.BGE_DIMENSIONS]
+               or stored[chunk['chunk_id']]['dimensions'] != embeddings.BGE_DIMENSIONS
+               or ('meta_sha256' in stored[chunk['chunk_id']] and (
+                   stored[chunk['chunk_id']]['meta_sha256'] != chunk['chunk_text_sha256']
+                   or stored[chunk['chunk_id']].get('actual_input_sha256') != chunk['chunk_text_sha256']
+                   or stored[chunk['chunk_id']].get('model_revision') != REVISION))]
     for offset in range(0, len(missing), 4):
         part = missing[offset:offset + 4]
         vectors = embeddings.validate(embeddings.embed([chunk['chunk_text'] for chunk in part]),
                                       len(part), embeddings.BGE_DIMENSIONS)
         with db.tx() as transaction:
             for chunk, vector in zip(part, vectors, strict=True):
+                transaction.run(f'''INSERT INTO {META_TABLE}
+                    (kind,source_id,source_sha256,actual_input_sha256,protocol,model_revision,token_count,created_at)
+                    VALUES ('knowledge',:id,:sha,:sha,:proto,:rev,:tokens,now())
+                    ON CONFLICT (kind,source_id) DO UPDATE SET
+                    source_sha256=EXCLUDED.source_sha256,
+                    actual_input_sha256=EXCLUDED.actual_input_sha256,
+                    protocol=EXCLUDED.protocol,
+                    model_revision=EXCLUDED.model_revision,
+                    token_count=EXCLUDED.token_count,
+                    created_at=EXCLUDED.created_at''',
+                    id=str(chunk['chunk_id']), sha=chunk['chunk_text_sha256'], dims=embeddings.BGE_DIMENSIONS,
+                    proto=PROTOCOL, rev=embeddings.PROVENANCE['model_revision'],
+                    tokens=max(1, min(len(chunk['chunk_text'].split()), 8192)))
                 changed = transaction.run(f'''UPDATE {TABLE} SET embedding_model=:model,dimensions=:dims,
                     input_sha256=:sha,embedding=CAST(:vector AS vector),embedded_at=now()
                     WHERE chunk_id=:id AND chunk_text_sha256=:sha''',
@@ -66,12 +89,16 @@ def search(question: str, category: str) -> list[dict]:
     if not db.val('SELECT to_regclass(:table)', table=TABLE):
         raise llm.LlmError('BGE-M3 색인: index_knowledge.py --apply로 자료 색인을 먼저 준비해 주세요')
     params = dict(category=category, real_only=category == CATEGORIES[0],
-                  model=embeddings.BGE_MODEL, dims=embeddings.BGE_DIMENSIONS)
+                  model=embeddings.BGE_MODEL, dims=embeddings.BGE_DIMENSIONS,
+                  revision=embeddings.PROVENANCE['model_revision'])
     counts = db.one(f'''SELECT count(*) AS total,count(v.chunk_id) AS indexed
         FROM knowledge.chunks c JOIN knowledge.documents d USING(document_id)
         LEFT JOIN {TABLE} v ON v.chunk_id=c.chunk_id AND v.embedding_model=:model
             AND v.dimensions=:dims AND v.input_sha256=c.chunk_text_sha256
-        WHERE d.category=:category AND (NOT :real_only OR NOT c.is_virtual)''', **params) or {}
+        LEFT JOIN {META_TABLE} p ON p.kind='knowledge' AND p.source_id=c.chunk_id
+            AND p.source_sha256=c.chunk_text_sha256 AND p.model_revision=:revision
+        WHERE d.category=:category AND (NOT :real_only OR NOT c.is_virtual)
+          AND (v.chunk_id IS NOT NULL AND p.source_id IS NOT NULL)''', **params) or {}
     if not counts.get('total'):
         return []
     if counts.get('indexed') != counts['total']:
@@ -81,6 +108,8 @@ def search(question: str, category: str) -> list[dict]:
                 d.document_id,d.category,d.title AS document_title'''
     source = f'''FROM knowledge.chunks c JOIN knowledge.documents d USING(document_id)
         JOIN {TABLE} v ON v.chunk_id=c.chunk_id
+        JOIN {META_TABLE} p ON p.kind='knowledge' AND p.source_id=c.chunk_id
+            AND p.source_sha256=c.chunk_text_sha256 AND p.model_revision=:revision
         WHERE d.category=:category AND (NOT :real_only OR NOT c.is_virtual)
           AND v.embedding_model=:model AND v.dimensions=:dims
           AND v.input_sha256=c.chunk_text_sha256'''
