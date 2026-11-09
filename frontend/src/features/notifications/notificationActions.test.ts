@@ -9,7 +9,7 @@ vi.mock('@/shared/state/session', () => ({ me: () => m.me, signInSeq: () => m.se
 vi.mock('@/api/endpoints/notifications', () => ({ notificationsApi: { read: m.read, readAll: m.readAll, readTarget: m.readTarget } }));
 vi.mock('@/api/endpoints/plans', () => ({ plansApi: { get: m.get, reports: m.reports } }));
 vi.mock('@/shared/state/catalog', () => ({ mergeRes: vi.fn(), mergeReg: vi.fn() }));
-vi.mock('@/features/draft/draftSync', () => ({ pullDraft: m.pull }));
+vi.mock('@/features/draft/draftSync', () => ({ pullDraftOrThrow: m.pull }));
 
 type Actions = typeof import('./notificationActions');
 type Ws = typeof import('@/shared/state/workspace');
@@ -287,6 +287,14 @@ describe('코멘트·작업 알림 (#96): 있는 로드맵은 바뀐 부분만 �
     it('받기가 실패하면 읽음으로 바꾸지 않는다', async () => {
       m.get.mockRejectedValue(new Error('network'));
       await expect(act.readViewed(qcAndSeed(), A1, comment(), () => true)).rejects.toThrow('network');
+      expect(m.read).not.toHaveBeenCalled();
+    });
+
+    it('작성 중인 문서를 다시 읽지 못하면 읽음으로 바꾸지 않는다', async () => {
+      wsMod.useWs.setState({ ...wsMod.freshWs('A'), draftId: 'd1' });
+      m.pull.mockRejectedValue(new Error('network'));
+      const job = note({ id: 'n8', kind: 'job', jobKind: 'options', jobStatus: 'done', planId: null, reportId: null, draftId: 'd1' });
+      await expect(act.readViewed(new QueryClient(), A1, job, () => true)).rejects.toThrow('network');
       expect(m.read).not.toHaveBeenCalled();
     });
 

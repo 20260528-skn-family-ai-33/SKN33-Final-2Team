@@ -62,6 +62,22 @@ describe('저장 실패 뒤 진행 막기', () => {
 });
 
 
+describe('조회 실패 전달 (PR #139 리뷰)', () => {
+  it('네트워크 오류: pullDraftOrThrow 는 던지고 pullDraft 는 넘어가며, 작성 중인 문서는 그대로 둔다', async () => {
+    api.get.mockRejectedValue(new ApiError(503, { message: '잠시 뒤 다시 시도해 주세요' }));
+    await expect(sync.pullDraftOrThrow()).rejects.toBeInstanceOf(ApiError);
+    await expect(sync.pullDraft()).resolves.toBe(true);
+    expect(wsMod.ws().draftId).toBe('d1');
+    expect(wsMod.ws().draft.goal).toBe('새 목표');
+  });
+
+  it('문서가 없어졌으면(404) 둘 다 던지지 않고 작성 문서를 비운다', async () => {
+    api.get.mockRejectedValue(new ApiError(404, { message: '없음' }));
+    await expect(sync.pullDraftOrThrow()).resolves.toBe(true);
+    expect(wsMod.ws().draftId).toBeNull();
+  });
+});
+
 describe('늦은 조회 응답의 단계 되돌림 방지', () => {
   it('자료 저장 전에 시작한 조회가 늦게 끝나도 6번 완료 상태를 해제하지 않는다', async () => {
     wsMod.updateWs(s=>{s.draft.chosen='A1';s.draft.v2Assessment={generationId:'g',completed:true,materialsReady:false};});
