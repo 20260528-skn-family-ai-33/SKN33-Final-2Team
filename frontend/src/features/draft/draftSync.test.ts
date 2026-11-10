@@ -62,6 +62,26 @@ describe('저장 실패 뒤 진행 막기', () => {
 });
 
 
+describe('새 작성 건의 시작 방식 저장', () => {
+  beforeEach(() => wsMod.useWs.setState({ ...wsMod.freshWs('u1'), draftId: null, draft: wsMod.freshDraft() }, true));
+
+  it('목표를 입력하기 전이어도 고른 시작 방식만으로 작성 문서를 만들어 새로고침 뒤에도 남긴다', async () => {
+    api.create.mockResolvedValue({ draftId: 'd9', draft: { ...wsMod.freshDraft(), startMode: 'after' } });
+    wsMod.updateWs((s) => void (s.draft.startMode = 'after'));
+    await sync.flush();
+    expect(api.create).toHaveBeenCalledTimes(1);
+    expect(api.create.mock.calls[0][0].draft).toMatchObject({ startMode: 'after', goal: '' });
+    expect(wsMod.ws().draftId).toBe('d9');
+    expect(wsMod.ws().draft.startMode).toBe('after');
+  });
+
+  it('시작 방식을 고르지 않았고 입력도 없으면 작성 문서를 만들지 않는다', async () => {
+    await sync.flush();
+    expect(api.create).not.toHaveBeenCalled();
+    expect(wsMod.ws().draftId).toBeNull();
+  });
+});
+
 describe('조회 실패 전달 (PR #139 리뷰)', () => {
   it('네트워크 오류: pullDraftOrThrow 는 던지고 pullDraft 는 넘어가며, 작성 중인 문서는 그대로 둔다', async () => {
     api.get.mockRejectedValue(new ApiError(503, { message: '잠시 뒤 다시 시도해 주세요' }));

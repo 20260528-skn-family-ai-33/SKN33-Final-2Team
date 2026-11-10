@@ -15,7 +15,8 @@ const CLIENT = ['goal', 'project', 'prefs', 'detailsOk', 'answers', 'deepOn', 'd
 
 const snap = (st: WsState): string =>
   JSON.stringify([CLIENT.map((k) => st.draft[k]), st.lastNew, st.draft.doc ? st.draft.doc.summary : null, (st.draft.gen && st.draft.gen.cur) || null, st.pendingFlow === 'inputs' || st.pendingFlow === 'options' ? st.pendingFlow : null]);
-const hasContent = (st: WsState): boolean => !!(String(st.draft.goal || '').trim() || st.draft.detailsOk || st.draft.project);
+/** 작성 문서를 서버에 처음 만들 만한 내용이 있는지. 시작 방식은 아직 입력 전이어도 새로고침 뒤까지 남아야 한다 */
+const hasContent = (st: WsState): boolean => !!(String(st.draft.goal || '').trim() || st.draft.detailsOk || st.draft.project || st.draft.startMode);
 
 /* 보고 있는 버전(genCur)은 사용자가 버전을 바꿨을 때만 보낸다. 백엔드(drafts._apply_client)는 genCur 를 받으면
    버전이 그대로여도 고른 안(draftPlan)을 지우므로, 늘 보내면 검토·확정 화면에서 고른 안이 사라진다(10/26 발견 · 백엔드 요청 목록 B-4) */
