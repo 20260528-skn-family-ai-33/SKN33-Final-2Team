@@ -8,9 +8,8 @@ import type { Account, DemoAccount } from '@/api/types/account';
 import { paths } from '@/app/paths';
 import { useGo } from '@/shared/hooks/useGo';
 import { ai, cause, ping } from '@/shared/state/ai';
-import { isSup, me, setAccount, useSession } from '@/shared/state/session';
+import { me, setAccount, useSession } from '@/shared/state/session';
 import { toast } from '@/shared/state/ui';
-import { ws } from '@/shared/state/workspace';
 import { Icon } from '@/shared/ui/Icon';
 import { Note } from '@/shared/ui/parts';
 import { AppVersion } from '@/shared/ui/AppVersion';
@@ -86,10 +85,8 @@ export function LoginPage() {
       return setErr(`로그인했지만 기록을 불러오지 못했어요 · ${cause(x).user}`);
     }
     setPw('');
-    const last = ws().lastRoute;
-    const admin = acct.accountType === 'admin';
-    const back = last && last !== paths.login && !last.startsWith('/admin') && (!last.startsWith('/team') || isSup(me())) ? last : paths.home;
-    go(admin ? paths.admin : back, { force: true, replace: true });
+    // 로그인 첫 화면은 늘 홈이다. 관리자 계정은 직원 홈을 쓸 수 없어 관리자 화면의 첫 화면으로 간다
+    go(acct.accountType === 'admin' ? paths.admin : paths.home, { force: true, replace: true });
     toast(acct.accountType === 'admin' ? `관리자 ${acct.admin.name} 님, 반가워요` : `${acct.user.name} 님, 반가워요`);
     if (me() && ai.live()) void ping();
   };

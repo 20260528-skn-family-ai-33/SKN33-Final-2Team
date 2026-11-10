@@ -230,10 +230,9 @@ export const reloadWorkspace = async (accept: () => boolean = () => true): Promi
   const owner = ws().owner;
   const w = await accountApi.workspace();
   if (me()?.id !== u.id || ws().owner !== owner || !accept()) return false;
-  const keep = { lastRoute: ws().lastRoute };
   const st = fromWorkspace(w, u.id, (s, d) => takeDraftInto(s, d));
   applying = true;
-  useWs.setState({ ...st, ...keep }, true);
+  useWs.setState(st, true);
   applying = false;
   serverGenCur = curJ(ws());
   lastSent = snap(ws());

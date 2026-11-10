@@ -1,6 +1,6 @@
 /* 로그인한 직원의 작업 공간 (5차 gp-core.js 의 S·OWN 과 gp-parts.js 의 상태 틀을 옮김)
    서버 기록: draft·draftId·draftPlan·lastNew(작성 중인 로드맵) · plans(확정 로드맵) · reports(결과 보고서)
-   화면 상태(브라우저 저장소 · 직원별): demoOpen·mgr(쓰는 중인 코멘트)·mcEdit(고치는 중인 보낸 코멘트)·revs(쓰는 중인 수정 요청)·meEdit·regenReq·picks·lastRoute
+   화면 상태(브라우저 저장소 · 직원별): demoOpen·mgr(쓰는 중인 코멘트)·mcEdit(고치는 중인 보낸 코멘트)·revs(쓰는 중인 수정 요청)·meEdit·regenReq·picks
    작성 중인 로드맵의 입력은 고칠 때마다 잠깐 기다렸다가 서버에 저장한다(features/draft/draftSync.ts) */
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
@@ -79,7 +79,6 @@ export interface WsState {
   meEdit: Record<string, unknown> | null;
   regenReq: RegenReq | null;
   picks: string[];
-  lastRoute: string | null;
   /** 기획서 파일을 올리는 중인 요청 번호(화면에만 · 저장하지 않음). 서버가 아직 기획서를 몰라
       저장·다시 읽기 응답이 화면의 '읽는 중'을 지울 수 있어, 이 동안 1단계를 마치지 않은 것으로 본다 */
   docUpload: number | null;
@@ -100,7 +99,6 @@ export const freshWs = (owner: string | null = null): WsState => ({
   meEdit: null,
   regenReq: null,
   picks: [],
-  lastRoute: null,
   docUpload: null,
 });
 
@@ -112,7 +110,7 @@ export const ws = (): WsState => useWs.getState();
 
 /* ── 브라우저 저장소 (화면 상태만 · 직원별) ── */
 const UI_KEY = (id: string) => 'growpath.ui.' + id;
-const UI_FIELDS = ['demoOpen', 'mgr', 'mcEdit', 'meEdit', 'regenReq', 'picks', 'lastRoute'] as const;
+const UI_FIELDS = ['demoOpen', 'mgr', 'mcEdit', 'meEdit', 'regenReq', 'picks'] as const;
 
 export const store = {
   get(k: string): string | null {
