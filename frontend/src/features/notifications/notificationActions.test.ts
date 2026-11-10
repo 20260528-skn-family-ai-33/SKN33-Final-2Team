@@ -140,12 +140,12 @@ describe('P2 본인 알림: 화면에 있는 로드맵은 덮지 않고, 없는 
     expect(wsMod.ws().draft.goal).toBe('아직 저장 안 된 작성 중 목표');
   });
 
-  it('보고서 알림: 이미 있는 로드맵은 그대로 두고 그 로드맵의 보고서 목록만 바꾼다', async () => {
+  it('보고서 알림: 최신 로드맵을 조회하되 아직 진행 중이면 입력을 보존한다', async () => {
     seed({ p1: rec('p1', 'active', '저장 전 새 답변'), p2: rec('p2', 'active') });
     m.reports.mockResolvedValue([rep('r-new', 'p1')]);
     await act.refreshTarget(new QueryClient(), A1, note({}));
     const s = wsMod.ws();
-    expect(m.get).not.toHaveBeenCalled();
+    expect(m.get).toHaveBeenCalledWith('p1');
     expect(m.reports).toHaveBeenCalledWith('p1');
     expect(essayOf(s.plans.p1)).toBe('저장 전 새 답변');
     expect(s.reports.map((r) => r.id)).toEqual(['r-new', 'r-other']);
@@ -218,6 +218,17 @@ describe('markTargetRead (#96 · 부서장이 직원 기록 화면을 열 때)',
 describe('코멘트·작업 알림 (#96): 있는 로드맵은 바뀐 부분만 고친다', () => {
   const seed = (R: PlanRecord) => wsMod.useWs.setState({ ...wsMod.freshWs('A'), plans: { p1: R } });
   const server = (o: Partial<PlanRecord>) => ({ plan: { ...rec('p1', 'active', '서버 답변'), ...o } as PlanRecord });
+
+  it('보고서 완료 알림은 이미 캐시된 진행 중 로드맵도 갱신한다', async () => {
+    seed(rec('p1', 'active', '저장 전 답변'));
+    m.get.mockResolvedValue(server({ status: 'done' }));
+    m.reports.mockResolvedValue([rep('r1', 'p1')]);
+    await act.refreshTarget(new QueryClient(), A1, note({ kind: 'report' }));
+    expect(m.get).toHaveBeenCalledWith('p1');
+    expect(wsMod.ws().plans.p1.status).toBe('done');
+    expect(wsMod.ws().reports.map(r => r.id)).toEqual(['r1']);
+    expect(m.read).not.toHaveBeenCalled();
+  });
 
   it('코멘트 알림: 새 코멘트를 받되 저장 전 사후 점검 입력은 덮지 않는다', async () => {
     seed(rec('p1', 'active', '저장 전 새 답변'));

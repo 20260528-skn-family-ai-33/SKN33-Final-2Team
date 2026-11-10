@@ -56,8 +56,8 @@ export function NotificationBell() {
   useEffect(() => {
     const t = currentSignIn();
     if (!data || !t || t.id !== owner) return;
-    noteInbox(`${t.id}:${t.seq}`, data.items, (n) => open || (notificationTarget(n) === pathname && !isOtherDraft(n, ws().draftId)));
-  }, [data, owner, open, pathname]);
+    noteInbox(`${t.id}:${t.seq}`, data.items, () => open);
+  }, [data, owner, open]);
   useEffect(() => resetFloats, []);
   const floats = useFloats((s) => s.items);
   const floatRef = useRef<HTMLDivElement>(null);
