@@ -4,6 +4,7 @@ import re
 import unicodedata
 
 from app import catalog_candidates, course_levels
+from app.english_patterns import english_token
 
 # Django 과정의 API 실습은 '구현'이라는 단어 없이도 구체적인 구성 요소와 작업으로 기술된다.
 _drf_api = r'django\s+rest\s+framework|\bdrf\b|\b\w*apiview\b|\b\w*viewset\b|\b\w*serializer\b|\bmultipartparser\b|\bapiclient\b'
@@ -33,8 +34,8 @@ _topics = (
     ('알고리즘|자료구조', r'최소\s*(?:신장|스패닝)|크루스칼', r'최소\s*(?:신장|스패닝)|크루스칼|kruskal|spanning tree', r'간선|비용|정렬|분리\s*집합|union'),
     ('웨어하우스|OLAP', r'차원|팩트|스타\s*스키마|scd', r'차원|스타\s*스키마|팩트|사실\s*(?:표|테이블)|scd|dimensional', r'팩트|대리\s*키|차원\s*키|이력|시점|차원\s*(?:표|테이블)|사실\s*(?:표|테이블)|dimension|fact\s*table'),
     ('RDBMS', r'스키마|제약\s*조건|외래\s*키|정규화', r'관계형|스키마|데이터\s*모델|정규화|erd|관계\s*모델', r'제약|기본\s*키|외래\s*키|정규화|이력|무결성|참조|종속'),
-    ('SQL', r'실행\s*계획|인덱스|explain', r'실행\s*계획|인덱스|explain|index', r'스캔|조회|통계|성능|비용|복합|측정|분석|사용\s*여부|\bio\b|analyze|scan'),
-    ('SQL', r'조인|\bjoin\b', r'조인|\bjoin\b', r'외부|내부|행|집계|테이블|중복|결과|정합성|검증|실습|구현|inner|outer|group by'),
+    (r'\bSQL\b', r'실행\s*계획|인덱스|explain', r'실행\s*계획|인덱스|explain|index', r'스캔|조회|통계|성능|비용|복합|측정|분석|사용\s*여부|\bio\b|analyze|scan'),
+    (r'\bSQL\b', r'조인|\bjoin\b', r'조인|\bjoin\b', r'외부|내부|행|집계|테이블|중복|결과|정합성|검증|실습|구현|inner|outer|group by'),
     ('NoSQL', r'샤딩|파티션|분할\s*키', r'파티션|샤딩|shard|분할\s*키', r'키|요청|분산|처리량|불균형|partition key'),
     ('머신러닝', r'불균형|재현율|정밀도', r'불균형|smote|재현율|recall|imbalanc', r'분류|정밀도|샘플링|임[곗계]\s*값|precision|미탐|오탐'),
     ('딥러닝', r'드롭아웃|dropout', r'드롭아웃|드랍아웃|dropout', r'과적합|학습|정규화|층|손실|검증|overfit'),
@@ -54,8 +55,8 @@ _topics = (
     ('마이크로서비스', r'재시도|대체\s*응답|회로\s*차단', r'마이크로서비스|microservice|\bmsa\b|서킷|회로\s*차단', r'재시도|대체\s*응답|회로\s*차단|서킷|fallback|retry'),
     ('FastAPI|웹 프레임워크', r'fastapi|패스트api', r'fastapi|패스트api', r'라우터|요청|의존성|응답|엔드포인트|pydantic|실습|rest\s*api.{0,12}(?:구현|개발|실습)'),
     ('FastAPI|웹 프레임워크', r'django|장고', r'django|장고', r'뷰|라우팅|모델|요청|템플릿|orm|view|rest\s*api.{0,12}(?:구현|개발|실습)'),
-    ('SQL', r'조인|join', r'조인|\bjoins?\b', r'집계|group by|서브쿼리|외부\s*조인|내부\s*조인|outer join|inner join'),
-    ('SQL', r'실행\s*계획|인덱스', r'쿼리\s*저장소|explain|실행\s*계획|인덱스', r'성능\s*평가|실제.{0,8}(?:시간|io)|스캔|analyze|커버링|복합\s*인덱스'),
+    (r'\bSQL\b', r'조인|join', r'조인|\bjoins?\b', r'집계|group by|서브쿼리|외부\s*조인|내부\s*조인|outer join|inner join'),
+    (r'\bSQL\b', r'실행\s*계획|인덱스', r'쿼리\s*저장소|explain|실행\s*계획|인덱스', r'성능\s*평가|실제.{0,8}(?:시간|io)|스캔|analyze|커버링|복합\s*인덱스'),
     ('RDBMS', r'관계형|정규화|제약\s*조건', r'스키마|릴레이션|관계\s*모델|정규화|er\s*모델', r'제약\s*조건|기본\s*키|외래\s*키|이상\s*현상|정규형|함수.{0,2}종속'),
     ('EDA|탐색적', r'결측|이상치', r'결측|이상치|missing value|outlier', r'대체|제거|처리|정제|탐지|분포|보간'),
     ('머신러닝', r'불균형', r'불균형|소수\s*(?:클래스|범주)|smote|imbalanc', r'임[계곗]값|재현율|정밀도|가중치|샘플링|recall'),
@@ -77,13 +78,19 @@ _topics = (
 )
 TOPICS = tuple(tuple(re.compile(expr, re.I | re.ASCII) for expr in row) for row in _topics)
 
+# STORAGE 안의 RAG와 한국어 조사가 붙은 독립 용어 'RAG를'을 구분한다.
+_llm_subject = r'언어\s*모델|응답|답변|' + english_token('LLM|RAG|RAGAS')
+_translation_metric = english_token('BLEU|ROUGE|BERTScore')
+_grounding_metric = english_token('faithfulness|groundedness')
+
 # 사전점검의 해당 스킬 과업에서 찾을 수 있는 근거. 한 차시가 직접 다루는 작업을 구분한다.
 _tasks = (
     (r'NLP|자연어', r'(?=.*(?:응답|답변|LLM|언어\s*모델))(?=.*(?:품질|근거성|거절|환각|정답|평가))',
-     ((r'LLM|언어\s*모델|응답|답변|\bRAG\b|RAGAS|faithfulness|groundedness|BLEU|ROUGE|BERTScore',
-       r'(?:LLM|언어\s*모델|응답|답변|RAG).{0,14}(?:평가|판정)|(?:정답|의미).{0,8}(?:비교|일치)|LLM.as.a.judge|\b(?:BLEU|ROUGE|BERTScore)\b'),
-      (r'환각|근거|충실도|faithfulness|groundedness|RAGAS|거절|무응답',
-       r'faithfulness|groundedness|(?:환각|충실도|근거성|거절|무응답).{0,12}(?:측정|평가|판정|지표|검증|임곗값)'))),
+     ((rf'{_llm_subject}|{_translation_metric}|{_grounding_metric}',
+       '(?:' + _llm_subject + r').{0,14}(?:평가|판정)|(?:정답|의미).{0,8}(?:비교|일치)|'
+       + english_token(r'LLM[ ._-]as[ ._-]a[ ._-]judge') + '|' + _translation_metric),
+      (r'환각|근거|충실도|거절|무응답|' + _grounding_metric + '|' + english_token('RAGAS'),
+       _grounding_metric + r'|(?:환각|충실도|근거성|거절|무응답).{0,12}(?:측정|평가|판정|지표|검증|임곗값)'))),
     (r'EDA|탐색적', r'(?=.*(?:예측|체크포인트|반복\s*측정|지연|latency))(?=.*(?:지표|구간|표본|집단|그룹|비교))',
      ((r'모델|예측|평가|성능', r'(?:모델|예측|성능|평가).{0,9}(?:성능\s*향상|평가\s*지표|성능\s*평가|평가\s*방법|평가와|평가하기|오차\s*분석)|분류\s*지표'),
       (r'그룹|구간|반복\s*측정|표본|분포|groupby|groupkfold', r'그룹별\s*(?:집계|비교|기준선)|구간별\s*(?:분포|비교|집계)|반복\s*측정|소표본|groupby|groupkfold'))),
@@ -99,12 +106,14 @@ TASKS = tuple((re.compile(skill, re.I), re.compile(intent, re.I),
 
 @lru_cache(maxsize=512)
 def task_topics(name, application):
+    application = ' '.join(application.split())
     return tuple(facet for skill, intent, facets in TASKS if skill.search(name) and intent.search(application)
                  for facet in facets)
 
 
 @lru_cache(maxsize=512)
 def requested(name, context):
+    context = ' '.join(context.split())
     return tuple((subject, action) for skill, trigger, subject, action in TOPICS
                  if skill.search(name) and trigger.search(context))
 
@@ -125,9 +134,23 @@ _lab = re.compile(r'^(?:.{0,12}[·:]\s*)?(?:연습|실습|hands.on lab|exercise)
 def claims(lines):
     # 전체 목차에서 멀리 떨어진 단어를 하나의 학습 근거로 합치지 않는다.
     for line in lines:
-        for sentence in re.split(r'(?<=[.!?])\s+', line):
+        for sentence in catalog_candidates.description_sentences(line):
             if 0 < len(sentence) <= 450:
                 yield sentence.casefold()
+
+
+def profile_descriptions(lines, focused_units):
+    """과업 근거를 찾은 소개문만 같은 문장 단위로 판정·발췌한다."""
+    if not focused_units:
+        return lines
+    result = []
+    for line in lines:
+        sentences = catalog_candidates.description_sentences(line)
+        if any(sentence.casefold() in focused_units for sentence in sentences):
+            result.extend(sentences)
+        else:
+            result.append(line)
+    return result
 
 
 def identity(row, rid):
@@ -154,7 +177,7 @@ def curriculum_score(index, rid, topics):
     doc = index[rid]
     cache = doc['topic_scores']
     if topics not in cache:
-        units = [unit for unit, _, _ in doc['units']]
+        units = [unit for unit, _, _ in doc['units']] if doc['rows'] else []
         units.extend(claims(doc['lines']))
         cache[topics] = max((lesson_score(topics, doc['record']['title'], unit) for unit in units), default=0)
     return cache[topics]

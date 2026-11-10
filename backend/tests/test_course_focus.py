@@ -15,6 +15,78 @@ class CourseFocusTests(unittest.TestCase):
     name = '컴퓨터 비전(CV) 모델링'
     target = '차선 영상을 세그멘테이션하고 픽셀 마스크를 생성한다'
 
+    def assert_delivered(self, name, goal, examples, expected):
+        spec = {'name': name, 'application': goal}
+        project = {'goal': goal}
+        selection = {'skills': [spec], 'commonApplications': {name: goal}}
+        for track, level in [('A1', 'BEGINNER'), ('A2', 'INTERMEDIATE'), ('A3', 'ADVANCED')]:
+            with self.subTest(track=track, goal=goal):
+                items = {key: dict(id=key, title=key, provider='교육원', type='course', usable=True,
+                                   skills=[name], difficulty=level, hours=1, cost=0, content=intro,
+                                   curriculum={'items': [{'title': unit} for unit in units]})
+                         for key, (intro, units) in examples.items()}
+                course = {'id': track, 'learningSkills': [spec]}
+                pools, _ = rag.retrieve(project, selection, items, course,
+                    embed=lambda texts: [[1.] * rag.DIMENSIONS for _ in texts],
+                    search=lambda kind, ids, *args: [dict(resource_id=i, similarity=.8, current_cost=0) for i in ids])
+                self.assertEqual({row['id'] for row in pools[0]['courses']}, set(expected))
+                model = Mock(return_value={'skills': [{'name': name, 'courses': [], 'books': []}]})
+                recommend_resources(project, selection, items, model, course=course, retrieved_pools=pools)
+                cards = {c['title']: c for c in model.call_args.args[1]['skills'][0]['courses']}
+                self.assertEqual(set(cards), set(expected))
+                for key, proof in expected.items():
+                    self.assertIn(proof, ' '.join([cards[key]['content'], *(u['title'] for u in cards[key]['outline'])]))
+
+    def test_nosql_does_not_inherit_sql_engine_or_join_requirements(self):
+        unit = 'MongoDB 문서 조회 실습'
+        examples = {'mongo': ('', [unit]), 'comparison': ('', [unit, 'MySQL 테이블과 비교']),
+                    'wrong-tag': ('', ['MySQL에서 테이블 두 개를 조인하는 실습'])}
+        self.assert_delivered('NoSQL & 분산 DB', 'PostgreSQL 조인과 MongoDB 문서 조회를 구현한다',
+                              examples, {'mongo': unit, 'comparison': unit})
+
+    def test_description_keeps_the_same_airflow_evidence_with_another_sentence(self):
+        proof = 'Airflow DAG의 태스크 의존성과 스케줄을 다룹니다.'
+        self.assert_delivered('ETL & 데이터 파이프라인', 'Airflow DAG를 구현한다', {
+            'one': (proof, []), 'two': ('실무 데이터를 다룹니다. ' + proof, []),
+            'separate': ('Airflow를 다룹니다. 별도의 웹 서버 스케줄을 소개합니다.', []),
+            'prereq': ('선수지식: ' + proof, []), 'inline-prereq': ('과정 안내입니다. 선수지식: ' + proof, []),
+            'question': ('Q. ' + proof, []),
+            'continued-prereq': ('자료를 배포합니다. 선수지식:\n' + proof, []),
+            'restart': ('선수지식: Python 문법. 학습 목표: ' + proof, []),
+        }, {'one': proof, 'two': proof, 'restart': proof})
+
+    def test_joint_sql_and_nosql_goal_keeps_each_skills_courses(self):
+        sql = 'SQL 기본 문법 & 조인'
+        nosql = 'NoSQL & 분산 DB'
+        goals = {sql: 'PostgreSQL 조인 쿼리를 구현한다', nosql: 'MongoDB 문서 조회를 구현한다'}
+        skills = [dict(name=name, application=goal) for name, goal in goals.items()]
+        project = {'goal': 'PostgreSQL 조인 쿼리를 구현하고 MongoDB 문서 조회를 구현한다'}
+        for track, level in [('A1', 'BEGINNER'), ('A2', 'INTERMEDIATE'), ('A3', 'ADVANCED')]:
+            items = {key: dict(id=key, title=key, type='course', skills=[name], usable=True, difficulty=level,
+                               cost=0, hours=1, curriculum={'items': [{'title': unit} for unit in units]})
+                     for key, name, units in [
+                         ('pg', sql, ['PostgreSQL 테이블 조인 결과 검증 실습']),
+                         ('other-engine', sql, ['MySQL 테이블 조인 결과 검증 실습']),
+                         ('mongo', nosql, ['MongoDB 문서 조회 실습', 'MySQL 테이블과 비교'])]}
+            for applications in [goals, {}]:
+                with self.subTest(track=track, has_saved_scope=bool(applications)):
+                    pools, _ = rag.retrieve(project, {'skills': skills, 'commonApplications': applications}, items,
+                        {'id': track, 'learningSkills': skills}, embed=lambda texts: [[1.] * rag.DIMENSIONS for _ in texts],
+                        search=lambda kind, ids, *args: [dict(resource_id=i, current_cost=0, similarity=.8) for i in ids])
+                    self.assertEqual({p['name']: [r['id'] for r in p['courses']] for p in pools},
+                                     {sql: ['pg'], nosql: ['mongo']})
+
+    def test_korean_particles_and_line_wrapping_preserve_nlp_evidence(self):
+        for goal in ('LLM 응답 품질 평가', 'LLM 응답\n품질 평가'):
+            plain = 'BLEU, ROUGE 지표 실습'
+            attached = 'BLEU와 ROUGE로 번역 품질 측정'
+            self.assert_delivered('자연어 처리(NLP) & LLM 기초', goal, {
+                'plain': ('', [plain]), 'attached': ('', [attached]),
+                'different': ('', ['ROUGER 도구로 길이 측정']), 'qa': ('', ['Q. BLEU로 어떻게 평가하나요?']),
+                'LLM 운영': ('', ['STORAGE 디스크 성능 평가 실습']),
+                'rag-eval': ('', ['RAG를 평가하는 실습']),
+            }, {'plain': plain, 'attached': attached, 'rag-eval': 'RAG를 평가하는 실습'})
+
     def test_nlp_evaluation_handoff_uses_skill_intent_and_not_inference_token_budget(self):
         name = '자연어 처리(NLP) & LLM 기초'
         application = 'LLM 답변의 근거성과 정답 일치를 평가한다'

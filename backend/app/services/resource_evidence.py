@@ -32,6 +32,7 @@ _aliases = {
     'MLOps': ('mlops', '모델 서빙', '모델서빙', '모델 배포', '모델배포', 'model serving', 'model deployment',
               '머신러닝 파이프라인', '기계학습 파이프라인'),
     'RDBMS': ('rdbms', '모델링', '정규화', '관계형', '데이터베이스 설계'),
+    'NoSQL': ('nosql', 'mongodb', '몽고db', '몽고디비', 'dynamodb', 'cassandra', '분산 db', '분산 데이터베이스'),
     'SQL': ('sql', '조인', '쿼리'),
     'EDA': ('eda', '탐색적', '전처리', 'pandas', '판다스', '데이터 분석'),
     'ETL': ('etl', 'elt', 'dbt', 'airflow', '에어플로우', '데이터 파이프라인', 'data pipeline', '데이터 적재', '데이터 수집', '데이터 변환'),
@@ -108,7 +109,7 @@ _scope_topics = (
     ('데이터 계보', r'웨어하우스|거버넌스', r'계보|' + _en('lineage'), r'계보|변환 경로|' + _en('lineage')),
     (None, r'POSIX|동시성', r'세마포어|' + _en('semaphores?'), r'세마포어|' + _en('semaphores?|sem_wait|sem_post')),
     (None, r'ETL|파이프라인', _dbt.pattern, _dbt.pattern),
-    ('SQL 조인', r'SQL|RDBMS', r'조인|' + _en(r'joins?'), r'조인|' + _en(r'joins?')),
+    ('SQL 조인', _en('sql|rdbms'), r'조인|' + _en(r'joins?'), r'조인|' + _en(r'joins?')),
     ('토큰화', r'RAG|NLP|자연어', r'토큰화|' + _en(r'tokeniz\w*'), r'토큰|' + _en(r'tokens?|tokeniz\w*')),
     ('Kubernetes', r'클라우드|cloud|Docker', r'쿠버네티스|' + _en(r'kubernetes|k8s'), r'쿠버네티스|' + _en(r'kubernetes|k8s')),
     ('비동기 I/O', r'Python|파이썬', _async_io, _async_io),
@@ -556,12 +557,13 @@ def learning_rows(item: dict) -> list[tuple[int, dict, str]]:
     return result
 
 def facts(item: dict, project: dict, selection: dict) -> dict:
-    from app.services.course_focus import claims, lesson_score
+    from app.services.course_focus import claims, lesson_score, profile_descriptions
     rows = learning_rows(item)
     # 수집 소개문에는 전체 목차가 붙기도 한다. 섹션명·중단 단원이 소개 근거로 재진입하지 않게 한다.
     outline_lines = {line.strip() for row in (item.get('curriculum') or {}).get('items') or [] if isinstance(row, dict)
                      for key in ('section', 'title', 'description') for line in normalize(row.get(key)).splitlines()}
-    descriptions = [line for line in evidence.learning_lines(normalize(item.get('_learning_description') or item.get('content')))
+    descriptions = [line for line in evidence.learning_lines(normalize(item.get('_learning_description') or item.get('content')),
+                                                             description=True)
                     if not _admin.search(line) and line.strip() not in outline_lines]
     learning = '\n'.join([*descriptions, *(row[2] for row in rows)]).casefold()
     title = normalize(item.get('title')).casefold()
@@ -604,7 +606,7 @@ def facts(item: dict, project: dict, selection: dict) -> dict:
             scope[skill['name']] &= bool(audit_units)
             if audit_units and _access_denial.search(context) and not any(_access_denial.search(u) for u in audit_units):
                 audit_gaps.add(skill['name'])
-        if skill.get('fromEmployeeGoal') and re.search(r'SQL|RDBMS', skill['name'], re.I):
+        if skill.get('fromEmployeeGoal') and re.search(_en('sql|rdbms'), skill['name'], re.I):
             wanted = {k for k, pattern in _sql_engines.items() if pattern.search(context)}
             if wanted:
                 covered = {k for k, pattern in _sql_engines.items() if pattern.search(text)}
@@ -644,7 +646,7 @@ def facts(item: dict, project: dict, selection: dict) -> dict:
             # Windows 전용 GUI·시스템 동기화는 POSIX 서비스의 적용 근거로 공유하지 않는다.
             scope[skill['name']] &= not (_windows.search(title) and not _linux.search(title))
     discussion_context = bool(_discussion.search(normalize(item.get('title')) + '\n' + '\n'.join(descriptions)))
-    profiles = {skill['name']: _profile(skill, project, rows, descriptions, text,
+    profiles = {skill['name']: _profile(skill, project, rows, profile_descriptions(descriptions, focused[skill['name']]), text,
                                        skill['name'] in supported, scope[skill['name']],
                                        discussion_context=discussion_context, focused_units=focused[skill['name']]) for skill in selection['skills']}
     for name in document_gaps:
@@ -753,9 +755,10 @@ def description_excerpt(info: dict, project: dict, skill: dict, course=None) -> 
     challenge = (course.get('id') if isinstance(course, dict) else course) == 'A3'
     async_target = bool(re.search(_async_io, _skill_context(skill), re.I))
     dbt_targets = _dbt_targets(skill)
-    from app.services.course_focus import lesson_score
+    from app.services.course_focus import lesson_score, profile_descriptions
     task = _task_topics(skill)
-    lines = sorted(dict.fromkeys(info['descriptions']), key=lambda line: (
+    descriptions = profile_descriptions(info['descriptions'], info['focusedUnits'][skill['name']])
+    lines = sorted(dict.fromkeys(descriptions), key=lambda line: (
         -len(_dbt_facets({}, line, dbt_targets)),
         -lesson_score(task, info['title'], line.casefold()) if task else 0,
         -bool(async_target and _async_context.search(line)),

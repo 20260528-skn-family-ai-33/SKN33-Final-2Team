@@ -55,19 +55,28 @@ _source: dict | None = None
 _index: dict = {}
 
 
-def learning_lines(value: str) -> list[str]:
+def description_sentences(line: str) -> list[str]:
+    # 'Q. …'라는 질문 표시를 뒤의 문장에서 떼어 학습 근거로 만들지 않는다.
+    return re.split(r'(?<=[.!?])(?<!\bQ\.)\s+', line, flags=re.I)
+
+
+def learning_lines(value: str, *, description: bool = False) -> list[str]:
     """명시된 선수지식/대상/강사 구역을 다음 학습 구역 전까지 제외한다."""
     result, blocked = [], False
     for line in content_text(value).splitlines():
         line = line.strip()
         if not line:
             continue
-        if _blocked.search(line):
-            blocked = True
-        elif _learning.search(line):
-            blocked = False
-        if not blocked:
-            result.append(line)
+        kept = []
+        for part in description_sentences(line) if description else (line,):
+            if _blocked.search(part):
+                blocked = True
+            elif _learning.search(part):
+                blocked = False
+            if not blocked:
+                kept.append(part)
+        if kept:
+            result.append(' '.join(kept))
     return result
 
 
@@ -82,7 +91,8 @@ def cached_index(records: dict[str, dict]) -> dict:
                     # 진행 중인 요청의 스냅샷은 유지하고 동일 자료의 정규화 결과만 재사용한다.
                     index[key] = dict(previous, record=r)
                     continue
-                lines = [line for line in learning_lines(r.get('_learning_description') or r.get('content') or '')
+                lines = [line for line in learning_lines(r.get('_learning_description') or r.get('content') or '',
+                                                         description=r.get('type') == 'course')
                          if not _course_admin.search(line)]
                 outline = r.get('curriculum') or {}
                 rows, lesson_units, own_rows = [], [], {}
