@@ -44,6 +44,27 @@ class CourseFocusTests(unittest.TestCase):
         self.assert_delivered('NoSQL & 분산 DB', 'PostgreSQL 조인과 MongoDB 문서 조회를 구현한다',
                               examples, {'mongo': unit, 'comparison': unit})
 
+    def test_nosql_storage_lessons_need_database_evidence(self):
+        examples = {
+            'cosmos': ('', ['Azure Cosmos DB 컨테이너 쿼리 실습']),
+            'redis': ('', ['Redis 키-값 저장소 쿼리 실습']),
+            'Azure Cosmos DB 입문': ('', ['컨테이너의 항목을 조회하는 실습']),
+            'data-model': ('문서형 데이터베이스에서 데이터를 조회하는 실습', []),
+            'direct-query': ('', ['Azure Cosmos DB에서 쿼리를 작성하는 실습']),
+            'commands': ('', ['Redis GET/SET으로 데이터를 조회하는 실습']),
+            'relational': ('', ['MySQL 테이블 조인 쿼리 실습']),
+            'css': ('', ['CSS 컨테이너 쿼리 실습']),
+            'Azure Cosmos DB for PostgreSQL': ('', ['PostgreSQL 테이블 조인 쿼리 실습']),
+            'Redis 기초': ('', ['채팅 메시지 Pub/Sub 구현 실습']),
+            'files': ('', ['팀 문서 저장소 파일 검색 실습']),
+            'prerequisite': ('선수지식: Redis 키-값 저장소 쿼리 실습', ['웹 페이지 구현']),
+        }
+        self.assert_delivered('NoSQL & 분산 DB', '문서 저장소 조회를 구현한다', examples, {
+            'cosmos': examples['cosmos'][1][0], 'redis': examples['redis'][1][0],
+            'Azure Cosmos DB 입문': examples['Azure Cosmos DB 입문'][1][0], 'data-model': examples['data-model'][0],
+            'direct-query': examples['direct-query'][1][0], 'commands': examples['commands'][1][0],
+        })
+
     def test_description_keeps_the_same_airflow_evidence_with_another_sentence(self):
         proof = 'Airflow DAG의 태스크 의존성과 스케줄을 다룹니다.'
         self.assert_delivered('ETL & 데이터 파이프라인', 'Airflow DAG를 구현한다', {

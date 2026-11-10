@@ -157,6 +157,17 @@ def normalize(value: object) -> str:
     return unicodedata.normalize('NFKC', str(value or ''))
 
 
+# Cosmos DB·Redis는 여러 용도로 쓰인다. 제품과 함께 가르치는 자료 접근이 있어야 NoSQL 근거로 쓴다.
+_nosql_model = re.compile(r'키\s*[-·–]?\s*값\s*(?:저장소|데이터베이스)|문서\s*(?:형|지향)\s*(?:데이터베이스|저장소)'
+                          + '|' + _en(r'key[- ]value (?:stores?|databases?)|document(?:[- ]oriented)? databases?|document stores?'), re.I)
+_nosql_platform = re.compile(_en(r'cosmos\s*db|redis') + r'|레디스', re.I)
+_record_access = (r'(?:컨테이너|컬렉션|문서|항목|키\s*[-·–]?\s*값)\s*(?:을|를|의|에서)?\s*'
+                  r'(?:쿼리|질의|조회|읽기|쓰기|저장|갱신|삭제)|' + _en(r'point reads?|(?:query|read|write) (?:items?|documents?|containers?)'))
+_nosql_access = re.compile(_record_access, re.I)
+_direct_query = r'\s*(?:에서|로|의)?\s*(?:쿼리|질의|' + _en(r'queries|query|GET\s*/\s*SET') + ')'
+_named_nosql_access = re.compile(
+    rf'(?:{_nosql_platform.pattern})(?:{_direct_query}|[^.!?\n]{{0,60}}?(?:{_record_access}))', re.I)
+
 _sql_engines = {
     'postgresql': re.compile(r'postgres(?:ql)?|포스트그레', re.I),
     'mysql': re.compile(r'mysql|마이에스큐엘', re.I),
@@ -399,9 +410,8 @@ def suitability_key(info: dict, skill: str) -> tuple:
 
 
 def _profile(skill: dict, project: dict, rows: list, descriptions: list[str], text: str, supported: bool, scope: bool,
-             *, discussion_context: bool = False, focused_units=frozenset()) -> dict:
+             *, terms, discussion_context: bool = False, focused_units=frozenset()) -> dict:
     stage = _stage(project, skill)
-    terms = skill_terms(skill)
     name = normalize(skill['name'])
     etl_targets = _dbt_targets(skill)
     concurrency_skill = bool(re.search(r'Python|파이썬|멀티스레딩|동시성', name, re.I))
@@ -527,6 +537,16 @@ def skill_terms(skill: dict):
     words = re.findall(r'[a-z0-9+#.]{2,}|[가-힣]{2,}', str(skill['name']).casefold())
     return evidence.query_terms([' '.join(word for word in words if word not in _generic)])
 
+
+def _course_terms(skill: dict, title: str):
+    terms = skill_terms(skill)
+    if 'nosql' in skill['name'].casefold():
+        # 제목에 제품명이 있으면 차시가 제품명을 반복할 필요가 없다.
+        terms.extend((_nosql_model, _named_nosql_access))
+        if _nosql_platform.search(title):
+            terms.append(_nosql_access)
+    return terms
+
 def project_terms(project: dict):
     text = normalize(' '.join(str(project.get(key) or '') for key in ('goal', 'projectSummary', 'desiredCompetencies')))
     words = re.findall(r'[a-z0-9+#.]{2,}|[가-힣]{2,}', text.casefold())
@@ -570,8 +590,9 @@ def facts(item: dict, project: dict, selection: dict) -> dict:
     text = title + '\n' + learning
     dbt_scoped = {skill['name'] for skill in selection['skills'] if (targets := _dbt_targets(skill))
                   and any(_dbt_facets(row, value, targets) for _, row, value in rows)}
+    terms = {skill['name']: _course_terms(skill, title) for skill in selection['skills']}
     supported = [skill['name'] for skill in selection['skills'] if skill['name'] in (item.get('skills') or [])
-                 and (skill['name'] in dbt_scoped or evidence.matches(text, skill_terms(skill)))]
+                 and (skill['name'] in dbt_scoped or evidence.matches(text, terms[skill['name']]))]
     focused = {}
     focus_scores = {}
     for skill in selection['skills']:
@@ -647,7 +668,7 @@ def facts(item: dict, project: dict, selection: dict) -> dict:
             scope[skill['name']] &= not (_windows.search(title) and not _linux.search(title))
     discussion_context = bool(_discussion.search(normalize(item.get('title')) + '\n' + '\n'.join(descriptions)))
     profiles = {skill['name']: _profile(skill, project, rows, profile_descriptions(descriptions, focused[skill['name']]), text,
-                                       skill['name'] in supported, scope[skill['name']],
+                                       skill['name'] in supported, scope[skill['name']], terms=terms[skill['name']],
                                        discussion_context=discussion_context, focused_units=focused[skill['name']]) for skill in selection['skills']}
     for name in document_gaps:
         profiles[name]['unverifiedTargetTopics'] = [*target_gaps({'suitability': profiles}, name), '문서 입력·전처리']
@@ -694,7 +715,7 @@ def outline(item: dict, project: dict, selection: dict, skill: dict, course=None
     if _linux_security_target(skill):
         local = [*local, _os_controls, _linux_controls]
     topic = focus_terms(project, skill, goal_only=True)
-    terms = skill_terms(skill)
+    terms = _course_terms(skill, info['title'])
     challenge = (course.get('id') if isinstance(course, dict) else course) == 'A3'
     profile = (info.get('suitability') or {}).get(skill['name']) or {}
     stage_units = set(profile.get('unitIndices') or []) if profile.get('requiredStage') != 'conceptual' else set()
@@ -750,7 +771,7 @@ def _depth_evidence(text: str) -> bool:
 def description_excerpt(info: dict, project: dict, skill: dict, course=None) -> str:
     """순위에 사용한 학습 소개를 모델에 발췌한다. 선수지식·목차 복제본은 제외한다."""
     local = focus_terms({}, skill) or focus_terms(project, skill)
-    terms = skill_terms(skill)
+    terms = _course_terms(skill, info['title'])
     applied = set(info['suitability'][skill['name']]['appliedDescription'])
     challenge = (course.get('id') if isinstance(course, dict) else course) == 'A3'
     async_target = bool(re.search(_async_io, _skill_context(skill), re.I))
@@ -775,7 +796,7 @@ def description_excerpt(info: dict, project: dict, skill: dict, course=None) -> 
 
 def _rank_signals(info: dict, project: dict, skill: dict, challenge: bool) -> tuple[int, int, int]:
     local = focus_terms({}, skill) or focus_terms(project, skill)
-    tagged = skill_terms(skill)
+    tagged = _course_terms(skill, info['title'])
     learning = {text for _, _, text in info['rows']} | {line.casefold() for line in info['descriptions']}
     # 같은 홍보 문구와 일반 행동어의 반복은 점수가 되지 않는다. 서로 다른 대상의 동시 근거만 센다.
     focus = max((min(evidence.matches(text, local), 2) for text in learning), default=0)
