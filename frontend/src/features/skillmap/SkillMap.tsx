@@ -26,7 +26,7 @@ function layoutOf(d: SkillMapData): Layout {
   return m;
 }
 
-/** 점 하나의 모양. cls: .sm-n 에 붙는 상태(cov·off·next) · tag: 오른쪽 꼬리표 · aria: 이름 뒤에 읽어 줄 말 · medal: 점 위에 얹는 메달 뱃지 */
+/** 점 하나의 모양. cls: .sm-n 에 붙는 상태(cov·off) · tag: 오른쪽 꼬리표 · aria: 이름 뒤에 읽어 줄 말 · medal: 점 위에 얹는 메달 뱃지 */
 export interface NodeLook {
   cls: string;
   tag?: string;
@@ -43,8 +43,8 @@ function starPoints(outer: number): string {
     return `${(Math.cos(angle) * radius).toFixed(1)},${(Math.sin(angle) * radius).toFixed(1)}`;
   }).join(' ');
 }
-/** 화살표의 모양. on: 이 로드맵이 양쪽을 다룸 · trail: 지나온 길(강조한 실선) · next: 다음에 열 수 있음(강조한 점선) */
-export type EdgeLook = '' | 'on' | 'trail' | 'next';
+/** 화살표의 모양. on: 이 로드맵이 양쪽을 다룸 · trail: 지나온 길(뱃지 스킬에서 이어진 화살표) */
+export type EdgeLook = '' | 'on' | 'trail';
 export interface MapView {
   label: string;
   sum: ReactNode;

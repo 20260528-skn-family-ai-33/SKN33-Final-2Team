@@ -10,7 +10,6 @@ import type { ResourceMap, SkillMapData } from '@/api/types/catalog';
 import type { PlanRecord, Report } from '@/api/types/plan';
 import { groupLearningActivities, OTHER_LEARNING } from '@/features/roadmap/roadmapLearningData';
 import { isBookResource, st } from '@/shared/lib/plan';
-import { relOf } from './layout';
 
 export type Medal = 'bronze' | 'silver' | 'gold';
 export type SkillLevel = 'learning' | Medal;
@@ -73,14 +72,4 @@ export function earnedSkills(data: SkillMapData, records: PlanRecord[], reports:
   }
   marks.forEach((mark) => mark.plans.sort((a, b) => RANK[b.level] - RANK[a.level]));
   return { marks, unmatched: [...unmatched] };
-}
-
-/** 선수 스킬에 모두 뱃지가 있고 아직 시작하지 않은 스킬. 선수 관계가 없는 스킬은 넣지 않는다 */
-export function nextSkills(data: SkillMapData, marks: Map<number, SkillMark>): Set<number> {
-  const { parents } = relOf(data);
-  return new Set(
-    data.skills
-      .filter((skill) => !marks.has(skill.id) && (parents[skill.id] || []).length > 0 && parents[skill.id].every((id) => isEarned(marks.get(id))))
-      .map((skill) => skill.id),
-  );
 }

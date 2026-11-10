@@ -1,8 +1,8 @@
-/* 내 스킬 지도(누적) 뱃지 계산: 학습 중·브론즈·실버·골드, 학습한 횟수, 다음에 열 수 있는 스킬 */
+/* 내 스킬 지도(누적) 뱃지 계산: 학습 중·브론즈·실버·골드, 학습한 횟수 */
 import { describe, expect, it } from 'vitest';
 import type { ResourceMap, SkillMapData } from '@/api/types/catalog';
 import type { PlanRecord, Report } from '@/api/types/plan';
-import { earnedSkills, nextSkills } from './earned';
+import { earnedSkills } from './earned';
 
 const data: SkillMapData = {
   skills: [
@@ -73,17 +73,5 @@ describe('earnedSkills', () => {
     const result = earnedSkills(data, [plan], [], resources);
     expect(result.marks.size).toBe(0);
     expect(result.unmatched).toEqual(['없는 스킬']);
-  });
-});
-
-describe('nextSkills', () => {
-  const marksOf = (records: PlanRecord[]) => earnedSkills(data, records, [], resources).marks;
-  it('선수 스킬에 모두 뱃지가 있는 스킬만 다음에 열 수 있다', () => {
-    expect([...nextSkills(data, marksOf([rec('p1', 'active', [{ id: 'a', skill: 'SQL' }], ['a'])]))]).toEqual([2]);
-  });
-  it('선수 스킬이 학습 중이거나, 선수 관계가 없거나, 이미 시작한 스킬은 넣지 않는다', () => {
-    expect([...nextSkills(data, marksOf([rec('p1', 'active', [{ id: 'a', skill: 'SQL' }], [])]))]).toEqual([]);
-    const started = rec('p1', 'active', [{ id: 'a', skill: 'SQL' }, { id: 'b', skill: 'SQL 튜닝' }], ['a']);
-    expect([...nextSkills(data, marksOf([started]))]).toEqual([]);
   });
 });

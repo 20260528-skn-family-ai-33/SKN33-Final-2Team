@@ -10,11 +10,11 @@ import { useMe } from '@/shared/state/session';
 import { recs, useWs } from '@/shared/state/workspace';
 import { Icon } from '@/shared/ui/Icon';
 import { Note } from '@/shared/ui/parts';
-import { earnedSkills, isEarned, LEVEL_TEXT, medalOf, nextSkills, type SkillMark } from './earned';
+import { earnedSkills, isEarned, LEVEL_TEXT, medalOf, type SkillMark } from './earned';
 import { relOf } from './layout';
 import { MapBox } from './SkillMap';
 
-function MyInfo({ data, picked, marks, next, onClose }: { data: SkillMapData; picked: number | null; marks: Map<number, SkillMark>; next: Set<number>; onClose: () => void }) {
+function MyInfo({ data, picked, marks, onClose }: { data: SkillMapData; picked: number | null; marks: Map<number, SkillMark>; onClose: () => void }) {
   const certificates = useCatalog((state) => state.certById);
   const me = useMe();
   const go = useGo();
@@ -30,7 +30,7 @@ function MyInfo({ data, picked, marks, next, onClose }: { data: SkillMapData; pi
       <div className="sm-pick-h">
         <b>{s.name}</b>
         <span className="tag">{s.category}</span>
-        <span className={`tag ${mark ? 'acc' : 'line'}`}>{mark ? LEVEL_TEXT[mark.level] : next.has(picked) ? '다음에 열 수 있음' : '시작 전'}</span>
+        <span className={`tag ${mark ? 'acc' : 'line'}`}>{mark ? LEVEL_TEXT[mark.level] : '시작 전'}</span>
         {mark && mark.plans.length > 1 ? <span className="tag line">{mark.plans.length}회 학습</span> : null}
         <button className="link quiet" aria-label="설명 닫기" onClick={onClose}>
           <Icon name="x" />
@@ -78,7 +78,6 @@ export function MySkillMap() {
       viewKey="mine"
       build={(data, pid) => {
         const { marks, unmatched } = earnedSkills(data, records, reports, resources);
-        const next = nextSkills(data, marks);
         const draft = data.prerequisiteSource !== 'db';
         const medals = [...marks.values()].map(medalOf);
         const countOf = (medal: string) => medals.filter((m) => m === medal).length;
@@ -110,10 +109,6 @@ export function MySkillMap() {
                 학습 중
               </span>
               <span>
-                <i className="k-next" />
-                다음에 열 수 있음{draft ? '(가정)' : ''}
-              </span>
-              <span>
                 <i className="k-e" />
                 지나온 길
               </span>
@@ -121,13 +116,13 @@ export function MySkillMap() {
           ),
           look: (skillId) => {
             const mark = marks.get(skillId);
-            if (!mark) return next.has(skillId) ? { cls: 'next', aria: ' · 다음에 열 수 있음' } : { cls: 'off' };
+            if (!mark) return { cls: 'off' };
             const times = mark.plans.length;
             const medal = medalOf(mark);
             return { cls: 'cov', tag: times > 1 ? `${times}회` : '', aria: ` · ${LEVEL_TEXT[mark.level]}${times > 1 ? ` · ${times}회 학습` : ''}`, ring: !medal, medal };
           },
-          edge: (from, to) => (!isEarned(marks.get(from)) ? '' : marks.has(to) ? 'trail' : next.has(to) ? 'next' : ''),
-          info: (close) => <MyInfo data={data} picked={pid} marks={marks} next={next} onClose={close} />,
+          edge: (from, to) => (isEarned(marks.get(from)) && marks.has(to) ? 'trail' : ''),
+          info: (close) => <MyInfo data={data} picked={pid} marks={marks} onClose={close} />,
           notes: (
             <>
               {marks.size ? null : (
@@ -140,7 +135,7 @@ export function MySkillMap() {
                 때 표시해요. 꼬리표의 숫자는 그 스킬을 배운 로드맵 수예요(한 번이면 표시하지 않아요). 내가 기록한 학습 이력이에요. 역량 판정이나 인사평가에 쓰지 않아요.
               </Note>
               {draft ? (
-                <Note>선수 관계 {data.prerequisites.length}개는 팀 DB에 아직 없어 임시 초안(가정)으로 그렸어요. ‘다음에 열 수 있음’도 이 초안을 따르니 참고로만 봐 주세요.</Note>
+                <Note>선수 관계 {data.prerequisites.length}개는 팀 DB에 아직 없어 임시 초안(가정)으로 그렸어요. 팀 검토 전에는 참고로만 봐 주세요.</Note>
               ) : null}
               {unmatched.length ? (
                 <Note>
