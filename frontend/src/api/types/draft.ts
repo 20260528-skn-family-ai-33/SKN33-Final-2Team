@@ -269,6 +269,7 @@ export interface RegenRequest {
 
 export interface SelectedSkill { name: string; application: string; reason?: string }
 export interface DraftDoc {
+  readonly demoSeeded?: boolean;
   selectionNotice?: string;
   selectedSkills?: SelectedSkill[];
   skillCandidates?: SelectedSkill[];

@@ -67,6 +67,20 @@ describe('chooseStartMode', () => {
     closeSheet();
     expect(proceed).not.toHaveBeenCalled();
   });
+  it('단계 이동 초안은 기존 로드맵과 수정안의 보관을 제안하지 않는다', () => {
+    setPlans(plan('a', '2026-10-21', 4, 'active', { pending: {} as PlanRecord['pending'] }));
+    const draft = useWs.getState().draft;
+    useWs.setState({ draft: { ...draft, demoSeeded: true } });
+    try {
+      chooseStartMode(vi.fn());
+      const html = renderToStaticMarkup(sheet()!.body() as ReactElement);
+      expect(html).toContain('동시 진행');
+      expect(html).toContain('끝나고 시작');
+      expect(html).not.toContain('보관');
+    } finally {
+      useWs.setState({ draft });
+    }
+  });
   it('수정안이 있는 로드맵이 있으면 보관할 때 버린다고 알린다', () => {
     setPlans(plan('a', '2026-10-21', 4, 'active', { pending: {} as PlanRecord['pending'] }));
     chooseStartMode(vi.fn());

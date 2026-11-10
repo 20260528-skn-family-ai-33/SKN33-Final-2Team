@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 
 from app import auth, db
 from app.errors import ApiError, api_error_handler
-from app.routers import account
+from app.routers import account, work
 from app.services import demo, drafts, plans
 
 
@@ -39,6 +39,7 @@ class DemoDatabaseTests(unittest.TestCase):
         self.addCleanup(self.clean_fixtures)
         app = FastAPI()
         app.include_router(account.r)
+        app.include_router(work.r)
         app.add_exception_handler(ApiError, api_error_handler)
         app.dependency_overrides[account.require_demo_mode] = lambda: None
         app.dependency_overrides[auth.require_employee] = lambda: auth.Account('employee', self.employee, 'QA')
@@ -59,6 +60,67 @@ class DemoDatabaseTests(unittest.TestCase):
 
     def projects(self, employee):
         return db.all_('SELECT * FROM public.projects WHERE employee_id = :e ORDER BY project_id', e=employee)
+
+    def ordinary_review(self):
+        # 일반 작성 API로 새 프로젝트를 만들고 생성 결과만 같은 검토용 fixture로 채운다.
+        self.jump('review')
+        sample = drafts.current(self.employee)
+        demo.reset(self.employee)
+        created = self.client.post('/api/v1/drafts', json={'draft': {'demoSeeded': True}}).json()
+        self.assertFalse(created['draft']['demoSeeded'])
+        pid = created['draftId']
+        with db.tx() as t:
+            w = drafts._row(t, self.employee, pid)['draft_choices']
+            d = sample['draft'].copy()
+            d.pop('demoSeeded')
+            drafts._save_questions(t, pid, d)
+            drafts._save_answers(t, pid, d)
+            w.update(draft=d, draftPlan=sample['draftPlan'], lastNew=sample['lastNew'])
+            drafts._write(t, pid, w)
+        return pid
+
+    def confirm(self, pid, **body):
+        return self.client.post(f'/api/v1/drafts/{pid}/confirm', json=body)
+
+    def head_notices(self, rid):
+        return db.val("""SELECT count(*) FROM app_ext.notifications WHERE roadmap_id = CAST(:r AS uuid)
+                         AND recipient_id = :h AND actor_id = :e AND kind = 'roadmap'""", r=rid, h=self.head, e=self.employee)
+
+    def test_demo_and_ordinary_confirmation_with_an_active_plan_and_ready_revision(self):
+        first = self.ordinary_review()
+        ordinary = self.confirm(first).json()['planId']
+        self.assertEqual(self.head_notices(ordinary), 1)
+        with db.tx() as t:
+            revision = t.val("""INSERT INTO app_ext.roadmap_revisions(roadmap_id, request, status)
+                                VALUES(CAST(:r AS uuid), '{}', 'ready') RETURNING revision_id""", r=ordinary)
+        def revision_status():
+            return db.val('SELECT status FROM app_ext.roadmap_revisions WHERE revision_id = :v', v=revision)
+        original = self.projects(self.employee)
+        for mode in ('together', 'after'):
+            with self.subTest(mode=mode):
+                self.jump('review')
+                sample = self.client.get('/api/v1/drafts/current').json()
+                pid = sample['draftId']
+                self.assertTrue(sample['draft']['demoSeeded'])
+                before = self.projects(self.employee)
+                denied = self.confirm(pid, startMode='archive', demoSeeded=False)
+                self.assertEqual((denied.status_code, denied.json()['error']['code']), (409, 'DEMO_ARCHIVE_FORBIDDEN'))
+                self.assertEqual(self.projects(self.employee), before)
+                self.assertEqual(revision_status(), 'ready')
+                rid = self.confirm(pid, startMode=mode).json()['planId']
+                self.assertEqual(self.head_notices(rid), 0)
+                self.assertIs(db.val("SELECT draft_choices->'demoSeeded' FROM public.projects WHERE project_id = CAST(:p AS uuid)", p=pid), True)
+                demo.reset(self.employee)
+                self.assertEqual(self.projects(self.employee), original)
+                self.assertEqual(revision_status(), 'ready')
+
+        second = self.ordinary_review()
+        rid = self.confirm(second, startMode='archive', demoSeeded=True).json()['planId']
+        self.assertEqual(self.head_notices(rid), 1)
+        demo.reset(self.employee)
+        states = {str(p['project_id']): p['status'] for p in self.projects(self.employee)}
+        self.assertEqual(states, {first: 'ARCHIVED', second: 'IN_PROGRESS'})
+        self.assertEqual(revision_status(), 'discarded')
 
     def test_all_stages_preserve_unmarked_project_and_other_employee(self):
         with db.tx() as t:

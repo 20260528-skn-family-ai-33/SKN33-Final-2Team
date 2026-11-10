@@ -278,7 +278,7 @@ def present(w: dict | None, draft_id: str | None) -> dict:
     if q and q.get('deep'):
         # 심화 질문 정답·해설·모범 답안은 점검 결과가 나온 뒤에만 보낸다(10/23 · 화면에서는 접어 둠)
         d = dict(d, quiz=dict(q, deep=DC.public(q['deep'], bool((d.get('diag') or {}).get('deep')))))
-    return {'draftId': draft_id, 'draft': d, 'draftPlan': displayed_plan, 'lastNew': w.get('lastNew'),
+    return {'draftId': draft_id, 'draft': dict(d, demoSeeded=w.get('demoSeeded') is True), 'draftPlan': displayed_plan, 'lastNew': w.get('lastNew'),
             'res': catalog.resources_for(_res_keys(w)), 'reg': regstore.bundle(_basis_ids(w))}
 
 
@@ -1072,6 +1072,9 @@ def confirm(employee_id: int, draft_id: str, start_mode: str | None = None) -> d
         r = _row(t, employee_id, draft_id)
         w = _wrap(r['draft_choices'])
         d = w['draft']
+        demo_seeded = w.get('demoSeeded') is True
+        if demo_seeded and mode == 'archive':
+            raise ApiError(409, 'DEMO_ARCHIVE_FORBIDDEN', '시연 초안은 기존 로드맵을 보관할 수 없어요. 다른 시작 방식을 골라 주세요.')
         if not w.get('draftPlan') or not d.get('chosen'):
             raise ApiError(409, 'NOT_SELECTED', '확정할 안을 먼저 골라 주세요')
         g = d['gen']
@@ -1122,10 +1125,13 @@ def confirm(employee_id: int, draft_id: str, start_mode: str | None = None) -> d
             # active 를 읽은 뒤 다른 요청이 마친 로드맵은 archive_row 가 건너뛴다. 새 로드맵 확정은 그대로 진행한다
             for row in active:
                 PL.archive_row(t, row)
+        confirmed = {'gp5': 1, 'confirmed': True, 'roadmapId': roadmap_id}
+        if demo_seeded:
+            confirmed['demoSeeded'] = True
         t.run("""UPDATE public.projects SET status = 'IN_PROGRESS', current_stage = 7, draft_choices = :w, updated_at = now() WHERE project_id = CAST(:p AS uuid)""",
-              w=db.J({'gp5': 1, 'confirmed': True, 'roadmapId': roadmap_id}), p=draft_id)
-        # 로드맵 생성 완료 알림(#82·#96): 부서장에게만. 확정과 같은 트랜잭션이라 확정이 실패하면 남지 않는다
-        NT.roadmap_created(t, employee_id, roadmap_id)
+              w=db.J(confirmed), p=draft_id)
+        if not demo_seeded:
+            NT.roadmap_created(t, employee_id, roadmap_id)
         NT.draft_confirmed(t, employee_id, draft_id)
     with _img_lock:
         _images.pop(draft_id, None)
