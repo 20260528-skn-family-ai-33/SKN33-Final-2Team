@@ -25,6 +25,11 @@ describe('작성 단계 ID ↔ 주소', () => {
   it('서로 바꿔도 같은 값', () => {
     for (const id of ['new-goal', 'new-details', 'new-result-edit', 'new-review']) expect(pathToNewId(newIdToPath(id))).toBe(id);
   });
+  it('합쳐진 자료 선택 단계는 로드맵·자료 선택 화면으로 잇고, 그 화면은 자기 ID 로 저장한다', () => {
+    expect(newIdToPath('new-materials')).toBe(paths.newOptions);
+    expect(legacyToPath('new-materials')).toBe(paths.newOptions);
+    expect(pathToNewId(paths.newOptions)).toBe('new-options');
+  });
   it('저장된 단계가 없으면 첫 단계', () => {
     expect(newIdToPath(null)).toBe(paths.newGoal);
     expect(pathToNewId('/roadmaps')).toBeNull();
