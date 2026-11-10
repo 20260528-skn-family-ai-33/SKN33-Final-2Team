@@ -1108,7 +1108,7 @@ def report_start(employee_id: int, roadmap_id: str) -> str:
             t.run('DELETE FROM public.growth_reports WHERE roadmap_id = :r', r=row['roadmap_id'])
             rep_id = str(t.val("INSERT INTO public.growth_reports(project_id, roadmap_id, report_type, report_content) VALUES(:p, :r, 'PRE_POST', :c) RETURNING report_id",
                                p=row['project_id'], r=row['roadmap_id'], c=db.J(r)))
-            t.run('INSERT INTO app_ext.report_meta(report_id) VALUES(CAST(:i AS uuid))', i=rep_id)
+            t.run('INSERT INTO app_ext.report_meta(report_id, confirmed, confirmed_at) VALUES(CAST(:i AS uuid), true, now())', i=rep_id)
             t.run('UPDATE public.diagnostic_rounds SET post_completed_at = now() WHERE diagnostic_round_id = :d', d=row['diagnostic_round_id'])
             t.run('UPDATE app_ext.post_checks SET running = false, fail = NULL WHERE roadmap_id = :r', r=row['roadmap_id'])
             # 보고서 작성 완료 알림(#82): 본인·부서장. 위에서 지운 이전 보고서의 알림은 함께 지워졌다(report_id ON DELETE CASCADE)
