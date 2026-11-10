@@ -96,8 +96,8 @@ def _base_rows(employee_id: int, roadmap_id: str | None = None) -> list[dict]:
         except ValueError:
             return []
     return db.all_("""SELECT r.roadmap_id, r.project_id, r.content, r.created_at, r.diagnostic_round_id,
-                         CASE WHEN report.created_at IS NOT NULL THEN 'COMPLETED' ELSE p.status::text END AS status,
-                         p.employee_id, m.version, coalesce(m.done_at, report.created_at) AS done_at, m.archived_at, m.resumed_at
+                         p.status::text AS status,
+                         p.employee_id, m.version, coalesce(m.done_at, CASE WHEN p.status = 'COMPLETED' THEN report.created_at END) AS done_at, m.archived_at, m.resumed_at
                       FROM public.roadmaps r JOIN public.projects p ON p.project_id = r.project_id
                       LEFT JOIN app_ext.roadmap_meta m ON m.roadmap_id = r.roadmap_id
                       LEFT JOIN LATERAL (
