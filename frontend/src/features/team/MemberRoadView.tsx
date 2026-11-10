@@ -8,12 +8,14 @@ import { groupLearningActivities } from '@/features/roadmap/roadmapLearningData'
 import { SkillMap } from '@/features/skillmap/SkillMap';
 import { st } from '@/shared/lib/plan';
 import { useCatalog } from '@/shared/state/catalog';
+import { useClockRefresh } from '@/shared/state/demoClock';
 import { Stats } from '@/shared/ui/parts';
 
 export function MemberRoadView({ R }: { R: PlanRecord }) {
   const resources = useCatalog((state) => state.res);
   const pl = R.plan;
   const learning = pl.def.learningReport as ReviewMaterials | undefined;
+  useClockRefresh();
   const week = weekNow(R);
   // 직원 화면처럼 이번 주에 할 스킬을 표시한다(진행 중인 로드맵만)
   const current =

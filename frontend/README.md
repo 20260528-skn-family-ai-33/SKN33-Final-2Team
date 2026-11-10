@@ -68,6 +68,8 @@ docker build -f frontend/Dockerfile -t growpath-web .
 
 시연 도구 기본값은 Compose·단독 개발·단독 Docker 빌드 모두 `off`예요(#77). Compose는 루트 `.env`의 `VITE_DEMO_TOOLS`, 단독 개발은 `frontend/.env.local`을 읽어요. 미설정·빈 값·공백·알 수 없는 값은 off이며, 앞뒤 공백과 대소문자를 정리한 `on`만 허용해요. 로컬 시연에는 `VITE_DEMO_TOOLS=on`·`GP5_DEMO_MODE=on`을 함께 명시해요. 단독 Docker 빌드에는 `--build-arg VITE_DEMO_TOOLS=on`도 전달해요. 서버 `/ai/providers`의 `demoMode`가 true일 때만 직원·관리자 시연 도구와 관리자 가데이터 선택지를 표시해요. 기존 설치의 적용·되돌리기는 [최상위 README](../README.md#베타-설치시연-설정-63-64)를 따라요. 직원 고르기는 별도 설정이에요.
 
+시연 도구의 `기준 날짜`는 로드맵 주차 계산에 쓰는 오늘만 앞으로 옮겨요(`shared/state/demoClock.ts`). 서버 기록은 바꾸지 않고 그 브라우저 탭에서만 적용되며, 실제 오늘보다 이전 날짜는 고를 수 없어요. 시연이 꺼지면 저장된 값도 쓰지 않아요.
+
 ## 지켜야 할 것
 
 - 서버 호출은 `src/api/`에만 둬요. 계약이 바뀌면 `docs/API_계약.md`도 함께 고쳐요.

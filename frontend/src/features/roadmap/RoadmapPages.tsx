@@ -12,6 +12,7 @@ import { count, st } from '@/shared/lib/plan';
 import { weekNow } from '@/features/home/ganttCalc';
 import { groupLearningActivities } from './roadmapLearningData';
 import { useCatalog } from '@/shared/state/catalog';
+import { useClockRefresh } from '@/shared/state/demoClock';
 import { useMe } from '@/shared/state/session';
 import { closeSheet, openSheet } from '@/shared/state/ui';
 import { newComments, planReports, recs, useWs } from '@/shared/state/workspace';
@@ -200,6 +201,7 @@ function openArchive(go: ReturnType<typeof useGo>, R: PlanRecord): void {
 
 /** 진행 중이면 기록할 수 있고, 마쳤거나 보관한 로드맵은 읽기 전용(활동·완료·메모·버전·보고서·받은 코멘트) */
 function RoadView({ R }: { R: PlanRecord }) {
+  useClockRefresh();
   const resources = useCatalog(state => state.res);
   const go = useGo();
   const reports = useWs((s) => s.reports);
