@@ -1,7 +1,8 @@
 /* 스킬 지도 — 검토·확정 화면과 내 로드맵(확정한 로드맵) 화면, 요약 박스 바로 아래 (5차 gp-skillmap.js · 2026-10-23 팀 합의)
-   생활코딩 WEBn 지식 지도(seomal)처럼 점과 화살표로 그린다. 로드맵에 없는 스킬은 따로 표시하지 않는다(10/23 사용자 결정) */
+   생활코딩 WEBn 지식 지도(seomal)처럼 점과 화살표로 그린다. 로드맵에 없는 스킬은 따로 표시하지 않는다(10/23 사용자 결정)
+   그리는 틀(MapBox)은 내 스킬 지도(MySkillMap · 누적)와 함께 쓴다. 점과 화살표를 어떤 모양으로 그릴지는 쓰는 쪽이 MapView 로 정한다 */
 import { useQuery } from '@tanstack/react-query';
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { catalogApi } from '@/api/endpoints/catalog';
 import type { SkillMapData } from '@/api/types/catalog';
 import type { PlanContent } from '@/api/types/plan';
@@ -16,7 +17,7 @@ import { actWeek, canvasMeasure, coverOf, place, relOf, weeksOf, type Cover, typ
 let layoutCache: { d: SkillMapData; m: Layout } | null = null;
 let bigPref: boolean | null = null;
 // 넓은 화면은 칸에 맞추고, 좁은 화면은 실제 크기로 두고 옆으로 밀어 본다
-const bigNow = () => (bigPref != null ? bigPref : window.innerWidth <= 900);
+const bigNow = () => (bigPref != null ? bigPref : typeof window !== 'undefined' && window.innerWidth <= 900);
 
 function layoutOf(d: SkillMapData): Layout {
   if (layoutCache && layoutCache.d === d) return layoutCache.m;
@@ -24,6 +25,38 @@ function layoutOf(d: SkillMapData): Layout {
   layoutCache = { d, m };
   return m;
 }
+
+/** 점 하나의 모양. cls: .sm-n 에 붙는 상태(cov·off·next) · tag: 오른쪽 꼬리표 · aria: 이름 뒤에 읽어 줄 말 · medal: 점 위에 얹는 메달 뱃지 */
+export interface NodeLook {
+  cls: string;
+  tag?: string;
+  aria?: string;
+  ring?: boolean;
+  medal?: 'bronze' | 'silver' | 'gold';
+}
+
+/** 메달 가운데 별(꼭짓점 5개). 점 크기에 맞춰 그린다 */
+function starPoints(outer: number): string {
+  return Array.from({ length: 10 }, (_, i) => {
+    const radius = i % 2 ? outer * 0.42 : outer;
+    const angle = (Math.PI / 5) * i - Math.PI / 2;
+    return `${(Math.cos(angle) * radius).toFixed(1)},${(Math.sin(angle) * radius).toFixed(1)}`;
+  }).join(' ');
+}
+/** 화살표의 모양. on: 이 로드맵이 양쪽을 다룸 · trail: 지나온 길(강조한 실선) · next: 다음에 열 수 있음(강조한 점선) */
+export type EdgeLook = '' | 'on' | 'trail' | 'next';
+export interface MapView {
+  label: string;
+  sum: ReactNode;
+  keys: ReactNode;
+  look: (id: number) => NodeLook;
+  edge: (from: number, to: number) => EdgeLook;
+  /** 누른 스킬의 설명. close 는 누른 스킬을 푼다 */
+  info: (close: () => void) => ReactNode;
+  notes?: ReactNode;
+}
+
+const InfoSlot = ({ render, close }: { render: MapView['info']; close: () => void }) => <>{render(close)}</>;
 
 function Info({ data, picked, cov, owned, onClose }: { data: SkillMapData; picked: number | null; cov: Cover; owned?: string[]; onClose: () => void }) {
   const certificates = useCatalog(state => state.certById);
@@ -68,31 +101,28 @@ function Info({ data, picked, cov, owned, onClose }: { data: SkillMapData; picke
   );
 }
 
-function Svg({ data, pl, picked, onPick, big }: { data: SkillMapData; pl: PlanContent; picked: number | null; onPick: (id: number) => void; big: boolean }) {
-  useCatalog((s) => s.res);
+function Svg({ data, view, picked, onPick, big }: { data: SkillMapData; view: MapView; picked: number | null; onPick: (id: number) => void; big: boolean }) {
   const m = useMemo(() => layoutOf(data), [data]);
-  const cov = coverOf(data, pl, resOf);
   const tw = useMemo(() => canvasMeasure(), []);
-  const on = (id: number) => cov.has(id);
-  /* 주차 꼬리표: 노드 오른쪽에 붙으므로 그림 너비에 넣는다 */
-  const tags = m.nodes.map((n) => {
-    const c = cov.get(n.id);
-    const tagT = c ? weeksOf(c) : '';
-    return { c, tagT, tagW: tagT ? tw(tagT, 10, 700) + 12 : 0 };
+  /* 꼬리표: 노드 오른쪽에 붙으므로 그림 너비에 넣는다 */
+  const looks = m.nodes.map((n) => {
+    const look = view.look(n.id);
+    const tagT = look.tag || '';
+    return { look, tagT, tagW: tagT ? tw(tagT, 10, 700) + 12 : 0 };
   });
-  const x1 = m.nodes.reduce((v, n, i) => (tags[i].tagT ? Math.max(v, n.x + n.r + 5 + tags[i].tagW) : v), -1e9);
+  const x1 = m.nodes.reduce((v, n, i) => (looks[i].tagT ? Math.max(v, n.x + n.r + 5 + looks[i].tagW) : v), -1e9);
   const nodes = m.nodes.map((n, i) => {
-    const { c, tagT, tagW } = tags[i];
+    const { look, tagT, tagW } = looks[i];
     const y0 = n.r + 15;
     return (
       <g
         key={n.id}
-        className={`sm-n${c ? ' cov' : ' off'}${picked === n.id ? ' pick' : ''}`}
+        className={`sm-n ${look.cls}${picked === n.id ? ' pick' : ''}`}
         transform={`translate(${n.x.toFixed(1)},${n.y.toFixed(1)})`}
         role="button"
         tabIndex={0}
         aria-pressed={picked === n.id}
-        aria-label={`${n.name}${c ? ` · 이 로드맵 ${tagT}` : ''}`}
+        aria-label={`${n.name}${look.aria || ''}`}
         data-arg={n.id}
         onClick={() => onPick(n.id)}
         onKeyDown={(e) => {
@@ -103,7 +133,14 @@ function Svg({ data, pl, picked, onPick, big }: { data: SkillMapData; pl: PlanCo
         }}
       >
         <circle className="dot" r={n.r.toFixed(1)} />
-        {c ? <circle className="ring" r={(n.r + 1.5).toFixed(1)} /> : null}
+        {look.ring ? <circle className="ring" r={(n.r + 1.5).toFixed(1)} /> : null}
+        {look.medal ? (
+          <g className={`medal ${look.medal}`}>
+            <circle className="coin" r={n.r.toFixed(1)} />
+            <circle className="rim" r={(n.r * 0.74).toFixed(1)} />
+            <polygon className="star" points={starPoints(n.r * 0.5)} />
+          </g>
+        ) : null}
         {n.lines.map((l, i) => (
           <text key={i} x="0" y={(y0 + i * 15).toFixed(1)} textAnchor="middle">
             {l}
@@ -139,7 +176,7 @@ function Svg({ data, pl, picked, onPick, big }: { data: SkillMapData; pl: PlanCo
       height={H}
       style={!big ? { width: '100%', maxWidth: W, height: 'auto' } : { width: W, height: 'auto' }}
       role="img"
-      aria-label="스킬 지도: 팀 DB 스킬과 선수 관계(가정), 이 로드맵이 다루는 스킬 표시"
+      aria-label={view.label}
     >
       <defs>
         {[
@@ -161,12 +198,12 @@ function Svg({ data, pl, picked, onPick, big }: { data: SkillMapData; pl: PlanCo
           const d = Math.hypot(vx, vy) || 1;
           const ux = vx / d;
           const uy = vy / d;
-          const hit = on(a) && on(bb);
+          const edge = view.edge(a, bb);
           return (
             <line
               key={i}
-              className={`sm-e${hit ? ' on' : ''}`}
-              markerEnd={`url(#sm-${hit ? 'on' : 'g'})`}
+              className={`sm-e${edge ? ` ${edge}` : ''}`}
+              markerEnd={`url(#sm-${edge ? 'on' : 'g'})`}
               x1={(A.x + ux * (A.r + 2)).toFixed(1)}
               y1={(A.y + uy * (A.r + 2)).toFixed(1)}
               x2={(B.x - ux * (B.r + 5)).toFixed(1)}
@@ -180,20 +217,17 @@ function Svg({ data, pl, picked, onPick, big }: { data: SkillMapData; pl: PlanCo
   );
 }
 
-/** 검토·확정 = 작성 중 안, 내 로드맵 = 확정한 로드맵. 다른 로드맵으로 옮기면 누른 스킬은 풀어 둔다 */
-/** owned: 추천 자격증에서 뺄 보유 자격증. 기본은 로그인한 본인 것 · 부서장이 직원 로드맵을 볼 때는 직원 보유 자격증을 받지 않으므로 [] (#96) */
-export function SkillMap({ pl, owned }: { pl: PlanContent; owned?: string[] }) {
+/** 스킬 지도 틀: 자료를 불러와 요약·범례·그림·설명·안내를 차례로 놓는다. viewKey 가 바뀌면(다른 로드맵) 누른 스킬은 풀어 둔다 */
+export function MapBox({ id, title, viewKey, build }: { id: string; title: string; viewKey: string; build: (data: SkillMapData, picked: number | null) => MapView }) {
   const q = useQuery({ queryKey: ['skills-map'], queryFn: catalogApi.skillMap, staleTime: Infinity });
-  const key = pl.rid || 'draft';
-  const [picked, setPicked] = useState<{ key: string; id: number | null }>({ key, id: null });
+  const [picked, setPicked] = useState<{ key: string; id: number | null }>({ key: viewKey, id: null });
   const [big, setBig] = useState(bigNow());
   const wrapRef = useRef<HTMLDivElement>(null);
   const keepScroll = useRef(false);
-  const pid = picked.key === key ? picked.id : null;
+  const pid = picked.key === viewKey ? picked.id : null;
   const data = q.data;
-  const cov = useMemo(() => (data ? coverOf(data, pl, resOf) : new Map()), [data, pl]);
 
-  // 실제 크기로 볼 때(좁은 화면·크게 보기)는 이 로드맵의 스킬이 가운데 오게 밀어 둔다
+  // 실제 크기로 볼 때(좁은 화면·크게 보기)는 강조한 스킬이 가운데 오게 밀어 둔다
   useLayoutEffect(() => {
     const w = wrapRef.current;
     if (keepScroll.current) {
@@ -210,11 +244,11 @@ export function SkillMap({ pl, owned }: { pl: PlanContent; owned?: string[] }) {
     });
     w.scrollLeft = pts.reduce((s, p) => s + p[0], 0) / pts.length - w.clientWidth / 2;
     w.scrollTop = pts.reduce((s, p) => s + p[1], 0) / pts.length - w.clientHeight / 2;
-  }, [data, big, key]);
+  }, [data, big, viewKey]);
 
   const head = (n?: React.ReactNode) => (
     <div className="sec-h">
-      <h2 className="st">이 로드맵이 다루는 스킬</h2>
+      <h2 className="st">{title}</h2>
       {n}
     </div>
   );
@@ -222,7 +256,7 @@ export function SkillMap({ pl, owned }: { pl: PlanContent; owned?: string[] }) {
     const e = q.error as ApiError;
     const msg = (e.payload && (e.payload.message || e.payload.raw)) || e.message || '';
     return (
-      <div className="sec" id="smBox">
+      <div className="sec" id={id}>
         {head()}
         <div className="loading">
           <Icon name="alert" />
@@ -236,7 +270,7 @@ export function SkillMap({ pl, owned }: { pl: PlanContent; owned?: string[] }) {
   }
   if (!data)
     return (
-      <div className="sec" id="smBox">
+      <div className="sec" id={id}>
         {head()}
         <div className="loading">
           <span className="sp" />
@@ -244,14 +278,13 @@ export function SkillMap({ pl, owned }: { pl: PlanContent; owned?: string[] }) {
         </div>
       </div>
     );
-  const draft = data.prerequisiteSource !== 'db';
-  const pick = (id: number) => {
+  const pick = (skillId: number) => {
     keepScroll.current = true;
-    setPicked({ key, id: pid === id ? null : id });
+    setPicked({ key: viewKey, id: pid === skillId ? null : skillId });
   };
-  const unmatched = data.unmatched || [];
+  const view = build(data, pid);
   return (
-    <div className="sec" id="smBox">
+    <div className="sec" id={id}>
       {head(
         <button
           className="link quiet"
@@ -264,36 +297,77 @@ export function SkillMap({ pl, owned }: { pl: PlanContent; owned?: string[] }) {
           {big ? '화면에 맞추기' : '크게 보기'}
         </button>,
       )}
-      <p className="small muted sm-sum">
-        팀 DB 스킬 {data.skills.length}개 가운데 이 로드맵이 다루는 스킬 <b>{cov.size}개</b>를 진하게, 다루는 주차를 꼬리표로 보여 줘요.
-      </p>
+      <p className="small muted sm-sum">{view.sum}</p>
       <div className="card flat sm-card">
-        <div className="sm-key">
-          <span>
-            <i className="k-cov" />이 로드맵이 다루는 스킬(꼬리표 = 주차)
-          </span>
-          <span>
-            <i className="k-e" />
-            배우게 될 스킬 · 학습 연결{draft ? '(가정)' : ''}
-          </span>
-          <span>
-            <i className="k-n" />점 크기 = 팀 DB 자료 수
-          </span>
-        </div>
+        <div className="sm-key">{view.keys}</div>
         <div className="sm-wrap" ref={wrapRef}>
-          <Svg data={data} pl={pl} picked={pid} onPick={pick} big={big} />
+          <Svg data={data} view={view} picked={pid} onPick={pick} big={big} />
         </div>
         <div className="sm-info" aria-live="polite">
-          <Info data={data} picked={pid} cov={cov} owned={owned} onClose={() => pid != null && pick(pid)} />
+          <InfoSlot render={view.info} close={() => pid != null && pick(pid)} />
         </div>
       </div>
-      {cov.size ? null : <Note>이 로드맵의 활동에서 팀 DB 스킬을 찾지 못했어요.</Note>}
-      {draft ? <Note>선수 관계 {data.prerequisites.length}개는 팀 DB에 아직 없어 임시 초안(가정)으로 그렸어요. 팀 검토 전에는 참고로만 봐 주세요.</Note> : null}
-      {unmatched.length ? (
-        <Note>
-          선수 관계 초안 {unmatched.length}개는 지금 팀 DB 스킬 이름과 맞지 않아 뺐어요({unmatched.map((u) => `${u.prerequisite} → ${u.skill}`).join(', ')}).
-        </Note>
-      ) : null}
+      {view.notes}
     </div>
+  );
+}
+
+/** 검토·확정 = 작성 중 안, 내 로드맵 = 확정한 로드맵 */
+/** owned: 추천 자격증에서 뺄 보유 자격증. 기본은 로그인한 본인 것 · 부서장이 직원 로드맵을 볼 때는 직원 보유 자격증을 받지 않으므로 [] (#96) */
+export function SkillMap({ pl, owned }: { pl: PlanContent; owned?: string[] }) {
+  // 자료가 나중에 오면 자료에 붙은 스킬로 다시 그린다
+  useCatalog((s) => s.res);
+  return (
+    <MapBox
+      id="smBox"
+      title="이 로드맵이 다루는 스킬"
+      viewKey={pl.rid || 'draft'}
+      build={(data, pid) => {
+        const cov = coverOf(data, pl, resOf);
+        const draft = data.prerequisiteSource !== 'db';
+        const unmatched = data.unmatched || [];
+        return {
+          label: '스킬 지도: 팀 DB 스킬과 선수 관계(가정), 이 로드맵이 다루는 스킬 표시',
+          sum: (
+            <>
+              팀 DB 스킬 {data.skills.length}개 가운데 이 로드맵이 다루는 스킬 <b>{cov.size}개</b>를 진하게, 다루는 주차를 꼬리표로 보여 줘요.
+            </>
+          ),
+          keys: (
+            <>
+              <span>
+                <i className="k-cov" />이 로드맵이 다루는 스킬(꼬리표 = 주차)
+              </span>
+              <span>
+                <i className="k-e" />
+                배우게 될 스킬 · 학습 연결{draft ? '(가정)' : ''}
+              </span>
+              <span>
+                <i className="k-n" />점 크기 = 팀 DB 자료 수
+              </span>
+            </>
+          ),
+          look: (skillId) => {
+            const c = cov.get(skillId);
+            if (!c) return { cls: 'off' };
+            const tag = weeksOf(c);
+            return { cls: 'cov', tag, aria: ` · 이 로드맵 ${tag}`, ring: true };
+          },
+          edge: (from, to) => (cov.has(from) && cov.has(to) ? 'on' : ''),
+          info: (close) => <Info data={data} picked={pid} cov={cov} owned={owned} onClose={close} />,
+          notes: (
+            <>
+              {cov.size ? null : <Note>이 로드맵의 활동에서 팀 DB 스킬을 찾지 못했어요.</Note>}
+              {draft ? <Note>선수 관계 {data.prerequisites.length}개는 팀 DB에 아직 없어 임시 초안(가정)으로 그렸어요. 팀 검토 전에는 참고로만 봐 주세요.</Note> : null}
+              {unmatched.length ? (
+                <Note>
+                  선수 관계 초안 {unmatched.length}개는 지금 팀 DB 스킬 이름과 맞지 않아 뺐어요({unmatched.map((u) => `${u.prerequisite} → ${u.skill}`).join(', ')}).
+                </Note>
+              ) : null}
+            </>
+          ),
+        };
+      }}
+    />
   );
 }

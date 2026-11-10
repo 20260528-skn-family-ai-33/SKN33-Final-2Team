@@ -187,6 +187,9 @@
   .sm-e { stroke: #3A3A3A; }
   .sm-n .dot { fill: var(--surface); stroke: #5A5A5A; }
   .sm-n text { stroke: rgba(13, 13, 13, .92); }
+  /* 내 스킬 지도(누적): 이 테마의 점·화살표 색 규칙이 기본 규칙보다 우선하므로 다음 스킬·지나온 길 색을 다시 적는다 */
+  .sm-n.next .dot { stroke: var(--accent); }
+  .sm-e.trail, .sm-e.next { stroke: var(--accent); }
 
   /* 강조색 바탕 위 글자는 어둡게(밝은 강조색 위 흰 글자는 읽기 어렵다) */
   .btn.pri, .chip:has(input:checked), .chip.on, .scale label:has(input:checked), .li .idx.on, .stepper li.cur .sn, .stt.done,

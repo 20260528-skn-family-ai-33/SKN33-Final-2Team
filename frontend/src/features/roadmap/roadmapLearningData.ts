@@ -1,13 +1,16 @@
 import type { Cert, ResourceMap } from '@/api/types/catalog';
 import type { Activity, PlanContent } from '@/api/types/plan';
 
+/** 스킬을 알 수 없는 활동을 모으는 묶음 이름 */
+export const OTHER_LEARNING = '기타 학습';
+
 export function groupLearningActivities(plan: PlanContent, resources: ResourceMap) {
   const report = plan.def.learningReport as { skillOrder?: string[] } | undefined;
   const preferred = [...new Set([...(report?.skillOrder || []), ...(plan.def.learningSkills || []).map(skill => skill.name)])];
   const groups = new Map<string, Activity[]>();
   for (const activity of plan.acts) {
     const tags = activity.skills || (activity.res ? resources[activity.res]?.skills : []) || [];
-    const name = activity.skill || tags.find(tag => preferred.includes(tag)) || tags[0] || '기타 학습';
+    const name = activity.skill || tags.find(tag => preferred.includes(tag)) || tags[0] || OTHER_LEARNING;
     groups.set(name, [...(groups.get(name) || []), activity]);
   }
   const names = [...preferred.filter(name => groups.has(name)), ...[...groups.keys()].filter(name => !preferred.includes(name))];
