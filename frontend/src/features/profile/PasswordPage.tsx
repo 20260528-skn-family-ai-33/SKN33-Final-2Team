@@ -2,6 +2,7 @@ import { useRef, useState, type FormEvent } from 'react';
 import { ApiError } from '@/api/client';
 import { accountApi } from '@/api/endpoints/account';
 import { paths } from '@/app/paths';
+import { logoutAndReset } from '@/features/auth/actions';
 import { useGo } from '@/shared/hooks/useGo';
 import { toast } from '@/shared/state/ui';
 import { Page } from '@/shared/ui/parts';
@@ -29,8 +30,8 @@ export function PasswordPage() {
     try {
       await accountApi.changePassword(current, next);
       form.reset();
-      toast('비밀번호를 변경했어요.');
-      go(paths.me, { replace: true });
+      await logoutAndReset(go);
+      toast('비밀번호를 변경했어요. 새 비밀번호로 다시 로그인해 주세요.');
     } catch (failure) {
       setError(failure instanceof ApiError ? failure.message : '비밀번호를 변경하지 못했어요.');
     } finally {

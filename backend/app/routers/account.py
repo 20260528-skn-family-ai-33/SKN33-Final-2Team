@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 
 from .. import db, llm, regulation_embeddings
 from ..agents import runtime as rt
-from ..auth import Account, end_session, hash_password, login, require_account, require_employee, start_session, verify_password
+from ..auth import COOKIE, Account, end_session, hash_password, login, require_account, require_employee, start_session, verify_password
 from ..config import S, level_ok
 from ..errors import ApiError, provider_label, unavailable_reason
 from ..services import demo, goals, profile
@@ -89,7 +89,10 @@ def api_change_password(body: dict, a: Account = Depends(require_employee)):
         if not t.run('UPDATE public.employees SET password_hash = :new WHERE employee_id = :e AND password_hash = :old',
                      e=a.id, old=stored, new=replacement):
             raise ApiError(409, 'PASSWORD_CHANGED', '비밀번호가 이미 변경됐어요. 현재 비밀번호를 다시 확인해 주세요.')
-    return Response(status_code=204)
+        t.run("DELETE FROM app_ext.sessions WHERE account_type = 'employee' AND account_id = :e", e=a.id)
+    response = Response(status_code=204)
+    response.delete_cookie(COOKIE, path='/')
+    return response
 
 
 @r.put('/me/profile/self')
