@@ -6,6 +6,7 @@ import { accountApi } from '@/api/endpoints/account';
 import type { User } from '@/api/types/account';
 import { newIdToPath, paths } from '@/app/paths';
 import { dropGoals } from '@/features/draft/goal/goalStore';
+import { MySkillMap } from '@/features/skillmap/MySkillMap';
 import { useGo } from '@/shared/hooks/useGo';
 import { failToast } from '@/shared/lib/fail';
 import { regApplies, regGroups, regSet } from '@/shared/lib/reg';
@@ -443,6 +444,7 @@ export function MePage() {
         <PermCard e={e} />
         <UseCard e={e} />
       </div>
+      <MySkillMap />
     </Page>
   );
 }

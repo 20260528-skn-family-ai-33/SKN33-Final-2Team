@@ -1,4 +1,5 @@
 /* 도서는 진행 상태 없이 보여 주고, 홈 일정표와 스킬별 완료 수에서는 뺀다 */
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
@@ -65,7 +66,13 @@ beforeAll(() => {
   });
 });
 
-const inRouter = (node: React.ReactNode) => renderToStaticMarkup(<MemoryRouter>{node}</MemoryRouter>);
+// 점검·보고서의 내 스킬 지도가 스킬 자료를 불러오므로 질의 클라이언트를 함께 둔다(서버 렌더링이라 요청은 나가지 않고 불러오는 중으로 그려진다)
+const inRouter = (node: React.ReactNode) =>
+  renderToStaticMarkup(
+    <QueryClientProvider client={new QueryClient()}>
+      <MemoryRouter>{node}</MemoryRouter>
+    </QueryClientProvider>,
+  );
 
 describe('홈 일정표의 도서', () => {
   it('도서 줄·도서만 있는 스킬을 빼고 완료 수도 도서 없이 센다', () => {

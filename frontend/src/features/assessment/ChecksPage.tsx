@@ -7,6 +7,7 @@ import {
   openPostAnswers,
   postStart,
 } from '@/features/roadmap/parts';
+import { MySkillMap } from '@/features/skillmap/MySkillMap';
 import { useGo } from '@/shared/hooks/useGo';
 import { count, isPlanComplete } from '@/shared/lib/plan';
 import { useMe } from '@/shared/state/session';
@@ -84,6 +85,7 @@ export function ChecksPage() {
           </div>
         </div>
       ) : null}
+      <MySkillMap />
       <div className="sec">
         <div className="sec-h">
           <h2 className="st">기록</h2>
