@@ -349,6 +349,7 @@ def get(employee_id: int, draft_id: str) -> dict:
 def create(employee_id: int, body: dict) -> dict:
     """작성 시작(API-14). 이미 작성 중인 것이 있으면 그것을 돌려준다(작성 중인 로드맵은 하나)"""
     with db.tx() as t:
+        t.lock_workspace(employee_id)
         r = _current_row(t, employee_id, lock=True)
         if r:
             return present(_wrap(r['draft_choices']), str(r['project_id']))
@@ -439,7 +440,7 @@ def _save_questions(t: db.Tx, draft_id: str, d: dict, kind: str = 'PRE') -> None
                              p=draft_id, r=rid, k=kind, s=str(DG.skill_label(q.get('skill') or ''))[:100], q=q['text'], o=db.J([{'value': v, 'label': l} for v, l in D['answerOpts']]), n=i))
 
 
-def _save_answers(t: db.Tx, draft_id: str, d: dict) -> None:
+def _save_answers(t: db.Tx, draft_id: str, d: dict, kind: str = 'PRE') -> None:
     labels = dict(D['answerOpts'])
     for q in d['quiz']['questions']:
         v = d['answers'].get(q['id'])
@@ -447,9 +448,9 @@ def _save_answers(t: db.Tx, draft_id: str, d: dict) -> None:
             continue
         if v:
             t.run("""INSERT INTO public.assessment_responses(project_id, question_id, assessment_type, selected_option, score)
-                     VALUES(CAST(:p AS uuid), CAST(:q AS uuid), 'PRE', :o, :s)
+                     VALUES(CAST(:p AS uuid), CAST(:q AS uuid), :k, :o, :s)
                      ON CONFLICT (project_id, question_id) DO UPDATE SET selected_option = EXCLUDED.selected_option, score = EXCLUDED.score, answered_at = now()""",
-                  p=draft_id, q=q['dbId'], o=labels.get(str(v), str(v)), s=int(v))
+                  p=draft_id, q=q['dbId'], k=kind, o=labels.get(str(v), str(v)), s=int(v))
         else:
             t.run('DELETE FROM public.assessment_responses WHERE project_id = CAST(:p AS uuid) AND question_id = CAST(:q AS uuid)', p=draft_id, q=q['dbId'])
 

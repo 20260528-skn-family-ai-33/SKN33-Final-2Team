@@ -54,6 +54,10 @@ class Tx:
     def run(self, sql: str, **p) -> int:
         return self.c.execute(text(sql), p).rowcount
 
+    def lock_workspace(self, employee_id: int) -> None:
+        """초안 생성·시연 교체·부서장 코멘트가 같은 직원의 자료를 동시에 바꾸지 않도록 한다."""
+        self.val('SELECT employee_id FROM public.employees WHERE employee_id = :e FOR NO KEY UPDATE', e=employee_id)
+
     def actor(self, employee_id: int) -> None:
         """팀 DB 트리거(guard_roadmap_comment)가 읽는 작성자 정보. 이 트랜잭션 안에서만 유효"""
         self.c.execute(text("SELECT set_config('growpath.employee_id', :v, true)"), {'v': str(employee_id)})

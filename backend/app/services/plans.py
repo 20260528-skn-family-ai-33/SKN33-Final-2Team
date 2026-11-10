@@ -634,6 +634,10 @@ def send_comment(head_id: int, member_id: int, roadmap_id: str, body: dict) -> s
     row = _comment_target(head_id, member_id, roadmap_id, '보낼')
     f = _comment_fields(body)
     with db.tx() as t:
+        # 시연 초기화가 먼저 끝났다면 이미 사라진 대상에 코멘트를 쓰지 않는다.
+        t.lock_workspace(member_id)
+        if not t.val('SELECT 1 FROM public.roadmaps WHERE roadmap_id = :r', r=row['roadmap_id']):
+            raise not_found('로드맵')
         t.actor(head_id)
         cid = str(t.val('INSERT INTO public.roadmap_comments(roadmap_id, author_employee_id, body) VALUES(:r, :a, :b) RETURNING comment_id', r=row['roadmap_id'], a=head_id,
                         b=_comment_body(f['fit'], f['fitText'], f['level'], f['levelText'], f['free'])))
