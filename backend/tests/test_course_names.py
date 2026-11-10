@@ -60,7 +60,8 @@ class ReportCourseTests(unittest.TestCase):
         plan = dict(plan, version=2, goal='분석', acts=[], assess=assess)
         row = {'roadmap_id': 'p', 'project_id': 1, 'diagnostic_round_id': 1, 'content': plan}
         transaction = Mock()
-        transaction.one.return_value = None
+        transaction.one.side_effect = [None, {'content': plan}]
+        transaction.all.return_value = []
         transaction.val.return_value = 'report'
         model = Mock(return_value={'good': [], 'improve': [], 'next': None})
         with ExitStack() as stack:

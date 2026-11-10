@@ -16,7 +16,8 @@ class ReportSurveyTests(unittest.TestCase):
         post = {'answers':{'q2':'4','q1':'5'},'goalSelf':'1'}
         row = {'roadmap_id':'p','project_id':1,'diagnostic_round_id':1,'content':plan}
         transaction = Mock()
-        transaction.one.return_value = None
+        transaction.one.side_effect = [None, {'content': plan}]
+        transaction.all.return_value = []
         transaction.val.return_value = 'report'
         with ExitStack() as stack:
             stack.enter_context(patch.object(plans,'_owned',return_value=row))

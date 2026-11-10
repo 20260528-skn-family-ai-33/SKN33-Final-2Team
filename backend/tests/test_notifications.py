@@ -73,13 +73,14 @@ class ConfirmHookTests(unittest.TestCase):
 class ReportHookTests(unittest.TestCase):
     """보고서 작성 완료 = 사후 점검 뒤 보고서 작성 작업이 보고서를 저장한 때(확인 전)"""
 
-    def start(self, report):
+    def start(self, report, *, stale=False):
         assess = {'domain': 'SQL', 'questions': [{'id': 'q1', 'area': 'SQL', 'skill': 'SQL', 'text': '조인을 작성할 수 있다.'}], 'answers': {'q1': '1'}}
         plan = {'version': 1, 'goal': '분석', 'name': '계획', 'opt': 'A1', 'acts': [], 'assess': assess}
         post = {'answers': {'q1': '4'}, 'goalSelf': '1'}
         row = {'roadmap_id': RID, 'project_id': 1, 'diagnostic_round_id': 1, 'content': plan}
         t = Mock()
-        t.one.return_value = None
+        t.one.side_effect = [None, {'content': dict(plan, version=2) if stale else plan}]
+        t.all.return_value = []
         t.val.return_value = 'report-1'
         with ExitStack() as stack:
             stack.enter_context(patch.object(plans, '_owned', return_value=row))
@@ -97,6 +98,9 @@ class ReportHookTests(unittest.TestCase):
             notify = stack.enter_context(patch.object(NT, 'report_created'))
             try:
                 plans.report_start(7, RID)
+            except plans.ApiError as error:
+                if not stale or error.code != 'REPORT_STALE':
+                    raise
             except AgentError:
                 pass
         return notify, t
@@ -104,6 +108,12 @@ class ReportHookTests(unittest.TestCase):
     def test_saved_report_notifies_in_the_same_transaction(self):
         notify, t = self.start({'return_value': {'good': [], 'improve': [], 'next': None}})
         notify.assert_called_once_with(t, 7, RID, 'report-1')
+
+    def test_changed_snapshot_leaves_no_report_or_completion_notification(self):
+        notify, t = self.start({'return_value': {'good': [], 'improve': [], 'next': None}}, stale=True)
+        notify.assert_not_called()
+        self.assertFalse(any('growth_reports' in str(c.args[0]) for c in t.val.call_args_list if c.args))
+        self.assertTrue(any('running = false' in str(c.args[0]) for c in t.run.call_args_list if c.args))
 
     def test_failed_report_leaves_no_notification(self):
         notify, t = self.start({'side_effect': AgentError('Ollama 연결 실패')})

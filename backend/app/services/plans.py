@@ -362,6 +362,10 @@ def save_progress(employee_id: int, roadmap_id: str, act_id: str, body: dict) ->
     targets = [a['id'] for a in row['content']['acts'] if a['id'] == act_id or
                (shared and a.get('res') == activity.get('res') and not a.get('task'))]
     with db.tx() as t:
+        current = t.one('SELECT content FROM public.roadmaps WHERE roadmap_id = :r FOR UPDATE', r=row['roadmap_id'])
+        status = t.val('SELECT status::text FROM public.projects WHERE project_id = :p', p=row['project_id'])
+        if status != 'IN_PROGRESS' or not current or current['content'].get('version') != row['content'].get('version'):
+            raise ApiError(409, 'PROGRESS_STALE', '로드맵 상태가 바뀌었어요. 새로고침 후 다시 시도해 주세요.')
         if required_courses:
             done = {p['activity_id'] for p in t.all(
                 "SELECT activity_id FROM app_ext.activity_progress WHERE roadmap_id = CAST(:r AS uuid) AND status = 'done'",
@@ -617,12 +621,13 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
     return {'revisionId': rev_id, 'jobId': jid}
 
 
-def revision_support(employee_id: int, roadmap_id: str, rev_id: str) -> str | None:
+def revision_support(employee_id: int, roadmap_id: str, rev_id: str, accepted: bool = False) -> str | None:
     """수정안의 지원 조건 확인(바뀐 경우만). 실패하면 '확인 필요'로 두고 다시 확인은 사용자가 누를 때만"""
     rv = db.one('SELECT result, status FROM app_ext.roadmap_revisions WHERE revision_id = CAST(:i AS uuid)', i=rev_id)
-    if not rv or rv['status'] != 'ready':
+    if not rv or rv['status'] != ('accepted' if accepted else 'ready'):
         return None
     pd = rv['result']
+    signature = RM.sup_sig(pd['to'])
     from .drafts import _sup_input, _plans_brief
 
     def work(job: jobs.JobCtx):
@@ -640,26 +645,30 @@ def revision_support(employee_id: int, roadmap_id: str, rev_id: str) -> str | No
                 # 성공으로 바꾸지 않고 이유를 적어 작업을 실패로 남긴다(작업 표 error · 서버 오류 추적은 남기지 않음)
                 raise ApiError(409, 'REVISION_GONE', '확인하는 동안 수정안이 지워져 지원 조건 확인 결과를 저장하지 않았어요')
             res = cur['result']
+            if RM.sup_sig(res['to']) != signature:
+                return {'ok': False}
             if err:
                 res['supFail'] = {'cause': err}
             else:
                 res['to']['def']['support'] = (out or {}).get(res['to']['opt']) or {'level': 'missing', 'summary': '이 버전은 확인 결과를 받지 못했어요. 담당 부서에 확인해 주세요.', 'basis': [], 'missing': []}
                 res.pop('supFail', None)
-            if cur['status'] == 'ready':
+            if cur['status'] in ('ready', 'accepted'):
                 t.run('UPDATE app_ext.roadmap_revisions SET result = :r, updated_at = now() WHERE revision_id = CAST(:i AS uuid)', r=db.J(res), i=rev_id)
-            elif cur['status'] == 'accepted' and not err:
+            if cur['status'] == 'accepted' and not err:
                 # 확인 중에 확정했으면 확정한 버전에 남긴다
-                _patch_current_support(roadmap_id, res['to']['def']['support'])
+                _patch_current_support(roadmap_id, res['to']['def']['support'], res['to']['version'])
         if err:
             raise AgentError(err['raw'] or err['text'])
         return {'ok': True}
-    work._resume = {'operation':'plans.revision_support','kwargs':{'employee_id':employee_id,'roadmap_id':roadmap_id,'rev_id':rev_id}}
-    return jobs.start('revision-support', employee_id, roadmap_id, work)
+    work._resume = {'operation':'plans.revision_support','kwargs':{'employee_id':employee_id,'roadmap_id':roadmap_id,'rev_id':rev_id,'accepted':accepted}}
+    return jobs.start('revision-support', employee_id, f'{roadmap_id}:{rev_id}:accepted' if accepted else roadmap_id, work)
 
 
-def _patch_current_support(roadmap_id: str, support: dict) -> None:
+def _patch_current_support(roadmap_id: str, support: dict, version: int) -> None:
     with db.tx() as t:
         row = t.one('SELECT content FROM public.roadmaps WHERE roadmap_id = CAST(:r AS uuid) FOR UPDATE', r=roadmap_id)
+        if not row or row['content'].get('version') != version:
+            return
         content = row['content']
         content.setdefault('def', {})['support'] = support
         t.run('UPDATE public.roadmaps SET content = :c, updated_at = now() WHERE roadmap_id = CAST(:r AS uuid)', c=db.J(content), r=roadmap_id)
@@ -746,7 +755,13 @@ def accept_revision(employee_id: int, roadmap_id: str, revision_id: str, selecte
             done = {item['activity_id'] for item in t.all(
                 "SELECT activity_id FROM app_ext.activity_progress WHERE roadmap_id = :r AND status = 'done'", r=row['roadmap_id'])}
             handoff = cur.get('handoff') or pd['handoff']
-            pd = dict(pd, to=_mix_revision_skills(cur, pd['to'], handoff, selected_skills, done),
+            proposal = pd['to']
+            mixed = _mix_revision_skills(cur, proposal, handoff, selected_skills, done)
+            if (proposal['opt'], proposal['hours'], RM.sup_sig(proposal)) == (mixed['opt'], mixed['hours'], RM.sup_sig(mixed)):
+                support = proposal['def'].get('support')
+                if support:
+                    mixed['def']['support'] = copy.deepcopy(support)
+            pd = dict(pd, to=mixed,
                       prefsTo=cur.get('prefs'), handoff=handoff)
 
         changed = pd['to']['opt'] != cur['opt']
@@ -789,10 +804,16 @@ def accept_revision(employee_id: int, roadmap_id: str, revision_id: str, selecte
         _write_steps(t, roadmap_id, plan)
         t.run('UPDATE app_ext.roadmap_meta SET version = :v WHERE roadmap_id = :r', v=plan['version'], r=row['roadmap_id'])
         t.run('INSERT INTO app_ext.roadmap_versions(roadmap_id, version, plan, reason) VALUES(:r, :v, :p, :w)', r=row['roadmap_id'], v=plan['version'], p=db.J(plan), w=pd['label'])
-        t.run("UPDATE app_ext.roadmap_revisions SET status = 'accepted', updated_at = now() WHERE revision_id = CAST(:i AS uuid)", i=revision_id)
+        t.run("UPDATE app_ext.roadmap_revisions SET status = 'accepted', result = :result, updated_at = now() WHERE revision_id = CAST(:i AS uuid)", i=revision_id, result=db.J(dict(pd, to=plan)))
         if pd.get('fromComment'):
             t.run("""INSERT INTO app_ext.comment_meta(comment_id, status, applied_version) VALUES(CAST(:c AS uuid), 'applied', :v)
                      ON CONFLICT (comment_id) DO UPDATE SET status = 'applied', applied_version = :v""", c=pd['fromComment'], v=plan['version'])
+    if selected_skills is not None and not plan['def'].get('support'):
+        try:
+            revision_support(employee_id, roadmap_id, revision_id, accepted=True)
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception('Accepted revision support scheduling failed')
     return record(_owned(employee_id, roadmap_id))
 
 
@@ -1031,6 +1052,17 @@ def _report_deep(row: dict, A: dict) -> dict | None:
     return {'concepts': concepts, 'essays': essays}
 
 
+def _report_snapshot_matches(t, roadmap_id, stored, snapshot):
+    from .report_snapshot import matches
+    progress = {str(item['activity_id']): {'status': item['status'], 'memo': item.get('memo') or '', 'file': item.get('attachment')}
+                for item in t.all('SELECT activity_id,status,memo,attachment FROM app_ext.activity_progress WHERE roadmap_id = :r FOR UPDATE', r=roadmap_id)}
+    if matches(snapshot, dict(stored, acts=tracked_acts(stored)), progress):
+        return True
+    from .duration_proposals import apply_plan_schedule
+    refreshed = apply_plan_schedule(stored)
+    return matches(snapshot, dict(refreshed, acts=tracked_acts(refreshed)), progress)
+
+
 def _finish_report_plan(t: db.Tx, project_id, roadmap_id) -> None:
     t.run("UPDATE public.projects SET status = 'COMPLETED', updated_at = now() WHERE project_id = :p AND status <> 'COMPLETED'", p=project_id)
     t.run('UPDATE app_ext.roadmap_meta SET done_at = coalesce(done_at, now()) WHERE roadmap_id = :r', r=roadmap_id)
@@ -1101,19 +1133,30 @@ def report_start(employee_id: int, roadmap_id: str) -> str:
                          'essays': [{'area': e['area'], 'pre': e['preLevel'], 'post': (judge.get(e['id']) or {}).get('level'), 'why': (judge.get(e['id']) or {}).get('why')}
                                     for e in deep_inp['essays']]}
         with db.tx() as t:
-            if deep_inp:
-                t.run("UPDATE app_ext.post_checks SET deep = deep || jsonb_build_object('judge', CAST(:j AS jsonb)) WHERE roadmap_id = :r",
-                      j=json.dumps(out.get('judge') or {}, ensure_ascii=False), r=row['roadmap_id'])
-            # 팀 DB 보고서는 넣은 뒤 고칠 수 없어(트리거) 확인 전 보고서는 지우고 새로 넣는다
-            t.run('DELETE FROM public.growth_reports WHERE roadmap_id = :r', r=row['roadmap_id'])
-            rep_id = str(t.val("INSERT INTO public.growth_reports(project_id, roadmap_id, report_type, report_content) VALUES(:p, :r, 'PRE_POST', :c) RETURNING report_id",
-                               p=row['project_id'], r=row['roadmap_id'], c=db.J(r)))
-            t.run('INSERT INTO app_ext.report_meta(report_id, confirmed, confirmed_at) VALUES(CAST(:i AS uuid), true, now())', i=rep_id)
-            t.run('UPDATE public.diagnostic_rounds SET post_completed_at = now() WHERE diagnostic_round_id = :d', d=row['diagnostic_round_id'])
-            t.run('UPDATE app_ext.post_checks SET running = false, fail = NULL WHERE roadmap_id = :r', r=row['roadmap_id'])
-            # 보고서 작성 완료 알림(#82): 본인·부서장. 위에서 지운 이전 보고서의 알림은 함께 지워졌다(report_id ON DELETE CASCADE)
-            _finish_report_plan(t, row['project_id'], row['roadmap_id'])
-            NT.report_created(t, employee_id, str(row['roadmap_id']), rep_id)
+            # Match the revision acceptance lock order before finalizing the roadmap.
+            t.all("SELECT revision_id FROM app_ext.roadmap_revisions WHERE roadmap_id = :r AND status IN ('running', 'ready', 'failed') FOR UPDATE", r=row['roadmap_id'])
+            current = t.one('SELECT content FROM public.roadmaps WHERE roadmap_id = :r FOR UPDATE', r=row['roadmap_id'])
+            stale = not current or not _report_snapshot_matches(t, row['roadmap_id'], current['content'], execution_snapshot)
+            if stale:
+                message = '보고서 생성 중 학습 기록이 바뀌었어요. 최신 기록으로 다시 시도해 주세요.'
+                t.run('UPDATE app_ext.post_checks SET running = false, fail = :f WHERE roadmap_id = :r',
+                      f=db.J({'cause': {'code': 'REPORT_STALE', 'user': message, 'text': message}}), r=row['roadmap_id'])
+            else:
+                if deep_inp:
+                    t.run("UPDATE app_ext.post_checks SET deep = deep || jsonb_build_object('judge', CAST(:j AS jsonb)) WHERE roadmap_id = :r",
+                          j=json.dumps(out.get('judge') or {}, ensure_ascii=False), r=row['roadmap_id'])
+                # 팀 DB 보고서는 넣은 뒤 고칠 수 없어(트리거) 확인 전 보고서는 지우고 새로 넣는다
+                t.run('DELETE FROM public.growth_reports WHERE roadmap_id = :r', r=row['roadmap_id'])
+                rep_id = str(t.val("INSERT INTO public.growth_reports(project_id, roadmap_id, report_type, report_content) VALUES(:p, :r, 'PRE_POST', :c) RETURNING report_id",
+                                   p=row['project_id'], r=row['roadmap_id'], c=db.J(r)))
+                t.run('INSERT INTO app_ext.report_meta(report_id, confirmed, confirmed_at) VALUES(CAST(:i AS uuid), true, now())', i=rep_id)
+                t.run('UPDATE public.diagnostic_rounds SET post_completed_at = now() WHERE diagnostic_round_id = :d', d=row['diagnostic_round_id'])
+                t.run('UPDATE app_ext.post_checks SET running = false, fail = NULL WHERE roadmap_id = :r', r=row['roadmap_id'])
+                # 보고서 작성 완료 알림(#82): 본인·부서장. 위에서 지운 이전 보고서의 알림은 함께 지워졌다(report_id ON DELETE CASCADE)
+                _finish_report_plan(t, row['project_id'], row['roadmap_id'])
+                NT.report_created(t, employee_id, str(row['roadmap_id']), rep_id)
+        if stale:
+            raise ApiError(409, 'REPORT_STALE', message)
         return {'reportId': rep_id}
     work._resume = {'operation':'plans.report_start','kwargs':{'employee_id':employee_id,'roadmap_id':roadmap_id}}
     jid = jobs.start('report', employee_id, roadmap_id, work)
@@ -1129,16 +1172,8 @@ def confirm_report(employee_id: int, report_id: str) -> dict:
         if not r:
             raise not_found('결과 보고서')
         snapshot=(r.get('report_content') or {}).get('executionSnapshot')
-        if snapshot:
-            from .report_snapshot import matches
-            progress={str(item['activity_id']):{'status':item['status'],'memo':item.get('memo') or '', 'file':item.get('attachment')}
-                for item in t.all('SELECT activity_id,status,memo,attachment FROM app_ext.activity_progress WHERE roadmap_id = :r FOR UPDATE',r=r['roadmap_id'])}
-            stored = r['content']
-            if not matches(snapshot, dict(stored, acts=tracked_acts(stored)), progress):
-                from .duration_proposals import apply_plan_schedule
-                refreshed = apply_plan_schedule(stored)
-                if not matches(snapshot, dict(refreshed, acts=tracked_acts(refreshed)), progress):
-                    raise ApiError(409,'REPORT_STALE','보고서 작성 후 실행 기록이 바뀌었어요. 최신 기록으로 보고서를 다시 만든 뒤 종료해 주세요.')
+        if snapshot and not _report_snapshot_matches(t, r['roadmap_id'], r['content'], snapshot):
+            raise ApiError(409, 'REPORT_STALE', '보고서 작성 후 실행 기록이 바뀌었어요. 최신 기록으로 보고서를 다시 만든 뒤 종료해 주세요.')
         t.run('INSERT INTO app_ext.report_meta(report_id, confirmed, confirmed_at) VALUES(:i, true, now()) ON CONFLICT (report_id) DO UPDATE SET confirmed = true, confirmed_at = now()',
               i=r['report_id'])
         _finish_report_plan(t, r['project_id'], r['roadmap_id'])
