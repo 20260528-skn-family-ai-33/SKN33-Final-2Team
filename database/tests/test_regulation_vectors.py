@@ -46,9 +46,11 @@ class RegulationVectorTests(unittest.TestCase):
         sha = rv.input_hash(row)
         current = {'input_version': rv.INPUT_VERSION, 'input_sha256': sha,
                    'dimensions': rv.DIMENSIONS, 'meta_sha256': sha, 'actual_input_sha256': sha,
-                   'model_revision': rv.PROVENANCE['model_revision'], 'protocol': rv.PROTOCOL,
+                   'model_revision': rv.PROVENANCE['model_revision'], 'protocol': rv.ACCEPTED_PROTOCOLS[0],
                    'token_count': 3}
-        self.assertFalse(rv.needs_embedding(row, {'c1': current}))
+        for protocol in rv.ACCEPTED_PROTOCOLS:
+            with self.subTest(protocol=protocol):
+                self.assertFalse(rv.needs_embedding(row, {'c1': dict(current, protocol=protocol)}))
         self.assertTrue(rv.needs_embedding(row, {}))
         for field, bad in (('meta_sha256', None), ('meta_sha256', 'old'),
                            ('actual_input_sha256', 'old'), ('model_revision', 'old'),
@@ -61,7 +63,7 @@ class RegulationVectorTests(unittest.TestCase):
         conn = MagicMock()
         conn.execute.return_value.fetchone.return_value = {'id': None}
         with patch.object(rv, 'sources', return_value=[{'rag_chunk_id': 'c1'}]), \
-             patch.object(rv, 'embed_texts') as embed:
+             patch.object(rv, 'embed_for_index') as embed:
             with self.assertRaisesRegex(ValueError, 'Restore the shared BGE-M3 database'):
                 rv.embed(conn)
         conn.execute.assert_called_once_with('SELECT to_regclass(%s) AS id', (rv.META_TABLE,))
@@ -69,7 +71,9 @@ class RegulationVectorTests(unittest.TestCase):
         embed.assert_not_called()
 
     def test_import_rejects_unverified_model_provenance_before_database_access(self):
-        for version, provenance in ((1, None), (2, dict(rv.PROVENANCE, model_revision='unknown'))):
+        # version 2는 revision은 있지만 실제 정밀도·토큰 수가 없어 현재 값을 임의로 붙일 수 없다.
+        for version, provenance in ((1, None), (2, rv.PROVENANCE),
+                                    (rv.EXPORT_FORMAT_VERSION, dict(rv.PROVENANCE, model_revision='unknown'))):
             with self.subTest(version=version), TemporaryDirectory() as directory:
                 payload = json.dumps({'format_version': version, 'provenance': provenance})
                 path = Path(directory) / 'vectors.json'

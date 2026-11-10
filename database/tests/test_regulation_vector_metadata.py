@@ -14,10 +14,13 @@ from psycopg.conninfo import conninfo_to_dict
 from psycopg.rows import dict_row
 
 from src.database.vectors import regulation_vectors as vectors
+from src.shared.bge_embeddings import ACCEPTED_PROTOCOLS, IndexedEmbedding
 
 
 VECTOR = [1.0] + [0.0] * 1023
 OTHER_VECTOR = [0.0, 1.0] + [0.0] * 1022
+FP16, FP32 = ACCEPTED_PROTOCOLS
+TOKENS = 11
 FIXTURE_TABLES = (
     'regulations.regulation_versions',
     'regulations.rag_chunks',
@@ -26,6 +29,10 @@ FIXTURE_TABLES = (
     'public.learning_resource_embeddings',
     'knowledge.chunks',
 )
+
+
+def indexed(texts, vector=VECTOR):
+    return [IndexedEmbedding(vector[:], FP32, TOKENS) for _ in texts]
 
 
 class RegulationVectorMetadataDatabaseTests(unittest.TestCase):
@@ -138,8 +145,7 @@ class RegulationVectorMetadataDatabaseTests(unittest.TestCase):
         }
 
     def _embed(self):
-        with patch.object(vectors, 'embed_texts',
-                          side_effect=lambda texts: [VECTOR[:] for _ in texts]) as embed:
+        with patch.object(vectors, 'embed_for_index', side_effect=indexed) as embed:
             result = vectors.embed(self.conn)
         self.conn.commit()
         return result, embed
@@ -167,17 +173,91 @@ class RegulationVectorMetadataDatabaseTests(unittest.TestCase):
         self.assertEqual(report['tables'][vectors.TABLE], {'total': 2, 'valid': 2})
         self.assertEqual(report['provenance'], {'total': 2, 'valid': 2})
 
-    def _backend_ensure(self, vector=VECTOR):
+    def _backend_ensure(self, vector=VECTOR, during_embedding=None):
         articles = {row['rag_chunk_id']: {
             'id': row['rag_chunk_id'], 'path': row['context_path'],
             'chunkText': row['chunk_text'],
         } for row in vectors.sources(self.conn)}
         self.conn.commit()
+
+        def embed_batch(texts):
+            if during_embedding:
+                during_embedding()
+            return indexed(texts, vector)
+
         with patch.object(self.backend.regstore, 'article', side_effect=articles.__getitem__), \
-             patch.object(self.backend.embeddings, 'embed',
-                          side_effect=lambda texts: [vector[:] for _ in texts]) as embed:
+             patch.object(self.backend.embeddings, 'embed_for_index', side_effect=embed_batch) as embed:
             result = self.backend.ensure_vectors(list(articles))
         return result, embed
+
+    def _other_connection(self, statement):
+        def run():
+            with psycopg.connect(self.db_url, autocommit=True) as other:
+                other.execute(statement)
+        return run
+
+    def test_backend_ensure_holds_source_row_lock_until_commit(self):
+        outcomes = []
+        real_run = self.backend.db.Tx.run
+
+        def run_with_concurrent_update(transaction, sql, **params):
+            if not outcomes:
+                with psycopg.connect(self.db_url, autocommit=True) as other:
+                    other.execute("SET lock_timeout = '200ms'")
+                    try:
+                        other.execute("UPDATE regulations.rag_chunks SET chunk_text='동시 변경' WHERE rag_chunk_id='r1'")
+                        outcomes.append('updated')
+                    except psycopg.errors.LockNotAvailable:
+                        outcomes.append('blocked')
+            return real_run(transaction, sql, **params)
+
+        with patch.object(self.backend.db.Tx, 'run', run_with_concurrent_update):
+            saved, _ = self._backend_ensure()
+        self.assertEqual((saved, outcomes), (2, ['blocked']))
+        self._backend_accepts_current_vectors()
+
+    def _assert_source_change_during_embedding_is_rejected(self, statement):
+        before = self._state()
+        with self.assertRaisesRegex(self.backend.llm.LlmError, '규정 원문이 바뀌었어요'):
+            self._backend_ensure(during_embedding=self._other_connection(statement))
+        self.assertEqual(self._state(), before)
+
+    def test_backend_ensure_rejects_source_changed_during_embedding(self):
+        self._assert_source_change_during_embedding_is_rejected(
+            "UPDATE regulations.rag_chunks SET chunk_text='임베딩 도중 변경' WHERE rag_chunk_id='r2'")
+
+    def test_backend_ensure_rejects_source_deleted_during_embedding(self):
+        self._assert_source_change_during_embedding_is_rejected(
+            "DELETE FROM regulations.rag_chunks WHERE rag_chunk_id='r2'")
+
+    def test_records_reported_precision_and_tokens(self):
+        for ensure in (self._embed, self._backend_ensure):
+            with self.subTest(path=ensure.__name__):
+                self.conn.execute('TRUNCATE regulations.rag_chunk_embeddings, growpath_bge_meta.inputs')
+                self.conn.commit()
+                ensure()
+                rows = self.conn.execute('SELECT protocol, token_count FROM growpath_bge_meta.inputs').fetchall()
+                self.conn.commit()
+                self.assertEqual(rows, [{'protocol': FP32, 'token_count': TOKENS}] * 2)
+                self._backend_accepts_current_vectors()
+
+    def test_shared_fp16_records_stay_current_and_only_changed_row_becomes_fp32(self):
+        self._embed()
+        self.conn.execute('UPDATE growpath_bge_meta.inputs SET protocol=%s, token_count=1', (FP16,))
+        self.conn.commit()
+        self._backend_accepts_current_vectors()
+        retry, embed = self._embed()
+        self.assertEqual(retry['saved'], 0)
+        embed.assert_not_called()
+        self.conn.execute("UPDATE regulations.rag_chunks SET chunk_text='재색인 원문' WHERE rag_chunk_id='r1'")
+        self.conn.commit()
+        self.assertEqual(self._embed()[0]['saved'], 1)
+        rows = self.conn.execute('''SELECT source_id, protocol, token_count FROM growpath_bge_meta.inputs
+            ORDER BY source_id''').fetchall()
+        self.conn.commit()
+        self.assertEqual(rows, [{'source_id': 'r1', 'protocol': FP32, 'token_count': TOKENS},
+                                {'source_id': 'r2', 'protocol': FP16, 'token_count': 1}])
+        self._backend_accepts_current_vectors()
 
     def test_backend_ensure_refreshes_real_sql_and_retry_is_noop(self):
         first, _ = self._backend_ensure()
@@ -269,15 +349,19 @@ class RegulationVectorMetadataDatabaseTests(unittest.TestCase):
         self._embed()
         path = self._export()
         payload = json.loads(json.loads(path.read_text(encoding='utf-8'))['payload'])
-        self.assertEqual(payload['format_version'], 2)
+        self.assertEqual(payload['format_version'], vectors.EXPORT_FORMAT_VERSION)
         self.assertEqual(payload['provenance'], vectors.PROVENANCE)
+        self.assertEqual({(row['protocol'], row['token_count']) for row in payload['rows']}, {(FP32, TOKENS)})
         self.conn.execute('TRUNCATE regulations.rag_chunk_embeddings, growpath_bge_meta.inputs')
         self.conn.commit()
-        with patch.object(vectors, 'embed_texts') as embed, self.conn.transaction():
+        with patch.object(vectors, 'embed_for_index') as embed, self.conn.transaction():
             imported = vectors.import_vectors(self.conn, path)
         embed.assert_not_called()
         self.assertEqual(imported['imported_vectors'], 2)
         self.conn.commit()
+        rows = self.conn.execute('SELECT DISTINCT protocol, token_count FROM growpath_bge_meta.inputs').fetchall()
+        self.conn.commit()
+        self.assertEqual(rows, [{'protocol': FP32, 'token_count': TOKENS}])
         self._backend_accepts_current_vectors()
         retry, embed = self._embed()
         self.assertEqual(retry['saved'], 0)
@@ -288,16 +372,19 @@ class RegulationVectorMetadataDatabaseTests(unittest.TestCase):
         path = self._export()
         payload = json.loads(json.loads(path.read_text(encoding='utf-8'))['payload'])
         before = self._state()
-        cases = [dict(payload, format_version=1)]
+        cases = [dict(payload, format_version=1), dict(payload, format_version=2)]
         for field in vectors.PROVENANCE:
             cases.append(dict(payload, provenance=dict(vectors.PROVENANCE, **{field: 'wrong'})))
+        for changes in ({'protocol': 'old'}, {'protocol': None}, {'token_count': 0},
+                        {'token_count': 8193}, {'token_count': True}, {'token_count': None}):
+            cases.append(dict(payload, rows=[dict(payload['rows'][0], **changes), payload['rows'][1]]))
         for index, invalid in enumerate(cases):
             with self.subTest(index=index):
                 data = json.dumps(invalid, ensure_ascii=False, sort_keys=True)
                 altered = Path(self.temp) / f'invalid-{index}.json'
                 altered.write_text(json.dumps({'payload': data,
                     'sha256': hashlib.sha256(data.encode('utf-8')).hexdigest()}), encoding='utf-8')
-                with patch.object(vectors, 'embed_texts') as embed:
+                with patch.object(vectors, 'embed_for_index') as embed:
                     with self.assertRaises(ValueError), self.conn.transaction():
                         vectors.import_vectors(self.conn, altered)
                 embed.assert_not_called()
@@ -312,7 +399,7 @@ class RegulationVectorMetadataDatabaseTests(unittest.TestCase):
                 self.conn.commit()
                 before = self._state()
                 try:
-                    with patch.object(vectors, 'embed_texts') as embed:
+                    with patch.object(vectors, 'embed_for_index') as embed:
                         with self.assertRaises(psycopg.errors.CheckViolation):
                             vectors.import_vectors(self.conn, path)
                     embed.assert_not_called()
@@ -331,8 +418,7 @@ class RegulationVectorMetadataDatabaseTests(unittest.TestCase):
                 self.conn.commit()
                 before = self._state()
                 try:
-                    with patch.object(vectors, 'embed_texts',
-                                      side_effect=lambda texts: [VECTOR[:] for _ in texts]):
+                    with patch.object(vectors, 'embed_for_index', side_effect=indexed):
                         with self.assertRaises(psycopg.errors.CheckViolation):
                             vectors.embed(self.conn)
                     self.assertEqual(self._state(), before)
@@ -353,7 +439,7 @@ class RegulationVectorMetadataDatabaseTests(unittest.TestCase):
         self.conn.execute("UPDATE regulations.rag_chunks SET chunk_text=chunk_text || ' 변경'")
         self.conn.commit()
         before = self._state()
-        with patch.object(vectors, 'embed_texts', side_effect=RuntimeError('mock model failure')):
+        with patch.object(vectors, 'embed_for_index', side_effect=RuntimeError('mock model failure')):
             with self.assertRaisesRegex(RuntimeError, 'mock model failure'):
                 vectors.embed(self.conn)
         self.assertEqual(self._state(), before)
@@ -361,7 +447,8 @@ class RegulationVectorMetadataDatabaseTests(unittest.TestCase):
     def _assert_source_guard_rolls_back_first_write(self, delete):
         self._embed()
         entries = [{'rag_chunk_id': row['rag_chunk_id'], 'input_sha256': vectors.input_hash(row),
-                    'embedding': OTHER_VECTOR} for row in vectors.sources(self.conn)]
+                    'embedding': OTHER_VECTOR, 'protocol': FP32, 'token_count': TOKENS}
+                   for row in vectors.sources(self.conn)]
         if delete:
             self.conn.execute("DELETE FROM regulations.rag_chunks WHERE rag_chunk_id='r2'")
         else:

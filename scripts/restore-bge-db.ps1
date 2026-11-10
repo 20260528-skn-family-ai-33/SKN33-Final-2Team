@@ -68,7 +68,10 @@ $containerFile = "/tmp/bge-$($info.sha256).dump"
 if ($LASTEXITCODE -ne 0) { throw '백업 파일 복사가 실패했습니다.' }
 & docker compose exec -T db sh -c 'exec pg_restore -U "$POSTGRES_USER" --single-transaction --exit-on-error --no-owner --no-acl -d "$1" "$2"' sh $Database $containerFile
 if ($LASTEXITCODE -ne 0) { throw '복원이 실패했습니다. 원본 DB는 변경하지 않았습니다.' }
+# 검증과 복원 표시를 한 트랜잭션으로 묶어, INSERT 실패·연결 단절 시 빈 표시 테이블이 남지 않게 한다.
+# CREATE DATABASE가 트랜잭션 안에서 실행되지 않도록 공통 psql 함수에는 적용하지 않는다.
 $verification = @"
+BEGIN;
 DO `$verify`$ BEGIN
 IF (SELECT count(*) FROM public.learning_resource_embeddings WHERE embedding_model='BAAI/bge-m3' AND dimensions=1024 AND vector_dims(embedding)=1024) <> 2984
 OR (SELECT count(*) FROM regulations.rag_chunk_embeddings WHERE embedding_model='BAAI/bge-m3' AND dimensions=1024 AND vector_dims(embedding)=1024) <> 1406
@@ -77,6 +80,7 @@ THEN RAISE EXCEPTION 'BGE vector counts differ from manifest'; END IF;
 END `$verify`$;
 CREATE TABLE IF NOT EXISTS growpath_bge_meta.restore_state(archive_sha256 text PRIMARY KEY, restored_at timestamptz NOT NULL DEFAULT now());
 INSERT INTO growpath_bge_meta.restore_state(archive_sha256) VALUES ('$($info.sha256)') ON CONFLICT (archive_sha256) DO NOTHING;
+COMMIT;
 "@
 Invoke-BgePg -SqlArgs @('-d',$Database,'-c',$verification)
 & docker compose exec -T db rm -f $containerFile

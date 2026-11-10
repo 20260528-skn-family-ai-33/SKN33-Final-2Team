@@ -10,13 +10,15 @@ import math
 from pathlib import Path
 import sys
 
+from . import provenance
 from ..deployment import connect
 
-from src.shared.bge_embeddings import MODEL, DIMENSIONS, PROVENANCE, embed_texts, vector_values
+from src.shared.bge_embeddings import (ACCEPTED_PROTOCOLS, MAX_TOKENS, MODEL, DIMENSIONS, PROVENANCE,
+                                       embed_for_index, embed_texts, vector_values)
 TABLE = 'regulations.rag_chunk_embeddings'
-META_TABLE = 'growpath_bge_meta.inputs'
+META_TABLE = provenance.META_TABLE
 INPUT_VERSION = 'context_path+blank_line+chunk_text/v1'
-PROTOCOL = 'bge-m3/cls-l2-fp16/v1'
+EXPORT_FORMAT_VERSION = 3
 DDL = '''
 SET LOCAL search_path TO public, extensions;
 CREATE TABLE IF NOT EXISTS regulations.rag_chunk_embeddings (
@@ -112,13 +114,8 @@ def sources(conn):
     return conn.execute(SOURCE_SQL).fetchall()
 
 
-def require_meta_table(conn):
-    if not conn.execute('SELECT to_regclass(%s) AS id', (META_TABLE,)).fetchone()['id']:
-        raise ValueError('Restore the shared BGE-M3 database with growpath_bge_meta.inputs first.')
-
-
 def stored(conn):
-    require_meta_table(conn)
+    provenance.require_table(conn)
     if not table_exists(conn):
         return {}
     return {r['rag_chunk_id']:r for r in conn.execute(
@@ -135,11 +132,7 @@ def needs_embedding(row, previous):
     old = previous.get(row['rag_chunk_id'])
     sha = input_hash(row)
     return (not old or old['input_version'] != INPUT_VERSION or old['input_sha256'] != sha
-            or old.get('dimensions') != DIMENSIONS or old.get('meta_sha256') != sha
-            or old.get('actual_input_sha256') != sha
-            or old.get('model_revision') != PROVENANCE['model_revision']
-            or old.get('protocol') != PROTOCOL
-            or not 1 <= (old.get('token_count') or 0) <= 8192)
+            or old.get('dimensions') != DIMENSIONS or not provenance.is_current(old, sha, sha))
 
 
 def status(conn):
@@ -153,7 +146,7 @@ def status(conn):
 
 
 def store_rows(conn, entries):
-    require_meta_table(conn)
+    provenance.require_table(conn)
     for entry in entries:
         current = conn.execute('''SELECT rag_chunk_id,chunk_text,context_path
             FROM regulations.rag_chunks WHERE rag_chunk_id=%s FOR SHARE''',
@@ -168,15 +161,8 @@ def store_rows(conn, entries):
               dimensions=EXCLUDED.dimensions,input_version=EXCLUDED.input_version,
               input_sha256=EXCLUDED.input_sha256,embedding=EXCLUDED.embedding,updated_at=now()''',
             (entry['rag_chunk_id'],MODEL,DIMENSIONS,INPUT_VERSION,entry['input_sha256'],vector))
-        conn.execute(f'''INSERT INTO {META_TABLE}
-            (kind,source_id,source_sha256,actual_input_sha256,protocol,model_revision,token_count)
-            VALUES ('regulations',%s,%s,%s,%s,%s,%s)
-            ON CONFLICT (kind,source_id) DO UPDATE SET
-              source_sha256=EXCLUDED.source_sha256,actual_input_sha256=EXCLUDED.actual_input_sha256,
-              protocol=EXCLUDED.protocol,model_revision=EXCLUDED.model_revision,
-              token_count=EXCLUDED.token_count,created_at=now()''',
-            (entry['rag_chunk_id'],entry['input_sha256'],entry['input_sha256'],PROTOCOL,
-             PROVENANCE['model_revision'],max(1,min(len(input_text(current).split()),8192))))
+        provenance.save(conn,'regulations',entry['rag_chunk_id'],entry['input_sha256'],entry['input_sha256'],
+                        entry['protocol'],entry['token_count'])
 
 
 def embed(conn, batch_size=16):
@@ -191,11 +177,12 @@ def embed(conn, batch_size=16):
     saved = 0
     for offset in range(0,len(pending),batch_size):
         batch = pending[offset:offset+batch_size]
-        vectors = embed_texts([input_text(row) for row in batch])
+        indexed = embed_for_index([input_text(row) for row in batch])
         with conn.transaction():
             conn.execute('SET LOCAL search_path TO public, extensions')
-            store_rows(conn,[{'rag_chunk_id':row['rag_chunk_id'],'input_sha256':input_hash(row),'embedding':vector}
-                             for row,vector in zip(batch,vectors)])
+            store_rows(conn,[{'rag_chunk_id':row['rag_chunk_id'],'input_sha256':input_hash(row),'embedding':item.vector,
+                              'protocol':item.protocol,'token_count':item.token_count}
+                             for row,item in zip(batch,indexed,strict=True)])
         saved += len(batch)
         print(f'Embedded {saved}/{len(pending)} chunks',file=sys.stderr)
     return {'saved':saved,'skipped_unchanged':len(rows)-len(pending),'embedding_model':MODEL,
@@ -232,8 +219,9 @@ def export_vectors(conn,output):
     if not table_exists(conn):
         raise ValueError('No regulation vector table; run embed first.')
     conn.execute('SET LOCAL search_path TO public, extensions')
-    rows = conn.execute(f'''SELECT e.rag_chunk_id,e.input_sha256,e.embedding::text AS embedding
+    rows = conn.execute(f'''SELECT e.rag_chunk_id,e.input_sha256,e.embedding::text AS embedding,p.protocol,p.token_count
         FROM {TABLE} e JOIN regulations.rag_chunks c USING (rag_chunk_id)
+        JOIN {META_TABLE} p ON p.kind='regulations' AND p.source_id=e.rag_chunk_id
         WHERE e.embedding_model=%s AND e.input_version=%s AND e.input_sha256={HASH_SQL}
           AND c.search_status NOT IN ('superseded', 'not_for_answer')
         ORDER BY e.rag_chunk_id''',(MODEL,INPUT_VERSION)).fetchall()
@@ -242,7 +230,7 @@ def export_vectors(conn,output):
         raise ValueError('Some regulation vectors or metadata are missing/stale; finish embed before export.')
     for row in rows:
         row['embedding'] = vector_values(row['embedding'])
-    payload = {'format_version':2,'kind':'regulation_vectors','model':MODEL,'dimensions':DIMENSIONS,
+    payload = {'format_version':EXPORT_FORMAT_VERSION,'kind':'regulation_vectors','model':MODEL,'dimensions':DIMENSIONS,
                'input_version':INPUT_VERSION,'provenance':PROVENANCE,'rows':rows}
     data = json.dumps(payload,ensure_ascii=False,sort_keys=True,allow_nan=False)
     wrapper = {'sha256':hashlib.sha256(data.encode('utf-8')).hexdigest(),'payload':data}
@@ -258,10 +246,11 @@ def import_vectors(conn,path):
     if hashlib.sha256(data.encode('utf-8')).hexdigest()!=wrapper['sha256']:
         raise ValueError('Regulation vector export checksum mismatch')
     payload = json.loads(data)
-    if payload.get('format_version') != 2 or payload.get('provenance') != PROVENANCE:
+    # 실제 추론 정밀도·토큰 수가 없는 version 1·2 파일에 현재 값을 임의로 붙이지 않는다.
+    if payload.get('format_version') != EXPORT_FORMAT_VERSION or payload.get('provenance') != PROVENANCE:
         raise ValueError('Regulation vector export provenance missing/mismatched; rerun embed and export.')
     if (payload['format_version'],payload['kind'],payload['model'],payload['dimensions'],payload['input_version']) != (
-            2,'regulation_vectors',MODEL,DIMENSIONS,INPUT_VERSION):
+            EXPORT_FORMAT_VERSION,'regulation_vectors',MODEL,DIMENSIONS,INPUT_VERSION):
         raise ValueError('Regulation vector export format/model mismatch')
     rows = payload['rows']
     if len({r['rag_chunk_id'] for r in rows})!=len(rows):
@@ -269,9 +258,12 @@ def import_vectors(conn,path):
     current = {r['rag_chunk_id']:r for r in sources(conn)}
     for row in rows:
         vector_values(row['embedding'])
+        if (row.get('protocol') not in ACCEPTED_PROTOCOLS or type(row.get('token_count')) is not int
+                or not 1<=row['token_count']<=MAX_TOKENS):
+            raise ValueError('Regulation vector export row provenance is invalid; rerun embed and export.')
         if row['rag_chunk_id'] not in current or input_hash(current[row['rag_chunk_id']])!=row['input_sha256']:
             raise ValueError('Restore matching regulation source data before vector import.')
-    require_meta_table(conn)
+    provenance.require_table(conn)
     with conn.transaction():
         conn.execute(DDL,prepare=False)
         store_rows(conn,rows)

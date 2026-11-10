@@ -9,3 +9,7 @@ DIMENSIONS = _contract['dimensions']
 REVISION = _contract['model_revision']
 WEIGHTS_SHA256 = _contract['weights_sha256']
 PROVENANCE = {key: _contract[key] for key in ('model_revision', 'weights_sha256', 'pooling', 'normalization')}
+# 서버가 보고한 추론 정밀도 → 검증 기록의 프로토콜. 공유 백업의 기존 행은 GPU FP16 값을 유지한다.
+INDEX_PROTOCOLS = _contract['index_protocols']
+ACCEPTED_PROTOCOLS = tuple(INDEX_PROTOCOLS.values())
+MAX_TOKENS = 8192

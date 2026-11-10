@@ -68,5 +68,8 @@ def embeddings(request: EmbeddingRequest):
         vectors = torch.nn.functional.normalize(output, p=2, dim=1)
         if vectors.shape[1] != DIMENSIONS or not torch.isfinite(vectors).all():
             raise HTTPException(500, 'Invalid BGE dense vectors')
-        return {'model': MODEL, **PROVENANCE, 'data': [
-            {'index': index, 'embedding': vector.tolist()} for index, vector in enumerate(vectors)]}
+        # 패딩을 뺀 실제 토큰 수와 추론 정밀도는 색인 도구가 검증 기록에 그대로 남긴다.
+        counts = tokens['attention_mask'].sum(dim=1).tolist()
+        return {'model': MODEL, **PROVENANCE, 'precision': state['precision'], 'data': [
+            {'index': index, 'embedding': vector.tolist(), 'token_count': count}
+            for index, (vector, count) in enumerate(zip(vectors, counts, strict=True))]}

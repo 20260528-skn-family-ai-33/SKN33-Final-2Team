@@ -7,6 +7,10 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from src.database.vectors import resource_vectors as vectors
+from src.shared.bge_embeddings import ACCEPTED_PROTOCOLS, PROVENANCE, IndexedEmbedding
+
+FP16, FP32 = ACCEPTED_PROTOCOLS
+TEXT_SHA = hashlib.sha256('private source text'.encode('utf-8')).hexdigest()
 
 
 def source(value):
@@ -15,7 +19,12 @@ def source(value):
 
 def current(value):
     return {'input_sha256': value, 'input_version': vectors.INPUT_VERSION,
-            'dimensions': vectors.DIMENSIONS}
+            'dimensions': vectors.DIMENSIONS, 'meta_sha256': value, 'actual_input_sha256': TEXT_SHA,
+            'model_revision': PROVENANCE['model_revision'], 'protocol': FP16, 'token_count': 3}
+
+
+def indexed(vector):
+    return IndexedEmbedding(vector, FP32, 11)
 
 
 class ResourceRefreshTests(unittest.TestCase):
@@ -28,7 +37,7 @@ class ResourceRefreshTests(unittest.TestCase):
         self.conn = MagicMock()
 
     def test_plan_identifies_25_stale_books_without_api_or_writes(self):
-        with patch.object(vectors, 'sources', return_value=self.rows), patch.object(vectors, 'stored', return_value=self.previous), patch.object(vectors, 'embed_texts') as api:
+        with patch.object(vectors, 'sources', return_value=self.rows), patch.object(vectors, 'stored', return_value=self.previous), patch.object(vectors, 'embed_for_index') as api:
             result = vectors.plan(self.conn, resource_types=['books'], max_records=25)
         self.assertEqual((result['selected_count'], result['current_count'], result['pending_count']), (26, 1, 25))
         self.assertEqual(result['batch_count'], 1)
@@ -40,7 +49,7 @@ class ResourceRefreshTests(unittest.TestCase):
 
     def test_selected_embed_updates_only_the_25_stale_books(self):
         batch = [[1.0] + [0.0] * (vectors.DIMENSIONS - 1) for _ in range(25)]
-        with patch.object(vectors, 'sources', return_value=self.rows), patch.object(vectors, 'stored', return_value=self.previous), patch.object(vectors, 'status', return_value={}), patch.object(vectors, 'embed_texts', return_value=batch) as api:
+        with patch.object(vectors, 'sources', return_value=self.rows), patch.object(vectors, 'stored', return_value=self.previous), patch.object(vectors, 'status', return_value={}), patch.object(vectors, 'embed_for_index', return_value=[indexed(v) for v in batch]) as api:
             result = vectors.embed(self.conn, client='mock-client', resource_types=['books'], max_records=25)
         self.assertEqual(result['embedded_count'], 25)
         self.assertTrue(result['embedding_api_called'])
@@ -53,13 +62,13 @@ class ResourceRefreshTests(unittest.TestCase):
         self.assertEqual(len(meta_writes), 25)
         self.assertEqual({c.args[1][1] for c in meta_writes}, {str(i) for i in range(25)})
         self.assertTrue(all(c.args[1][0] == 'books' and c.args[1][2] == f'new-{c.args[1][1]}' for c in meta_writes))
-        expected_actual = hashlib.sha256('private source text'.encode('utf-8')).hexdigest()
-        self.assertTrue(all(c.args[1][3] == expected_actual for c in meta_writes))
-        self.assertTrue(all(c.args[1][4] == vectors.PROTOCOL and c.args[1][5] == vectors.PROVENANCE['model_revision'] for c in meta_writes))
+        self.assertTrue(all(c.args[1][3] == TEXT_SHA for c in meta_writes))
+        # 서버가 보고한 정밀도·토큰 수를 공백 단어 수로 추정하지 않고 그대로 기록한다.
+        self.assertTrue(all(c.args[1][4:] == (FP32, PROVENANCE['model_revision'], 11) for c in meta_writes))
 
     def test_count_growth_aborts_before_ddl_and_paid_calls(self):
         for cap in (24, 0, -1):
-            with self.subTest(cap=cap), patch.object(vectors, 'sources', return_value=self.rows), patch.object(vectors, 'stored', return_value=self.previous), patch.object(vectors, 'embed_texts') as api:
+            with self.subTest(cap=cap), patch.object(vectors, 'sources', return_value=self.rows), patch.object(vectors, 'stored', return_value=self.previous), patch.object(vectors, 'embed_for_index') as api:
                 with self.assertRaises(vectors.RefreshPlanError):
                     vectors.embed(self.conn, resource_types=['books'], max_records=cap)
                 api.assert_not_called()
@@ -67,7 +76,7 @@ class ResourceRefreshTests(unittest.TestCase):
 
     def test_unknown_id_and_ambiguous_selection_fail_before_writes(self):
         for kinds, ids in [(['books'], ['absent']), (['books', 'jobs'], ['1']), (['unknown'], None)]:
-            with self.subTest(kinds=kinds, ids=ids), patch.object(vectors, 'sources', return_value=self.rows), patch.object(vectors, 'stored', return_value=self.previous), patch.object(vectors, 'embed_texts') as api:
+            with self.subTest(kinds=kinds, ids=ids), patch.object(vectors, 'sources', return_value=self.rows), patch.object(vectors, 'stored', return_value=self.previous), patch.object(vectors, 'embed_for_index') as api:
                 with self.assertRaises(vectors.RefreshPlanError):
                     vectors.embed(self.conn, resource_types=kinds, resource_ids=ids)
                 api.assert_not_called()
@@ -82,14 +91,14 @@ class ResourceRefreshTests(unittest.TestCase):
         with patch.object(vectors, 'sources', return_value=rows), patch.object(vectors, 'stored', return_value={}):
             self.assertEqual(vectors.plan(self.conn, resource_types=['books'])['input_utf8_bytes'], 8000)
         rows[('books', 'new')]['text'] = '\uac00' * 2667
-        with patch.object(vectors, 'sources', return_value=rows), patch.object(vectors, 'stored', return_value={}), patch.object(vectors, 'embed_texts') as api:
+        with patch.object(vectors, 'sources', return_value=rows), patch.object(vectors, 'stored', return_value={}), patch.object(vectors, 'embed_for_index') as api:
             with self.assertRaisesRegex(vectors.RefreshPlanError, '8000 UTF-8'):
                 vectors.embed(self.conn, resource_types=['books'])
             api.assert_not_called()
             self.conn.execute.assert_not_called()
 
     def test_current_explicit_target_does_not_reembed_or_write(self):
-        with patch.object(vectors, 'sources', return_value=self.rows), patch.object(vectors, 'stored', return_value=self.previous), patch.object(vectors, 'status', return_value={}), patch.object(vectors, 'embed_texts') as api:
+        with patch.object(vectors, 'sources', return_value=self.rows), patch.object(vectors, 'stored', return_value=self.previous), patch.object(vectors, 'status', return_value={}), patch.object(vectors, 'embed_for_index') as api:
             result = vectors.embed(self.conn, resource_types=['books'], resource_ids=['current'])
         self.assertEqual(result['embedded_count'], 0)
         self.assertFalse(result['database_changes'])
@@ -99,14 +108,14 @@ class ResourceRefreshTests(unittest.TestCase):
 
     def test_source_change_propagates_failure_to_transaction_rollback(self):
         changed = {**self.rows, ('books', '0'): source('changed-during-call')}
-        with patch.object(vectors, 'sources', side_effect=[self.rows, changed]), patch.object(vectors, 'stored', return_value=self.previous), patch.object(vectors, 'embed_texts', return_value=[[1.0] * vectors.DIMENSIONS]), patch.object(vectors, 'status') as status:
+        with patch.object(vectors, 'sources', side_effect=[self.rows, changed]), patch.object(vectors, 'stored', return_value=self.previous), patch.object(vectors, 'embed_for_index', return_value=[indexed([1.0] * vectors.DIMENSIONS)]), patch.object(vectors, 'status') as status:
             with self.assertRaisesRegex(ValueError, 'sources changed'):
                 vectors.embed(self.conn, resource_types=['books'], resource_ids=['0'], max_records=1)
         self.assertIs(self.conn.transaction.return_value.__exit__.call_args.args[0], ValueError)
         status.assert_not_called()
 
     def test_api_failure_propagates_without_success_or_hash_only_update(self):
-        with patch.object(vectors, 'sources', return_value=self.rows), patch.object(vectors, 'stored', return_value=self.previous), patch.object(vectors, 'embed_texts', side_effect=RuntimeError('mock failure')), patch.object(vectors, 'status') as status:
+        with patch.object(vectors, 'sources', return_value=self.rows), patch.object(vectors, 'stored', return_value=self.previous), patch.object(vectors, 'embed_for_index', side_effect=RuntimeError('mock failure')), patch.object(vectors, 'status') as status:
             with self.assertRaises(RuntimeError):
                 vectors.embed(self.conn, resource_types=['books'], resource_ids=['0'])
         self.assertFalse(any(c.args[0].startswith('INSERT') for c in self.conn.execute.call_args_list))
@@ -114,7 +123,7 @@ class ResourceRefreshTests(unittest.TestCase):
         status.assert_not_called()
 
     def test_cli_plan_starts_a_read_only_transaction(self):
-        with patch.object(vectors, 'connect') as connect, patch.object(vectors, 'sources', return_value=self.rows), patch.object(vectors, 'stored', return_value=self.previous), patch.object(vectors, 'embed_texts') as api, redirect_stdout(StringIO()) as output:
+        with patch.object(vectors, 'connect') as connect, patch.object(vectors, 'sources', return_value=self.rows), patch.object(vectors, 'stored', return_value=self.previous), patch.object(vectors, 'embed_for_index') as api, redirect_stdout(StringIO()) as output:
             connect.return_value.__enter__.return_value = self.conn
             vectors.main(['plan', '--resource-type', 'books', '--max-records', '25'])
         self.conn.execute.assert_called_once_with('SET TRANSACTION READ ONLY')
@@ -128,6 +137,25 @@ class ResourceRefreshTests(unittest.TestCase):
                     vectors.main(args)
                 connect.assert_not_called()
 
+
+    def test_vector_without_valid_metadata_is_not_current(self):
+        src = source('same')
+        self.assertTrue(vectors.is_current(src, current('same')))
+        self.assertTrue(vectors.is_current(src, dict(current('same'), protocol=FP32)))
+        for changes in ({'meta_sha256': None}, {'meta_sha256': 'old'}, {'actual_input_sha256': 'old'},
+                        {'model_revision': 'old'}, {'protocol': 'old'}, {'token_count': 0}, {'token_count': 8193}):
+            with self.subTest(changes=changes):
+                self.assertFalse(vectors.is_current(src, dict(current('same'), **changes)))
+
+    def test_missing_metadata_table_is_refused_before_embedding_or_ddl(self):
+        self.conn.execute.return_value.fetchone.return_value = {'id': None}
+        with patch.object(vectors, 'sources', return_value=self.rows), patch.object(vectors, 'embed_for_index') as api:
+            for call in (vectors.plan, vectors.embed):
+                with self.subTest(call=call.__name__), self.assertRaisesRegex(ValueError, 'Restore the shared BGE-M3 database'):
+                    call(self.conn, resource_types=['books'])
+        api.assert_not_called()
+        self.assertTrue(all('to_regclass' in c.args[0] for c in self.conn.execute.call_args_list))
+        self.assertNotIn('growpath_bge_meta', vectors.DDL)
 
     def test_truncated_input_separates_source_and_actual_sha_and_is_current(self):
         # 전체 원문(소개 10000자)과 축약된 실제 입력 텍스트
@@ -143,7 +171,9 @@ class ResourceRefreshTests(unittest.TestCase):
             'dimensions': vectors.DIMENSIONS,
             'meta_sha256': full_json_hash,
             'actual_input_sha256': actual_sha,
-            'model_revision': vectors.PROVENANCE['model_revision']
+            'model_revision': PROVENANCE['model_revision'],
+            'protocol': FP16,
+            'token_count': 3,
         }
         self.assertTrue(vectors.is_current(src, stored_good))
 
@@ -157,7 +187,7 @@ class ResourceRefreshTests(unittest.TestCase):
         with patch.object(vectors, 'sources', return_value=rows), \
              patch.object(vectors, 'stored', return_value=previous), \
              patch.object(vectors, 'status', return_value={}), \
-             patch.object(vectors, 'embed_texts', return_value=[[1.0] * vectors.DIMENSIONS]):
+             patch.object(vectors, 'embed_for_index', return_value=[indexed([1.0] * vectors.DIMENSIONS)]):
             vectors.embed(self.conn, client='mock-client', resource_types=['books'])
 
         meta_writes = [c for c in self.conn.execute.call_args_list if c.args[0].startswith(f'INSERT INTO {vectors.META_TABLE}')]
