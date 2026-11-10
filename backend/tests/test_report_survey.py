@@ -18,7 +18,7 @@ class ReportSurveyTests(unittest.TestCase):
         transaction = Mock()
         transaction.one.side_effect = [None, {'content': plan}]
         transaction.all.return_value = []
-        transaction.val.return_value = 'report'
+        transaction.val.side_effect = lambda sql, **kw: 'IN_PROGRESS' if 'SELECT status::text' in sql else 'report'
         with ExitStack() as stack:
             stack.enter_context(patch.object(plans,'_owned',return_value=row))
             stack.enter_context(patch.object(plans,'record',return_value={'plan':plan,'post':post,'progress':{}}))

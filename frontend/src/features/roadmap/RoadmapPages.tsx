@@ -1,3 +1,4 @@
+import { waitJob } from '@/api/jobs';
 import { plansApi } from '@/api/endpoints/plans';
 import { failToast } from '@/shared/lib/fail';
 import { CmItem, prepareCommentRevision } from './comments';
@@ -22,7 +23,7 @@ import { newComments, planReports, recs, updateWs, useWs } from '@/shared/state/
 import { Icon } from '@/shared/ui/Icon';
 import { Note, Page, Stats } from '@/shared/ui/parts';
 import { Alerts, NoPlan, openPreAnswers, openVersions, PlanGate, postStart } from './parts';
-import { archivePlan, resumePlan, revise, startRevise } from './planActions';
+import { archivePlan, pullPlan, resumePlan, revise, startRevise } from './planActions';
 import { useState } from 'react';
 import { won } from '@/shared/lib/format';
 
@@ -253,6 +254,20 @@ function RoadView({ R }: { R: PlanRecord }) {
   const reps = planReports({ reports }, R);
   const pl = R.plan;
   const live = R.status === 'active';
+  const [checkingSupport, setCheckingSupport] = useState(false);
+  async function retrySupport() {
+    if (checkingSupport) return;
+    setCheckingSupport(true);
+    try {
+      const job = await plansApi.reviseSupportRetry(R.id, pl.version);
+      if (job?.jobId) await waitJob(job.jobId);
+      await pullPlan(R.id);
+    } catch (error) {
+      failToast(error, '지원 조건을 확인하지 못했어요');
+    } finally {
+      setCheckingSupport(false);
+    }
+  }
   const cs = R.comments || [];
   const cmBtn = cs.length ? (
     <button className="btn ghost sm" onClick={() => go(paths.comments(R.id))}>
@@ -328,6 +343,12 @@ function RoadView({ R }: { R: PlanRecord }) {
           {R.status === 'done' ? '마친 로드맵이에요. 기록은 읽기만 할 수 있어요.' : '보관한 로드맵이에요. 기록은 읽기만 할 수 있고, ‘다시 진행하기’를 누르면 이어서 기록할 수 있어요.'}
         </Note>
       )}
+      {pl.supportCheckPending && <div className="actions">
+        <span className="small muted">이 버전의 지원 조건 확인이 필요해요.</span>
+        <button type="button" className="btn line sm" disabled={checkingSupport} onClick={() => void retrySupport()}>
+          {checkingSupport ? '확인 중…' : '지원 조건 다시 확인'}
+        </button>
+      </div>}
       <Stats pl={pl} periodLabel={pl.def.learningReport ? '자료 학습 예상 기간' : '기간'} />
       <RoadmapResources R={R} />
       {pl.def.learningReport ? <ReviewSkillBlocks confirmed materials={pl.def.learningReport as ReviewMaterials}

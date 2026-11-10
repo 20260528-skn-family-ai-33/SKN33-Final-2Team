@@ -73,7 +73,7 @@ class ConfirmHookTests(unittest.TestCase):
 class ReportHookTests(unittest.TestCase):
     """보고서 작성 완료 = 사후 점검 뒤 보고서 작성 작업이 보고서를 저장한 때(확인 전)"""
 
-    def start(self, report, *, stale=False):
+    def start(self, report, *, stale=False, archived=False):
         assess = {'domain': 'SQL', 'questions': [{'id': 'q1', 'area': 'SQL', 'skill': 'SQL', 'text': '조인을 작성할 수 있다.'}], 'answers': {'q1': '1'}}
         plan = {'version': 1, 'goal': '분석', 'name': '계획', 'opt': 'A1', 'acts': [], 'assess': assess}
         post = {'answers': {'q1': '4'}, 'goalSelf': '1'}
@@ -81,7 +81,7 @@ class ReportHookTests(unittest.TestCase):
         t = Mock()
         t.one.side_effect = [None, {'content': dict(plan, version=2) if stale else plan}]
         t.all.return_value = []
-        t.val.return_value = 'report-1'
+        t.val.side_effect = lambda sql, **kw: ('ARCHIVED' if archived else 'IN_PROGRESS') if 'SELECT status::text' in sql else 'report-1'
         with ExitStack() as stack:
             stack.enter_context(patch.object(plans, '_owned', return_value=row))
             stack.enter_context(patch.object(plans, 'record', return_value={'plan': plan, 'post': post, 'progress': {}}))
@@ -99,7 +99,7 @@ class ReportHookTests(unittest.TestCase):
             try:
                 plans.report_start(7, RID)
             except plans.ApiError as error:
-                if not stale or error.code != 'REPORT_STALE':
+                if not (stale or archived) or error.code != 'REPORT_STALE':
                     raise
             except AgentError:
                 pass
@@ -113,6 +113,13 @@ class ReportHookTests(unittest.TestCase):
         notify, t = self.start({'return_value': {'good': [], 'improve': [], 'next': None}}, stale=True)
         notify.assert_not_called()
         self.assertFalse(any('growth_reports' in str(c.args[0]) for c in t.val.call_args_list if c.args))
+        self.assertTrue(any('running = false' in str(c.args[0]) for c in t.run.call_args_list if c.args))
+
+    def test_archived_during_generation_stays_archived(self):
+        notify, t = self.start({'return_value': {'good': [], 'improve': [], 'next': None}}, archived=True)
+        notify.assert_not_called()
+        self.assertFalse(any('growth_reports' in str(c.args[0]) for c in t.val.call_args_list if c.args))
+        self.assertFalse(any('UPDATE public.projects' in str(c.args[0]) for c in t.run.call_args_list if c.args))
         self.assertTrue(any('running = false' in str(c.args[0]) for c in t.run.call_args_list if c.args))
 
     def test_failed_report_leaves_no_notification(self):

@@ -106,3 +106,19 @@ class AcceptedRevisionSupportTests(TestCase):
                 else:
                     apply.assert_not_called()
                     tx.run.assert_not_called()
+
+    def test_pending_accepted_version_can_retry_after_registration_failure(self):
+        row = {'roadmap_id': 'roadmap', 'content': {'version': 2, 'supportCheckPending': True}}
+        with patch.object(plans, '_owned', return_value=row), \
+             patch('app.services.generation_lock.generation_guard', side_effect=lambda *_: transaction(None)), \
+             patch.object(plans.db, 'one', return_value={'revision_id': 'rev'}) as lookup, \
+             patch.object(plans.db, 'val', side_effect=[None, None, 'job']), \
+             patch.object(plans, 'revision_support', side_effect=[RuntimeError('queue unavailable'), 'job']) as schedule:
+            with self.assertRaisesRegex(RuntimeError, 'queue unavailable'):
+                plans.revision_support_retry(1, 'roadmap', 2)
+            self.assertTrue(row['content']['supportCheckPending'])
+            self.assertEqual(plans.revision_support_retry(1, 'roadmap', 2), 'job')
+            self.assertEqual(plans.revision_support_retry(1, 'roadmap', 2), 'job')
+            self.assertEqual(schedule.call_count, 2)
+            schedule.assert_called_with(1, 'roadmap', 'rev', accepted=True)
+            self.assertEqual(lookup.call_args.kwargs['v'], '2')

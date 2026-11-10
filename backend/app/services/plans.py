@@ -671,12 +671,31 @@ def _patch_current_support(roadmap_id: str, support: dict, version: int) -> None
             return
         content = row['content']
         content.setdefault('def', {})['support'] = support
+        content.pop('supportCheckPending', None)
         t.run('UPDATE public.roadmaps SET content = :c, updated_at = now() WHERE roadmap_id = CAST(:r AS uuid)', c=db.J(content), r=roadmap_id)
         t.run("UPDATE app_ext.roadmap_versions SET plan = :c WHERE roadmap_id = CAST(:r AS uuid) AND version = :v", c=db.J(content), r=roadmap_id, v=content.get('version'))
 
 
-def revision_support_retry(employee_id: int, roadmap_id: str) -> str | None:
-    _owned(employee_id, roadmap_id)
+def revision_support_retry(employee_id: int, roadmap_id: str, version: int | None = None) -> str | None:
+    row = _owned(employee_id, roadmap_id)
+    plan = row['content']
+    if version is not None:
+        if plan.get('version') != version:
+            raise ApiError(409, 'REVISION_CHANGED', '로드맵 버전이 바뀌었어요. 새로고침해 주세요.')
+        if not plan.get('supportCheckPending'):
+            return None
+        from .generation_lock import generation_guard
+        with generation_guard('accepted-support', str(row['roadmap_id'])):
+            rv = db.one("""SELECT revision_id FROM app_ext.roadmap_revisions
+                          WHERE roadmap_id = :r AND status = 'accepted' AND result->'to'->>'version' = :v
+                          ORDER BY updated_at DESC LIMIT 1""", r=row['roadmap_id'], v=str(plan['version']))
+            if not rv:
+                raise ApiError(409, 'NO_REVISION', '다시 확인할 확정 버전이 없어요')
+            rev_id = str(rv['revision_id'])
+            ref = f'{roadmap_id}:{rev_id}:accepted'
+            running = db.val("SELECT job_id FROM app_ext.jobs WHERE employee_id = :e AND kind = 'revision-support' AND ref = :r AND status = 'running'",
+                             e=employee_id, r=ref)
+            return str(running) if running else revision_support(employee_id, roadmap_id, rev_id, accepted=True)
     rv = _revision(roadmap_id)
     if not rv or rv['status'] != 'ready':
         raise ApiError(409, 'NO_REVISION', '다시 확인할 수정안이 없어요')
@@ -797,6 +816,8 @@ def accept_revision(employee_id: int, roadmap_id: str, revision_id: str, selecte
         plan.pop('selectionEvidence', None)
         if isinstance(evidence, dict):
             plan['selectionEvidence'] = copy.deepcopy(evidence)
+        if selected_skills is not None and not plan['def'].get('support'):
+            plan['supportCheckPending'] = True
         validate_free_plan(t, plan)
         # 로드맵 내용이 바뀌면 팀 DB 트리거가 코멘트에 '수정 완료' 시각만 적는다. 그 갱신은 작성자 검사 트리거(본문·작성자·로드맵 열)를 거치지 않는다
         t.run('UPDATE public.roadmaps SET content = :c, strategy_type = :st, strategy_title = :tt, summary = :s, updated_at = now() WHERE roadmap_id = :r',
@@ -808,9 +829,9 @@ def accept_revision(employee_id: int, roadmap_id: str, revision_id: str, selecte
         if pd.get('fromComment'):
             t.run("""INSERT INTO app_ext.comment_meta(comment_id, status, applied_version) VALUES(CAST(:c AS uuid), 'applied', :v)
                      ON CONFLICT (comment_id) DO UPDATE SET status = 'applied', applied_version = :v""", c=pd['fromComment'], v=plan['version'])
-    if selected_skills is not None and not plan['def'].get('support'):
+    if plan.get('supportCheckPending'):
         try:
-            revision_support(employee_id, roadmap_id, revision_id, accepted=True)
+            revision_support_retry(employee_id, roadmap_id, plan['version'])
         except Exception:
             import logging
             logging.getLogger(__name__).exception('Accepted revision support scheduling failed')
@@ -1133,12 +1154,15 @@ def report_start(employee_id: int, roadmap_id: str) -> str:
                          'essays': [{'area': e['area'], 'pre': e['preLevel'], 'post': (judge.get(e['id']) or {}).get('level'), 'why': (judge.get(e['id']) or {}).get('why')}
                                     for e in deep_inp['essays']]}
         with db.tx() as t:
-            # Match the revision acceptance lock order before finalizing the roadmap.
-            t.all("SELECT revision_id FROM app_ext.roadmap_revisions WHERE roadmap_id = :r AND status IN ('running', 'ready', 'failed') FOR UPDATE", r=row['roadmap_id'])
-            current = t.one('SELECT content FROM public.roadmaps WHERE roadmap_id = :r FOR UPDATE', r=row['roadmap_id'])
-            stale = not current or not _report_snapshot_matches(t, row['roadmap_id'], current['content'], execution_snapshot)
+            # Archive also locks the project before touching revision rows.
+            status = t.val('SELECT status::text FROM public.projects WHERE project_id = :p FOR UPDATE', p=row['project_id'])
+            stale = status != 'IN_PROGRESS'
+            if not stale:
+                t.all("SELECT revision_id FROM app_ext.roadmap_revisions WHERE roadmap_id = :r AND status IN ('running', 'ready', 'failed') FOR UPDATE", r=row['roadmap_id'])
+                current = t.one('SELECT content FROM public.roadmaps WHERE roadmap_id = :r FOR UPDATE', r=row['roadmap_id'])
+                stale = not current or not _report_snapshot_matches(t, row['roadmap_id'], current['content'], execution_snapshot)
             if stale:
-                message = '보고서 생성 중 학습 기록이 바뀌었어요. 최신 기록으로 다시 시도해 주세요.'
+                message = '보고서 생성 중 로드맵 상태나 학습 기록이 바뀌었어요. 로드맵 상태를 확인한 뒤 다시 시도해 주세요.'
                 t.run('UPDATE app_ext.post_checks SET running = false, fail = :f WHERE roadmap_id = :r',
                       f=db.J({'cause': {'code': 'REPORT_STALE', 'user': message, 'text': message}}), r=row['roadmap_id'])
             else:

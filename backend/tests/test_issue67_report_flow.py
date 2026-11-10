@@ -23,7 +23,7 @@ class Issue67ReportTests(TestCase):
         post={'answers':{q['id']:'5' for q in questions},'quizAnswers':post_answers,'goalSelf':'1'}
         progress={'0':{'status':'done','memo':'모의 실행 근거','file':{'name':'synthetic.txt'}}}
         row={'roadmap_id':'p','project_id':1,'diagnostic_round_id':1,'content':plan}
-        tx=Mock();tx.one.side_effect=[None,{'content':plan}];tx.val.return_value='report'
+        tx=Mock();tx.one.side_effect=[None,{'content':plan}];tx.val.side_effect = lambda sql, **kw: 'IN_PROGRESS' if 'SELECT status::text' in sql else 'report'
         tx.all.side_effect=lambda sql,**kw: [{'activity_id':key,'status':item['status'],'memo':item['memo'],'attachment':item['file']} for key,item in progress.items()] if 'activity_progress' in sql else []
         captured={}
         def model(ctx,system,payload,**kw):

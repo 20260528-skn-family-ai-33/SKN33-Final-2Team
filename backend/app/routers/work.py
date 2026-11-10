@@ -289,8 +289,8 @@ def api_revise(plan_id: str, request: Request, body: dict, a: Account = Depends(
 
 
 @r.post('/plans/{plan_id}/revisions/support/retry')
-def api_rev_support(plan_id: str, request: Request, a: Account = Depends(require_employee)):
-    jid = PL.revision_support_retry(a.id, plan_id)
+def api_rev_support(plan_id: str, request: Request, version: int | None = None, a: Account = Depends(require_employee)):
+    jid = PL.revision_support_retry(a.id, plan_id, version)
     return job_response(request, jid, a.id)
 
 
