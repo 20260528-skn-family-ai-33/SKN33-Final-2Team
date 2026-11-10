@@ -65,7 +65,7 @@ export async function markTargetRead(qc: QueryClient, t: SignIn, kind: Notificat
  *  이미 있으면 그 알림이 바꾼 부분만 고친다: 저장 전 사후 점검 입력(post)을 덮지 않게(#96) */
 function takeNotified(s: WsState, n: AppNotification, fresh: PlanRecord): void {
   const old = s.plans[fresh.id];
-  if (!old) {
+  if (!old || (n.kind === 'report' && fresh.status === 'done')) {
     putRec(s, fresh);
     return;
   }
@@ -79,7 +79,7 @@ function takeNotified(s: WsState, n: AppNotification, fresh: PlanRecord): void {
  *  로드맵 확정 전 작업: 작성 중인 로드맵을 서버에서 다시 읽는다.
  *  본인·직원: 작업 공간에 없는 로드맵만 받아 넣는다(있는 로드맵을 서버 값으로 덮으면 저장 전 입력이 사라진다).
  *    코멘트·작업 알림은 그 내용이 작업 공간에 아직 없으므로 있는 로드맵도 받아 바뀐 부분만 고친다.
- *    보고서 알림이면 그 로드맵의 보고서 목록만 바꾼다. 로그인이 바뀌었으면 넣지 않는다. 부르는 쪽은 기다린 뒤 이동한다 */
+ *    보고서 완료 알림은 보고서 목록과 완료된 로드맵을 함께 갱신한다. 로그인이 바뀌었으면 넣지 않는다. 부르는 쪽은 기다린 뒤 이동한다 */
 export async function refreshTarget(qc: QueryClient, t: SignIn, n: AppNotification): Promise<void> {
   if (n.audience === 'head') {
     await qc.invalidateQueries({ queryKey: memberKey(n.employee.id), refetchType: 'all' });
@@ -92,7 +92,7 @@ export async function refreshTarget(qc: QueryClient, t: SignIn, n: AppNotificati
     if (!isOtherDraft(n, ws().draftId)) await pullDraftOrThrow();
     return;
   }
-  const stale = n.kind === 'comment' || n.kind === 'job';
+  const stale = n.kind === 'comment' || n.kind === 'job' || n.kind === 'report';
   const [plan, reports] = await Promise.all([
     ws().plans[planId] && !stale ? Promise.resolve(null) : plansApi.get(planId),
     n.kind === 'report' || n.kind === 'task' ? plansApi.reports(planId) : Promise.resolve(null),

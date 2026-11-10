@@ -1,10 +1,16 @@
+import { plansApi } from '@/api/endpoints/plans';
+import { waitJob } from '@/api/jobs';
+import { failToast } from '@/shared/lib/fail';
+import { MaterialSkillTabs } from '@/features/draft/result/MaterialSkillTabs';
+import { commentSkillNames } from './roadmapLearningData';
+import { ReviewResourceCard, ReviewTaskCopy, type ReviewMaterials } from '@/features/draft/review/ReviewSkillBlocks';
 import { planDescription } from '@/shared/lib/planDescription';
 import { Stats } from '@/shared/ui/parts';
 import { activityTime } from '@/shared/lib/resourceTime';
 import { trackName } from '@/shared/constants/data';
 /* 수정 요청 (10/14 · 5차 scr.revise · P.revForm·revCtl·revRow·goalRow·diffView)
    여러 항목을 함께 골라도 된다. 고른 항목과 요청 내용을 관점 에이전트가 함께 보고 수정안을 먼저 보여 준다. 확정하기 전까지 지금 로드맵은 그대로 */
-import { useEffect } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { newIdToPath, paths } from '@/app/paths';
 import type { PendingRevision, PlanContent, PlanRecord, RevForm } from '@/api/types/plan';
 import { CertPicker } from '@/features/draft/details/CertPicker';
@@ -18,7 +24,7 @@ import { certNameOf, prefText } from '@/shared/lib/prefs';
 import { ai, cause, errText, PROV } from '@/shared/state/ai';
 import { setAt } from '@/shared/state/bind';
 import { useCatalog } from '@/shared/state/catalog';
-import { toast } from '@/shared/state/ui';
+import { closeSheet, openSheet, toast } from '@/shared/state/ui';
 import { draftActive, emptyPrefs, freshDraft, updateWs, useWs } from '@/shared/state/workspace';
 import { BCheckArr, BInput, BNum, BText } from '@/shared/ui/bound';
 import { Icon } from '@/shared/ui/Icon';
@@ -338,8 +344,69 @@ function RevForm({ R }: { R: PlanRecord }) {
   );
 }
 
+function SkillRevisionChoices({ pd, selected, onPick, retrying, onRetry }: {
+  pd: PendingRevision; selected: string[]; onPick: (skill: string, recommended: boolean) => void;
+  retrying: string | null; onRetry: (skill: string) => void;
+}) {
+  const names = commentSkillNames(pd.from);
+  const [active, setActive] = useState('');
+  const id = useId();
+  const resources = useCatalog(state => state.res);
+  const skill = names.includes(active) ? active : names[0];
+  if (!skill) return null;
+  return <div className="stack">
+    {names.length > 1 && <MaterialSkillTabs names={names} active={skill} onChange={setActive} id={id} panelId={id + '-panel'} />}
+    <div id={id + '-panel'} role={names.length > 1 ? 'tabpanel' : undefined} aria-label={skill} className="stack">
+      {names.length === 1 && <h3 className="st">{skill}</h3>}
+      {([['현재 계획', pd.from, false], ['새 제안', pd.to, true]] as const).map(([label, plan, recommended]) => {
+        const report = plan.def.learningReport as ReviewMaterials | undefined;
+        const saved = report?.recommendations?.skills.find(item => item.name === skill);
+        const activities = plan.acts.filter(activity => activity.skill === skill &&
+          !isBookActivity(activity) && !saved?.books.some(book => book.id === activity.res));
+        const disabled = recommended && !activities.length;
+        return <section key={label} className={`card rv-pick-card${recommended ? ' rv-recommendation-new' : ''}`}
+          data-selected={selected.includes(skill) === recommended} data-disabled={disabled}
+          onClick={event => {
+            if (disabled || (event.target instanceof Element && event.target.closest('a, button, input, label, summary'))) return;
+            onPick(skill, recommended);
+          }}>
+          <div className="sec-h"><label className="st">
+            <input type="radio" name={id + '-choice'} checked={selected.includes(skill) === recommended}
+              disabled={disabled} onChange={() => onPick(skill, recommended)} /> {label}
+          </label>{recommended && <button type="button" className="btn line sm" disabled={!!retrying}
+            onClick={() => onRetry(skill)}>{retrying === skill ? '재요청 중…' : '재요청하기'}</button>}</div>
+          <div className="stack">
+            <section aria-label="강좌">
+              <h4 className="st">강좌</h4>
+              <div className="stack">{activities.filter(activity => activity.res).map(activity => {
+                const resourceId = activity.res!;
+                const item = { ...activity, skill, how: activity.how || '' };
+                const resource = saved?.courses.find(course => course.id === resourceId) || resources[resourceId];
+                return <ReviewResourceCard key={activity.id} kind="강좌" activity={item}
+                  resource={{ ...resource, id: resourceId, title: resource?.title || activity.title,
+                    timeNote: resource?.timeNote ?? undefined, timeStatus: resource?.timeStatus ?? undefined }} />;
+              })}</div>
+              {!activities.some(activity => activity.res) && <p className="small muted">표시할 강좌가 없어요.</p>}
+            </section>
+            <section aria-label="산출물">
+              <h4 className="st">산출물</h4>
+              {activities.filter(activity => !activity.res).map(activity =>
+                <div className="review-task" key={activity.id}>
+                  <ReviewTaskCopy task={{ ...activity, skill, how: activity.how || '' }} />
+                </div>)}
+              {!activities.some(activity => !activity.res) && <p className="small muted">표시할 산출물이 없어요.</p>}
+            </section>
+          </div>
+        </section>;
+      })}
+    </div>
+  </div>;
+}
+
 function Revise({ R }: { R: PlanRecord }) {
   const go = useGo();
+  const [retrying, setRetrying] = useState<string | null>(null);
+  const [picks, setPicks] = useState<{ revisionId?: string; skills: string[] }>({ skills: [] });
   usePlanWatch(R.id);
   const base = R.plan;
   const noForm = !R.rev || !R.rev.v;
@@ -354,14 +421,76 @@ function Revise({ R }: { R: PlanRecord }) {
   const agent = `${D.perspectives[pid].name}`;
   const cm = r.fromComment ? (R.comments || []).find((c) => c.id === r.fromComment) : undefined;
   /* 요청 내용을 채운 뒤 부서장이 코멘트를 고쳤으면(10/23 코멘트 수정) 알리고, 고친 내용으로 다시 채울 수 있게 한다 */
+  const skillComment = cm?.skill;
+  const mixed = !r.fromComment && !!base.def.learningReport;
+  const revisionId = R.revision?.id;
+  const selectedSkills = picks.revisionId === revisionId ? picks.skills : [];
+  const confirmRevision = () => {
+    if (!pd) return;
+    if (mixed) {
+      const activities = (plan: PlanContent, skill: string) => plan.acts
+        .filter(activity => activity.skill === skill && !isBookActivity(activity))
+        .map(activity => [activity.res || null, activity.title, activity.how || '', activity.stage, activity.hours]);
+      const changed = selectedSkills.some(skill =>
+        JSON.stringify(activities(pd.from, skill)) !== JSON.stringify(activities(pd.to, skill)));
+      if (!changed) {
+        toast('변경 점이 없습니다.');
+        return;
+      }
+    }
+    openSheet({
+      title: '로드맵 확정',
+      body: () => <p>선택한 수정안을 이 로드맵에 적용할까요?</p>,
+      foot: () => <>
+        <button type="button" className="btn pri" onClick={() => {
+          closeSheet();
+          void acceptRevision(go, R.id, mixed ? selectedSkills : undefined);
+        }}>확정하기</button>
+        <button type="button" className="btn line" onClick={closeSheet}>취소</button>
+      </>,
+    });
+  };
+  const retrySkill = async (skill: string) => {
+    if (!revisionId || retrying || busy) return;
+    setRetrying(skill);
+    try {
+      const job = await plansApi.revise(R.id, { retrySkill: skill, revisionId,
+        rev: { on: {}, v: r.v, note: r.note, fromComment: false }, key: revKey(r) });
+      await waitJob(job.jobId);
+      await pullPlan(R.id);
+    } catch (error) {
+      failToast(error, '이 스킬의 새 제안을 만들지 못했어요');
+    } finally {
+      setRetrying(null);
+    }
+  };
+  const startNew = () => {
+    const hasDraft = draftActive(useWs.getState());
+    openSheet({
+      title: '새 로드맵 만들기',
+      body: () => <><p>완전 새로운 로드맵을 생성하게 됩니다.</p>
+        {hasDraft && <p>작성 중인 초안 대신 새 작성을 시작해요.</p>}</>,
+      foot: () => <>
+        <button type="button" className="btn pri" onClick={() => {
+          updateWs(state => {
+            state.draft = freshDraft();
+            state.draftId = null;
+            state.draftPlan = null;
+          });
+          go(paths.newGoal);
+        }}>확인</button>
+        <button type="button" className="btn line" onClick={closeSheet}>취소</button>
+      </>,
+    });
+  };
   const stale = !!(cm && r.cmStamp && cm.stamp !== r.cmStamp);
   const fail = r.fail && 'cause' in r.fail && r.fail.cause ? cause(r.fail.cause) : null;
-  const ok = revOk(R);
+  const ok = revOk(R) && !cm?.deleted && cm?.status !== 'applied';
   let out: React.ReactNode = null;
   if (busy)
     out = (
       <div className="agents">
-        <AgentRow st="run" name={`${agent} · 수정안 작성`} sub={runSub('roadmap', '고른 항목과 요청 내용을 반영하고 있어요')} />
+        <AgentRow st="run" name={skillComment || mixed ? '새로운 강좌와 산출물 추천 중' : `${agent} · 수정안 작성`} sub={skillComment || mixed ? undefined : runSub('roadmap', '고른 항목과 요청 내용을 반영하고 있어요')} />
         <Skeleton kind="rows" />
       </div>
     );
@@ -380,7 +509,7 @@ function Revise({ R }: { R: PlanRecord }) {
         foot={
           <button className="btn pri" disabled={!ok} onClick={() => void revise(R.id)}>
             <Icon name="retry" />
-            다시 시도하기
+            {skillComment ? '재요청하기' : '다시 시도하기'}
           </button>
         }
       />
@@ -393,8 +522,27 @@ function Revise({ R }: { R: PlanRecord }) {
           {pd.source && pd.source !== 'mock' ? <span className="tag acc">{PROV[pd.source] || 'API'} 작성</span> : <span className="tag">가데이터</span>}
         </div>
         {revKey(r) !== pd.key ? <Note>수정안을 만든 뒤 고른 항목이나 요청 내용을 바꿨어요. 바뀐 내용으로 보려면 ‘수정안 다시 만들기’를 눌러 주세요.</Note> : null}
-        <DiffView pd={pd} />
-        <RevSupView pd={pd} pid={R.id} onPulled={async () => void (await pullPlan(R.id))} />
+        {skillComment ? <div className="stack">
+          {([['기존 강좌와 산출물', pd.from, pd.to], ['새로 추천한 강좌와 산출물', pd.to, pd.from]] as const).map(([title, plan, other], index) => {
+            const unchanged = new Set(other.acts.map(activity => activity.id));
+            const rows = plan.acts.filter(activity => activity.skill === skillComment && !unchanged.has(activity.id));
+            return <section className={`card${index ? ' rv-recommendation-new' : ''}`} key={title}>
+              <div className="sec-h"><h3 className="st">{title}</h3><span className={`tag ${index ? 'acc' : 'line'}`}>{index ? '새 제안' : '현재 계획'}</span></div>
+              <div className="stack">{rows.map(activity => {
+                const item = { ...activity, skill: skillComment, how: activity.how || '' };
+                if (!activity.res) return <div className="review-task" key={activity.id}><ReviewTaskCopy task={item} /></div>;
+                const report = plan.def.learningReport as ReviewMaterials | undefined;
+                const saved = report?.recommendations?.skills.find(skill => skill.name === skillComment);
+                const course = saved?.courses.find(course => course.id === activity.res) || useCatalog.getState().res[activity.res];
+                return <ReviewResourceCard key={activity.id} kind="강좌" activity={item}
+                  resource={{ ...course, id: activity.res, title: course?.title || activity.title, timeNote: course?.timeNote ?? undefined, timeStatus: course?.timeStatus ?? undefined }} />;
+              })}</div>
+            </section>;
+          })}
+        </div> : mixed ? <SkillRevisionChoices pd={pd} selected={selectedSkills} retrying={retrying} onRetry={skill => void retrySkill(skill)} onPick={(skill, recommended) =>
+          setPicks({ revisionId, skills: recommended ? [...new Set([...selectedSkills, skill])] : selectedSkills.filter(name => name !== skill) })
+        } /> : <DiffView pd={pd} />}
+        {!mixed && <RevSupView pd={pd} pid={R.id} onPulled={async () => void (await pullPlan(R.id))} />}
       </>
     );
   const cmt = cm ? (
@@ -438,28 +586,24 @@ function Revise({ R }: { R: PlanRecord }) {
   return (
     <Page
       back={r.fromComment ? paths.comments(base.rid || R.id) : paths.roadmap(base.rid || R.id)}
-      eyebrow={`${base.name} · v${base.version} · ${base.goal}`}
-      title="무엇을 바꿀까요?"
-      lead={`여러 항목을 함께 골라도 돼요. 고른 항목과 요청 내용을 ${agent} 에이전트가 함께 보고 수정안을 먼저 보여 드려요. 확정하기 전까지 지금 로드맵은 그대로예요.`}
-      foot={
-        pd && !busy && !fail ? (
-          <>
-            <button className="btn pri" onClick={() => void acceptRevision(go, R.id)}>
-              v{(base.version || 0) + 1}로 확정하기
-            </button>
-            <button className="btn line" onClick={() => void dropRevision(go, R.id)}>
-              취소
-            </button>
-          </>
-        ) : undefined
-      }
+      eyebrow={<>{base.name} · v{base.version}<br />{base.goal}</>}
+      title={skillComment ? '새로운 추천 강좌와 산출물입니다.' : mixed ? '스킬별 로드맵 수정안' : '무엇을 바꿀까요?'}
+      lead={skillComment ? `${skillComment}의 기존 강좌·산출물과 새 제안을 비교해 보세요.` : mixed ? '스킬마다 현재 계획과 새 제안 중 하나를 골라 주세요.' : `여러 항목을 함께 골라도 돼요. 고른 항목과 요청 내용을 ${agent} 에이전트가 함께 보고 수정안을 먼저 보여 드려요. 확정하기 전까지 지금 로드맵은 그대로예요.`}
+      foot={<>
+        {mixed && <button type="button" className="btn line" onClick={startNew}>새 로드맵 만들기</button>}
+        <button type="button" className="btn pri" disabled={!pd || busy || !!retrying || !!fail || (!!skillComment && (!ok || stale || revKey(r) !== pd.key))}
+          onClick={confirmRevision}>
+          확정하기
+        </button>
+        <button type="button" className="btn line" onClick={() => void dropRevision(go, R.id)}>취소</button>
+      </>}
     >
       {cmt}
-      <RevForm R={R} />
+      {!skillComment && !mixed && <RevForm R={R} />}
       {fail && !busy ? null : (
         <div className="actions rv-act">
-          <button className={`btn ${pd ? 'line' : 'pri'}`} disabled={!ok} onClick={() => void revise(R.id)}>
-            {busy ? '수정안을 만드는 중…' : pd ? '수정안 다시 만들기' : '수정안 만들기'}
+          <button className={`btn ${pd ? 'line' : 'pri'}`} disabled={!ok || !!retrying} onClick={() => void revise(R.id)}>
+            {busy ? '수정안을 만드는 중…' : mixed ? '전체 재요청' : skillComment ? '재요청하기' : pd ? '수정안 다시 만들기' : '수정안 만들기'}
           </button>
         </div>
       )}

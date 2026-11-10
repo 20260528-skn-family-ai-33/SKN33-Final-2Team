@@ -184,6 +184,29 @@ export function HomePage() {
   const plans = useWs((s) => s.plans);
   const drafting = useWs((s) => draftActive(s));
   const act = recs({ plans }, 'active');
+  const [savedGraphOrders, setSavedGraphOrders] = useState<Record<string, string[]>>({});
+  const graphKey = me?.id ? `growpath:home-graph-order:${me.id}` : '';
+  let savedOrder = savedGraphOrders[graphKey];
+  if (!savedOrder && graphKey) {
+    try {
+      const stored: unknown = JSON.parse(localStorage.getItem(graphKey) ?? '[]');
+      if (Array.isArray(stored)) savedOrder = stored.filter((id): id is string => typeof id === 'string');
+    } catch { /* Use the default order when storage is unavailable. */ }
+  }
+  const byId = new Map(act.map(plan => [plan.id, plan]));
+  const graphPlans = [...new Set([...(savedOrder ?? []), ...byId.keys()])]
+    .flatMap(id => { const plan = byId.get(id); return plan ? [plan] : []; });
+  function moveGraph(id: string, offset: number) {
+    const ids = graphPlans.map(plan => plan.id);
+    const index = ids.indexOf(id);
+    const next = index + offset;
+    if (index < 0 || next < 0 || next >= ids.length) return;
+    [ids[index], ids[next]] = [ids[next], ids[index]];
+    setSavedGraphOrders(previous => ({ ...previous, [graphKey]: ids }));
+    if (graphKey) {
+      try { localStorage.setItem(graphKey, JSON.stringify(ids)); } catch { /* Keep the current session order. */ }
+    }
+  }
   const hello = (me?.name || '').slice(1);
   if (!act.length) {
     if (drafting)
@@ -233,7 +256,7 @@ export function HomePage() {
       <p className="eyebrow">안녕하세요, {hello} 님</p>
       <h1 className="t">진행 중인 로드맵 {act.length}개</h1>
       <p className="lead">전체 일정을 먼저 보여 드리고, 로드맵마다 이번 주차 활동을 보여 드려요.</p>
-      <GanttAll list={act} />
+      <GanttAll list={graphPlans} onMove={moveGraph} />
       {act.map((R) => (
         <section className="hp" key={R.id}>
           <div className="hp-h">

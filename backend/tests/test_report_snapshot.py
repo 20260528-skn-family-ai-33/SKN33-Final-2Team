@@ -61,7 +61,8 @@ class ReportSnapshotTests(unittest.TestCase):
         post={'answers':{'q1':'4'},'goalSelf':'1'}
         row={'roadmap_id':'p','project_id':1,'diagnostic_round_id':1,'content':plan}
         progress={'course':{'status':'done'},'task':{'status':'done'}}
-        transaction=Mock();transaction.one.return_value=None;transaction.val.return_value='report'
+        transaction=Mock();transaction.one.side_effect=[None,{'content':plan}];transaction.val.side_effect = lambda sql, **kw: 'IN_PROGRESS' if 'SELECT status::text' in sql else 'report'
+        transaction.all.side_effect=lambda sql,**kw: [{'activity_id':key,'status':item['status']} for key,item in progress.items()] if 'activity_progress' in sql else []
         report=Mock(return_value={'good':[],'improve':[],'next':None})
         with ExitStack() as stack:
             for target,name,value in [(plans,'_owned',row),(plans,'record',{'plan':plan,'post':post,'progress':progress}),(plans,'_report_deep',None),(plans.db,'one',{}),(plans.db,'val',{}),

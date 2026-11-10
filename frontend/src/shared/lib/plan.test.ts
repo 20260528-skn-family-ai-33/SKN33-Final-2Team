@@ -147,12 +147,12 @@ describe('공유 강좌의 실제 일정과 전체 기간', () => {
     expect(excluded.acts.some(a => a.skill === 'Web')).toBe(false);
     expect(excluded.def.learningReport!.durationEstimates!.RAG.addedWeeks).toBe(2);
   });
-  it('도서는 1주 작업량을 추가하고 공유 강좌만 있는 후속 스킬은 미래 슬롯을 만들지 않는다', () => {
+  it('도서는 주차를 추가하지 않고 공유 강좌만 있는 후속 스킬은 미래 슬롯을 만들지 않는다', () => {
     const input = sharedOption();
     input.learningReport!.choices.RAG.books = ['book'];
     input.acts.push({id: 'book-act', skill: 'RAG', stage: 2, title: 'Book', res: 'book', hours: 12});
     const plan = buildPlan(input, {hours: 6}, '');
-    expect(plan.weeks).toBe(8); expect(plan.totalH).toBe(30.3);
+    expect(plan.weeks).toBe(7); expect(plan.totalH).toBe(24.3);
     expect(plan.acts.find(a => a.skill === 'Web')).toMatchObject({wFrom: 1, wTo: 3});
     expect(plan.acts.every(a => a.wFrom >= 1 && a.wFrom <= a.wTo && a.wTo <= plan.weeks)).toBe(true);
   });
@@ -161,7 +161,7 @@ describe('공유 강좌의 실제 일정과 전체 기간', () => {
     input.learningReport!.recommendations.skills.forEach((row, i) => {row.courses[0] = {id: String(i), title: 'short', hours: 0.1}; input.learningReport!.choices[row.name].course = String(i); input.acts[i].res = String(i);});
     expect(buildPlan(input, {hours: 0.4}, '').weeks).toBe(4);
   });
-  it('비인접 스킬의 같은 도서도 각 스킬 순서에 맞춰 별도 주차로 배정하고 활동 ID는 유지한다', () => {
+  it('비인접 스킬의 같은 도서는 주차 없이 활동 ID를 유지한다', () => {
     const input = sharedOption();
     for (const name of ['RAG', 'Web']) {
       input.learningReport!.choices[name].books = ['book'];
@@ -169,35 +169,35 @@ describe('공유 강좌의 실제 일정과 전체 기간', () => {
     }
     const before = structuredClone(input), plan = buildPlan(input, {hours: 6}, '');
     expect(input).toEqual(before);
-    expect(plan.weeks).toBe(9); expect(plan.totalH).toBe(30.3);
-    expect(plan.acts.filter(a => a.res === 'book').map(a => [a.id, a.wFrom, a.wTo, a.resourceWindow])).toEqual([
-      ['book-RAG', 4, 4, {from: 4, to: 4}], ['book-Web', 7, 7, {from: 7, to: 7}],
+    expect(plan.weeks).toBe(7); expect(plan.totalH).toBe(24.3);
+    expect(plan.acts.filter(a => a.res === 'book').map(a => [a.id, a.resourceWindow])).toEqual([
+      ['book-RAG', undefined], ['book-Web', undefined],
     ]);
-    expect(plan.def.learningReport!.durationEstimates!.Web).toMatchObject({bookWeeks: 1, addedWeeks: 1, totalWeeks: 9});
+    expect(plan.def.learningReport!.durationEstimates!.Web).toMatchObject({bookWeeks: 0, addedWeeks: 0, totalWeeks: 7});
   });
-  it('도서만 선택한 스킬은 각 스킬 순서에 따라 1주씩 순차 배정된다', () => {
+  it('도서만 선택한 스킬은 학습 기간이 0주다', () => {
     const input = sharedOption(), report = input.learningReport!;
     report.recommendations.skills.forEach(row => { row.courses = []; report.choices[row.name].course = null; });
     input.acts = ['RAG', 'Web'].map(name => ({id: `book-${name}`, skill: name, stage: 2, title: 'Book', res: 'book', hours: 12}));
     for (const name of ['RAG', 'Web']) report.choices[name].books = ['book'];
-    expect(buildPlan(input, {hours: 6}, '').weeks).toBe(2);
+    expect(buildPlan(input, {hours: 6}, '').weeks).toBe(0);
     report.skillOrder.reverse();
-    expect(buildPlan(input, {hours: 6}, '').def.learningReport!.durationEstimates!.RAG.bookWeeks).toBe(1);
+    expect(buildPlan(input, {hours: 6}, '').def.learningReport!.durationEstimates!.RAG.bookWeeks).toBe(0);
     report.choices.Web.enabled = false;
-    expect(buildPlan(input, {hours: 6}, '').def.learningReport!.durationEstimates!.RAG.bookWeeks).toBe(1);
+    expect(buildPlan(input, {hours: 6}, '').def.learningReport!.durationEstimates!.RAG.bookWeeks).toBe(0);
     report.choices.RAG.books = [];
     input.acts = [];
     expect(buildPlan(input, {hours: 6}, '').weeks).toBe(0);
     report.choices.RAG.books = ['book'];
-    expect(buildPlan(input, {hours: 12}, '').weeks).toBe(1);
+    expect(buildPlan(input, {hours: 12}, '').weeks).toBe(0);
   });
-  it('제목이 같은 다른 ID의 도서는 각각 1주로 계산한다', () => {
+  it('제목이 같은 다른 ID의 도서도 주차에 포함하지 않는다', () => {
     const input = sharedOption(), report = input.learningReport!;
     report.recommendations.skills.forEach(row => { row.courses = []; report.choices[row.name].course = null; });
     report.recommendations.skills.find(row => row.name === 'Web')!.books.push({id: 'other-book', title: 'book', hours: 12});
     report.choices.RAG.books = ['book']; report.choices.Web.books = ['other-book'];
     input.acts = [];
-    expect(buildPlan(input, {hours: 6}, '').weeks).toBe(2);
+    expect(buildPlan(input, {hours: 6}, '').weeks).toBe(0);
   });
   it('시간 미확인과 수치 추정을 구분하고 계획 배정 합계에 미확인 1주를 명시한다', () => {
     const input = sharedOption();
@@ -207,17 +207,17 @@ describe('공유 강좌의 실제 일정과 전체 기간', () => {
     expect(plan.totalHUnknown).toBe(true); expect(plan.totalHEstimated).toBe(true);
     expect(plan.def.learningReport!.durationEstimates!.Web.unknownCourses).toEqual(['shared']);
   });
-  it('주당 시간 변경 시 도서 배정만 바꾸고 원본·카탈로그 시간·과제·비용을 보존한다', () => {
+  it('주당 시간 변경 시 강좌 배정을 바꾸고 원본·카탈로그 시간·과제·비용을 보존한다', () => {
     const input = sharedOption();
     input.learningReport!.choices.RAG.books = ['book'];
     input.acts.push({id:'book-act',skill:'RAG',stage:2,title:'Book',res:'book',hours:12});
     input.acts.push({id:'task',skill:'RAG',stage:3,title:'Task',hours:8});
     const before = structuredClone(input);
     const first = buildPlan(input, {hours:6}, ''), changed = buildPlan(input, {hours:12}, '');
-    expect(first).toMatchObject({weeks:8, materialHours:30.3, taskHours:8, totalH:38.3});
-    expect(changed).toMatchObject({weeks:5, materialHours:36.3, taskHours:8, totalH:44.3});
-    expect(first.acts.find(a=>a.res==='book')).toMatchObject({hours:6,catalogHours:12,hoursAllocation:'book-week'});
-    expect(changed.acts.find(a=>a.res==='book')).toMatchObject({hours:12,catalogHours:12,hoursAllocation:'book-week'});
+    expect(first).toMatchObject({weeks:7, materialHours:24.3, taskHours:8, totalH:32.3});
+    expect(changed).toMatchObject({weeks:4, materialHours:24.3, taskHours:8, totalH:32.3});
+    expect(first.acts.find(a=>a.res==='book')).toMatchObject({hours:12,catalogHours:12});
+    expect(changed.acts.find(a=>a.res==='book')).toMatchObject({hours:12,catalogHours:12});
     expect(JSON.parse(JSON.stringify(first))).toEqual(first);
     expect(changed.cost).toBe(first.cost); expect(input).toEqual(before);
   });

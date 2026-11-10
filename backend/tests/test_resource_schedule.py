@@ -46,8 +46,8 @@ class ResourceScheduleTests(TestCase):
         rows = self.estimates(['RAG', 'ETL', 'Web', 'MLOps'])
         self.assertEqual(rows['Web']['addedWeeks'], 0)
         self.assertEqual((rows['Web']['startWeek'], rows['Web']['endWeek']), (1, 3))
-        self.assertEqual(rows['Web']['totalWeeks'], 8)
-        self.assertEqual(rows['RAG']['bookWeeks'], 1)
+        self.assertEqual(rows['Web']['totalWeeks'], 7)
+        self.assertEqual(rows['RAG']['bookWeeks'], 0)
         for row in rows.values():
             self.assertLessEqual(row['startWeek'], row['endWeek'])
             self.assertLessEqual(row['endWeek'], row['totalWeeks'])
@@ -58,28 +58,28 @@ class ResourceScheduleTests(TestCase):
         self.assertEqual(result['totalWeeks'], 3)
         self.assertEqual(result['courseWeeks'], 3)
 
-    def test_shared_book_is_one_week_even_for_nonadjacent_skills(self):
+    def test_shared_book_adds_no_weeks_for_nonadjacent_skills(self):
         for name in ('RAG', 'Web'):
             self.choices[name]['books'] = ['book']
         rows = self.estimates(['RAG', 'ETL', 'Web', 'MLOps'])
-        self.assertEqual(rows['RAG']['totalWeeks'], 9)
-        self.assertEqual(rows['RAG']['bookWeeks'], 1)
-        self.assertEqual(rows['Web']['bookWeeks'], 1)
-        self.assertEqual(rows['Web']['addedWeeks'], 1)
-        self.assertEqual(sum(row['addedWeeks'] for row in rows.values()), 9)
+        self.assertEqual(rows['RAG']['totalWeeks'], 7)
+        self.assertEqual(rows['RAG']['bookWeeks'], 0)
+        self.assertEqual(rows['Web']['bookWeeks'], 0)
+        self.assertEqual(rows['Web']['addedWeeks'], 0)
+        self.assertEqual(sum(row['addedWeeks'] for row in rows.values()), 7)
         before = deepcopy(self.saved)
         preview = material_plan.preview(self.saved, self.draft)
-        self.assertEqual(preview['weeks'], 9)
-        self.assertEqual(preview['totalH'], 30.3)
+        self.assertEqual(preview['weeks'], 7)
+        self.assertEqual(preview['totalH'], 24.3)
         books = [a for a in preview['acts'] if a.get('res') == 'book']
         self.assertEqual(len(books), 2)
-        self.assertEqual([a['resourceWindow'] for a in books], [{'from': 4, 'to': 4}, {'from': 5, 'to': 5}])
+        self.assertTrue(all('resourceWindow' not in a for a in books))
         self.assertEqual(self.saved, before)
         revision = dict(deepcopy(preview['def']), acts=[dict(a, key=a['id']) for a in preview['acts']])
         rebuilt = material_plan.rebuild_revision(revision, preview, self.draft['handoff'])
         revised = roadmap.build_plan(rebuilt, {'hours': 6, 'start': 2}, 'Goal')
-        self.assertEqual(revised['weeks'], 9)
-        self.assertEqual(revised['totalH'], 30.3)
+        self.assertEqual(revised['weeks'], 7)
+        self.assertEqual(revised['totalH'], 24.3)
 
     def test_book_only_shared_selection_reorder_disable_and_reselect(self):
         for row in self.rec['skills']:
@@ -88,18 +88,18 @@ class ResourceScheduleTests(TestCase):
         self.choices['RAG']['books'] = ['book']
         self.choices['Web']['books'] = ['book']
         rows = self.estimates()
-        self.assertEqual(rows['RAG']['totalWeeks'], 2)
-        self.assertEqual(rows['Web']['bookWeeks'], 1)
+        self.assertEqual(rows['RAG']['totalWeeks'], 0)
+        self.assertEqual(rows['Web']['bookWeeks'], 0)
         reordered = self.estimates(list(reversed(self.order)))
-        self.assertEqual(reordered['Web']['bookWeeks'], 1)
-        self.assertEqual(reordered['RAG']['bookWeeks'], 1)
+        self.assertEqual(reordered['Web']['bookWeeks'], 0)
+        self.assertEqual(reordered['RAG']['bookWeeks'], 0)
         self.choices['RAG']['enabled'] = False
-        self.assertEqual(self.estimates()['Web']['bookWeeks'], 1)
+        self.assertEqual(self.estimates()['Web']['bookWeeks'], 0)
         self.choices['Web']['books'] = []
         self.assertEqual(self.estimates()['Web']['totalWeeks'], 0)
         self.choices['Web']['books'] = ['book']
-        self.assertEqual(self.estimates(weekly=12)['Web']['totalWeeks'], 1)
-        self.assertEqual(self.estimates(weekly=12)['Web']['resources'], [{'id': 'book', 'startWeek': 1, 'endWeek': 1}])
+        self.assertEqual(self.estimates(weekly=12)['Web']['totalWeeks'], 0)
+        self.assertEqual(self.estimates(weekly=12)['Web']['resources'], [])
 
     def test_different_book_ids_are_not_deduplicated_by_title(self):
         for row in self.rec['skills']:
@@ -108,7 +108,7 @@ class ResourceScheduleTests(TestCase):
         self.rec['skills'][1]['books'].append(dict(self.resources['book'], id='other-book'))
         self.choices['RAG']['books'] = ['book']
         self.choices['Web']['books'] = ['other-book']
-        self.assertEqual(self.estimates()['Web']['totalWeeks'], 2)
+        self.assertEqual(self.estimates()['Web']['totalWeeks'], 0)
 
     def test_previous_book_schedule_version_cannot_be_saved_as_current(self):
         tx = Mock(); tx.one.return_value = {'draft_choices': {'v2Survey': self.saved, 'draft': self.draft}}
@@ -241,7 +241,7 @@ class ResourceScheduleTests(TestCase):
         self.assertEqual(plan['durationBasis'], 'materials-only')
         self.assertEqual((plan['acts'][0]['wFrom'], plan['acts'][0]['wTo']), (1, 1))
 
-    def test_five_skills_keep_order_and_book_only_skill_adds_exactly_one_week(self):
+    def test_five_skills_keep_order_and_book_only_skill_adds_no_weeks(self):
         self.order.append('Security')
         self.rec['skills'].append({'name': 'Security', 'courses': [], 'books': [self.resources['book']]})
         self.choices['Security'] = {'course': None, 'books': [], 'enabled': True}
@@ -251,5 +251,5 @@ class ResourceScheduleTests(TestCase):
         self.assertIsNone(rows['Security']['startWeek'])
         self.choices['Security']['books'] = ['book']
         rows = self.estimates()
-        self.assertEqual(rows['Security']['addedWeeks'], 1)
-        self.assertEqual(rows['Security']['totalWeeks'], 8)
+        self.assertEqual(rows['Security']['addedWeeks'], 0)
+        self.assertEqual(rows['Security']['totalWeeks'], 7)

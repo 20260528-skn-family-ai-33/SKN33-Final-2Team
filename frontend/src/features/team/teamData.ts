@@ -21,10 +21,11 @@ export function useMemberOf(uid: string | undefined) {
   return { team: t, member: (t.data?.members || []).map((m) => m.user).find((u) => u.id === String(uid)) || null };
 }
 
-export function useMemberState(uid: string | undefined) {
+export function useMemberState(uid: string | undefined, refreshComments = false) {
   return useQuery({
     queryKey: memberKey(String(uid)),
     enabled: !!uid,
+    refetchInterval: refreshComments ? 5_000 : false,
     queryFn: async (): Promise<MemberState> => {
       const w = await teamApi.member(String(uid));
       mergeRes(w.res);

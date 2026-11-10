@@ -10,6 +10,7 @@ import { PostCheckPage } from '@/features/assessment/PostCheckPage';
 import { LoginPage } from '@/features/auth/LoginPage';
 import { HomePage } from '@/features/home/HomePage';
 import { MePage } from '@/features/profile/MePage';
+import { PasswordPage } from '@/features/profile/PasswordPage';
 import { CommentSentPage, MemberListPage, MemberPlansPage, MemberReportPage, MemberRoadPage } from '@/features/team/TeamPages';
 import { ReportPage } from '@/features/report/ReportPage';
 import { ResourcePage, ResourcesPage } from '@/features/resources/ResourcePages';
@@ -36,6 +37,7 @@ export const router = createBrowserRouter([
       r(paths.login, <LoginPage />, { title: '로그인', role: 'public' }),
       r(paths.home, <HomePage />, { nav: 'home', title: '홈', width: 'wide' }),
       r(paths.me, <MePage />, { nav: 'me', title: '내 정보', width: 'wide' }),
+      r(paths.password, <PasswordPage />, { nav: 'me', title: '비밀번호 변경' }),
       // 새 로드맵 작성
       r(paths.newGoal, <DraftScreen><GoalStep /></DraftScreen>, { nav: 'new', title: '새 로드맵 작성', width: 'wide' }),
       r(paths.newDetails, <DraftScreen step="details"><DetailsStep /></DraftScreen>, { nav: 'new', title: '세부 사항', width: 'wide' }),

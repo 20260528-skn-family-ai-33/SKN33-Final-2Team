@@ -33,6 +33,7 @@ export interface MemberState {
 }
 
 export interface CommentBody {
+  skill?: string;
   fit: string;
   fitText: string;
   level: string;

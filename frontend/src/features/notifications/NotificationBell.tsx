@@ -2,7 +2,7 @@
    30초마다(창이 보일 때만)·화면을 옮길 때·창을 열 때 새로 받는다. 누르면 읽음으로 바꾸고 그 로드맵·보고서 화면으로 간다.
    부서장(#96): 내 알림을 위, 소속 직원 알림을 아래에 나눠 두고, 소속 직원 알림은 직원별 한 줄로 묶는다.
    묶음을 누르면 창 안에서 그 직원의 알림을 건별로 보여 주고(2단계), 건을 누르면 바로 그 화면으로 간다.
-   목록에는 읽지 않은 알림만 온다(#96 · 읽으면 목록에서 빠짐). 새 알림은 화면 아래에도 띄우고, 누르면 같은 방식으로 그 화면으로 간다(notificationFloat.ts).
+   읽은 알림도 24시간 동안 목록에 남는다. 새 알림은 화면 아래에도 띄우고, 누르면 같은 방식으로 그 화면으로 간다(notificationFloat.ts).
    서버 동기화(직원별 캐시·다른 로그인의 늦은 응답 버리기·없는 대상 기록만 받기)는 notificationActions.ts */
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
@@ -18,7 +18,6 @@ import { ws } from '@/shared/state/workspace';
 import { Icon } from '@/shared/ui/Icon';
 import { currentSignIn, markRead, notificationKey, refreshTarget, stillSignedIn } from './notificationActions';
 import { clearFloats, dismissFloat, FLOAT_MAX, holdFloats, noteInbox, resetFloats, useFloats } from './notificationFloat';
-import { useReadOnView } from './notificationReadOnView';
 import { isOtherDraft, notificationSub, notificationTarget, notificationTime, notificationTitle, splitNotifications, staffGroupSub, type StaffGroup } from './notificationView';
 
 const POLL_MS = 30_000;
@@ -39,7 +38,6 @@ export function NotificationBell() {
   const items = q.data?.items || [];
   const unread = q.data?.unread || 0;
   const { mine, staff } = splitNotifications(items);
-  useReadOnView(items, pathname);
   // 새로 받은 목록에 그 직원의 알림이 없어졌으면 처음 단계를 보여 준다
   const group = staffId ? staff.find((g) => g.employee.id === staffId) : undefined;
 
@@ -58,8 +56,8 @@ export function NotificationBell() {
   useEffect(() => {
     const t = currentSignIn();
     if (!data || !t || t.id !== owner) return;
-    noteInbox(`${t.id}:${t.seq}`, data.items, (n) => open || (notificationTarget(n) === pathname && !isOtherDraft(n, ws().draftId)));
-  }, [data, owner, open, pathname]);
+    noteInbox(`${t.id}:${t.seq}`, data.items, () => open);
+  }, [data, owner, open]);
   useEffect(() => resetFloats, []);
   const floats = useFloats((s) => s.items);
   const floatRef = useRef<HTMLDivElement>(null);
@@ -219,7 +217,7 @@ export function NotificationBell() {
           </button>
           <span className="notif-who">
             <b id="notif-who">{group.employee.name} 님의 알림</b>
-            <small>읽지 않은 알림 {group.items.length}건</small>
+            <small>전체 {group.items.length}건 · 읽지 않음 {group.unread}건</small>
           </span>
         </div>
         <ul className="notif-list">{group.items.map((n) => itemRow(n, true))}</ul>

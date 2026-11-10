@@ -155,11 +155,9 @@ export function RevSupView({ pd, pid, onPulled }: { pd: PendingRevision; pid: st
       </>
     );
   return (
-    <div className="card flat rv-sup">
-      <dl className="kv">
-        <dt>지원 조건 · v{(pd.from.version || 0) + 1}</dt>
-        <dd>{cell}</dd>
-      </dl>
-    </div>
+    <details key={pd.key} className="card flat rv-sup">
+      <summary>지원 조건 · v{(pd.from.version || 0) + 1}</summary>
+      <div>{cell}</div>
+    </details>
   );
 }

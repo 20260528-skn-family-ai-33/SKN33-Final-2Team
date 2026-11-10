@@ -210,8 +210,7 @@ export function ChecksPage() {
                       <div className="tx">
                         <b>결과 보고서</b>
                         <small>
-                          {report.createdAt} ·{' '}
-                          {report.confirmed ? '확인함' : '확인 전'}
+                          {report.createdAt}
                         </small>
                       </div>
                       <span className="end">

@@ -20,14 +20,34 @@ def example_plan():
 
 
 class DurationDisplayTests(TestCase):
+    def test_legacy_material_schedule_is_normalized_in_every_roadmap_status(self):
+        from app.services import plans
+
+        source = example_plan()
+        source['def']['materialSchedule'] = [{'skill': 'SQL', 'weeks': 4}]
+        before = deepcopy(source)
+        row = dict(roadmap_id='roadmap', content=source, created_at=None, done_at=None,
+                   archived_at=None, resumed_at=None)
+        with patch.object(plans.db, 'all_', return_value=[]), patch.object(plans, '_comments', return_value=[]), \
+             patch.object(plans.catalog, 'refresh_book_links', side_effect=lambda books: books), \
+             patch.object(plans.catalog, 'refresh_course_levels', side_effect=lambda courses: courses):
+            records = [plans.record(dict(row, status=status), for_mgr=True)
+                       for status in ('IN_PROGRESS', 'ARCHIVED', 'COMPLETED', 'IN_PROGRESS')]
+        self.assertEqual([record['status'] for record in records], ['active', 'archived', 'done', 'active'])
+        normalized = records[0]['plan']
+        self.assertNotEqual(normalized['weeks'], before['weeks'])
+        for record in records[1:]:
+            self.assertEqual(record['plan'], normalized)
+        self.assertEqual(source, before)
+
     def test_other_resources_are_not_tasks_and_shared_ids_count_once(self):
         source = example_plan()
         source['acts'] += [dict(id=name, skill='SQL', res='cert', task=True, hours=10)
                            for name in ('cert1', 'cert2')]
         plan = apply_plan_schedule(source)
         self.assertEqual((plan['materialHours'], plan['taskHours'], plan['otherMaterialHours'], plan['totalH']),
-                         (18.5, 8, 10, 36.5))
-        self.assertEqual(plan['weeks'], 6)
+                         (13.5, 8, 10, 31.5))
+        self.assertEqual(plan['weeks'], 4)
         self.assertEqual(apply_plan_schedule(plan), plan)
 
     def test_selected_and_replaced_tasks_match_the_review_contract(self):
@@ -55,35 +75,35 @@ class DurationDisplayTests(TestCase):
                 selected = [act['id'] for act in option['acts'] if task or act.get('res')]
                 chosen = selection_option(saved, draft, selected, 'base')
                 plan = roadmap.build_plan(chosen, {'hours': 5}, 'SQL')
-                self.assertEqual((plan['weeks'], plan['materialHours'], plan['taskHours']), (6, 18.5, 8 if task else 0))
-                self.assertEqual(next(act for act in plan['acts'] if act.get('res') == 'book')['hours'], 5)
+                self.assertEqual((plan['weeks'], plan['materialHours'], plan['taskHours']), (4, 13.5, 8 if task else 0))
+                self.assertEqual(next(act for act in plan['acts'] if act.get('res') == 'book')['hours'], 10)
             composed = compose_skill_selection(saved, draft, 'base', {'SQL': 'alternative'})
             saved['activityVersions'].append(composed)
             selected = [act['id'] for act in composed['option']['acts']]
             plan = roadmap.build_plan(selection_option(saved, draft, selected, composed['id']), {'hours': 5}, 'SQL')
-            self.assertEqual((plan['taskHours'], plan['totalH']), (3, 21.5))
+            self.assertEqual((plan['taskHours'], plan['totalH']), (3, 16.5))
 
     def test_material_allocation_task_separation_and_catalog_preservation(self):
         source = example_plan()
         before = deepcopy(source)
         plan = apply_plan_schedule(source)
-        self.assertEqual((plan['weeks'], plan['materialHours'], plan['taskHours'], plan['totalH']), (6, 18.5, 8, 26.5))
+        self.assertEqual((plan['weeks'], plan['materialHours'], plan['taskHours'], plan['totalH']), (4, 13.5, 8, 21.5))
         books = [a for a in plan['acts'] if a['res'] == 'book']
-        self.assertTrue(all(a['hours'] == 5 and a['catalogHours'] == 10 and a['hoursAllocation'] == 'book-week' for a in books))
+        self.assertTrue(all(a['hours'] == 10 and 'resourceWindow' not in a and 'hoursAllocation' not in a for a in books))
         self.assertEqual(source, before)
         self.assertEqual(apply_plan_schedule(plan), plan)
         plan['hours'] = 10
         revised = apply_plan_schedule(plan)
-        self.assertEqual((revised['weeks'], revised['materialHours'], revised['taskHours']), (5, 23.5, 8))
-        self.assertTrue(all(a['hours'] == 10 and a['catalogHours'] == 10 for a in revised['acts'] if a['res'] == 'book'))
-        self.assertEqual(plan['acts'][1]['hours'], 5)
+        self.assertEqual((revised['weeks'], revised['materialHours'], revised['taskHours']), (3, 13.5, 8))
+        self.assertTrue(all(a['hours'] == 10 for a in revised['acts'] if a['res'] == 'book'))
+        self.assertEqual(plan['acts'][1]['hours'], 10)
 
     def test_unknown_time_remains_unknown_but_has_explicit_one_week_allocation(self):
         source = example_plan()
         for row in source['def']['learningReport']['recommendations']['skills']:
             row['courses'][0].update(hours=None, timeStatus='unknown')
         plan = apply_plan_schedule(source)
-        self.assertEqual((plan['weeks'], plan['materialHours'], plan['totalH']), (4, 10, 18))
+        self.assertEqual((plan['weeks'], plan['materialHours'], plan['totalH']), (2, 5, 13))
         self.assertTrue(plan['totalHUnknown'])
         self.assertTrue(all(a['hours'] == 5 and a['timeStatus'] == 'unknown' and '미확인' in a['hoursBasis'] for a in plan['acts'] if a['res'] == 'course'))
 
@@ -108,7 +128,7 @@ class DurationDisplayTests(TestCase):
         details = [call.kwargs['d'].obj for call in tx.val.call_args_list]
         books = [row for row in details if row['res'] == 'book']
         self.assertEqual(len(books), 2)
-        self.assertTrue(all(row['hours'] == 5 and row['catalogHours'] == 10 and row['hoursAllocation'] == 'book-week' for row in books))
+        self.assertTrue(all(row['hours'] == 10 and row['hoursAllocation'] is None for row in books))
 
     def test_active_db_and_new_templates_receive_one_contract_each(self):
         import json

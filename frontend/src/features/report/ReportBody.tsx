@@ -34,7 +34,7 @@ export function ReportBody({ r }: { r: Report }) {
           <SurveyComparisonRow phase="post" value={row.post} />
         </li>)}</ol>
       </details>}
-      {!!r.quizEvidence?.length && <QuizLearningCheck evidence={r.quizEvidence} />}
+      {!!(r.quizEvidence?.length || r.postQuizDetails?.length) && <QuizLearningCheck evidence={r.quizEvidence ?? []} postDetails={r.postQuizDetails} />}
       <div className="card" style={{ marginTop: 12 }}>
         <h2 className="st">실행 기록</h2>
         <dl className="kv">

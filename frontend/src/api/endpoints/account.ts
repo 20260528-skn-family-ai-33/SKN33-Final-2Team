@@ -11,6 +11,8 @@ export const accountApi = {
   logout: () => http.post<null>('/auth/logout'),
   me: () => http.get<Account>('/me'),
   profile: () => http.get<ProfileView>('/me/profile'),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    http.put<null>('/me/password', { currentPassword, newPassword }),
   saveSelf: (body: Record<string, unknown>) => http.put<ProfileView>('/me/profile/self', body),
   revertSelf: () => http.del<ProfileView>('/me/profile/self'),
   consent: (period: string, consent: boolean) => http.put<{ period: string; consent: boolean }>(`/me/evaluations/${enc(period)}/consent`, { consent }),

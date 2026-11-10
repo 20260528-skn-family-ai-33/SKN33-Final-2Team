@@ -174,12 +174,12 @@ export async function revise(pid: string): Promise<void> {
   await pullPlan(pid);
 }
 
-export async function acceptRevision(go: Go, pid: string): Promise<void> {
+export async function acceptRevision(go: Go, pid: string, selectedSkills?: string[]): Promise<void> {
   const R = ws().plans[pid];
   const rv = R && R.revision;
   if (!R || !R.pending || !rv) return;
   try {
-    const Rn = takePlan(await plansApi.acceptRevision(rv.id));
+    const Rn = takePlan(await plansApi.acceptRevision(rv.id, selectedSkills));
     if (!Rn) return;
     updateWs((s) => {
       s.plans[Rn.id].rev = null;
@@ -210,19 +210,23 @@ export async function dropRevision(go: Go, pid: string): Promise<void> {
     }
   });
   go(back);
-  toast('수정안을 버렸어요. 계획은 그대로예요');
+  toast('현재 상태를 유지했어요.');
 }
 
 /** 수정 요청 시작: 쓰던 양식이 없으면 새로 만든다 */
 export function startRevise(go: Go, pid: string): void {
   const R = ws().plans[pid];
   if (!R || R.status !== 'active') return;
-  if (!(R.revision && R.revision.status === 'running'))
+  const integrated = !!R.plan.def.learningReport;
+  const resume = R.revision?.status === 'running' || (integrated && !!R.pending && !R.rev?.fromComment);
+  if (!resume)
     updateWs((s) => {
-      s.plans[pid].rev = freshRev(s.plans[pid]);
+      s.plans[pid].rev = freshRev(s.plans[pid], integrated
+        ? '기존 목표와 스킬 순서, 학습 여건을 유지하고 스킬별로 개선할 강좌와 산출물을 제안해 주세요. 도서와 완료한 활동은 유지해 주세요. 새 산출물 설명은 만들 것:, 필수 항목:, 제출물:, 평가 기준: 순서로 각 항목을 작성해 주세요.' : '');
       s.plans[pid].pending = null;
     });
   go(paths.revise(pid));
+  if (integrated && !resume) void revise(pid);
 }
 
 /* 보관(API-41): 진행을 멈추고 지난 로드맵으로 옮긴다. 기록은 그대로이고 언제든 다시 진행할 수 있다(API-42) */

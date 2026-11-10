@@ -101,3 +101,31 @@ it.each([true, false, undefined])('이전 기준 여부(%s)를 전달하고 저�
   expect(fetchMock).toHaveBeenCalledTimes(1);
   expect(fetchMock.mock.calls[0][1]?.method).toBeUndefined();
 });
+
+it.each([true, false])('빈 작업 완료 후 저장 자료를 조회한다 (%s)', async hasSaved => {
+  const ready: Result = { generationId: 'g1', recommendations: { id: 'r1', skills: [] }, choices: {} };
+  waitJob.mockResolvedValue({});
+  const fetchMock = vi.fn<typeof fetch>()
+    .mockResolvedValueOnce(Response.json({ recommendations: null, preparingJobId: 'job-empty' }))
+    .mockResolvedValueOnce(Response.json(hasSaved ? ready : { recommendations: null }));
+  vi.stubGlobal('fetch', fetchMock);
+  const load = loadRecommendations('empty-job', 'g1', 'A3', 'v1');
+  if (hasSaved) await expect(load).resolves.toEqual(ready);
+  else await expect(load).rejects.toThrow('다시 시도');
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+  expect(fetchMock.mock.calls[1][1]?.method).toBeUndefined();
+});
+
+it('작업 ID 발급 대기는 상한 이후 종료한다', async () => {
+  vi.useFakeTimers();
+  try {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ recommendations: null, preparingJobId: '' })));
+    const load = loadRecommendations('pending-job', 'g1', 'A3', 'v1');
+    const assertion = expect(load).rejects.toThrow('자료 준비가 지연');
+    await vi.advanceTimersByTimeAsync(10200);
+    await assertion;
+    expect(waitJob).not.toHaveBeenCalled();
+  } finally {
+    vi.useRealTimers();
+  }
+});

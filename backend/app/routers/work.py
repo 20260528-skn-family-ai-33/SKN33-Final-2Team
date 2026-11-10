@@ -289,8 +289,8 @@ def api_revise(plan_id: str, request: Request, body: dict, a: Account = Depends(
 
 
 @r.post('/plans/{plan_id}/revisions/support/retry')
-def api_rev_support(plan_id: str, request: Request, a: Account = Depends(require_employee)):
-    jid = PL.revision_support_retry(a.id, plan_id)
+def api_rev_support(plan_id: str, request: Request, version: int | None = None, a: Account = Depends(require_employee)):
+    jid = PL.revision_support_retry(a.id, plan_id, version)
     return job_response(request, jid, a.id)
 
 
@@ -303,9 +303,10 @@ def _rev_owner(a: Account, revision_id: str) -> str:
 
 
 @r.post('/revisions/{revision_id}/accept')
-def api_rev_accept(revision_id: str, a: Account = Depends(require_employee)):
+def api_rev_accept(revision_id: str, a: Account = Depends(require_employee), body: dict | None = None):
     rid = _rev_owner(a, revision_id)
-    rec = PL.accept_revision(a.id, rid, revision_id)
+    selected = (body or {}).get('selectedSkills')
+    rec = PL.accept_revision(a.id, rid, revision_id, selected) if selected is not None else PL.accept_revision(a.id, rid, revision_id)
     return dict(_plan_out(rec), planId=rid, version=rec['plan']['version'])
 
 

@@ -3,12 +3,12 @@ import { quizSummary } from './quizSummary';
 import './quizLearningCheck.css';
 
 type Evidence=NonNullable<Report['quizEvidence']>;
-export function QuizLearningCheck({ evidence }: { evidence:Evidence }) {
- if(!evidence.length)return null;
- const skills=Array.from(new Set(evidence.map(row=>row.skill)));
+export function QuizLearningCheck({ evidence, postDetails }: { evidence:Evidence; postDetails?: Report["postQuizDetails"] }) {
+ if(!evidence.length&&!postDetails?.length)return null;
+ const skills=Array.from(new Set((evidence.length ? evidence : postDetails ?? []).map(row=>row.skill)));
  return <details className="card report-survey learning-check" open>
   <summary><span>학습 점검</span><span className="learning-check-count">{skills.length}개 스킬</span></summary>
-  <p className="learning-check-intro">어떤 개념을 확인했는지, 사전·사후 정답 수를 함께 살펴보세요.</p>
+  {!!evidence.length && <><p className="learning-check-intro">어떤 개념을 확인했는지, 사전·사후 정답 수를 함께 살펴보세요.</p>
   <div className="learning-check-groups">{skills.map((skill,index)=>{
    const rows=quizSummary(evidence.filter(row=>row.skill===skill));
    return <section className="learning-check-skill" key={skill} aria-label={skill}>
@@ -21,6 +21,17 @@ export function QuizLearningCheck({ evidence }: { evidence:Evidence }) {
     </div>)}
    </section>;
   })}</div>
-  <p className="learning-check-note">정답 수 / 문항 수 · 사전·사후는 같은 개념의 다른 문제입니다. 결과는 학습 확인 자료이며 난이도를 보정한 역량 점수가 아닙니다.</p>
+  </>}
+  {!!postDetails?.length && <details>
+    <summary>사후 퀴즈 문항별 결과</summary>
+    <ol>{postDetails.map(row => <li key={row.id}>
+      <strong>{row.skill} · {row.isCorrect ? '정답' : '오답'}</strong>
+      <p>{row.question}</p>
+      <p>선택 답안 · {row.selected}</p>
+      <p>정답 · {row.correct}</p>
+      {row.explanation && <p>해설 · {row.explanation}</p>}
+    </li>)}</ol>
+  </details>}
+  {!!evidence.length && <p className="learning-check-note">정답 수 / 문항 수 · 사전·사후는 같은 개념의 다른 문제입니다. 결과는 학습 확인 자료이며 난이도를 보정한 역량 점수가 아닙니다.</p>}
  </details>;
 }

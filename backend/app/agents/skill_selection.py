@@ -1,6 +1,7 @@
 """프로젝트의 핵심 스킬 최대 5개 선정 실험. 기존 서비스에는 아직 연결하지 않는다."""
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from typing import Any
 
@@ -31,6 +32,22 @@ class SelectionError(ValueError):
     """선정 계약을 만족하지 않아 후속 설문으로 넘길 수 없는 결과."""
 
 
+def _skill_rows(response: object) -> object:
+    while isinstance(response, dict):
+        if 'skills' in response:
+            return response['skills']
+        wrappers = [key for key in ('data', 'result') if key in response]
+        if len(wrappers) != 1:
+            break
+        response = response[wrappers[0]]
+    return None
+
+
+def _normalized_tag(name: str) -> str:
+    name = re.sub(r'^(?:[-*\u2022]\s+|\d+[.)]\s+)', '', name.strip(), count=1)
+    return ' '.join(name.split()).casefold()
+
+
 def select_skills(
     project: dict[str, Any],
     available_skills: list[str],
@@ -58,7 +75,7 @@ def select_skills(
     payload['learnerKnowledge']=project.get('learnerKnowledge') or {}
     payload['hrContext']=project.get('hrContext') or {}
     raw = generate(SYSTEM, payload)
-    rows = raw.get('skills') if isinstance(raw, dict) else None
+    rows = _skill_rows(raw)
     if not isinstance(rows, list):
         raise SelectionError('스킬 목록 형식이 올바르지 않습니다.')
     if not 1 <= len(rows) <= MAX_SKILLS:
@@ -68,12 +85,16 @@ def select_skills(
         if not isinstance(row, dict):
             raise SelectionError('스킬 항목 형식이 올바르지 않습니다.')
         name = row.get('name')
+        if isinstance(name, str) and name not in tags:
+            normalized = _normalized_tag(name)
+            matches = [tag for tag in tags if _normalized_tag(tag) == normalized]
+            name = matches[0] if len(matches) == 1 else None
         if not isinstance(name, str) or name not in tags or name in seen:
             raise SelectionError('DB에 없는 태그 또는 중복 태그입니다.')
         if any(not isinstance(row.get(k), str) or not row[k].strip() for k in ('reason', 'application')):
             raise SelectionError('선정 이유와 프로젝트 사용 부분이 필요합니다.')
         seen.add(name)
-        selected.append({k: row[k].strip() for k in ('name', 'reason', 'application')})
+        selected.append(dict(name=name, reason=row['reason'].strip(), application=row['application'].strip()))
     return {'skills': selected}
 
 

@@ -42,10 +42,10 @@ class RevisionMaterialsTests(TestCase):
         out = self.rebuild(); report = out['learningReport']
         self.assertEqual(report['choices']['SQL']['courses'], ['c1', 'c2'])
         self.assertEqual(report['choices']['SQL']['books'], ['b1'])
-        self.assertEqual(report['durationEstimates']['SQL']['weeks'], 6)
+        self.assertEqual(report['durationEstimates']['SQL']['weeks'], 5)
         self.assertEqual(report['skillDetails'][0]['competencySummary'], [])
         plan = roadmap.build_plan(out, {'hours': 4, 'start': 2}, 'Goal')
-        self.assertEqual(plan['weeks'], 6)  # 2 + 3 course weeks, one book week; task excluded
+        self.assertEqual(plan['weeks'], 5)  # 2 + 3 course weeks
 
     def test_changed_weekly_time_recalculates_without_task_time(self):
         self.handoff['prefs']['weeklyHours'] = 8
