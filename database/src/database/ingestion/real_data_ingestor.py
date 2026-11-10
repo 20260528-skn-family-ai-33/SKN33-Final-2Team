@@ -606,6 +606,10 @@ class RealDataIngestor:
                 records=[r for r in source_records if r['fields'].get('content_status')=='ready'
                          and exclusion_reason(kind,r['fields'],r['source'],r['raw'],r['fetched_at']) is None]
                 if not records:continue
+                tracks_difficulty = kind == 'courses' and conn.execute(
+                    """SELECT EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid='public.courses'::regclass
+                       AND attname='difficulty_estimated' AND NOT attisdropped) AS enabled"""
+                ).fetchone()['enabled']
                 pk,map_table=TABLES[kind]
                 # Synchronize explicit integer-ID allocation with all table writers; keep existing IDs.
                 conn.execute(f'LOCK TABLE public.{kind} IN SHARE ROW EXCLUSIVE MODE')
@@ -647,7 +651,16 @@ class RealDataIngestor:
                     fields['last_batch_updated']=datetime.now(timezone.utc)
                     names=list(fields)
                     params=[fields[n] for n in names]
-                    assignments=','.join(f'{n}=EXCLUDED.{n}' for n in names if n!=pk)
+                    updates={n:f'EXCLUDED.{n}' for n in names if n!=pk}
+                    if kind=='courses' and 'difficulty' in updates:
+                        # 외부 API의 중급·미기재 값으로 팀이 검토한 강좌 난이도를 덮지 않는다.
+                        preserve = "courses.difficulty='UPPER_INTERMEDIATE'"
+                        if tracks_difficulty:
+                            preserve += " OR (courses.difficulty_estimated AND EXCLUDED.difficulty IS NULL)"
+                            updates['difficulty_estimated'] = f'CASE WHEN {preserve} THEN courses.difficulty_estimated ELSE false END'
+                            updates['difficulty_basis'] = f'CASE WHEN {preserve} THEN courses.difficulty_basis ELSE NULL END'
+                        updates['difficulty']=f'CASE WHEN {preserve} THEN courses.difficulty ELSE EXCLUDED.difficulty END'
+                    assignments=','.join(f'{n}={value}' for n,value in updates.items())
                     conn.execute(f'''INSERT INTO public.{kind} ({','.join(names)}) VALUES ({','.join(['%s']*len(names))})
                         ON CONFLICT ({pk}) DO UPDATE SET {assignments}''',params)
                     # Replace links only for refreshed records. Unfetched rows and their links remain intact.

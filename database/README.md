@@ -278,3 +278,105 @@ python -m src.database.vectors.resource_vectors status
 10/29 리뷰 보정 검증: 무료 단위 215개 통과·5개 제외, 실제 격리 DB/인증 HTTP 13개 통과, 화면 43개 테스트·타입 검사·빌드 통과(lint 기존 경고 37개). 목록→단건 상세→목차 펼치기를 브라우저에서 확인했다. 100건 목록은 약 1.26MB에서 0.20MB로 줄었다. 원본 DB 변경·유료 모델 호출은 없으며 변경은 로컬에서 검증했다.
 
 10/29 선택 수정 추가 검증: 무료 단위 216개 통과·5개 제외, 실제 격리 PostgreSQL/인증 HTTP 16개 통과, 프런트 13파일·47개 테스트와 타입·lint·빌드 통과(lint 기존 경고 37개). 최신 검토 DB의 비공개 복사본에서 관리자 시간 확인 후 동기화 보존과 표시 문구/숫자 정밀도를 검사했다. 내부 브라우저에서 도서 전체 소개 접근·관리자 설명 변경 후 상세 재진입 갱신·단계와 실행 기록의 ‘5시간 50분’ 표시를 확인했다. 원본 DB 쓰기·유료 호출은 0회이며 실제 모델 추론은 검사하지 않았다.
+#147 무료 강좌 보충은 확충 DB에 적용한다. `scripts/supplement_free_courses_147.py --database <DB명>`은 한 트랜잭션에서 태그·메타·벡터 갱신 대상을 확인한 뒤 롤백한다. 적용 전 PostgreSQL custom-format 백업을 남기고, 같은 명령에 `--apply`를 붙여 로컬 BGE 서버로 해당 강좌만 색인한다. DB 연결은 `DATABASE_URL`, 모델 주소는 `BGE_M3_BASE_URL`을 사용한다. 패키지는 `config/free_course_supply_147.json`이며 외부 PostgreSQL 강좌 1개에 SQL 튜닝 태그를 연결하고 무료 Django REST 사내교육 6개(2401~2406)를 등록한다. 적용 후 미리보기를 다시 실행하면 갱신 벡터 수는 0이어야 한다. 복구가 필요하면 적용 직전 백업을 별도 DB에 복원해 검증한 뒤 연결을 전환한다.
+
+## 검토 강좌 난이도
+
+미기재 강좌는 저장된 제목과 공개 목차로 분류한다. `public.courses.difficulty`에 등급을 저장하고
+`difficulty_estimated`에 추정 여부, `difficulty_basis`에 사용한 근거를 남긴다. 명시적 단서가 부족하면
+‘명시적 수준 근거 부족, 계획용 중간값’으로 기록한다. 원본 등급이 있는 과정은 추정 대상에서 제외한다.
+
+검토 명단에 027을 적용한 뒤, 같은 DB와 BGE 서버를 연결한 저장소의 `database/`에서
+`python scripts/backfill_course_difficulty.py --database <DB명>`으로 대상을 확인한다.
+`--apply`는 028을 적용하고 난이도와 BGE 입력을 함께 갱신한다. 재실행하면 새로 누락됐거나 입력이 바뀐 대상만 처리한다.
+현재 수집 기준 밖의 강좌도 이미 보관 중인 벡터가 있다면 입력 변경을 반영한다. 이 작업은 해당 강좌의 추천 자격을 바꾸지 않는다.
+이전 상태 전체를 복구하려면 실행 전 전체 백업을 별도 DB에 복원해 연결을 전환한다.
+
+`courses.difficulty`의 `UPPER_INTERMEDIATE`는 강좌 단위의 **중상**이다. 기존에 스킬별로 검토했던 96개 연결은 서로 다른 강좌 85개에 해당한다. 검토 전 난이도(중급 50개·미기재 35개)는 `config/reviewed_course_difficulties_147.json`에 보존한다.
+
+확충 BGE DB와 로컬 BGE 서버에 연결된 환경에서 `database/`를 기준으로 `python scripts/promote_reviewed_courses.py --database <DB명>`을 실행해 대상을 확인한다. `--apply`를 추가하면 027 제약 변경을 등록하고, 해당 강좌의 난이도와 벡터를 한 트랜잭션으로 갱신한다. `--restore --apply`는 같은 명단의 원래 난이도와 벡터를 복원하며 새 난이도를 허용하는 스키마는 유지한다.
+
+## 사내교육 기본 412개 복제와 보강 2개 재현: 총 414개 (#147)
+
+`config/internal_training_packages.json`에 등록한 `internal_training_pilot.json` 12개,
+`internal_training_expansion.json` 394개, `free_course_supply_147.json` 6개를
+`scripts/apply_internal_training.py`로 함께 적재한다. 최근 6개는 기존 무료 보충 명령과 같은 원본이다.
+파생 사본 `internal_training_free_147.json`은 두지 않는다. 기존 `supplement_free_courses_147.py --database <DB명> [--apply]`
+명령은 외부 강좌 연결 동작을 유지하고, 교육 6개의 필드 변환·적재·검증은 통합 적재기에 위임한다.
+데이터는 설계된 사내 실습이며 `record_source=INTERNAL_TRAINING_PILOT`, `is_real=false`로 구분한다.
+이 패키지는 교육 데이터만 포함한다. 옛 `reviewed` 명단·스킬별 승격·외부 강좌 변경을 실행하지 않으며
+스키마를 설치하지 않는다. 기존 강좌의 난이도·추정 여부·근거를 보존하고 신규 교육에만 패키지 난이도를 넣는다.
+중상 85개와 추정 615개의 처리는 위 담당 스크립트와 별개다.
+
+먼저 현재 canonical BGE 백업을 **별도 DB**에 복원하고 `DATABASE_URL`을 지정한다. 아래 명령은 `database/` 기준이다.
+대상 DB 이름이 연결과 다르면 중단한다. 기본 동작은 교육·스킬·메타 변경을 시험한 뒤 전체 롤백하며 임베딩을 호출하지 않는다.
+
+```shell
+python scripts/apply_internal_training.py --database <격리DB명>
+python scripts/apply_internal_training.py --database <격리DB명> --apply
+python scripts/apply_internal_training.py --database <격리DB명> --verify-only
+```
+
+벡터가 없거나 오래되면 `BGE_M3_BASE_URL`의 canonical BGE-M3 서버를 사용한다. 공식 revision·가중치·CLS·L2·1024차원 계약을 확인한다.
+동일 원문의 current 벡터는 `--export-vectors <파일.json>`으로 **읽기 전용** 검증·내보내기한 뒤,
+복원 대상에 `--vector-cache <파일.json> --cache-only --apply`로 재사용할 수 있다.
+캐시의 모델 계약·원문/실제 입력 해시·차원·정규화·입력 이력을 다시 확인한다. 다른 원문을 해시만 바꾸어 사용하지 않는다.
+`--cache-only`는 재사용할 벡터가 없으면 전체 롤백하고 추론하지 않는다. 캐시·덤프는 Git에 넣지 않고 별도 위치에서 SHA-256과 함께 보존한다.
+
+적재는 교육 원본·차시 시간·수강 기간·원화 가격·내부 안내 URL·스킬·앱 메타·벡터를 한 트랜잭션으로 검증한다.
+기존 406개는 `duration_weeks=NULL`, 최근 6개는 기존 값 4주를 보존하며, 실제 학습 시간은 차시 분의 합계다.
+미리보기·적용을 재시도하면 신규 교육·변경·임베딩은 모두 0이어야 한다. 오류 때는 전체 롤백한다.
+적용 완료 후 되돌릴 때는 적용 전 백업을 **다른 DB**에 복원·검증하고 연결을 전환한다.
+현재 live DB를 대상으로 이 검사를 실행하지 않는다.
+
+후속 담당자가 신규 교육을 추가할 때는 같은 `internal-training/v1` 형식의 `courses` 패키지를 만들고,
+`internal_training_packages.json`의 `packages`에 파일명을 등록하면 기본 실행에 포함된다.
+미등록 파일을 자동 검색하지 않으며, 누락 파일·중복 파일·중복 교육 ID는 실패한다.
+임시 선택은 `--package`를 사용한다. 이 옵션은 기본 목록을 대체하므로 전체 적용 때는 기본 3개와 추가 파일을 모두 반복 지정한다.
+ID 중복은 실패한다. 기존 교육의 보강은 해당 ID를 담은 검토 패키지에 `--refresh`를 명시한다.
+이때 소유 필드·스킬만 갱신하고 기존 난이도·추정 근거는 유지한다. 원문이 바뀌면 이전 벡터 캐시를 제거하고 canonical 서버로 재색인한다.
+표지 담당자는 패키지의 `image_url`과 프런트 자산을 함께 맞춘다. 신규 6개의 현재 공통 SVG 경로는 유지했다.
+
+`python -m unittest tests.test_internal_training.PackageTests -v`는 외부 연결 없는 패키지 검사다.
+`IsolatedDatabaseTests`는 `INTERNAL_TRAINING_TEST_DSN`·`INTERNAL_TRAINING_VECTOR_CACHE`를 명시한
+전용 `course147-night-db-*` 컨테이너의 `training147*` DB에서만 실행한다.
+사내교육이 없는 상태에서 412개 신규 적재·무변경 재시도·실패 롤백·벡터 복구와 교육 외 전체 테이블·85/615·제약의 보존을 검사한다.
+
+### 야간 보강 2개를 포함한 414개
+
+현재 재고는 위 기본 412개와 `config/night_course_supply_147.json`의 2개를 합한 **414개**다.
+기본 복제 목록은 412개로 유지한다. 이전 412개 백업에서도 복제·검사를 재현하고, 이후 승인된 보강 2개를 별도 단계로 적재한다.
+보강 원본을 다른 JSON에 복사하지 않는다. 두 ID는 `INTERNAL_NIGHT_147_DROPOUT`, `INTERNAL_NIGHT_147_IDS_TLS`이며
+중급·무료, 계획 학습시간은 각각 75분·65분이다. `duration_provenance.package_version`에도 원본 패키지 버전을 남긴다.
+
+`DATABASE_URL`을 명시한 **격리 DB**에 기본 412개를 준비한 뒤 아래 명령을 실행한다. DB 이름이 연결과 다르면 중단한다.
+기존 live 이름의 실행도 유지하지만 이 재현 작업에서는 사용하지 않는다.
+로컬 RTX QA 서버는 호스트에서 `http://127.0.0.1:18779/v1`, Docker에서 `http://host.docker.internal:18779/v1`을
+`BGE_M3_BASE_URL`에 지정한다. 제품의 전역 임베딩 설정은 변경하지 않는다.
+
+```shell
+python scripts/supplement_night_courses_147.py --database <격리DB명>
+python scripts/supplement_night_courses_147.py --database <격리DB명> --apply
+python scripts/supplement_night_courses_147.py --database <격리DB명> --apply
+python scripts/supplement_night_courses_147.py --database <격리DB명> --verify-only
+```
+
+첫 명령은 SELECT 전용 미리보기, 첫 적용은 신규 2개와 BGE 벡터 2개, 재시도는 신규·임베딩 0개여야 한다.
+414개 전체를 대조할 때는 공통 적재기에 기본 3개와 보강 원본을 모두 명시한다. `--verify-only`는 DB에 쓰지 않는다.
+
+```shell
+python scripts/apply_internal_training.py --database <격리DB명> --package config/internal_training_pilot.json --package config/internal_training_expansion.json --package config/free_course_supply_147.json --package config/night_course_supply_147.json --verify-only
+```
+
+이 검사는 총 교육·벡터 **414개**, 무료 **128개**를 확인한다. 기본 명령의 412개 결과와 구분한다.
+로컬 작업 산출물 `work/course_search_147/night_20261110/internal_training_replay.ps1`는 기본 412개 복원을 재현하며,
+`-WithNightSupply`를 붙이면 같은 새 격리 DB에서 보강 명령·재시도·414개 전체 검증까지 실행하고 전용 컨테이너를 정리한다.
+기존 85개 중상·615개 추정과 두 신규 ID 밖 자료·벡터는 그대로 유지해야 한다.
+
+2026-11-10 격리 재현: 패키지 단위 11개와 기본 복제 DB 검사 1개, 합계 12개가 통과했다(건너뜀 0).
+사내교육 0개에서 기본 412개와 검증한 current 벡터 412개를 재사용해 복원하고,
+보강 CLI로 신규 2개·RTX BGE 벡터 2개를 추가했다. 재시도는 신규·임베딩 0개였으며,
+통합 읽기 전용 대조에서 교육·current 벡터 414개와 무료 128개를 확인했다.
+중상 85개·추정 615개와 보강 밖 자료·벡터의 해시를 보존했다. live DB 쓰기와 Git/Drive 게시 없이 수행했다.
+상세 결과는 로컬 `work/course_search_147/night_20261110/internal_training_414_result.json`과
+해당 재현 폴더의 `night_*.json`, `verify_414.json`, `tests.log`에 남겼으며 전용 컨테이너·네트워크는 정리했다.

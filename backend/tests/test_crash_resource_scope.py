@@ -4,8 +4,8 @@ import json
 import unittest
 from unittest.mock import Mock
 
-from app.agents.resource_recommendations import recommend_resources, validate_choices
-from app.services import crash_courses, crash_requirements, resource_evidence, resource_rag
+from app.agents.resource_recommendations import RecommendationError, recommend_resources, validate_choices
+from app.services import crash_courses, resource_evidence, resource_rag
 from test_recommendation_suitability import WEB, course
 
 
@@ -37,6 +37,7 @@ class CrashResourceScopeTests(unittest.TestCase):
         self.django = course('django', ['Django REST API 구현 실습'], skills=[WEB], hours=1)
 
     def test_retrieval_and_recommendation_choose_two_hours_for_same_core(self):
+        self.project = {'goal': 'FastAPI로 REST API 구현'}
         original = deepcopy((self.project, self.selection, self.option))
         items = {row['id']: row for row in (self.long, self.django, self.short)}
         embed = Mock(return_value=[[1.0] + [0.0] * (resource_rag.DIMENSIONS - 1)])
@@ -47,40 +48,36 @@ class CrashResourceScopeTests(unittest.TestCase):
                                          embed=embed, search=search)
         embed.assert_called_once()
         query, = embed.call_args.args[0]
-        self.assertNotIn('django', query.casefold())
         self.assertNotIn('followup', query.casefold())
-        self.assertEqual(json.loads(query), {'course': {'id': 'A2'}, 'coreOutcome': self.skill['coreOutcome'],
-                                             'coreCriteria': self.skill['coreCriteria']})
+        self.assertEqual(json.loads(query)['goal'], self.project['goal'])
+        self.assertNotIn('coreCriteria', json.loads(query))
         self.assertEqual(pools[0]['courses'][0]['id'], 'short')
 
         generate = Mock(return_value={'skills': [{'name': WEB, 'books': [],
-                                                   'courses': [{'id': 'long'}, {'id': 'short'}, {'id': 'django'}]}]})
+                                                   'courses': [{'id': 'long'}, {'id': 'short'}]}]})
         result = recommend_resources(self.project, self.selection, items, generate, course=self.option,
                                      retrieved_pools=pools)
         payload = generate.call_args.args[1]
         profiles = {row['title']: row['learningEvidence'] for row in payload['skills'][0]['courses']}
         self.assertEqual(profiles['short']['requiredStack'], ['fastapi'])
         self.assertEqual(profiles['short']['missingStack'], [])
-        self.assertFalse(profiles['django']['suitable'])
-        self.assertEqual(profiles['django']['missingStack'], ['fastapi'])
+        self.assertNotIn('django', profiles)
         self.assertEqual(payload['crashStudyPlan']['uniqueHours'], 2)
         self.assertEqual(result['skills'][0]['selectedCourse'], 'short')
         self.assertEqual(payload['project']['goal'], original[0]['goal'])
         self.assertEqual((self.project, self.selection, self.option), original)
 
-    def test_unsuitable_model_only_choice_leaves_course_unselected(self):
+    def test_unsuitable_model_only_choice_cannot_reference_a_filtered_course(self):
         items = {row['id']: row for row in (self.short, self.long, self.django)}
         pools = [{'name': WEB, 'courses': list(items.values()), 'books': []}]
         raw = {'skills': [{'name': WEB, 'courses': [{'id': 'django'}], 'books': []}]}
-        result = recommend_resources(self.project, self.selection, items, lambda *_: raw,
-                                     course=self.option, retrieved_pools=pools)
-        row, = result['skills']
-        self.assertEqual(row['courses'], [])
-        self.assertIsNone(row['selectedCourse'])
-        self.assertIn(row['courseDiagnostic']['reason'], ('stack_mismatch', 'insufficient_evidence'))
-        validate_choices(result, {WEB: {'course': None, 'books': []}})
+        before = deepcopy((self.project, self.selection, pools))
+        with self.assertRaises(RecommendationError):
+            recommend_resources(self.project, self.selection, items, lambda *_: raw,
+                                course=self.option, retrieved_pools=pools)
+        self.assertEqual((self.project, self.selection, pools), before)
 
-    def test_core_replacement_uses_same_applied_technology_as_generation(self):
+    def test_core_replacement_recognizes_only_applied_technology(self):
         self.project['goal'] = 'Django 사용 필수'
         self.skill['coreCriteria'] = ['응답 코드 확인']
         for outcome in ('FastAPI 대신 Django로 REST API 구현',
@@ -92,7 +89,6 @@ class CrashResourceScopeTests(unittest.TestCase):
             with self.subTest(outcome=outcome):
                 self.skill['coreOutcome'] = outcome
                 original = deepcopy((self.project, self.selection))
-                crash_requirements.validate_core_requirements([self.skill], self.project)
                 good = resource_evidence.facts(self.django, self.project, self.selection)
                 wrong = resource_evidence.facts(self.short, self.project, self.selection)
                 profile = good['suitability'][WEB]
@@ -111,7 +107,6 @@ class CrashResourceScopeTests(unittest.TestCase):
         self.django['hours'] = 5
         self.short['hours'] = 1
         original = deepcopy((self.project, self.selection, self.option))
-        crash_requirements.validate_core_requirements([self.skill], self.project)
         items = {row['id']: row for row in (self.short, self.django)}
         embed = Mock(return_value=[[1.0] + [0.0] * (resource_rag.DIMENSIONS - 1)])
         search = Mock(return_value=[{'resource_id': 'short', 'similarity': .95},
@@ -119,30 +114,27 @@ class CrashResourceScopeTests(unittest.TestCase):
         pools, _ = resource_rag.retrieve(self.project, self.selection, items, self.option,
                                          embed=embed, search=search)
         query, = embed.call_args.args[0]
-        self.assertEqual(json.loads(query), {'course': {'id': 'A2'},
-                                             'coreOutcome': self.skill['coreOutcome'],
-                                             'coreCriteria': self.skill['coreCriteria']})
+        self.assertEqual(json.loads(query)['goal'], self.project['goal'])
+        self.assertNotIn('coreOutcome', json.loads(query))
         self.assertEqual(pools[0]['courses'][0]['id'], 'django')
         generate = Mock(return_value={'skills': [{'name': WEB, 'books': [],
-                                                   'courses': [{'id': 'short'}, {'id': 'django'}]}]})
+                                                   'courses': [{'id': 'django'}]}]})
         result = recommend_resources(self.project, self.selection, items, generate, course=self.option,
                                      retrieved_pools=pools)
         payload = generate.call_args.args[1]
         profiles = {row['title']: row['learningEvidence'] for row in payload['skills'][0]['courses']}
         self.assertEqual(profiles['django']['requiredStack'], ['django'])
         self.assertTrue(profiles['django']['suitable'])
-        self.assertEqual(profiles['short']['missingStack'], ['django'])
-        self.assertFalse(profiles['short']['suitable'])
+        self.assertNotIn('short', profiles)
         self.assertEqual(payload['crashStudyPlan']['uniqueHours'], 5)
         self.assertEqual(result['skills'][0]['selectedCourse'], 'django')
         validate_choices(result, {WEB: {'course': 'django', 'books': []}})
 
         generate.return_value['skills'][0]['courses'] = [{'id': 'short'}]
-        result = recommend_resources(self.project, self.selection, items, generate, course=self.option,
-                                     retrieved_pools=pools)
-        self.assertEqual(result['skills'][0]['courses'], [])
-        self.assertIsNone(result['skills'][0]['selectedCourse'])
-        validate_choices(result, {WEB: {'course': None, 'books': []}})
+        pools = [{'name': WEB, 'courses': list(items.values()), 'books': []}]
+        with self.assertRaises(RecommendationError):
+            recommend_resources(self.project, self.selection, items, generate, course=self.option,
+                                retrieved_pools=pools)
         self.assertEqual((self.project, self.selection, self.option), original)
 
     def test_core_still_requires_every_applied_framework(self):
@@ -230,6 +222,7 @@ class CrashResourceScopeTests(unittest.TestCase):
                 self.assertFalse(profile['suitable'])
 
     def test_recommendation_rejects_excluded_technology_in_applied_evidence(self):
+        self.project = {'goal': 'Django로 REST API 구현'}
         self.skill.update(coreOutcome='Django REST API 구현', coreCriteria=['응답 코드 확인'])
         self.django['hours'] = 5
         replacement = course('replacement', ['Django 대신 FastAPI로 REST API 구현'], skills=[WEB], hours=1)
@@ -240,23 +233,23 @@ class CrashResourceScopeTests(unittest.TestCase):
                                     for key, score in [('replacement', .95), ('partial-name', .9), ('django', .8)]])
         pools, _ = resource_rag.retrieve(self.project, self.selection, items, self.option,
                                          embed=embed, search=search)
-        self.assertEqual(pools[0]['courses'][0]['id'], 'django')
+        self.assertEqual([row['id'] for row in pools[0]['courses']], ['django'])
+        # 이전 추천 캐시에 제외된 강좌가 남은 경우에도 최종 선택을 검사한다.
+        pools = [{'name': WEB, 'courses': list(items.values()), 'books': []}]
         generate = Mock(return_value={'skills': [{'name': WEB, 'books': [],
-                                                   'courses': [{'id': key} for key in items]}]})
+                                                   'courses': [{'id': 'django'}]}]})
         result = recommend_resources(self.project, self.selection, items, generate, course=self.option,
                                      retrieved_pools=pools)
         payload = generate.call_args.args[1]
         profiles = {row['title']: row['learningEvidence'] for row in payload['skills'][0]['courses']}
         for key in ('replacement', 'partial-name'):
-            self.assertEqual(profiles[key]['missingStack'], ['django'])
-            self.assertFalse(profiles[key]['suitable'])
+            self.assertNotIn(key, profiles)
         self.assertEqual(payload['crashStudyPlan']['uniqueHours'], 5)
         self.assertEqual(result['skills'][0]['selectedCourse'], 'django')
         generate.return_value['skills'][0]['courses'] = [{'id': 'replacement'}, {'id': 'partial-name'}]
-        result = recommend_resources(self.project, self.selection, items, generate, course=self.option,
-                                     retrieved_pools=pools)
-        self.assertEqual(result['skills'][0]['courses'], [])
-        self.assertIsNone(result['skills'][0]['selectedCourse'])
+        with self.assertRaises(RecommendationError):
+            recommend_resources(self.project, self.selection, items, generate, course=self.option,
+                                retrieved_pools=pools)
 
     def test_core_keeps_english_framework_context_rules(self):
         self.skill['coreCriteria'] = ['응답 코드 확인']
@@ -303,7 +296,6 @@ class CrashResourceScopeTests(unittest.TestCase):
         for technology, stack in (('FastAPI', 'fastapi'), ('Django', 'django')):
             with self.subTest(technology=technology):
                 self.skill['coreCriteria'] = [f'{technology}에서 JWT 권한 경계 검증']
-                crash_requirements.validate_core_requirements([self.skill], {'goal': f'{technology} 사용 필수'})
                 row = course('secure', [f'{technology} REST API 구현 실습', 'JWT 권한 경계 검증 실습'],
                              skills=[WEB])
                 profile = resource_evidence.facts(row, self.project, self.selection)['suitability'][WEB]

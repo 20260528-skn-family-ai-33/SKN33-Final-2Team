@@ -10,7 +10,7 @@ from app.services import crash_courses as crash, resource_rag as rag
 def course(key, hours=2, **changes):
     return dict({'id': key, 'type': 'course', 'title': f'SQL 조회 {key}', 'usable': True,
                  'skills': ['SQL'], 'hours': hours, 'timeStatus': 'confirmed', 'estimated': [],
-                 'cost': 0, 'content': '학습목표\nSQL 조인 조회',
+                 'cost': 0, 'difficulty': 'INTERMEDIATE', 'content': '학습목표\nSQL 조인 조회',
                  'curriculum': {'items': [{'title': 'SQL 조인 실습'}]}, 'retrievalScore': .8}, **changes)
 
 
@@ -49,7 +49,8 @@ class CrashCourseTests(unittest.TestCase):
         self.project['goal'] = 'Python RAG 검색 챗봇'
         broad = course('no-python', .2, skills=['Python 프로그래밍 & 비동기 I/O'], title='RAG 검색 챗봇',
                        content='RAG 검색 챗봇', curriculum={'items': []})
-        actual = course('python', 2, skills=['Python 프로그래밍 & 비동기 I/O'], title='Python RAG 검색 챗봇')
+        actual = course('python', 2, skills=['Python 프로그래밍 & 비동기 I/O'], title='Python RAG 검색 챗봇',
+                        curriculum={'items': [{'title': 'Python API 응답을 파싱하고 RAG 문서로 변환하는 실습'}]})
         self.assertEqual(self.rank([broad, actual])[0]['id'], 'python')
 
     def test_project_scope_precedes_duration_when_both_teach_the_skill(self):
@@ -57,14 +58,17 @@ class CrashCourseTests(unittest.TestCase):
         self.selection = {'skills': [{'name': 'Python 프로그래밍 & 비동기 I/O'}]}
         narrow = course('bot', .5, skills=['Python 프로그래밍 & 비동기 I/O'], title='Python 디스코드 봇',
                         content='Python으로 디스코드 봇 작성', curriculum={'items': []})
-        applied = course('data', 2, skills=['Python 프로그래밍 & 비동기 I/O'], title='Python 데이터 분석 자동화')
+        applied = course('data', 2, skills=['Python 프로그래밍 & 비동기 I/O'], title='Python 데이터 분석 자동화',
+                         curriculum={'items': [{'title': 'Python pandas 데이터 프레임 분석 자동화 실습'}]})
         self.assertEqual(self.rank([narrow, applied])[0]['id'], 'data')
 
     def test_explicit_fastapi_goal_is_not_replaced_by_shorter_node_course(self):
         self.project['goal'] = 'FastAPI 웹 API 서버 구현과 요청 검증'
         self.selection = {'skills': [{'name': 'RESTful API 서버 아키텍처'}]}
-        node = course('node', 1, skills=['RESTful API 서버 아키텍처'], title='NodeJS API 서버 요청 검증')
-        fastapi = course('fastapi', 4, skills=['RESTful API 서버 아키텍처'], title='FastAPI API 서버 요청 검증')
+        node = course('node', 1, skills=['RESTful API 서버 아키텍처'], title='NodeJS API 서버 요청 검증',
+                      curriculum={'items': [{'title': 'NodeJS REST API 요청 검증 구현 실습'}]})
+        fastapi = course('fastapi', 4, skills=['RESTful API 서버 아키텍처'], title='FastAPI API 서버 요청 검증',
+                         curriculum={'items': [{'title': 'FastAPI REST API 요청 검증 구현 실습'}]})
         self.assertEqual(self.rank([node, fastapi])[0]['id'], 'fastapi')
 
     def test_prerequisites_are_not_counted_as_shared_learning(self):
@@ -126,10 +130,10 @@ class CrashCourseTests(unittest.TestCase):
         pipeline = course('pipeline', 2, skills=['ETL & 데이터 파이프라인'], title='ETL 데이터 적재', content='ETL 파이프라인 구성')
         self.assertEqual(self.rank([unrelated, pipeline])[0]['id'], 'pipeline')
 
-    def test_short_slate_retains_two_semantic_leaders_without_putting_them_first(self):
+    def test_short_slate_keeps_six_shortest_matches_without_long_semantic_reservations(self):
         rows=[course(str(i), 20-i, retrievalScore=.9-i*.002) for i in range(20)]
         result=crash.rank(rows,self.project,self.selection,self.selection['skills'][0],limit=6)
-        self.assertEqual([r['id'] for r in result],['19','18','17','16','1','0'])
+        self.assertEqual([r['id'] for r in result],['19','18','17','16','15','14'])
         self.assertEqual(len(result),6)
 
     def test_shared_alignment_does_not_restore_global_word_coverage_priority(self):
@@ -165,7 +169,7 @@ class CrashCourseTests(unittest.TestCase):
         embed = lambda texts: [[1.0] + [0.0] * (rag.DIMENSIONS - 1) for _ in texts]
         pools, meta = rag.retrieve(self.project, self.selection, items, {'id': 'A2'}, embed=embed, search=search)
         self.assertEqual(search.call_args.args[3], 20)
-        self.assertEqual([r['id'] for r in pools[0]['courses']], ['19', '18', '17', '16', '1', '0'])
+        self.assertEqual([r['id'] for r in pools[0]['courses']], ['19', '18', '17', '16', '15', '14'])
         self.assertEqual(meta['version'], rag.version_for('A2'))
         free, meta = rag.retrieve(self.project, self.selection, items, {'id': 'A1'}, embed=embed, search=search)
         self.assertEqual(search.call_args.args[3], 20)

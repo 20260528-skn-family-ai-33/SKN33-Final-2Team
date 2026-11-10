@@ -1,0 +1,414 @@
+{
+  "schema_version": "internal-training/v1",
+  "origin": "course-level-policy/internal_training_pilot.json",
+  "courses": [
+    {
+      "id": "INTERNAL_CHALLENGE_01",
+      "title": "Airflow DAG로 증분 적재하고 실패한 DW 파티션 백필",
+      "track": "challenge",
+      "fee_won": 69000,
+      "url": "/resources/INTERNAL_CHALLENGE_01?view=curriculum",
+      "image_url": "/images/internal-training/challenge-01.webp",
+      "skills": [
+        "ETL & 데이터 파이프라인",
+        "데이터 웨어하우스 & OLAP"
+      ],
+      "audience": "DAG와 SQL 적재 경험이 있는 개발자",
+      "outcome": "실패 구간만 복구한 DAG와 중복·누락 검증 SQL",
+      "units": [
+        {
+          "minutes": 50,
+          "title": "증분 설계",
+          "description": "Airflow의 데이터 구간과 DW 파티션을 맞추고 워터마크를 정한다."
+        },
+        {
+          "minutes": 90,
+          "title": "실패 주입 및 백필",
+          "description": "변환 중 일부 파티션에 오류를 넣고 재시도와 선택적 백필을 구현한다."
+        },
+        {
+          "minutes": 70,
+          "title": "복구 검증",
+          "description": "재처리 전후 행 수·유일키·집계 금액을 비교해 멱등성을 검증한다."
+        }
+      ],
+      "difficulty": "ADVANCED",
+      "syllabus_summary": "실패 구간만 복구한 DAG와 중복·누락 검증 SQL · Airflow의 데이터 구간과 DW 파티션을 맞추고 워터마크를 정한다. 변환 중 일부 파티션에 오류를 넣고 재시도와 선택적 백필을 구현한다. 재처리 전후 행 수·유일키·집계 금액을 비교해 멱등성을 검증한다.",
+      "meta_note": "실습 결과물 · 실패 구간만 복구한 DAG와 중복·누락 검증 SQL"
+    },
+    {
+      "id": "INTERNAL_CHALLENGE_02",
+      "title": "OLAP 차원 변경 이력과 데이터 계보 검증",
+      "track": "challenge",
+      "fee_won": 48000,
+      "url": "/resources/INTERNAL_CHALLENGE_02?view=curriculum",
+      "image_url": "/images/internal-training/challenge-02.webp",
+      "skills": [
+        "데이터 웨어하우스 & OLAP",
+        "데이터 거버넌스 & 보안 규정 준수"
+      ],
+      "audience": "차원 모델과 SQL을 아는 데이터 담당자",
+      "outcome": "SCD 이력과 원천에서 지표까지의 데이터 계보 검증표",
+      "units": [
+        {
+          "minutes": 60,
+          "title": "변경 모델링",
+          "description": "OLAP 고객 차원의 변경 사례에 SCD 1·2형을 각각 적용한다."
+        },
+        {
+          "minutes": 70,
+          "title": "계보 추적",
+          "description": "원천 필드와 차원 키, 집계 지표 간 변환 경로를 기록한다."
+        },
+        {
+          "minutes": 80,
+          "title": "정합성 검증",
+          "description": "지연 도착 변경을 주입하고 과거 시점 지표가 재현되는지 SQL로 검증한다."
+        }
+      ],
+      "difficulty": "ADVANCED",
+      "syllabus_summary": "SCD 이력과 원천에서 지표까지의 데이터 계보 검증표 · OLAP 고객 차원의 변경 사례에 SCD 1·2형을 각각 적용한다. 원천 필드와 차원 키, 집계 지표 간 변환 경로를 기록한다. 지연 도착 변경을 주입하고 과거 시점 지표가 재현되는지 SQL로 검증한다.",
+      "meta_note": "실습 결과물 · SCD 이력과 원천에서 지표까지의 데이터 계보 검증표"
+    },
+    {
+      "id": "INTERNAL_CHALLENGE_03",
+      "title": "Bash로 Linux 권한 드리프트 탐지와 복구 검증",
+      "track": "challenge",
+      "fee_won": 0,
+      "url": "/resources/INTERNAL_CHALLENGE_03?view=curriculum",
+      "image_url": "/images/internal-training/challenge-03.webp",
+      "skills": [
+        "리눅스 환경 및 Bash 스크립팅",
+        "시스템 & OS 보안 강화"
+      ],
+      "audience": "셸 자동화 경험이 있는 시스템 운영자",
+      "outcome": "Linux 권한 편차 보고서와 복구 검증 스크립트",
+      "units": [
+        {
+          "minutes": 50,
+          "title": "기준선 설계",
+          "description": "서비스 계정·파일 권한을 수집해 Bash 비교 기준선을 만든다."
+        },
+        {
+          "minutes": 80,
+          "title": "드리프트 재현",
+          "description": "권한과 소유자를 바꾼 표본에서 허용 변경과 취약 설정을 구분한다."
+        },
+        {
+          "minutes": 70,
+          "title": "복구 검증",
+          "description": "재적용 전후 권한과 서비스 접근을 검사하고 롤백 로그를 보존한다."
+        }
+      ],
+      "difficulty": "ADVANCED",
+      "syllabus_summary": "Linux 권한 편차 보고서와 복구 검증 스크립트 · 서비스 계정·파일 권한을 수집해 Bash 비교 기준선을 만든다. 권한과 소유자를 바꾼 표본에서 허용 변경과 취약 설정을 구분한다. 재적용 전후 권한과 서비스 접근을 검사하고 롤백 로그를 보존한다.",
+      "meta_note": "실습 결과물 · Linux 권한 편차 보고서와 복구 검증 스크립트"
+    },
+    {
+      "id": "INTERNAL_CHALLENGE_04",
+      "title": "Redis 캐시 무효화와 API 일관성 부하 테스트",
+      "track": "challenge",
+      "fee_won": 89000,
+      "url": "/resources/INTERNAL_CHALLENGE_04?view=curriculum",
+      "image_url": "/images/internal-training/challenge-04.webp",
+      "skills": [
+        "RESTful API 서버 아키텍처",
+        "대용량 트래픽 처리 & 캐싱"
+      ],
+      "audience": "Redis와 HTTP API를 운영하는 개발자",
+      "outcome": "캐시 정책별 불일치율·DB 부하·p95 비교 보고서",
+      "units": [
+        {
+          "minutes": 60,
+          "title": "실험 설계",
+          "description": "같은 조회·쓰기 API에 TTL과 명시적 무효화를 구현하고 부하를 고정한다."
+        },
+        {
+          "minutes": 100,
+          "title": "장애와 부하 재현",
+          "description": "Redis 삭제 지연과 갱신 경쟁을 주입해 오래된 응답과 DB 조회 수를 측정한다."
+        },
+        {
+          "minutes": 80,
+          "title": "정책 비교",
+          "description": "정합성 오류율·p95·원본 부하를 비교해 운영 정책과 복구 기준을 선택한다."
+        }
+      ],
+      "difficulty": "ADVANCED",
+      "syllabus_summary": "캐시 정책별 불일치율·DB 부하·p95 비교 보고서 · 같은 조회·쓰기 API에 TTL과 명시적 무효화를 구현하고 부하를 고정한다. Redis 삭제 지연과 갱신 경쟁을 주입해 오래된 응답과 DB 조회 수를 측정한다. 정합성 오류율·p95·원본 부하를 비교해 운영 정책과 복구 기준을 선택한다.",
+      "meta_note": "실습 결과물 · 캐시 정책별 불일치율·DB 부하·p95 비교 보고서"
+    },
+    {
+      "id": "INTERNAL_CHALLENGE_05",
+      "title": "POSIX 공유 메모리에서 경쟁 상태 재현과 동기화 비교",
+      "track": "challenge",
+      "fee_won": 59000,
+      "url": "/resources/INTERNAL_CHALLENGE_05?view=curriculum",
+      "image_url": "/images/internal-training/challenge-05.webp",
+      "skills": [
+        "시스템 프로그래밍 & POSIX API",
+        "멀티스레딩 & 비동기 동시성"
+      ],
+      "audience": "IPC와 C 프로그래밍 경험이 있는 개발자",
+      "outcome": "경쟁 상태 재현 코드와 동기화 방식별 결과표",
+      "units": [
+        {
+          "minutes": 60,
+          "title": "경합 재현",
+          "description": "POSIX 공유 메모리에 카운터를 두고 여러 작업자의 갱신 손실을 재현한다."
+        },
+        {
+          "minutes": 90,
+          "title": "동기화 비교",
+          "description": "프로세스 공유 뮤텍스와 이름 있는 세마포어를 적용해 동일 작업을 반복한다."
+        },
+        {
+          "minutes": 60,
+          "title": "정확도·성능 검증",
+          "description": "경합 수준별 처리량·대기시간·최종 카운터를 비교한다."
+        }
+      ],
+      "difficulty": "ADVANCED",
+      "syllabus_summary": "경쟁 상태 재현 코드와 동기화 방식별 결과표 · POSIX 공유 메모리에 카운터를 두고 여러 작업자의 갱신 손실을 재현한다. 프로세스 공유 뮤텍스와 이름 있는 세마포어를 적용해 동일 작업을 반복한다. 경합 수준별 처리량·대기시간·최종 카운터를 비교한다.",
+      "meta_note": "실습 결과물 · 경쟁 상태 재현 코드와 동기화 방식별 결과표"
+    },
+    {
+      "id": "INTERNAL_CHALLENGE_06",
+      "title": "웹 파일 업로드 취약점 재현과 OS 실행 권한 차단",
+      "track": "challenge",
+      "fee_won": 75000,
+      "url": "/resources/INTERNAL_CHALLENGE_06?view=curriculum",
+      "image_url": "/images/internal-training/challenge-06.webp",
+      "skills": [
+        "시스템 & OS 보안 강화",
+        "웹 애플리케이션 취약점 진단"
+      ],
+      "audience": "웹 서비스와 Linux 접근 제어를 다루는 개발자",
+      "outcome": "업로드 경로 격리 설정과 차단 회귀 테스트",
+      "units": [
+        {
+          "minutes": 60,
+          "title": "격리 환경에서 재현",
+          "description": "실습 서버에서 무해한 테스트 파일의 실행 경로와 실행 권한을 확인한다."
+        },
+        {
+          "minutes": 80,
+          "title": "방어 설정 비교",
+          "description": "저장 경로 분리, 웹 핸들러 차단, OS 최소 권한을 각각 적용한다."
+        },
+        {
+          "minutes": 70,
+          "title": "회귀 검증",
+          "description": "정상 업로드·다운로드는 허용되고 업로드 파일 실행은 차단되는지 테스트한다."
+        }
+      ],
+      "difficulty": "ADVANCED",
+      "syllabus_summary": "업로드 경로 격리 설정과 차단 회귀 테스트 · 실습 서버에서 무해한 테스트 파일의 실행 경로와 실행 권한을 확인한다. 저장 경로 분리, 웹 핸들러 차단, OS 최소 권한을 각각 적용한다. 정상 업로드·다운로드는 허용되고 업로드 파일 실행은 차단되는지 테스트한다.",
+      "meta_note": "실습 결과물 · 업로드 경로 격리 설정과 차단 회귀 테스트"
+    },
+    {
+      "id": "INTERNAL_CRASH_01",
+      "title": "Airflow 태스크 3개로 작은 분석 마트 적재",
+      "track": "crash",
+      "fee_won": 0,
+      "url": "/resources/INTERNAL_CRASH_01?view=curriculum",
+      "image_url": "/images/internal-training/crash-01.webp",
+      "skills": [
+        "ETL & 데이터 파이프라인",
+        "데이터 웨어하우스 & OLAP"
+      ],
+      "audience": "Airflow 실행 경험이 없는 데이터 담당자",
+      "outcome": "DAG 실행 이력과 마트의 행 수를 대조한 결과표",
+      "units": [
+        {
+          "minutes": 15,
+          "title": "입력 만들기",
+          "description": "CSV 주문 세 건과 비어 있는 분석 마트를 준비한다."
+        },
+        {
+          "minutes": 30,
+          "title": "DAG 작성",
+          "description": "Airflow Python 태스크로 주문 수집, 금액 변환, 마트 적재를 순서대로 연결한다."
+        },
+        {
+          "minutes": 15,
+          "title": "실행 확인",
+          "description": "같은 날짜를 다시 실행해 결과 행 수와 주문 합계를 대조한다."
+        }
+      ],
+      "difficulty": "BEGINNER",
+      "syllabus_summary": "DAG 실행 이력과 마트의 행 수를 대조한 결과표 · CSV 주문 세 건과 비어 있는 분석 마트를 준비한다. Airflow Python 태스크로 주문 수집, 금액 변환, 마트 적재를 순서대로 연결한다. 같은 날짜를 다시 실행해 결과 행 수와 주문 합계를 대조한다.",
+      "meta_note": "실습 결과물 · DAG 실행 이력과 마트의 행 수를 대조한 결과표"
+    },
+    {
+      "id": "INTERNAL_CRASH_02",
+      "title": "fork와 wait로 좀비 프로세스 재현 및 회수",
+      "track": "crash",
+      "fee_won": 0,
+      "url": "/resources/INTERNAL_CRASH_02?view=curriculum",
+      "image_url": "/images/internal-training/crash-02.webp",
+      "skills": [
+        "운영체제(OS) & 동시성 제어",
+        "시스템 프로그래밍 & POSIX API"
+      ],
+      "audience": "Linux 명령을 쓸 수 있는 개발자",
+      "outcome": "좀비가 발생하고 회수된 시점의 프로세스 목록",
+      "units": [
+        {
+          "minutes": 10,
+          "title": "자식 만들기",
+          "description": "C에서 fork로 부모와 자식 프로세스를 나눈다."
+        },
+        {
+          "minutes": 20,
+          "title": "좀비 재현",
+          "description": "부모 대기를 늦춰 ps의 STAT와 PPID를 읽는다."
+        },
+        {
+          "minutes": 20,
+          "title": "회수 검증",
+          "description": "waitpid를 호출하고 자식 상태와 종료 코드를 대조한다."
+        }
+      ],
+      "difficulty": "BEGINNER",
+      "syllabus_summary": "좀비가 발생하고 회수된 시점의 프로세스 목록 · C에서 fork로 부모와 자식 프로세스를 나눈다. 부모 대기를 늦춰 ps의 STAT와 PPID를 읽는다. waitpid를 호출하고 자식 상태와 종료 코드를 대조한다.",
+      "meta_note": "실습 결과물 · 좀비가 발생하고 회수된 시점의 프로세스 목록"
+    },
+    {
+      "id": "INTERNAL_CRASH_03",
+      "title": "프로세스 두 개의 세마포어 대기와 깨우기 실습",
+      "track": "crash",
+      "fee_won": 12000,
+      "url": "/resources/INTERNAL_CRASH_03?view=curriculum",
+      "image_url": "/images/internal-training/crash-03.webp",
+      "skills": [
+        "운영체제(OS) & 동시성 제어",
+        "시스템 프로그래밍 & POSIX API"
+      ],
+      "audience": "프로세스 간 통신을 배우는 개발자",
+      "outcome": "대기·깨우기 순서가 보이는 두 프로세스의 로그",
+      "units": [
+        {
+          "minutes": 15,
+          "title": "자원 준비",
+          "description": "POSIX 이름 있는 세마포어를 열고 프로세스 둘이 공유한다."
+        },
+        {
+          "minutes": 25,
+          "title": "동기화 실습",
+          "description": "sem_wait와 sem_post로 임계 구역 진입 순서를 기록한다."
+        },
+        {
+          "minutes": 20,
+          "title": "대기 확인",
+          "description": "초기 카운트를 바꿔 누가 대기하는지 확인하고 세마포어를 해제한다."
+        }
+      ],
+      "difficulty": "BEGINNER",
+      "syllabus_summary": "대기·깨우기 순서가 보이는 두 프로세스의 로그 · POSIX 이름 있는 세마포어를 열고 프로세스 둘이 공유한다. sem_wait와 sem_post로 임계 구역 진입 순서를 기록한다. 초기 카운트를 바꿔 누가 대기하는지 확인하고 세마포어를 해제한다.",
+      "meta_note": "실습 결과물 · 대기·깨우기 순서가 보이는 두 프로세스의 로그"
+    },
+    {
+      "id": "INTERNAL_CRASH_04",
+      "title": "mmap 페이지 접근을 바꿔 페이지 폴트 관찰",
+      "track": "crash",
+      "fee_won": 18000,
+      "url": "/resources/INTERNAL_CRASH_04?view=curriculum",
+      "image_url": "/images/internal-training/crash-04.webp",
+      "skills": [
+        "컴퓨터 구조 & 메모리 관리",
+        "시스템 프로그래밍 & POSIX API"
+      ],
+      "audience": "C 포인터와 Linux 명령을 아는 개발자",
+      "outcome": "순차·임의 접근의 페이지 폴트 비교표",
+      "units": [
+        {
+          "minutes": 15,
+          "title": "mmap 준비",
+          "description": "고정 크기 파일을 POSIX mmap으로 메모리에 매핑한다."
+        },
+        {
+          "minutes": 25,
+          "title": "접근 패턴 변경",
+          "description": "페이지 크기 단위로 순차 접근과 임의 접근을 실행한다."
+        },
+        {
+          "minutes": 20,
+          "title": "페이지 폴트 확인",
+          "description": "getrusage로 접근 전후 minor fault 차이를 기록하고 해제한다."
+        }
+      ],
+      "difficulty": "BEGINNER",
+      "syllabus_summary": "순차·임의 접근의 페이지 폴트 비교표 · 고정 크기 파일을 POSIX mmap으로 메모리에 매핑한다. 페이지 크기 단위로 순차 접근과 임의 접근을 실행한다. getrusage로 접근 전후 minor fault 차이를 기록하고 해제한다.",
+      "meta_note": "실습 결과물 · 순차·임의 접근의 페이지 폴트 비교표"
+    },
+    {
+      "id": "INTERNAL_CRASH_05",
+      "title": "Redis TTL을 붙인 조회 API의 DB 호출 수 비교",
+      "track": "crash",
+      "fee_won": 15000,
+      "url": "/resources/INTERNAL_CRASH_05?view=curriculum",
+      "image_url": "/images/internal-training/crash-05.webp",
+      "skills": [
+        "RESTful API 서버 아키텍처",
+        "대용량 트래픽 처리 & 캐싱"
+      ],
+      "audience": "조회 API를 구현할 수 있는 개발자",
+      "outcome": "캐시 적용 전후 DB 호출 횟수와 TTL 만료 로그",
+      "units": [
+        {
+          "minutes": 15,
+          "title": "기준선 수집",
+          "description": "같은 상품 조회 API를 반복 호출하고 DB 쿼리 횟수를 기록한다."
+        },
+        {
+          "minutes": 30,
+          "title": "Redis TTL 적용",
+          "description": "cache-aside 방식으로 키를 읽고 누락 시 SET EX로 원본을 저장한다."
+        },
+        {
+          "minutes": 15,
+          "title": "만료 확인",
+          "description": "캐시 적중과 TTL 만료 뒤의 DB 호출 수를 비교한다."
+        }
+      ],
+      "difficulty": "BEGINNER",
+      "syllabus_summary": "캐시 적용 전후 DB 호출 횟수와 TTL 만료 로그 · 같은 상품 조회 API를 반복 호출하고 DB 쿼리 횟수를 기록한다. cache-aside 방식으로 키를 읽고 누락 시 SET EX로 원본을 저장한다. 캐시 적중과 TTL 만료 뒤의 DB 호출 수를 비교한다.",
+      "meta_note": "실습 결과물 · 캐시 적용 전후 DB 호출 횟수와 TTL 만료 로그"
+    },
+    {
+      "id": "INTERNAL_CRASH_06",
+      "title": "권한 변경 감사 로그에서 민감 데이터 접근 추적",
+      "track": "crash",
+      "fee_won": 22000,
+      "url": "/resources/INTERNAL_CRASH_06?view=curriculum",
+      "image_url": "/images/internal-training/crash-06.webp",
+      "skills": [
+        "시스템 & OS 보안 강화",
+        "데이터 거버넌스 & 보안 규정 준수"
+      ],
+      "audience": "Linux 계정·권한을 다루는 운영자",
+      "outcome": "권한 변경과 민감 파일 접근을 연결한 감사 기록",
+      "units": [
+        {
+          "minutes": 15,
+          "title": "감사 설정",
+          "description": "테스트 파일에 Linux audit 규칙을 설정한다."
+        },
+        {
+          "minutes": 25,
+          "title": "접근 재현",
+          "description": "계정 권한을 바꾸고 허용·거부된 읽기 시각을 기록한다."
+        },
+        {
+          "minutes": 20,
+          "title": "증적 정리",
+          "description": "감사 로그에서 행위자·대상·결과를 추출해 권한 변경과 연결한다."
+        }
+      ],
+      "difficulty": "BEGINNER",
+      "syllabus_summary": "권한 변경과 민감 파일 접근을 연결한 감사 기록 · 테스트 파일에 Linux audit 규칙을 설정한다. 계정 권한을 바꾸고 허용·거부된 읽기 시각을 기록한다. 감사 로그에서 행위자·대상·결과를 추출해 권한 변경과 연결한다.",
+      "meta_note": "실습 결과물 · 권한 변경과 민감 파일 접근을 연결한 감사 기록"
+    }
+  ]
+}

@@ -166,6 +166,22 @@ class CatalogExpansionTests(TestCase):
         self.assertEqual(report['jobs']['excluded']['no_it_skill_evidence'],1)
         self.assertFalse(any('DELETE' in str(call) for call in conn.execute.call_args_list))
 
+    def test_only_ready_internal_lesson_plans_are_eligible_for_indexing(self):
+        from unittest.mock import MagicMock
+        from src.shared.catalog_eligibility import eligible_keys
+        valid = dict(course_id='INTERNAL_CRASH_2401', platform='사내교육', record_source='INTERNAL_TRAINING_PILOT',
+                     content_status='ready', curriculum=dict(source='internal_training_pilot_v1',
+                                                           outcome='요청 검증', items=[{'title':'DRF API 실습'}]))
+        records = [valid, dict(valid,course_id='INTERNAL_CRASH_2402',curriculum={}),
+                   dict(valid,course_id='external'),dict(valid,course_id='INTERNAL_CRASH_2403',content_status='inactive')]
+        def query(sql):
+            rows = SKILLS if 'SELECT skill_id' in sql else [{'record':r} for r in records] if 'public.courses ' in sql else []
+            return MagicMock(fetchall=lambda:rows)
+        conn=MagicMock();conn.execute.side_effect=query
+        usable,report=eligible_keys(conn)
+        self.assertEqual(usable,{('courses',valid['course_id'])})
+        self.assertEqual(report['courses']['excluded']['incomplete_internal_curriculum'],3)
+
 
     def test_listed_kdc_outside_004_005_skips_only_doomed_detail_calls(self):
         obj=ing()

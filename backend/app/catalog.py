@@ -10,9 +10,10 @@ import re
 import threading
 import time
 
-from . import db, course_time, catalog_evidence, catalog_candidates
+from . import db, course_time, catalog_evidence, catalog_candidates, course_levels
 
 KIND = {'course': '강좌', 'book': '도서', 'cert': '자격', 'doc': '공식 문서'}
+_library_api = re.compile(r'^https?://(?:www\.)?data4library\.kr(?::\d+)?/api(?:/|[?#]|$)', re.I)
 _lock = threading.Lock()
 _cache: dict = {'at': 0.0, 'items': {}, 'skills': {}}
 TTL_S = 120
@@ -31,18 +32,29 @@ def _load() -> dict:
                        UNION ALL SELECT 'cert', cert_id::text, skill_id FROM public.certification_skills"""):
         links.setdefault((r['t'], r['k']), []).append(skills.get(r['skill_id'], ''))
     meta = {r['resource_key']: r for r in db.all_('SELECT * FROM app_ext.resource_meta')}
-    rows = db.all_("""SELECT m.resource_key, m.resource_type, c.course_id, c.title AS c_title, c.org_name, c.platform, c.url AS c_url, c.cost AS c_cost,
+    rows = db.all_("""WITH book_pages AS (
+            SELECT DISTINCT ON (entity_key) entity_key AS isbn, payload#>>'{list_record,bookDtlUrl}' AS url
+            FROM growpath_meta.catalog_api_sources
+            WHERE resource_type='books' AND source='API_DATA4LIBRARY'
+              AND payload#>>'{list_record,isbn13}'=entity_key
+              AND payload#>>'{list_record,bookDtlUrl}' ~ '^https://(www[.])?data4library[.]kr/bookV[?]seq=[0-9]+$'
+            ORDER BY entity_key, fetched_at DESC NULLS LAST, payload#>>'{list_record,bookDtlUrl}'
+        )
+        SELECT m.resource_key, m.resource_type, c.course_id, c.title AS c_title, c.org_name, c.platform, c.url AS c_url, c.cost AS c_cost,
             c.duration_weeks, c.duration_seconds,c.duration_kind,c.estimated_duration_seconds,c.duration_provenance,
             c.difficulty, c.syllabus_summary, c.curriculum, c.content_status AS c_status, c.source_url AS c_src, c.source_verified_at AS c_ver, c.last_batch_updated AS c_upd,
+            to_jsonb(c)->>'difficulty_estimated' AS difficulty_estimated,
+            to_jsonb(c)->>'difficulty_basis' AS difficulty_basis,
             c.image_url AS c_img,
             b.isbn, b.title AS b_title, b.author, b.publisher, b.description AS b_desc, b.content_status AS b_status, b.source_url AS b_src, b.loan_count,
-            b.source_verified_at AS b_ver, b.last_batch_updated AS b_upd, b.image_url AS b_img,
+            b.source_verified_at AS b_ver, b.last_batch_updated AS b_upd, b.image_url AS b_img, bp.url AS b_page,
             x.cert_id, x.title AS x_title, x.provider AS x_provider, x.test_subjects, x.exam_type, x.pass_score, x.content_status AS x_status, x.source_url AS x_src,
             x.source_verified_at AS x_ver, x.last_batch_updated AS x_upd, x.image_url AS x_img,
             d.doc_id, d.title AS d_title, d.provider AS d_provider, d.url AS d_url, d.description AS d_desc, d.source_verified_at AS d_ver
         FROM app_ext.resource_meta m
         LEFT JOIN public.courses c ON c.course_id = m.course_id
         LEFT JOIN public.books b ON b.isbn = m.isbn
+        LEFT JOIN book_pages bp ON bp.isbn = b.isbn
         LEFT JOIN public.certifications x ON x.cert_id = m.cert_id
         LEFT JOIN app_ext.learning_docs d ON d.doc_id = m.doc_id""")
     for r in rows:
@@ -55,10 +67,14 @@ def _load() -> dict:
             checked = _date(r['c_ver'] or r['c_upd'])
             sk = links.get(('course', r['course_id']), [])
             extra = {'platform': r['platform'], 'difficulty': r['difficulty'], 'weeks': r['duration_weeks'],
+                     '_courseLevel': course_levels.classify(r['difficulty'], title, r['curriculum'])[0],
                      '_learning_description': m['content'] or (r['curriculum'] or {}).get('description') or r['syllabus_summary'] or '',
                      'curriculum': {key: (r['curriculum'] or {}).get(key) for key in ('coverage', 'items', 'item_count', 'source_url')}}
         elif t == 'book':
-            title, provider, url, status = r['b_title'], r['publisher'], r['b_src'], r['b_status']
+            title, provider, status = r['b_title'], r['publisher'], r['b_status']
+            url = (r['b_src'] or '').strip()
+            if not url or _library_api.match(url):
+                url = r.get('b_page') or ''
             content = r['b_desc'] or (f"저자 {r['author']}" if r['author'] else '')
             source, checked = '도서관 정보나루 도서', _date(r['b_ver'] or r['b_upd'])
             sk = links.get(('book', r['isbn']), [])
@@ -80,6 +96,13 @@ def _load() -> dict:
         est = list(m['estimated_fields'] or [])
         timing = course_time.effective(r, m) if t == 'course' else {}
         if timing:est = timing['estimated']
+        if t == 'course':
+            level = difficulty_info(r, title)
+            extra.update(level, _courseLevel=level['difficulty'])
+            est = [field for field in est if field != 'difficulty']
+            if level['difficultyEstimated']:
+                est.append('difficulty')
+            timing['estimated'] = est
         items[r['resource_key']] = dict({
             'id': r['resource_key'], 'type': t, 'title': title, 'provider': provider or '', 'kind': KIND[t],
             'format': m['format'] or '', 'hours': float(m['hours']) if m['hours'] is not None else None,
@@ -95,9 +118,19 @@ def _load() -> dict:
 
 
 def _image(v: str | None) -> str:
-    """표지·썸네일·배지 주소(팀 DB image_url). 화면에서 <img src>로 바로 쓰므로 http(s) 주소만 내보낸다(2026-10-22 사용자 결정: 원본 주소에서 바로 불러옴)"""
+    """외부 원본 주소와 앱이 제공하는 사내교육 표지만 화면에 내보낸다."""
     v = (v or '').strip()
-    return v if re.match(r'https?://', v, re.I) else ''
+    return v if re.match(r'https?://', v, re.I) or re.fullmatch(r'/images/(?:internal-training/(?:crash|challenge)-[0-9]{2,4}\.webp|resource-(?:course|book|cert)\.svg)', v) else ''
+
+
+def difficulty_info(row: dict, title: str) -> dict:
+    """신규 열이 없는 DB·NULL 원본도 읽고, DB가 제공한 추정 여부와 근거를 보존한다."""
+    level, basis = course_levels.classify(row.get('difficulty'), title, row.get('curriculum'))
+    estimated = basis != '원본' or str(row.get('difficulty_estimated')).lower() == 'true'
+    basis = row.get('difficulty_basis') or (basis if basis != '원본' or not estimated else 'DB에서 추정한 난이도')
+    source = 'reviewed' if basis == '목차 검토로 중상 확정' else 'estimated' if estimated else 'original'
+    return {'difficulty': level, 'difficultyEstimated': estimated,
+            'difficultyBasis': basis, 'difficultySource': source}
 
 
 def _usable(t: str, status: str | None, skills: list) -> bool:
@@ -140,6 +173,34 @@ def get(key: str | None) -> dict | None:
     return items().get(key or '') if key else None
 
 
+def refresh_book_links(cards: list[dict], current_items: dict | None = None) -> list[dict]:
+    """이전 추천의 수집 API 주소를 현재 ISBN 공개 페이지로 바꾼 표시용 사본이다."""
+    result = []
+    for card in cards:
+        key = card.get('id') or ''
+        url = (card.get('url') or '').strip()
+        if key.startswith('book_') and (not url or _library_api.match(url)):
+            current = current_items.get(key) if current_items is not None else get(key)
+            card = dict(card, url=current.get('url', '') if current else '')
+        result.append(card)
+    return result
+
+
+def refresh_course_levels(cards: list[dict], current_items: dict | None = None) -> list[dict]:
+    """같은 난이도의 저장 카드에 빠진 출처를 보완한다. 과거 난이도·저장 원문은 유지한다."""
+    result = []
+    for card in cards:
+        current = current_items.get(card.get('id')) if current_items is not None else get(card.get('id'))
+        if current and current.get('type') == 'course' and card.get('difficulty') in (None, current.get('difficulty')):
+            fields = ('difficulty', 'difficultyEstimated', 'difficultyBasis', 'difficultySource')
+            card = dict(card, **{key: current[key] for key in fields if key in current})
+            if 'difficultyEstimated' in current:
+                estimated = [key for key in card.get('estimated') or [] if key != 'difficulty']
+                card['estimated'] = estimated + (['difficulty'] if current['difficultyEstimated'] else [])
+        result.append(card)
+    return result
+
+
 def resources_for(keys, *, detail: bool = False) -> dict[str, dict]:
     """화면에 보낼 자료(쓰인 키만)"""
     all_ = items()
@@ -149,7 +210,7 @@ def resources_for(keys, *, detail: bool = False) -> dict[str, dict]:
 def _public(r: dict, *, detail: bool = False) -> dict:
     out = {k: r.get(k) for k in ('id', 'title', 'provider', 'kind', 'format', 'hours', 'cost', 'stage', 'real', 'skills', 'audience', 'prereq',
                                   'content', 'note', 'url', 'image', 'type', 'source', 'checked', 'estimated', 'certCode', 'platform', 'difficulty', 'weeks', 'author',
-                                  'timeStatus','durationKind','durationSeconds','timeNote','curriculum')}
+                                  'timeStatus','durationKind','durationSeconds','timeNote','curriculum','difficultyEstimated','difficultyBasis','difficultySource')}
     out['detailsLoaded'] = detail
     if not detail:
         out['content'] = str(r.get('content') or '')[:400]

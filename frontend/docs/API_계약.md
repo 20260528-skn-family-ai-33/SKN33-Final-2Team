@@ -125,7 +125,11 @@
 
 `GET /resources`·`POST /resources/lookup`·작업 공간의 자료 첨부는 요약(`detailsLoaded=false`)이다. `content`는 최대 400자, `curriculum`에는 개수(`item_count`)·확보 상태(`coverage`)만 보내고 `items`는 제외한다. `GET /resources/{id}`는 상세(`detailsLoaded=true`)로 전체 소개와 순서 있는 `curriculum.items`(`title`, `section`, `description`)를 제공한다. 목차 유무·자료 유형과 관계없이 요약에 ‘전체 소개·상세 보기’ 링크를 제공한다. 상세 화면은 전체 상세 캐시가 있어도 재진입마다 단건 상세를 조회하며 이후 요약 수신으로 전체 목차를 지우지 않는다.
 
-`curriculum.coverage`는 `public_outline`·`partial_outline`·`sample`·`description_only`이며 목차를 확보하지 못한 것을 빈 강좌로 해석하지 않는다. 원문 강의 전체나 자막을 저장했다는 뜻은 아니다.
+`curriculum.coverage`는 `public_outline`·`partial_outline`·`sample`·`description_only`·`full_outline`이며 목차를 확보하지 못한 것을 빈 강좌로 해석하지 않는다. `full_outline`은 사내교육의 전체 실습 계획에 사용하며 원문 강의 전체나 자막을 저장했다는 뜻은 아니다.
+
+강좌 `difficulty`는 초급·중급·중상·고급(`BEGINNER`·`INTERMEDIATE`·`UPPER_INTERMEDIATE`·`ADVANCED`)이며 화면에는 등급만 표시한다. API와 추천 후보에는 출처(`difficultySource`: `original`·`estimated`·`reviewed`), 추정 여부(`difficultyEstimated`), 근거(`difficultyBasis`)를 유지한다. `difficultyEstimated=true`일 때만 `estimated`에 `difficulty`를 넣는다.
+
+도서는 ISBN에 연결된 공개 도서 페이지를 `url`로 제공한다. 이전 추천·확정 계획·과거 버전의 수집 API 링크는 응답 사본에서 교체하고 저장 원문과 선택은 보존한다. 사내교육의 `url`은 `/resources/{id}?view=curriculum`으로 안내·교육비·시간·펼친 실습 목차를 제공한다. 앱이 배포한 사내교육 WebP와 일반 자료 SVG 표지도 허용하며 임의의 상대 경로는 허용하지 않는다. Crash 전용 핵심 결과물 표시는 제거하지만 기존 `coreOutcome`·`coreCriteria`·`followUpScope` 저장 필드는 유지한다.
 
 `hours`는 일정 계산용 정밀 값이고 `timeStatus`는 `confirmed`·`estimated`·`manual`이다. `durationKind`로 영상/학습 시간을 구분하고 `timeNote`에 출처·추정 근거를 제공한다. 자료·단계·선택지·간트·실행 기록·수정 화면은 공통 함수를 통해 10분 단위로 반올림한다(예: `5.83333` → ‘5시간 50분’). 새 `roadmap_steps.estimated_duration` 문구도 같은 규칙이며 숫자와 일정 계산 정밀도는 유지한다. 관리자 입력에서 시간 숫자는 그대로 두고 시간 추정 표시만 해제해도 `manual`로 저장하고 자동 동기화에서 보존한다. 새 로드맵 활동은 `hoursEstimated`, `hoursBasis`를 함께 저장하며 기존 확정 활동의 시간을 일괄 변경하지 않는다. 과거 활동의 `hoursEstimated`가 없으면 ‘추정 여부 미기록’으로 표시한다. 현재 강좌 시간이 확인돼 있어도 과거 계획 시간을 확인 시간으로 재해석하지 않는다. 025·026 DB 적용과 적재 후 앱을 배포해야 한다.
 

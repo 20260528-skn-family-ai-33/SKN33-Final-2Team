@@ -55,19 +55,28 @@ _source: dict | None = None
 _index: dict = {}
 
 
-def learning_lines(value: str) -> list[str]:
+def description_sentences(line: str) -> list[str]:
+    # 'Q. …'라는 질문 표시를 뒤의 문장에서 떼어 학습 근거로 만들지 않는다.
+    return re.split(r'(?<=[.!?])(?<!\bQ\.)\s+', line, flags=re.I)
+
+
+def learning_lines(value: str, *, description: bool = False) -> list[str]:
     """명시된 선수지식/대상/강사 구역을 다음 학습 구역 전까지 제외한다."""
     result, blocked = [], False
     for line in content_text(value).splitlines():
         line = line.strip()
         if not line:
             continue
-        if _blocked.search(line):
-            blocked = True
-        elif _learning.search(line):
-            blocked = False
-        if not blocked:
-            result.append(line)
+        kept = []
+        for part in description_sentences(line) if description else (line,):
+            if _blocked.search(part):
+                blocked = True
+            elif _learning.search(part):
+                blocked = False
+            if not blocked:
+                kept.append(part)
+        if kept:
+            result.append(' '.join(kept))
     return result
 
 
@@ -82,7 +91,8 @@ def cached_index(records: dict[str, dict]) -> dict:
                     # 진행 중인 요청의 스냅샷은 유지하고 동일 자료의 정규화 결과만 재사용한다.
                     index[key] = dict(previous, record=r)
                     continue
-                lines = [line for line in learning_lines(r.get('_learning_description') or r.get('content') or '')
+                lines = [line for line in learning_lines(r.get('_learning_description') or r.get('content') or '',
+                                                         description=r.get('type') == 'course')
                          if not _course_admin.search(line)]
                 outline = r.get('curriculum') or {}
                 rows, lesson_units, own_rows = [], [], {}
@@ -111,7 +121,7 @@ def cached_index(records: dict[str, dict]) -> dict:
                               'units': [(text.casefold(), {name for name, rx in _actions.items() if rx.search(text)},
                                          {name for name, rx in _depth_actions.items() if rx.search(text)}
                                          if not _intro_lesson.search(text) else set()) for text in units],
-                              'query_profiles': {},
+                              'query_profiles': {}, 'topic_scores': {},
                               'outline': '\n'.join(row[2] for row in rows),
                               'dedup': (' '.join(r['title'].casefold().split()), r.get('provider', '').casefold(), r.get('type'))}
             _source, _index = records, index
@@ -206,7 +216,7 @@ def track_fit(x: dict, terms: list[re.Pattern], track: str, topics: list[re.Patt
         depth = min(profile['depthUnits'], 4) / 4 * (.5 + .5 * len(profile['depthActions']) / 3)
         # 난이도 표시는 보조 근거다. 확인된 심화 단원이 둘 이상일 때만 가산한다.
         difficulty = str(x['record'].get('difficulty') or '').upper()
-        level = {'INTERMEDIATE': .8, 'ADVANCED': 1}.get(difficulty, 0)
+        level = {'INTERMEDIATE': .8, 'UPPER_INTERMEDIATE': .9, 'ADVANCED': 1}.get(difficulty, 0)
         level_bonus = .25 * level * depth if x['rows'] and profile['depthUnits'] >= 2 else 0
         confidence = 1 if x['rows'] else .25
         fit = confidence * (.1 * lifecycle + .1 * practice + .55 * depth) + level_bonus
@@ -343,6 +353,13 @@ def entry(r: dict, selection: Selection) -> dict:
         result['curriculumCoverage'] = outline.get('coverage') or 'description_only'
     if r.get('difficulty'):
         result['difficulty'] = r['difficulty']
+        result['difficultyEstimated'] = bool(r.get('difficultyEstimated') or 'difficulty' in (r.get('estimated') or []))
+        result['difficultySource'] = ('reviewed' if r.get('difficultyBasis') == '목차 검토로 중상 확정'
+                                      else r.get('difficultySource') or ('estimated' if result['difficultyEstimated'] else 'original'))
+        if result['difficultyEstimated']:
+            result['estimated'] = ['difficulty']
+        if r.get('difficultyBasis'):
+            result['difficultyBasis'] = str(r['difficultyBasis'])[:160]
     if r.get('format') and 'format' not in (r.get('estimated') or []):
         result['format'] = r['format']
     if r.get('durationKind'):

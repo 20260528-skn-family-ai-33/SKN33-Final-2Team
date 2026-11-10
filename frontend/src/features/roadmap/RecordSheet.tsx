@@ -29,7 +29,8 @@ let recFile: File | null = null;
 
 function RecRes({ a, r }: { a: Activity; r: Resource | null }) {
   const go = useGo();
-  const url = r && /^https?:\/\//i.test(r.url || '') ? (r.url as string) : '';
+  const internal = !!r && r.platform === '사내교육' && r.url === paths.resourceCurriculum(r.id);
+  const url = r?.url && (internal || /^https?:\/\//i.test(r.url)) ? r.url : '';
   return (
     <div className="rec-res">
       <div className="rec-res-h">
@@ -39,7 +40,7 @@ function RecRes({ a, r }: { a: Activity; r: Resource | null }) {
           {r ? (
             <small>
               {r.kind} · {resourceSource(r)}
-              {r.real ? '' : ' · 가상 자료'}
+              {r.real || r.platform === '사내교육' ? '' : ' · 가상 자료'}
             </small>
           ) : null}
         </div>
@@ -47,7 +48,7 @@ function RecRes({ a, r }: { a: Activity; r: Resource | null }) {
       <div className="rec-res-b">
         {url ? (
           <a className="btn line" href={url} target="_blank" rel="noopener noreferrer">
-            원본 열기
+            {internal ? '사내교육 안내 보기' : '원본 열기'}
             <Icon name="out" />
           </a>
         ) : null}

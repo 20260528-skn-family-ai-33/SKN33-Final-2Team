@@ -28,6 +28,7 @@ export const paths = {
   // 학습 자료
   resources: '/resources',
   resource: (id: string) => `/resources/${encodeURIComponent(id)}`,
+  resourceCurriculum: (id: string) => `/resources/${encodeURIComponent(id)}?view=curriculum`,
   // 부서장
   team: '/team',
   member: (uid: string) => `/team/${uid}`,

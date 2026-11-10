@@ -8,6 +8,7 @@ import re
 from typing import Any
 
 from .resource_instructions import COMMON as SYSTEM, instructions
+from app import course_levels
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +80,61 @@ def _no_candidates(kind: str) -> dict:
     return {'reason': 'no_candidates', 'detail': f'조건에 맞는 {kind} 후보가 없습니다.'}
 
 
+def _recover_cross_skill_courses(by_name, payload, references, eligibility, generate):
+    """다른 스킬에만 허용된 강좌 키는 제외하고, 유효한 선택이 전혀 없는 칸만 한 번 재선택한다."""
+    from app.llm import LlmError
+
+    retry = []
+    for pool in payload['skills']:
+        name = pool['name']
+        row = by_name[name]
+        picked = row.get('courses')
+        if not isinstance(picked, list) or len(picked) > 3:
+            continue  # 응답 구조·허위 키·종류·중복 등은 기존 검증에서 거절한다.
+        kept = []
+        for pick in picked:
+            key = pick.get('key') if isinstance(pick, dict) else None
+            ref = references.get(key) if isinstance(key, str) else None
+            if (ref and ref[0] == 'courses' and eligibility[ref[1]] and pick.get('id', ref[1]) == ref[1]
+                    and name not in eligibility[ref[1]]):
+                continue
+            kept.append(pick)
+        if len(kept) == len(picked):
+            continue
+        by_name[name] = {**row, 'courses': kept}
+        if not kept:
+            by_name[name]['courseDiagnostic'] = {
+                'reason': 'insufficient_evidence', 'detail': '모델이 이 스킬에 맞는 강좌를 선택하지 못했습니다.'}
+            cards = [c for c in pool['courses'] if name in c['eligibleSkills']]
+            if cards:
+                retry.append({'name': name, 'application': pool.get('application'), 'courses': cards})
+    if not retry:
+        return
+    # 비용과 지연을 제한한다. 재선택 응답은 요청한 칸의 로컬 키만 받을 수 있다.
+    try:
+        raw = generate('목표와 각 스킬에 적합한 강좌를 다시 선택하세요. 각 칸의 courses에 있는 choiceKey만 '
+                       '사용하세요. 적합한 것이 없으면 빈 배열을 쓰세요. '
+                       'JSON: {"skills":[{"name":"입력 스킬명","courses":[{"key":"choiceKey"}]}]}',
+                       {'project': payload['project'], 'course': (payload['course'] or {}).get('id'), 'skills': retry})
+    except (ValueError, LlmError, TimeoutError) as exc:
+        logger.warning('강좌 재선택 실패: %s', type(exc).__name__)
+        return
+    rows = raw.get('skills') if isinstance(raw, dict) else None
+    if not isinstance(rows, list):
+        return
+    for pool in retry:
+        matches = [r for r in rows if isinstance(r, dict) and r.get('name') == pool['name']]
+        picks = matches[0].get('courses') if len(matches) == 1 else None
+        if not isinstance(picks, list) or not 0 < len(picks) <= 3:
+            continue
+        allowed = {c['choiceKey'] for c in pool['courses']}
+        keys = [p.get('key') if isinstance(p, dict) else None for p in picks]
+        if all(isinstance(k, str) and k in allowed for k in keys) and len(set(keys)) == len(keys):
+            row = by_name[pool['name']]
+            row['courses'] = [{'key': k} for k in keys]
+            row.pop('courseDiagnostic', None)
+
+
 def _empty_skill(name: str) -> dict:
     return {'name': name, 'courses': [], 'books': [], 'selectedCourse': None, 'selectedBooks': [],
             'courseDiagnostic': _no_candidates('강좌'), 'bookDiagnostic': _no_candidates('도서')}
@@ -109,17 +165,11 @@ def _course_gap(name: str, candidates: list[dict], cache: dict) -> dict:
 def _finalize_crash(result: list[dict], pools: list[dict], selection: dict, project: dict, cache: dict) -> None:
     from app.services import crash_courses as crash
     from app.services.resource_evidence import hours
-    # 모델이 고른 강좌 중 핵심 기준을 충족한 자료로 서버가 기본 조합을 정한다.
+    # 공통 검사 뒤 모델이 고른 목록은 보존한다. 기존 조합 선호는 첫 추천 순서에만 적용한다.
     chosen = crash.shortest_bundle(result, project, selection, cache)
     default = crash.shortest_bundle(pools, project, selection, cache)
     for output, pool in zip(result, pools):
         name, cards = output['name'], output['courses']
-        if cards and name not in chosen:
-            # 강좌 목록이 남으면 선택 저장에서 강좌 1개를 요구한다.
-            output['courses'] = []
-            output['selectedCourse'] = None
-            output['courseDiagnostic'] = _course_gap(name, cards, cache)
-            continue
         ordered = crash.rank(cards, project, selection, {'name': name}, cache=cache)
         if name in chosen:
             first = chosen[name]
@@ -176,11 +226,16 @@ def candidate_pools(project: dict, selection: dict, items: dict[str, dict], limi
             # 스킬·종류·사용 가능 여부를 후보 개수 제한보다 먼저 적용한다.
             available = [row for row in items.values() if row.get('usable') and row.get('type') == kind and not exclusion(row,knowledge,str(project.get('goal') or '')) and skill['name'] in (row.get('skills') or []) and (not free_only or kind == 'book' or (row.get('cost') == 0 and not isinstance(row.get('cost'), bool)))]
             available.sort(key=lambda row: (-score(row), str(row.get('title') or ''), row['id']))
+            track = course.get('id') if isinstance(course, dict) else course
+            if kind == 'course' and track in ('A2', 'A3'):
+                available.sort(key=lambda r: course_levels.preference(r, track))
             if kind == 'course' and rank_courses and crash_courses.is_crash(course):
                 available = crash_courses.rank(available, project, selection, skill, cache=crash_cache)
             fields = ('id', 'title', 'provider', 'cost', 'hours', 'estimated', 'image', 'url', 'skills', 'content', 'curriculum')
             if kind == 'course' and crash_courses.is_crash(course):
                 fields += ('timeStatus',)
+            if kind == 'course':
+                fields += ('difficulty', 'difficultyEstimated', 'difficultyBasis', 'difficultySource')
             by_kind[key] = [deepcopy({field: row.get(field) for field in fields})
                 for row in available[:limit]]
         pools.append({'name': skill['name'], 'application': skill.get('application') or '', **by_kind})
@@ -190,20 +245,45 @@ def candidate_pools(project: dict, selection: dict, items: dict[str, dict], limi
 def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
                         generate: Callable[[str, dict], dict], *, course: dict | None = None, retrieved_pools: list[dict] | None = None) -> dict:
     project = dict(project, selectedCourse=deepcopy(course or project.get('selectedCourse')))
+    from app.services import resource_evidence
+    plan_selection = selection
+    selection = resource_evidence.course_selection(project, selection, course)
     pools = retrieved_pools if retrieved_pools is not None else candidate_pools(project, selection, items, free_only=bool(course and course.get('id') == 'A1'), course=course)
     if not any(row['courses'] or row['books'] for row in pools):
         return {'skills': [_empty_skill(row['name']) for row in pools]}
     # 원문·개인 식별정보 대신 프로젝트 맥락과 확인된 자료 후보를 전달한다.
     from app.services import crash_courses
-    from app.services import resource_evidence
     from app.services import book_candidates
     crash_cache = {}
     is_crash = crash_courses.is_crash(course)
+    track = (course or {}).get('id')
+    rejected_diagnostics = {}
+    if track in ('A1', 'A2', 'A3'):
+        # 직접 호출과 저장 후보의 재사용도 검색 진입점과 같은 가격·수준·관련성 문턱을 통과한다.
+        filtered = []
+        for pool, skill in zip(pools, selection['skills'], strict=True):
+            courses, rejected = [], []
+            for row in pool['courses']:
+                source = items.get(row['id'], row)
+                if not course_levels.eligible({**source, 'cost': row.get('cost')}, track):
+                    continue
+                if row['id'] not in crash_cache:
+                    crash_cache[row['id']] = resource_evidence.facts(source, project, selection)
+                if resource_evidence.course_applicable(crash_cache[row['id']], skill):
+                    courses.append(row)
+                else:
+                    rejected.append(row)
+            if rejected and not courses:
+                rejected_diagnostics[pool['name']] = _course_gap(pool['name'], rejected, crash_cache)
+            filtered.append({**pool, 'courses': courses})
+        pools = filtered
     if is_crash:
         pools = crash_courses.share_candidates(pools, project, selection, items, cache=crash_cache)
-    pools, common_books = book_candidates.common_pool(pools, items, selection=selection)
+    pools, common_books = book_candidates.common_pool(pools, items, selection=plan_selection)
     if not any(pool['courses'] or pool['books'] for pool in pools):
-        return {'skills': [_empty_skill(pool['name']) for pool in pools]}
+        return {'skills': [dict(_empty_skill(pool['name']), **(
+            {'courseDiagnostic': rejected_diagnostics[pool['name']]} if pool['name'] in rejected_diagnostics else {}))
+            for pool in pools]}
     names = [pool['name'] for pool in pools]
     book_catalog = book_candidates.model_catalog(common_books, items, names)
     book_refs = {book['id']: f'B{index}' for index, book in enumerate(common_books, 1)}
@@ -220,7 +300,9 @@ def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
     for rid, (_, original) in provided['courses'].items():
         if rid not in crash_cache:
             crash_cache[rid] = resource_evidence.facts(items.get(rid, original), project, selection)
+    skill_specs = {skill['name']: skill for skill in selection['skills']}
     course_eligibility = {rid: [name for name in names if name in (items.get(rid, original).get('skills') or [])
+                               and (track not in ('A1', 'A2', 'A3') or resource_evidence.course_applicable(crash_cache[rid], skill_specs[name]))
                                and (not is_crash or rid in local_courses[name]
                                     or resource_evidence.suitable(crash_cache[rid], name))]
                           for rid, (_, original) in provided['courses'].items()}
@@ -275,6 +357,7 @@ def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
         if not isinstance(row, dict) or row.get('name') not in [p['name'] for p in pools] or row['name'] in by_name:
             raise RecommendationError('추천 스킬이 입력과 다르거나 중복되었습니다.')
         by_name[row['name']] = row
+    _recover_cross_skill_courses(by_name, payload, references, course_eligibility, generate)
     candidate_titles = {key: ' '.join(resource_evidence.normalize(provided[kind][rid][1].get('title')).split())
                         for key, (kind, rid) in references.items()}
     result = []
@@ -300,6 +383,8 @@ def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
                 if (not source or source.get('type') != ('course' if key == 'courses' else 'book')
                         or not source.get('usable') or pool['name'] not in (source.get('skills') or [])
                         or rid not in provided[key] or rid in seen or (key == 'books' and rid not in candidates)
+                        or (key == 'courses' and not course_levels.eligible(
+                            {**source, 'cost': provided[key][rid][1].get('cost')}, track))
                         or (key == 'courses' and pool['name'] not in course_eligibility[rid])):
                     raise RecommendationError('후보에 없거나 중복된 자료입니다.')
                 card = deepcopy(candidates.get(rid) or provided[key][rid][1])
@@ -328,7 +413,7 @@ def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
         if diagnostic:
             output['courseDiagnostic'] = _display_diagnostic(diagnostic, candidate_titles)
         elif not is_crash and not output['courses']:
-            output['courseDiagnostic'] = _course_gap(pool['name'], eligible, crash_cache)
+            output['courseDiagnostic'] = rejected_diagnostics.get(pool['name']) or _course_gap(pool['name'], eligible, crash_cache)
         diagnostic = _diagnostic(row, 'book', bool(pool['books']), bool(output['books']))
         if not pool['books']:
             output['bookDiagnostic'] = _no_candidates('도서')
@@ -374,8 +459,9 @@ def recommend_from_catalog(ctx: Any, pre: dict, course: dict | None = None) -> d
     from app.learner_knowledge import from_profile,hr_context
     project=dict(pre['project'],learnerKnowledge=from_profile(pre.get('profile')),hrContext=hr_context(pre.get('profile')))
     project['selectedCourse'] = deepcopy(course)
-    pools, retrieval = retrieve(project, pre['selection'], items, course)
-    result = recommend_resources(project, pre['selection'], items,
+    selection = dict(pre['selection'], commonApplications=pre.get('_commonApplications') or {})
+    pools, retrieval = retrieve(project, selection, items, course)
+    result = recommend_resources(project, selection, items,
         lambda system, payload: runtime.llm_json(ctx, system, payload, role='resources'), course=course, retrieved_pools=pools)
     result['retrieval'] = retrieval
     return result

@@ -2,11 +2,13 @@
 
 /** 학습 자료 하나(catalog._public). 팀 DB 에 없는 값은 규칙으로 채우고 estimated 에 그 칸 이름을 적는다 */
 export interface ResourceCurriculum {
-  coverage?: 'public_outline' | 'partial_outline' | 'sample' | 'description_only';
+  coverage?: 'public_outline' | 'partial_outline' | 'sample' | 'description_only' | 'full_outline';
   item_count?: number;
   items?: { title: string; section?: string; description?: string; suspended?: boolean }[];
   source_url?: string;
 }
+
+export type DifficultySource = 'original' | 'estimated' | 'reviewed';
 
 export interface Resource {
   id: string;
@@ -37,7 +39,10 @@ export interface Resource {
   estimated?: string[];
   certCode?: string | null;
   platform?: string;
-  difficulty?: string;
+  difficulty?: string | null;
+  difficultyEstimated?: boolean;
+  difficultyBasis?: string;
+  difficultySource?: DifficultySource;
   weeks?: number | null;
   author?: string | null;
 }

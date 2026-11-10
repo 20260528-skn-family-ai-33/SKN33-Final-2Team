@@ -217,22 +217,23 @@ class SuitabilityTests(unittest.TestCase):
         self.assertEqual([row['id'] for row in result], ['actual', 'intro'])
 
     def test_diagnostics_are_optional_bounded_and_do_not_retry_or_force_choices(self):
+        # 형식 검사는 코스 정책과 분리한다. 엄격한 코스 입력은 근거 없는 후보를 모델 호출 전에 제거한다.
         row = course('intro', ['RAG 개요'])
         selection = {'skills': [self.selection['skills'][0]]}
         pools = [{'name': RAG, 'courses': [row], 'books': []}]
         raw = {'skills': [{'name': RAG, 'courses': [], 'books': [],
                            'courseDiagnostic': {'reason': 'insufficient_evidence', 'detail': '구현 단원 근거가 부족합니다.'}}]}
         model = Mock(return_value=raw)
-        result = recommend_resources(self.project, selection, {'intro': row}, model, course={'id': 'A2'}, retrieved_pools=pools)
+        result = recommend_resources(self.project, selection, {'intro': row}, model, retrieved_pools=pools)
         model.assert_called_once()
         self.assertIsNone(result['skills'][0]['selectedCourse'])
         self.assertEqual(result['skills'][0]['courseDiagnostic'], raw['skills'][0]['courseDiagnostic'])
         payload = model.call_args.args[1]
-        self.assertIsNone(payload['crashStudyPlan'])
+        self.assertNotIn('crashStudyPlan', payload)
         self.assertEqual(payload['skills'][0]['courses'][0]['learningEvidence']['evidenceLevel'], 'conceptual')
         # 진단 형식·사유 오류는 추천 전체를 실패시키지 않고 서버가 계산한 안내로 대체한다.
         fallback = recommend_resources(self.project, selection, {'intro': row}, lambda *_: dict(raw, skills=[
-            dict(raw['skills'][0], courseDiagnostic=None)]), course={'id': 'A2'}, retrieved_pools=pools)
+            dict(raw['skills'][0], courseDiagnostic=None)]), retrieved_pools=pools)
         server = fallback['skills'][0]['courseDiagnostic']
         for diagnostic in ({'reason': 'invented', 'detail': '사유'}, {'reason': 'scope_gap', 'detail': ' '},
                            {'reason': 'longer_for_coverage', 'detail': '사유'}, {'reason': 'no_candidates', 'detail': '사유'},
@@ -241,12 +242,12 @@ class SuitabilityTests(unittest.TestCase):
                 bad = deepcopy(raw)
                 bad['skills'][0]['courseDiagnostic'] = diagnostic
                 result = recommend_resources(self.project, selection, {'intro': row}, lambda *_: bad,
-                                             course={'id': 'A2'}, retrieved_pools=pools)
+                                             retrieved_pools=pools)
                 self.assertEqual(result['skills'][0]['courseDiagnostic'], server)
         long = deepcopy(raw)
         long['skills'][0]['courseDiagnostic'] = {'reason': 'scope_gap', 'detail': 'x' * 300, 'extra': True}
         kept = recommend_resources(self.project, selection, {'intro': row}, lambda *_: long,
-                                   course={'id': 'A2'}, retrieved_pools=pools)['skills'][0]['courseDiagnostic']
+                                   retrieved_pools=pools)['skills'][0]['courseDiagnostic']
         self.assertEqual(kept, {'reason': 'scope_gap', 'detail': 'x' * 239 + '…'})
 
     def test_longer_choice_diagnostic_preserves_model_choice_and_legacy_key_responses(self):
@@ -295,15 +296,15 @@ class SuitabilityTests(unittest.TestCase):
 
     def test_shared_longer_course_wins_when_it_alone_covers_every_returned_skill(self):
         short = course('short', ['RAG 문서 검색 구현'], skills=[RAG, WEB], hours=1)
-        long = course('long', ['RAG 문서 검색 구현과 평가', 'FastAPI 서버 실행'], skills=[RAG, WEB], hours=9)
+        long = course('long', ['RAG 문서 검색 구현과 평가', 'FastAPI 엔드포인트 구현과 서버 실행'], skills=[RAG, WEB], hours=9)
         selection = {'skills': self.selection['skills'][:2]}
         pools = [{'name': skill['name'], 'courses': [short, long], 'books': []} for skill in selection['skills']]
         def generate(_, payload):
-            keys = {row['title']: row['choiceKey'] for row in payload['skills'][0]['courses']}
-            return {'skills': [{'name': skill['name'], 'courses': [{'key': keys['long']}, {'key': keys['short']}],
+            return {'skills': [{'name': skill['name'], 'courses': [{'key': card['choiceKey']}
+                                for card in sorted(pool['courses'], key=lambda row: row['title'])],
                                 'books': [], 'courseDiagnostic': {'reason': 'longer_for_coverage',
                                 'detail': '검색 품질 평가와 FastAPI 실행을 함께 학습해야 합니다.'}}
-                               for skill in selection['skills']]}
+                               for skill, pool in zip(selection['skills'], payload['skills'])]}
         result = recommend_resources(self.project, selection, {'short': short, 'long': long}, generate,
                                      course={'id': 'A2'}, retrieved_pools=pools)
         self.assertEqual([skill['selectedCourse'] for skill in result['skills']], ['long', 'long'])
@@ -318,6 +319,7 @@ class SuitabilityTests(unittest.TestCase):
             with self.subTest(reason=reason):
                 name = skill['name']
                 row = course('mismatch', units, skills=[name])
+                row['difficulty'] = 'ADVANCED'
                 pools = [{'name': name, 'courses': [row], 'books': []}]
                 raw = {'skills': [{'name': name, 'courses': [], 'books': []}]}
                 result = recommend_resources(self.project, {'skills': [skill]}, {'mismatch': row}, lambda *_: raw,

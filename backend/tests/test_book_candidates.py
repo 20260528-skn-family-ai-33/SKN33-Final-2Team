@@ -7,7 +7,9 @@ from app.agents.resource_recommendations import recommend_resources, Recommendat
 
 def item(key, skills, kind='book', **extra):
     return {'id':key,'type':kind,'usable':True,'skills':skills,'title':key,'cost':100,'hours':2,
-            'content':'학습 설명 '+('소개 '*1000),**extra}
+            'content':'학습 설명 '+('소개 '*1000),
+            **({'difficulty':'ADVANCED','curriculum':{'items':[{'title':'RAG 문서 검색 구현과 NLP 토큰화 원리'}]}}
+               if kind=='course' else {}),**extra}
 
 
 class BookCandidateTests(unittest.TestCase):
@@ -132,9 +134,9 @@ class BookCandidateTests(unittest.TestCase):
         self.assertEqual(result['skills'][0]['selectedCourse'],'course')
         self.assertTrue(result['skills'][0]['courses'][0]['sharedCandidate'])
         changed=deepcopy(row);changed['skills']=['NLP']
-        with self.assertRaises(RecommendationError):
-            recommend_resources({'goal':'RAG'},{'skills':[{'name':'RAG'},{'name':'NLP'}]}, {'course':changed},lambda *_:raw,
-                                course={'id':'A3'},retrieved_pools=pools)
+        corrected=recommend_resources({'goal':'RAG'},{'skills':[{'name':'RAG'},{'name':'NLP'}]}, {'course':changed},lambda *_:raw,
+                                      course={'id':'A3'},retrieved_pools=pools)
+        self.assertEqual([s['selectedCourse'] for s in corrected['skills']], [None, 'course'])
 
     def test_shared_book_cannot_be_borrowed_into_an_unlinked_skill_or_wrong_kind(self):
         row=item('only-rag',['RAG'])

@@ -16,6 +16,7 @@ from psycopg.types.json import Jsonb
 from src.database import course_curriculum
 from src.database.ingestion.course_supplement import insert_approved, insert_catalog_approved, prepare
 from src.database.vectors import resource_vectors
+from src.shared.bge_embeddings import INDEX_PROTOCOLS, IndexedEmbedding
 from tests.test_course_supplement import external_course
 
 
@@ -33,8 +34,8 @@ class CourseSupplementDatabaseTests(unittest.TestCase):
         self.skills = self.c.execute('SELECT skill_id,name,category FROM public.skill_tags ORDER BY skill_id').fetchall()
         self.root = Path(self.enterContext(tempfile.TemporaryDirectory()))
         self.fake = [1.0] + [0.0] * (resource_vectors.DIMENSIONS - 1)
-        self.api = self.enterContext(patch.object(resource_vectors, 'embed_texts',
-                                                side_effect=lambda texts, **kw: [self.fake for _ in texts]))
+        self.api = self.enterContext(patch.object(resource_vectors, 'embed_for_index', side_effect=lambda texts, **kw:
+            [IndexedEmbedding(self.fake, INDEX_PROTOCOLS['float32'], 11) for _ in texts]))
 
     def fixture(self, source='WEB_INFLEARN'):
         row = external_course(source)

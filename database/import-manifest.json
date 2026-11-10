@@ -83,10 +83,10 @@
       "source_sha256": null,
       "source_bytes": null,
       "source_kind": "import_documentation_or_verification",
-      "sha256": "bd30905eec13aaf3d2e47e3ce7942c5e458adf6ce93592cfa23625e4ec09d3cc",
-      "bytes": 50008,
+      "sha256": "b8b658ac10958b901b05208d915081185bf72440ae79788e0866f585f630514a",
+      "bytes": 61361,
       "handling": "adjusted",
-      "change_note": "Issue #83: remove the unneeded book-only mode; retain shared backup and LLM candidates, keep the existing request budget (2026-11-04).",
+      "change_note": "Issue #147: course supply, difficulty provenance, canonical vector refresh and package verification.",
       "local_update_source": {
         "path": "README.md",
         "sha256": "e872d64ea58c53311d098dc1c769f5bc3232ad947d690054b75a0a0a20c6d8c6"
@@ -297,10 +297,10 @@
       "source_sha256": "82327b5737f40c891484955c2eb2ce490a53b0de46990408d4b6f9708441991d",
       "source_bytes": 4420,
       "source_kind": "local_final_database_snapshot",
-      "sha256": "13fd2d0821734b1462b4f73173b2ef2d0b50ee58150dded419a6a55d074aa42a",
-      "bytes": 5518,
+      "sha256": "2adfba6055d91b7d6c4340feabd7acdb4d041c228da61b8255ac61be941362dd",
+      "bytes": 5579,
       "handling": "adjusted",
-      "change_note": "Issue #35: supplementary course normalization, verified outline cache upgrade, timezone-stable evidence and regression checks (2026-10-30).",
+      "change_note": "Issue #147: course supply, difficulty provenance, canonical vector refresh and package verification.",
       "local_update_source": {
         "path": "scripts/check_workspace.py",
         "sha256": "82327b5737f40c891484955c2eb2ce490a53b0de46990408d4b6f9708441991d"
@@ -774,10 +774,10 @@
       "source_sha256": "0432c150ef770fc7abbd9257e95ad88f34555d9dc102080826dd6d11ade3e6b1",
       "source_bytes": 41897,
       "source_kind": "source_commit_file",
-      "sha256": "e0f0e0855a6007bc0161a0440dc5e5c7c931cb20149a5d433bdb341d8b8ff180",
-      "bytes": 49388,
-      "handling": "copied",
-      "change_note": "Issue #83: remove the unneeded book-only mode; retain shared backup and LLM candidates, keep the existing request budget (2026-11-04).",
+      "sha256": "44ff25af41f334ecec8b07bf846bd8d038e5ea095b2c483de13f995bf623e87b",
+      "bytes": 50595,
+      "handling": "adjusted",
+      "change_note": "Issue #147: course supply, difficulty provenance, canonical vector refresh and package verification.",
       "local_update_source": {
         "path": "src/database/ingestion/real_data_ingestor.py",
         "sha256": "7382ff2768333b8ddb77d2dc0322025351944c5acedc9036c8a33dec8920ca1b"
@@ -1039,10 +1039,10 @@
       "source_sha256": "5f3a506dcc0e59a7d76a27f84d07a4646cae73a3062fd8689e107184056514f1",
       "source_bytes": 11968,
       "source_kind": "source_commit_file",
-      "sha256": "938b30397b3a27640798923ed8517c8a04533fd1da4c31a6bab8d729912e9de1",
-      "bytes": 16172,
+      "sha256": "ec15c5501bb76c9e4dc206f153353b75e8485e043cae0c5212f7b504f8d465f9",
+      "bytes": 19431,
       "handling": "adjusted",
-      "change_note": "Issue #14: reconcile latest main, implementation/contracts, regression coverage and verification metadata (2026-10-28).",
+      "change_note": "Issue #147: course supply, difficulty provenance, canonical vector refresh and package verification.",
       "local_update_source": {
         "path": "src/database/vectors/resource_vectors.py",
         "sha256": "868d5609aded079c923ffb672753a7cf84b351af90e91b2139a0f464a916eb0e"
@@ -1124,10 +1124,10 @@
       "source_sha256": "9d063abbc3baf8c1412d4bbd58ec7aa0f1dae5b25278c76f4cdce2512914545e",
       "source_bytes": 5979,
       "source_kind": "source_commit_file",
-      "sha256": "74efcdf85759aadfd26e2aade948cce66453c749ab15a6ccf88c4cee65eeba47",
-      "bytes": 10392,
-      "handling": "copied",
-      "change_note": "2026-10-27 final DB code/schema/ERD synchronization; keep original source history and external data exclusions.",
+      "sha256": "c9973622d2a5fac5abf32f33eec2cd3ae947433de43724b3e03ed115f21b5124",
+      "bytes": 11017,
+      "handling": "adjusted",
+      "change_note": "Issue #147: course supply, difficulty provenance, canonical vector refresh and package verification.",
       "local_update_source": {
         "path": "src/shared/catalog_eligibility.py",
         "sha256": "74efcdf85759aadfd26e2aade948cce66453c749ab15a6ccf88c4cee65eeba47"
@@ -1249,10 +1249,10 @@
       "source_sha256": "2531e5882b559cf5c00b304f6847638f9121ab3a5911681498af953746ac6045",
       "source_bytes": 9909,
       "source_kind": "source_commit_file",
-      "sha256": "76d045f9bf4020a8ff8cba8fbea3d2e9eb28440f7534cb7cbf77620757d3063f",
-      "bytes": 13974,
-      "handling": "copied",
-      "change_note": "Issue #83: remove the unneeded book-only mode; retain shared backup and LLM candidates, keep the existing request budget (2026-11-04).",
+      "sha256": "74af2df03244e7368092e9d286b8f7ddd4daec598d63ef686850c1c550e1a167",
+      "bytes": 15184,
+      "handling": "adjusted",
+      "change_note": "Issue #147: course supply, difficulty provenance, canonical vector refresh and package verification.",
       "local_update_source": {
         "path": "tests/test_catalog_expansion.py",
         "sha256": "12e77bbd46d7eefb6737aadb178fdf228d07e18d201b3eba772aee57b1a807ae"
@@ -1650,9 +1650,9 @@
       "source_bytes": null,
       "source_kind": "team_followup_implementation",
       "handling": "adjusted",
-      "sha256": "692bd00ef7a8e4a2db3c11a8c43242a19b8c5194f82a66b301a34138a3bf6b0b",
-      "bytes": 8302,
-      "change_note": "Issue #14: reconcile latest main, implementation/contracts, regression coverage and verification metadata (2026-10-28)."
+      "sha256": "cdd974e535d9531ba52dfaa2f9425f6979a360412839b1acc4da362f6a340114",
+      "bytes": 12235,
+      "change_note": "Issue #147: course supply, difficulty provenance, canonical vector refresh and package verification."
     },
     {
       "path": "database/tests/test_resource_refresh_database.py",

@@ -475,38 +475,6 @@ def _validate_learning_acts(raw,handoff):
         if reason:raise llm.LlmError(f'기존 지식 반영 필요: {reason}')
 
 
-def _validate_crash_requirements(pid: str, result: dict, inp: dict) -> None:
-    if pid != 'A2':
-        return
-    from app.services.crash_requirements import validate_core_requirements
-    try:
-        validate_core_requirements(result.get('learningSkills') or [], inp['handoff'], inp.get('request'))
-    except ValueError as error:
-        raise llm.LlmError(str(error)) from error
-
-
-def _validate_crash_revision_requirements(rows: list[dict], inp: dict) -> None:
-    """같은 Crash의 핵심은 고정이다. 새 의무의 충족 가능성을 모델 호출 전에 확인한다."""
-    from app.errors import ApiError
-    from app.services.crash_requirements import MissingCoreRequirements, RequirementTextTooLong, validate_core_requirements
-    previous = inp.get('previousHandoff')
-    # 이전 사용자 입력을 모르면 현재 요구를 기존 의무라고 추정해 면제하지 않는다.
-    previous = previous if isinstance(previous, dict) else None
-    try:
-        validate_core_requirements(rows, inp['handoff'], inp.get('request'), previous_handoff=previous)
-    except RequirementTextTooLong as error:
-        raise ApiError(422, 'CRASH_REQUIREMENTS_TOO_LONG', str(error)) from error
-    except MissingCoreRequirements as error:
-        missing = ', '.join(error.missing)
-        raise ApiError(
-            422, 'CRASH_CORE_REQUIREMENT_CONFLICT',
-            f'확정된 Crash 핵심에서 충족하지 못하는 새 필수 기술: {missing}. '
-            '이번 수정에서 새 필수 요구를 빼거나, 해당 요구를 목표에 포함한 새 Crash 로드맵을 만들어 확정해 주세요.',
-            hint='같은 Crash의 시간 변경·활동 수정은 핵심 기준을 유지하므로 같은 요청을 다시 시도해도 반영할 수 없어요.',
-            cause=f'미충족 필수 기술: {missing}',
-        ) from error
-
-
 def option(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
     """inp: pid, handoff, variant?, request?, previousDef?, previous?"""
     pid = inp['pid']
@@ -532,11 +500,6 @@ def option(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
         from app.learner_knowledge import POLICY
         provenance = {}
         system = _sys(pid, R_SYS, provenance, inp.get('_evaluationPrompt')) + extra
-        required_prompt = ''
-        if pid == 'A2':
-            from app.services.crash_requirements import prompt_requirements
-            required_prompt = prompt_requirements(inp['handoff'], inp.get('request'))
-            system += required_prompt
         if system.startswith('[통합 생성 계약 roadmap-generation/v1]'):
             # 이전에 설치된 통합 프롬프트에는 Crash 핵심 기준 계약이 없다. DB 재설치 전에도 같은 계약을 적용한다.
             if track_policy.CRASH_CORE_MARKER not in system:
@@ -548,15 +511,6 @@ def option(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
                 system += FIXED_SELECTION_CONTRACT if inp['handoff'].get('selectedSkillsFixed') else CONTRACT
             if inp['handoff'].get('selectedSkillsFixed'):
                 system += '\n사용자가 선정한 skillOrder는 확정이다. 이 목록과 순서를 모두 유지하고 learningSkills에 반환한다. 관점 때문에 역량을 빼거나 더하지 않는다.'
-        # 통합 프롬프트도 courseSkillSelection일 때만 learningSkills를 요구한다. 빠지면 검증이 항상 실패한다.
-        if required_prompt and not inp['handoff'].get('courseSkillSelection'):
-            system += '''\n[구형 Crash 필수 기술 응답 계약]
-courseSkillSelection 값과 무관하게 활동만 반환하지 말고 learningSkills를 반드시 1~3개 함께 반환한다.
-name은 handoff.skillOrder·skillNames가 있으면 그 목록 안에서, 없으면 skillTags의 등록 이름 안에서 고른다. 새 이름은 만들지 않는다.
-각 항목에 name·application(프로젝트 적용 범위), coreOutcome(핵심 구현 결과), coreCriteria(서로 다른 핵심 완료 기준 1~3개), followUpScope(후속 범위 0~3개)를 쓴다.
-필수 기술은 coreOutcome 또는 coreCriteria의 실제 구현에 포함한다. 후속·비교로만 넘기지 않는다.
-JSON에 "learningSkills":[{"name":"등록 스킬명","application":"적용 범위","coreOutcome":"핵심 구현 결과","coreCriteria":["완료 기준"],"followUpScope":[]}]를 추가한다.
-'''
         payload = _catalog_payload(pid, {'handoff': inp['handoff'], 'skillTags': catalog.skill_names(),
                                         'previous': inp.get('previous'), 'previousLearningSkills': (inp.get('previousDef') or {}).get('learningSkills'), 'request': inp.get('request')}, system, prev_ids,
                                    rt.S.ollama_num_ctx if ctx.mode == 'ollama' else catalog_budget.DEFAULT_CONTEXT)
@@ -567,8 +521,8 @@ JSON에 "learningSkills":[{"name":"등록 스킬명","application":"적용 범�
             o['optionId'] = str(uuid4())
             o['promptProvenance'] = dict(provenance, source=ctx.mode,
                                         effectivePromptHash=hashlib.sha256(system.encode('utf-8')).hexdigest())
-        # 필수 요구가 있는 구형 생성도 핵심을 보존·검증한다. 요구 없는 구형 옵션은 종전 동작을 유지한다.
-        if inp['handoff'].get('courseSkillSelection') or (pid == 'A2' and required_prompt and 'learningSkills' in r):
+        # 구형 Crash는 스킬 목록 없이도 읽되, 모델이 반환한 목록은 형식을 검사한 뒤 보존한다.
+        if inp['handoff'].get('courseSkillSelection') or (pid == 'A2' and 'learningSkills' in r):
             from app.services.course_skills import validate_recommendations, recommendation_key
             allowed=set(payload['handoff'].get('skillOrder') or payload['handoff'].get('skillNames') or [])
             if pid == 'A2' and not allowed and not inp['handoff'].get('courseSkillSelection'):
@@ -591,14 +545,8 @@ JSON에 "learningSkills":[{"name":"등록 스킬명","application":"적용 범�
         if inp.get('request'):
             o.update(summary=str(r.get('summary') or '').strip()[:80], notes=rt.arr(r.get('notes'), 3))
         return o
-    def checked(callback):
-        def run(data):
-            result = callback(data)
-            _validate_crash_requirements(pid, result, inp)
-            return result
-        return run
     task = f"{D['perspectives'][pid]['name']} {'요청 반영해 다시 작성' if inp.get('request') else '다시 작성' if inp.get('variant') else '작성'}"
-    return rt.run(ctx, f'로드맵 계획 · {pid}', task, inp, checked(_mock_option), checked(api), role='roadmap', sim=sim, mock_delay=0.7 + D['optionOrder'].index(pid) * 0.26,
+    return rt.run(ctx, f'로드맵 계획 · {pid}', task, inp, _mock_option, api, role='roadmap', sim=sim, mock_delay=0.7 + D['optionOrder'].index(pid) * 0.26,
                   log_input={k: v for k, v in inp.items() if k not in ('previousDef', 'previousHandoff', '_evaluationPrompt')})
 
 
@@ -777,12 +725,10 @@ def _revision_skill_targets(plan: dict, handoff: dict) -> list[dict]:
 
 
 def revise(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
-    """inp: pid, handoff, previousHandoff?, changes, request, fromComment, plan{opt,name,tagline,def,hours,start,acts[{id,stage,title,res,hours,how,done}]}"""
+    """inp: pid, handoff, changes, request, fromComment, plan{opt,name,tagline,def,hours,start,acts[{id,stage,title,res,hours,how,done}]}"""
     pid, pl = inp['pid'], inp['plan']
     skill_targets = _revision_skill_targets(pl, inp['handoff'])
     course_changed = pid != pl['opt']
-    if pid == 'A2' and not course_changed:
-        _validate_crash_revision_requirements(skill_targets, inp)
     report = (pl.get('def') or {}).get('learningReport') or {}
     target_names = list(dict.fromkeys(report.get('skillOrder') or inp['handoff'].get('skillOrder')
                                      or inp['handoff'].get('skillNames') or [row['name'] for row in skill_targets]))
@@ -819,9 +765,6 @@ def revise(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
             handoff['prefs'] = dict(handoff['prefs'], certRes=None)
         from app.learner_knowledge import POLICY
         system = _sys(pid, REV_SYS, evaluation_prompt=inp.get('_evaluationPrompt'))
-        if pid == 'A2' and course_changed:
-            from app.services.crash_requirements import prompt_requirements
-            system += prompt_requirements(inp['handoff'], inp.get('request'))
         integrated_revision = system.startswith('[통합 수정 계약 roadmap-revision/v1]')
         if not integrated_revision:
             system += POLICY + track_policy.course_guidance(pid, 'tasks') + track_policy.PERIOD_GUIDANCE
@@ -865,10 +808,6 @@ Crash는 최소 기능판으로 범위를 좁히되 핵심 기능의 안전성·
             result = rebuild_revision(result, pl, inp['handoff'])
             if not course_changed and skill_targets and not result.get('learningSkills'):
                 result['learningSkills'] = copy.deepcopy(skill_targets)
-            if pid == 'A2' and not course_changed:
-                _validate_crash_revision_requirements(result.get('learningSkills') or [], inp)
-            else:
-                _validate_crash_requirements(pid, result, inp)
             return result
         return run
     task = '관점 바꿔 다시 작성' if inp['changes'].get('perspective') else '수정안 작성'

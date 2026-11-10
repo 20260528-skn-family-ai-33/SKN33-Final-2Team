@@ -181,6 +181,8 @@ def course_context(t, employee_id: int, project_id: str, course: str | None = No
     if (draft['gen'].get('regenRun') or {}).get(course):
         raise ApiError(409,'REGEN_RUNNING','해당 로드맵을 다시 만드는 중이에요. 완료 후 자료를 확인해 주세요.')
     scoped=scope_view(saved,course,draft['gen']['options'][course])
+    scoped['_commonApplications'] = {s['name']: s['application'] for s in
+                                     (saved.get('selection') or {}).get('skills', []) if s.get('application')}
     expected_names = {row['name'] for row in scoped['selection']['skills']}
     cached_names = {row['name'] for row in (scoped.get('recommendations') or {}).get('skills', [])}
     scoped['recommendations'] = (compatible_recommendations(scoped, version_for(course))

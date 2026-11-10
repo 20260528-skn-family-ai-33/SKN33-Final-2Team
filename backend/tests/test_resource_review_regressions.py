@@ -176,6 +176,7 @@ class CourseDiagnosticTests(TestCase):
             for model_diagnostic in (False, True):
                 with self.subTest(unit=unit, model_diagnostic=model_diagnostic):
                     item = course('web', [unit], skills=[WEB])
+                    item['difficulty'] = 'ADVANCED'
                     raw = {'name': WEB, 'courses': [], 'books': []}
                     if model_diagnostic:
                         raw['courseDiagnostic'] = {'reason': 'stack_mismatch', 'detail': '구현 기술이 달라요.'}

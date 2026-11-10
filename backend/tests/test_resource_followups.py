@@ -10,7 +10,7 @@ from app.services.duration_proposals import resource_schedule
 
 def course(key, titles, hours=2, skills=None):
     return {'id': key, 'type': 'course', 'title': key, 'usable': True, 'cost': 0,
-            'hours': hours, 'timeStatus': 'confirmed', 'skills': skills or ['ETL'],
+            'hours': hours, 'timeStatus': 'confirmed', 'difficulty': 'INTERMEDIATE', 'skills': skills or ['ETL'],
             'curriculum': {'items': [{'section': 'dbt', 'title': title} for title in titles]}}
 
 
@@ -26,8 +26,10 @@ class ResourceCardEvidenceTests(unittest.TestCase):
         original = deepcopy((row, raw, pools))
         for pid in ('A1', 'A2', 'A3'):
             with self.subTest(course=pid):
-                result = recommend_resources(self.project, self.selection, {'partial': row}, lambda *_: raw,
-                                             course={'id': pid}, retrieved_pools=pools)
+                active = dict(row, difficulty='ADVANCED' if pid == 'A3' else 'INTERMEDIATE')
+                active_pools = [{**pools[0], 'courses': [active]}]
+                result = recommend_resources(self.project, self.selection, {'partial': active}, lambda *_: raw,
+                                             course={'id': pid}, retrieved_pools=active_pools)
                 self.assertEqual(result['skills'][0]['courses'][0]['unverifiedTargetTopics'],
                                  ['dbt 품질 테스트', 'dbt 증분 처리'])
         self.assertEqual((row, raw, pools), original)
@@ -38,6 +40,7 @@ class ResourceCardEvidenceTests(unittest.TestCase):
         raw = {'skills': [{'name': 'ETL', 'courses': [{'id': 'full', 'unverifiedTargetTopics': ['모델의 값']}], 'books': []}]}
         for pid in ('A1', 'A2', 'A3'):
             with self.subTest(course=pid):
+                row['difficulty'] = 'ADVANCED' if pid == 'A3' else 'INTERMEDIATE'
                 result = recommend_resources(self.project, self.selection, {'full': row}, lambda *_: raw,
                                              course={'id': pid}, retrieved_pools=[{'name': 'ETL', 'courses': [row], 'books': []}])
                 self.assertNotIn('unverifiedTargetTopics', result['skills'][0]['courses'][0])

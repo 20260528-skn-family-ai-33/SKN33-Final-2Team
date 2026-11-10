@@ -1,0 +1,8 @@
+{
+  "schema_version": "internal-training-index/v1",
+  "packages": [
+    "internal_training_pilot.json",
+    "internal_training_expansion.json",
+    "free_course_supply_147.json"
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "version": "course-search-147/night-20261110-v1",
+  "record_source": "INTERNAL_TRAINING_PILOT",
+  "platform": "사내교육",
+  "image_url": "/images/resource-course.svg",
+  "provenance": "#147 야간 부족 재고 검토 후 새로 작성한 사내교육 실습. 외부 강좌·영상 시간이 아니며 차시별 계획 학습시간이다.",
+  "courses": [
+    {
+      "id": "INTERNAL_NIGHT_147_DROPOUT",
+      "title": "신경망 드롭아웃 · 손글씨 분류기의 train/eval 전환 검증",
+      "skill": "딥러닝 신경망 아키텍처",
+      "difficulty": "INTERMEDIATE",
+      "outcome": "고정된 손글씨 표본으로 MLP의 과적합을 관찰하고 드롭아웃 확률과 학습·평가 모드가 검증 손실에 미치는 영향을 재현한다.",
+      "distinct_from": ["음성 명령 분류", "설비 센서 분류", "상품 임베딩 채널", "감성 분류", "체크포인트 학습 재개"],
+      "units": [
+        {"minutes": 15, "title": "손글씨 표본의 고정 분할과 과적합 기준선", "description": "공개 손글씨 표본의 학습·검증 인덱스와 난수 시드를 고정한다. 작은 MLP를 학습해 학습 손실과 검증 손실의 차이를 기록하고 검증 표본이 학습에 섞이지 않는지 검사한다."},
+        {"minutes": 40, "title": "드롭아웃 층과 train/eval 모드 비교 실습", "description": "같은 초기 가중치에서 드롭아웃 확률 0, 0.2, 0.5를 적용한다. 학습 모드에서는 마스크가 달라지고 평가 모드에서는 같은 입력의 결과가 안정되는지 확인한다. 평가 모드를 누락한 실행을 의도적으로 재현해 예측 차이를 기록한다."},
+        {"minutes": 20, "title": "드롭아웃 적용 전후 일반화 결과 검증", "description": "세 설정의 손실 곡선·검증 정확도·동일 입력 반복 예측을 표로 비교한다. 한 실행의 개선을 보장하지 않고 시드와 설정을 함께 제출한다. 드롭아웃을 켠 채 검증한 경우를 실패 사례로 포함한다."}
+      ]
+    },
+    {
+      "id": "INTERNAL_NIGHT_147_IDS_TLS",
+      "title": "Suricata 침입 탐지 · TLS SNI 경보와 정상 접속 예외 검증",
+      "skill": "네트워크 보안 & 침입 탐지",
+      "difficulty": "INTERMEDIATE",
+      "outcome": "격리된 합성 PCAP에서 TLS SNI 탐지 규칙을 적용하고 정상·의심 접속의 경보를 패킷 위치와 대조한다.",
+      "distinct_from": ["DNS 질의", "SSH 접속 시도", "DNS 응답 짝", "HTTP 이중 확장자", "TCP 플래그 조합"],
+      "units": [
+        {"minutes": 15, "title": "TLS 정상·의심 접속 PCAP과 기대 경보 준비", "description": "실제 서비스에 공격 요청을 보내지 않고 합성된 TLS ClientHello PCAP을 사용한다. 정상 업무 도메인과 검사용 의심 SNI를 나누고 패킷 번호·세션·예상 탐지 여부를 기록한다. 암호화된 본문을 복호화했다고 가정하지 않는다."},
+        {"minutes": 30, "title": "Suricata TLS SNI 탐지 규칙 적용 실습", "description": "tls.sni 조건과 자체 규칙 ID를 사용해 준비한 PCAP을 오프라인 재생한다. 경보 로그를 원래 패킷과 연결하고 정상 도메인에도 경보가 발생하는 넓은 조건의 오탐을 재현한다. DNS 규칙과 TLS SNI 규칙의 적용 대상을 구분한다."},
+        {"minutes": 20, "title": "침입 탐지 규칙의 오탐·누락 회귀 검사", "description": "정상 도메인 예외와 의심 SNI 조건을 분리한 뒤 같은 PCAP을 다시 검사한다. 정상 접속의 오탐과 의심 접속 누락 수를 비교하고 빈 SNI·잘린 패킷은 판정 보류로 남긴다. 규칙 파일·도구 버전·실행 명령·경보 대조표를 제출한다."}
+      ]
+    }
+  ]
+}
