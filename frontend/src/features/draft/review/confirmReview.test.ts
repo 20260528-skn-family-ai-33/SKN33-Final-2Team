@@ -1,8 +1,9 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 const mock=vi.hoisted(()=>({
   state:{pendingFlow:undefined as 'materials'|undefined,owner:'u' as string|null,draftId:'d' as string|null,lastNew:'old' as string|null,draft:{goal:'검색 구현',prefs:{hours:4},chosen:'A1',v2Assessment:{generationId:'g',materialsKey:'m'}}},
-  flush:vi.fn(),confirm:vi.fn(),reload:vi.fn(),toast:vi.fn(),ensurePostQuiz:vi.fn(),
+  flush:vi.fn(),confirm:vi.fn(),reload:vi.fn(),toast:vi.fn(),notice:vi.fn(),ensurePostQuiz:vi.fn(),
 }));
+vi.mock('@/shared/state/ui',()=>({toast:mock.notice}));
 vi.mock('@/shared/state/workspace',()=>({ws:()=>mock.state,updateWs:(fn:(s:typeof mock.state)=>void)=>fn(mock.state)}));
 vi.mock('@/api/endpoints/drafts',()=>({draftsApi:{confirm:mock.confirm}}));
 vi.mock('@/features/assessment/postActions',()=>({ensurePostQuiz:mock.ensurePostQuiz}));
@@ -19,7 +20,7 @@ it('연속 확정 클릭은 산출물 저장·확정·화면 이동을 각각 �
   const first=confirmReview(go,save),second=confirmReview(go,save);
   await vi.waitFor(()=>expect(save).toHaveBeenCalledOnce());expect(mock.confirm).not.toHaveBeenCalled();pending.resolve(true);
   expect(await first).toBe(true);expect(await second).toBe(true);
-  expect(mock.confirm).toHaveBeenCalledExactlyOnceWith('d');expect(mock.reload).toHaveBeenCalledOnce();expect(mock.ensurePostQuiz).toHaveBeenCalledExactlyOnceWith('plan');expect(go).toHaveBeenCalledExactlyOnceWith('/roadmaps/plan/confirmed',{force:true});
+  expect(mock.confirm).toHaveBeenCalledExactlyOnceWith('d',undefined);expect(mock.reload).toHaveBeenCalledOnce();expect(mock.ensurePostQuiz).toHaveBeenCalledExactlyOnceWith('plan');expect(go).toHaveBeenCalledExactlyOnceWith('/roadmaps/plan/confirmed',{force:true});
 });
 it('자동 저장 대기 중 입력이 바뀌면 산출물 저장·확정을 시작하지 않는다',async()=>{
   const pending=deferred<void>();mock.flush.mockReturnValue(pending.work);const save=vi.fn(),go=vi.fn();
@@ -50,6 +51,15 @@ it('확정 오류는 자동 재시도하지 않고 사용자가 다시 클릭할
   expect(await confirmReview(go)).toBe(true);expect(mock.confirm).toHaveBeenCalledTimes(2);
 });
 
+it('고른 시작 방식을 확정 요청에 실어 보내고, 끝나고 시작은 보관 안내를 띄우지 않는다',async()=>{
+  const go=vi.fn();expect(await confirmReview(go,undefined,'after')).toBe(true);
+  expect(mock.confirm).toHaveBeenCalledExactlyOnceWith('d','after');expect(mock.notice).not.toHaveBeenCalled();
+});
+it('보관하고 시작은 확정이 끝난 뒤에만 보관했다고 알린다',async()=>{
+  const go=vi.fn();mock.confirm.mockRejectedValueOnce(Error('offline'));
+  expect(await confirmReview(go,undefined,'archive')).toBe(false);expect(mock.notice).not.toHaveBeenCalled();
+  expect(await confirmReview(go,undefined,'archive')).toBe(true);expect(mock.confirm).toHaveBeenLastCalledWith('d','archive');expect(mock.notice).toHaveBeenCalledOnce();
+});
 it('자료 선택을 저장하지 않으면 이전 산출물 저장과 확정 API를 호출하지 않는다',async()=>{
  mock.state.pendingFlow='materials';const save=vi.fn(),go=vi.fn();
  expect(await confirmReview(go,save)).toBe(false);expect(save).not.toHaveBeenCalled();expect(mock.confirm).not.toHaveBeenCalled();expect(mock.toast).toHaveBeenCalledOnce();

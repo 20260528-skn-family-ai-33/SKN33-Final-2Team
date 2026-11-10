@@ -1060,8 +1060,13 @@ def selection_of(d: dict) -> dict:
     return {'perspective': d['id'], 'name': name, 'agent': f"로드맵 계획 에이전트 · {d['id']} {name}", 'source': d.get('source'), 'at': today()}
 
 
-def confirm(employee_id: int, draft_id: str) -> dict:
-    """개인 로드맵 확정(API-35 · 기관 승인·결재 아님). 진행 중인 다른 로드맵은 그대로, 고르지 않은 안·버전은 버린다"""
+def confirm(employee_id: int, draft_id: str, start_mode: str | None = None) -> dict:
+    """개인 로드맵 확정(API-35 · 기관 승인·결재 아님). 고르지 않은 안·버전은 버린다.
+    진행 중인 다른 로드맵은 start_mode 대로: together(기본 · 그대로 함께) · after(모두 끝난 다음 주부터 시작) · archive(같은 트랜잭션에서 보관)"""
+    mode = 'together' if start_mode is None else start_mode
+    if mode not in PL.START_MODES:
+        raise ApiError(422, 'BAD_START_MODE', '새 로드맵의 시작 방식을 다시 골라 주세요')
+    active = PL.active_rows(employee_id) if mode != 'together' else []
     with db.tx() as t:
         r = _row(t, employee_id, draft_id)
         w = _wrap(r['draft_choices'])
@@ -1107,8 +1112,15 @@ def confirm(employee_id: int, draft_id: str) -> dict:
         evidence = confirmation_evidence(str(draft_id), d)
         if evidence:
             plan['selectionEvidence'] = evidence
+        start_date = PL.next_start(active) if mode == 'after' else None
+        if start_date:
+            plan['startDate'] = start_date
         rid = _round(t, draft_id, d)
         roadmap_id = PL.insert_roadmap(t, draft_id, rid, plan)
+        if mode == 'archive':
+            # active 를 읽은 뒤 다른 요청이 마친 로드맵은 archive_row 가 건너뛴다. 새 로드맵 확정은 그대로 진행한다
+            for row in active:
+                PL.archive_row(t, row)
         t.run("""UPDATE public.projects SET status = 'IN_PROGRESS', current_stage = 7, draft_choices = :w, updated_at = now() WHERE project_id = CAST(:p AS uuid)""",
               w=db.J({'gp5': 1, 'confirmed': True, 'roadmapId': roadmap_id}), p=draft_id)
         # 로드맵 생성 완료 알림(#82·#96): 부서장에게만. 확정과 같은 트랜잭션이라 확정이 실패하면 남지 않는다

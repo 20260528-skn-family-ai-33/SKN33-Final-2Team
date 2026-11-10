@@ -9,7 +9,7 @@ import { SkillMap } from '@/features/skillmap/SkillMap';
 import { RoadmapResources, RoadmapActivityList } from './RoadmapLearning';
 import { useGo } from '@/shared/hooks/useGo';
 import { count, isPlanComplete, st, trackedActs } from '@/shared/lib/plan';
-import { weekNow } from '@/features/home/ganttCalc';
+import { monthDay, planStart, startsLater, weekNow } from '@/features/home/ganttCalc';
 import { groupLearningActivities } from './roadmapLearningData';
 import { useCatalog } from '@/shared/state/catalog';
 import { useClockRefresh } from '@/shared/state/demoClock';
@@ -24,6 +24,7 @@ import { useState } from 'react';
 import { won } from '@/shared/lib/format';
 
 function RoadLi({ R }: { R: PlanRecord }) {
+  useClockRefresh();
   const go = useGo();
   const [open, setOpen] = useState(false);
   const pl = R.plan;
@@ -36,7 +37,9 @@ function RoadLi({ R }: { R: PlanRecord }) {
     ? isPlanComplete(pl, R.progress) ? '완료' : '조기 종료'
     : R.status === 'archived'
       ? '보관'
-      : '진행 중';
+      : startsLater(R)
+        ? `${monthDay(planStart(R))} 시작`
+        : '진행 중';
 
   const confirmedDate = (R.createdAt || pl.confirmedAt || '').slice(0, 10).replace(/-/g, '.');
 
@@ -258,7 +261,10 @@ function RoadView({ R }: { R: PlanRecord }) {
       foot={foot}
     >
       {live ? (
-        <Alerts R={R} />
+        <>
+          {startsLater(R) ? <Note>이 로드맵은 {monthDay(planStart(R))}부터 시작해요.</Note> : null}
+          <Alerts R={R} />
+        </>
       ) : (
         <Note>
           {R.status === 'done' ? '마친 로드맵이에요. 기록은 읽기만 할 수 있어요.' : '보관한 로드맵이에요. 기록은 읽기만 할 수 있고, ‘다시 진행하기’를 누르면 이어서 기록할 수 있어요.'}
@@ -324,6 +330,7 @@ function Confirmed({ R }: { R: PlanRecord }) {
   const others = useWs((s) => recs(s, 'active').filter((x) => x.id !== R.id).length);
   const pl = R.plan;
   const first = pl.version === 1;
+  const later = startsLater(R);
   const sup = me?.mySupervisor;
   return (
     <>
@@ -334,7 +341,7 @@ function Confirmed({ R }: { R: PlanRecord }) {
         {trackName(pl.opt, pl.name)} · v{pl.version}
       </p>
       <h1 className="t lg">{first ? '로드맵을 확정했어요' : '수정안을 확정했어요'}</h1>
-      <p className="lead">{first ? '첫 활동부터 시작해 보세요. 실행한 만큼 기록하면 돼요.' : `${pl.why} 내용을 새 버전으로 저장했어요. 이전 버전도 남아 있어요.`}</p>
+      <p className="lead">{first ? (later ? '시작일이 되면 첫 활동부터 진행해 보세요. 실행한 만큼 기록하면 돼요.' : '첫 활동부터 시작해 보세요. 실행한 만큼 기록하면 돼요.') : `${pl.why} 내용을 새 버전으로 저장했어요. 이전 버전도 남아 있어요.`}</p>
       <div className="card flat">
         <div className="stack">
           {pl.selection ? (
@@ -352,7 +359,7 @@ function Confirmed({ R }: { R: PlanRecord }) {
           {first && others ? (
             <div className="row top">
               <Icon name="map" />
-              <span>진행 중인 다른 로드맵 {others}개도 그대로 함께 진행돼요.</span>
+              <span>{later ? <><b>{monthDay(planStart(R))}</b>부터 시작해요. 진행 중인 로드맵이 끝난 다음 주예요.</> : `진행 중인 다른 로드맵 ${others}개도 그대로 함께 진행돼요.`}</span>
             </div>
           ) : null}
           {sup ? (
@@ -367,7 +374,7 @@ function Confirmed({ R }: { R: PlanRecord }) {
       </div>
       <div className="actions">
         <button className="btn pri" onClick={() => go(paths.home)}>
-          로드맵 시작하기
+          {later ? '홈으로' : '로드맵 시작하기'}
         </button>
         <button className="btn line" onClick={() => go(paths.roadmap(R.id))}>
           로드맵 보기

@@ -12,7 +12,7 @@ import { useGo } from '@/shared/hooks/useGo';
 import { failToast } from '@/shared/lib/fail';
 import { count } from '@/shared/lib/plan';
 import { useState } from 'react';
-import { weekNow } from './ganttCalc';
+import { monthDay, planStart, startsLater, weekNow } from './ganttCalc';
 import { useClockRefresh } from '@/shared/state/demoClock';
 import { useMe } from '@/shared/state/session';
 import { toast } from '@/shared/state/ui';
@@ -83,6 +83,8 @@ function StageCard({ R }: { R: PlanRecord }) {
   const [expanded, setExpanded] = useState(false);
   useClockRefresh();
   const week = weekNow(R);
+  const later = startsLater(R);
+  const startText = monthDay(planStart(R));
   const resources = useCatalog(s => s.res);
   const shared = sharedCourses(pl.acts, resources);
   const sharedIds = new Set(shared.map(course => course.id));
@@ -136,13 +138,13 @@ function StageCard({ R }: { R: PlanRecord }) {
     <div className="card">
       <div className="sec-h">
         <h2 className="st">
-          {expanded ? '전체 활동' : '이번 주차 활동'} · {week}주차
+          {expanded ? '전체 활동' : later ? '시작 전' : '이번 주차 활동'}{later ? '' : ` · ${week}주차`}
         </h2>
         <span className="small muted" style={{ marginLeft: 'auto' }}>
           {hasMore && <button type="button" className="btn line home-show-all" aria-expanded={expanded} onClick={() => setExpanded(value => !value)}>{expanded ? '접기' : '모두 보기'}</button>}
         </span>
       </div>
-      {!groups.size && !visibleShared.length && <p className="small muted">이번 주차에 예정된 활동이 없어요. 모두 보기에서 전체 활동을 확인할 수 있어요.</p>}
+      {!groups.size && !visibleShared.length && <p className="small muted">{later ? `${startText}부터 시작해요.` : '이번 주차에 예정된 활동이 없어요.'} 모두 보기에서 전체 활동을 확인할 수 있어요.</p>}
       <div className="home-skill-groups">
         {visibleShared.map(course => <section className="home-skill-group" key={`shared:${course.id}`}>
           <h3>{course.skills.join(' and ')}</h3>

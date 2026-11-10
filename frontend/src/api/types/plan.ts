@@ -53,6 +53,8 @@ export interface PlanContent {
   version?: number;
   why?: string;
   confirmedAt?: string;
+  /** 진행 중인 로드맵이 끝난 다음 주로 미뤄 확정했을 때만 있는 1주차 첫날(YYYY-MM-DD). 없으면 확정한 날부터 센다 */
+  startDate?: string;
   prefs?: Prefs;
   assess?: { v2?: { survey: import('@/features/draft/quiz/assessment/flow').Survey; answers: Record<string, number> }; domain: string; questions: QuizQuestion[]; answers: Record<string, string>; deep?: Record<string, unknown> | null };
   handoff?: Handoff;

@@ -256,6 +256,9 @@ export interface EditDoc {
   prefs: Prefs;
 }
 
+/** 진행 중인 로드맵이 있을 때 새 로드맵을 확정하는 방식(API-35): 함께 진행 · 끝난 다음 주부터 · 보관하고 이번 주부터 */
+export type StartMode = 'together' | 'after' | 'archive';
+
 /** 3안 중 하나 다시 만들기 요청(API-29) */
 export interface RegenRequest {
   wish: string;
