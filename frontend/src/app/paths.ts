@@ -55,6 +55,8 @@ export const NEW_ORDER = [
   paths.newOptions,
   paths.newReview,
 ] as string[];
+/** 새 로드맵 작성 탭에 속한 주소인지(자료 선택 주소는 로드맵 선택 화면으로 이어진다) */
+export const isNewPath = (p: string): boolean => NEW_ORDER.includes(p) || p === paths.newMaterials;
 
 /** 5차 화면 ID(lastNew 에 저장된 값) → 경로. 서버 작성 문서의 lastNew 는 5차 ID 로 저장돼 있어 서로 바꿔 쓴다 */
 const NEW_ID_TO_PATH: Record<string, string> = {

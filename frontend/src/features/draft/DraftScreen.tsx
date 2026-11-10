@@ -1,10 +1,12 @@
 /* 작성 단계 화면 감싸기: 진입 조건(앞 단계를 마치지 않았으면 돌려보냄) · 마지막 단계 기억 · 앞 단계 변경 확인 카드 */
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { paths } from '@/app/paths';
-import type { WsState } from '@/shared/state/workspace';
+import { ws, type WsState } from '@/shared/state/workspace';
 import { StepGate, useRememberStep } from './guard';
 import { blockedTo, diagKey, docBusy, type StepKey } from './model';
+import { confirmInFlight } from './review/confirmReview';
 import { StaleStepGuard } from './stale';
+import { needsStartMode, StartModeRedirect } from './startModeSheet';
 
 function Remember() {
   useRememberStep();
@@ -12,6 +14,9 @@ function Remember() {
 }
 
 export function DraftScreen({ step, extra, remember = true, children }: { step?: StepKey; extra?: (s: WsState) => string | null; remember?: boolean; children: ReactNode }) {
+  // 화면에 들어올 때 한 번만 본다. 주소 직접 입력·뒤로 가기처럼 useGo 를 거치지 않는 진입을 막는 곳이다
+  const [mustAsk] = useState(() => needsStartMode(ws()) && !confirmInFlight());
+  if (mustAsk) return <StartModeRedirect />;
   const body = <StaleStepGuard>{children}</StaleStepGuard>;
   return (
     <>

@@ -31,7 +31,8 @@ from . import profile as PF
 
 STEP_ROUTES = ['new-goal', 'new-details', 'new-details-check', 'new-quiz', 'new-result', 'new-result-edit', 'new-gen', 'new-options', 'new-materials', 'new-review']
 # deepOn·deepMcq·deepEssay: 심화 질문을 풀지(체크)와 객관식·서술형 답(10/23)
-CLIENT_KEYS = ('goal', 'project', 'prefs', 'detailsOk', 'answers', 'deepOn', 'deepMcq', 'deepEssay', 'chosen', 'edit', 'lastNew', 'selectedSkills', 'skillInputKey', 'skillCandidates')
+# startMode: 진행 중인 로드맵이 있을 때 작성 탭에 들어오며 고른 시작 방식(확정 때 화면이 보낸다)
+CLIENT_KEYS = ('goal', 'project', 'prefs', 'detailsOk', 'answers', 'deepOn', 'deepMcq', 'deepEssay', 'chosen', 'edit', 'lastNew', 'selectedSkills', 'skillInputKey', 'skillCandidates', 'startMode')
 _images: dict[str, list] = {}   # 기획서 이미지(base64)는 DB에 넣지 않고 서버 메모리에만 잠깐 둔다
 _img_lock = threading.Lock()
 
@@ -39,7 +40,7 @@ _img_lock = threading.Lock()
 def fresh_draft() -> dict:
     return {'goal': '', 'project': None, 'prefs': {'format': '', 'cert': '', 'hours': '', 'weeks': '', 'budget': '', 'etc': ''}, 'detailsOk': False,
             'quiz': None, 'answers': {}, 'deepOn': False, 'deepMcq': {}, 'deepEssay': {}, 'diag': None, 'startStage': None, 'fix': None, 'edit': None, 'handoff': None, 'gen': None, 'chosen': None,
-            'quizFail': None, 'diagFail': None, 'genRun': None, 'doc': None, 'genPrefs': None, 'quizRun': None, 'diagRun': None}
+            'quizFail': None, 'diagFail': None, 'genRun': None, 'doc': None, 'genPrefs': None, 'quizRun': None, 'diagRun': None, 'startMode': None}
 
 
 def today() -> str:
@@ -363,7 +364,13 @@ def create(employee_id: int, body: dict) -> dict:
     return present(w, pid)
 
 
+def _check_start_mode(mode) -> None:
+    if mode is not None and mode not in PL.START_MODES:
+        raise ApiError(422, 'BAD_START_MODE', '새 로드맵의 시작 방식을 다시 골라 주세요')
+
+
 def _apply_client(w: dict, body: dict) -> None:
+    _check_start_mode(body.get('startMode'))
     d = w['draft']
     previous_inputs=input_signature(d)
     previous_chosen=d.get('chosen')
@@ -1064,10 +1071,9 @@ def selection_of(d: dict) -> dict:
 def confirm(employee_id: int, draft_id: str, start_mode: str | None = None) -> dict:
     """개인 로드맵 확정(API-35 · 기관 승인·결재 아님). 고르지 않은 안·버전은 버린다.
     진행 중인 다른 로드맵은 start_mode 대로: together(기본 · 그대로 함께) · after(모두 끝난 다음 주부터 시작) · archive(같은 트랜잭션에서 보관)"""
+    _check_start_mode(start_mode)
     mode = 'together' if start_mode is None else start_mode
-    if mode not in PL.START_MODES:
-        raise ApiError(422, 'BAD_START_MODE', '새 로드맵의 시작 방식을 다시 골라 주세요')
-    active = PL.active_rows(employee_id) if mode != 'together' else []
+    active =PL.active_rows(employee_id) if mode != 'together' else []
     with db.tx() as t:
         r = _row(t, employee_id, draft_id)
         w = _wrap(r['draft_choices'])

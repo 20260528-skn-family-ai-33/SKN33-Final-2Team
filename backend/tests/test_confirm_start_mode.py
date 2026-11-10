@@ -159,6 +159,38 @@ class ConfirmStartModeTests(unittest.TestCase):
                 tx.assert_not_called()
 
 
+class DraftSaveTests(unittest.TestCase):
+    """작성 탭에 들어올 때 고른 시작 방식은 작성 문서에 저장한다"""
+
+    def doc(self):
+        return {'draft': drafts.fresh_draft(), 'draftPlan': {'kept': True}}
+
+    def test_new_draft_has_no_choice_yet(self):
+        self.assertIsNone(drafts.fresh_draft()['startMode'])
+
+    def test_saves_the_choice_without_discarding_later_steps(self):
+        for mode in plans.START_MODES:
+            with self.subTest(mode=mode):
+                w = self.doc()
+                drafts._apply_client(w, {'startMode': mode})
+                self.assertEqual(w['draft']['startMode'], mode)
+                self.assertEqual(w['draftPlan'], {'kept': True})
+
+    def test_empty_choice_is_allowed(self):
+        w = self.doc()
+        drafts._apply_client(w, {'startMode': None})
+        self.assertIsNone(w['draft']['startMode'])
+
+    def test_invalid_choice_is_rejected_before_saving(self):
+        for mode in ('later', '', False, True, 0, 1, [], {}):
+            with self.subTest(mode=mode):
+                w = self.doc()
+                with self.assertRaises(ApiError) as caught:
+                    drafts._apply_client(w, {'goal': '바뀌면 안 됨', 'startMode': mode})
+                self.assertEqual((caught.exception.status, caught.exception.code), (422, 'BAD_START_MODE'))
+                self.assertEqual(w['draft']['goal'], '')
+
+
 class ArchiveRowTests(unittest.TestCase):
     ROW = {'project_id': 'project', 'roadmap_id': RID, 'status': 'IN_PROGRESS'}
 
