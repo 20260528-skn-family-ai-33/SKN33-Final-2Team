@@ -599,6 +599,8 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
         pd = {'from': base, 'to': to, 'key': body.get('key'), 'request': req, 'fromComment': rev.get('fromComment') or False, 'summary': summary, 'notes': out.get('notes') or [],
               'source': d.get('source'), 'prefsFrom': base.get('prefs'), 'prefsTo': ch['raw'], 'handoff': handoff,
               'label': f"{'부서장 코멘트 반영' if rev.get('fromComment') else '수정 요청 반영'}{' · ' + summary if summary else ''}"[:70]}
+        if comment:
+            pd['commentStamp'] = comment['stamp']
         if skill:
             pd['skillComment'] = {'stamp': comment['stamp'], 'targets': [a['id'] for a in targets.values()]}
         # 지원 조건: 자료·자격·기간·비용이 그대로면 이전 버전의 확인 결과, 바뀌었으면 규정 에이전트가 이 버전을 다시 확인(설계서 v1.7 SCR-RM-06)
@@ -794,14 +796,16 @@ def accept_revision(employee_id: int, roadmap_id: str, revision_id: str, selecte
         baseline_row = t.one('SELECT baseline_content FROM public.roadmaps WHERE roadmap_id = :r FOR UPDATE', r=row['roadmap_id']) or {}
         baseline = baseline_row.get('baseline_content') or {}
         scoped = pd.get('skillComment')
-        if scoped:
+        if pd.get('fromComment'):
+            stamp = pd.get('commentStamp') or (scoped or {}).get('stamp')
             source = t.one("""SELECT c.updated_at, m.fit, m.status
                                FROM public.roadmap_comments c LEFT JOIN app_ext.comment_meta m USING (comment_id)
                                WHERE c.comment_id = CAST(:c AS uuid) AND c.roadmap_id = :r FOR UPDATE OF c""",
                            c=pd['fromComment'], r=row['roadmap_id'])
             if (not source or source['fit'] == '__deleted__' or source['status'] == 'applied'
-                    or source['updated_at'].isoformat() != scoped['stamp']):
+                    or not stamp or source['updated_at'].isoformat() != stamp):
                 raise ApiError(409, 'COMMENT_UNAVAILABLE', '코멘트가 변경됐어요. 수정안을 다시 요청해 주세요.')
+        if scoped:
             current = t.val('SELECT content FROM public.roadmaps WHERE roadmap_id = :r', r=row['roadmap_id'])
             if current != pd['from']:
                 raise ApiError(409, 'REVISION_CHANGED', '로드맵이 변경됐어요. 수정안을 다시 요청해 주세요.')
