@@ -6,7 +6,7 @@ import { weekNow } from '@/features/home/ganttCalc';
 import { RoadmapActivityList, RoadmapResources } from '@/features/roadmap/RoadmapLearning';
 import { groupLearningActivities } from '@/features/roadmap/roadmapLearningData';
 import { SkillMap } from '@/features/skillmap/SkillMap';
-import { st } from '@/shared/lib/plan';
+import { st, trackedActs } from '@/shared/lib/plan';
 import { useCatalog } from '@/shared/state/catalog';
 import { useClockRefresh } from '@/shared/state/demoClock';
 import { Stats } from '@/shared/ui/parts';
@@ -21,7 +21,7 @@ export function MemberRoadView({ R }: { R: PlanRecord }) {
   const current =
     R.status === 'active'
       ? groupLearningActivities(pl, resources)
-          .filter((group) => group.activities.some((a) => a.wFrom <= week && week <= a.wTo) && group.activities.some((a) => st(R.progress, a.id) !== 'done'))
+          .filter((group) => group.activities.some((a) => a.wFrom <= week && week <= a.wTo) && trackedActs(group.activities).some((a) => st(R.progress, a.id) !== 'done'))
           .map((group) => group.name)
       : [];
   return (

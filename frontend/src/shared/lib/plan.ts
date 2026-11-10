@@ -92,8 +92,15 @@ export const range = (acts: Activity[]): string => {
 
 /** 활동 진행 상태: 완료가 아니면 진행 중 */
 export const st = (progress: Record<string, Progress> | undefined, id: string): 'done' | 'doing' => (progress?.[id]?.status === 'done' ? 'done' : 'doing');
-export const count = (pl: PlanContent, progress?: Record<string, Progress>) => ({ t: pl.acts.length, done: pl.acts.filter((a) => st(progress, a.id) === 'done').length });
-export const nextAct = (pl: PlanContent, progress?: Record<string, Progress>) => pl.acts.find((a) => st(progress, a.id) !== 'done');
+/** 도서는 참고 자료로만 두어 진행 상태를 기록하지 않는다. 진척 계산과 홈 일정표에서 뺀다 */
+export const isBookResource = (r: Pick<Resource, 'type' | 'kind'> | null | undefined): boolean => r?.type === 'book' || r?.kind === '도서';
+export const isBookActivity = (a: Pick<Activity, 'res'>): boolean => isBookResource(resOf(a.res));
+export const trackedActs = <T extends Pick<Activity, 'res'>>(acts: T[]): T[] => acts.filter((a) => !isBookActivity(a));
+export const count = (pl: PlanContent, progress?: Record<string, Progress>) => {
+  const acts = trackedActs(pl.acts);
+  return { t: acts.length, done: acts.filter((a) => st(progress, a.id) === 'done').length };
+};
+export const nextAct = (pl: PlanContent, progress?: Record<string, Progress>) => trackedActs(pl.acts).find((a) => st(progress, a.id) !== 'done');
 export const curStage = (pl: PlanContent, progress?: Record<string, Progress>) => (nextAct(pl, progress) || pl.acts[pl.acts.length - 1]).stage;
 export const stageActs = (pl: PlanContent, n: number) => pl.acts.filter((a) => a.stage === n);
 export const recProgress = (R: PlanRecord | null | undefined) => (R && R.progress) || {};

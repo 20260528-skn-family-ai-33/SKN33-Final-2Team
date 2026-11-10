@@ -67,8 +67,16 @@ describe('진행 계산', () => {
   it('완료한 활동 수와 다음 활동을 센다', () => {
     const pl = buildPlan(def, { hours: 4 }, '');
     const progress = { a1: { status: 'done' } } as never;
-    expect(count(pl, progress)).toMatchObject({ t: 3, done: 1 });
+    expect(count(pl, progress)).toMatchObject({ t: 2, done: 1 });
     expect(nextAct(pl, progress)?.id).toBe('a2');
+  });
+
+  it('도서는 완료 기록이 있어도 진척률에 넣지 않고 다음 활동으로도 고르지 않는다', () => {
+    const pl = buildPlan(def, { hours: 4 }, '');
+    expect(count(pl, { a3: { status: 'done' } } as never)).toMatchObject({ t: 2, done: 0 });
+    const others = { a1: { status: 'done' }, a2: { status: 'done' } } as never;
+    expect(count(pl, others)).toMatchObject({ t: 2, done: 2 });
+    expect(nextAct(pl, others)).toBeUndefined();
   });
 
   it('주차 범위를 처음~끝으로 쓴다(한 주면 그 주만)', () => {

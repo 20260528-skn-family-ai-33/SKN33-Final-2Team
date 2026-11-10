@@ -8,7 +8,7 @@ import { paths } from '@/app/paths';
 import { SkillMap } from '@/features/skillmap/SkillMap';
 import { RoadmapResources, RoadmapActivityList } from './RoadmapLearning';
 import { useGo } from '@/shared/hooks/useGo';
-import { count, st } from '@/shared/lib/plan';
+import { count, st, trackedActs } from '@/shared/lib/plan';
 import { weekNow } from '@/features/home/ganttCalc';
 import { groupLearningActivities } from './roadmapLearningData';
 import { useCatalog } from '@/shared/state/catalog';
@@ -269,7 +269,7 @@ function RoadView({ R }: { R: PlanRecord }) {
       {pl.def.learningReport ? <ReviewSkillBlocks confirmed materials={pl.def.learningReport as ReviewMaterials}
         acts={pl.acts.filter((act): act is typeof act & { skill: string; how: string; hours: number } => !!act.skill).map(act => ({ ...act, how: act.how || '' }))}
         selectedIds={pl.acts.map(act => act.id)} busy={!live}
-        currentSkillNames={live ? groupLearningActivities(pl, resources).filter(group => group.activities.some(a => a.wFrom <= weekNow(R) && weekNow(R) <= a.wTo) && group.activities.some(a => st(R.progress, a.id) !== 'done')).map(group => group.name) : []}
+        currentSkillNames={live ? groupLearningActivities(pl, resources).filter(group => group.activities.some(a => a.wFrom <= weekNow(R) && weekNow(R) <= a.wTo) && trackedActs(group.activities).some(a => st(R.progress, a.id) !== 'done')).map(group => group.name) : []}
         onOpenResource={(skill, resourceId) => { const activity = pl.acts.find(act => act.skill === skill && act.res === resourceId) || pl.acts.find(act => act.res === resourceId); if (activity) openRecord(R.id, activity.id); }}
         onSubmit={name => { const task = pl.acts.find(act => act.skill === name && !act.res); if (task) openRecord(R.id, task.id); }} /> : <SkillMap pl={pl} /> }
       <div className="sec"><RoadmapActivityList R={R} /></div>
