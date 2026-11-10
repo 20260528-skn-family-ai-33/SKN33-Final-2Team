@@ -1063,7 +1063,7 @@ def selection_of(d: dict) -> dict:
 def confirm(employee_id: int, draft_id: str, start_mode: str | None = None) -> dict:
     """개인 로드맵 확정(API-35 · 기관 승인·결재 아님). 고르지 않은 안·버전은 버린다.
     진행 중인 다른 로드맵은 start_mode 대로: together(기본 · 그대로 함께) · after(모두 끝난 다음 주부터 시작) · archive(같은 트랜잭션에서 보관)"""
-    mode = start_mode or 'together'
+    mode = 'together' if start_mode is None else start_mode
     if mode not in PL.START_MODES:
         raise ApiError(422, 'BAD_START_MODE', '새 로드맵의 시작 방식을 다시 골라 주세요')
     active = PL.active_rows(employee_id) if mode != 'together' else []
@@ -1118,6 +1118,7 @@ def confirm(employee_id: int, draft_id: str, start_mode: str | None = None) -> d
         rid = _round(t, draft_id, d)
         roadmap_id = PL.insert_roadmap(t, draft_id, rid, plan)
         if mode == 'archive':
+            # active 를 읽은 뒤 다른 요청이 마친 로드맵은 archive_row 가 건너뛴다. 새 로드맵 확정은 그대로 진행한다
             for row in active:
                 PL.archive_row(t, row)
         t.run("""UPDATE public.projects SET status = 'IN_PROGRESS', current_stage = 7, draft_choices = :w, updated_at = now() WHERE project_id = CAST(:p AS uuid)""",

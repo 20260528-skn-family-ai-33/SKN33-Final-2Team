@@ -340,18 +340,23 @@ def save_progress(employee_id: int, roadmap_id: str, act_id: str, body: dict) ->
 
 
 # ── 보관·다시 진행 (API-41·42) ──
-def archive_row(t: db.Tx, row: dict) -> None:
-    t.run("UPDATE public.projects SET status = 'ARCHIVED', updated_at = now() WHERE project_id = :p", p=row['project_id'])
+def archive_row(t: db.Tx, row: dict) -> bool:
+    """진행 중일 때만 보관하고 보관했는지 돌려준다. row 를 읽은 뒤 다른 요청이 로드맵을 마쳤으면 완료 상태를 덮어쓰지 않도록 조건부로 갱신한다"""
+    if not t.run("UPDATE public.projects SET status = 'ARCHIVED', updated_at = now() WHERE project_id = :p AND status = 'IN_PROGRESS'", p=row['project_id']):
+        return False
     t.run('UPDATE app_ext.roadmap_meta SET archived_at = now() WHERE roadmap_id = :r', r=row['roadmap_id'])
     t.run("UPDATE app_ext.roadmap_revisions SET status = 'discarded', updated_at = now() WHERE roadmap_id = :r AND status IN ('running', 'ready', 'failed')", r=row['roadmap_id'])
+    return True
 
 
 def archive(employee_id: int, roadmap_id: str) -> dict:
+    not_active = ApiError(409, 'NOT_ACTIVE', '진행 중인 로드맵만 보관할 수 있어요')
     row = _owned(employee_id, roadmap_id)
     if STATUS.get(row['status']) != 'active':
-        raise ApiError(409, 'NOT_ACTIVE', '진행 중인 로드맵만 보관할 수 있어요')
+        raise not_active
     with db.tx() as t:
-        archive_row(t, row)
+        if not archive_row(t, row):
+            raise not_active
     return record(_owned(employee_id, roadmap_id))
 
 

@@ -62,7 +62,7 @@ class NextStartTests(unittest.TestCase):
 
 
 class ConfirmStartModeTests(unittest.TestCase):
-    def confirm(self, mode, active=(), insert_error=None):
+    def confirm(self, mode, active=(), insert_error=None, real_archive=False, on_insert=None):
         option = {'id': 'A2', 'name': 'A2', 'short': 'A2', 'tagline': 'test', 'acts': []}
         w = {'draftPlan': {'exists': True}, 'draft': {'chosen': 'A2', 'gen': {'options': {'A2': option}}, 'handoff': {}, 'goal': 'test',
                                                       'quiz': {'questions': [], 'domain': 'test'}, 'answers': {}, 'prefs': {}}}
@@ -82,8 +82,9 @@ class ConfirmStartModeTests(unittest.TestCase):
             stack.enter_context(patch.object(plans, 'shared_with', return_value={}))
             stack.enter_context(patch.object(NT, 'roadmap_created'))
             self.read_active = stack.enter_context(patch.object(plans, '_base_rows', return_value=list(active)))
-            self.insert = stack.enter_context(patch.object(plans, 'insert_roadmap', return_value=RID, side_effect=insert_error))
-            self.archive = stack.enter_context(patch.object(plans, 'archive_row'))
+            self.insert = stack.enter_context(patch.object(plans, 'insert_roadmap', return_value=RID, side_effect=on_insert or insert_error))
+            if not real_archive:
+                self.archive = stack.enter_context(patch.object(plans, 'archive_row'))
             return drafts.confirm(7, 'draft', mode)
 
     def saved_plan(self):
@@ -124,12 +125,67 @@ class ConfirmStartModeTests(unittest.TestCase):
             self.confirm('archive', [row('2026-11-04', 4)], insert_error=RuntimeError('db'))
         self.archive.assert_not_called()
 
-    def test_unknown_mode_is_rejected_before_writing(self):
-        with patch.object(drafts.db, 'tx') as tx:
+    def test_roadmap_finished_after_the_read_stays_finished(self):
+        """목록을 읽은 뒤 다른 요청이 보고서를 확인해 로드맵을 마친 경우: 완료를 보관으로 덮어쓰지 않고 새 로드맵은 확정한다"""
+        state = {'status': 'IN_PROGRESS'}
+        follow_up = []
+
+        def run(sql, **params):
+            if "SET status = 'ARCHIVED'" in sql:
+                if "AND status = 'IN_PROGRESS'" in sql and state['status'] != 'IN_PROGRESS':
+                    return 0
+                state['status'] = 'ARCHIVED'
+                return 1
+            follow_up.append(sql)
+            return 1
+
+        def finish_elsewhere(*args):
+            self.t.run.side_effect = run
+            state['status'] = 'COMPLETED'
+            return RID
+
+        out = self.confirm('archive', [row('2026-11-04', 4)], real_archive=True, on_insert=finish_elsewhere)
+        self.assertEqual(out['planId'], RID)
+        self.assertEqual(state['status'], 'COMPLETED')
+        self.assertFalse([sql for sql in follow_up if 'archived_at' in sql or 'roadmap_revisions' in sql])
+
+    def test_invalid_mode_is_rejected_before_reading_or_writing(self):
+        for mode in ('later', '', False, True, 0, 1, [], {}, ['after']):
+            with self.subTest(mode=mode), patch.object(drafts.db, 'tx') as tx, patch.object(plans, 'active_rows') as read:
+                with self.assertRaises(ApiError) as caught:
+                    drafts.confirm(7, 'draft', mode)
+                self.assertEqual((caught.exception.status, caught.exception.code), (422, 'BAD_START_MODE'))
+                read.assert_not_called()
+                tx.assert_not_called()
+
+
+class ArchiveRowTests(unittest.TestCase):
+    ROW = {'project_id': 'project', 'roadmap_id': RID, 'status': 'IN_PROGRESS'}
+
+    def test_archives_only_a_roadmap_still_in_progress(self):
+        t = Mock()
+        t.run.return_value = 1
+        self.assertTrue(plans.archive_row(t, self.ROW))
+        statements = [c.args[0] for c in t.run.call_args_list]
+        self.assertIn("AND status = 'IN_PROGRESS'", statements[0])
+        self.assertIn('archived_at', statements[1])
+        self.assertIn('roadmap_revisions', statements[2])
+
+    def test_changes_nothing_else_when_the_status_already_moved(self):
+        t = Mock()
+        t.run.return_value = 0
+        self.assertFalse(plans.archive_row(t, self.ROW))
+        t.run.assert_called_once()
+
+    def test_archive_api_answers_conflict_when_finished_meanwhile(self):
+        t = Mock()
+        t.run.return_value = 0
+        with patch.object(plans.db, 'tx', side_effect=lambda: tx_of(t)), patch.object(plans, '_owned', return_value=self.ROW), \
+                patch.object(plans, 'record') as record:
             with self.assertRaises(ApiError) as caught:
-                drafts.confirm(7, 'draft', 'later')
-        self.assertEqual(caught.exception.status, 422)
-        tx.assert_not_called()
+                plans.archive(7, RID)
+        self.assertEqual((caught.exception.status, caught.exception.code), (409, 'NOT_ACTIVE'))
+        record.assert_not_called()
 
 
 class RouteTests(unittest.TestCase):
@@ -150,10 +206,18 @@ class RouteTests(unittest.TestCase):
             self.assertEqual(self.client.post(self.URL).status_code, 200)
         confirm.assert_called_once_with(7, 'draft', None)
 
-    def test_unknown_mode_answers_422(self):
-        response = self.client.post(self.URL, json={'startMode': 'later'})
-        self.assertEqual(response.status_code, 422)
-        self.assertEqual(response.json()['error']['code'], 'BAD_START_MODE')
+    def test_null_counts_as_omitted(self):
+        with patch.object(work.DR, 'confirm', return_value={'planId': RID}) as confirm:
+            self.assertEqual(self.client.post(self.URL, json={'startMode': None}).status_code, 200)
+        confirm.assert_called_once_with(7, 'draft', None)
+
+    def test_invalid_mode_answers_422(self):
+        for mode in ('later', '', False, 0, [], {}):
+            with self.subTest(mode=mode), patch.object(drafts.db, 'tx') as tx:
+                response = self.client.post(self.URL, json={'startMode': mode})
+                self.assertEqual(response.status_code, 422)
+                self.assertEqual(response.json()['error']['code'], 'BAD_START_MODE')
+                tx.assert_not_called()
 
 
 class AcceptRevisionTests(unittest.TestCase):
