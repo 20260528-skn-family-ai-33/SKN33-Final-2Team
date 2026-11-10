@@ -1,8 +1,9 @@
 /* 좌측 메뉴 (5차 gp-core.js sidebar · aiBox) — 직원 화면 공통 */
 import { newIdToPath, paths } from '@/app/paths';
+import { useState } from 'react';
 import { DemoTools } from '@/features/demo/DemoTools';
 import { useGo } from '@/shared/hooks/useGo';
-import { ai, levelLabel, ping, PROV, resetConn, setChoice, setReasoning, useAi, useAiMode, type UiProvider } from '@/shared/state/ai';
+import { ai, canClearHiddenDemoSettings, clearDemoSettings, levelLabel, ping, PROV, resetConn, setChoice, setReasoning, useAi, useAiMode, type UiProvider } from '@/shared/state/ai';
 import { logoutAndReset } from '@/features/auth/actions';
 import { isSup, meLine, useMe } from '@/shared/state/session';
 import { toast } from '@/shared/state/ui';
@@ -14,6 +15,22 @@ import { Brand, NavLink, SideToggle } from '@/shared/ui/sideParts';
 
 export function AiBox() {
   const { choice } = useAiMode();
+  const showRecovery = useAi(canClearHiddenDemoSettings);
+  const [clearing, setClearing] = useState(false);
+  async function clearSettings() {
+    setClearing(true);
+    try {
+      if (await clearDemoSettings()) {
+        resetConn();
+        toast('가데이터와 실패 시연을 해제했어요');
+        if (ai.live()) void ping();
+      }
+    } catch (err) {
+      failToast(err, '시연 설정을 해제하지 못했어요');
+    } finally {
+      setClearing(false);
+    }
+  }
   // 모델 상태(사용 가능 여부)·추론 정도는 ai.* 로 읽으므로, 바뀌면 다시 그리도록 구독만 한다(연결 확인 결과는 useAiMode 의 conn)
   useAi((s) => s.status);
   useAi((s) => s.settings.reasoning);
@@ -23,7 +40,7 @@ export function AiBox() {
         resetConn();
         toast(
           ai.demoMock()
-            ? `${PROV[p]}로 바꿨어요 · 지금은 시연 도구에서 가데이터로 보는 중이에요`
+            ? `${PROV[p]}로 바꿨어요 · 현재는 가데이터 설정이 적용돼요`
             : ai.available(p)
               ? `${PROV[p]}로 에이전트를 호출해요`
               : `${PROV[p]}를 지금 쓸 수 없어요 · 가데이터로 자동 대체하지 않아요`,
@@ -81,6 +98,9 @@ export function AiBox() {
       {effort('ollama')}
       {opt('api', 'OpenAI API', ai.openaiModel())}
       {effort('api')}
+      {showRecovery && <button type="button" className="btn line sm" disabled={clearing} onClick={() => void clearSettings()}>
+        {clearing ? '해제 중…' : '가데이터·실패 시연 해제'}
+      </button>}
       <div className="aim-st" id="aimSt" aria-live="polite">
         <AimStatus />
       </div>

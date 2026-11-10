@@ -447,7 +447,7 @@ export function OptionsStep() {
             {missing.map((id) => `${D.perspectives[id].name}`).join(', ')}은 생성되지 않았어요. 코스 이름 옆 ‘재생성’으로 해당 코스만 다시 받을 수 있어요. 성공한 코스는 유지됩니다.
           </Note>
         ) : null}
-        {off ? <Note>가데이터 모드에는 RAG 시나리오 후보만 있어요. 다른 목표의 후보는 좌측 ‘AI 모델’에서 RunPod-Ollama나 OpenAI API를 쓰면 확인할 수 있어요.</Note> : null}
+        {off ? <Note>저장된 예시 로드맵과 입력한 목표의 주제가 달라요. 목표에 맞는 안을 받으려면 AI 모델 설정을 확인한 뒤 다시 생성해 주세요.</Note> : null}
       </Page>
     </>
   );

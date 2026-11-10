@@ -6,7 +6,7 @@ import { AdminSide } from '@/features/admin/AdminSide';
 import { AssistantHost } from '@/features/assistant/AssistantHost';
 import { DraftNavGuard } from '@/features/draft/stale';
 import { NotificationBell } from '@/features/notifications/NotificationBell';
-import { connFor, PROV, useAi, useAiMode } from '@/shared/state/ai';
+import { canClearHiddenDemoSettings, connFor, PROV, useAi, useAiMode } from '@/shared/state/ai';
 import { isSup, meOf, useSession } from '@/shared/state/session';
 import { SheetHost, ToastHost } from '@/shared/ui/SheetHost';
 import { Loading } from '@/shared/ui/parts';
@@ -35,6 +35,7 @@ function ModeChip() {
   const acct = useSession((s) => s.account);
   const { mode, choice, checked, conn } = useAiMode();
   const server = useAi((s) => s.status.server);
+  const hiddenDemo = useAi(canClearHiddenDemoSettings);
 
   if (!acct) return <span className="mode" />;
 
@@ -75,7 +76,7 @@ function ModeChip() {
     }
   }
 
-  const label = mode === 'mock' ? '시연용 가데이터' : PROV[choice];
+  const label = mode === 'mock' ? '시연용 가데이터' : hiddenDemo ? '실패 시연 적용 중' : PROV[choice];
 
   return (
     <div className="api-picker" ref={pickerRef}>

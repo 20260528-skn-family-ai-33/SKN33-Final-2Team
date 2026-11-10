@@ -380,11 +380,6 @@ function Confirmed({ R }: { R: PlanRecord }) {
           로드맵 보기
         </button>
       </div>
-      {first && sup ? (
-        <Note>
-          시연: 로그아웃한 뒤 부서장 {sup.name}(사번 {sup.code})으로 로그인하면 이 로드맵에 코멘트를 남길 수 있어요.
-        </Note>
-      ) : null}
     </>
   );
 }
