@@ -232,7 +232,7 @@ def _revision(roadmap_id: str) -> dict | None:
 def record(row: dict, for_mgr: bool = False) -> dict:
     rid = str(row['roadmap_id'])
     plan = dict(row['content'], rid=rid)
-    if STATUS.get(row['status']) == 'active' and (plan.get('def') or {}).get('materialSchedule'):
+    if (plan.get('def') or {}).get('materialSchedule'):
         from .duration_proposals import apply_plan_schedule
         plan = apply_plan_schedule(plan)
     versions = [dict(v['plan'], rid=rid) for v in db.all_('SELECT plan FROM app_ext.roadmap_versions WHERE roadmap_id = :r ORDER BY version', r=row['roadmap_id'])] or [plan]

@@ -20,6 +20,26 @@ def example_plan():
 
 
 class DurationDisplayTests(TestCase):
+    def test_legacy_material_schedule_is_normalized_in_every_roadmap_status(self):
+        from app.services import plans
+
+        source = example_plan()
+        source['def']['materialSchedule'] = [{'skill': 'SQL', 'weeks': 4}]
+        before = deepcopy(source)
+        row = dict(roadmap_id='roadmap', content=source, created_at=None, done_at=None,
+                   archived_at=None, resumed_at=None)
+        with patch.object(plans.db, 'all_', return_value=[]), patch.object(plans, '_comments', return_value=[]), \
+             patch.object(plans.catalog, 'refresh_book_links', side_effect=lambda books: books), \
+             patch.object(plans.catalog, 'refresh_course_levels', side_effect=lambda courses: courses):
+            records = [plans.record(dict(row, status=status), for_mgr=True)
+                       for status in ('IN_PROGRESS', 'ARCHIVED', 'COMPLETED', 'IN_PROGRESS')]
+        self.assertEqual([record['status'] for record in records], ['active', 'archived', 'done', 'active'])
+        normalized = records[0]['plan']
+        self.assertNotEqual(normalized['weeks'], before['weeks'])
+        for record in records[1:]:
+            self.assertEqual(record['plan'], normalized)
+        self.assertEqual(source, before)
+
     def test_other_resources_are_not_tasks_and_shared_ids_count_once(self):
         source = example_plan()
         source['acts'] += [dict(id=name, skill='SQL', res='cert', task=True, hours=10)
