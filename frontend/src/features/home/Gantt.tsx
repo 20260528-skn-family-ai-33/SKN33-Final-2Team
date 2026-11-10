@@ -17,7 +17,7 @@ import { useClockRefresh, useDemoDay } from '@/shared/state/demoClock';
 import { useGo } from '@/shared/hooks/useGo';
 import { count, isBookResource, st } from '@/shared/lib/plan';
 import { Icon } from '@/shared/ui/Icon';
-import { addDays, axisAll, colsOne, dailyCols, confirmDay, dayGap, gtPos, md, planStart, planWeeks, weekNow, type GtCol } from './ganttCalc';
+import { addDays, axisAll, colsOne, dailyCols, dayGap, gtPos, md, planStart, planWeeks, weekNow, type GtCol } from './ganttCalc';
 
 import './ganttInteraction.css';
 
@@ -482,7 +482,7 @@ export function GanttOne({ R }: { R: PlanRecord }) {
       cols={colsOne(R)}
       days={dailyCols(base, 7 * n)}
       rows={<Stages R={R} off={0} T={7 * n} up={[]} onToggle={toggle} />}
-      note={`1주차는 시작일(${md(confirmDay(R))})부터 ${md(addDays(base, 6))}까지예요. 150% 이상 확대하면 하루 단위로 보여요.`}
+      note={`1주차는 시작일(${md(base)})부터 ${md(addDays(base, 6))}까지예요. 150% 이상 확대하면 하루 단위로 보여요.`}
     />
   );
 }
@@ -498,7 +498,7 @@ export function GanttAll({ list }: { list: PlanRecord[] }) {
     const off = dayGap(axis, starts[i]);
     const w = planWeeks(pl);
     const wk = weekNow(R);
-    const at = `${wk <= w ? `지금 ${wk}주차 / ` : ''}전체 ${w}주`;
+    const at = `${wk < 1 ? `${md(starts[i])} 시작 / ` : wk <= w ? `지금 ${wk}주차 / ` : ''}전체 ${w}주`;
     return (
       <div className="gt-roadmap-group" key={R.id}>
         <Row

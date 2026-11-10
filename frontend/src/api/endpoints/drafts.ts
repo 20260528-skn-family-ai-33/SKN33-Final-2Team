@@ -1,7 +1,7 @@
 /* 새 로드맵 작성 (API-14~35) — 오래 걸리는 작업(문항·진단·기획서 요약)은 202 {jobId} 로 바로 돌려받고, 화면은 작성 문서를 다시 읽어 진행을 본다 */
 import { enc, fileForm, http } from '../client';
 import type { JobStarted } from '../types/common';
-import type { DraftResponse, RegenRequest } from '../types/draft';
+import type { DraftResponse, RegenRequest, StartMode } from '../types/draft';
 
 const a = { async: true } as const;
 
@@ -27,5 +27,6 @@ export const draftsApi = {
   /** perspective 가 null 이면 세 안 모두 다시 확인 */
   supportRetry: (id: string, perspective: string | null) => http.post<DraftResponse>(`/drafts/${enc(id)}/options/support/retry`, { perspective }),
   select: (id: string, perspective: string, displayed?: { course: string; optionId: string; promptVersionId: string }[]) => http.post<DraftResponse>(`/drafts/${enc(id)}/selection`, { perspective, displayed }),
-  confirm: (id: string) => http.post<{ planId: string }>(`/drafts/${enc(id)}/confirm`),
+  /** startMode 는 진행 중인 로드맵이 있을 때만 보낸다. 없으면 서버는 together 로 본다 */
+  confirm: (id: string, startMode?: StartMode) => http.post<{ planId: string }>(`/drafts/${enc(id)}/confirm`, startMode ? { startMode } : undefined),
 };

@@ -13,11 +13,21 @@ export const today0 = (now: Date = clockNow()): Date => new Date(now.getFullYear
 export const addDays = (d: Date, n: number): Date => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 export const dayGap = (a: Date, b: Date): number => Math.round((b.getTime() - a.getTime()) / DAY);
 export const md = (d: Date): string => `${d.getMonth() + 1}/${d.getDate()}`;
+export const monthDay = (d: Date): string => `${d.getMonth() + 1}월 ${d.getDate()}일`;
 export const monday = (d: Date): Date => addDays(d, -((d.getDay() + 6) % 7));
 export const confirmDay = (R: Pick<PlanRecord, 'createdAt' | 'plan'>, now?: Date): Date => ymd(R.createdAt) || ymd(R.plan.confirmedAt) || today0(now);
-export const planStart = (R: Pick<PlanRecord, 'createdAt' | 'plan'>, now?: Date): Date => confirmDay(R, now);
+/** 1주차 첫날. 끝난 다음 주로 미룬 로드맵만 startDate 가 있고, 나머지는 확정한 날이다 */
+export const planStart = (R: Pick<PlanRecord, 'createdAt' | 'plan'>, now?: Date): Date => ymd(R.plan.startDate) || confirmDay(R, now);
 export const planWeeks = (pl: PlanContent): number => Math.max(1, pl.weeks || 0, ...pl.acts.map((a) => a.wTo));
+/** 시작일 전이면 1보다 작다. 화면에 주차로 보일 때는 startsLater 로 먼저 가른다 */
 export const weekNow = (R: Pick<PlanRecord, 'createdAt' | 'plan'>, now?: Date): number => Math.floor(dayGap(planStart(R, now), today0(now)) / 7) + 1;
+export const startsLater = (R: Pick<PlanRecord, 'createdAt' | 'plan'>, now?: Date): boolean => planStart(R, now) > today0(now);
+/** 로드맵들이 모두 끝난 다음 주의 첫날. 이미 끝났으면 오늘이다(서버 plans.next_start 와 같은 규칙) */
+export const followingStart = (list: Pick<PlanRecord, 'createdAt' | 'plan'>[], now?: Date): Date =>
+  list.reduce((latest, R) => {
+    const next = addDays(planStart(R, now), 7 * planWeeks(R.plan));
+    return next > latest ? next : latest;
+  }, today0(now));
 
 /** 막대 위치: 축 첫날부터 from~to 일(to 는 포함하지 않음). 막대 사이에 2px 틈을 둔다 */
 export const gtPos = (from: number, to: number, T: number) => ({ left: `calc(${(from / T) * 100}% + 1px)`, width: `calc(${((to - from) / T) * 100}% - 2px)` });

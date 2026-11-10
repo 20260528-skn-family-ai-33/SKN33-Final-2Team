@@ -197,8 +197,8 @@ def api_selection(draft_id: str, body: dict, a: Account = Depends(require_employ
 
 
 @r.post('/drafts/{draft_id}/confirm')
-def api_confirm(draft_id: str, a: Account = Depends(require_employee)):
-    return DR.confirm(a.id, draft_id)
+def api_confirm(draft_id: str, body: dict | None = None, a: Account = Depends(require_employee)):
+    return DR.confirm(a.id, draft_id, (body or {}).get('startMode'))
 
 
 # ── 내 로드맵 (API-36~47) ──

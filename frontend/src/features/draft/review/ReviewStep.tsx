@@ -2,7 +2,8 @@ import { useRef, useState } from 'react';
 import { DeliverableSelection, type DeliverableSelectionHandle } from './DeliverableSelection';
 import { trackName } from '@/shared/constants/data';
 /* 6. 검토·확정 (5차 scr['new-review'] · P.confirm)
-   확정(API-35): 새 로드맵 기록. 진행 중인 다른 로드맵은 보관하지 않고 함께 진행한다(10/14 · 묻지 않음) */
+   확정(API-35): 새 로드맵 기록. 진행 중인 로드맵이 있으면 시작 방식을 먼저 묻는다(startModeSheet) */
+import type { StartMode } from '@/api/types/draft';
 import { paths } from '@/app/paths';
 import { SkillMap } from '@/features/skillmap/SkillMap';
 import { useGo } from '@/shared/hooks/useGo';
@@ -11,6 +12,7 @@ import { Icon } from '@/shared/ui/Icon';
 import { Page, Stats } from '@/shared/ui/parts';
 import { StagesView } from '@/shared/ui/StagesView';
 import { confirmReview } from './confirmReview';
+import { chooseStartMode } from './startModeSheet';
 import { useKickSupport } from '../generation/GenerationStep';
 import { SupCell, SupNote } from '../options/support';
 import { Stepper } from '../Stepper';
@@ -33,15 +35,18 @@ export function ReviewStep() {
   const g = useWs((s) => s.draft.gen);
   useDraftWatch();
   useKickSupport();
-  async function submit() {
-    if (busy || submitting || (assessment && !ready)) return;
+  async function confirm(startMode?: StartMode) {
     setSubmitting(true);
-    try { await confirmReview(go, assessment ? () => deliverables.current?.save() || Promise.resolve(false) : undefined); }
+    try { await confirmReview(go, assessment ? () => deliverables.current?.save() || Promise.resolve(false) : undefined, startMode); }
     finally { setSubmitting(false); }
+  }
+  function submit() {
+    if (busy || submitting || (assessment && !ready)) return;
+    chooseStartMode((startMode) => void confirm(startMode));
   }
   if (!pl) return <><Stepper cur="review" busy={submitting} /><Page title="이 로드맵으로 확정할까요?" foot={<>
     <button className="btn line" disabled={submitting} onClick={() => go(paths.newOptions)}>이전: 로드맵·자료 선택</button>
-    <button className="btn pri" disabled={busy || submitting || !ready} onClick={() => void submit()}>확정하기</button>
+    <button className="btn pri" disabled={busy || submitting || !ready} onClick={submit}>확정하기</button>
   </>}>
     {assessment && (reviewPlan ? <Stats pl={reviewPlan} bare periodLabel="자료 학습 예상 기간" /> : <p role="status">{reviewError ? '검토 시간을 계산하지 못했어요. 아래에서 다시 불러와 주세요.' : '검토할 자료와 선택한 과제 시간을 계산 중…'}</p>)}
     {assessment ? <DeliverableSelection ref={deliverables} onReadyChange={setReady} onBusyChange={setBusy} onPlanChange={setReview} /> : <p role="status">최종 검토 결과를 불러오는 중…</p>}
@@ -59,7 +64,7 @@ export function ReviewStep() {
               <Icon name="left" />
               이전: 로드맵·자료 선택
             </button>
-            <button className="btn pri" disabled={busy || submitting || (assessment && !ready)} onClick={() => void submit()}>
+            <button className="btn pri" disabled={busy || submitting || (assessment && !ready)} onClick={submit}>
               확정하기
             </button>
           </>

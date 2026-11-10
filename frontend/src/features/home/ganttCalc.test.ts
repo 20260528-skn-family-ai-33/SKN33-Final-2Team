@@ -1,7 +1,7 @@
 /* 홈 로드맵 일정 간트: 실제 시작일부터 7일씩 주차를 센다 */
 import { describe, expect, it } from 'vitest';
 import type { PlanContent, PlanRecord } from '@/api/types/plan';
-import { axisAll, colsOne, dailyCols, md, monday, planStart, planWeeks, weekNow } from './ganttCalc';
+import { axisAll, colsOne, dailyCols, followingStart, md, monday, planStart, planWeeks, startsLater, weekNow } from './ganttCalc';
 
 const rec = (createdAt: string, weeks: number): PlanRecord => ({ createdAt, plan: { weeks, acts: [] } as unknown as PlanContent }) as PlanRecord;
 // 2026-10-26 은 월요일
@@ -49,6 +49,28 @@ it('일 단위 칸은 월 경계와 오늘 표시를 정확하게 만든다', ()
   expect(days.map(day => day.sub)).toEqual([29,30,31,1,2,3,4]);
   expect(days[3]).toEqual({top:'11월',sub:1,on:true,weekStart:false});
   expect(md(planStart(rec('2026-10-29T12:30:00',2)))).toBe('10/29');
+});
+
+const scheduled = (createdAt: string, startDate: string, weeks: number) => ({ createdAt, plan: { weeks, acts: [], startDate } as unknown as PlanContent }) as PlanRecord;
+
+it('끝난 다음 주로 미룬 로드맵은 정해 둔 시작일부터 주차를 센다', () => {
+  const record = scheduled('2026-10-26', '2026-11-09', 2);
+  expect(md(planStart(record))).toBe('11/9');
+  expect(startsLater(record, new Date(2026, 10, 8))).toBe(true);
+  expect(weekNow(record, new Date(2026, 10, 8))).toBeLessThan(1);
+  expect(startsLater(record, new Date(2026, 10, 9))).toBe(false);
+  expect(weekNow(record, new Date(2026, 10, 9))).toBe(1);
+});
+it('시작 전 로드맵은 일정표에 이번 주 칸이 없다', () => {
+  expect(colsOne(scheduled('2026-10-26', '2026-11-09', 2), NOW).some((col) => col.on)).toBe(false);
+});
+it('끝난 다음 주는 마지막 주차 다음 날이고, 여럿이면 가장 늦게 끝나는 로드맵을 따른다', () => {
+  expect(md(followingStart([rec('2026-10-21', 4)], NOW))).toBe('11/18');
+  expect(md(followingStart([rec('2026-10-21', 4), rec('2026-10-26', 5)], NOW))).toBe('11/30');
+  expect(md(followingStart([rec('2026-10-21', 2), scheduled('2026-10-21', '2026-11-04', 2)], NOW))).toBe('11/18');
+});
+it('진행 중인 로드맵의 기간이 이미 지났으면 오늘을 넘겨 준다', () => {
+  expect(md(followingStart([rec('2026-09-01', 2)], NOW))).toBe('10/26');
 });
 
 it('일 단위에서도 7일마다 주 시작 경계를 유지한다', () => {
