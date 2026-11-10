@@ -13,6 +13,7 @@ import { failToast } from '@/shared/lib/fail';
 import { count } from '@/shared/lib/plan';
 import { useState } from 'react';
 import { weekNow } from './ganttCalc';
+import { useClockRefresh } from '@/shared/state/demoClock';
 import { useMe } from '@/shared/state/session';
 import { toast } from '@/shared/state/ui';
 import { draftActive, recs, updateWs, useWs, ws } from '@/shared/state/workspace';
@@ -80,6 +81,7 @@ function PostCta({ R }: { R: PlanRecord }) {
 function StageCard({ R }: { R: PlanRecord }) {
   const pl = R.plan;
   const [expanded, setExpanded] = useState(false);
+  useClockRefresh();
   const week = weekNow(R);
   const resources = useCatalog(s => s.res);
   const shared = sharedCourses(pl.acts, resources);

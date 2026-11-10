@@ -12,6 +12,7 @@ import { openRecord } from '@/features/roadmap/RecordSheet';
 import { ActRow } from '@/features/roadmap/parts';
 import { openSheet } from '@/shared/state/ui';
 import { useCatalog } from '@/shared/state/catalog';
+import { useClockRefresh, useDemoDay } from '@/shared/state/demoClock';
 import { useGo } from '@/shared/hooks/useGo';
 import { count, st } from '@/shared/lib/plan';
 import { Icon } from '@/shared/ui/Icon';
@@ -363,14 +364,16 @@ function Card({ title, link, heads, cols, days, rows, note, cls }: { title: Reac
     changeZoom(Math.min(1, timelineSize.available / timelineSize.base));
     element.scrollLeft = 0;
   };
-  /* 일정이 칸보다 넓어 옆으로 밀리면 이번 주 칸이 이름 칸 바로 옆(한 칸 띄움)에 오게 맞춘다 */
+  /* 일정이 칸보다 넓어 옆으로 밀리면 이번 주 칸이 이름 칸 바로 옆(한 칸 띄움)에 오게 맞춘다.
+     시연 기준 날짜를 옮기면 지금 표시 중인 칸(주·일 단위)을 다시 따라간다. 시연이 아니면 첫 표시 때만 맞춘다 */
+  const demoDay = useDemoDay();
   useEffect(() => {
     const sc = scroll.current;
     const on = sc?.querySelector<HTMLElement>('.gt-h .on');
     if (!sc || !on || sc.scrollWidth <= sc.clientWidth) return;
     const l = sc.querySelector<HTMLElement>('.gt-h .gt-l');
     sc.scrollLeft += on.getBoundingClientRect().left - sc.getBoundingClientRect().left - (l?.offsetWidth || 0) - on.offsetWidth;
-  }, []);
+  }, [demoDay]);
   return (
     <div className="card gt-card">
       <div className="sec-h">
@@ -461,6 +464,7 @@ function useFold() {
 }
 
 export function GanttOne({ R }: { R: PlanRecord }) {
+  useClockRefresh();
   const go = useGo();
   const toggle = useFold();
   const pl = R.plan;
@@ -485,6 +489,7 @@ export function GanttOne({ R }: { R: PlanRecord }) {
 }
 
 export function GanttAll({ list }: { list: PlanRecord[] }) {
+  useClockRefresh();
   const go = useGo();
   const toggle = useFold();
   const { axis, starts, T, cols } = axisAll(list);

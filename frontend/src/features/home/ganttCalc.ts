@@ -1,5 +1,6 @@
 /* 일정 주차는 로드맵을 처음 시작한 날짜부터 7일씩 계산한다. */
 import type { PlanContent, PlanRecord } from '@/api/types/plan';
+import { clockNow } from '@/shared/state/demoClock';
 
 const DAY = 864e5;
 export const ymd = (s: string | null | undefined): Date | null => {
@@ -8,7 +9,7 @@ export const ymd = (s: string | null | undefined): Date | null => {
     .map(Number);
   return y ? new Date(y, m - 1, d) : null;
 };
-export const today0 = (now: Date = new Date()): Date => new Date(now.getFullYear(), now.getMonth(), now.getDate());
+export const today0 = (now: Date = clockNow()): Date => new Date(now.getFullYear(), now.getMonth(), now.getDate());
 export const addDays = (d: Date, n: number): Date => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 export const dayGap = (a: Date, b: Date): number => Math.round((b.getTime() - a.getTime()) / DAY);
 export const md = (d: Date): string => `${d.getMonth() + 1}/${d.getDate()}`;

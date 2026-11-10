@@ -4,6 +4,7 @@ import { useGo } from '@/shared/hooks/useGo';
 import { actMeta, range, st } from '@/shared/lib/plan';
 import { activityTime } from '@/shared/lib/resourceTime';
 import { useCatalog } from '@/shared/state/catalog';
+import { useClockRefresh } from '@/shared/state/demoClock';
 import { useMe } from '@/shared/state/session';
 import { ActThumb, Stt } from '@/shared/ui/parts';
 import { ActRow } from './parts';
@@ -56,6 +57,7 @@ export function RoadmapResources({ R, owned }: { R: PlanRecord; owned?: string[]
 
 /** readOnly: 부서장이 보는 직원 로드맵(#96) — 진행 중이어도 실행 기록을 열지 않고 상태만 보여 준다 */
 export function RoadmapActivityList({ R, readOnly = false }: { R: PlanRecord; readOnly?: boolean }) {
+  useClockRefresh();
   const week = weekNow(R);
   const due = (activity: PlanRecord['plan']['acts'][number]) => R.status === 'active' && activity.wFrom <= week && week <= activity.wTo && st(R.progress, activity.id) !== 'done';
   const resources = useCatalog(state => state.res);
