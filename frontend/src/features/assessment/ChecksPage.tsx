@@ -8,7 +8,7 @@ import {
   postStart,
 } from '@/features/roadmap/parts';
 import { useGo } from '@/shared/hooks/useGo';
-import { count } from '@/shared/lib/plan';
+import { count, isPlanComplete } from '@/shared/lib/plan';
 import { useMe } from '@/shared/state/session';
 import { recs, useWs } from '@/shared/state/workspace';
 import { Icon } from '@/shared/ui/Icon';
@@ -21,10 +21,7 @@ function recordRank(R: PlanRecord): number {
   if (R.status === 'active') return 0;
   if (R.status === 'archived') return 1;
 
-  const activity = count(R.plan, R.progress);
-  const completed = activity.t > 0 && activity.done === activity.t;
-
-  return completed ? 3 : 2;
+  return isPlanComplete(R.plan, R.progress) ? 3 : 2;
 }
 export function ChecksPage() {
   const go = useGo();
@@ -105,13 +102,14 @@ export function ChecksPage() {
             const linkedReports = reports.filter((report) => report.planId === R.id);
             const hasPostAnswers = Object.values(R.post.answers || {}).some(Boolean);
             const activity = count(R.plan, R.progress);
-            const ratio = activity.t > 0 ? activity.done / activity.t : 0;
+            const complete = isPlanComplete(R.plan, R.progress);
+            const ratio = complete ? 1 : activity.done / (activity.t || 1);
             const percent = Math.round(ratio * 100);
             const hue = Math.max(0, Math.min(120, ratio * 120));
             const statusText = R.status === 'archived'
               ? '보관'
               : R.status === 'done'
-                ? activity.t > 0 && activity.done === activity.t ? '완료' : '조기 종료'
+                ? complete ? '완료' : '조기 종료'
                 : '진행 중';
             return (
               <section className="check-plan-group" key={R.id}>

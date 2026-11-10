@@ -28,6 +28,8 @@
 
 새 계획에는 공유 강좌·도서의 `resourceWindow: {from,to}`, `durationBasis: materials-only`, `totalHUnknown`·`totalHEstimated`가 포함될 수 있다. `totalH`도 같은 강좌·도서 ID는 한 번만 더하지만 활동 ID·소속 스킬은 유지한다. 자료 기간에는 과제 소요 주차가 포함되지 않으며 과제 시간은 `totalH`에 남는다. 기존 확정 계획은 일괄 변경하지 않으며 도서 완료 상태를 함께 갱신하는 변경도 포함하지 않는다.
 
+도서 활동에는 진행 상태를 표시·기록하지 않는다. 로드맵 목록의 `done`·`total`, 보고서의 `doneTitles`·`restTitles`·`executionSnapshot`은 도서를 빼고 계산하며 주차 배정과 메모는 유지한다.
+
 ### 스킬별 자료 추천 — `/api/v2/drafts/{id}/recommendations`
 
 조회·생성 응답의 `recommendations.skills[]`에 스킬별 강좌와 도서가 들어간다. 최종 추천 도서는 스킬당 0~3권이며, 0권이면 `books`와 `selectedBooks`가 빈 배열이다. 자료 선택 화면은 저장된 `choices`를 우선한다.

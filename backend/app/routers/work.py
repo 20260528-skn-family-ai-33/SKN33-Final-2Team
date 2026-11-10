@@ -208,7 +208,7 @@ def api_plans(status: str = '', detail: int = 0, a: Account = Depends(require_em
     if detail:
         return {'plans': recs, 'res': PL.resources_of(recs), 'reg': PL.reg_of(recs)}
     return [{'planId': k, 'goal': v['plan']['goal'], 'perspective': v['plan']['opt'], 'version': v['plan']['version'], 'status': v['status'],
-             'done': sum(1 for x in v['plan']['acts'] if (v['progress'].get(x['id']) or {}).get('status') == 'done'), 'total': len(v['plan']['acts']),
+             'done': sum(1 for x in PL.tracked_acts(v['plan']) if (v['progress'].get(x['id']) or {}).get('status') == 'done'), 'total': len(PL.tracked_acts(v['plan'])),
              'newComments': sum(1 for c in v['comments'] if c['status'] == 'new'), 'weeks': v['plan']['weeks'], 'weeklyHours': v['plan']['hours'],
              'doneAt': v['doneAt'], 'archivedAt': v['archivedAt']} for k, v in recs.items()]
 

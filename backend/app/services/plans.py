@@ -34,6 +34,19 @@ def today() -> str:
     return date.today().isoformat()
 
 
+def _is_book(resource: dict | None) -> bool:
+    return bool(resource) and (resource.get('type') == 'book' or resource.get('kind') == '도서')
+
+
+def tracked_acts(plan: dict) -> list[dict]:
+    """완료 여부를 세는 활동. 도서는 진행 상태를 기록하지 않는 참고 자료라 뺀다."""
+    acts = plan['acts']
+    if not any(a.get('res') for a in acts):
+        return acts  # 과제만 있으면 자료 목록을 읽지 않는다
+    items = catalog.items()
+    return [a for a in acts if not _is_book(items.get(a.get('res') or ''))]
+
+
 def _d(v) -> str | None:
     return v.strftime('%Y-%m-%d') if v else None
 
@@ -703,9 +716,10 @@ def report_start(employee_id: int, roadmap_id: str) -> str:
     items = [{'id': q['id'], 'area': q['area'], 'text': q['text'], 'skill': DG.skill_label(q.get('skill') or ''), 'pre': A['answers'].get(q['id']), 'post': post['answers'][q['id']]} for q in A['questions']]
     prog = rec['progress']
     from .report_snapshot import capture,evidence
-    execution_snapshot=capture(pl,prog)
-    done = [a for a in pl['acts'] if (prog.get(a['id']) or {}).get('status') == 'done']
-    rest = [a for a in pl['acts'] if (prog.get(a['id']) or {}).get('status') != 'done']
+    tracked = tracked_acts(pl)
+    execution_snapshot=capture(dict(pl,acts=tracked),prog)
+    done = [a for a in tracked if (prog.get(a['id']) or {}).get('status') == 'done']
+    rest = [a for a in tracked if (prog.get(a['id']) or {}).get('status') != 'done']
     goal_self = D['goalSelf'][int(post['goalSelf']) - 1] if post['goalSelf'] else ''
     deep_inp = _report_deep(row, A)
     with db.tx() as t:
@@ -717,7 +731,7 @@ def report_start(employee_id: int, roadmap_id: str) -> str:
     def work(job: jobs.JobCtx):
         ctx = rt.context(employee_id)
         inp = {'goal': pl['goal'], 'planName': course_name(pl['opt'], pl['name']), 'opt': pl['opt'], 'domain': A.get('domain'), 'items': items, 'doneTitles': [a['title'] for a in done],
-               'restTitles': [a['title'] for a in rest], 'total': len(pl['acts']), 'goalSelf': goal_self}
+               'restTitles': [a['title'] for a in rest], 'total': len(tracked), 'goalSelf': goal_self}
         inp['executionEvidence']=evidence(execution_snapshot)
         if quiz_evidence:inp['quizEvidence']=quiz_evidence
         if deep_inp:
@@ -776,7 +790,7 @@ def confirm_report(employee_id: int, report_id: str) -> dict:
             from .report_snapshot import matches
             progress={str(item['activity_id']):{'status':item['status'],'memo':item.get('memo') or '', 'file':item.get('attachment')}
                 for item in t.all('SELECT activity_id,status,memo,attachment FROM app_ext.activity_progress WHERE roadmap_id = :r FOR UPDATE',r=r['roadmap_id'])}
-            if not matches(snapshot,r['content'],progress):
+            if not matches(snapshot,dict(r['content'],acts=tracked_acts(r['content'])),progress):
                 raise ApiError(409,'REPORT_STALE','보고서 작성 후 실행 기록이 바뀌었어요. 최신 기록으로 보고서를 다시 만든 뒤 종료해 주세요.')
         t.run('INSERT INTO app_ext.report_meta(report_id, confirmed, confirmed_at) VALUES(:i, true, now()) ON CONFLICT (report_id) DO UPDATE SET confirmed = true, confirmed_at = now()',
               i=r['report_id'])
