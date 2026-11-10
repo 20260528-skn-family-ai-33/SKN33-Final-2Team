@@ -47,7 +47,7 @@ _topics = (
     ('보안|탐지', r'침입\s*탐지|탐지\s*규칙|공격\s*트래픽', r'침입\s*탐지|suricata|snort|\bids\b', r'규칙|경보|패킷|오탐|트래픽|분석'),
     ('MLOps', r'추론\s*API|모델.{0,8}(?:서빙|배포)|mlflow', r'mlflow|모델.{0,12}(?:배포|서빙|레지스트리)|model serving', r'버전|배포|엔드포인트|추론|로그|모니터링|rollback'),
     ('PyTorch|TensorFlow', r'전이\s*학습|미세\s*조정|사전학습', r'전이\s*학습|미세\s*조정|파인\s*튜닝|transfer learning|fine.tun|torchvision', r'학습|동결|백본|분류|헤드|가중치|train'),
-    ('NLP|자연어', r'토큰|서브워드|어휘집', r'토큰화|토크나이저|서브워드|tokeniz|wordpiece|\bbpe\b', r'문장|분절|문자|길이|토큰|어휘'),
+    ('NLP|자연어', r'토큰화|토크나이저|서브워드|어휘집|tokeniz|wordpiece|\bbpe\b|토큰.{0,8}(?:분절|분할|나누|분리)', r'토큰화|토크나이저|서브워드|tokeniz|wordpiece|\bbpe\b', r'문장|분절|문자|길이|토큰|어휘'),
     ('네트워크 프로토콜', r'패킷|핸드셰이크|재전송', r'\btcp\b|tcpdump|wireshark|와이어샤크', r'캡처|패킷|재전송|연결|흐름|handshake'),
     ('Kubernetes', r'롤링|롤백|롤아웃|deployment', r'쿠버네티스|kubernetes|\bk8s\b|\baks\b|디플로이먼트|deployment|rollout', r'롤링|롤아웃|롤백|워크로드.{0,10}배포|리소스\s*배포|이미지\s*배포|애플리케이션.{0,12}배포|서비스.{0,12}배포|배포\s*매니페스트|deploy'),
     ('POSIX', r'프로세스\s*간\s*통신|\bipc\b', r'\b(?:posix|ipc)\b|프로세스\s*간\s*통신', r'파이프|공유\s*메모리|큐|세마포어|소켓|pipe|fifo|shm'),
@@ -77,6 +77,31 @@ _topics = (
 )
 TOPICS = tuple(tuple(re.compile(expr, re.I | re.ASCII) for expr in row) for row in _topics)
 
+# 사전점검의 해당 스킬 과업에서 찾을 수 있는 근거. 한 차시가 직접 다루는 작업을 구분한다.
+_tasks = (
+    (r'NLP|자연어', r'(?=.*(?:응답|답변|LLM|언어\s*모델))(?=.*(?:품질|근거성|거절|환각|정답|평가))',
+     ((r'LLM|언어\s*모델|응답|답변|\bRAG\b|RAGAS|faithfulness|groundedness|BLEU|ROUGE|BERTScore',
+       r'(?:LLM|언어\s*모델|응답|답변|RAG).{0,14}(?:평가|판정)|(?:정답|의미).{0,8}(?:비교|일치)|LLM.as.a.judge|\b(?:BLEU|ROUGE|BERTScore)\b'),
+      (r'환각|근거|충실도|faithfulness|groundedness|RAGAS|거절|무응답',
+       r'faithfulness|groundedness|(?:환각|충실도|근거성|거절|무응답).{0,12}(?:측정|평가|판정|지표|검증|임곗값)'))),
+    (r'EDA|탐색적', r'(?=.*(?:예측|체크포인트|반복\s*측정|지연|latency))(?=.*(?:지표|구간|표본|집단|그룹|비교))',
+     ((r'모델|예측|평가|성능', r'(?:모델|예측|성능|평가).{0,9}(?:성능\s*향상|평가\s*지표|성능\s*평가|평가\s*방법|평가와|평가하기|오차\s*분석)|분류\s*지표'),
+      (r'그룹|구간|반복\s*측정|표본|분포|groupby|groupkfold', r'그룹별\s*(?:집계|비교|기준선)|구간별\s*(?:분포|비교|집계)|반복\s*측정|소표본|groupby|groupkfold'))),
+    (r'ETL|파이프라인', r'(?=.*(?:측정값|평가\s*결과|요청.{0,4}응답|이벤트|로그))(?=.*(?:집계|적재|대사|데이터\s*흐름))',
+     ((r'원천|마트|스테이징|데이터|레코드|파이프라인|적재|이벤트|로그',
+       r'행\s*수.{0,14}(?:대조|검증|비교)|무결성\s*검사|중복\s*레코드|집계\s*SQL|일자별\s*대사|누락\s*검증|멱등|워터마크'),
+      (r'이벤트|로그|측정값|메트릭|telemetry|스트리밍', r'(?:로그|이벤트|측정값|메트릭)\s*(?:데이터|레코드|스트림)?\s*(?:를|을|의|별)?\s*(?:수집|적재|집계|처리)|로그\s*스트리밍|스트리밍\s*데이터.{0,8}(?:처리|집계)|(?:적재|집계).{0,10}(?:접근 로그|이벤트 데이터)'))),
+)
+TASKS = tuple((re.compile(skill, re.I), re.compile(intent, re.I),
+               tuple((re.compile(subject, re.I), re.compile(action, re.I)) for subject, action in facets))
+              for skill, intent, facets in _tasks)
+
+
+@lru_cache(maxsize=512)
+def task_topics(name, application):
+    return tuple(facet for skill, intent, facets in TASKS if skill.search(name) and intent.search(application)
+                 for facet in facets)
+
 
 @lru_cache(maxsize=512)
 def requested(name, context):
@@ -86,6 +111,8 @@ def requested(name, context):
 
 def lesson_score(topics, title, unit):
     """주제와 작업이 함께 확인된 차시를 찾는다. 제목의 주제만으로는 점수를 주지 않는다."""
+    if re.match(r'^\s*(?:Q\s*[.:]|질문\s*[:：])', unit, re.I):
+        return 0
     count = sum(bool(action.search(unit) and (subject.search(unit) or subject.search(title)))
                 for subject, action in topics)
     return 0 if not count else 3 * count + bool(_practice.search(unit)) + bool(_lab.search(unit))

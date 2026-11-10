@@ -239,9 +239,14 @@ def course_selection(project: dict, selection: dict, course: dict | None) -> dic
     return {'skills': skills}
 
 
+def _task_topics(skill):
+    from app.services import course_focus
+    return course_focus.task_topics(skill['name'], skill.get('stageApplication') or _skill_context(skill))
+
+
 def requested_topics(skill):
     from app.services import course_focus
-    return course_focus.requested(skill['name'], _skill_context(skill))
+    return course_focus.requested(skill['name'], _skill_context(skill)) + _task_topics(skill)
 
 
 def focus_priority(info, name):
@@ -483,9 +488,11 @@ def _profile(skill: dict, project: dict, rows: list, descriptions: list[str], te
             taught = _core_stack_names([value for value in practice
                                         if not _concept.search(value) or _practice.search(value)])
             missing = sorted(set(missing) - (separate_stacks & taught))
+    task = _task_topics(skill)
     conceptual = [value for value in learning if _concept.search(value) or _design.search(value)
                   or _foundations.search(value) or _security.search(value)
-                  or _discussion.search(value) or _question.search(value)]
+                  or _discussion.search(value) or _question.search(value)
+                  or (task and value in focused_units)]
     gap = 0 if applied else 1 if conceptual else 2 if supported else 3
     result = {'requiredStage': stage, 'evidenceLevel': ('applied' if applied and stage != 'conceptual'
             else 'conceptual' if applied or conceptual else 'mention' if supported else 'missing'),
@@ -706,9 +713,14 @@ def outline(item: dict, project: dict, selection: dict, skill: dict, course=None
     remaining = [row for row in info['rows'] if score(row) > 0]
     ordered, covered, covered_facets = [], set(), set()
     # 실제 적용 단원이 있는데 소개 발췌만 보여 모델이 근거를 재확인하지 못하는 경우를 피한다.
-    grounded = [row for row in remaining if row[0] in stage_units]
+    from app.services.course_focus import lesson_score
+    task = _task_topics(skill)
+    def task_score(row):
+        return lesson_score(task, info['title'], row[2]) if task else 0
+    task_rows = [row for row in remaining if task_score(row)]
+    grounded = task_rows or [row for row in remaining if row[0] in stage_units]
     if grounded:
-        chosen = max(grounded, key=lambda row: (score(row), -row[0]))
+        chosen = max(grounded, key=lambda row: (task_score(row), score(row), -row[0]))
         ordered.append(chosen)
         covered.update(i for i, term in enumerate(local) if term.search(chosen[2]))
         covered_facets.update(facets.get(chosen[0], ()))
@@ -741,8 +753,11 @@ def description_excerpt(info: dict, project: dict, skill: dict, course=None) -> 
     challenge = (course.get('id') if isinstance(course, dict) else course) == 'A3'
     async_target = bool(re.search(_async_io, _skill_context(skill), re.I))
     dbt_targets = _dbt_targets(skill)
+    from app.services.course_focus import lesson_score
+    task = _task_topics(skill)
     lines = sorted(dict.fromkeys(info['descriptions']), key=lambda line: (
         -len(_dbt_facets({}, line, dbt_targets)),
+        -lesson_score(task, info['title'], line.casefold()) if task else 0,
         -bool(async_target and _async_context.search(line)),
         -evidence.matches(line.casefold(), local),
         -bool(challenge and _depth_evidence(line) and evidence.matches(line.casefold(), local + terms)),

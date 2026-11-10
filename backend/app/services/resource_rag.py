@@ -13,7 +13,7 @@ from app.services import book_candidates, course_focus, resource_evidence
 
 MODEL = embeddings.BGE_MODEL
 DIMENSIONS = embeddings.BGE_DIMENSIONS
-VERSION = 'resource-pgvector-rag/v31-skill-scope'
+VERSION = 'resource-pgvector-rag/v32-skill-task-candidates'
 PER_KIND = 6
 COURSE_REVIEW = 20
 FIELDS = ('id','title','provider','cost','hours','estimated','image','url','skills','content','curriculum')
@@ -91,7 +91,9 @@ def retrieve(project, selection, items, course=None, *, embed=None, search=None)
     for i in active:
         if all_pools[i]['courses']:
             spec = shared['skills'][i]
+            common_application = (selection.get('commonApplications') or {}).get(spec['name'])
             queries[i, 'courses'] = json.dumps({'goal': project.get('goal'), 'skill': spec['name'],
+                                                **({'application': common_application} if common_application else {}),
                                                 'desiredCompetencies': project.get('desiredCompetencies'),
                                                 'projectSummary': project.get('projectSummary')},
                                                ensure_ascii=False, sort_keys=True)

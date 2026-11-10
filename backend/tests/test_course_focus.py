@@ -4,7 +4,7 @@ from unittest.mock import Mock
 from app import course_levels
 
 from app.agents.resource_recommendations import recommend_resources
-from app.services import resource_rag as rag
+from app.services import resource_evidence, resource_rag as rag
 
 
 class InputCaptured(Exception):
@@ -14,6 +14,52 @@ class InputCaptured(Exception):
 class CourseFocusTests(unittest.TestCase):
     name = '컴퓨터 비전(CV) 모델링'
     target = '차선 영상을 세그멘테이션하고 픽셀 마스크를 생성한다'
+
+    def test_nlp_evaluation_handoff_uses_skill_intent_and_not_inference_token_budget(self):
+        name = '자연어 처리(NLP) & LLM 기초'
+        application = 'LLM 답변의 근거성과 정답 일치를 평가한다'
+        project = {'goal': 'LLM 운영 지표를 설계한다', 'projectSummary': '입력 최대 6,144토큰, 출력 최대 512토큰'}
+        spec = {'name': name, 'application': '코스에서 생성한 개별 예시'}
+        selection = {'skills': [spec], 'commonApplications': {name: application}}
+        for track, level in [('A1','BEGINNER'), ('A2','INTERMEDIATE'), ('A3','ADVANCED')]:
+            units = {'eval':['토큰화 소개', 'RAGAS faithfulness 지표로 답변의 근거성을 평가하는 실습'],
+                     'token':['토크나이저로 문장을 서브워드 토큰으로 분절하는 실습'],
+                     'qa':['Q. RAG 평가 방법은 무엇인가요?']}
+            items = {k: dict(id=k, type='course', usable=True, title=k, provider='기관', skills=[name], cost=0,
+                             difficulty=level, hours=1, curriculum={'items':[{'title':u} for u in lessons]})
+                     for k, lessons in units.items()}
+            embed = Mock(return_value=[[1.] * rag.DIMENSIONS])
+            def search(kind, ids, vector, limit, free):
+                return [dict(resource_id=k, similarity=.8, current_cost=0) for k in ids]
+            option = {'id':track, 'learningSkills':[spec]}
+            pools,_ = rag.retrieve(project,selection,items,option,embed=embed,search=search)
+            self.assertIn(application, embed.call_args.args[0][0])
+            self.assertNotIn('코스에서 생성한 개별 예시', embed.call_args.args[0][0])
+            model = Mock(return_value={'skills':[{'name':name,'courses':[],'books':[]}]})
+            recommend_resources(project,selection,items,model,course=option,retrieved_pools=pools)
+            cards = model.call_args.args[1]['skills'][0]['courses']
+            self.assertEqual([c['title'] for c in cards], ['eval'])
+            self.assertEqual(cards[0]['outline'][0]['title'], units['eval'][1])
+        from app.services import course_focus
+        self.assertTrue(course_focus.requested(name, '한국어 토큰화와 문장 분절을 실습한다'))
+
+    def test_task_evidence_for_metrics_and_event_pipeline(self):
+        cases = [
+            ('탐색적 데이터 분석(EDA) & 전처리', '모델 예측 지표를 구간별 비교한다',
+             '판다스 그룹별 집계 실습', '기초 통계: 결측치 대체 실습'),
+            ('ETL & 데이터 파이프라인', '이벤트 측정값 집계와 원천·적재 결과를 검증한다',
+             '원천과 마트의 행 수를 대조하는 실습', 'LLM 채팅 응답 스트리밍 구현'),
+        ]
+        for name, goal, good, bad in cases:
+            project = {'goal':goal}
+            spec = {'name':name,'application':goal}
+            option = {'id':'A3','learningSkills':[spec]}
+            common = resource_evidence.course_selection(project,{'skills':[spec]},option)
+            for title, expected in ((good,True),(bad,False)):
+                item = dict(id='one',type='course',usable=True,title=name,skills=[name],cost=0,difficulty='ADVANCED',
+                            curriculum={'items':[{'title':title}]})
+                info=resource_evidence.facts(item,project,common)
+                self.assertEqual(resource_evidence.course_applicable(info,common['skills'][0]),expected,(name,title))
 
     def test_reviewed_level_follows_the_course_across_skill_tags(self):
         levels = ['ADVANCED', 'UPPER_INTERMEDIATE', 'INTERMEDIATE', 'BEGINNER']
