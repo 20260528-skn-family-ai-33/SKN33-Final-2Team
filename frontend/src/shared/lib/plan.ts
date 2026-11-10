@@ -100,6 +100,11 @@ export const count = (pl: PlanContent, progress?: Record<string, Progress>) => {
   const acts = trackedActs(pl.acts);
   return { t: acts.length, done: acts.filter((a) => st(progress, a.id) === 'done').length };
 };
+/** 계획한 활동을 모두 마쳤는지. 도서만 있으면 남은 활동이 없어 마친 것으로 본다(보고서의 조기 종료 판정과 같은 기준) */
+export const isPlanComplete = (pl: PlanContent, progress?: Record<string, Progress>): boolean => {
+  const c = count(pl, progress);
+  return pl.acts.length > 0 && c.done === c.t;
+};
 export const nextAct = (pl: PlanContent, progress?: Record<string, Progress>) => trackedActs(pl.acts).find((a) => st(progress, a.id) !== 'done');
 export const curStage = (pl: PlanContent, progress?: Record<string, Progress>) => (nextAct(pl, progress) || pl.acts[pl.acts.length - 1]).stage;
 export const stageActs = (pl: PlanContent, n: number) => pl.acts.filter((a) => a.stage === n);

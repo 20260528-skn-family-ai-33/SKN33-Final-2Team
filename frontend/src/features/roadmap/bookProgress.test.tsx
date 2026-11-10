@@ -3,16 +3,24 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import type { Activity, PlanRecord } from '@/api/types/plan';
+import { ChecksPage } from '@/features/assessment/ChecksPage';
 import { GanttAll } from '@/features/home/Gantt';
 import { mergeRes } from '@/shared/state/catalog';
+import { useWs } from '@/shared/state/workspace';
 import { ActRow } from './parts';
 import { RoadmapActivityList } from './RoadmapLearning';
+import { RoadmapList } from './RoadmapPages';
 
-// 서버 렌더링에서 zustand 훅은 초기 상태를 읽으므로, 합쳐 둔 자료 목록을 읽도록 바꾼다
+// 서버 렌더링에서 zustand 훅은 초기 상태를 읽으므로, 테스트가 넣어 둔 상태를 읽도록 바꾼다
 vi.mock('@/shared/state/catalog', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/shared/state/catalog')>();
   const read = (selector: Parameters<typeof actual.useCatalog>[0]) => selector(actual.useCatalog.getState());
   return { ...actual, useCatalog: Object.assign(read, actual.useCatalog) };
+});
+vi.mock('@/shared/state/workspace', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/shared/state/workspace')>();
+  const read = (selector: Parameters<typeof actual.useWs>[0]) => selector(actual.useWs.getState());
+  return { ...actual, useWs: Object.assign(read, actual.useWs) };
 });
 
 const act = (id: string, skill: string, res: string | null, wFrom: number, wTo: number, title: string) =>
@@ -24,6 +32,7 @@ const record = (acts: Activity[], progress: PlanRecord['progress'] = {}, status:
     status,
     createdAt: '2026-10-26',
     progress,
+    post: { answers: {} },
     plan: {
       goal: '목표',
       opt: 'A1',
@@ -31,6 +40,7 @@ const record = (acts: Activity[], progress: PlanRecord['progress'] = {}, status:
       version: 1,
       weeks: 5,
       hours: 4,
+      cost: 0,
       acts,
       def: {
         learningSkills: [{ name: 'SQL' }, { name: '독서' }],
@@ -76,6 +86,30 @@ describe('홈 일정표의 도서', () => {
 
   it('도서만 있는 로드맵도 진행 막대를 숫자로 계산한다', () => {
     expect(inRouter(<GanttAll list={[record([bookOnly])]} />)).not.toContain('NaN');
+  });
+});
+
+describe('마친 로드맵의 완료·조기 종료 표시', () => {
+  const cases: [string, PlanRecord, string, string][] = [
+    ['도서만 있으면 남은 활동이 없어 완료', record([bookOnly], { 'book-only': { status: 'done' } }, 'done'), '완료', '100%'],
+    ['도서 기록이 없어도 도서만 있으면 완료', record([bookOnly], {}, 'done'), '완료', '100%'],
+    ['강좌를 마치면 완료', record([course], { course: { status: 'done' } }, 'done'), '완료', '100%'],
+    ['강좌가 남으면 조기 종료', record([course, book], { book: { status: 'done' } }, 'done'), '조기 종료', '0%'],
+    ['활동이 하나도 없으면 조기 종료', record([], {}, 'done'), '조기 종료', '0%'],
+  ];
+  const render = (R: PlanRecord, page: React.ReactNode) => {
+    useWs.setState({ plans: { [R.id]: R }, reports: [] });
+    return inRouter(page);
+  };
+
+  it.each(cases)('내 로드맵: %s', (_name, R, label) => {
+    expect(render(R, <RoadmapList />)).toContain(`<span class="roadmap-info-badge">${label}</span>`);
+  });
+
+  it.each(cases)('점검·보고서: %s', (_name, R, label, percent) => {
+    const html = render(R, <ChecksPage />);
+    expect(html).toContain(`<span class="roadmap-info-badge">${label}</span>`);
+    expect(html).toMatch(new RegExp(`class="check-plan-percent"[^>]*>${percent}<`));
   });
 });
 

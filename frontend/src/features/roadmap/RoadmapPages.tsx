@@ -8,7 +8,7 @@ import { paths } from '@/app/paths';
 import { SkillMap } from '@/features/skillmap/SkillMap';
 import { RoadmapResources, RoadmapActivityList } from './RoadmapLearning';
 import { useGo } from '@/shared/hooks/useGo';
-import { count, st, trackedActs } from '@/shared/lib/plan';
+import { count, isPlanComplete, st, trackedActs } from '@/shared/lib/plan';
 import { weekNow } from '@/features/home/ganttCalc';
 import { groupLearningActivities } from './roadmapLearningData';
 import { useCatalog } from '@/shared/state/catalog';
@@ -33,7 +33,7 @@ function RoadLi({ R }: { R: PlanRecord }) {
 
   const statusText =
   R.status === 'done'
-    ? c.t > 0 && c.done === c.t ? '완료' : '조기 종료'
+    ? isPlanComplete(pl, R.progress) ? '완료' : '조기 종료'
     : R.status === 'archived'
       ? '보관'
       : '진행 중';

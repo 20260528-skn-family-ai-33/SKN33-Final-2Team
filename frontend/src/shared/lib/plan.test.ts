@@ -2,7 +2,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { OptionDef } from '@/api/types/draft';
 import { mergeRes } from '@/shared/state/catalog';
-import { buildPlan, count, nextAct, range } from './plan';
+import { buildPlan, count, isPlanComplete, nextAct, range } from './plan';
 
 const def: OptionDef = {
   id: 'A1',
@@ -77,6 +77,14 @@ describe('진행 계산', () => {
     const others = { a1: { status: 'done' }, a2: { status: 'done' } } as never;
     expect(count(pl, others)).toMatchObject({ t: 2, done: 2 });
     expect(nextAct(pl, others)).toBeUndefined();
+  });
+
+  it('도서를 뺀 활동을 모두 마치면 완료로 보고, 활동이 아예 없으면 완료로 보지 않는다', () => {
+    const pl = buildPlan(def, { hours: 4 }, '');
+    expect(isPlanComplete(pl, { a1: { status: 'done' } } as never)).toBe(false);
+    expect(isPlanComplete(pl, { a1: { status: 'done' }, a2: { status: 'done' } } as never)).toBe(true);
+    expect(isPlanComplete({ ...pl, acts: pl.acts.filter((a) => a.id === 'a3') })).toBe(true);
+    expect(isPlanComplete({ ...pl, acts: [] })).toBe(false);
   });
 
   it('주차 범위를 처음~끝으로 쓴다(한 주면 그 주만)', () => {
