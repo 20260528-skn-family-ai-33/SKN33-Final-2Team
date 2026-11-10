@@ -15,8 +15,9 @@ import { CmItem, CmTag, cmMine } from '@/features/roadmap/comments';
 import { D } from '@/shared/constants/data';
 import { useGo } from '@/shared/hooks/useGo';
 import { failToast } from '@/shared/lib/fail';
+import { canUseDemo } from '@/shared/lib/demoAccess';
 import { count } from '@/shared/lib/plan';
-import { cause } from '@/shared/state/ai';
+import { cause, useAi } from '@/shared/state/ai';
 import { setAt, useAt } from '@/shared/state/bind';
 import { meLine, useMe } from '@/shared/state/session';
 import { toast } from '@/shared/state/ui';
@@ -394,6 +395,7 @@ function MgrCmItem({ uid, pid, c, live }: { uid: string; pid: string; c: Comment
 }
 
 export function MemberRoadPage() {
+  const demoTools = useAi(s => canUseDemo(s.status.demoMode));
   const go = useGo();
   const refresh = useRefreshTeam();
   const { pid = '' } = useParams();
@@ -469,7 +471,7 @@ export function MemberRoadPage() {
         <div className="sec">
           <div className="sec-h">
             <h2 className="st">{cs.length ? '새 코멘트' : '계획 조정 의견'}</h2>
-            <button
+            {demoTools && <button
               className="link quiet"
               onClick={() => {
                 const c = D.commentSample;
@@ -477,7 +479,7 @@ export function MemberRoadPage() {
               }}
             >
               시연용 예시 문장
-            </button>
+            </button>}
           </div>
           <div className="card">
             <CommentFields k={key} />
@@ -539,9 +541,6 @@ export function CommentSentPage() {
           소속 직원 계획으로
         </button>
       </div>
-      <Note>
-        시연: 로그아웃한 뒤 {e.name}(사번 {e.code})으로 로그인하면 받은 코멘트를 볼 수 있어요.
-      </Note>
     </>
   );
 }

@@ -79,6 +79,8 @@
 
 시연 설정 저장은 서버가 성공 응답을 보낸 뒤에만 화면에 반영합니다. 가데이터·실패 시연 저장은 같은 큐에서 요청하고, 실패 시 기존값을 유지합니다. 이전 로그인 회차의 응답은 버리며 시연 응답으로 제공자·추론값을 덮지 않습니다.
 
+서버 ON·프런트 OFF에서 직원이 AI 모델 메뉴의 해제를 누르면 기존 `PUT /me/demo-settings`에 `demoMock: false`와 지원하는 모든 `failSim` 항목의 `false`를 한 번에 보냅니다. 버튼은 적용 중인 시연 설정이 있을 때만 표시합니다.
+
 `GET /ai/providers`의 `providers[].models`는 `{default, roadmap, regulation, embed, vision}`이에요. `default`는 진단 에이전트, `roadmap`은 로드맵 에이전트, `regulation`은 규정 에이전트(사내 생활 도우미 답변·안별 지원 조건 확인), `vision`은 기획서 이미지 읽기 모델이에요. `regulation`이 없는 옛 응답이면 화면은 `default`를 써요. `GET /ai/status?provider=ollama`의 `models[]`는 `{role, name, installed, loaded, think}`이고(`think`는 아래 추론 정도 · 진단·로드맵 모델만), `default` 다음에는 `default`와 이름이 다른 `roadmap`·`regulation`만 들어가요(같은 이름이면 Ollama에 한 번만 올라가서) (#33).
 
 추론 정도 요청은 `{ "provider": "ollama" | "openai", "level": "<단계 이름>" | null }`이고 그 모드의 값만 바꿔(다른 모드 값은 그대로 · 동시에 저장해도 사라지지 않음) 모드별로 저장한 전체 `{reasoning: {ollama?, openai?}}`를 돌려준다. 화면은 저장을 하나씩 차례로 보내고 마지막 선택의 응답만 화면에 맞춘다. `null`은 그 모드를 서버 기본값으로 되돌린다. 단계 이름은 소문자·숫자·`_`·`-` 20자 이내만 받고 `true`·`false` 같은 값은 받지 않는다(`422 / BAD_REASONING`). OpenAI는 서버의 단계 목록 밖이면 같은 오류다. 고를 수 있는 단계는 이렇게 온다.

@@ -4,6 +4,7 @@
 import { create } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
 import { ApiError } from '@/api/client';
+import { canUseDemo } from '@/shared/lib/demoAccess';
 import { aiApi, demoApi, type ModelState, type ProviderInfo, type ThinkLevels } from '@/api/endpoints/account';
 import type { FailSim, ServerProvider, UserSettings } from '@/api/types/account';
 import type { StoredCause } from '@/api/types/common';
@@ -101,6 +102,12 @@ export const useAiMode = (): { mode: Mode; choice: UiProvider; demo: boolean; ch
 
 export const DOC_CHARS = 6000;
 export const SIM_KINDS = ['goal', 'doc', 'quiz', 'diag', 'gen', 'sup', 'report', 'reg', 'rev'];
+
+/** 서버에서 적용 중인 시연 설정을 끌 도구가 이 화면 빌드에 없을 때만 복구를 제공한다. */
+export function canClearHiddenDemoSettings({ status, settings }: AiState): boolean {
+  return status.demoMode === true && !canUseDemo(status.demoMode)
+    && (settings.demoMock || SIM_KINDS.some(kind => settings.failSim[kind]));
+}
 
 let statusRequest = 0;
 export async function checkStatus(): Promise<void> {
@@ -200,6 +207,10 @@ export function setDemoMock(on: boolean): Promise<boolean> {
 
 export function setFailSim(k: string, on: boolean): Promise<boolean> {
   return saveDemoSettings({ failSim: { [k]: on } });
+}
+
+export function clearDemoSettings(): Promise<boolean> {
+  return saveDemoSettings({ demoMock: false, failSim: Object.fromEntries(SIM_KINDS.map(kind => [kind, false])) });
 }
 
 /* ── 연결 상태 (좌측 'AI 모델'·진단 에이전트 창 상단) ── */

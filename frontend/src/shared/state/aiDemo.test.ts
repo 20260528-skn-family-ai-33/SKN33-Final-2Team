@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/api/client';
 import { demoApi } from '@/api/endpoints/account';
 import type { UserSettings } from '@/api/types/account';
-import { ai, applySettings, setDemoMock, setFailSim, useAi } from './ai';
+import { ai, applySettings, canClearHiddenDemoSettings, clearDemoSettings, setDemoMock, setFailSim, SIM_KINDS, useAi } from './ai';
 
 const session = vi.hoisted(() => ({ seq: 0 }));
 vi.mock('@/shared/state/session', () => ({ signInSeq: () => session.seq }));
@@ -27,7 +27,35 @@ beforeEach(() => {
     } },
   });
 });
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
+
+describe('시연 도구가 없는 빌드에서 설정 해제', () => {
+  it.each([
+    ['off', true, true, false, true],
+    ['off', true, false, true, true],
+    ['off', true, false, false, false],
+    ['on', true, true, true, false],
+    ['off', false, true, true, false],
+    ['on', false, true, true, false],
+    ['off', undefined, true, true, false],
+  ] as const)('화면 %s · 서버 %s · 가데이터 %s · 실패 시연 %s → 해제 버튼 %s', (build, server, mock, fail, visible) => {
+    vi.stubEnv('VITE_DEMO_TOOLS', build);
+    const state = useAi.getState();
+    expect(canClearHiddenDemoSettings({ ...state, status: { ...state.status, demoMode: server },
+      settings: settings({ demoMock: mock, failSim: { goal: fail } }) })).toBe(visible);
+  });
+  it('해제 실패 시 저장값을 유지하고 재시도 한 번으로 모든 실패 시연과 가데이터를 끈다', async () => {
+    const previous = settings({ demoMock: true, failSim: { goal: true, doc: true } });
+    applySettings(previous);
+    const error = disabled();
+    const save = vi.spyOn(demoApi, 'settings').mockRejectedValueOnce(error).mockResolvedValueOnce(settings());
+    await expect(clearDemoSettings()).rejects.toBe(error);
+    expect(useAi.getState().settings).toEqual(previous);
+    expect(await clearDemoSettings()).toBe(true);
+    expect(save).toHaveBeenLastCalledWith({ demoMock: false, failSim: Object.fromEntries(SIM_KINDS.map(k => [k, false])) });
+    expect(useAi.getState().settings).toEqual(settings());
+  });
+});
 
 describe('시연 설정은 서버에 저장된 뒤 표시한다', () => {
   it('가데이터 저장 응답 전에는 실제 모델 표시를 유지하고 성공 뒤에만 바꾼다', async () => {
