@@ -138,7 +138,7 @@ describe('작업·코멘트 알림 (#96)', () => {
   it('작업마다 결과를 보거나 다시 시도할 화면으로 간다', () => {
     expect(notificationTarget(job('options'))).toBe('/new/options');
     expect(notificationTarget(job('regenerate', 'failed'))).toBe('/new/options');
-    expect(notificationTarget(job('materials'))).toBe('/new/materials');
+    expect(notificationTarget(job('materials'))).toBe('/new/options');
     expect(notificationTarget(job('revision', 'done', 'p1'))).toBe('/roadmaps/p1/revise');
     expect(notificationTarget(job('report', 'failed', 'p1'))).toBe('/roadmaps/p1/post');
   });
@@ -163,15 +163,15 @@ describe('작업·코멘트 알림 (#96)', () => {
 
   it('지금 보는 화면을 가리키는 읽지 않은 본인·직원 알림만 고른다', () => {
     const items = [job('options'), job('materials'), n({ kind: 'job', jobKind: 'options', jobStatus: 'done', read: true, id: 'old' }), n({ audience: 'head', employee: { id: '4', name: '오직원' } })];
-    expect(viewedNow(items, '/new/options', 'd1').map((x) => x.jobKind)).toEqual(['options']);
+    expect(viewedNow(items, '/new/options', 'd1').map((x) => x.jobKind)).toEqual(['options', 'materials']); // 학습 자료도 이 화면에서 본다
     expect(viewedNow(items, '/team/4/plans/p1', 'd1')).toEqual([]); // 부서장 알림은 기록이 화면에 보일 때 따로 처리한다
     expect(viewedNow(items, '/roadmaps', 'd1')).toEqual([]);
   });
 
   it('다른 문서의 작업 알림은 같은 주소를 보고 있어도 읽음 대상이 아니다 (PR #139 리뷰)', () => {
-    expect(viewedNow([job('materials')], '/new/materials', 'd2')).toEqual([]);
-    expect(viewedNow([job('materials')], '/new/materials', null)).toEqual([]);
-    expect(viewedNow([job('materials')], '/new/materials', 'd1')).toHaveLength(1);
+    expect(viewedNow([job('materials')], '/new/options', 'd2')).toEqual([]);
+    expect(viewedNow([job('materials')], '/new/options', null)).toEqual([]);
+    expect(viewedNow([job('materials')], '/new/options', 'd1')).toHaveLength(1);
   });
 
   it('로드맵 확정 전 작업 알림만 문서를 구분한다', () => {

@@ -3,9 +3,8 @@ import type { AppNotification, NotificationJobKind } from '@/api/types/notificat
 import { paths } from '@/app/paths';
 import { trackName } from '@/shared/constants/data';
 
-/** 작업 알림을 누르면 갈 곳(결과를 보거나 다시 시도하는 화면) */
+/** 작업 알림을 누르면 갈 곳(결과를 보거나 다시 시도하는 화면). 3안·다시 만든 안·학습 자료는 모두 '로드맵·자료 선택' 화면에서 본다 */
 function jobTarget(kind: NotificationJobKind | null, planId: string): string {
-  if (kind === 'materials') return paths.newMaterials;
   if (kind === 'revision') return paths.revise(planId);
   if (kind === 'report') return paths.post(planId);
   return paths.newOptions;

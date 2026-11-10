@@ -1,6 +1,6 @@
 /* 앱 틀 (5차 gp-core.js boot·render) — 상단 띠 · 좌측 메뉴 · 본문. 화면마다 정한 메뉴 강조·제목·폭(handle)을 읽어 그린다 */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Navigate, Outlet, useLocation, useMatches } from 'react-router';
+import { Navigate, Outlet, useMatches } from 'react-router';
 import { paths } from '@/app/paths';
 import { AdminSide } from '@/features/admin/AdminSide';
 import { AssistantHost } from '@/features/assistant/AssistantHost';
@@ -8,7 +8,6 @@ import { DraftNavGuard } from '@/features/draft/stale';
 import { NotificationBell } from '@/features/notifications/NotificationBell';
 import { connFor, PROV, useAi, useAiMode } from '@/shared/state/ai';
 import { isSup, meOf, useSession } from '@/shared/state/session';
-import { updateWs } from '@/shared/state/workspace';
 import { SheetHost, ToastHost } from '@/shared/ui/SheetHost';
 import { Loading } from '@/shared/ui/parts';
 import { AppVersion } from '@/shared/ui/AppVersion';
@@ -122,7 +121,6 @@ export function AppShell() {
   const booted = useSession((s) => s.booted);
   const acct = useSession((s) => s.account);
   const h = useHandle();
-  const loc = useLocation();
   const admin = acct?.accountType === 'admin';
 
   useEffect(() => {
@@ -132,10 +130,6 @@ export function AppShell() {
   useEffect(() => {
     document.title = 'GrowPath · ' + (acct ? h.title || '' : '로그인');
   }, [acct, h.title]);
-  /* 다시 로그인하면 마지막으로 보던 화면으로(직원별 브라우저 저장) */
-  useEffect(() => {
-    if (acct?.accountType === 'employee' && loc.pathname !== paths.login) updateWs((s) => void (s.lastRoute = loc.pathname));
-  }, [acct, loc.pathname]);
 
   let body: ReactNode;
   let width = h.width || '';

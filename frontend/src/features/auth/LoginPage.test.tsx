@@ -5,12 +5,11 @@ import { LoginPage } from './LoginPage';
 const state = vi.hoisted(() => ({ demo: { accounts: [] as Array<{ code: string; name: string; dept: string }> } }));
 vi.mock('@/shared/state/session', () => ({
   useSession: (selector: (s: typeof state) => unknown) => selector(state),
-  isSup: vi.fn(), me: vi.fn(), setAccount: vi.fn(),
+  me: vi.fn(), setAccount: vi.fn(),
 }));
 vi.mock('@/shared/hooks/useGo', () => ({ useGo: () => vi.fn() }));
 vi.mock('@/shared/state/ai', () => ({ ai: {}, cause: vi.fn(), ping: vi.fn() }));
 vi.mock('@/shared/state/ui', () => ({ toast: vi.fn() }));
-vi.mock('@/shared/state/workspace', () => ({ ws: vi.fn() }));
 
 describe('로그인 베타 직원 목록', () => {
   it('베타 직원 선택이 꺼져도 사번 직접 입력과 비밀번호 안내를 제공한다', () => {

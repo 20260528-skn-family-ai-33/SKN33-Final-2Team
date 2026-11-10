@@ -20,7 +20,7 @@ export const STEPS: [StepKey, string, string][] = [
 ];
 
 /** 단계 표시에 따로 없는 하위 화면은 속한 단계로 보여 준다 */
-export const SUB: Record<string, StepKey> = { [paths.newMaterials]: 'options', [paths.newResultEdit]: 'result', [paths.newGen]: 'options' };
+export const SUB: Record<string, StepKey> = { [paths.newResultEdit]: 'result', [paths.newGen]: 'options' };
 export const stepOfPath = (p: string): StepKey | undefined => STEPS.find((x) => x[2] === p)?.[0] || SUB[p];
 
 /* ── 검사 ── */

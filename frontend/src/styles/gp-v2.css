@@ -695,7 +695,7 @@ a.me .me-go { width: 16px; height: 16px; flex: none; color: var(--ink-4); }
 .sm-key .k-cov { border: 2.5px solid var(--accent); }
 .sm-key .k-e { width: 18px; height: 0; border-radius: 0; border-top: 2px solid var(--accent); }
 .sm-key .k-n { width: 8px; height: 8px; background: var(--ink-4); }
-.sm-wrap { overflow: auto; max-height: 78vh; background: radial-gradient(circle at 1px 1px, #ECECE7 1px, transparent 0) 0 0 / 22px 22px #fff; }
+.sm-wrap { overflow-x: auto; background: radial-gradient(circle at 1px 1px, #ECECE7 1px, transparent 0) 0 0 / 22px 22px #fff; }
 .sm-svg { display: block; margin: 0 auto; -webkit-user-select: none; user-select: none; }
 .sm-e { stroke: #CFCFC8; stroke-width: 1.4; }
 .sm-e.on { stroke: var(--accent); stroke-width: 2.4; }
@@ -710,7 +710,23 @@ a.me .me-go { width: 16px; height: 16px; flex: none; color: var(--ink-4); }
 .sm-n.cov .ring { fill: none; stroke: var(--accent); stroke-width: 3.6; }
 .sm-n .tag rect { fill: var(--accent); }
 .sm-n .tag text { fill: #fff; font-size: 10px; font-weight: 700; stroke: none; }
+/* 내 스킬 지도(누적): 점 위에 메달 뱃지(브론즈·실버·골드)를 얹고, 뱃지 스킬에서 이어진 화살표(지나온 길)를 강조한다 */
+.sm-card { --m-bronze: #CD8B52; --m-bronze-dk: #8A4F1D; --m-silver: #C9CED6; --m-silver-dk: #6F7884; --m-gold: #F4C534; --m-gold-dk: #9A6C00; }
+.sm-n .medal .coin { stroke-width: 1.6; }
+.sm-n .medal .rim { fill: none; stroke: rgba(255, 255, 255, .7); stroke-width: 1.1; }
+.sm-n .medal.bronze .coin { fill: var(--m-bronze); stroke: var(--m-bronze-dk); }
+.sm-n .medal.bronze .star { fill: var(--m-bronze-dk); }
+.sm-n .medal.silver .coin { fill: var(--m-silver); stroke: var(--m-silver-dk); }
+.sm-n .medal.silver .star { fill: var(--m-silver-dk); }
+.sm-n .medal.gold .coin { fill: var(--m-gold); stroke: var(--m-gold-dk); }
+.sm-n .medal.gold .star { fill: var(--m-gold-dk); }
+.sm-e.trail { stroke: var(--accent); stroke-width: 2.4; }
+.sm-key .k-bronze { background: var(--m-bronze); border: 1.5px solid var(--m-bronze-dk); }
+.sm-key .k-silver { background: var(--m-silver); border: 1.5px solid var(--m-silver-dk); }
+.sm-key .k-gold { background: var(--m-gold); border: 1.5px solid var(--m-gold-dk); }
 .sm-n.pick .dot { stroke: var(--ink); stroke-width: 2.4; }
+.sm-n.pick .medal .coin { stroke: var(--ink); stroke-width: 2.4; }
+.sm-n:focus-visible .medal .coin { stroke: var(--ink); stroke-width: 2; }
 .sm-n.pick { opacity: 1; }
 .sm-info { padding: 12px 16px 14px; border-top: 1px solid var(--line); background: var(--surface); }
 .sm-pick-h { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
