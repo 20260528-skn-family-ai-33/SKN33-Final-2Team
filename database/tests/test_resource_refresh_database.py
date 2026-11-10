@@ -10,6 +10,7 @@ from psycopg.conninfo import conninfo_to_dict
 from psycopg.rows import dict_row
 
 from src.database.vectors import resource_vectors as vectors
+from src.shared.bge_embeddings import ACCEPTED_PROTOCOLS, IndexedEmbedding
 
 
 class ResourceRefreshDatabaseTests(unittest.TestCase):
@@ -31,7 +32,7 @@ class ResourceRefreshDatabaseTests(unittest.TestCase):
             text = 'fixture-' + rid
             self.rows[('books', rid)] = {'hash': hashlib.sha256(text.encode()).hexdigest(), 'text': text, 'record': {}}
         self.fake = [1.0] + [0.0] * (vectors.DIMENSIONS - 1)
-        self.api = self.enterContext(patch.object(vectors, 'embed_texts', side_effect=lambda texts, **kw: [self.fake for _ in texts]))
+        self.api = self.enterContext(patch.object(vectors, 'embed_for_index', side_effect=lambda texts, **kw: [IndexedEmbedding(self.fake, ACCEPTED_PROTOCOLS[1], 3) for _ in texts]))
         self.enterContext(patch.object(vectors, 'sources', return_value=self.rows))
 
     def state(self):

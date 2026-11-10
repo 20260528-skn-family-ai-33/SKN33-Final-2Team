@@ -102,6 +102,7 @@ class AppContractTests(unittest.TestCase):
         from app import catalog
         from src.database.ingestion.course_supplement import insert_approved
         from src.database.vectors import resource_vectors
+        from src.shared.bge_embeddings import ACCEPTED_PROTOCOLS, IndexedEmbedding
         from tests.test_course_supplement import external_course
         row = external_course()
         key = str(uuid4().int % 10**12 + 10**12)
@@ -118,7 +119,7 @@ class AppContractTests(unittest.TestCase):
         fake = [1.0] + [0.0] * (resource_vectors.DIMENSIONS - 1)
         with psycopg.connect(os.environ['EMPLOYEE_FORM_TEST_DB_URL'], row_factory=dict_row) as c:
             skills = c.execute('SELECT skill_id,name,category FROM public.skill_tags ORDER BY skill_id').fetchall()
-            with patch.object(resource_vectors, 'embed_texts', return_value=[fake]) as api:
+            with patch.object(resource_vectors, 'embed_for_index', return_value=[IndexedEmbedding(fake, ACCEPTED_PROTOCOLS[1], 3)]) as api:
                 insert_approved(c, [row], skills)
                 api.assert_called_once()
         def remove():

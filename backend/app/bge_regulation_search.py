@@ -3,12 +3,11 @@ from __future__ import annotations
 
 import hashlib
 
-from . import db, hybrid_search, llm, regulation_embeddings as embeddings, regstore
+from . import bge_provenance as provenance, db, hybrid_search, llm, regulation_embeddings as embeddings, regstore
 
 TABLE = 'regulations.rag_chunk_embeddings'
-META_TABLE = 'growpath_bge_meta.inputs'
+META_TABLE = provenance.META_TABLE
 INPUT_VERSION = 'context_path+blank_line+chunk_text/v1'
-PROTOCOL = 'bge-m3/cls-l2-fp16/v1'
 
 
 def input_text(article: dict) -> str:
@@ -23,32 +22,21 @@ def _inputs(ids: list[str]) -> dict[str, tuple[str, str]]:
 
 def _stored(ids: list[str]) -> dict[str, dict]:
     rows = db.all_(f'''SELECT e.rag_chunk_id,e.dimensions,e.input_sha256,e.input_version,
-            p.source_sha256 AS meta_sha256, p.actual_input_sha256, p.model_revision
+            p.source_sha256 AS meta_sha256, p.actual_input_sha256, p.model_revision, p.protocol, p.token_count
         FROM {TABLE} e
         LEFT JOIN {META_TABLE} p ON p.kind='regulations' AND p.source_id=e.rag_chunk_id
         WHERE e.embedding_model=:m AND e.rag_chunk_id=ANY(:i)''', m=embeddings.BGE_MODEL, i=ids)
     return {row['rag_chunk_id']: row for row in rows}
 
 
+def _is_current(row: dict | None, sha: str) -> bool:
+    return (row is not None and row['dimensions'] == embeddings.BGE_DIMENSIONS
+            and row['input_sha256'] == sha and row.get('input_version') == INPUT_VERSION
+            and provenance.is_current(row, sha, sha))
+
+
 def _missing(inputs: dict, stored: dict) -> list[str]:
-    from .bge_model import REVISION
-    missing = []
-    for i, (_, sha) in inputs.items():
-        if i not in stored:
-            missing.append(i)
-            continue
-        row = stored[i]
-        if (row['dimensions'] != embeddings.BGE_DIMENSIONS
-                or row['input_sha256'] != sha
-                or row.get('input_version') != INPUT_VERSION):
-            missing.append(i)
-            continue
-        if ('meta_sha256' in row and (row['meta_sha256'] != sha
-                or row.get('actual_input_sha256') != sha
-                or row.get('model_revision') != REVISION)):
-            missing.append(i)
-            continue
-    return missing
+    return [i for i, (_, sha) in inputs.items() if not _is_current(stored.get(i), sha)]
 
 
 def ensure_vectors(ids: list[str]) -> int:
@@ -57,28 +45,17 @@ def ensure_vectors(ids: list[str]) -> int:
     missing = _missing(inputs, _stored(ids))
     for offset in range(0, len(missing), 4):
         part = missing[offset:offset + 4]
-        vectors = embeddings.validate(embeddings.embed([inputs[i][0] for i in part]), len(part), embeddings.BGE_DIMENSIONS)
+        indexed = embeddings.embed_for_index([inputs[i][0] for i in part])
+        vectors = embeddings.validate([item.vector for item in indexed], len(part), embeddings.BGE_DIMENSIONS)
         with db.tx() as transaction:
-            current_rows = transaction.all('''
+            # 커밋까지 원문 행을 잠가, 임베딩한 원문과 다른 원문의 벡터·기록이 저장되지 않게 한다.
+            current_shas = {row['rag_chunk_id']: row['current_sha'] for row in transaction.all('''
                 SELECT rag_chunk_id, encode(sha256(convert_to(context_path || chr(10) || chr(10) || chunk_text, 'UTF8')), 'hex') AS current_sha
-                FROM regulations.rag_chunks WHERE rag_chunk_id = ANY(:ids)''', ids=part)
-            current_shas = {r['rag_chunk_id']: r['current_sha'] for r in current_rows}
-            if current_shas and any(current_shas.get(aid) != inputs[aid][1] for aid in part if aid in current_shas):
-                raise llm.LlmError('BGE-M3 색인: 색인 중 규정 원문이 바뀌었어요. 다시 확인해 주세요')
-            for aid, vector in zip(part, vectors, strict=True):
-                transaction.run(f'''INSERT INTO {META_TABLE}
-                    (kind,source_id,source_sha256,actual_input_sha256,protocol,model_revision,token_count,created_at)
-                    VALUES ('regulations',:i,:s,:s,:proto,:rev,:tokens,now())
-                    ON CONFLICT (kind,source_id) DO UPDATE SET
-                    source_sha256=EXCLUDED.source_sha256,
-                    actual_input_sha256=EXCLUDED.actual_input_sha256,
-                    protocol=EXCLUDED.protocol,
-                    model_revision=EXCLUDED.model_revision,
-                    token_count=EXCLUDED.token_count,
-                    created_at=EXCLUDED.created_at''',
-                    i=aid, s=inputs[aid][1], proto=PROTOCOL,
-                    rev=embeddings.PROVENANCE['model_revision'],
-                    tokens=max(1, min(len(inputs[aid][0].split()), 8192)))
+                FROM regulations.rag_chunks WHERE rag_chunk_id = ANY(:ids) ORDER BY rag_chunk_id FOR SHARE''', ids=part)}
+            if any(current_shas.get(aid) != inputs[aid][1] for aid in part):
+                raise llm.LlmError('BGE-M3 색인: 색인 중 규정 원문이 바뀌었어요(수정 또는 삭제). 다시 확인해 주세요')
+            for aid, vector, item in zip(part, vectors, indexed, strict=True):
+                provenance.save_input(transaction, 'regulations', aid, inputs[aid][1], inputs[aid][1], item)
                 transaction.run(f'''INSERT INTO {TABLE}
                     (rag_chunk_id,embedding_model,dimensions,embedding,input_sha256,input_version)
                     VALUES (:i,:m,:d,CAST(:v AS vector),:s,:iv)

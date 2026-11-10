@@ -12,9 +12,24 @@
 
 전체 **78표·29,246행**을 새 격리 DB에 복원해 전 행 지문, 함수, 열·제약조건 및 시퀀스를 대조했다. 기본 복원 도구의 `inventory`는 기준 53표·25,102행이고 `app_ext`를 포함한 전체 지문은 `all_schema_table_fingerprints`에 있다. 스키마 변경은 없으며 ERD는 행 수만 갱신했다. 로컬 앱 DB는 변경하지 않았다.
 
-## 규정 벡터와 검증 기록 갱신 (#136)
+## 벡터와 검증 기록 갱신 (#136, #144)
 
-공유 BGE DB를 가리키는 연결 환경변수를 확인한 뒤 `database/`에서 실행한다. `growpath_bge_meta.inputs`가 없는 DB는 먼저 현재 공유 백업으로 복원해야 한다. 도구가 빈 메타 테이블을 임의로 만들지는 않는다.
+공유 BGE DB를 가리키는 연결 환경변수를 확인한 뒤 `database/`에서 실행한다. `growpath_bge_meta.inputs`가 없는 DB는 먼저 현재 공유 백업으로 복원해야 한다. 모든 색인 도구는 이 표가 없으면 쓰기 전에 거절하며, 빈 메타 테이블을 임의로 만들지 않는다.
+
+색인 도구는 벡터와 검증 기록을 같은 트랜잭션에 저장한다. 실패했을 때 되돌아가는 범위는 경로마다 다르다.
+
+| 경로 | 한 트랜잭션의 범위 | 실패 후 |
+| --- | --- | --- |
+| 자료 `resource_vectors embed` | 작업 전체 | 전부 롤백 |
+| 규정 `regulation_vectors embed` | `--batch-size` 배치 | 실패한 배치만 롤백, 완료한 배치 유지. 재실행 시 이어서 처리 |
+| 규정 `regulation_vectors import` | 파일 전체 | 전부 롤백 |
+| 규정·회사생활 `backend/tools/index_*.py --apply` | 4건 배치 | 실패한 배치만 롤백, 완료한 배치 유지. 재실행 시 이어서 처리 |
+| 회사생활 `knowledge_documents.insert` | 작업 전체 | 전부 롤백 |
+| 강좌 스킬 보정 `apply_corrections` | 작업 전체(링크 포함) | 전부 롤백 |
+
+임베딩 중 원문이 바뀌거나 삭제되면 해당 트랜잭션을 거절한다. 규정은 저장이 끝날 때까지 원문 행을 잠가, 확인 직후의 동시 수정도 커밋 뒤로 밀린다.
+
+검증 기록의 `protocol`과 `token_count`는 임베딩 서버가 보고한 실제 값이다. CPU 기본 추론은 `bge-m3/cls-l2-fp32/v1`, 명시적 `BGE_M3_DTYPE=float16`은 `bge-m3/cls-l2-fp16/v1`로 남는다. 공유 백업의 기존 행은 GPU FP16 추론 기록(`bge-m3/cls-l2-fp16/v1`, 공백 기준 토큰 수)을 그대로 유지하며 일괄 변경하거나 재임베딩하지 않는다. 검증기는 두 프로토콜을 모두 인정한다. 색인에는 이 정보를 응답하는 최신 `bge-m3` 서버가 필요하므로 `docker compose up -d --build bge-m3`로 다시 빌드한다. 이전 서버로는 질문 임베딩(검색)만 동작하고 색인은 거절된다. 스키마 변경과 새 마이그레이션은 없다.
 
 ```powershell
 python -m src.database.vectors.regulation_vectors --db-env SUPABASE_DB_URL status
@@ -22,11 +37,11 @@ python -m src.database.vectors.regulation_vectors --db-env SUPABASE_DB_URL embed
 python -m src.database.vectors.regulation_vectors --db-env SUPABASE_DB_URL status
 ```
 
-`embed`는 원문·벡터·검증 기록의 해시와 모델 revision을 확인하고 누락·불일치한 규정만 재생성한다. 벡터와 메타는 같은 배치 트랜잭션에서 저장한다. 실패한 배치는 함께 롤백하며, 이미 완료된 이전 배치는 유지된다. 원인을 해결한 뒤 재실행하면 정상인 행은 건너뛴다. `import`는 파일 전체의 벡터·메타를 하나의 트랜잭션에서 저장한다. 스키마 변경이나 새 마이그레이션은 없으며, 원문·기존 벡터를 이전 상태로 되돌려야 한다면 갱신 전 검증 백업을 별도 DB에 복원해 확인한 뒤 연결을 전환한다.
+`embed`는 원문·벡터·검증 기록의 해시와 모델 revision을 확인하고 누락·불일치한 규정만 재생성한다. 원인을 해결한 뒤 재실행하면 정상인 행은 건너뛴다. 원문·기존 벡터를 이전 상태로 되돌려야 한다면 갱신 전 검증 백업을 별도 DB에 복원해 확인한 뒤 연결을 전환한다.
 
-규정 벡터 `export` 파일은 모델 provenance를 포함하는 **format_version 2**다. 메타가 누락되거나 오래된 상태에서는 내보내기를 거절한다. 모델 revision을 확인할 수 없는 구형 version 1 파일과 provenance가 다른 파일은 가져오지 않는다. 원본 공유 DB에서 `embed` 후 새로 `export`하거나, 대상 DB의 규정 원문에서 `embed`를 실행한다. 기존 공유 DB 백업 형식은 바꾸지 않는다. 프로토콜 문자열과 공백 기준 토큰 수 기록은 현재 검증기와 호환되도록 유지하며, 실제 추론 정밀도·토큰 수 기록 개선은 후속 #144 범위다.
+규정 벡터 `export` 파일은 모델 provenance와 행별 프로토콜·토큰 수를 포함하는 **format_version 3**이다. 메타가 누락되거나 오래된 상태에서는 내보내기를 거절한다. 실제 추론 정보를 확인할 수 없는 version 1·2 파일과 provenance가 다른 파일은 가져오지 않는다. 원본 공유 DB에서 `embed` 후 새로 `export`하거나, 대상 DB의 규정 원문에서 `embed`를 실행한다. 기존 공유 DB 백업 형식은 바꾸지 않는다.
 
-외부 연결 없는 단위 검사는 `python -m unittest tests.test_regulation_vectors -v`다. 실제 SQL 검사는 비어 있는 일회용 pgvector DB(이름 접두사 `growpath_regulation_test_`)의 URL을 `BGE_REGULATION_TEST_DB_URL`에 지정하고, 저장소의 `backend/`·`database/`를 `PYTHONPATH`에 넣어 `python -m unittest tests.test_regulation_vector_metadata -v`로 실행한다. 이 검사는 테스트 표를 만들고 커밋하므로 운영 DB에 연결하지 않는다. 임베딩 응답만 모의 처리하며 실제 모델 품질 검사는 포함하지 않는다.
+외부 연결 없는 단위 검사는 `python -m unittest tests.test_regulation_vectors -v`다. 실제 SQL 검사는 비어 있는 일회용 pgvector DB의 URL을 지정하고, 저장소의 `backend/`·`database/`를 `PYTHONPATH`에 넣어 실행한다. 규정은 이름 접두사 `growpath_regulation_test_`의 DB를 `BGE_REGULATION_TEST_DB_URL`에 지정해 `python -m unittest tests.test_regulation_vector_metadata -v`로, 자료·회사생활·스킬 보정은 접두사 `growpath_bge_meta_test_`의 DB를 `BGE_META_TEST_DB_URL`에 지정해 `python -m unittest tests.test_bge_meta_sync_database -v`로 실행한다. 이 검사들은 테스트 표를 만들고 커밋하므로 운영 DB에 연결하지 않는다. 임베딩 응답만 모의 처리하며 실제 모델 품질 검사는 포함하지 않는다.
 
 ## 새 DB 복원
 
@@ -56,7 +71,7 @@ LLM 입력에 스킬별 적합 도서 최소 3권을 우선 확보하는 코드�
 팀원은 **새 전체 백업을 복원한 뒤 PR #41이 반영된 최신 main을 통합한 PR #29의 최종 코드를 반영하고 앱을 다시 빌드**한다. 복원 대상 DB를 가리키도록 기존 환경설정을 확인한다. 기존 DB를 유지할 경우 먼저 별도 백업과 복제본을 만들고 아래 데이터 보정의 적용 전후를 비교해야 한다.
 
 - 목차 보정은 `python scripts/backfill_course_curriculum.py`로 계획을 확인하고 `--apply`로 적용한다. 이 백업에서는 변경 0건이며 유료 호출은 없다. SQL 001~026을 편집하지 않는다.
-- 스킬 보정의 원문 SHA-256·이전/이후 스킬·근거는 [최종 품질 기록](data/exports/final_quality_20261029.manifest.json)의 `skill_correction_plan`에 있다. 기존 `src.database.course_skill_corrections.apply_corrections`에 이 계획을 전달하면 링크와 실제 벡터를 한 트랜잭션으로 갱신하며, 이미 반영된 상태에서는 0건이다. 구판 DB의 추가 임베딩은 별도 비용 승인이 필요하다. 기존 배포 전용 CLI는 원래 작업 PC의 포트·복제 검증 파일을 요구하므로 수신 PC에서 그대로 실행하지 않는다.
+- 스킬 보정의 원문 SHA-256·이전/이후 스킬·근거는 [최종 품질 기록](data/exports/final_quality_20261029.manifest.json)의 `skill_correction_plan`에 있다. 기존 `src.database.course_skill_corrections.apply_corrections`에 이 계획을 전달하면 링크·실제 벡터·검증 기록을 한 트랜잭션으로 갱신하며(#144), 이미 반영된 상태에서는 0건이다. 임베딩은 로컬 BGE-M3 서버를 사용한다. 기존 배포 전용 CLI는 원래 작업 PC의 포트·복제 검증 파일을 요구하므로 수신 PC에서 그대로 실행하지 않는다.
 - 추천 해시 불일치 1명은 실제 입력 변경이 아닌 Windows/Linux 정렬 차이였다. 코드가 사내 스킬·등록 자격 목록을 일정하게 정렬하도록 수정했고, 105명의 원래 생성 입력과 해시가 모두 일치했다. 직접 입력한 목록 순서와 추천 원문·해시는 바꾸지 않았다.
 
 남은 데이터 한계: 가격 미확인 83강좌, 계획 시간 추정 330강좌, 목차 일부 제목 미제공 9강좌·소개만 제공 6강좌. 전체 315개 형식·근거 항목과 대표 23명·69개 의미를 AI가 점검했다. 가상 직원의 공통 문장 틀과 사람 검토 필요는 남는다. 실제 모델의 전체 추천 품질 평가나 모든 강좌 사이트 재접속 검사는 하지 않았다. Free Track의 자격증 데모 실패·확정 전 가격 재검사는 별도 코드 후속 작업이다.
