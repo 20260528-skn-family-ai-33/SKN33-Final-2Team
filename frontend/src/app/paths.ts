@@ -4,6 +4,7 @@ export const paths = {
   login: '/login',
   home: '/',
   me: '/me',
+  password: '/me/password',
   // 새 로드맵 작성
   newGoal: '/new/goal',
   newDetails: '/new/details',

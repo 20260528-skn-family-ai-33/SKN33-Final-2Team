@@ -534,6 +534,9 @@ a.me .grow { min-width: 0; }
 a.me .me-go { width: 16px; height: 16px; flex: none; color: var(--ink-4); }
 .me-sup { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 5px; font-size: 11px; font-weight: 650; line-height: 1.5; background: var(--accent-soft2); color: var(--accent-ink); vertical-align: 1px; }
 .nav-sup { margin-top: 14px; }
+.page-title-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; }
+.page-title-action { flex-shrink: 0; margin-inline-start: auto; }
+.page-title-action .btn { white-space: nowrap; }
 .me-page { display: grid; gap: 12px; }
 .me-page .sec-h { align-items: center; }
 .me-page .sec-h .tag { margin-left: auto; }
@@ -781,3 +784,16 @@ a.me .me-go { width: 16px; height: 16px; flex: none; color: var(--ink-4); }
 .dr-tag.ok { background: var(--accent-soft2); color: var(--accent-ink); }
 .dr-tag.bad { background: var(--danger-soft); color: var(--danger); }
 .dr-tag.mid { background: var(--warn-soft); color: var(--warn); }
+
+.card.rv-recommendation-new {
+  border-inline-start: 5px solid var(--acc);
+  background: color-mix(in srgb, var(--acc) 9%, var(--card, var(--bg)));
+}
+.rv-recommendation-new > .sec-h {
+  padding-bottom: 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--acc) 35%, var(--line));
+}
+.rv-recommendation-new > .sec-h .st { color: var(--acc); }
+
+.rv-pick-card[data-disabled="false"] { cursor: pointer; }
+.rv-pick-card[data-selected="true"] { outline: 2px solid var(--acc); outline-offset: -2px; }

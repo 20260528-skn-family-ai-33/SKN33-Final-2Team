@@ -52,15 +52,25 @@ def api_team_plan(plan_id: str, a: Account = Depends(require_employee)):
 def api_team_comment(plan_id: str, body: dict, a: Account = Depends(require_employee)):
     head = _head(a)
     uid = _owner_of(head, plan_id)
+    if 'comments' in body:
+        ids = PL.send_comments(head, uid, plan_id, body['comments'])
+        return {'commentIds': ids, 'userId': str(uid)}
     return {'commentId': PL.send_comment(head, uid, plan_id, body), 'userId': str(uid)}
 
 
-# 설계서 v1.7 에 없는 추가(10/23 사용자 요청): 보낸 코멘트 고치기. 삭제 API 는 두지 않는다
 @r.patch('/plans/{plan_id}/comments/{comment_id}')
 def api_team_comment_edit(plan_id: str, comment_id: str, body: dict, a: Account = Depends(require_employee)):
     head = _head(a)
     uid = _owner_of(head, plan_id)
     return {'commentId': comment_id, 'userId': str(uid), 'changed': PL.edit_comment(head, uid, plan_id, comment_id, body)}
+
+
+@r.delete('/plans/{plan_id}/comments/{comment_id}')
+def api_team_comment_delete(plan_id: str, comment_id: str, a: Account = Depends(require_employee)):
+    head = _head(a)
+    uid = _owner_of(head, plan_id)
+    PL.delete_comment(head, uid, plan_id, comment_id)
+    return {'commentId': comment_id, 'userId': str(uid)}
 
 
 # 결과 보고서 과제(#96). 소속 직원의 로드맵만

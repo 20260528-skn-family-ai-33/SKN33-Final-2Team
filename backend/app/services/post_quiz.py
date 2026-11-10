@@ -36,6 +36,25 @@ def comparison(plan,answers,post_survey=None):
     return rows
 
 
+def report_details(survey, answers):
+    rows = []
+    for group in (survey or {}).get('groups', []):
+        for question in group.get('quizzes', []):
+            options = question.get('options') or []
+            correct = question.get('answer')
+            selected = answers.get(question['id'])
+            if type(correct) is not int or not 0 <= correct < len(options):
+                continue
+            if str(selected) not in {str(i) for i in range(len(options))}:
+                continue
+            selected = int(selected)
+            rows.append(dict(id=question['id'], skill=group['skill'],
+                             question=question.get('q') or question.get('text') or '',
+                             selected=options[selected], correct=options[correct],
+                             isCorrect=selected == correct, explanation=question.get('explain') or ''))
+    return rows
+
+
 def public_assessment(assessment):
     value=deepcopy(assessment)
     for group in (value.get('v2') or {}).get('survey',{}).get('groups',[]):

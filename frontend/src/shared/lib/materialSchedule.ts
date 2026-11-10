@@ -36,7 +36,8 @@ export function applyMaterialSchedule(input: PlanContent): PlanContent {
     }
   }
   let cursor = 0;
-  const courses = new Map<string, Slot>(), books = new Map<string, Slot>(), skillBooks = new Map<string, Slot>();
+  const courses = new Map<string, Slot>();
+  const books = new Set(active.flatMap(name => choices[name].books));
   const estimates: Record<string, DurationEstimate> = {};
   const courseCounts = new Map<string, number>();
   for (const name of active) {
@@ -62,15 +63,6 @@ export function applyMaterialSchedule(input: PlanContent): PlanContent {
       }
       slots.push(courses.get(rid)!);
     }
-    let bookWeeks = 0;
-    for (const rid of [...choice.books].sort()) {
-      const slot = allocateWeeks(1, rid);
-      if (!books.has(rid)) books.set(rid, slot);
-      skillBooks.set(`${name}:${rid}`, slot);
-      slots.push(slot);
-      ownSlots.push(slot);
-      bookWeeks += 1;
-    }
     for (const rid of courseIds(choice)) {
       if ((courseCounts.get(rid) || 0) <= 1 || courseWeeks > 0) ownSlots.push(courses.get(rid)!);
     }
@@ -78,7 +70,7 @@ export function applyMaterialSchedule(input: PlanContent): PlanContent {
     const startWeek = windowSlots.length ? Math.min(...windowSlots.map(slot => slot.startWeek)) : null;
     const endWeek = windowSlots.length ? Math.max(...windowSlots.map(slot => slot.endWeek)) : null;
     estimates[name] = {...context, weeks: startWeek == null || endWeek == null ? 0 : endWeek - startWeek + 1,
-      startWeek, endWeek, addedWeeks: cursor - before, courseWeeks, bookWeeks,
+      startWeek, endWeek, addedWeeks: cursor - before, courseWeeks, bookWeeks: 0,
       method: DURATION_METHOD, scheduleKey, course: choice.course, courses: courseIds(choice), books: [...choice.books].sort(),
       unknownCourses: courseIds(choice).filter(rid => times.get(rid)?.status === 'unknown'),
       estimatedCourses: courseIds(choice).filter(rid => times.get(rid)?.status === 'estimated')};
@@ -88,19 +80,18 @@ export function applyMaterialSchedule(input: PlanContent): PlanContent {
   report.durationEstimates = estimates;
   plan.def.materialSchedule = Object.entries(estimates).map(([skill, row]) => ({skill, weeks: row.weeks!, startWeek: row.startWeek, endWeek: row.endWeek, addedWeeks: row.addedWeeks, totalWeeks: plan.weeks}));
   const seen = new Set<string>();
-  const seenBooks = new Set<string>();
   const seenOther = new Set<string>();
   let materialHours = 0, taskHours = 0, otherMaterialHours = 0;
   for (const activity of plan.acts) {
     const rid = activity.res || '', name = activity.skill || '';
     const resource = courses.get(rid);
-    const book = skillBooks.get(`${name}:${rid}`) || books.get(rid);
-    const slot = resource || book || estimates[name];
+    const book = books.has(rid);
+    const slot = resource || estimates[name];
     if (slot) {
       activity.wFrom = slot.startWeek || Math.max(1, plan.weeks);
       activity.wTo = slot.endWeek || activity.wFrom;
     }
-    if (resource || book) activity.resourceWindow = {from: slot.startWeek!, to: slot.endWeek!};
+    if (resource) activity.resourceWindow = {from: slot.startWeek!, to: slot.endWeek!};
     if (resource) {
       activity.timeStatus = resource.timeStatus;
       activity.hoursEstimated = resource.timeStatus !== 'confirmed';
@@ -110,14 +101,13 @@ export function applyMaterialSchedule(input: PlanContent): PlanContent {
       seen.add(rid);
       materialHours += activity.hours;
     } else if (book) {
+      if (activity.hoursAllocation === 'book-week') activity.hours = activity.catalogHours ?? 0;
       if (activity.catalogHours === undefined) activity.catalogHours = activity.hours;
-      activity.hours = weekly;
-      activity.hoursAllocation = 'book-week';
-      activity.hoursEstimated = true;
-      activity.hoursBasis = '도서 1권당 1주 배정(주당 학습시간 기준), 실제 독서시간 아님';
-      if (seenBooks.has(rid)) continue;
-      seenBooks.add(rid);
-      materialHours += weekly;
+      delete activity.hoursAllocation;
+      delete activity.resourceWindow;
+      delete activity.hoursBasis;
+      delete activity.hoursEstimated;
+      delete activity.timeStatus;
     } else if (!rid) {
       taskHours += positive(activity.hours) ? activity.hours : 0;
     } else if (!seenOther.has(rid)) {

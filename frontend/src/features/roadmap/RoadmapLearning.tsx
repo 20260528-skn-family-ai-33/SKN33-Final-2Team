@@ -8,7 +8,7 @@ import { useClockRefresh } from '@/shared/state/demoClock';
 import { useMe } from '@/shared/state/session';
 import { ActThumb, Stt } from '@/shared/ui/parts';
 import { ActRow } from './parts';
-import { activityAnchor, groupLearningActivities, matchingCertificates } from './roadmapLearningData';
+import { activitiesOutsideSkillCards, activityAnchor, groupLearningActivities, matchingCertificates } from './roadmapLearningData';
 import './roadmapLearning.css';
 import { weekNow } from '@/features/home/ganttCalc';
 import { ResourceImage } from '@/shared/ui/ResourceImage';
@@ -41,7 +41,9 @@ export function RoadmapResources({ R, owned }: { R: PlanRecord; owned?: string[]
           return <li key={activity.id}><button type="button" onClick={() => jump(activity.id)} aria-label={`${resource.title} 학습 활동으로 이동`}>
             <ResourceImage image={resource.image} type={kind === '도서' ? 'book' : 'course'} />
             <span><b>{resource.title}</b><small>{activity.skill || groups.find(group => group.activities.includes(activity))?.name}</small></span>
-          </button></li>;
+          </button>{owned && resource.url && /^https?:\/\//i.test(resource.url) && (
+            <a className="link small" href={resource.url} target="_blank" rel="noopener noreferrer" aria-label={`${resource.title} 바로가기 (새 탭)`}>바로가기 ↗</a>
+          )}</li>;
         })}</ul> : <p className="small muted">선택한 {kind}가 없어요.</p>}
       </section>;
     })}
@@ -56,12 +58,14 @@ export function RoadmapResources({ R, owned }: { R: PlanRecord; owned?: string[]
 }
 
 /** readOnly: 부서장이 보는 직원 로드맵(#96) — 진행 중이어도 실행 기록을 열지 않고 상태만 보여 준다 */
-export function RoadmapActivityList({ R, readOnly = false }: { R: PlanRecord; readOnly?: boolean }) {
+export function RoadmapActivityList({ R, readOnly = false, skipSkillCardDuplicates = false }: { R: PlanRecord; readOnly?: boolean; skipSkillCardDuplicates?: boolean }) {
   useClockRefresh();
   const week = weekNow(R);
   const due = (activity: PlanRecord['plan']['acts'][number]) => R.status === 'active' && activity.wFrom <= week && week <= activity.wTo && st(R.progress, activity.id) !== 'done';
   const resources = useCatalog(state => state.res);
-  const groups = groupLearningActivities(R.plan, resources);
+  const plan = skipSkillCardDuplicates ? { ...R.plan, acts: activitiesOutsideSkillCards(R.plan) } : R.plan;
+  const groups = groupLearningActivities(plan, resources);
+  if (!groups.length) return null;
   return <div className="roadmap-learning-groups">{groups.map((group, index) => { const tracked = trackedActs(group.activities); return <details open className={`card roadmap-learning-group${R.status === 'active' && group.activities.some(a => a.wFrom <= week && week <= a.wTo) && tracked.some(a => st(R.progress, a.id) !== 'done') ? ' is-current-week' : ''}`} key={group.name}>
     <summary><span className="no">{index + 1}</span><h2>{group.name}</h2><span className="small muted">{range(group.activities)}{tracked.length ? ` · ${tracked.filter(activity => st(R.progress, activity.id) === 'done').length}/${tracked.length} 완료` : ''}</span><span className="learning-toggle-more">펼치기</span><span className="learning-toggle-less">접기</span></summary>
     {[{ title: '자료 학습', acts: group.materials }, { title: '산출물', acts: group.tasks }].filter(category => category.acts.length).map(category => <div className="roadmap-learning-category" key={category.title}>

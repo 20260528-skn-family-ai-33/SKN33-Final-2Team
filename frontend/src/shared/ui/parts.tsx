@@ -10,7 +10,7 @@ import { Icon } from './Icon';
 import { ResourceImage } from './ResourceImage';
 import { MaterialBasis } from './MaterialBasis';
 
-export function Page(o: { back?: string; eyebrow?: ReactNode; title: ReactNode; lead?: ReactNode; children?: ReactNode; foot?: ReactNode }) {
+export function Page(o: { back?: string; eyebrow?: ReactNode; title: ReactNode; titleAction?: ReactNode; lead?: ReactNode; children?: ReactNode; foot?: ReactNode }) {
   const go = useGo();
   return (
     <>
@@ -23,7 +23,12 @@ export function Page(o: { back?: string; eyebrow?: ReactNode; title: ReactNode; 
         </div>
       ) : null}
       {o.eyebrow ? <p className="eyebrow">{o.eyebrow}</p> : null}
-      <h1 className="t">{o.title}</h1>
+      {o.titleAction ? (
+        <div className="page-title-row">
+          <h1 className="t">{o.title}</h1>
+          <div className="page-title-action">{o.titleAction}</div>
+        </div>
+      ) : <h1 className="t">{o.title}</h1>}
       {o.lead ? <p className="lead">{o.lead}</p> : null}
       {o.children}
       {o.foot ? <div className="actions">{o.foot}</div> : null}

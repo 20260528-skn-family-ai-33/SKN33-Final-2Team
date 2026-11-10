@@ -190,7 +190,7 @@ function Post({ R }: { R: PlanRecord }) {
           <>
           {hasQuiz && <button type="button" className="btn line" onClick={() => { setPhase('surveys'); window.scrollTo(0, 0); }}>이전: 설문</button>}
           <button className="btn pri" disabled={!postValid(R)} onClick={() => void makeReport(go, R.id)}>
-            결과 보고서 만들기
+            사후 점검 제출
           </button>
           </>
         )

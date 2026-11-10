@@ -33,12 +33,22 @@ export function loadRecommendations(id: string, generation: string | undefined, 
   const path = recommendationUrl(id, course);
   // Persist genCur before reading the materials of a newly selected proposal version.
   const work = flush().then(async () => {
-    let body=await requestMaterials(path);
-    while(!body.recommendations && body.preparingJobId===''){
-      await new Promise(resolve=>setTimeout(resolve,150));
-      body=await requestMaterials(path);
+    const deadline = Date.now() + 10000;
+    let body = await requestMaterials(path);
+    while (!body?.recommendations && body?.preparingJobId === '') {
+      if (Date.now() >= deadline) throw new Error('자료 준비가 지연되고 있어요. 잠시 뒤 다시 시도해 주세요.');
+      await new Promise(resolve => setTimeout(resolve, 150));
+      body = await requestMaterials(path);
     }
-    return body.recommendations ? body : body.preparingJobId ? waitJob<Result>(body.preparingJobId) : requestMaterials(path, { method: 'POST', headers: { Prefer: 'respond-async' } });
+    if (body?.recommendations) return body;
+    const completed = body?.preparingJobId
+      ? await waitJob<Result>(body.preparingJobId)
+      : await requestMaterials(path, { method: 'POST', headers: { Prefer: 'respond-async' } });
+    if (completed?.recommendations) return completed;
+
+    const saved = await requestMaterials(path);
+    if (saved?.recommendations) return saved;
+    throw new Error('현재 제안의 자료를 준비하지 못했어요. 다시 시도해 주세요.');
   });
   recommendationFlights.set(key, work);
   void work.finally(() => { if (recommendationFlights.get(key) === work) recommendationFlights.delete(key); }).catch(() => {});

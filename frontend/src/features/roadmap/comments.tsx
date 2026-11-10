@@ -14,7 +14,7 @@ import { newComments, updateWs, useWs } from '@/shared/state/workspace';
 import { Icon } from '@/shared/ui/Icon';
 import { Page } from '@/shared/ui/parts';
 import { cmBy } from './parts';
-import { freshRev, takePlan } from './planActions';
+import { freshRev, revise, takePlan } from './planActions';
 
 export function CommentView({ c }: { c: Pick<Comment, 'fit' | 'fitText' | 'level' | 'levelText' | 'free'> }) {
   const fit = D.commentFit.find((x) => x[0] === c.fit)?.[1];
@@ -47,9 +47,9 @@ export function CommentView({ c }: { c: Pick<Comment, 'fit' | 'fitText' | 'level
 
 export const CmTag = ({ c, mgr }: { c: Comment; mgr?: boolean }) =>
   c.status === 'applied' ? (
-    <span className="tag ok">v{c.appliedVersion || ''}에 반영</span>
+    <span className="tag ok" title={c.appliedVersion ? `v${c.appliedVersion}에 반영` : undefined}>{mgr ? '수정 완료' : '완료'}</span>
   ) : c.status === 'read' ? (
-    <span className="tag line">확인함</span>
+    <span className="tag line">{mgr ? '완료' : '확인함'}</span>
   ) : (
     <span className="tag acc">{mgr ? '확인 전' : '새 코멘트'}</span>
   );
@@ -60,15 +60,15 @@ export function CmItem({ c, foot, mgr }: { c: Comment; foot?: ReactNode; mgr?: b
   return (
     <div className="cm-item">
       <div className="cm-h">
-        <b>{mgr && cmMine(c) ? '보낸 코멘트' : cmBy(c)}</b>
+        <b>{mgr && cmMine(c) ? (c.deleted ? '삭제된 코멘트' : '보낸 코멘트') : cmBy(c)}{c.skill ? ` · ${c.skill}` : ''}</b>
         <span className="small muted">
           {c.at}
           {c.editedAt ? ` · 수정됨 ${c.editedAt}` : ''}
         </span>
-        <CmTag c={c} mgr={mgr} />
+        {c.deleted ? <span className="tag line">삭제된 코멘트</span> : <CmTag c={c} mgr={mgr} />}
       </div>
-      <CommentView c={c} />
-      {foot}
+      {!c.deleted && <CommentView c={c} />}
+      {!c.deleted && foot}
     </div>
   );
 }
@@ -82,6 +82,17 @@ export function commentReq(c: Comment): string {
   return [line('업무 적합성', fit, c.fitText), line('수준·기간·분량', lv, c.levelText), c.free && `자유 의견: ${c.free}`].filter(Boolean).join('\n');
 }
 
+export function prepareCommentRevision(planId: string, comment: Comment): boolean {
+  const record = useWs.getState().plans[planId];
+  if (record?.status !== 'active' || comment.deleted || comment.status === 'applied') return false;
+  updateWs(state => {
+    const plan = state.plans[planId];
+    plan.rev = { ...freshRev(plan, commentReq(comment), comment.id), cmStamp: comment.stamp };
+    plan.pending = null;
+  });
+  return true;
+}
+
 export function CommentsPage({ R }: { R: PlanRecord }) {
   const go = useGo();
   const pl = R.plan;
@@ -91,13 +102,9 @@ export function CommentsPage({ R }: { R: PlanRecord }) {
   useWs((s) => s.plans[R.id]);
   if (!list.length) return <Page back={paths.roadmap(R.id)} title="받은 코멘트가 없어요" lead="이 로드맵에 부서장이 의견을 남기면 여기에 쌓여요." />;
   const apply = (c: Comment) => {
-    if (R.status !== 'active') return;
-    updateWs((s) => {
-      const x = s.plans[R.id];
-      x.rev = { ...freshRev(x, commentReq(c), c.id), cmStamp: c.stamp };
-      x.pending = null;
-    });
+    if (!prepareCommentRevision(R.id, c)) return;
     go(paths.revise(R.id));
+    if (c.skill) void revise(R.id);
   };
   const read = async (c: Comment) => {
     try {

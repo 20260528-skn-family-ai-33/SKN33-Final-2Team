@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { commentSkillNames } from '@/features/roadmap/roadmapLearningData';
 import { trackName } from '@/shared/constants/data';
 /* 부서장 (API-55~59 · 5차 gp-parts.js m-list·m-plan·m-road·m-report·m-done)
    부서장 범위(2026-10-27 팀 합의): 자기 부서 직원만(부서장의 계획은 본인만 봄). 서버가 소속 관계를 확인하고 공개 범위만 보낸다.
@@ -26,8 +28,7 @@ import { BText } from '@/shared/ui/bound';
 import { Icon } from '@/shared/ui/Icon';
 import { Loading, Note, Page } from '@/shared/ui/parts';
 import { mk, useMemberOf, useMemberState, useRefreshTeam, useTeam } from './teamData';
-import { arrangeMembers, detailShown, hasRecords, unseenOf } from './teamList';
-import { useMarkSeen } from './teamSeen';
+import { arrangeMembers, hasRecords, unseenOf } from './teamList';
 
 const ST_TAG: Record<string, React.ReactNode> = { done: <span className="tag line">마침</span>, archived: <span className="tag line">보관</span> };
 const who = (e: TeamUser) => `${e.name} · ${meLine(e)}`;
@@ -178,7 +179,7 @@ function MgrRepRow({ uid, r, unseen = false }: { uid: string; r: Report; unseen?
           결과 보고서 · {trackName(r.opt)} v{r.version}
         </b>
         <small>
-          {r.goal} · {r.createdAt} · {r.confirmed ? '직원 확인함' : '직원 확인 전'}
+          {r.goal} · {r.createdAt}
         </small>
       </div>
       <span className="end">
@@ -258,6 +259,10 @@ export function MemberPlansPage() {
 }
 
 /** 부서장이 쓰는 중인 코멘트 칸 (5차 P.mgrCommentFields · nm: 같은 화면에 새 칸과 고치는 칸이 함께 있을 때 라디오 이름 꼬리) */
+function hasComment(draft?: MgrDraft) {
+  return !!draft && [draft.fit, draft.level, draft.fitText, draft.levelText, draft.free].some(value => value?.trim());
+}
+
 function CommentFields({ k, nm = '' }: { k: string; nm?: string }) {
   const b = `mgr.${k}`;
   const fit = useAt<string>(`${b}.fit`);
@@ -266,7 +271,7 @@ function CommentFields({ k, nm = '' }: { k: string; nm?: string }) {
     <>
       <div className="field">
         <label>
-          업무 적합성 <span className="muted small">담당 업무·부서 AI 사업과 맞나요?</span>
+          업무 적합성 <span className="muted small">선택 · 담당 업무와 맞나요?</span>
         </label>
         <div className="chips">
           {D.commentFit.map(([v, l]) => (
@@ -280,7 +285,7 @@ function CommentFields({ k, nm = '' }: { k: string; nm?: string }) {
       </div>
       <div className="field">
         <label>
-          수준·기간·분량 <span className="muted small">난이도와 기간이 적절한가요?</span>
+          수준·기간·분량 <span className="muted small">선택 · 난이도와 기간이 적절한가요?</span>
         </label>
         <div className="chips">
           {D.commentLevel.map(([v, l]) => (
@@ -319,7 +324,7 @@ function MgrCmItem({ uid, pid, c, live }: { uid: string; pid: string; c: Comment
   const key = mk(mk(uid, pid), c.id);
   const editing = useWs((s) => s.mcEdit === key);
   const m = useWs((s) => s.mgr[key]);
-  if (!live || !cmMine(c)) return <CmItem c={c} mgr />;
+  if (!live || !cmMine(c) || c.deleted) return <CmItem c={c} mgr />;
   if (c.status === 'applied') return <CmItem c={c} mgr foot={<p className="small muted cm-act">v{c.appliedVersion || ''}에 반영된 코멘트라 고칠 수 없어요.</p>} />;
   if (!editing)
     return (
@@ -342,11 +347,24 @@ function MgrCmItem({ uid, pid, c, live }: { uid: string; pid: string; c: Comment
               <Icon name="edit" />
               수정
             </button>
+            <button className="btn line sm" onClick={async event => {
+              if (!window.confirm('이 코멘트를 삭제할까요? 삭제 표시는 남아요.')) return;
+              const button = event.currentTarget;
+              button.disabled = true;
+              try {
+                await teamApi.commentDelete(pid, c.id);
+                await refresh(uid);
+              } catch (error) {
+                failToast(error, '코멘트를 삭제하지 못했어요');
+              } finally {
+                button.disabled = false;
+              }
+            }}>삭제</button>
           </div>
         }
       />
     );
-  const ok = !!(m && m.fit && m.level && cmChanged(m));
+  const ok = !!(m && hasComment(m) && cmChanged(m));
   const save = async (btn: HTMLButtonElement) => {
     if (!m || !ok) return;
     btn.disabled = true;
@@ -394,16 +412,87 @@ function MgrCmItem({ uid, pid, c, live }: { uid: string; pid: string; c: Comment
   );
 }
 
+function CommentSendButton({ uid, R }: { uid: string; R: PlanRecord }) {
+  const refresh = useRefreshTeam();
+  const drafts = useWs(state => state.mgr);
+  const [sending, setSending] = useState(false);
+  const key = mk(uid, R.id);
+  const entries = [undefined, ...commentSkillNames(R.plan)].flatMap(skill => {
+    const draftKey = skill ? mk(key, skill) : key;
+    const draft = drafts[draftKey];
+    if (!draft || !hasComment(draft)) return [];
+    return [{ draftKey, draft, body: { skill, fit: draft.fit || '', fitText: draft.fitText || '',
+      level: draft.level || '', levelText: draft.levelText || '', free: draft.free || '' } }];
+  });
+
+  async function send() {
+    if (sending || !entries.length) return;
+    setSending(true);
+    try {
+      await teamApi.commentsSend(R.id, entries.map(entry => entry.body));
+      updateWs(state => {
+        for (const entry of entries) {
+          if (useWs.getState().mgr[entry.draftKey] === entry.draft) delete state.mgr[entry.draftKey];
+        }
+      });
+      toast('코멘트를 보냈어요');
+      await refresh(uid);
+    } catch (error) {
+      failToast(error, '코멘트를 보내지 못했어요');
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return <button type="button" className="btn pri" disabled={sending || !entries.length}
+    onClick={() => void send()}>{sending ? '보내는 중…' : '코멘트 보내기'}</button>;
+}
+
+function ManagerCommentHistory({ uid, R, comments }: { uid: string; R: PlanRecord; comments: Comment[] }) {
+  return <>{(['보낸 코멘트', '삭제된 코멘트'] as const).map((title, index) => {
+    const entries = comments.filter(comment => Boolean(comment.deleted) === (index === 1));
+    return entries.length > 0 && <details key={title}>
+      <summary className="st">{title} {entries.length}개</summary>
+      {entries.map(comment => <MgrCmItem key={comment.id} uid={uid} pid={R.id} c={comment} live={R.status === 'active'} />)}
+    </details>;
+  })}</>;
+}
+
+function scrollToComment(element: HTMLElement | null) {
+  if (!element) return;
+  element.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+}
+
+function SkillComments({ uid, R, skill, showSkill = false, inline = false }: { uid: string; R: PlanRecord; skill: string; showSkill?: boolean; inline?: boolean }) {
+  const draftKey = mk(mk(uid, R.id), skill);
+  const comments = (R.comments || []).filter(comment => comment.skill === skill).reverse();
+  const live = R.status === 'active';
+  if (!live && !comments.length) return null;
+
+  const body = <>
+    <ManagerCommentHistory uid={uid} R={R} comments={comments} />
+    {live && <CommentFields k={draftKey} nm={draftKey} />}
+  </>;
+  if (inline) return <section ref={scrollToComment} className="sec" aria-label={skill + ' 코멘트'}>
+    <div className="sec-h"><h3 className="st">스킬 코멘트</h3></div>
+    {body}
+  </section>;
+  return <details className="card" onToggle={event => {
+    if (event.currentTarget.open) scrollToComment(event.currentTarget);
+  }}>
+    <summary style={{ display: 'flex', justifyContent: showSkill ? 'space-between' : 'flex-end' }}>{showSkill && <span>{skill}</span>}<span className="btn line sm" aria-label={`${skill} 코멘트`}>코멘트</span></summary>
+    {body}
+  </details>;
+}
+
 export function MemberRoadPage() {
   const demoTools = useAi(s => canUseDemo(s.status.demoMode));
-  const go = useGo();
-  const refresh = useRefreshTeam();
+  const [openComment, setOpenComment] = useState<{ planId: string; skill: string } | null>(null);
+  const [adjustmentPlanId, setAdjustmentPlanId] = useState<string | null>(null);
   const { pid = '' } = useParams();
   const { uid, member: e, gone, teamLoading } = useMemberGate();
-  const q = useMemberState(uid);
+  const q = useMemberState(uid, !gone && !teamLoading && !!e);
   const key = mk(uid, pid);
-  const draft = useWs((s) => s.mgr[key]);
-  useMarkSeen('roadmap', pid, detailShown({ gone, teamLoading, member: e }, !!q.data?.plans[pid]));
   if (gone) return <Navigate to={paths.team} replace />;
   if (teamLoading || !e) return <Loading text="서버에서 불러오는 중…" />;
   if (!q.data) return <Page back={paths.member(uid)} eyebrow={who(e)} title="확정한 로드맵"><MemberLoading q={q} /></Page>;
@@ -412,36 +501,36 @@ export function MemberRoadPage() {
   if (!R) return q.isFetching ? <Loading text="서버에서 소속 직원의 기록을 불러오는 중…" /> : <Navigate to={paths.member(uid)} replace />;
   const pl = R.plan;
   const live = R.status === 'active';
+  const adjustmentOpen = adjustmentPlanId === R.id;
   const cs = (R.comments || []).slice().reverse();
   const reps = q.data.reports.filter((r) => r.planId === R.id);
-  const okNew = !!(draft && draft.fit && draft.level);
-  const send = async () => {
-    if (!draft || !okNew) return;
-    try {
-      await teamApi.comment(pid, { fit: draft.fit || '', fitText: draft.fitText || '', level: draft.level || '', levelText: draft.levelText || '', free: draft.free || '' });
-      updateWs((s) => void (s.mgr[key] = {}));
-      await refresh(uid);
-      go(paths.commentSent(uid, pid));
-    } catch (err) {
-      failToast(err, '코멘트를 보내지 못했어요');
-    }
-  };
   return (
     <Page
       back={paths.member(uid)}
       eyebrow={`${who(e)} · ${trackName(pl.opt, pl.name)} v${pl.version} · ${R.createdAt} 확정${live ? '' : R.status === 'done' ? ' · 마침' : ' · 보관'}`}
       title={pl.displayTitle || pl.goal}
       lead={pl.displayTitle ? pl.goal : undefined}
-      foot={
-        live ? (
-          <button className="btn pri" disabled={!okNew} onClick={() => void send()}>
-            코멘트 보내기
-          </button>
-        ) : undefined
-      }
+
     >
       {/* 직원의 '내 로드맵'과 같은 구성(#96) — 읽기 전용 */}
-      <MemberRoadView R={R} />
+      <MemberRoadView R={R}
+        skillAction={skill => {
+          if (!live && !cs.some(comment => comment.skill === skill)) return null;
+          const open = openComment?.planId === R.id && openComment.skill === skill;
+          return <button type="button" className="link quiet small" aria-label={skill + ' 코멘트'} aria-expanded={open}
+            onClick={event => {
+              event.preventDefault();
+              event.stopPropagation();
+              const card = event.currentTarget.closest('details');
+              if (!open && card) card.open = true;
+              setOpenComment(open ? null : { planId: R.id, skill });
+            }}>코멘트</button>;
+        }}
+        skillFooter={skill => !pl.def.learningReport
+          ? <SkillComments uid={uid} R={R} skill={skill} showSkill />
+          : openComment?.planId === R.id && openComment.skill === skill
+            ? <SkillComments uid={uid} R={R} skill={skill} inline /> : null}
+      />
       {reps.length ? (
         <div className="sec">
           <div className="sec-h">
@@ -458,19 +547,21 @@ export function MemberRoadPage() {
       {cs.length ? (
         <div className="sec">
           <div className="sec-h">
-            <h2 className="st">코멘트 기록 {cs.length}</h2>
+            <h2 className="st">코멘트 기록 {cs.length} <span className="small muted">(보낸 {cs.filter(c => !c.deleted).length} · 삭제 {cs.filter(c => c.deleted).length})</span></h2>
           </div>
           <div className="stack">
-            {cs.map((c) => (
-              <MgrCmItem key={c.id} uid={uid} pid={pid} c={c} live={live} />
-            ))}
+            <ManagerCommentHistory uid={uid} R={R} comments={cs} />
           </div>
         </div>
       ) : null}
-      {live ? (
-        <div className="sec">
+      {live && <div className="actions">
+        <button type="button" className="btn line" aria-expanded={adjustmentOpen}
+          onClick={() => setAdjustmentPlanId(adjustmentOpen ? null : R.id)}>계획 조정 의견</button>
+      </div>}
+      {live && adjustmentOpen ? (
+        <section ref={scrollToComment} className="sec" aria-label="계획 조정 의견">
           <div className="sec-h">
-            <h2 className="st">{cs.length ? '새 코멘트' : '계획 조정 의견'}</h2>
+            <h2 className="st">계획 조정 의견</h2>
             {demoTools && <button
               className="link quiet"
               onClick={() => {
@@ -485,13 +576,14 @@ export function MemberRoadPage() {
             <CommentFields k={key} />
           </div>
           <Note>
-            새 코멘트는 앞서 보낸 코멘트를 덮어쓰지 않고 쌓여요(팀 DB 부서장 코멘트 표). 보낸 코멘트는 직원이 로드맵에 반영하기 전까지 ‘수정’으로 고칠 수 있고, 지울 수는 없어요.
+            새 코멘트는 앞서 보낸 코멘트를 덮어쓰지 않고 쌓여요. 직원이 로드맵에 반영하기 전까지 수정하거나 삭제할 수 있어요.
             직원이 확인했는지, 몇 번째 버전에 반영했는지 여기서 볼 수 있어요. 직원이 반영을 요청해 수정안을 확정해야 로드맵이 바뀌어요.
           </Note>
-        </div>
-      ) : (
+        </section>
+      ) : !live ? (
         <Note>직원이 {R.status === 'done' ? '마친' : '보관한'} 로드맵이에요. 코멘트는 진행 중인 로드맵에만 보낼 수 있어요.</Note>
-      )}
+      ) : null}
+      {live && <div className="actions"><CommentSendButton uid={uid} R={R} /></div>}
     </Page>
   );
 }
@@ -499,8 +591,7 @@ export function MemberRoadPage() {
 export function MemberReportPage() {
   const { rid = '' } = useParams();
   const { uid, member: e, gone, teamLoading } = useMemberGate();
-  const q = useMemberState(uid);
-  useMarkSeen('report', rid, detailShown({ gone, teamLoading, member: e }, !!q.data?.reports.some((x) => x.id === rid)));
+  const q = useMemberState(uid, !gone && !teamLoading && !!e);
   if (gone) return <Navigate to={paths.team} replace />;
   if (teamLoading || !e) return <Loading text="서버에서 불러오는 중…" />;
   if (!q.data) return <Page back={paths.member(uid)} eyebrow={who(e)} title="학습 결과 보고서"><MemberLoading q={q} /></Page>;
@@ -511,11 +602,20 @@ export function MemberReportPage() {
   return (
     <Page back={R ? paths.memberPlan(uid, R.id) : paths.member(uid)} eyebrow={`${who(e)} · 결과 보고서 · ${trackName(r.opt)} v${r.version} · ${r.createdAt}`} title="학습 결과 보고서" lead={r.goal}>
       <ReportBody r={r} />
+      {R && (() => {
+        const skills = commentSkillNames(R.plan)
+          .filter(skill => R.status === 'active' || R.comments?.some(comment => comment.skill === skill));
+        return skills.length > 0 && <section className="sec">
+          <div className="sec-h"><h2 className="st">스킬별 코멘트</h2></div>
+          <div className="stack">{skills.map(skill => <SkillComments key={skill} uid={uid} R={R} skill={skill} showSkill />)}</div>
+        </section>;
+      })()}
       <Note>
         {e.name} 님이 {r.confirmed ? '확인한' : '아직 확인하지 않은'} 보고서예요. 보고서 내용은 읽기만 할 수 있어요.
       </Note>
       {/* 같은 화면을 재사용해 다른 보고서로 옮겨도 쓰던 과제가 넘어가지 않게 로드맵별로 분리한다(PR #140 리뷰) */}
       <HeadReportTasks key={r.planId} planId={r.planId} memberName={e.name} />
+      {R?.status === 'active' && <div className="actions"><CommentSendButton uid={uid} R={R} /></div>}
     </Page>
   );
 }

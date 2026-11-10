@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 
 from .. import db, llm, regulation_embeddings
 from ..agents import runtime as rt
-from ..auth import Account, end_session, login, require_account, require_employee, start_session
+from ..auth import Account, end_session, hash_password, login, require_account, require_employee, start_session, verify_password
 from ..config import S, level_ok
 from ..errors import ApiError, provider_label, unavailable_reason
 from ..services import demo, goals, profile
@@ -69,6 +69,27 @@ def api_me(a: Account = Depends(require_account)):
 def api_profile(a: Account = Depends(require_employee)):
     v = profile.view(a.id)
     return dict(profile.spec(v), view=v)
+
+
+@r.put('/me/password', status_code=204)
+def api_change_password(body: dict, a: Account = Depends(require_employee)):
+    current, new = body.get('currentPassword'), body.get('newPassword')
+    if not isinstance(current, str) or not 1 <= len(current) <= 1024:
+        raise ApiError(422, 'PASSWORD_INVALID', '현재 비밀번호를 확인해 주세요.')
+    if not isinstance(new, str) or not 4 <= len(new) <= 128:
+        raise ApiError(422, 'PASSWORD_INVALID', '새 비밀번호는 4~128자로 입력해 주세요.')
+    if new == current:
+        raise ApiError(422, 'PASSWORD_INVALID', '현재 비밀번호와 다른 새 비밀번호를 입력해 주세요.')
+    row = db.one('SELECT password_hash FROM public.employees WHERE employee_id = :e', e=a.id)
+    stored = (row or {}).get('password_hash')
+    if not verify_password(stored, current):
+        raise ApiError(400, 'PASSWORD_INCORRECT', '현재 비밀번호가 맞지 않아요.')
+    replacement = hash_password(new)
+    with db.tx() as t:
+        if not t.run('UPDATE public.employees SET password_hash = :new WHERE employee_id = :e AND password_hash = :old',
+                     e=a.id, old=stored, new=replacement):
+            raise ApiError(409, 'PASSWORD_CHANGED', '비밀번호가 이미 변경됐어요. 현재 비밀번호를 다시 확인해 주세요.')
+    return Response(status_code=204)
 
 
 @r.put('/me/profile/self')

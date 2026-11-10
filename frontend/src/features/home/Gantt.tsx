@@ -113,6 +113,10 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
     groups.set(name, [...(groups.get(name) || []), activity]);
   }
   const names = [...skillOrder.filter(name => groups.has(name)), ...[...groups.keys()].filter(name => !skillOrder.includes(name))];
+  const courseStarts = [...new Set(acts.flatMap(activity => {
+    const resource = activity.res ? resources[activity.res] : undefined;
+    return resource?.type === 'course' || resource?.kind === '강좌' ? [activity.wFrom] : [];
+  }))].sort((a, b) => a - b);
   const shared=sharedCourses(acts,resources);
   const sharedIds=new Set(shared.map(course=>course.id));
   const when = (f: number, t: number) => `${f === t ? f : `${f}~${t}`}주차 · ${md(addDays(base, 7 * (f - 1)))}~${md(addDays(base, 7 * t - 1))}`;
@@ -270,6 +274,9 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
                     {as.filter(activity => !activity.res).map((a, i) => {
                       const task = !a.res;
                       const taskWeek = a.wTo || t;
+                      const nextCourseWeek = courseStarts.find(week => week > taskWeek) ?? taskWeek + 1;
+                      const taskMarkerStart = off + 7 * taskWeek - 3.5;
+                      const taskMarkerEnd = off + 7 * nextCourseWeek - 3.5;
                       const activityFrom = a.wFrom || taskWeek;
                       const activityTo = taskWeek;
                       const done = st(R.progress, a.id) === 'done';
@@ -295,7 +302,7 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
                                 className={`gt-bar act gt-task-submit${done ? ' done' : ''}`}
                                 aria-label={`${a.title} 과제물 제출`}
                                 onClick={() => openRecord(R.id, a.id)}
-                                style={gtPos(Math.max(0, off + 7 * taskWeek - 3.5), Math.min(T, off + 7 * taskWeek + 3.5), T)}
+                                style={gtPos(Math.max(0, taskMarkerStart), Math.min(T, taskMarkerEnd), T)}
                               >
                                 {done ? <Icon name="check" /> : null}
                               </button>
@@ -487,7 +494,7 @@ export function GanttOne({ R }: { R: PlanRecord }) {
   );
 }
 
-export function GanttAll({ list }: { list: PlanRecord[] }) {
+export function GanttAll({ list, onMove }: { list: PlanRecord[]; onMove?: (id: string, offset: number) => void }) {
   useClockRefresh();
   const go = useGo();
   const toggle = useFold();
@@ -513,6 +520,10 @@ export function GanttAll({ list }: { list: PlanRecord[] }) {
                   {at} · {trackName(pl.opt, pl.name)}
                 </small>
               </button>
+              {onMove && list.length > 1 && <>
+                <button type="button" className="btn line sm" aria-label={`${pl.goal} 위로`} disabled={i === 0} onClick={() => onMove(R.id, -1)}>↑</button>
+                <button type="button" className="btn line sm" aria-label={`${pl.goal} 아래로`} disabled={i === list.length - 1} onClick={() => onMove(R.id, 1)}>↓</button>
+              </>}
             </>
           }
           bar={

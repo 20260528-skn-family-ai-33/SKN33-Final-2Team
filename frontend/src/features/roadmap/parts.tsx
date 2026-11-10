@@ -84,7 +84,7 @@ export function RepAlert({ R }: { R: PlanRecord }) {
       <span className="grow">
         <b>결과 보고서가 나왔어요</b>
         <br />
-        <span className="small muted">확인하면 이 로드맵을 마친 것으로 기록해요</span>
+        <span className="small muted">결과 보고서에서 학습 내용을 확인할 수 있어요</span>
       </span>
       <Icon name="right" />
     </button>

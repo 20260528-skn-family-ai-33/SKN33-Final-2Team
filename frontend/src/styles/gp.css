@@ -679,7 +679,7 @@ details.more[open] > summary { margin-bottom: 12px; }
 }
 .notif-it:hover { background: var(--accent-soft2, rgba(0, 0, 0, .04)); }
 .notif-dot { width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; }
-.notif-it.new .notif-dot { background: var(--accent); }
+.notif-it.new .notif-dot { background: #e5484d; }
 .notif-tx { display: grid; gap: 2px; min-width: 0; }
 /* 창이 상단 띠 안에 있어 '.ribbon b'(흰 글자)를 받지 않게 색을 직접 정한다 */
 .ribbon .notif-panel b { color: var(--ink, #18191B); font-weight: 650; }
@@ -981,6 +981,12 @@ body:has(#toast:not([hidden])) .nfloat { bottom: 140px; }
   margin: 4px 0 0;
   font-weight: 700;
 }
+
+.roadmap-preview-reports {
+  border-top: 1px solid var(--line);
+  padding: 12px 16px;
+}
+.roadmap-preview-reports > h3 { margin: 0 0 8px; }
 
 .roadmap-preview-request {
   margin-top: 16px;

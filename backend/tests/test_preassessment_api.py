@@ -247,7 +247,7 @@ class ApiTests(unittest.TestCase):
         with patch.object(api.db,'tx',side_effect=lambda:transaction(Mock())),patch.object(api,'course_context',return_value=saved),patch.object(api,'course_input',return_value={'weeklyHours':4}),patch.object(api,'save_duration_proposals',side_effect=lambda *args,**kwargs:dict(saved,durationEstimates=args[5])),patch.object(api.runtime,'context') as context,patch.object(api.runtime,'llm_json') as generate,patch.object(api,'generation_guard') as lock:
             response=self.client.post(f'/api/v2/drafts/{self.pid}/recommendations/durations?course=A2',json={'generationId':saved['generationId'],'recommendationId':rid,'choices':saved['resourceChoices'],'skillOrder':['S']})
         self.assertEqual(response.status_code,200)
-        self.assertEqual(response.json()['durationEstimates']['S']['weeks'],3)
+        self.assertEqual(response.json()['durationEstimates']['S']['weeks'],2)
         context.assert_not_called();generate.assert_not_called();lock.assert_not_called()
 
 

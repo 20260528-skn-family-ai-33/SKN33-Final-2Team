@@ -4,7 +4,7 @@ export function displayOrder(order: string[], choices: Choices): string[] {
   return [...order.filter(name => choices[name]?.enabled !== false), ...order.filter(name => choices[name]?.enabled === false)];
 }
 
-export const DURATION_METHOD = 'resource-hours-books/v3';
+export const DURATION_METHOD = 'resource-hours-books/v4';
 export type DurationEstimate = {
   method?: string; weeks?: number | null; basis?: string; course?: string | null; courses?: string[]; books?: string[];
   startWeek?: number | null; endWeek?: number | null; addedWeeks?: number; totalWeeks?: number;

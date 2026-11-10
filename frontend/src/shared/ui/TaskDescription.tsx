@@ -10,7 +10,7 @@ export function TaskDescription({ text }: { text: string }) {
   const headings = [...text.matchAll(/(?:^|\n|\s)(만들\s*것|필수\s*항목|제출물|평가\s*기준)\s*[:：]/g)];
   const sections = headings.map((heading, index) => ({
     label: heading[1].replace(/\s+/g, '') === '만들것' ? '만들 것' : heading[1].replace(/\s+/g, '') === '필수항목' ? '필수 항목' : heading[1].replace(/\s+/g, '') === '평가기준' ? '평가 기준' : '제출물',
-    body: text.slice(heading.index! + heading[0].length, headings[index + 1]?.index ?? text.length).trim(),
+    body: text.slice(heading.index! + heading[0].length, headings[index + 1]?.index ?? text.length).trim().replace(/[;；]+$/, '.'),
   }));
   const introduction = headings.length ? text.slice(0, headings[0].index).trim() : '';
   const creation = sections.find(section => section.label === '만들 것');

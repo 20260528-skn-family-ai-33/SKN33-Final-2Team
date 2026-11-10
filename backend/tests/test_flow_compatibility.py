@@ -89,7 +89,7 @@ class FlowCompatibilityTests(unittest.TestCase):
   w,scoped=self.state();d=w['draft']
   option=activity_selection.selection_option(scoped,d,['task'])
   plan=drafts.RM.build_plan(option,{'hours':4},d['goal'])
-  self.assertEqual(plan['weeks'],3)
+  self.assertEqual(plan['weeks'],2)
   report=plan['def']['learningReport']
   self.assertEqual(report['recommendations']['skills'][0]['courses'][0]['id'],'c')
   self.assertEqual(report['skillDetails'][0]['competencySummary'],['검색 구성','검색 평가','결과 검증'])

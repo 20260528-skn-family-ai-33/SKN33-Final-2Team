@@ -334,6 +334,7 @@ function UseCard({ e }: { e: User }) {
 }
 
 export function MePage() {
+  const go = useGo();
   const e = useMe();
   const ed = useWs((s) => s.meEdit);
   const [err, setErr] = useState('');
@@ -408,6 +409,7 @@ export function MePage() {
     <Page
       eyebrow="내 정보"
       title={`${e.name} 님의 정보`}
+      titleAction={<button type="button" className="btn line sm" onClick={() => go(paths.password)}>비밀번호 변경</button>}
       lead="인사 정보와 권한은 팀 DB의 인사 데이터에서 가져와 고칠 수 없어요. 본인 입력 정보와 평정의 목표 추천 활용 동의는 직접 고칠 수 있고, 목표 후보 제안에 쓰여요."
     >
       <div className="me-page">

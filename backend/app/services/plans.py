@@ -95,10 +95,14 @@ def _base_rows(employee_id: int, roadmap_id: str | None = None) -> list[dict]:
             roadmap_id = str(uuid.UUID(str(roadmap_id)))
         except ValueError:
             return []
-    return db.all_("""SELECT r.roadmap_id, r.project_id, r.content, r.created_at, r.diagnostic_round_id, p.status, p.employee_id,
-                         m.version, m.done_at, m.archived_at, m.resumed_at
+    return db.all_("""SELECT r.roadmap_id, r.project_id, r.content, r.created_at, r.diagnostic_round_id,
+                         CASE WHEN report.created_at IS NOT NULL THEN 'COMPLETED' ELSE p.status::text END AS status,
+                         p.employee_id, m.version, coalesce(m.done_at, report.created_at) AS done_at, m.archived_at, m.resumed_at
                       FROM public.roadmaps r JOIN public.projects p ON p.project_id = r.project_id
                       LEFT JOIN app_ext.roadmap_meta m ON m.roadmap_id = r.roadmap_id
+                      LEFT JOIN LATERAL (
+                        SELECT max(g.created_at) AS created_at FROM public.growth_reports g WHERE g.roadmap_id = r.roadmap_id AND g.report_type = 'PRE_POST'
+                      ) report ON true
                       WHERE p.employee_id = :e AND p.status IN ('IN_PROGRESS', 'COMPLETED', 'ARCHIVED') AND r.content ? 'acts' AND r.content ? 'opt'
                         AND (CAST(:r AS uuid) IS NULL OR r.roadmap_id = CAST(:r AS uuid))
                       ORDER BY r.created_at""", e=employee_id, r=roadmap_id)
@@ -133,7 +137,9 @@ def _comments(roadmap_id: str) -> list[dict]:
     return [{'id': str(c['comment_id']), 'by': c['name'], 'byCode': c['employee_number'], 'fit': c['fit'] or 'none', 'fitText': c['fit_text'] or '',
              'level': c['level'] or 'none', 'levelText': c['level_text'] or '', 'free': c['free_text'] if c['fit'] else c['body'], 'at': _d(c['created_at']),
              'editedAt': _d(c['updated_at']) if c['updated_at'] > c['created_at'] else None, 'stamp': c['updated_at'].isoformat(),
-             'status': c['status'] or 'new', 'readAt': _d(c['read_at']), 'appliedVersion': c['applied_version']} for c in rows]
+             'status': c['status'] or 'new', 'readAt': _d(c['read_at']), 'appliedVersion': c['applied_version'],
+             **({'skill': skill} if (skill := _comment_skill(c['body'])) else {}),
+             **({'deleted': True, 'fit': 'none', 'free': '', 'editedAt': None} if c['fit'] == '__deleted__' else {})} for c in rows]
 
 
 def _post(row: dict, plan: dict) -> dict:
@@ -189,7 +195,7 @@ def post_deep_start(employee_id: int, roadmap_id: str) -> str | None:
     inp = {'goal': pl['goal'], 'acts': [a['title'] for a in pl['acts']], 'questions': A['questions'], 'pre': A['deep']['quiz']}
     with db.tx() as t:
         t.run("""INSERT INTO app_ext.post_checks(roadmap_id, deep) VALUES(:r, :d)
-                 ON CONFLICT (roadmap_id) DO UPDATE SET deep = EXCLUDED.deep, updated_at = now()""", r=row['roadmap_id'], d=db.J({'status': 'run', 'jobId': None}))
+                 ON CONFLICT (roadmap_id) DO UPDATE SET deep = (coalesce(app_ext.post_checks.deep, '{}'::jsonb) - ARRAY['status','jobId','fail','quiz','notes','mcq','essay']) || EXCLUDED.deep, updated_at = now()""", r=row['roadmap_id'], d=db.J({'status': 'run', 'jobId': None}))
 
     def work(job: jobs.JobCtx):
         ctx = rt.context(employee_id)
@@ -199,10 +205,10 @@ def post_deep_start(employee_id: int, roadmap_id: str) -> str | None:
                 raise AgentError('사후 심화 질문이 비어 있어요', ctx.provider)
         except AgentError as e:
             with db.tx() as t:
-                t.run('UPDATE app_ext.post_checks SET deep = :d, updated_at = now() WHERE roadmap_id = :r', d=db.J({'status': 'fail', 'fail': {'cause': e.info}}), r=row['roadmap_id'])
+                t.run("UPDATE app_ext.post_checks SET deep = (coalesce(deep, '{}'::jsonb) - ARRAY['status','jobId','fail','quiz','notes','mcq','essay']) || :d, updated_at = now() WHERE roadmap_id = :r", d=db.J({'status': 'fail', 'fail': {'cause': e.info}}), r=row['roadmap_id'])
             raise
         with db.tx() as t:
-            t.run('UPDATE app_ext.post_checks SET deep = :d, updated_at = now() WHERE roadmap_id = :r',
+            t.run("UPDATE app_ext.post_checks SET deep = (coalesce(deep, '{}'::jsonb) - ARRAY['status','jobId','fail','quiz','notes','mcq','essay']) || :d, updated_at = now() WHERE roadmap_id = :r",
                   d=db.J({'status': 'ready', 'quiz': out['deep'], 'notes': out.get('notes') or [], 'mcq': {}, 'essay': {}}), r=row['roadmap_id'])
         return {'ok': True}
     work._resume = {'operation':'plans.post_deep_start','kwargs':{'employee_id':employee_id,'roadmap_id':roadmap_id}}
@@ -226,6 +232,9 @@ def _revision(roadmap_id: str) -> dict | None:
 def record(row: dict, for_mgr: bool = False) -> dict:
     rid = str(row['roadmap_id'])
     plan = dict(row['content'], rid=rid)
+    if STATUS.get(row['status']) == 'active' and (plan.get('def') or {}).get('materialSchedule'):
+        from .duration_proposals import apply_plan_schedule
+        plan = apply_plan_schedule(plan)
     versions = [dict(v['plan'], rid=rid) for v in db.all_('SELECT plan FROM app_ext.roadmap_versions WHERE roadmap_id = :r ORDER BY version', r=row['roadmap_id'])] or [plan]
     for snapshot in [plan, *versions]:
         definition = snapshot.get('def') or {}
@@ -277,18 +286,29 @@ def _owned(employee_id: int, roadmap_id: str) -> dict:
     return rows[0]
 
 
-MGR_HIDDEN = ('deep', 'goalSelf', 'file', 'executionSnapshot')
+MGR_HIDDEN = ('deep', 'goalSelf', 'file', 'executionSnapshot', 'postQuizDetails')
 
 
 def reports(employee_id: int, for_mgr: bool = False) -> list[dict]:
-    rows = db.all_("""SELECT g.report_id, g.roadmap_id, g.report_content, g.created_at, coalesce(m.confirmed, false) AS confirmed
+    from .post_quiz import report_details
+
+    details_sql = "" if for_mgr else ", CASE WHEN pc.updated_at <= g.created_at THEN pc.deep END AS saved_post_check"
+    details_join = "" if for_mgr else "LEFT JOIN app_ext.post_checks pc ON pc.roadmap_id = g.roadmap_id"
+    rows = db.all_(f"""SELECT g.report_id, g.roadmap_id, g.report_content, g.created_at, coalesce(m.confirmed, false) AS confirmed
+                       {details_sql}
                       FROM public.growth_reports g JOIN public.projects p ON p.project_id = g.project_id LEFT JOIN app_ext.report_meta m ON m.report_id = g.report_id
+                       {details_join}
                       WHERE p.employee_id = :e AND g.report_content ? 'gained' ORDER BY g.created_at DESC""", e=employee_id)
     out = []
     for r in rows:
         # 수준값은 화면에 보내지 않는다. 부서장 화면에는 심화 질문 결과(10/23)와 사후 점검 원본 응답·첨부(목표 달성 답·결과물 파일 · PR #23 리뷰)를 빼고 보낸다
         c = {k: v for k, v in r['report_content'].items() if k != 'hidden' and not (for_mgr and k in (*MGR_HIDDEN,'quizEvidence','surveyEvidence'))}
         # 이전 보고서는 opt 에 Track 이름이 저장돼 있어 코스 ID로 대응시킨다(#78)
+        if not for_mgr and not c.get('postQuizDetails'):
+            saved = r.get('saved_post_check') or {}
+            details = report_details(saved.get('v2Quiz'), saved.get('v2Answers') or {})
+            if details:
+                c['postQuizDetails'] = details
         c.update(id=str(r['report_id']), planId=str(r['roadmap_id']), opt=course_id(c.get('opt')), confirmed=bool(r['confirmed']), createdAt=_d(r['created_at']))
         out.append(c)
     return out
@@ -329,11 +349,25 @@ def save_progress(employee_id: int, roadmap_id: str, act_id: str, body: dict) ->
     if activity is None:
         raise not_found('활동')
     st = body.get('status') if body.get('status') in ('doing', 'done') else 'doing'
-    resource = catalog.items().get(activity.get('res')) if activity.get('res') else None
+    completing_task = st == 'done' and activity.get('task') and activity.get('skill')
+    resources = catalog.items() if activity.get('res') or completing_task else {}
+    resource = resources.get(activity.get('res'))
+    required_courses = {
+        a['id'] for a in row['content']['acts']
+        if not a.get('task') and a.get('skill') == activity['skill']
+        and (resources.get(a.get('res'), {}).get('type') == 'course'
+             or resources.get(a.get('res'), {}).get('kind') == '강좌')
+    } if completing_task else set()
     shared = bool(resource and (resource.get('type') == 'course' or resource.get('kind') == '강좌') and not activity.get('task'))
     targets = [a['id'] for a in row['content']['acts'] if a['id'] == act_id or
                (shared and a.get('res') == activity.get('res') and not a.get('task'))]
     with db.tx() as t:
+        if required_courses:
+            done = {p['activity_id'] for p in t.all(
+                "SELECT activity_id FROM app_ext.activity_progress WHERE roadmap_id = CAST(:r AS uuid) AND status = 'done'",
+                r=roadmap_id)}
+            if required_courses - done:
+                raise ApiError(409, 'PREREQUISITE_COURSE_INCOMPLETE', '같은 스킬의 강좌를 먼저 완료해 주세요.')
         for target in targets:
             old = t.one('SELECT memo, attachment FROM app_ext.activity_progress WHERE roadmap_id = CAST(:r AS uuid) AND activity_id = :a', r=roadmap_id, a=target) or {}
             # Share status only; other skills keep their own notes and attachments.
@@ -426,6 +460,34 @@ def _rev_changes(r: dict, pl: dict) -> dict:
             'certRes': cert_res(raw)}
 
 
+def _skill_comment_option(out: dict, base: dict, targets: dict, skill: str, handoff: dict) -> dict:
+    from app.llm import LlmError
+    from .material_plan import rebuild_revision
+    old_ids = {a.get('res') for a in base['acts'] if a.get('skill') == skill}
+    old_tasks = {(a['title'], a.get('how') or '') for a in base['acts'] if a.get('skill') == skill and not a.get('res')}
+    proposals = [a for a in out['acts'] if a.get('skill') == skill]
+    courses = [a for a in proposals if a.get('res') and a['res'] not in old_ids
+               and (RM._res(a['res']) or {}).get('type') == 'course']
+    tasks = [a for a in proposals if not a.get('res') and (a['title'], a.get('how') or '') not in old_tasks]
+    if len(courses) != 1 or len(tasks) != 1:
+        raise ApiError(422, 'SKILL_REVISION_INVALID', '이 스킬의 새 강좌와 산출물을 하나씩 확인하지 못했어요. 다시 요청해 주세요.')
+    replacement = {targets['course']['id']: courses[0], targets['task']['id']: tasks[0]}
+    option = copy.deepcopy(base['def'])
+    option.pop('support', None)
+    option.pop('supportFail', None)
+    option['acts'] = [
+        dict(replacement[act['id']], key=None, skill=skill, stage=act['stage'])
+        if act['id'] in replacement else dict(act, key=act['id'])
+        for act in base['acts']
+    ]
+    option['summary'] = out.get('summary')
+    option['notes'] = out.get('notes')
+    try:
+        return rebuild_revision(option, base, handoff)
+    except LlmError as error:
+        raise ApiError(422, 'SKILL_REVISION_INVALID', str(error)) from error
+
+
 def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
     """수정안 작성(API-43). 확정하기 전까지 기존 로드맵은 그대로. 실패하면 가데이터로 대신하지 않는다"""
     from .drafts import handoff_prefs
@@ -433,7 +495,24 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
     if STATUS.get(row['status']) != 'active':
         raise ApiError(409, 'NOT_ACTIVE', '진행 중인 로드맵만 고칠 수 있어요')
     base = row['content']
+    retry_skill = body.get('retrySkill')
+    retry = None
+    if retry_skill is not None:
+        if not isinstance(retry_skill, str) or retry_skill not in ((base.get('def') or {}).get('learningReport') or {}).get('skillOrder', []):
+            raise ApiError(422, 'REVISION_SKILLS_INVALID', '다시 제안받을 스킬을 확인해 주세요.')
+        retry = _revision(str(row['roadmap_id']))
+        pending = (retry or {}).get('result') or {}
+        if not retry or retry['status'] != 'ready' or str(retry['revision_id']) != body.get('revisionId') or pending.get('fromComment') or pending.get('from') != base:
+            raise ApiError(409, 'REVISION_CHANGED', '현재 수정안을 다시 확인해 주세요.')
     rev = body.get('rev') or {}
+    comment = next((c for c in _comments(roadmap_id) if c['id'] == rev['fromComment']), None) if rev.get('fromComment') else None
+    if rev.get('fromComment') and not comment:
+        raise not_found('코멘트')
+    skill = (comment or {}).get('skill')
+    if comment and (comment.get('deleted') or comment.get('status') == 'applied'):
+        raise ApiError(409, 'COMMENT_UNAVAILABLE', '이미 반영했거나 삭제된 코멘트예요.')
+    if skill:
+        rev = dict(rev, on={})
     ch = _rev_changes(rev, base)
     prefs_h = handoff_prefs(ch['raw'])
     previous_handoff = dict(base.get('handoff') or {})
@@ -448,29 +527,76 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
                        details={**(previous_handoff.get('details') or {}), 'etc': constraint})
     req = str(rev.get('note') or '').strip()
     done = {p['activity_id'] for p in db.all_("SELECT activity_id FROM app_ext.activity_progress WHERE roadmap_id = :r AND status = 'done'", r=row['roadmap_id'])}
+    targets = {}
+    if skill:
+        for activity in base['acts']:
+            if activity.get('skill') != skill or activity['id'] in done:
+                continue
+            resource = activity.get('res')
+            if not resource:
+                targets.setdefault('task', activity)
+            elif (RM._res(resource) or {}).get('type') == 'course':
+                targets.setdefault('course', activity)
+        if len(targets) != 2:
+            raise ApiError(422, 'SKILL_REVISION_TARGET', '이 스킬에 교체 가능한 미완료 강좌와 산출물이 각각 필요해요.')
+        ch['c']['replaceActs'] = [{'key': a['id'], 'title': a['title']} for a in targets.values()]
+        ch['c']['replaceHint'] = f'{skill}의 지정 강좌 1개와 산출물 1개 교체. 강좌는 실제 카탈로그의 다른 강좌. 그 외 활동 유지.'
+        feedback = ' / '.join(comment.get(key) or '' for key in ('fit', 'fitText', 'level', 'levelText', 'free')).strip(' /')
+        req = f'{skill} 담당 부서장 의견: {feedback}\n{req}'.strip()
+    if (base.get('def') or {}).get('learningReport') and (skill or not rev.get('fromComment')):
+        req = (req + '\n도서 유지. 새 산출물 설명 형식: 만들 것:, 필수 항목:, 제출물:, 평가 기준:. 각 항목 내용 필수.').strip()
+    if retry:
+        req = (req + f'\n재요청 대상 스킬: {retry_skill}. 이 스킬의 강좌와 산출물만 새로 제안. 다른 스킬과 도서, 완료 활동 유지.').strip()
     inp = {'pid': ch['pid'], 'handoff': handoff,
            'changes': ch['c'], 'request': req or None, 'fromComment': rev.get('fromComment') or False,
            'plan': {k: base.get(k) for k in ('opt', 'name', 'tagline', 'def', 'hours', 'start')} | {'acts': [dict(a, done=a['id'] in done) for a in base['acts']]}}
-    with db.tx() as t:
-        t.run("UPDATE app_ext.roadmap_revisions SET status = 'discarded', updated_at = now() WHERE roadmap_id = :r AND status IN ('running', 'ready', 'failed')", r=row['roadmap_id'])
-        rev_id = str(t.val("INSERT INTO app_ext.roadmap_revisions(roadmap_id, request, status) VALUES(:r, :q, 'running') RETURNING revision_id",
-                           r=row['roadmap_id'], q=db.J(dict(rev, key=body.get('key')))))
+    if retry:
+        rev_id = str(retry['revision_id'])
+    else:
+        with db.tx() as t:
+            t.run("UPDATE app_ext.roadmap_revisions SET status = 'discarded', updated_at = now() WHERE roadmap_id = :r AND status IN ('running', 'ready', 'failed')", r=row['roadmap_id'])
+            rev_id = str(t.val("INSERT INTO app_ext.roadmap_revisions(roadmap_id, request, status) VALUES(:r, :q, 'running') RETURNING revision_id",
+                               r=row['roadmap_id'], q=db.J(dict(rev, key=body.get('key')))))
 
     def work(job: jobs.JobCtx):
         ctx = rt.context(employee_id)
         try:
             out = RM.revise(ctx, inp, sim=rt.sim_once(ctx, 'rev', str(body.get('key') or rev_id)))
+            if skill:
+                out = _skill_comment_option(out, base, targets, skill, handoff)
         except (AgentError, ApiError) as error:
             with db.tx() as t:
                 t.run("UPDATE app_ext.roadmap_revisions SET status = 'failed', error = :e, updated_at = now() WHERE revision_id = CAST(:i AS uuid) AND status = 'running'",
                       e=db.J({'cause': jobs.error_info(error)}), i=rev_id)
             raise
         d = RM.keep_ids(out, base, base['version'] + 1)
-        to = RM.build_plan(d, {'start': ch['start'], 'hours': prefs_h['weeklyHours'] or d.get('weeklyHours') or base['hours'] or D['autoHours'], 'format': prefs_h['formatKey'], 'patch': {}}, base['goal'])
+        if retry:
+            existing_ids = {activity['id'] for activity in base['acts']}
+            for activity in d['acts']:
+                if activity.get('skill') == retry_skill and activity['id'] not in existing_ids:
+                    activity['id'] = 'retry-' + uuid.uuid4().hex
+        if skill:
+            # 교체된 산출물에는 이전 완료 기록을 연결하지 않는다.
+            for index, activity in enumerate(d['acts']):
+                if activity['id'] == targets['task']['id']:
+                    activity['id'] = f"{base['opt'].lower()}-v{base['version'] + 1}-task-{index + 1}"
+        to = RM.build_plan(d, {'start': ch['start'], 'hours': base['hours'] if skill else prefs_h['weeklyHours'] or d.get('weeklyHours') or base['hours'] or D['autoHours'], 'format': prefs_h['formatKey'], 'patch': {}}, base['goal'])
+        if retry:
+            pending = retry['result']
+            updated = _mix_revision_skills(pending['to'], to, handoff, [retry_skill], done)
+            with db.tx() as t:
+                changed = t.run("""UPDATE app_ext.roadmap_revisions SET result = :result, updated_at = now()
+                                   WHERE revision_id = CAST(:i AS uuid) AND status = 'ready' AND result = CAST(:previous AS jsonb)""",
+                                i=rev_id, result=db.J(dict(pending, to=updated)), previous=db.J(pending))
+                if not changed:
+                    raise ApiError(409, 'REVISION_CHANGED', '수정안이 변경됐어요. 다시 확인해 주세요.')
+            return {'revisionId': rev_id}
         summary = str(out.get('summary') or '').strip()
         pd = {'from': base, 'to': to, 'key': body.get('key'), 'request': req, 'fromComment': rev.get('fromComment') or False, 'summary': summary, 'notes': out.get('notes') or [],
               'source': d.get('source'), 'prefsFrom': base.get('prefs'), 'prefsTo': ch['raw'], 'handoff': handoff,
               'label': f"{'부서장 코멘트 반영' if rev.get('fromComment') else '수정 요청 반영'}{' · ' + summary if summary else ''}"[:70]}
+        if skill:
+            pd['skillComment'] = {'stamp': comment['stamp'], 'targets': [a['id'] for a in targets.values()]}
         # 지원 조건: 자료·자격·기간·비용이 그대로면 이전 버전의 확인 결과, 바뀌었으면 규정 에이전트가 이 버전을 다시 확인(설계서 v1.7 SCR-RM-06)
         sup = (base.get('def') or {}).get('support')
         if sup and RM.sup_sig(to) == RM.sup_sig(base):
@@ -484,6 +610,8 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
         return {'revisionId': rev_id}
     work._resume = {'operation':'plans.revise_start','kwargs':{'employee_id':employee_id,'roadmap_id':roadmap_id,'body':body}}
     jid = jobs.start('revision', employee_id, roadmap_id, work)
+    if retry:
+        return {'revisionId': rev_id, 'jobId': jid}
     with db.tx() as t:
         t.run('UPDATE app_ext.roadmap_revisions SET job_id = CAST(:j AS uuid) WHERE revision_id = CAST(:i AS uuid)', j=jid, i=rev_id)
     return {'revisionId': rev_id, 'jobId': jid}
@@ -550,13 +678,77 @@ def revision_support_retry(employee_id: int, roadmap_id: str) -> str | None:
     return revision_support(employee_id, roadmap_id, str(rv['revision_id']))
 
 
-def accept_revision(employee_id: int, roadmap_id: str, revision_id: str) -> dict:
+def _mix_revision_skills(current: dict, proposal: dict, handoff: dict, selected: list[str], done: set[str]) -> dict:
+    from app.llm import LlmError
+    from .material_plan import rebuild_revision
+    old_report = (current.get('def') or {}).get('learningReport') or {}
+    new_report = (proposal.get('def') or {}).get('learningReport') or {}
+    old_names = old_report.get('skillOrder') or []
+    new_names = set(new_report.get('skillOrder') or [])
+    if (not isinstance(selected, list) or not selected
+            or any(not isinstance(name, str) or name not in old_names or name not in new_names for name in selected)
+            or len(set(selected)) != len(selected) or current['opt'] != proposal['opt']):
+        raise ApiError(422, 'REVISION_SKILLS_INVALID', '확정할 스킬 선택을 다시 확인해 주세요.')
+    chosen = set(selected)
+    activities = []
+    for name in old_names:
+        old = [a for a in current['acts'] if a.get('skill') == name]
+        book_ids = set((old_report.get('choices', {}).get(name) or {}).get('books') or [])
+        book_ids.update((new_report.get('choices', {}).get(name) or {}).get('books') or [])
+        new = old
+        if name in chosen:
+            new = [a for a in proposal['acts'] if a.get('skill') == name and a.get('res') not in book_ids]
+            if not new:
+                raise ApiError(422, 'REVISION_SKILLS_INVALID', '추천 활동이 없는 스킬은 기존 계획을 유지해 주세요.')
+            for index, activity in enumerate(old):
+                if activity.get('res') in book_ids:
+                    new.insert(index, activity)
+        old_by_id = {a['id']: a for a in old}
+        new_by_id = {a['id']: a for a in new}
+        if any(a['id'] in done and (
+            a['id'] not in new_by_id or any(new_by_id[a['id']].get(key) != a.get(key) for key in ('res', 'title', 'how'))
+        ) for a in old):
+            raise ApiError(409, 'REVISION_CHANGED', '완료한 활동은 바꿀 수 없어요. 기존 안을 선택해 주세요.')
+        activities.extend(dict(a, key=a['id'] if a['id'] in old_by_id else None) for a in new)
+    activities.extend(dict(a, key=a['id']) for a in current['acts'] if a.get('skill') not in old_names)
+    if len({a['id'] for a in activities}) != len(activities):
+        raise ApiError(422, 'REVISION_SKILLS_INVALID', '추천 활동이 겹쳐요. 수정안을 다시 만들어 주세요.')
+    option = copy.deepcopy(current['def'])
+    option['acts'] = activities
+    option.pop('support', None)
+    option.pop('supportFail', None)
+    try:
+        option = rebuild_revision(option, current, handoff)
+    except LlmError as error:
+        raise ApiError(422, 'REVISION_SKILLS_INVALID', str(error)) from error
+    for a in option['acts']:
+        a.pop('key', None)
+    result = RM.build_plan(option, {'start': current['start'], 'hours': current['hours'], 'format': current.get('format')}, current['goal'])
+    if RM.sup_sig(result) == RM.sup_sig(current) and current['def'].get('support'):
+        result['def']['support'] = copy.deepcopy(current['def']['support'])
+    return result
+
+
+def accept_revision(employee_id: int, roadmap_id: str, revision_id: str, selected_skills: list[str] | None = None) -> dict:
     row = _owned(employee_id, roadmap_id)
     with db.tx() as t:
         rv = t.one("SELECT result, status FROM app_ext.roadmap_revisions WHERE revision_id = CAST(:i AS uuid) AND roadmap_id = :r FOR UPDATE", i=revision_id, r=row['roadmap_id'])
         if not rv or rv['status'] != 'ready':
             raise ApiError(409, 'NO_REVISION', '확정할 수정안이 없어요')
         pd, cur = rv['result'], row['content']
+        if selected_skills is not None:
+            if pd.get('fromComment'):
+                raise ApiError(422, 'REVISION_SKILLS_INVALID', '코멘트 수정안은 기존 확정 방식을 사용해 주세요.')
+            current_row = t.one('SELECT content FROM public.roadmaps WHERE roadmap_id = :r FOR UPDATE', r=row['roadmap_id'])
+            if not current_row or current_row['content'] != pd['from']:
+                raise ApiError(409, 'REVISION_CHANGED', '로드맵이 바뀌었어요. 수정안을 다시 요청해 주세요.')
+            cur = current_row['content']
+            done = {item['activity_id'] for item in t.all(
+                "SELECT activity_id FROM app_ext.activity_progress WHERE roadmap_id = :r AND status = 'done'", r=row['roadmap_id'])}
+            handoff = cur.get('handoff') or pd['handoff']
+            pd = dict(pd, to=_mix_revision_skills(cur, pd['to'], handoff, selected_skills, done),
+                      prefsTo=cur.get('prefs'), handoff=handoff)
+
         changed = pd['to']['opt'] != cur['opt']
         from .drafts import selection_of
         plan = dict(pd['to'], version=cur['version'] + 1, confirmedAt=today(), why=pd['label'], assess=cur.get('assess'), prefs=pd['prefsTo'], handoff=pd['handoff'],
@@ -567,6 +759,23 @@ def accept_revision(employee_id: int, roadmap_id: str, revision_id: str) -> dict
         # 최초 확정 근거는 수정 모델의 결과로 교체하거나 새로 만들지 않는다.
         baseline_row = t.one('SELECT baseline_content FROM public.roadmaps WHERE roadmap_id = :r FOR UPDATE', r=row['roadmap_id']) or {}
         baseline = baseline_row.get('baseline_content') or {}
+        scoped = pd.get('skillComment')
+        if scoped:
+            source = t.one("""SELECT c.updated_at, m.fit, m.status
+                               FROM public.roadmap_comments c LEFT JOIN app_ext.comment_meta m USING (comment_id)
+                               WHERE c.comment_id = CAST(:c AS uuid) AND c.roadmap_id = :r FOR UPDATE OF c""",
+                           c=pd['fromComment'], r=row['roadmap_id'])
+            if (not source or source['fit'] == '__deleted__' or source['status'] == 'applied'
+                    or source['updated_at'].isoformat() != scoped['stamp']):
+                raise ApiError(409, 'COMMENT_UNAVAILABLE', '코멘트가 변경됐어요. 수정안을 다시 요청해 주세요.')
+            current = t.val('SELECT content FROM public.roadmaps WHERE roadmap_id = :r', r=row['roadmap_id'])
+            if current != pd['from']:
+                raise ApiError(409, 'REVISION_CHANGED', '로드맵이 변경됐어요. 수정안을 다시 요청해 주세요.')
+            done_ids = {item['activity_id'] for item in t.all(
+                "SELECT activity_id FROM app_ext.activity_progress WHERE roadmap_id = :r AND status = 'done'",
+                r=row['roadmap_id'])}
+            if done_ids.intersection(scoped['targets']):
+                raise ApiError(409, 'REVISION_CHANGED', '완료한 활동이 있어요. 수정안을 다시 요청해 주세요.')
         evidence = baseline.get('selectionEvidence') if isinstance(baseline, dict) else None
         if not isinstance(evidence, dict):
             evidence = cur.get('selectionEvidence')
@@ -605,12 +814,20 @@ def read_comment(employee_id: int, roadmap_id: str, comment_id: str) -> dict:
     return record(_owned(employee_id, roadmap_id))
 
 
-def _comment_body(fit: str, fit_text: str, level: str, level_text: str, free: str) -> str:
+_COMMENT_SKILL_PREFIX = '대상 스킬: '
+
+
+def _comment_skill(body: str | None) -> str:
+    first = (body or '').split('\n', 1)[0]
+    return first.removeprefix(_COMMENT_SKILL_PREFIX) if first.startswith(_COMMENT_SKILL_PREFIX) else ''
+
+
+def _comment_body(fit: str, fit_text: str, level: str, level_text: str, free: str, skill: str = '') -> str:
     lb = lambda lst, v: next((l for x, l in lst if x == v), '의견 없음')  # noqa: E731
     lines = [f"업무 적합성: {lb(D['commentFit'], fit)}{' — ' + fit_text if fit_text else ''}", f"수준·기간·분량: {lb(D['commentLevel'], level)}{' — ' + level_text if level_text else ''}"]
     if free:
         lines.append(f'자유 의견: {free}')
-    return '\n'.join(lines)
+    return '\n'.join([_COMMENT_SKILL_PREFIX + skill, *lines] if skill else lines)
 
 
 def _comment_target(head_id: int, member_id: int, roadmap_id: str, verb: str) -> dict:
@@ -625,49 +842,118 @@ def _comment_target(head_id: int, member_id: int, roadmap_id: str, verb: str) ->
 def _comment_fields(body: dict) -> dict:
     f = {'fit': body.get('fit'), 'fitText': (body.get('fitText') or '').strip(), 'level': body.get('level'), 'levelText': (body.get('levelText') or '').strip(),
          'free': (body.get('free') or '').strip()}
+    if not any(f.values()):
+        raise ApiError(422, 'COMMENT_FIELDS', '보낼 의견을 입력해 주세요')
+    f['fit'] = f['fit'] or 'none'
+    f['level'] = f['level'] or 'none'
     if f['fit'] not in {x for x, _ in D['commentFit']} or f['level'] not in {x for x, _ in D['commentLevel']}:
-        raise ApiError(422, 'COMMENT_FIELDS', '업무 적합성과 수준·기간·분량을 골라 주세요')
+        raise ApiError(422, 'COMMENT_FIELDS', '선택한 코멘트 항목을 확인해 주세요')
     return f
 
 
-def send_comment(head_id: int, member_id: int, roadmap_id: str, body: dict) -> str:
+def send_comments(head_id: int, member_id: int, roadmap_id: str, bodies: list[dict]) -> list[str]:
+    if not isinstance(bodies, list) or not 1 <= len(bodies) <= 100 or any(not isinstance(body, dict) for body in bodies):
+        raise ApiError(422, 'COMMENT_FIELDS', '보낼 코멘트를 확인해 주세요')
     row = _comment_target(head_id, member_id, roadmap_id, '보낼')
-    f = _comment_fields(body)
+    entries = []
+    for body in bodies:
+        skill = body.get('skill', '')
+        if skill != '':
+            plan = row['content']
+            learning = (plan.get('def') or {}).get('learningReport') or {}
+            choices = learning.get('choices') or {}
+            if choices:
+                allowed = {name for name, choice in choices.items() if choice.get('enabled') is not False}
+            else:
+                allowed = {entry.get('name') for entry in (plan.get('def') or {}).get('learningSkills') or []}
+                for activity in plan.get('acts') or []:
+                    allowed.add(activity.get('skill'))
+                    allowed.update(activity.get('skills') or [])
+            if not isinstance(skill, str) or '\n' in skill or '\r' in skill or skill not in allowed:
+                raise ApiError(422, 'COMMENT_SKILL_INVALID', '이 로드맵의 스킬을 선택해 주세요')
+        entries.append((skill, _comment_fields(body)))
+    ids = []
     with db.tx() as t:
         # 시연 초기화가 먼저 끝났다면 이미 사라진 대상에 코멘트를 쓰지 않는다.
         t.lock_workspace(member_id)
         if not t.val('SELECT 1 FROM public.roadmaps WHERE roadmap_id = :r', r=row['roadmap_id']):
             raise not_found('로드맵')
         t.actor(head_id)
-        cid = str(t.val('INSERT INTO public.roadmap_comments(roadmap_id, author_employee_id, body) VALUES(:r, :a, :b) RETURNING comment_id', r=row['roadmap_id'], a=head_id,
-                        b=_comment_body(f['fit'], f['fitText'], f['level'], f['levelText'], f['free'])))
-        t.run("""INSERT INTO app_ext.comment_meta(comment_id, fit, fit_text, level, level_text, free_text, status) VALUES(CAST(:c AS uuid), :f, :ft, :l, :lt, :fr, 'new')""",
-              c=cid, f=f['fit'], ft=f['fitText'], l=f['level'], lt=f['levelText'], fr=f['free'])
-        NT.comment_sent(t, head_id, member_id, str(row['roadmap_id']), cid)  # 새 코멘트 알림(#96). 고칠 때는 보내지 않는다
-    return cid
+        for skill, f in entries:
+            cid = str(t.val('INSERT INTO public.roadmap_comments(roadmap_id, author_employee_id, body) VALUES(:r, :a, :b) RETURNING comment_id', r=row['roadmap_id'], a=head_id,
+                            b=_comment_body(f['fit'], f['fitText'], f['level'], f['levelText'], f['free'], skill)))
+            t.run("""INSERT INTO app_ext.comment_meta(comment_id, fit, fit_text, level, level_text, free_text, status) VALUES(CAST(:c AS uuid), :f, :ft, :l, :lt, :fr, 'new')""",
+                  c=cid, f=f['fit'], ft=f['fitText'], l=f['level'], lt=f['levelText'], fr=f['free'])
+            ids.append(cid)
+        NT.comment_sent(t, head_id, member_id, str(row['roadmap_id']), ids[0])
+    return ids
+
+
+def send_comment(head_id: int, member_id: int, roadmap_id: str, body: dict) -> str:
+    return send_comments(head_id, member_id, roadmap_id, [body])[0]
+
+
+def delete_comment(head_id: int, member_id: int, roadmap_id: str, comment_id: str) -> None:
+    row = _comment_target(head_id, member_id, roadmap_id, '지울')
+    with db.tx() as t:
+        comment = t.one('SELECT author_employee_id FROM public.roadmap_comments WHERE comment_id = CAST(:c AS uuid) AND roadmap_id = :r FOR UPDATE',
+                        c=comment_id, r=row['roadmap_id'])
+        if not comment:
+            raise not_found('코멘트')
+        if comment['author_employee_id'] != head_id:
+            raise forbidden('내가 보낸 코멘트만 지울 수 있어요')
+        meta = t.one('SELECT fit, status FROM app_ext.comment_meta WHERE comment_id = CAST(:c AS uuid) FOR UPDATE', c=comment_id) or {}
+        if meta.get('fit') == '__deleted__':
+            return
+        if meta.get('status') == 'applied':
+            raise ApiError(409, 'COMMENT_APPLIED', '이미 로드맵에 반영한 코멘트는 지울 수 없어요')
+        t.actor(head_id)
+        t.run("UPDATE public.roadmap_comments SET body = CASE WHEN body LIKE '대상 스킬: %' THEN split_part(body, chr(10), 1) || chr(10) || '삭제된 코멘트' ELSE '삭제된 코멘트' END WHERE comment_id = CAST(:c AS uuid)", c=comment_id)
+        # 기존 필드로 삭제 표시를 남기고 구조화된 본문을 비운다.
+        t.run("""INSERT INTO app_ext.comment_meta(comment_id, fit, status) VALUES(CAST(:c AS uuid), '__deleted__', 'read')
+                 ON CONFLICT (comment_id) DO UPDATE SET fit = '__deleted__', status = 'read',
+                   fit_text = NULL, level = NULL, level_text = NULL, free_text = NULL""", c=comment_id)
+        # 묶음의 대표 코멘트를 삭제해도 같은 전송에 남은 코멘트로 알림을 유지한다.
+        t.run("""UPDATE app_ext.notifications n
+                   SET comment_id = sibling.comment_id
+                  FROM public.roadmap_comments removed
+                  CROSS JOIN LATERAL (
+                    SELECT c.comment_id FROM public.roadmap_comments c
+                    LEFT JOIN app_ext.comment_meta m USING (comment_id)
+                    WHERE c.roadmap_id = removed.roadmap_id
+                      AND c.author_employee_id = removed.author_employee_id
+                      AND c.created_at = removed.created_at AND c.comment_id <> removed.comment_id
+                      AND m.fit IS DISTINCT FROM '__deleted__'
+                    ORDER BY c.comment_id LIMIT 1
+                  ) sibling
+                 WHERE removed.comment_id = CAST(:c AS uuid) AND n.comment_id = removed.comment_id
+                   AND n.read_at IS NULL""", c=comment_id)
+        t.run("DELETE FROM app_ext.notifications WHERE comment_id = CAST(:c AS uuid) AND read_at IS NULL", c=comment_id)
 
 
 def edit_comment(head_id: int, member_id: int, roadmap_id: str, comment_id: str, body: dict) -> bool:
-    """보낸 코멘트 고치기(10/23 사용자 요청 · 삭제는 직원에게 혼선을 줘서 두지 않음).
+    """보낸 코멘트 고치기.
     직원이 수정안으로 반영하기 전(새·확인함)까지만 고칠 수 있고, 고치면 직원에게 다시 '새 코멘트'로 보인다. 이전 내용은 남기지 않는다(덮어쓰기).
     바뀐 값이 없으면 저장하지 않고 False"""
     row = _comment_target(head_id, member_id, roadmap_id, '고칠')
     f = _comment_fields(body)
     with db.tx() as t:
-        c = t.one('SELECT author_employee_id FROM public.roadmap_comments WHERE comment_id = CAST(:c AS uuid) AND roadmap_id = :r FOR UPDATE', c=comment_id, r=row['roadmap_id'])
+        c = t.one('SELECT author_employee_id, body FROM public.roadmap_comments WHERE comment_id = CAST(:c AS uuid) AND roadmap_id = :r FOR UPDATE', c=comment_id, r=row['roadmap_id'])
         if not c:
             raise not_found('코멘트')
         if c['author_employee_id'] != head_id:
             raise forbidden('내가 보낸 코멘트만 고칠 수 있어요')
         # 직원의 수정안 확정(accept_revision)이 같은 행을 'applied' 로 바꾸므로 잠근 뒤 상태를 본다
         m = t.one('SELECT fit, fit_text, level, level_text, free_text, status FROM app_ext.comment_meta WHERE comment_id = CAST(:c AS uuid) FOR UPDATE', c=comment_id) or {}
+        if m.get('fit') == '__deleted__':
+            raise not_found('코멘트')
         if m.get('status') == 'applied':
             raise ApiError(409, 'COMMENT_APPLIED', '직원이 이미 로드맵에 반영한 코멘트라 고칠 수 없어요', '새 의견은 새 코멘트로 보내 주세요')
         if m and [m['fit'], m['fit_text'] or '', m['level'], m['level_text'] or '', m['free_text'] or ''] == [f['fit'], f['fitText'], f['level'], f['levelText'], f['free']]:
             return False
         t.actor(head_id)
         t.run('UPDATE public.roadmap_comments SET body = :b WHERE comment_id = CAST(:c AS uuid)', c=comment_id,
-              b=_comment_body(f['fit'], f['fitText'], f['level'], f['levelText'], f['free']))
+              b=_comment_body(f['fit'], f['fitText'], f['level'], f['levelText'], f['free'], _comment_skill(c.get('body'))))
         t.run("""INSERT INTO app_ext.comment_meta(comment_id, fit, fit_text, level, level_text, free_text, status) VALUES(CAST(:c AS uuid), :f, :ft, :l, :lt, :fr, 'new')
                  ON CONFLICT (comment_id) DO UPDATE SET fit = :f, fit_text = :ft, level = :l, level_text = :lt, free_text = :fr, status = 'new', read_at = NULL""",
               c=comment_id, f=f['fit'], ft=f['fitText'], l=f['level'], lt=f['levelText'], fr=f['free'])
@@ -745,14 +1031,22 @@ def _report_deep(row: dict, A: dict) -> dict | None:
     return {'concepts': concepts, 'essays': essays}
 
 
+def _finish_report_plan(t: db.Tx, project_id, roadmap_id) -> None:
+    t.run("UPDATE public.projects SET status = 'COMPLETED', updated_at = now() WHERE project_id = :p AND status <> 'COMPLETED'", p=project_id)
+    t.run('UPDATE app_ext.roadmap_meta SET done_at = coalesce(done_at, now()) WHERE roadmap_id = :r', r=roadmap_id)
+    t.run("UPDATE app_ext.roadmap_revisions SET status = 'discarded', updated_at = now() WHERE roadmap_id = :r AND status IN ('running', 'ready', 'failed')", r=roadmap_id)
+
+
 def report_start(employee_id: int, roadmap_id: str) -> str:
     row = _owned(employee_id, roadmap_id)
+    if STATUS.get(row.get('status')) == 'done':
+        raise ApiError(409, 'REPORT_COMPLETED', '종료된 로드맵의 결과 보고서는 다시 만들 수 없어요.')
     rec = record(row)
     pl, post = rec['plan'], rec['post']
     A = pl['assess']
     if not all(post['answers'].get(q['id']) for q in A['questions']) or not post['goalSelf']:
         raise ApiError(409, 'POST_INCOMPLETE', '사후 점검 문항과 목표 달성에 모두 답해 주세요')
-    from .post_quiz import validate as validate_quiz, comparison as quiz_comparison
+    from .post_quiz import validate as validate_quiz, comparison as quiz_comparison, report_details
     from .post_quiz import with_survey,questions
     stored=(db.one('SELECT deep FROM app_ext.post_checks WHERE roadmap_id = :r',r=row['roadmap_id']) or {}).get('deep') or {}
     if questions(pl) and not stored.get('v2Quiz'):raise ApiError(409,'POST_QUIZ_REQUIRED','사후 퀴즈를 먼저 완료해 주세요.')
@@ -797,6 +1091,9 @@ def report_start(employee_id: int, roadmap_id: str) -> str:
         # 생성한 설명이 아니라 동일 문항 ID로 대응한 실제 응답을 보고서 시점에 보존한다.
         r['surveyEvidence']=[dict(item) for item in items]
         if quiz_evidence:r['quizEvidence']=quiz_evidence
+        post_quiz_details = report_details(stored.get('v2Quiz'), post.get('quizAnswers') or {})
+        if post_quiz_details:
+            r['postQuizDetails'] = post_quiz_details
         if deep_inp:
             # 보고서에는 개념별 사전→사후 결과와 영역별 서술형 판단만(부서장 화면에는 보내지 않음 · reports(for_mgr))
             judge = out.get('judge') or {}
@@ -815,6 +1112,7 @@ def report_start(employee_id: int, roadmap_id: str) -> str:
             t.run('UPDATE public.diagnostic_rounds SET post_completed_at = now() WHERE diagnostic_round_id = :d', d=row['diagnostic_round_id'])
             t.run('UPDATE app_ext.post_checks SET running = false, fail = NULL WHERE roadmap_id = :r', r=row['roadmap_id'])
             # 보고서 작성 완료 알림(#82): 본인·부서장. 위에서 지운 이전 보고서의 알림은 함께 지워졌다(report_id ON DELETE CASCADE)
+            _finish_report_plan(t, row['project_id'], row['roadmap_id'])
             NT.report_created(t, employee_id, str(row['roadmap_id']), rep_id)
         return {'reportId': rep_id}
     work._resume = {'operation':'plans.report_start','kwargs':{'employee_id':employee_id,'roadmap_id':roadmap_id}}
@@ -835,13 +1133,15 @@ def confirm_report(employee_id: int, report_id: str) -> dict:
             from .report_snapshot import matches
             progress={str(item['activity_id']):{'status':item['status'],'memo':item.get('memo') or '', 'file':item.get('attachment')}
                 for item in t.all('SELECT activity_id,status,memo,attachment FROM app_ext.activity_progress WHERE roadmap_id = :r FOR UPDATE',r=r['roadmap_id'])}
-            if not matches(snapshot,dict(r['content'],acts=tracked_acts(r['content'])),progress):
-                raise ApiError(409,'REPORT_STALE','보고서 작성 후 실행 기록이 바뀌었어요. 최신 기록으로 보고서를 다시 만든 뒤 종료해 주세요.')
+            stored = r['content']
+            if not matches(snapshot, dict(stored, acts=tracked_acts(stored)), progress):
+                from .duration_proposals import apply_plan_schedule
+                refreshed = apply_plan_schedule(stored)
+                if not matches(snapshot, dict(refreshed, acts=tracked_acts(refreshed)), progress):
+                    raise ApiError(409,'REPORT_STALE','보고서 작성 후 실행 기록이 바뀌었어요. 최신 기록으로 보고서를 다시 만든 뒤 종료해 주세요.')
         t.run('INSERT INTO app_ext.report_meta(report_id, confirmed, confirmed_at) VALUES(:i, true, now()) ON CONFLICT (report_id) DO UPDATE SET confirmed = true, confirmed_at = now()',
               i=r['report_id'])
-        t.run("UPDATE public.projects SET status = 'COMPLETED', updated_at = now() WHERE project_id = :p AND status <> 'COMPLETED'", p=r['project_id'])
-        t.run('UPDATE app_ext.roadmap_meta SET done_at = coalesce(done_at, now()) WHERE roadmap_id = :r', r=r['roadmap_id'])
-        t.run("UPDATE app_ext.roadmap_revisions SET status = 'discarded', updated_at = now() WHERE roadmap_id = :r AND status IN ('running', 'ready', 'failed')", r=r['roadmap_id'])
+        _finish_report_plan(t, r['project_id'], r['roadmap_id'])
     return {'planStatus': 'done', 'planId': str(r['roadmap_id'])}
 
 

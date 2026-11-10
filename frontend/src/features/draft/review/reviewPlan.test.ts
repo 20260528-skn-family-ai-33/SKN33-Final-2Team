@@ -23,17 +23,17 @@ describe('검토 선택과 확정 계획의 시간 기준', () => {
   it('카탈로그 전역 캐시 없이 현재 자료로 상단·카드를 함께 계산하고 원본을 보존한다', () => {
     const {materials, proposal, handoff} = fixture(), original = structuredClone(proposal);
     const result = reviewPlan(proposal, [proposal], {}, materials, handoff, 'SQL');
-    expect(result.plan).toMatchObject({weeks: 4, materialHours: 18.5, taskHours: 8, totalH: 26.5, cost: 1000, costUnknown: true});
-    expect(result.acts.find(act => act.res === 'book')).toMatchObject({hours: 5, catalogHours: 10, hoursAllocation: 'book-week'});
+    expect(result.plan).toMatchObject({weeks: 3, materialHours: 13.5, taskHours: 8, totalH: 21.5, cost: 1000, costUnknown: true});
+    expect(result.acts.find(act => act.res === 'book')).toMatchObject({hours: 10, catalogHours: 10});
     const card = renderToStaticMarkup(createElement(ReviewSkillBlocks, {materials, acts: result.acts, selectedIds: proposal.selectedIds, busy: false}));
     const stats = renderToStaticMarkup(createElement(Stats, {pl: result.plan}));
-    expect(card).toContain('도서 1주 배정 · 5시간'); expect(card).not.toContain('계획 10시간');
-    expect(stats).toContain('과제 별도 8시간'); expect(proposal).toEqual(original);
+    expect(card).toContain('일정 산정 제외'); expect(card).not.toContain('계획 10시간');
+    expect(stats).toContain('강좌 시간 기준 · 13시간 30분'); expect(stats).not.toContain('과제 별도'); expect(proposal).toEqual(original);
   });
   it('과제를 해제하면 합계에서만 제외하고 카드에는 재선택할 활동을 남긴다', () => {
     const {materials, proposal, handoff} = fixture(); proposal.selectedIds = ['c', 'b'];
     const result = reviewPlan(proposal, [proposal], {}, materials, handoff, 'SQL');
-    expect(result.plan).toMatchObject({weeks: 4, taskHours: 0, totalH: 18.5});
+    expect(result.plan).toMatchObject({weeks: 3, taskHours: 0, totalH: 13.5});
     expect(result.plan.acts.map(act => act.id)).toEqual(['c', 'b']);
     expect(result.acts.map(act => act.id)).toContain('t');
   });
@@ -43,7 +43,7 @@ describe('검토 선택과 확정 계획의 시간 기준', () => {
     alternative.option.acts[2] = {...alternative.option.acts[2], id: 'new-task', hours: 3};
     proposal.selectedIds = ['c', 'b', 'new-task'];
     const result = reviewPlan(proposal, [proposal, alternative], {SQL: 'new'}, materials, handoff, 'SQL');
-    expect(result.plan).toMatchObject({taskHours: 3, totalH: 21.5, weeks: 4});
+    expect(result.plan).toMatchObject({taskHours: 3, totalH: 16.5, weeks: 3});
     expect(result.acts.some(act => act.id === 't')).toBe(false);
     expect(result.acts.find(act => act.id === 'new-task')?.hours).toBe(3);
   });
@@ -53,7 +53,7 @@ describe('검토 선택과 확정 계획의 시간 기준', () => {
     expect(reviewPlan(JSON.parse(JSON.stringify(proposal)), [proposal], {}, materials, handoff, 'SQL')).toEqual(first);
     handoff.prefs.weeklyHours = 10;
     const next = reviewPlan(proposal, [proposal], {}, materials, handoff, 'SQL');
-    expect(next.plan).toMatchObject({weeks: 3, materialHours: 23.5, taskHours: 8});
+    expect(next.plan).toMatchObject({weeks: 2, materialHours: 13.5, taskHours: 8});
     expect(next.acts.find(act => act.res === 'book')).toMatchObject({hours: 10, catalogHours: 10});
   });
   it('단계 이전 과제는 표시·합계에서 제외하고 현재 선택 자료의 기간은 유지한다', () => {

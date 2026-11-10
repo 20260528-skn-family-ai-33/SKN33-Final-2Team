@@ -1,17 +1,18 @@
 /* 부서장이 보는 직원 로드맵 본문(#96) — 직원의 '내 로드맵'(roadmap/RoadmapPages RoadView)과 같은 구성을 읽기 전용으로 보여 준다.
    실행 기록 열기·과제물 제출·진행 상태 바꾸기는 두지 않는다. 메모·첨부 등 공개 범위 밖 값은 서버가 보내지 않는다(services/plans.record for_mgr) */
+import type { ReactNode } from 'react';
 import type { PlanRecord } from '@/api/types/plan';
 import { ReviewSkillBlocks, type ReviewMaterials } from '@/features/draft/review/ReviewSkillBlocks';
 import { weekNow } from '@/features/home/ganttCalc';
 import { RoadmapActivityList, RoadmapResources } from '@/features/roadmap/RoadmapLearning';
-import { groupLearningActivities } from '@/features/roadmap/roadmapLearningData';
+import { commentSkillNames, groupLearningActivities } from '@/features/roadmap/roadmapLearningData';
 import { SkillMap } from '@/features/skillmap/SkillMap';
 import { st, trackedActs } from '@/shared/lib/plan';
 import { useCatalog } from '@/shared/state/catalog';
 import { useClockRefresh } from '@/shared/state/demoClock';
 import { Stats } from '@/shared/ui/parts';
 
-export function MemberRoadView({ R }: { R: PlanRecord }) {
+export function MemberRoadView({ R, skillAction, skillFooter }: { R: PlanRecord; skillAction?: (skill: string) => ReactNode; skillFooter?: (skill: string) => ReactNode }) {
   const resources = useCatalog((state) => state.res);
   const pl = R.plan;
   const learning = pl.def.learningReport as ReviewMaterials | undefined;
@@ -21,7 +22,7 @@ export function MemberRoadView({ R }: { R: PlanRecord }) {
   const current =
     R.status === 'active'
       ? groupLearningActivities(pl, resources)
-          .filter((group) => group.activities.some((a) => a.wFrom <= week && week <= a.wTo) && trackedActs(group.activities).some((a) => st(R.progress, a.id) !== 'done'))
+          .filter((group) => trackedActs(group.activities).some((a) => a.wFrom <= week && week <= a.wTo && st(R.progress, a.id) !== 'done'))
           .map((group) => group.name)
       : [];
   return (
@@ -36,14 +37,18 @@ export function MemberRoadView({ R }: { R: PlanRecord }) {
           materials={learning}
           acts={pl.acts.filter((act): act is typeof act & { skill: string; how: string; hours: number } => !!act.skill).map((act) => ({ ...act, how: act.how || '' }))}
           selectedIds={pl.acts.map((act) => act.id)}
+          progress={R.progress}
           currentSkillNames={current}
+          skillAction={skillAction}
+          skillFooter={skillFooter}
         />
       ) : (
-        <SkillMap pl={pl} owned={[]} />
+        <>
+          <SkillMap pl={pl} owned={[]} />
+          {commentSkillNames(pl).map(skill => <div key={skill}>{skillFooter?.(skill)}</div>)}
+        </>
       )}
-      <div className="sec">
-        <RoadmapActivityList R={R} readOnly />
-      </div>
+      <RoadmapActivityList R={R} readOnly skipSkillCardDuplicates />
     </>
   );
 }

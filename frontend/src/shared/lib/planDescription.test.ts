@@ -40,10 +40,10 @@ describe('계산값과 AI 설명 분리', () => {
       expect(html).not.toContain('4.5'); expect(html).not.toContain('66,000'); expect(html).toContain('SQL 검증');
     }
   });
-  it('대표 기간은 자료 기준이고 과제·도서 기준을 함께 표시한다', () => {
+  it('대표 기간의 상세는 강좌 시간만 표시한다', () => {
     const html = renderToStaticMarkup(createElement(Stats, { pl: { weeks: 4, hours: 5, cost: 66000, costUnknown: true, durationBasis: 'materials-only', materialHours: 18.5, taskHours: 8 } }));
-    expect(html).toContain('자료 학습 예상 기간'); expect(html).toContain('산출물 과제 시간 제외');
-    expect(html).toContain('도서 1권 = 1주'); expect(html).toContain('18시간 30분'); expect(html).toContain('8시간');
+    expect(html).toContain('자료 학습 예상 기간'); expect(html).toContain('강좌 시간 기준');
+    expect(html).not.toContain('도서 1권 = 1주'); expect(html).toContain('18시간 30분'); expect(html).not.toContain('과제 별도');
     expect(html).toContain('66,000'); expect(html).toContain('일부 비용 확인 필요');
   });
   it('도서는 배정시간과 원래 카탈로그 참고값을 구분하고 구형 활동은 그대로 둔다', () => {

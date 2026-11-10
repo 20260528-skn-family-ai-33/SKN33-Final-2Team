@@ -9,7 +9,7 @@ from app.agents.resource_recommendations import (
     RecommendationError, validate_choices, validate_skill_order,
 )
 
-METHOD = 'resource-hours-books/v3'
+METHOD = 'resource-hours-books/v4'
 
 
 def positive(value):
@@ -42,8 +42,7 @@ def _ceil(value: Decimal) -> int:
 def resource_schedule(recommendations: dict, choices: dict, order: list[str], weekly_hours) -> dict:
     """첫 참조에 자료를 배정하고 이후 참조는 같은 구간을 사용한다.
 
-    올림은 누적 작업량에만 적용한다. 도서는 고유 ID당 1주이며, 주 중간에
-    시작한 자료의 달력 구간은 그 작업량보다 길 수 있다.
+    강좌만 일정에 배정하고, 도서는 선택 목록에 보존한다.
     """
     weekly = positive(weekly_hours)
     if weekly is None:
@@ -70,7 +69,8 @@ def resource_schedule(recommendations: dict, choices: dict, order: list[str], we
             raise RecommendationError('선택한 강좌의 시간 근거를 확인해 주세요.')
     budget = Decimal(str(weekly))
     cursor = 0
-    course_slots, book_slots, skill_book_slots, estimates = {}, {}, {}, {}
+    course_slots, estimates = {}, {}
+    books = {rid for name in active for rid in choices[name]['books']}
     course_counts = {}
     for name in active:
         for rid in _courses(choices[name]):
@@ -97,15 +97,7 @@ def resource_schedule(recommendations: dict, choices: dict, order: list[str], we
                                          hours=None if status == 'unknown' else hours, timeStatus=status)
                 course_added += w
             slots.append(course_slots[rid])
-        book_added = 0
         own_slots = []
-        for rid in sorted(choice['books']):
-            slot = dict(allocate_weeks(1), id=rid)
-            book_slots.setdefault(rid, slot)
-            skill_book_slots[(name, rid)] = slot
-            slots.append(slot)
-            own_slots.append(slot)
-            book_added += 1
         for rid in _courses(choice):
             if course_counts.get(rid, 0) <= 1 or course_added > 0:
                 own_slots.append(course_slots[rid])
@@ -120,8 +112,8 @@ def resource_schedule(recommendations: dict, choices: dict, order: list[str], we
         estimates[name] = {**deepcopy(context), 'weeks': end - start + 1 if window_slots else 0,
                            'startWeek': start, 'endWeek': end,
                            'addedWeeks': cursor - before,
-                           'courseWeeks': course_added, 'bookWeeks': book_added,
-                           'basis': ' · '.join(filter(None, ['강좌 ID별 시간 1회 합산 후 전체 올림 + 도서 ID별 1주', note])),
+                           'courseWeeks': course_added, 'bookWeeks': 0,
+                           'basis': ' · '.join(filter(None, ['강좌 시간 기준 · 도서 일정 제외', note])),
                            'method': METHOD, 'scheduleKey': key,
                            'course': choice.get('course'), 'courses': _courses(choice),
                            'books': sorted(choice['books']), 'unknownCourses': unknown, 'estimatedCourses': estimated,
@@ -129,7 +121,7 @@ def resource_schedule(recommendations: dict, choices: dict, order: list[str], we
     total = cursor
     for estimate in estimates.values():
         estimate['totalWeeks'] = total
-    return {'estimates': estimates, 'weeks': total, 'courses': course_slots, 'books': book_slots, 'skillBooks': skill_book_slots}
+    return {'estimates': estimates, 'weeks': total, 'courses': course_slots, 'books': books}
 
 
 def calculate_durations(project, recommendations, choices, order, weekly_hours):
@@ -173,14 +165,22 @@ def apply_plan_schedule(plan: dict) -> dict:
     option['materialSchedule'] = schedule_rows(schedule['estimates'])
     plan['weeks'] = schedule['weeks']
     seen_courses = set()
-    seen_books = set()
     seen_other = set()
     material_hours = Decimal(0)
     task_hours = Decimal(0)
     other_material_hours = Decimal(0)
     for activity in plan['acts']:
         name, rid = activity.get('skill'), activity.get('res')
-        resource_slot = schedule['courses'].get(rid) or schedule.get('skillBooks', {}).get((name, rid)) or schedule['books'].get(rid)
+        if rid in schedule['books']:
+            # 호환용 활동 주차는 남기되, 별도 일정과 주당 배정 시간은 제거한다.
+            if activity.pop('hoursAllocation', None) == 'book-week':
+                activity['hours'] = activity.get('catalogHours') or 0
+            activity.setdefault('catalogHours', activity['hours'])
+            activity.pop('resourceWindow', None)
+            activity.pop('hoursBasis', None)
+            activity.pop('hoursEstimated', None)
+            activity.pop('timeStatus', None)
+        resource_slot = schedule['courses'].get(rid)
         slot = resource_slot
         slot = slot or schedule['estimates'].get(name)
         if slot:
@@ -196,23 +196,13 @@ def apply_plan_schedule(plan: dict) -> dict:
                 else:
                     activity['hours'] = plan['hours']
                     activity['hoursBasis'] = '강좌 시간 미확인: 일정 계산용으로 1주 배정'
-            if rid in schedule['books']:
-                # 카탈로그 참고 시간과 이 계획에서 배정한 시간은 서로 다른 값이다.
-                activity.setdefault('catalogHours', activity.get('hours'))
-                activity['hours'] = plan['hours']
-                activity['hoursAllocation'] = 'book-week'
-                activity['hoursEstimated'] = True
-                activity['hoursBasis'] = '도서 1권당 1주 배정(주당 학습시간 기준), 실제 독서시간 아님'
         if rid in schedule['courses']:
             if rid in seen_courses:
                 continue
             seen_courses.add(rid)
             hours = activity['hours']
         elif rid in schedule['books']:
-            if rid in seen_books:
-                continue
-            seen_books.add(rid)
-            hours = plan['hours']
+            continue
         elif not rid:
             task_hours += Decimal(str(positive(activity.get('hours')) or 0))
             continue
