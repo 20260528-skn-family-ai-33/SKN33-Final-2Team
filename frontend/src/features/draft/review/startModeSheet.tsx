@@ -35,7 +35,8 @@ export function chooseStartMode(proceed: (mode?: StartMode) => void): void {
     proceed();
     return;
   }
-  const options = startOptions(active);
+  const canArchive = !ws().draft.demoSeeded;
+  const options = startOptions(active).filter(option => canArchive || option.mode !== 'archive');
   const only = active.length === 1 ? active[0].plan : null;
   openSheet({
     title: '새 로드맵을 언제 시작할까요?',
@@ -63,7 +64,7 @@ export function chooseStartMode(proceed: (mode?: StartMode) => void): void {
             </button>
           ))}
         </div>
-        {active.some((R) => R.pending) ? <Note>보관하면 만들어 둔 수정안은 버려요.</Note> : null}
+        {canArchive && active.some((R) => R.pending) ? <Note>보관하면 만들어 둔 수정안은 버려요.</Note> : null}
       </>
     ),
     foot: () => (

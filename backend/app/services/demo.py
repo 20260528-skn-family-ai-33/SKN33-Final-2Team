@@ -1,7 +1,6 @@
 """시연 도구: 처음 상태로 초기화 · 단계로 바로 이동 (4차 GP.act.reset · GP.seed 를 서버로 옮김 · 설계서 부록 A 시연 전용).
 
-로그인한 직원의 기록(작성 중인 로드맵·확정 로드맵·점검·보고서·받은 코멘트)만 지우고 다시 만든다. 다른 직원의 기록은 건드리지 않는다.
-시연 데이터는 가데이터 규칙(에이전트 mock 함수)으로 만든다. '코멘트 받은 뒤'는 내 계획을 보는 부서장 이름으로 예시 코멘트를 넣는다.
+단계 이동에서 만든 프로젝트만 교체한다. 코멘트 예시는 화면에서만 보여 준다.
 """
 from __future__ import annotations
 
@@ -22,10 +21,20 @@ STAGES = ['start', 'details', 'quiz', 'result', 'options', 'review', 'active', '
 
 def reset(employee_id: int) -> None:
     with db.tx() as t:
-        t.run('DELETE FROM public.projects WHERE employee_id = :e', e=employee_id)
+        _clear_seeded_projects(t, employee_id)
+
+
+def _clear_seeded_projects(t: db.Tx, employee_id: int) -> None:
+    t.lock_workspace(employee_id)
+    # 이전 버전의 데이터는 출처를 증명할 수 없다. 실제 부서장이 의견을 남긴 시연 계획도 보존한다.
+    t.run("""DELETE FROM public.projects p WHERE p.employee_id = :e
+             AND p.draft_choices @> '{"demoSeeded": true}'
+             AND NOT EXISTS (SELECT 1 FROM public.roadmaps r JOIN public.roadmap_comments c USING (roadmap_id)
+                             WHERE r.project_id = p.project_id)""", e=employee_id)
 
 
 def _new_project(t: db.Tx, employee_id: int, w: dict) -> str:
+    w['demoSeeded'] = True
     pid = str(t.val("""INSERT INTO public.projects(employee_id, project_name, status, current_stage, tech_stack, milestones, key_issues, deliverables,
                        validation_criteria, draft_conversations, draft_choices) VALUES(:e, '새 로드맵(작성 중)', 'DRAFTING', 1, '[]', '[]', '[]', '[]', '[]', '[]', :w)
                        RETURNING project_id""", e=employee_id, w=db.J(w)))
@@ -33,14 +42,14 @@ def _new_project(t: db.Tx, employee_id: int, w: dict) -> str:
     return pid
 
 
-def _confirm_into(t: db.Tx, employee_id: int, d: dict, pid_opt: str, goal: str | None = None, existing_project: str | None = None) -> str:
+def _confirm_into(t: db.Tx, employee_id: int, d: dict, pid_opt: str, goal: str | None = None, existing_project: str | None = None) -> tuple[str, dict]:
     """시연용 확정: 진단(문항·응답)을 담은 프로젝트에 로드맵을 넣는다. 두 번째 로드맵은 같은 진단을 복사한 새 프로젝트"""
     g = d['gen']
     o = g['options'][pid_opt]
     plan = RM.build_plan(o, RM.params_of(d['handoff'], o), goal or d['goal'])
     plan.update(version=1, confirmedAt=DR.today(), why='최초 확정', assess={'questions': d['quiz']['questions'], 'answers': dict(d['answers']), 'domain': d['quiz']['domain']},
                 prefs=copy.deepcopy(d['prefs']), handoff=d['handoff'], selection=DR.selection_of(o))
-    w = {'gp5': 1, 'confirmed': True}
+    w = {'gp5': 1, 'confirmed': True, 'demoSeeded': True}
     pj = existing_project or _new_project(t, employee_id, {'gp5': 1, 'draft': dict(d, goal=goal or d['goal']), 'draftPlan': None, 'lastNew': None})
     if not existing_project:
         d2 = copy.deepcopy(d)
@@ -53,7 +62,7 @@ def _confirm_into(t: db.Tx, employee_id: int, d: dict, pid_opt: str, goal: str |
     roadmap_id = PL.insert_roadmap(t, pj, rid, plan)
     t.run("UPDATE public.projects SET status = 'IN_PROGRESS', current_stage = 7, project_goal = :g, project_name = :n, draft_choices = :w WHERE project_id = CAST(:p AS uuid)",
           g=plan['goal'], n=plan['goal'][:255], w=db.J(dict(w, roadmapId=roadmap_id)), p=pj)
-    return roadmap_id
+    return roadmap_id, plan
 
 
 def _progress(t: db.Tx, roadmap_id: str, act_id: str, status: str, memo: str = '') -> None:
@@ -65,17 +74,19 @@ def _progress(t: db.Tx, roadmap_id: str, act_id: str, status: str, memo: str = '
 def jump(employee_id: int, stage: str) -> dict:
     if stage not in STAGES:
         raise ApiError(400, 'BAD_STAGE', '알 수 없는 시연 단계예요')
-    me = profile.view(employee_id)
-    if stage == 'comment' and not me.get('mySupervisor'):
-        raise ApiError(409, 'NO_SUPERVISOR', '내 계획을 보는 부서장이 없는 계정이라 이 단계는 쓸 수 없어요')
-    reset(employee_id)
-    if stage == 'start':
+    if stage == 'comment':
+        # 읽기 전용 미리보기. 다른 단계의 시연 기록도 바꾸지 않는다.
         return {'entry': 'home'}
     sc = D['scenario']
     d = DR.fresh_draft()
     d['goal'] = sc['goal']
     w = {'gp5': 1, 'draft': d, 'draftPlan': None, 'lastNew': None}
     with db.tx() as t:
+        _clear_seeded_projects(t, employee_id)
+        if stage == 'start':
+            return {'entry': 'home'}
+        if stage in ('details', 'quiz', 'result', 'options', 'review') and DR._current_row(t, employee_id):
+            raise ApiError(409, 'EXISTING_DRAFT', '작성 중인 로드맵이 있어 이 계정에 시연 초안을 열 수 없어요')
         if stage == 'details':
             w['lastNew'] = 'new-details'
             _new_project(t, employee_id, w)
@@ -102,6 +113,7 @@ def jump(employee_id: int, stage: str) -> dict:
         d['handoff'] = DR.build_handoff(d)
         d['genPrefs'] = copy.deepcopy(d['prefs'])
         d['gen'] = {'key': d['handoff']['key'], 'options': {pid: RM._mock_option({'pid': pid, 'handoff': d['handoff']}) for pid in D['optionOrder']}, 'missing': []}
+        me = profile.view(employee_id, t=t)
         for pid, o in d['gen']['options'].items():
             o['support'] = REG._mock_support_one(DR._sup_input(pid, o['name'], RM.build_plan(o, RM.params_of(d['handoff'], o), d['goal'])), me) \
                 if REG.regstore.set_for(me.get('empGroup')) else REG.support_scope(me)
@@ -115,48 +127,45 @@ def jump(employee_id: int, stage: str) -> dict:
             w['lastNew'] = 'new-review'
             DR._write(t, pj, w)
             return {'entry': 'new-review'}
-        rid = _confirm_into(t, employee_id, d, 'A3', existing_project=pj)
-    # 진행 기록·코멘트·사후 점검·보고서
-    plan = PL._base_rows(employee_id, rid)[0]['content']
-    ids = [a['id'] for a in plan['acts']]
-    with db.tx() as t:
+        rid, plan = _confirm_into(t, employee_id, d, 'A3', existing_project=pj)
+        ids = [a['id'] for a in plan['acts']]
         for i in ids[:2]:
             _progress(t, rid, i, 'done')
         _progress(t, rid, ids[2], 'doing', '공개 가능 여부를 확인한 규정 6건까지 정리했어요.')
         if stage == 'multi':
-            rid2 = _confirm_into(t, employee_id, d, 'A1', goal=D['scenario2Goal'])
-            # 같은 트랜잭션 안에서 읽는다(아직 커밋 전이라 다른 연결로는 안 보임)
-            first = t.val('SELECT content FROM public.roadmaps WHERE roadmap_id = CAST(:r AS uuid)', r=rid2)['acts'][0]['id']
-            _progress(t, rid2, first, 'done')
-    if stage in ('active', 'multi'):
-        return {'entry': 'home'}
-    if stage == 'comment':
-        sup = me['mySupervisor']
-        c = D['commentSample']
-        PL.send_comment(int(sup['id']), employee_id, rid, {'fit': c['fit'], 'fitText': c['fitText'], 'level': c['level'], 'levelText': c['levelText'], 'free': c['free']})
-        return {'entry': 'home'}
-    with db.tx() as t:
+            rid2, second = _confirm_into(t, employee_id, d, 'A1', goal=D['scenario2Goal'])
+            _progress(t, rid2, second['acts'][0]['id'], 'done')
+        if stage in ('active', 'multi'):
+            return {'entry': 'home'}
         for i in ids[2:-1]:
             _progress(t, rid, i, 'done')
         _progress(t, rid, ids[-1], 'doing', '팀 시연 일정 조율 중')
-    if stage == 'post':
-        return {'entry': f'post:{rid}'}
-    PL.save_post(employee_id, rid, {'answers': dict(sc['post']), 'goalSelf': '4', 'file': {'name': '규정QA_시제품_시연메모.pdf', 'size': 240000}})
-    row = PL._base_rows(employee_id, rid)[0]
-    rec = PL.record(row)
-    pl, post, A = rec['plan'], rec['post'], rec['plan']['assess']
-    items = [{'id': q['id'], 'area': q['area'], 'text': q['text'], 'skill': DG.skill_label(q.get('skill') or ''), 'pre': A['answers'].get(q['id']), 'post': post['answers'].get(q['id'])} for q in A['questions']]
+        if stage == 'post':
+            return {'entry': f'post:{rid}'}
+        return _seed_report(t, pj, rid, plan, d)
+
+
+def _seed_report(t: db.Tx, project_id: str, rid: str, pl: dict, d: dict) -> dict:
+    A = pl['assess']
+    answers = dict(D['scenario']['post'])
+    attachment = {'name': '규정QA_시제품_시연메모.pdf', 'size': 240000}
+    post_draft = dict(d, quiz=copy.deepcopy(d['quiz']), answers=answers)
+    DR._save_questions(t, project_id, post_draft, kind='POST')
+    DR._save_answers(t, project_id, post_draft, kind='POST')
+    t.run("INSERT INTO app_ext.post_checks(roadmap_id, goal_self, attachment) VALUES(CAST(:r AS uuid), 4, :f)",
+          r=rid, f=db.J(attachment))
+    items = [{'id': q['id'], 'area': q['area'], 'text': q['text'], 'skill': DG.skill_label(q.get('skill') or ''), 'pre': A['answers'].get(q['id']), 'post': answers.get(q['id'])} for q in A['questions']]
     tracked = PL.tracked_acts(pl)
-    done = [a['title'] for a in tracked if (rec['progress'].get(a['id']) or {}).get('status') == 'done']
-    rest = [a['title'] for a in tracked if (rec['progress'].get(a['id']) or {}).get('status') != 'done']
+    last_id = pl['acts'][-1]['id']
+    done = [a['title'] for a in tracked if a['id'] != last_id]
+    rest = [a['title'] for a in tracked if a['id'] == last_id]
     out = DG._mock_report({'goal': pl['goal'], 'opt': 'A3', 'domain': A.get('domain'), 'items': items, 'doneTitles': done, 'restTitles': rest, 'total': len(tracked)})
     r = {'planId': rid, 'version': 1, 'goal': pl['goal'], 'opt': pl['opt'], 'gained': [{'skill': x['skill'], 'from': x['pre'], 'to': x['post']} for x in items if DG.rose(x['pre'], x['post'])],
          'still': [{'skill': x['skill'], 'from': x['pre'], 'to': x['post']} for x in items if not DG.rose(x['pre'], x['post'])], 'doneTitles': done, 'restTitles': rest,
-         'goalSelf': D['goalSelf'][3], 'file': post.get('file'), 'good': out['good'], 'improve': out['improve'], 'next': out['next'],
-         'hidden': {'pre': d['diag']['level'], 'post': DG.level_of(A['questions'], post['answers'])}}
-    with db.tx() as t:
-        rep = str(t.val("INSERT INTO public.growth_reports(project_id, roadmap_id, report_type, report_content) VALUES(:p, :r, 'PRE_POST', :c) RETURNING report_id",
-                        p=row['project_id'], r=row['roadmap_id'], c=db.J(r)))
-        t.run('INSERT INTO app_ext.report_meta(report_id) VALUES(CAST(:i AS uuid))', i=rep)
-        t.run('UPDATE public.diagnostic_rounds SET post_completed_at = now() WHERE diagnostic_round_id = :d', d=row['diagnostic_round_id'])
+         'goalSelf': D['goalSelf'][3], 'file': attachment, 'good': out['good'], 'improve': out['improve'], 'next': out['next'],
+         'hidden': {'pre': d['diag']['level'], 'post': DG.level_of(A['questions'], answers)}}
+    rep = str(t.val("INSERT INTO public.growth_reports(project_id, roadmap_id, report_type, report_content) VALUES(CAST(:p AS uuid), CAST(:r AS uuid), 'PRE_POST', :c) RETURNING report_id",
+                    p=project_id, r=rid, c=db.J(r)))
+    t.run('INSERT INTO app_ext.report_meta(report_id) VALUES(CAST(:i AS uuid))', i=rep)
+    t.run('UPDATE public.diagnostic_rounds SET post_completed_at = now() WHERE project_id = CAST(:p AS uuid) AND round_number = 1', p=project_id)
     return {'entry': f'report:{rep}'}

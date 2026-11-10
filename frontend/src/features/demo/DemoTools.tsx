@@ -1,4 +1,4 @@
-/* 시연 도구 (5차 gp-core.js modeBox·jump·reset·agent-log) — 로그인한 계정의 서버 기록만 바꾼다.
+/* 시연 도구 (5차 gp-core.js modeBox·jump·reset·agent-log) — 로그인한 계정에 만든 시연 기록을 교체한다.
    '에이전트 동작 보기'는 시연·디버그 전용이라 누가 호출했든 모든 계정의 호출을 보여 준다(직원·관리자 화면 공통 · 2026-10-26).
    VITE_DEMO_TOOLS가 명시적 on이고 서버도 demoMode:true를 알릴 때만 표시한다. 서버 조회 실패·구버전 응답은 숨긴다. */
 import { useState } from 'react';
@@ -9,10 +9,11 @@ import { addDays, md, ymd } from '@/features/home/ganttCalc';
 import { useGo } from '@/shared/hooks/useGo';
 import { failToast } from '@/shared/lib/fail';
 import { canUseDemo } from '@/shared/lib/demoAccess';
+import { D } from '@/shared/constants/data';
 import { ai, ping, PROV, resetConn, setDemoMock, setFailSim, useAi, useAiMode } from '@/shared/state/ai';
 import { isoDay, setDemoDay, useDemoDay } from '@/shared/state/demoClock';
 import { dataReset } from '@/shared/state/events';
-import { isSup, useMe } from '@/shared/state/session';
+import { useMe } from '@/shared/state/session';
 import { closeSheet, openSheet, toast } from '@/shared/state/ui';
 import { updateWs, useWs } from '@/shared/state/workspace';
 import { Icon } from '@/shared/ui/Icon';
@@ -26,7 +27,7 @@ export const JUMPS: [string, string][] = [
   ['review', '확정 직전'],
   ['active', '로드맵 실행 중'],
   ['multi', '로드맵 2개 함께 진행'],
-  ['comment', '코멘트 받은 뒤'],
+  ['comment', '코멘트 예시 미리보기'],
   ['post', '사후 점검부터'],
   ['report', '결과 보고서'],
 ];
@@ -189,8 +190,13 @@ export function DemoTools() {
   const srv = serverLine(status);
 
   const jump = async (stage: string) => {
-    if (stage === 'comment' && !me.mySupervisor) {
-      toast('내 계획을 보는 부서장이 없는 계정이라 이 단계는 쓸 수 없어요');
+    if (stage === 'comment') {
+      const sample = D.commentSample;
+      openSheet({
+        title: '코멘트 예시 미리보기',
+        sub: '시연용 예시 · 화면에서만 표시해요',
+        body: () => <><p>{sample.fitText}</p><p>{sample.levelText}</p><p>{sample.free}</p></>,
+      });
       return;
     }
     toast('시연 데이터를 서버에 만드는 중이에요…');
@@ -207,17 +213,9 @@ export function DemoTools() {
 
   const reset = () =>
     openSheet({
-      title: '처음 상태로 초기화할까요?',
+      title: '시연 기록을 초기화할까요?',
       body: () => (
-        <>
-          <p style={{ marginTop: 0 }}>
-            <b>{me.name}</b> 님의 기록을 모두 지우고 처음 상태로 돌려요.
-          </p>
-          <ul className="plain-list small">
-            <li>지우는 것: 확정한 로드맵(진행 중·지난 로드맵), 작성 중인 로드맵, 점검 응답·결과 보고서, 받은 코멘트 (서버 DB에서)</li>
-            <li>그대로 두는 것: 내 정보(인사 정보·본인 입력)·목표 후보{isSup(me) ? ', 소속 직원의 로드맵과 기록' : ''}</li>
-          </ul>
-        </>
+        <p>단계 이동으로 만든 {me.name} 님의 시연 초안·로드맵과 그 점검·보고서를 삭제해요. 부서장이 코멘트를 남긴 로드맵은 보존해요.</p>
       ),
       foot: () => (
         <>
@@ -233,7 +231,7 @@ export function DemoTools() {
                 await reloadWorkspace();
                 dataReset();
                 go(paths.home, { force: true });
-                toast('내 기록을 처음 상태로 돌렸어요');
+                toast('시연 기록을 초기화했어요');
               } catch (err) {
                 failToast(err, '초기화하지 못했어요');
               }
@@ -313,30 +311,20 @@ export function DemoTools() {
         에이전트 동작 보기
       </button>
       <select
-        aria-label="시연 단계로 이동 (내 기록만 바꿈)"
+        aria-label="시연 단계로 이동"
         value=""
         onChange={(e) => {
           if (e.target.value) void jump(e.target.value);
         }}
       >
         <option value="">단계로 바로 이동…</option>
-        {JUMPS.map(([k, l]) =>
-          k === 'comment' && !me.mySupervisor ? (
-            <option key={k} value={k} disabled>
-              {l} (부서장 없는 계정)
-            </option>
-          ) : (
-            <option key={k} value={k}>
-              {l}
-            </option>
-          ),
-        )}
+        {JUMPS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
       </select>
       <p className="small muted" style={{ margin: '2px 0 6px', fontSize: 11.5, lineHeight: 1.4 }}>
-        단계 이동·초기화는 로그인한 계정({me.name})의 서버 기록만 바꿔요
+        단계 이동·초기화는 {me.name} 님의 시연 기록에만 적용돼요.
       </p>
       <button className="btn line sm" onClick={reset}>
-        처음 상태로 초기화
+        시연 기록 초기화
       </button>
     </details>
   );
