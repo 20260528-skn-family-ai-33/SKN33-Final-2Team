@@ -80,6 +80,61 @@ def _no_candidates(kind: str) -> dict:
     return {'reason': 'no_candidates', 'detail': f'조건에 맞는 {kind} 후보가 없습니다.'}
 
 
+def _recover_cross_skill_courses(by_name, payload, references, eligibility, generate):
+    """다른 스킬에만 허용된 강좌 키는 제외하고, 유효한 선택이 전혀 없는 칸만 한 번 재선택한다."""
+    from app.llm import LlmError
+
+    retry = []
+    for pool in payload['skills']:
+        name = pool['name']
+        row = by_name[name]
+        picked = row.get('courses')
+        if not isinstance(picked, list) or len(picked) > 3:
+            continue  # 응답 구조·허위 키·종류·중복 등은 기존 검증에서 거절한다.
+        kept = []
+        for pick in picked:
+            key = pick.get('key') if isinstance(pick, dict) else None
+            ref = references.get(key) if isinstance(key, str) else None
+            if (ref and ref[0] == 'courses' and eligibility[ref[1]] and pick.get('id', ref[1]) == ref[1]
+                    and name not in eligibility[ref[1]]):
+                continue
+            kept.append(pick)
+        if len(kept) == len(picked):
+            continue
+        by_name[name] = {**row, 'courses': kept}
+        if not kept:
+            by_name[name]['courseDiagnostic'] = {
+                'reason': 'insufficient_evidence', 'detail': '모델이 이 스킬에 맞는 강좌를 선택하지 못했습니다.'}
+            cards = [c for c in pool['courses'] if name in c['eligibleSkills']]
+            if cards:
+                retry.append({'name': name, 'application': pool.get('application'), 'courses': cards})
+    if not retry:
+        return
+    # 비용과 지연을 제한한다. 재선택 응답은 요청한 칸의 로컬 키만 받을 수 있다.
+    try:
+        raw = generate('목표와 각 스킬에 적합한 강좌를 다시 선택하세요. 각 칸의 courses에 있는 choiceKey만 '
+                       '사용하세요. 적합한 것이 없으면 빈 배열을 쓰세요. '
+                       'JSON: {"skills":[{"name":"입력 스킬명","courses":[{"key":"choiceKey"}]}]}',
+                       {'project': payload['project'], 'course': (payload['course'] or {}).get('id'), 'skills': retry})
+    except (ValueError, LlmError, TimeoutError) as exc:
+        logger.warning('강좌 재선택 실패: %s', type(exc).__name__)
+        return
+    rows = raw.get('skills') if isinstance(raw, dict) else None
+    if not isinstance(rows, list):
+        return
+    for pool in retry:
+        matches = [r for r in rows if isinstance(r, dict) and r.get('name') == pool['name']]
+        picks = matches[0].get('courses') if len(matches) == 1 else None
+        if not isinstance(picks, list) or not 0 < len(picks) <= 3:
+            continue
+        allowed = {c['choiceKey'] for c in pool['courses']}
+        keys = [p.get('key') if isinstance(p, dict) else None for p in picks]
+        if all(isinstance(k, str) and k in allowed for k in keys) and len(set(keys)) == len(keys):
+            row = by_name[pool['name']]
+            row['courses'] = [{'key': k} for k in keys]
+            row.pop('courseDiagnostic', None)
+
+
 def _empty_skill(name: str) -> dict:
     return {'name': name, 'courses': [], 'books': [], 'selectedCourse': None, 'selectedBooks': [],
             'courseDiagnostic': _no_candidates('강좌'), 'bookDiagnostic': _no_candidates('도서')}
@@ -302,6 +357,7 @@ def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
         if not isinstance(row, dict) or row.get('name') not in [p['name'] for p in pools] or row['name'] in by_name:
             raise RecommendationError('추천 스킬이 입력과 다르거나 중복되었습니다.')
         by_name[row['name']] = row
+    _recover_cross_skill_courses(by_name, payload, references, course_eligibility, generate)
     candidate_titles = {key: ' '.join(resource_evidence.normalize(provided[kind][rid][1].get('title')).split())
                         for key, (kind, rid) in references.items()}
     result = []
@@ -403,8 +459,9 @@ def recommend_from_catalog(ctx: Any, pre: dict, course: dict | None = None) -> d
     from app.learner_knowledge import from_profile,hr_context
     project=dict(pre['project'],learnerKnowledge=from_profile(pre.get('profile')),hrContext=hr_context(pre.get('profile')))
     project['selectedCourse'] = deepcopy(course)
-    pools, retrieval = retrieve(project, pre['selection'], items, course)
-    result = recommend_resources(project, pre['selection'], items,
+    selection = dict(pre['selection'], commonApplications=pre.get('_commonApplications') or {})
+    pools, retrieval = retrieve(project, selection, items, course)
+    result = recommend_resources(project, selection, items,
         lambda system, payload: runtime.llm_json(ctx, system, payload, role='resources'), course=course, retrieved_pools=pools)
     result['retrieval'] = retrieval
     return result

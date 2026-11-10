@@ -15,6 +15,64 @@ class CoursePolicyTests(unittest.TestCase):
     goal = 'PostgreSQL 실행계획의 인덱스 스캔 비용을 비교한다'
     lesson = 'PostgreSQL 실행계획의 순차 스캔과 인덱스 스캔 비용을 측정하고 비교하는 실습'
 
+    def test_log_build_and_container_deploy_keep_their_own_stage_in_every_track(self):
+        project = {'goal': 'Python으로 로그를 집계하고 Docker로 API를 배포한다'}
+        specs = [{'name': name, 'application': '생성된 코스의 별도 예시'} for name in ('Python', 'Docker')]
+        for track, level in [('A1', 'BEGINNER'), ('A2', 'BEGINNER'), ('A3', 'ADVANCED')]:
+            course = {'id': track, 'learningSkills': specs}
+            items = {name: {**self.item(name, level, lesson=lesson), 'skills': [name]} for name, lesson in
+                     [('Python', 'Python 로그 파일 읽기와 집계'), ('Docker', 'Docker로 API 배포 실습')]}
+            def search(kind, ids, vector, limit, free):
+                return [dict(resource_id=rid, similarity=.8, current_cost=0) for rid in ids]
+            pools, _ = rag.retrieve(project, {'skills': specs}, items, course,
+                                    embed=lambda ts: [[1.] * rag.DIMENSIONS for _ in ts], search=search)
+            common = evidence.course_selection(project, {'skills': specs}, course)
+            self.assertEqual([evidence._stage(project, s) for s in common['skills']], ['build', 'operate'])
+            solo = evidence.course_selection(project, {'skills': specs[:1]}, course)
+            self.assertEqual(solo['skills'][0], common['skills'][0])
+            self.assertEqual([[c['id'] for c in row['courses']] for row in pools], [['Python'], ['Docker']])
+
+    def test_fixed_application_precedes_course_example_for_stage(self):
+        project = {'goal': '서비스 배포'}
+        spec = {'name': 'Python', 'application': '운영 모니터링'}
+        selection = {'skills': [spec], 'commonApplications': {'Python': '로그 집계 구현'}}
+        common = evidence.course_selection(project, selection, {'learningSkills': [spec]})
+        self.assertEqual(evidence._stage(project, common['skills'][0]), 'build')
+
+    def test_security_log_analysis_needs_evidence_in_a_learning_unit(self):
+        name = 'SQL 기본 문법 & 조인'
+        def allowed(goal, table, lesson):
+            project = {'goal': goal}
+            spec = {'name': name, 'application': goal}
+            common = evidence.course_selection(project, {'skills': [spec]}, {'learningSkills': [spec]})
+            item = {**self.item('course', lesson=lesson), 'title': table, 'skills': [name]}
+            return evidence.course_applicable(evidence.facts(item, project, common), common['skills'][0])
+        goal = '계정 권한과 접근 로그의 정상·거절 사례를 SQL로 분류하고 해석한다'
+        self.assertFalse(allowed(goal, 'SQL 입문', 'SQL 주문 테이블 조회 실습'))
+        self.assertTrue(allowed(goal, 'SQL로 인증 이벤트 분석', 'SQL로 접근 로그의 거절 건수를 집계하는 실습'))
+        self.assertTrue(allowed('SQL로 주문 내역을 조회한다', 'SQL 입문', 'SQL 주문 테이블 조회 실습'))
+
+    def test_cross_skill_key_preserves_other_choices_and_retries_only_empty_skill(self):
+        project = {'goal': 'Python으로 로그를 집계하고 Docker로 API를 배포한다'}
+        specs = [{'name': n} for n in ('Python', 'Docker')]
+        items = {n: {**self.item(n, lesson=lesson), 'skills': [n]} for n, lesson in
+                 [('Python', 'Python 로그 집계 실습'), ('Docker', 'Docker API 배포 실습')]}
+        pools = [{'name': n, 'courses': [item], 'books': []} for n, item in items.items()]
+        for mixed, recovered in [(True, True), (False, True), (False, False)]:
+            first = {'skills': [{'name': 'Python', 'courses': [{'key': 'S1-C1'}], 'books': []},
+                                {'name': 'Docker', 'courses': ([{'key': 'S2-C1'}] if mixed else []) +
+                                 [{'key': 'S1-C1'}], 'books': []}]}
+            model = Mock(side_effect=[first, {'skills': [{'name': 'Docker', 'courses':
+                         [{'key': 'S2-C1' if recovered else 'S1-C1'}]}]}])
+            result = recommend_resources(project, {'skills': specs}, items, model,
+                                         course={'id': 'A1', 'learningSkills': specs}, retrieved_pools=pools)
+            self.assertEqual([s['selectedCourse'] for s in result['skills']], ['Python', 'Docker' if recovered else None])
+            self.assertEqual(model.call_count, 1 if mixed else 2)
+            if not mixed:
+                retry = model.call_args.args[1]['skills']
+                self.assertEqual([(s['name'], [c['choiceKey'] for c in s['courses']]) for s in retry],
+                                 [('Docker', ['S2-C1'])])
+
     def item(self, rid, level='INTERMEDIATE', hours=1, cost=0, lesson=None, **extra):
         return dict(id=rid, title=rid, type='course', usable=True, skills=[self.name],
                     provider='검사용 교육원', difficulty=level, hours=hours, cost=cost,

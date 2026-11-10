@@ -1,6 +1,7 @@
 """세 코스의 실제 학습 근거·관련 단원. 태그와 선수지식만으로 학습 내용을 단정하지 않는다."""
 from __future__ import annotations
 
+from functools import lru_cache
 import math
 import re
 import unicodedata
@@ -52,6 +53,12 @@ _admin = re.compile(r'만족도|수강\s*후기|강의\s*평가|과정\s*평가|
 _log_word = r'(?:(?<![가-힣])|(?:운영|서버|배치|시스템|보안|이벤트|웹)\s*)로그(?!인|아웃|손실|우도|함수|리즘)'
 _log_topic = re.compile(_log_word + r'|' + _en(r'(?:logs?|logging)'), re.I)
 _log_learning = re.compile(_log_word + r'|파싱|정규\s*표현|파일.{0,15}(?:읽|처리)|예외.{0,15}테스트|' + _en(r'(?:logging|parsing|pytest|fixture|stderr|batch)'), re.I)
+_log_operation = re.compile(r'집계|읽기|파싱|aggregate|parse', re.I)
+_audit_records = re.compile(r'(?:접근|접속|인증|인가|권한|보안|감사)\s*(?:로그|기록|이벤트)|'
+                           + _en(r'(?:access|auth(?:entication|orization)?|security|audit)\s+(?:logs?|events?|records?)'), re.I)
+_audit_analysis = re.compile(r'분류|분석|집계|조인|전처리|조회|해석|수집|라벨|탐지|거절|거부|허용|'
+                            + _en(r'classif\w*|analy\w*|aggregat\w*|query|join|filter\w*|detect\w*|denied'), re.I)
+_access_denial = re.compile(r'거절|거부|차단|' + _en(r'denied|denials?|forbidden|403'), re.I)
 
 _build = re.compile(r'만들|구현|구축|개발|실습|연동|실행|구성|빌드|코드\s*작성|파싱|조회|데이터\s*(?:변환|적재)|(?:예외|오류)\s*처리|작업\s*취소|' + _en(r'(?:build\w*|implement\w*|develop\w*|integrat\w*|hands[- ]on|labs?|execut\w*)'), re.I)
 _operate = re.compile(r'배포|서빙|모니터링|롤백|복구|' + _en(r'(?:deploy\w*|serving|monitor\w*|rollback|recover\w*)'), re.I)
@@ -192,18 +199,44 @@ def _skill_context(skill: dict) -> str:
     return normalize(' '.join(_target_texts(skill, crash_core_scope(skill)))).casefold()
 
 
+@lru_cache(maxsize=1)
+def _known_skill_terms():
+    return tuple(pattern for family in _aliases for pattern in skill_terms({'name': family}))
+
+
 def course_selection(project: dict, selection: dict, course: dict | None) -> dict:
     """강좌 관련성은 직원의 목표와 스킬로 판단한다. 생성된 코스 문장은 정렬·설명용이다."""
     skill_labels = {normalize(skill['name']).casefold() for skill in selection['skills']}
-    goal = ' '.join(dict.fromkeys(str(project.get(k) or '').strip()
+    fields = list(dict.fromkeys(str(project.get(k) or '').strip()
                                   for k in ('goal', 'desiredCompetencies', 'projectSummary')
                                   if k != 'desiredCompetencies'
-                                  or normalize(project.get(k)).casefold() not in skill_labels)).strip()
-    # 구버전 초안은 코스별 스킬이 생기기 전에 정한 공통 적용 범위를 가지고 있다.
+                                  or normalize(project.get(k)).casefold() not in skill_labels))
+    goal = ' '.join(filter(None, fields))
     scoped = bool((course or {}).get('learningSkills'))
-    return {'skills': [{'name': skill['name'], 'fromEmployeeGoal': scoped,
-                        'application': goal if scoped else skill.get('application') or goal}
-                       for skill in selection['skills']]}
+    if not scoped:
+        return {'skills': [dict(name=s['name'], fromEmployeeGoal=False, application=s.get('application') or goal)
+                           for s in selection['skills']]}
+    # 코스 생성 전 공통 사전점검의 스킬별 적용 범위만 사용한다. 그 값이 없는 이전 입력도
+    # 직원이 다른 기술에 명시한 행동(예: Docker 배포)을 Python의 요구 단계로 옮기지 않는다.
+    clauses = []
+    for field in fields:
+        for clause in re.split(r'(?<=[.!?;])\s+|\n+|(?<=하고)\s+|(?<=하며)\s+|,\s+|\s+and\s+', field, flags=re.I):
+            if clause.strip():
+                value = normalize(clause.strip()).casefold()
+                clauses.append((clause.strip(), value, bool(evidence.matches(value, _known_skill_terms()))))
+    applications = selection.get('commonApplications') or {}
+    skills = []
+    for skill in selection['skills']:
+        name = skill['name']
+        terms = skill_terms(skill)
+        own = [bool(evidence.matches(value, terms)) for _, value, _ in clauses]
+        # 형제 스킬의 선택 여부와 무관하게 같은 목표·스킬이면 같은 범위를 사용한다.
+        kept = [c for (c, _, named), match in zip(clauses, own) if match or not named]
+        relevant = ' '.join(kept) if any(own) and len(kept) < len(clauses) else goal
+        application = applications.get(name) or ''
+        skills.append(dict(name=name, fromEmployeeGoal=True, application=relevant,
+                           stageApplication=application or relevant))
+    return {'skills': skills}
 
 
 def requested_topics(skill):
@@ -220,7 +253,7 @@ def focus_priority(info, name):
 
 
 def _goal_context(project: dict, skill: dict) -> str:
-    return '' if crash_core_scope(skill) else normalize(project.get('goal')).casefold()
+    return '' if crash_core_scope(skill) or skill.get('fromEmployeeGoal') else normalize(project.get('goal')).casefold()
 
 
 def _dbt_targets(skill: dict) -> tuple[re.Pattern, ...]:
@@ -265,8 +298,8 @@ def _linux_security_target(skill: dict) -> bool:
 
 def _stage(project: dict, skill: dict) -> str:
     core = crash_core_scope(skill)
-    local = normalize(' '.join(_target_texts(skill, core))).casefold()
-    goal = '' if core else normalize(project.get('goal')).casefold()
+    local = normalize(skill.get('stageApplication') or ' '.join(_target_texts(skill, core))).casefold()
+    goal = _goal_context(project, skill)
     name = normalize(skill['name'])
     # 핵심 기준에 보안 검증을 명시했다면 개념 설명만으로 충족할 수 없다.
     if core and _security.search(local) and _security_action.search(local):
@@ -280,7 +313,7 @@ def _stage(project: dict, skill: dict) -> str:
         return 'security'
     if _operate.search(local) or ('MLOps' in name and _operate.search(goal)):
         return 'operate'
-    if _build.search(local):
+    if _build.search(local) or (_log_topic.search(local) and _log_operation.search(local)):
         return 'build'
     if _design.search(local):
         return 'design'
@@ -415,7 +448,7 @@ def _profile(skill: dict, project: dict, rows: list, descriptions: list[str], te
                 from app.services.course_focus import drf_practice
                 if drf_practice(value):
                     return True
-            return bool(_build.search(value) or (re.search(_async_io, value, re.I)
+            return bool(_build.search(value) or (_log_topic.search(value) and _log_operation.search(value)) or (re.search(_async_io, value, re.I)
                         and (re.search(r'사용|취소|병렬\s*처리|' + _en(r'(?:cancell?\w*|await|asyncio\.\w+)'), value, re.I)
                              or (concurrency_skill and _io_workload.search(value) and _async_comparison.search(value)))))
         return bool(_concept.search(value) or _design.search(value) or _foundations.search(value)
@@ -548,10 +581,22 @@ def facts(item: dict, project: dict, selection: dict) -> dict:
     anchor_terms = evidence.query_terms([' '.join(anchors)])
     scope = {}
     document_gaps = set()
+    audit_gaps = set()
     for skill in selection['skills']:
         context = _goal_context(project, skill) + ' ' + _skill_context(skill)
         scoped_analysis = bool(re.search(r'python|파이썬|EDA|탐색적', skill['name'], re.I) and _analysis_scope.search(context))
         scope[skill['name']] = not scoped_analysis or bool(_analysis_evidence.search(text))
+        if (re.search(r'EDA|탐색적|머신러닝|\bSQL\b', skill['name'], re.I)
+                and _audit_records.search(context) and _audit_analysis.search(context)):
+            # 태그가 넓은 분석 강좌는 권한 로그를 실제로 다루는 차시·학습목표가 있어야 한다.
+            # 다른 단원의 보안 단어와 일반 분석 실습을 이어 붙이지 않는다.
+            audit_units = [unit for _, _, unit in rows
+                           if _audit_analysis.search(unit) and (_audit_records.search(unit) or _audit_records.search(title))]
+            audit_units.extend(line for line in claims(descriptions)
+                               if _audit_records.search(line) and _audit_analysis.search(line))
+            scope[skill['name']] &= bool(audit_units)
+            if audit_units and _access_denial.search(context) and not any(_access_denial.search(u) for u in audit_units):
+                audit_gaps.add(skill['name'])
         if skill.get('fromEmployeeGoal') and re.search(r'SQL|RDBMS', skill['name'], re.I):
             wanted = {k for k, pattern in _sql_engines.items() if pattern.search(context)}
             if wanted:
@@ -597,6 +642,8 @@ def facts(item: dict, project: dict, selection: dict) -> dict:
                                        discussion_context=discussion_context, focused_units=focused[skill['name']]) for skill in selection['skills']}
     for name in document_gaps:
         profiles[name]['unverifiedTargetTopics'] = [*target_gaps({'suitability': profiles}, name), '문서 입력·전처리']
+    for name in audit_gaps:
+        profiles[name].setdefault('unverifiedTargetTopics', []).append('접근 거절 사례 판별')
     return {'rows': rows, 'descriptions': descriptions, 'title': title, 'supported': supported,
             'focusScores': focus_scores, 'focusedUnits': focused,
             'scopeEvidence': scope, 'suitability': profiles, 'topicHits': hits,

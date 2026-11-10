@@ -13,7 +13,7 @@ from app.services import book_candidates, course_focus, resource_evidence
 
 MODEL = embeddings.BGE_MODEL
 DIMENSIONS = embeddings.BGE_DIMENSIONS
-VERSION = 'resource-pgvector-rag/v30-grounded-target-evidence'
+VERSION = 'resource-pgvector-rag/v31-skill-scope'
 PER_KIND = 6
 COURSE_REVIEW = 20
 FIELDS = ('id','title','provider','cost','hours','estimated','image','url','skills','content','curriculum')
