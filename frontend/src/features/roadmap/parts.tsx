@@ -6,7 +6,7 @@ import type { Activity, Comment, PlanRecord } from '@/api/types/plan';
 import { newIdToPath, paths } from '@/app/paths';
 import { useGo } from '@/shared/hooks/useGo';
 import { won } from '@/shared/lib/format';
-import { actMeta, st } from '@/shared/lib/plan';
+import { actMeta, count, isBookResource, st } from '@/shared/lib/plan';
 import { ansLabel } from '@/shared/lib/prefs';
 import { useCatalog } from '@/shared/state/catalog';
 import { closeSheet, openSheet } from '@/shared/state/ui';
@@ -20,11 +20,13 @@ import { openRecord } from './RecordSheet';
 export function ActRow({ a, R }: { a: Activity; R: PlanRecord }) {
   const resource = useCatalog(s => a.res ? s.res[a.res] : undefined);
   const isCourse = resource?.type === 'course' || resource?.kind === '강좌';
+  const isBook = isBookResource(resource);
   const done = st(R.progress, a.id) === 'done';
   const memo = R.progress[a.id]?.memo;
+  const statusLabel = isBook ? '' : `, ${done ? '완료' : isCourse ? '미완료' : '진행 중'}${isCourse ? `, 진도 ${done ? 100 : 0}%` : ''}`;
   return (
     <li>
-      <button className="act-row" aria-label={`${a.title}, ${done ? '완료' : isCourse ? '미완료' : '진행 중'}${isCourse ? `, 진도 ${done ? 100 : 0}%` : ''}${memo ? ', 메모 있음' : ''}, 실행 기록 열기`} onClick={() => openRecord(R.id, a.id)}>
+      <button className="act-row" aria-label={`${a.title}${statusLabel}${memo ? ', 메모 있음' : ''}, 실행 기록 열기`} onClick={() => openRecord(R.id, a.id)}>
         <ActThumb a={a} />
         <span className="tx">
           {a.title}
@@ -33,7 +35,7 @@ export function ActRow({ a, R }: { a: Activity; R: PlanRecord }) {
             {memo ? ' · 메모 있음' : ''}
           </small>
         </span>
-        {done ? (
+        {isBook ? null : done ? (
           <span className="tag acc">
             <Icon name="check" />
             {isCourse ? '완료 · 100%' : '완료'}
@@ -228,7 +230,8 @@ export function postStart(go: ReturnType<typeof useGo>, pid: string): void {
   const R = ws().plans[pid];
   if (!R || R.status !== 'active') return;
   if (R.plan.assess?.v2 && !R.post.quizSurvey) void ensurePostQuiz(R.id).catch(() => {});
-  const left = R.plan.acts.filter((a) => st(R.progress, a.id) !== 'done').length;
+  const progress = count(R.plan, R.progress);
+  const left = progress.t - progress.done;
   const begun = !!(R.post.goalSelf || Object.keys(R.post.answers || {}).length || R.post.fail);
   if (!left || begun) {
     closeSheet();

@@ -9,7 +9,7 @@ import type { Resource } from '@/api/types/catalog';
 import { paths } from '@/app/paths';
 import { useGo } from '@/shared/hooks/useGo';
 import { failToast } from '@/shared/lib/fail';
-import { st, stageName } from '@/shared/lib/plan';
+import { isBookResource, st, stageName } from '@/shared/lib/plan';
 import { setAt, useAt } from '@/shared/state/bind';
 import { resOf } from '@/shared/state/catalog';
 import { me } from '@/shared/state/session';
@@ -68,7 +68,7 @@ function RecBody({ pid, id }: { pid: string; id: string }) {
   const pr = R.progress[a.id] || {};
   const r = a.res ? resOf(a.res) : null;
   const sup = me()?.mySupervisor;
-  const isBook = r?.type === 'book' || r?.kind === '도서';
+  const isBook = isBookResource(r);
   return (
     <>
       <p className="small muted">
@@ -87,7 +87,7 @@ function RecBody({ pid, id }: { pid: string; id: string }) {
       ) : (
         <RecRes a={a} r={r} />
       )}
-      <div className="field rec-st">
+      {!isBook && <div className="field rec-st">
         <span className="flabel" id="recStL">
           진행 상태
         </span>
@@ -99,7 +99,7 @@ function RecBody({ pid, id }: { pid: string; id: string }) {
             </label>
           ))}
         </div>
-      </div>
+      </div>}
       <div className="field">
         <label>
           메모 <span className="muted small">선택</span>
@@ -118,7 +118,7 @@ function RecBody({ pid, id }: { pid: string; id: string }) {
         <input className="input" type="file" id="recFile" onChange={(e) => (recFile = (e.target.files && e.target.files[0]) || null)} />
       </div>}
       <Note>
-        {isBook ? '메모는 나만 봐요.' : '메모·첨부는 나만 봐요.'}{sup ? ` 완료 여부는 부서장 ${sup.name} 님에게 진행 상태로 보여요.` : ''} {!isBook && '자료를 내지 않았다고 하지 않은 것으로 보지 않아요.'}
+        {isBook ? '메모는 나만 봐요.' : '메모·첨부는 나만 봐요.'}{sup && !isBook ? ` 완료 여부는 부서장 ${sup.name} 님에게 진행 상태로 보여요.` : ''} {!isBook && '자료를 내지 않았다고 하지 않은 것으로 보지 않아요.'}
       </Note>
     </>
   );

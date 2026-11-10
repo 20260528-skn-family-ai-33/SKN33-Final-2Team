@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 from pathlib import Path
@@ -105,27 +104,21 @@ def install(conn, *, apply: bool) -> dict:
                 AND resource_type='course' AND cost_won=0 AND hours=round(%s::numeric/60,6)
                 AND source_label=%s AND NOT is_real''', (rid,rid,minutes,data['platform'])).fetchone():
                 raise ValueError('과정 앱 메타데이터 불일치: ' + rid)
-        from src.database.vectors import resource_vectors as vectors
-        from src.shared.bge_embeddings import embed_texts
+        from src.database.vectors import provenance, resource_vectors as vectors
+        from src.shared.bge_embeddings import embed_for_index
         selected, pending = vectors.pending_sources(vectors.sources(conn), vectors.stored(conn), ['courses'], ids, len(ids))
         if len(selected) != len(ids):
             raise ValueError('신규 과정의 수집·색인 적격성을 확인할 수 없습니다.')
         # 기존 표·권한·전체 색인을 변경하는 DDL 없이 승인된 두 ID의 벡터만 기록한다.
-        embedded = embed_texts([row['text'] for _, row in pending]) if pending else []
-        for ((kind,rid),row), vector in zip(pending, embedded, strict=True):
+        embedded = embed_for_index([row['text'] for _, row in pending]) if pending else []
+        for ((kind,rid),row), item in zip(pending, embedded, strict=True):
             conn.execute('''INSERT INTO public.learning_resource_embeddings(resource_type,resource_id,embedding_model,
                 dimensions,input_version,input_sha256,embedding,course_id) VALUES('courses',%s,%s,1024,%s,%s,%s::vector,%s)
                 ON CONFLICT(resource_type,resource_id,embedding_model) DO UPDATE SET
                 dimensions=EXCLUDED.dimensions,input_version=EXCLUDED.input_version,input_sha256=EXCLUDED.input_sha256,
                 embedding=EXCLUDED.embedding,updated_at=now()''',
-                (rid,vectors.MODEL,vectors.INPUT_VERSION,row['hash'],json.dumps(vector),rid))
-            conn.execute('''INSERT INTO growpath_bge_meta.inputs(kind,source_id,source_sha256,actual_input_sha256,
-                protocol,model_revision,token_count,created_at) VALUES('courses',%s,%s,%s,%s,%s,%s,now())
-                ON CONFLICT(kind,source_id) DO UPDATE SET source_sha256=EXCLUDED.source_sha256,
-                actual_input_sha256=EXCLUDED.actual_input_sha256,protocol=EXCLUDED.protocol,
-                model_revision=EXCLUDED.model_revision,token_count=EXCLUDED.token_count,created_at=EXCLUDED.created_at''',
-                (rid,row['hash'],hashlib.sha256(row['text'].encode('utf-8')).hexdigest(),vectors.PROTOCOL,
-                 vectors.PROVENANCE['model_revision'],max(1,min(len(row['text'].split()),8192))))
+                (rid,vectors.MODEL,vectors.INPUT_VERSION,row['hash'],json.dumps(item.vector),rid))
+            provenance.save(conn, kind, rid, row['hash'], vectors.actual_input_hash(row), item.protocol, item.token_count)
         final_sources = vectors.sources(conn)
         _, remaining = vectors.pending_sources(final_sources, vectors.stored(conn), ['courses'], ids, len(ids))
         if remaining:

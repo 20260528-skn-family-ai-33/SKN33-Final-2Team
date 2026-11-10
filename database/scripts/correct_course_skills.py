@@ -5,7 +5,6 @@ import hashlib
 import json
 from pathlib import Path
 import sys
-from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -13,7 +12,7 @@ sys.path.insert(0, str(ROOT))
 from src.database.catalog_verification import fingerprints
 from src.database.course_skill_corrections import apply_corrections, validate_plan
 from src.database.deployment import connect
-from src.database.vectors.regulation_vectors import MODEL
+from src.shared.bge_embeddings import MODEL, request as bge_request
 
 
 def main():
@@ -50,18 +49,14 @@ def main():
         if fingerprints(conn) != baseline:
             raise ValueError('Live database changed since the review; compare before applying')
         unaffected = fingerprints(conn, [row['course_id'] for row in rows])
-        import os
-        from openai import OpenAI
-        api = OpenAI(api_key=os.environ['OPENAI_API_KEY'], base_url='https://api.openai.com/v1',
-                     timeout=45, max_retries=0)
-        def create(**kwargs):
-            if kwargs['model'] != MODEL or len(kwargs['input']) > args.max_courses:
-                raise ValueError('Paid scope exceeded')
-            response = api.embeddings.create(**kwargs)
-            requests.append({'model': response.model, 'input_count': len(kwargs['input']),
-                             'usage': response.usage.model_dump() if response.usage else None})
+        def bounded_request(payload):
+            if payload['model'] != MODEL or len(payload['input']) > args.max_courses:
+                raise ValueError('Approved embedding scope exceeded')
+            response = bge_request(payload)
+            requests.append({'model': response.get('model'), 'precision': response.get('precision'),
+                             'input_count': len(payload['input'])})
             return response
-        result = apply_corrections(conn, plan, client=SimpleNamespace(embeddings=SimpleNamespace(create=create)))
+        result = apply_corrections(conn, plan, client=bounded_request)
         after = fingerprints(conn)
         if fingerprints(conn, [row['course_id'] for row in rows]) != unaffected:
             raise ValueError('Unrelated rows changed; correction rolled back')

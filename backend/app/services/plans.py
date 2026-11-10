@@ -12,7 +12,7 @@ from __future__ import annotations
 import copy
 import json
 import uuid
-from datetime import date
+from datetime import date, timedelta
 
 from .. import catalog, course_time, db, jobs, regstore
 from ..agents import deepcheck as DC
@@ -28,10 +28,25 @@ from . import profile
 
 STATUS = {'IN_PROGRESS': 'active', 'COMPLETED': 'done', 'ARCHIVED': 'archived'}
 STATUS_DB = {v: k for k, v in STATUS.items()}
+# 진행 중인 로드맵이 있을 때 새 로드맵을 확정하는 방식(API-35): 함께 진행 · 끝난 다음 주부터 · 보관하고 이번 주부터
+START_MODES = ('together', 'after', 'archive')
 
 
 def today() -> str:
     return date.today().isoformat()
+
+
+def _is_book(resource: dict | None) -> bool:
+    return bool(resource) and (resource.get('type') == 'book' or resource.get('kind') == '도서')
+
+
+def tracked_acts(plan: dict) -> list[dict]:
+    """완료 여부를 세는 활동. 도서는 진행 상태를 기록하지 않는 참고 자료라 뺀다."""
+    acts = plan['acts']
+    if not any(a.get('res') for a in acts):
+        return acts  # 과제만 있으면 자료 목록을 읽지 않는다
+    items = catalog.items()
+    return [a for a in acts if not _is_book(items.get(a.get('res') or ''))]
 
 
 def _d(v) -> str | None:
@@ -87,6 +102,27 @@ def _base_rows(employee_id: int, roadmap_id: str | None = None) -> list[dict]:
                       WHERE p.employee_id = :e AND p.status IN ('IN_PROGRESS', 'COMPLETED', 'ARCHIVED') AND r.content ? 'acts' AND r.content ? 'opt'
                         AND (CAST(:r AS uuid) IS NULL OR r.roadmap_id = CAST(:r AS uuid))
                       ORDER BY r.created_at""", e=employee_id, r=roadmap_id)
+
+
+def active_rows(employee_id: int) -> list[dict]:
+    return [row for row in _base_rows(employee_id) if STATUS.get(row['status']) == 'active']
+
+
+def _start_day(row: dict) -> date:
+    """1주차 첫날. 끝난 다음 주로 미룬 로드맵만 startDate 가 있고, 나머지는 확정한 날이다(화면 ganttCalc.planStart 와 같은 규칙)"""
+    return date.fromisoformat(row['content'].get('startDate') or _d(row['created_at']))
+
+
+def _plan_weeks(plan: dict) -> int:
+    return max([1, plan.get('weeks') or 0, *[a.get('wTo') or 0 for a in plan['acts']]])
+
+
+def next_start(rows: list[dict]) -> str | None:
+    """로드맵들이 모두 끝난 다음 주의 첫날. 주차는 시작일부터 7일씩 세므로 마지막 주차 다음 날이고, 오늘 이전이면 미루지 않는다(None)"""
+    if not rows:
+        return None
+    day = max(_start_day(row) + timedelta(weeks=_plan_weeks(row['content'])) for row in rows).isoformat()
+    return day if day > today() else None
 
 
 def _comments(roadmap_id: str) -> list[dict]:
@@ -312,14 +348,23 @@ def save_progress(employee_id: int, roadmap_id: str, act_id: str, body: dict) ->
 
 
 # ── 보관·다시 진행 (API-41·42) ──
+def archive_row(t: db.Tx, row: dict) -> bool:
+    """진행 중일 때만 보관하고 보관했는지 돌려준다. row 를 읽은 뒤 다른 요청이 로드맵을 마쳤으면 완료 상태를 덮어쓰지 않도록 조건부로 갱신한다"""
+    if not t.run("UPDATE public.projects SET status = 'ARCHIVED', updated_at = now() WHERE project_id = :p AND status = 'IN_PROGRESS'", p=row['project_id']):
+        return False
+    t.run('UPDATE app_ext.roadmap_meta SET archived_at = now() WHERE roadmap_id = :r', r=row['roadmap_id'])
+    t.run("UPDATE app_ext.roadmap_revisions SET status = 'discarded', updated_at = now() WHERE roadmap_id = :r AND status IN ('running', 'ready', 'failed')", r=row['roadmap_id'])
+    return True
+
+
 def archive(employee_id: int, roadmap_id: str) -> dict:
+    not_active = ApiError(409, 'NOT_ACTIVE', '진행 중인 로드맵만 보관할 수 있어요')
     row = _owned(employee_id, roadmap_id)
     if STATUS.get(row['status']) != 'active':
-        raise ApiError(409, 'NOT_ACTIVE', '진행 중인 로드맵만 보관할 수 있어요')
+        raise not_active
     with db.tx() as t:
-        t.run("UPDATE public.projects SET status = 'ARCHIVED', updated_at = now() WHERE project_id = :p", p=row['project_id'])
-        t.run('UPDATE app_ext.roadmap_meta SET archived_at = now() WHERE roadmap_id = :r', r=row['roadmap_id'])
-        t.run("UPDATE app_ext.roadmap_revisions SET status = 'discarded', updated_at = now() WHERE roadmap_id = :r AND status IN ('running', 'ready', 'failed')", r=row['roadmap_id'])
+        if not archive_row(t, row):
+            raise not_active
     return record(_owned(employee_id, roadmap_id))
 
 
@@ -516,6 +561,9 @@ def accept_revision(employee_id: int, roadmap_id: str, revision_id: str) -> dict
         from .drafts import selection_of
         plan = dict(pd['to'], version=cur['version'] + 1, confirmedAt=today(), why=pd['label'], assess=cur.get('assess'), prefs=pd['prefsTo'], handoff=pd['handoff'],
                     selection=selection_of(pd['to']['def']) if changed else cur.get('selection'))
+        # 끝난 다음 주로 미룬 시작일은 수정안을 확정해도 그대로다. 수정안 내용(pd['to'])에는 시작일이 없다
+        if cur.get('startDate'):
+            plan['startDate'] = cur['startDate']
         # 최초 확정 근거는 수정 모델의 결과로 교체하거나 새로 만들지 않는다.
         baseline_row = t.one('SELECT baseline_content FROM public.roadmaps WHERE roadmap_id = :r FOR UPDATE', r=row['roadmap_id']) or {}
         baseline = baseline_row.get('baseline_content') or {}
@@ -709,9 +757,10 @@ def report_start(employee_id: int, roadmap_id: str) -> str:
     items = [{'id': q['id'], 'area': q['area'], 'text': q['text'], 'skill': DG.skill_label(q.get('skill') or ''), 'pre': A['answers'].get(q['id']), 'post': post['answers'][q['id']]} for q in A['questions']]
     prog = rec['progress']
     from .report_snapshot import capture,evidence
-    execution_snapshot=capture(pl,prog)
-    done = [a for a in pl['acts'] if (prog.get(a['id']) or {}).get('status') == 'done']
-    rest = [a for a in pl['acts'] if (prog.get(a['id']) or {}).get('status') != 'done']
+    tracked = tracked_acts(pl)
+    execution_snapshot=capture(dict(pl,acts=tracked),prog)
+    done = [a for a in tracked if (prog.get(a['id']) or {}).get('status') == 'done']
+    rest = [a for a in tracked if (prog.get(a['id']) or {}).get('status') != 'done']
     goal_self = D['goalSelf'][int(post['goalSelf']) - 1] if post['goalSelf'] else ''
     deep_inp = _report_deep(row, A)
     with db.tx() as t:
@@ -723,7 +772,7 @@ def report_start(employee_id: int, roadmap_id: str) -> str:
     def work(job: jobs.JobCtx):
         ctx = rt.context(employee_id)
         inp = {'goal': pl['goal'], 'planName': course_name(pl['opt'], pl['name']), 'opt': pl['opt'], 'domain': A.get('domain'), 'items': items, 'doneTitles': [a['title'] for a in done],
-               'restTitles': [a['title'] for a in rest], 'total': len(pl['acts']), 'goalSelf': goal_self}
+               'restTitles': [a['title'] for a in rest], 'total': len(tracked), 'goalSelf': goal_self}
         inp['executionEvidence']=evidence(execution_snapshot)
         if quiz_evidence:inp['quizEvidence']=quiz_evidence
         if deep_inp:
@@ -782,7 +831,7 @@ def confirm_report(employee_id: int, report_id: str) -> dict:
             from .report_snapshot import matches
             progress={str(item['activity_id']):{'status':item['status'],'memo':item.get('memo') or '', 'file':item.get('attachment')}
                 for item in t.all('SELECT activity_id,status,memo,attachment FROM app_ext.activity_progress WHERE roadmap_id = :r FOR UPDATE',r=r['roadmap_id'])}
-            if not matches(snapshot,r['content'],progress):
+            if not matches(snapshot,dict(r['content'],acts=tracked_acts(r['content'])),progress):
                 raise ApiError(409,'REPORT_STALE','보고서 작성 후 실행 기록이 바뀌었어요. 최신 기록으로 보고서를 다시 만든 뒤 종료해 주세요.')
         t.run('INSERT INTO app_ext.report_meta(report_id, confirmed, confirmed_at) VALUES(:i, true, now()) ON CONFLICT (report_id) DO UPDATE SET confirmed = true, confirmed_at = now()',
               i=r['report_id'])

@@ -6,7 +6,11 @@ from pathlib import Path
 import unittest
 from unittest.mock import MagicMock, patch
 
-from src.database.ingestion.knowledge_documents import load_files, validate_rows, reconstruct, prepare, search
+from src.database.ingestion.knowledge_documents import insert, load_files, validate_rows, reconstruct, prepare, search
+from src.shared.bge_embeddings import ACCEPTED_PROTOCOLS, PROVENANCE, IndexedEmbedding
+
+VECTOR = [1.0] + [0.0] * 1023
+METADATA_KEYS = ('source_url', 'source_limits', 'training_split', 'topic_id')
 
 
 def fixture(index=1):
@@ -75,10 +79,65 @@ class KnowledgeDocumentTests(unittest.TestCase):
                'embedding': '[1]', 'embedding_model': 'BAAI/bge-m3', 'input_sha256': row['chunk_text_sha256']}
         conn = MagicMock()
         conn.execute.return_value.fetchone.return_value = {'id': 'knowledge.chunks'}
-        conn.execute.return_value.fetchall.side_effect = [[old], [{'document_id': row['document_id'], 'category': row['category'], 'title': row['document_title'], 'document_kind': row['document_kind']}]]
+        conn.execute.return_value.fetchall.side_effect = [[old], [{'document_id': row['document_id'], 'category': row['category'], 'title': row['document_title'], 'document_kind': row['document_kind']}], []]
         with self.assertRaisesRegex(ValueError, '덮어쓰지'):
             prepare(conn, [changed])
         self.assertFalse(any('INSERT' in str(call) or 'UPDATE' in str(call) for call in conn.execute.call_args_list))
+
+    def stored(self, row):
+        return {**row, 'metadata': {k: row[k] for k in METADATA_KEYS}, 'embedding': '[1]',
+                'embedding_model': 'BAAI/bge-m3', 'input_sha256': row['chunk_text_sha256']}
+
+    def prepared(self, row, meta):
+        conn = MagicMock()
+        conn.execute.return_value.fetchone.return_value = {'id': 'present'}
+        conn.execute.return_value.fetchall.side_effect = [
+            [self.stored(row)],
+            [{'document_id': row['document_id'], 'category': row['category'],
+              'title': row['document_title'], 'document_kind': row['document_kind']}],
+            meta]
+        return prepare(conn, [row])
+
+    def test_existing_vector_with_current_metadata_is_not_reembedded(self):
+        row = fixture()
+        sha = row['chunk_text_sha256']
+        meta = {'source_id': row['chunk_id'], 'meta_sha256': sha, 'actual_input_sha256': sha,
+                'model_revision': PROVENANCE['model_revision'], 'protocol': ACCEPTED_PROTOCOLS[0], 'token_count': 3}
+        self.assertEqual(self.prepared(row, [meta]), [])
+
+    def test_existing_vector_with_missing_or_stale_metadata_is_repaired(self):
+        row = fixture()
+        sha = row['chunk_text_sha256']
+        stale = {'source_id': row['chunk_id'], 'meta_sha256': 'old', 'actual_input_sha256': sha,
+                 'model_revision': PROVENANCE['model_revision'], 'protocol': ACCEPTED_PROTOCOLS[0], 'token_count': 3}
+        for meta in ([], [stale]):
+            with self.subTest(meta=len(meta)):
+                self.assertEqual(self.prepared(row, meta), [row])
+
+    def test_missing_metadata_table_is_refused_before_reading_sources(self):
+        conn = MagicMock()
+        conn.execute.return_value.fetchone.return_value = {'id': None}
+        with self.assertRaisesRegex(ValueError, 'Restore the shared BGE-M3 database'):
+            prepare(conn, [fixture()])
+        conn.execute.assert_called_once()
+
+    def test_insert_saves_vector_and_reported_metadata_together(self):
+        row = fixture()
+        conn = MagicMock()
+        conn.execute.return_value.fetchall.return_value = [self.stored(row)]
+        reported = IndexedEmbedding(VECTOR, ACCEPTED_PROTOCOLS[1], 11)
+        with patch('src.database.ingestion.knowledge_documents.prepare', return_value=[row]), \
+             patch('src.database.ingestion.knowledge_documents.embed_for_index', return_value=[reported]), \
+             patch('builtins.print'):
+            result = insert(conn, [row])
+        self.assertEqual(result['embedded_chunks'], 1)
+        statements = [str(call.args[0]) for call in conn.execute.call_args_list]
+        chunk_at = next(i for i, sql in enumerate(statements) if sql.startswith('INSERT INTO knowledge.chunks'))
+        meta_at = next(i for i, sql in enumerate(statements) if sql.startswith('INSERT INTO growpath_bge_meta.inputs'))
+        self.assertLess(chunk_at, meta_at)
+        self.assertEqual(conn.execute.call_args_list[meta_at].args[1],
+                         ('knowledge', row['chunk_id'], row['chunk_text_sha256'], row['chunk_text_sha256'],
+                          ACCEPTED_PROTOCOLS[1], PROVENANCE['model_revision'], 11))
 
     def test_partial_deliverable_file_is_rejected(self):
         path = Path('workplace_guide_chunks.jsonl')

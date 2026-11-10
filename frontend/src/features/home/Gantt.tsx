@@ -3,7 +3,8 @@ import { sharedCourses } from './sharedCourses';
 import { trackName } from '@/shared/constants/data';
 /* 로드맵 일정(간트) 표시 (5차 ganttOne·ganttAll·gtStages·gtCard·gt-fold·설명 상자)
    로드맵이 하나면 '전체 진행' 카드 자리에, 여럿이면 하나로 합쳐 맨 위에 둔다. 이번 주 칸을 칠한다.
-   예정 주차가 지나도 늦었다고 표시하지 않는다(스스로 정한 학습 계획). 처음엔 모두 펼치고, 접은 상태는 새로 고칠 때까지만 기억한다 */
+   예정 주차가 지나도 늦었다고 표시하지 않는다(스스로 정한 학습 계획). 처음엔 모두 펼치고, 접은 상태는 새로 고칠 때까지만 기억한다.
+   도서는 진행 상태를 기록하지 않는 참고 자료라 일정표에 넣지 않는다 */
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { PlanRecord } from '@/api/types/plan';
@@ -12,10 +13,11 @@ import { openRecord } from '@/features/roadmap/RecordSheet';
 import { ActRow } from '@/features/roadmap/parts';
 import { openSheet } from '@/shared/state/ui';
 import { useCatalog } from '@/shared/state/catalog';
+import { useClockRefresh, useDemoDay } from '@/shared/state/demoClock';
 import { useGo } from '@/shared/hooks/useGo';
-import { count, st } from '@/shared/lib/plan';
+import { count, isBookResource, st } from '@/shared/lib/plan';
 import { Icon } from '@/shared/ui/Icon';
-import { addDays, axisAll, colsOne, dailyCols, confirmDay, dayGap, gtPos, md, planStart, planWeeks, weekNow, type GtCol } from './ganttCalc';
+import { addDays, axisAll, colsOne, dailyCols, dayGap, gtPos, md, planStart, planWeeks, weekNow, type GtCol } from './ganttCalc';
 
 import './ganttInteraction.css';
 
@@ -103,14 +105,15 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
   const base = planStart(R);
   const resources = useCatalog(state => state.res);
   const skillOrder = pl.def.learningSkills?.map(skill => skill.name) || [];
+  const acts = pl.acts.filter(activity => !isBookResource(activity.res ? resources[activity.res] : undefined));
   const groups = new Map<string, typeof pl.acts>();
-  for (const activity of pl.acts) {
+  for (const activity of acts) {
     const resource = activity.res ? resources[activity.res] : undefined;
     const name = activity.skill || activity.skills?.[0] || resource?.skills?.find(skill => skillOrder.includes(skill)) || resource?.skills?.[0] || '기타 활동';
     groups.set(name, [...(groups.get(name) || []), activity]);
   }
   const names = [...skillOrder.filter(name => groups.has(name)), ...[...groups.keys()].filter(name => !skillOrder.includes(name))];
-  const shared=sharedCourses(pl.acts,resources);
+  const shared=sharedCourses(acts,resources);
   const sharedIds=new Set(shared.map(course=>course.id));
   const when = (f: number, t: number) => `${f === t ? f : `${f}~${t}`}주차 · ${md(addDays(base, 7 * (f - 1)))}~${md(addDays(base, 7 * t - 1))}`;
   return (
@@ -180,7 +183,8 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
             const schedule = pl.def.materialSchedule?.find(row => row.skill === cluster.skills[0]);
             const deliverables = allActs.filter(a => !a.res);
             f = schedule?.startWeek ?? Math.min(...allActs.map(a => a.wFrom));
-            t = deliverables.length ? Math.max(...deliverables.map(a => a.wTo)) : (schedule?.endWeek ?? Math.max(...allActs.map(a => a.wTo)));
+            // 스킬 전체 구간(schedule.endWeek)에는 도서 주차가 들어 있어, 과제가 없으면 일정표에 남은 활동까지만 그린다
+            t = Math.max(...(deliverables.length ? deliverables : allActs).map(a => a.wTo));
           }
           const rangeEnd = Math.min(T, off + 7 * t + (allActs.some(activity => !activity.res) ? 3.5 : 0));
 
@@ -215,12 +219,8 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
                   const resource = resources[activity.res!];
                   return resource?.type === 'course' || resource?.kind === '강좌';
                 }).length;
-                const books = separateMaterials.filter(activity => {
-                  const resource = resources[activity.res!];
-                  return resource?.type === 'book' || resource?.kind === '도서';
-                }).length;
                 const materialLabel =
-                  [courses ? `강좌 ${courses}개` : '', books ? `도서 ${books}권` : '', separateMaterials.length > courses + books ? `기타 ${separateMaterials.length - courses - books}개` : '']
+                  [courses ? `강좌 ${courses}개` : '', separateMaterials.length > courses ? `기타 ${separateMaterials.length - courses}개` : '']
                     .filter(Boolean)
                     .join(' · ') || '공통 강좌 연결';
                 const showMaterials = () =>
@@ -363,14 +363,16 @@ function Card({ title, link, heads, cols, days, rows, note, cls }: { title: Reac
     changeZoom(Math.min(1, timelineSize.available / timelineSize.base));
     element.scrollLeft = 0;
   };
-  /* 일정이 칸보다 넓어 옆으로 밀리면 이번 주 칸이 이름 칸 바로 옆(한 칸 띄움)에 오게 맞춘다 */
+  /* 일정이 칸보다 넓어 옆으로 밀리면 이번 주 칸이 이름 칸 바로 옆(한 칸 띄움)에 오게 맞춘다.
+     시연 기준 날짜를 옮기면 지금 표시 중인 칸(주·일 단위)을 다시 따라간다. 시연이 아니면 첫 표시 때만 맞춘다 */
+  const demoDay = useDemoDay();
   useEffect(() => {
     const sc = scroll.current;
     const on = sc?.querySelector<HTMLElement>('.gt-h .on');
     if (!sc || !on || sc.scrollWidth <= sc.clientWidth) return;
     const l = sc.querySelector<HTMLElement>('.gt-h .gt-l');
     sc.scrollLeft += on.getBoundingClientRect().left - sc.getBoundingClientRect().left - (l?.offsetWidth || 0) - on.offsetWidth;
-  }, []);
+  }, [demoDay]);
   return (
     <div className="card gt-card">
       <div className="sec-h">
@@ -461,6 +463,7 @@ function useFold() {
 }
 
 export function GanttOne({ R }: { R: PlanRecord }) {
+  useClockRefresh();
   const go = useGo();
   const toggle = useFold();
   const pl = R.plan;
@@ -479,12 +482,13 @@ export function GanttOne({ R }: { R: PlanRecord }) {
       cols={colsOne(R)}
       days={dailyCols(base, 7 * n)}
       rows={<Stages R={R} off={0} T={7 * n} up={[]} onToggle={toggle} />}
-      note={`1주차는 시작일(${md(confirmDay(R))})부터 ${md(addDays(base, 6))}까지예요. 150% 이상 확대하면 하루 단위로 보여요.`}
+      note={`1주차는 시작일(${md(base)})부터 ${md(addDays(base, 6))}까지예요. 150% 이상 확대하면 하루 단위로 보여요.`}
     />
   );
 }
 
 export function GanttAll({ list }: { list: PlanRecord[] }) {
+  useClockRefresh();
   const go = useGo();
   const toggle = useFold();
   const { axis, starts, T, cols } = axisAll(list);
@@ -494,7 +498,7 @@ export function GanttAll({ list }: { list: PlanRecord[] }) {
     const off = dayGap(axis, starts[i]);
     const w = planWeeks(pl);
     const wk = weekNow(R);
-    const at = `${wk <= w ? `지금 ${wk}주차 / ` : ''}전체 ${w}주`;
+    const at = `${wk < 1 ? `${md(starts[i])} 시작 / ` : wk <= w ? `지금 ${wk}주차 / ` : ''}전체 ${w}주`;
     return (
       <div className="gt-roadmap-group" key={R.id}>
         <Row
@@ -513,7 +517,7 @@ export function GanttAll({ list }: { list: PlanRecord[] }) {
           }
           bar={
             <span className="gt-bar rm" style={gtPos(off, off + 7 * w, T)}>
-              <i style={{ width: `${(c.done / c.t) * 100}%` }} />
+              <i style={{ width: `${c.t ? (c.done / c.t) * 100 : 0}%` }} />
             </span>
           }
           tip={{ v: `${md(starts[i])}~${md(addDays(starts[i], 7 * w - 1))} · ${at}`, t: pl.goal, m: `${trackName(pl.opt, pl.name)} · v${pl.version} · 활동 ${c.t}개 중 ${c.done}개 완료` }}

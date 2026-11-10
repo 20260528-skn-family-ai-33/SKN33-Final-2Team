@@ -12,6 +12,17 @@ from app import bge_model, bge_regulation_search as regulations, bge_knowledge_s
 from app.services import resource_rag
 
 VECTOR = [1.] + [0.] * 1023
+FP16, FP32 = 'bge-m3/cls-l2-fp16/v1', 'bge-m3/cls-l2-fp32/v1'
+
+
+def indexed(vector=VECTOR):
+    return embeddings.IndexedEmbedding(vector, FP32, 3)
+
+
+def current_row(sha, **changes):
+    return {'dimensions': 1024, 'input_sha256': sha, 'input_version': regulations.INPUT_VERSION,
+            'meta_sha256': sha, 'actual_input_sha256': sha, 'model_revision': bge_model.REVISION,
+            'protocol': FP16, 'token_count': 3, **changes}
 
 
 class SharedBgeContractTest(unittest.TestCase):
@@ -21,10 +32,23 @@ class SharedBgeContractTest(unittest.TestCase):
         self.assertEqual(regulations.input_text(article), '취업규칙 > 제33조의4\n\n원문\n전체')
 
     def test_reconstructed_legacy_input_hash_is_not_reused(self):
-        stored = {'c': {'dimensions': 1024, 'input_sha256': 'same', 'input_version': 'bge-regulation-full-text-v1'}}
+        stored = {'c': current_row('same', input_version='bge-regulation-full-text-v1')}
         self.assertEqual(regulations._missing({'c': ('raw', 'same')}, stored), ['c'])
         stored['c']['input_version'] = regulations.INPUT_VERSION
         self.assertEqual(regulations._missing({'c': ('raw', 'same')}, stored), [])
+
+    def test_shared_fp16_and_new_fp32_records_are_both_current(self):
+        for protocol in (FP16, FP32):
+            with self.subTest(protocol=protocol):
+                stored = {'c': current_row('same', protocol=protocol)}
+                self.assertEqual(regulations._missing({'c': ('raw', 'same')}, stored), [])
+
+    def test_regulation_invalid_provenance_is_reindexed(self):
+        for changes in ({'protocol': 'old'}, {'protocol': None}, {'token_count': 0}, {'token_count': 8193},
+                        {'token_count': None}, {'meta_sha256': None}, {'model_revision': 'old'}):
+            with self.subTest(changes=changes):
+                stored = {'c': current_row('same', **changes)}
+                self.assertEqual(regulations._missing({'c': ('raw', 'same')}, stored), ['c'])
 
     def test_read_shared_tables_not_old_sidecars(self):
         self.assertEqual(regulations.TABLE, 'regulations.rag_chunk_embeddings')
@@ -86,7 +110,7 @@ class SharedBgeContractTest(unittest.TestCase):
              patch.object(regulations, 'input_text', return_value='규정 본문'), \
              patch.object(regulations.hashlib, 'sha256') as h_mock, \
              patch.object(regulations, '_stored', return_value={}), \
-             patch.object(embeddings, 'embed', return_value=[VECTOR]), \
+             patch.object(embeddings, 'embed_for_index', return_value=[indexed()]), \
              patch.object(regulations.db, 'tx', fake_tx):
             h_mock.return_value.hexdigest.return_value = sha
             updated = regulations.ensure_vectors(['aid'])
@@ -95,10 +119,13 @@ class SharedBgeContractTest(unittest.TestCase):
         self.assertEqual(len(calls), 2)
         meta_call = next(c for c in calls if 'growpath_bge_meta.inputs' in c[0])
         vector_call = next(c for c in calls if 'regulations.rag_chunk_embeddings' in c[0])
-        self.assertEqual(meta_call[1]['s'], sha)
-        self.assertEqual(meta_call[1]['proto'], 'bge-m3/cls-l2-fp16/v1')
-        self.assertEqual(meta_call[1]['rev'], bge_model.REVISION)
+        self.assertEqual(meta_call[1]['source_sha256'], sha)
+        self.assertEqual(meta_call[1]['actual_input_sha256'], sha)
+        self.assertEqual(meta_call[1]['protocol'], FP32)
+        self.assertEqual(meta_call[1]['token_count'], 3)
+        self.assertEqual(meta_call[1]['model_revision'], bge_model.REVISION)
         self.assertEqual(vector_call[1]['s'], sha)
+        self.assertIn('FOR SHARE', tx_mock.all.call_args.args[0])
 
     def test_regulation_source_change_aborts_with_error(self):
         article = {'path': '취업규칙 > 제1조', 'chunkText': '본문', 'id': 'aid'}
@@ -112,24 +139,30 @@ class SharedBgeContractTest(unittest.TestCase):
 
         with patch.object(regulations.regstore, 'article', return_value=article), \
              patch.object(regulations, '_stored', return_value={}), \
-             patch.object(embeddings, 'embed', return_value=[VECTOR]), \
+             patch.object(embeddings, 'embed_for_index', return_value=[indexed()]), \
              patch.object(regulations.db, 'tx', fake_tx):
             with self.assertRaisesRegex(llm.LlmError, '규정 원문이 바뀌었어요'):
                 regulations.ensure_vectors(['aid'])
 
+    def test_regulation_deleted_source_aborts_before_any_write(self):
+        article = {'path': '취업규칙 > 제1조', 'chunkText': '본문', 'id': 'aid'}
+        tx_mock = Mock(spec=regulations.db.Tx)
+        tx_mock.all.return_value = []
+        with patch.object(regulations.regstore, 'article', return_value=article), \
+             patch.object(regulations, '_stored', return_value={}), \
+             patch.object(embeddings, 'embed_for_index', return_value=[indexed()]), \
+             patch.object(regulations.db, 'tx', return_value=nullcontext(tx_mock)):
+            with self.assertRaisesRegex(llm.LlmError, '규정 원문이 바뀌었어요'):
+                regulations.ensure_vectors(['aid'])
+        tx_mock.run.assert_not_called()
+
     def test_regulation_meta_mismatch_detected_as_missing(self):
         inputs = {'c': ('raw', 'hash_val')}
         # 벡터는 일치하지만 메타 레코드 해시가 다른 경우
-        stored_bad_meta = {'c': {'dimensions': 1024, 'input_sha256': 'hash_val',
-                                 'input_version': regulations.INPUT_VERSION,
-                                 'meta_sha256': 'old_hash', 'actual_input_sha256': 'hash_val',
-                                 'model_revision': bge_model.REVISION}}
+        stored_bad_meta = {'c': current_row('hash_val', meta_sha256='old_hash')}
         self.assertEqual(regulations._missing(inputs, stored_bad_meta), ['c'])
         # 메타 레코드 해시까지 일치하면 missing 없음
-        stored_good_meta = {'c': {'dimensions': 1024, 'input_sha256': 'hash_val',
-                                  'input_version': regulations.INPUT_VERSION,
-                                  'meta_sha256': 'hash_val', 'actual_input_sha256': 'hash_val',
-                                  'model_revision': bge_model.REVISION}}
+        stored_good_meta = {'c': current_row('hash_val')}
         self.assertEqual(regulations._missing(inputs, stored_good_meta), [])
 
     def test_knowledge_ensure_vectors_updates_meta_inputs_atomically(self):
@@ -146,7 +179,7 @@ class SharedBgeContractTest(unittest.TestCase):
             yield tx_mock
 
         with patch.object(knowledge.db, 'all_', return_value=[]), \
-             patch.object(embeddings, 'embed', return_value=[VECTOR]), \
+             patch.object(embeddings, 'embed_for_index', return_value=[indexed()]), \
              patch.object(knowledge.db, 'tx', fake_tx):
             updated = knowledge.ensure_vectors([chunk_obj])
 
@@ -154,9 +187,9 @@ class SharedBgeContractTest(unittest.TestCase):
         self.assertEqual(len(calls), 2)
         meta_call = next(c for c in calls if 'growpath_bge_meta.inputs' in c[0])
         chunk_call = next(c for c in calls if 'UPDATE knowledge.chunks' in c[0])
-        self.assertEqual(meta_call[1]['sha'], sha)
-        self.assertEqual(meta_call[1]['proto'], 'bge-m3/cls-l2-fp16/v1')
-        self.assertEqual(meta_call[1]['rev'], bge_model.REVISION)
+        self.assertEqual(meta_call[1]['source_sha256'], sha)
+        self.assertEqual(meta_call[1]['protocol'], FP32)
+        self.assertEqual(meta_call[1]['model_revision'], bge_model.REVISION)
         self.assertEqual(chunk_call[1]['sha'], sha)
 
     def test_verify_bge_database_supports_skipping_seed_counts(self):
@@ -210,7 +243,7 @@ class SharedBgeContractTest(unittest.TestCase):
         tx_mock.run.return_value = 1
         with patch.object(regulations.regstore, 'article', return_value=article), \
              patch.object(regulations, '_stored', return_value={}), \
-             patch.object(embeddings, 'embed', return_value=[VECTOR]) as embed, \
+             patch.object(embeddings, 'embed_for_index', return_value=[indexed()]) as embed, \
              patch.object(regulations.db, 'tx', return_value=nullcontext(tx_mock)):
             updated = regulations.ensure_vectors([aid])
 
@@ -218,8 +251,9 @@ class SharedBgeContractTest(unittest.TestCase):
         embed.assert_called_once_with([text])
         tx_mock.all.assert_called_once()
         self.assertEqual(tx_mock.run.call_count, 2)
-        for write in tx_mock.run.call_args_list:
-            self.assertEqual(write.kwargs['s'], sha)
+        meta, vector = tx_mock.run.call_args_list
+        self.assertEqual(meta.kwargs['source_sha256'], sha)
+        self.assertEqual(vector.kwargs['s'], sha)
 
     def test_regulation_reindex_propagates_storage_errors(self):
         aid = 'chunk_1'
@@ -234,7 +268,7 @@ class SharedBgeContractTest(unittest.TestCase):
                 tx_mock.run.side_effect = [1] * (failed_write - 1) + [error]
                 with patch.object(regulations.regstore, 'article', return_value=article), \
                      patch.object(regulations, '_stored', return_value={}), \
-                     patch.object(embeddings, 'embed', return_value=[VECTOR]), \
+                     patch.object(embeddings, 'embed_for_index', return_value=[indexed()]), \
                      patch.object(regulations.db, 'tx', return_value=nullcontext(tx_mock)):
                     with self.assertRaises(RuntimeError) as raised:
                         regulations.ensure_vectors([aid])

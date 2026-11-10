@@ -1,13 +1,16 @@
 /* 시연 도구 (5차 gp-core.js modeBox·jump·reset·agent-log) — 로그인한 계정의 서버 기록만 바꾼다.
    '에이전트 동작 보기'는 시연·디버그 전용이라 누가 호출했든 모든 계정의 호출을 보여 준다(직원·관리자 화면 공통 · 2026-10-26).
    VITE_DEMO_TOOLS가 명시적 on이고 서버도 demoMode:true를 알릴 때만 표시한다. 서버 조회 실패·구버전 응답은 숨긴다. */
+import { useState } from 'react';
 import { legacyToPath, paths } from '@/app/paths';
 import { aiApi, demoApi, type AgentLogEntry } from '@/api/endpoints/account';
 import { reloadWorkspace } from '@/features/draft/draftSync';
+import { addDays, md, ymd } from '@/features/home/ganttCalc';
 import { useGo } from '@/shared/hooks/useGo';
 import { failToast } from '@/shared/lib/fail';
 import { canUseDemo } from '@/shared/lib/demoAccess';
 import { ai, ping, PROV, resetConn, setDemoMock, setFailSim, useAi, useAiMode } from '@/shared/state/ai';
+import { isoDay, setDemoDay, useDemoDay } from '@/shared/state/demoClock';
 import { dataReset } from '@/shared/state/events';
 import { isSup, useMe } from '@/shared/state/session';
 import { closeSheet, openSheet, toast } from '@/shared/state/ui';
@@ -130,6 +133,49 @@ export function AdminDemoTools() {
   );
 }
 
+/** 로드맵 주차 계산의 오늘을 앞으로 옮겨 본다. 연도를 치는 중에 잠깐 생기는 과거 날짜는 적용하지 않고 입력칸에만 둔다 */
+function DemoDay() {
+  const demoDay = useDemoDay();
+  const [rejected, setRejected] = useState<string | null>(null);
+  const today = isoDay(new Date());
+  const shown = demoDay ?? today;
+  const step = (days: number) => setDemoDay(isoDay(addDays(ymd(shown)!, days)));
+  return (
+    <>
+      <div className="foot-lbl" style={{ marginTop: 4 }}>
+        기준 날짜
+      </div>
+      <input
+        type="date"
+        aria-label="로드맵 주차를 계산할 기준 날짜"
+        min={today}
+        max="9999-12-31"
+        value={rejected ?? shown}
+        onChange={(e) => {
+          const picked = e.target.value;
+          setRejected(picked >= today ? null : picked);
+          if (picked >= today) setDemoDay(picked);
+        }}
+        onBlur={() => setRejected(null)}
+      />
+      <div className="demo-day-steps">
+        <button className="btn line sm" onClick={() => step(1)}>
+          +1일
+        </button>
+        <button className="btn line sm" onClick={() => step(7)}>
+          +1주
+        </button>
+        <button className="btn line sm" disabled={!demoDay} onClick={() => setDemoDay(null)}>
+          오늘로
+        </button>
+      </div>
+      <p className="small muted" style={{ margin: '4px 0 8px', fontSize: 11.5, lineHeight: 1.4 }}>
+        이 탭의 로드맵 주차 표시만 바뀌어요 · 서버 기록은 그대로예요 · 탭을 닫으면 실제 날짜로 돌아가요
+      </p>
+    </>
+  );
+}
+
 export function DemoTools() {
   const me = useMe();
   const go = useGo();
@@ -137,6 +183,7 @@ export function DemoTools() {
   const status = useAi((s) => s.status);
   const failSim = useAi((s) => s.settings.failSim);
   const open = useWs((s) => s.demoOpen);
+  const demoDay = useDemoDay();
   if (!canUseDemo(status.demoMode) || !me) return null;
   const fs = { ...ai.failSim(), ...failSim };
   const srv = serverLine(status);
@@ -202,7 +249,7 @@ export function DemoTools() {
     <details className="demo" open={open} onToggle={(e) => updateWs((s) => void (s.demoOpen = (e.target as HTMLDetailsElement).open))}>
       <summary>
         <Icon name="right" />
-        시연 도구
+        시연 도구{demoDay ? ` · ${md(ymd(demoDay)!)} 기준` : ''}
       </summary>
       <div className="foot-lbl">에이전트 데이터</div>
       <label className="radio">
@@ -260,6 +307,7 @@ export function DemoTools() {
       <p className="small muted" style={{ margin: '2px 0 8px 24px', fontSize: 11.5, lineHeight: 1.4 }}>
         켜 두면 첫 시도만 실패해요
       </p>
+      <DemoDay />
       <button className="btn line sm" onClick={() => void showAgentLog()}>
         <Icon name="cpu" />
         에이전트 동작 보기

@@ -11,7 +11,7 @@ import { pullPlan } from '@/features/roadmap/planActions';
 import { D } from '@/shared/constants/data';
 import { useGo } from '@/shared/hooks/useGo';
 import { failToast } from '@/shared/lib/fail';
-import { st } from '@/shared/lib/plan';
+import { count } from '@/shared/lib/plan';
 import { ai, cause, errText } from '@/shared/state/ai';
 import { setAt } from '@/shared/state/bind';
 import { updateWs, ws } from '@/shared/state/workspace';
@@ -163,7 +163,8 @@ function Post({ R }: { R: PlanRecord }) {
       />
     );
   }
-  const left = pl.acts.filter((a) => st(R.progress, a.id) !== 'done').length;
+  const activity = count(pl, R.progress);
+  const left = activity.t - activity.done;
   const dp = R.post.deep;
   const base = `plans.${R.id}.post`;
   return (

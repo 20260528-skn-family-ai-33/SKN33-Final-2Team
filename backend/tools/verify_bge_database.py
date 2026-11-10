@@ -7,7 +7,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app import db
-from app.bge_model import MODEL, REVISION, PROVENANCE
+from app.bge_model import ACCEPTED_PROTOCOLS, MODEL, REVISION, PROVENANCE
 from app.config import env
 
 
@@ -47,8 +47,8 @@ def verify(*, check_counts: bool = True) -> dict:
         WHERE e.input_version<>'db-resource-fields-and-skill-links/v1'
           OR p.source_sha256 IS DISTINCT FROM e.input_sha256''')
     provenance = db.one('''SELECT count(*) AS total,count(*) FILTER(WHERE model_revision=:revision
-        AND protocol='bge-m3/cls-l2-fp16/v1' AND token_count BETWEEN 1 AND 8192) AS valid
-        FROM growpath_bge_meta.inputs''', revision=REVISION)
+        AND protocol=ANY(:protocols) AND token_count BETWEEN 1 AND 8192) AS valid
+        FROM growpath_bge_meta.inputs''', revision=REVISION, protocols=list(ACCEPTED_PROTOCOLS))
     if bad_regulations or bad_knowledge or bad_resources or provenance['total'] != provenance['valid']:
         raise ValueError(f'BGE DB 입력 계약 오류: bad_reg={bad_regulations}, bad_know={bad_knowledge}, bad_res={bad_resources}, prov={provenance}')
     expected_inputs = 4832 + internal

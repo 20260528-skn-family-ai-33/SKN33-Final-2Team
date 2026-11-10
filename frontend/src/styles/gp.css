@@ -89,8 +89,10 @@ svg.i { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor;
 .demo summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 4px; }
 .demo summary::-webkit-details-marker { display: none; }
 .demo[open] summary { margin-bottom: 8px; color: var(--ink-2); }
-.demo select { width: 100%; height: 32px; border: 1px solid var(--line-2); border-radius: 8px; background: #fff; font-size: 12.5px; padding: 0 6px; }
+.demo select, .demo input[type="date"] { width: 100%; height: 32px; border: 1px solid var(--line-2); border-radius: 8px; background: #fff; font-size: 12.5px; padding: 0 6px; }
 .demo .btn { margin-top: 6px; width: 100%; }
+.demo-day-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.demo-day-steps .btn { padding-left: 0; padding-right: 0; }
 
 /* ── 좌측 메뉴 접기(2026-11): 메뉴 맨 아래 단추로 접으면 아이콘만 남은 72px 줄이 된다(<html data-side="collapsed"> · shared/state/sideMenu.ts).
    단추 글자색은 메뉴 글자색을 그대로 따라 테마의 밝은·어두운 메뉴 어디서나 읽힌다.

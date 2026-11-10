@@ -176,7 +176,7 @@ docker compose exec backend python tools/index_regulations.py
 docker compose exec backend python tools/index_knowledge.py
 ```
 
-`index_*.py --apply`는 명시적인 생성·저장 옵션입니다. 동일 공유본에서는 기존 벡터를 재사용해 saved=0이어야 하며 정상 사용을 위해 실행할 필요는 없습니다. 원문이 변경된 경우 입력 해시와 #124 provenance를 함께 갱신하는 별도 재색인·검증이 필요합니다. 검색 중에는 DB·색인을 쓰거나 누락 벡터를 OpenAI로 자동 보충하지 않습니다.
+`index_*.py --apply`는 명시적인 생성·저장 옵션입니다. 동일 공유본에서는 기존 벡터를 재사용해 saved=0이어야 하며 정상 사용을 위해 실행할 필요는 없습니다. 원문이 변경된 경우 이 명령이 변경분만 다시 임베딩해 입력 해시와 #124 provenance를 벡터와 같은 트랜잭션에 저장합니다. provenance에는 서버가 보고한 실제 추론 정밀도·토큰 수를 남기므로, 색인 전에 `docker compose up -d --build bge-m3`로 서버를 최신 코드로 다시 빌드합니다. 경로별 롤백 범위와 프로토콜 구분은 [벡터와 검증 기록 갱신](../database/RESTORE.md#벡터와-검증-기록-갱신-136-144)을 따릅니다. 검색 중에는 DB·색인을 쓰거나 누락 벡터를 OpenAI로 자동 보충하지 않습니다.
 
 실제 검색·후보 후처리 검증(생성 LLM 없음):
 

@@ -12,7 +12,7 @@ import { RevSupView } from '@/features/draft/options/support';
 import { D } from '@/shared/constants/data';
 import { useGo } from '@/shared/hooks/useGo';
 import { clone } from '@/shared/lib/format';
-import { actMeta, diff, st, stageName } from '@/shared/lib/plan';
+import { actMeta, diff, isBookActivity, st, stageName } from '@/shared/lib/plan';
 import { certNameOf, prefText } from '@/shared/lib/prefs';
 import { ai, cause, errText, PROV } from '@/shared/state/ai';
 import { setAt } from '@/shared/state/bind';
@@ -130,7 +130,7 @@ function RevCtl({ k, R }: { k: string; R: PlanRecord }) {
             {a.title}
             <small>
               {a.stage}단계 · {actMeta(a)} · {activityTime(a).text}
-              {st(R.progress, a.id) === 'done' ? ' · 완료' : ''}
+              {st(R.progress, a.id) === 'done' && !isBookActivity(a) ? ' · 완료' : ''}
             </small>
           </span>
           <span className="ck">

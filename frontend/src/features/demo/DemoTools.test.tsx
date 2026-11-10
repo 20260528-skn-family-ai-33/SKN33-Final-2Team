@@ -38,4 +38,15 @@ describe('직원·관리자 시연 도구 공개 범위', () => {
     expect(renderToStaticMarkup(<DemoTools />).includes('시연 도구')).toBe(visible);
     expect(renderToStaticMarkup(<AdminDemoTools />).includes('시연 도구')).toBe(visible);
   });
+
+  it('직원 시연 도구에서만 로드맵 기준 날짜를 고른다', async () => {
+    vi.stubEnv('VITE_DEMO_TOOLS', 'on');
+    vi.resetModules();
+    state.status.demoMode = true;
+    const { DemoTools, AdminDemoTools } = await import('./DemoTools');
+    const html = renderToStaticMarkup(<DemoTools />);
+    expect(html).toContain('기준 날짜');
+    expect(html).toContain('type="date"');
+    expect(renderToStaticMarkup(<AdminDemoTools />)).not.toContain('기준 날짜');
+  });
 });

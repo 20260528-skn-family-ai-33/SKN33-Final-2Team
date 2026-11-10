@@ -13,13 +13,13 @@ from functools import partial
 import hashlib
 import json
 
+from . import provenance
 from ..deployment import connect
-from src.shared.bge_embeddings import MODEL, DIMENSIONS, PROVENANCE, embed_texts, vector_values
+from src.shared.bge_embeddings import MODEL, DIMENSIONS, embed_for_index, vector_values
 
 TABLE = 'public.learning_resource_embeddings'
-META_TABLE = 'growpath_bge_meta.inputs'
+META_TABLE = provenance.META_TABLE
 INPUT_VERSION = 'db-resource-fields-and-skill-links/v1'
-PROTOCOL = 'bge-m3/cls-l2-fp16/v1'
 SPECS = {
     'skills': ('skill_tags', 'skill_id', ('skill_id', 'name', 'category'), None),
     'courses': ('courses', 'course_id', (
@@ -36,18 +36,6 @@ SPECS = {
 }
 DDL = '''
 SET LOCAL search_path TO public, extensions;
-CREATE SCHEMA IF NOT EXISTS growpath_bge_meta;
-CREATE TABLE IF NOT EXISTS growpath_bge_meta.inputs (
-    kind text NOT NULL,
-    source_id text NOT NULL,
-    source_sha256 text NOT NULL,
-    actual_input_sha256 text NOT NULL,
-    protocol text NOT NULL,
-    model_revision text NOT NULL,
-    token_count integer NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    PRIMARY KEY (kind, source_id)
-);
 CREATE TABLE IF NOT EXISTS public.learning_resource_embeddings (
     resource_type TEXT NOT NULL CHECK (resource_type IN ('skills','courses','certifications','books','jobs','majors')),
     resource_id TEXT NOT NULL,
@@ -145,31 +133,27 @@ def table_exists(conn):
 
 
 def stored(conn):
+    provenance.require_table(conn)
     if not table_exists(conn):
         return {}
-    has_meta = bool(conn.execute("SELECT to_regclass(%s) AS id", (META_TABLE,)).fetchone()['id'])
-    if not has_meta:
-        return {(r['resource_type'], r['resource_id']): r for r in conn.execute(
-            f'''SELECT resource_type,resource_id,input_sha256,input_version,dimensions
-                FROM {TABLE} WHERE embedding_model=%s''', (MODEL,)).fetchall()}
     return {(r['resource_type'], r['resource_id']): r for r in conn.execute(
         f'''SELECT e.resource_type, e.resource_id, e.input_sha256, e.input_version, e.dimensions,
-                   p.source_sha256 AS meta_sha256, p.actual_input_sha256, p.model_revision
+                   p.source_sha256 AS meta_sha256, p.actual_input_sha256, p.model_revision,
+                   p.protocol, p.token_count
             FROM {TABLE} e
             LEFT JOIN {META_TABLE} p ON p.kind=e.resource_type AND p.source_id=e.resource_id
             WHERE e.embedding_model=%s''', (MODEL,)).fetchall()}
 
 
+def actual_input_hash(source):
+    """축약된 실제 임베딩 입력의 해시. 전체 원문 해시(source['hash'])와 구분해 기록한다."""
+    return hashlib.sha256(source['text'].encode('utf-8')).hexdigest()
+
+
 def is_current(source, previous):
     if not previous or previous['input_sha256'] != source['hash'] or previous['input_version'] != INPUT_VERSION or previous['dimensions'] != DIMENSIONS:
         return False
-    if 'meta_sha256' in previous:
-        actual_sha = hashlib.sha256(source['text'].encode('utf-8')).hexdigest()
-        if (previous['meta_sha256'] != source['hash'] or
-                previous.get('actual_input_sha256') != actual_sha or
-                previous.get('model_revision') != PROVENANCE['model_revision']):
-            return False
-    return True
+    return provenance.is_current(previous, source['hash'], actual_input_hash(source))
 
 
 def status(conn):
@@ -247,30 +231,18 @@ def embed(conn, client=None, *, resource_types: Iterable[str] | None = None,
             conn.execute(DDL)
         for start in range(0, len(pending), 32):
             batch = pending[start:start + 32]
-            vectors = embed_texts([v['text'] for _, v in batch], client=client)
-            for ((kind, rid), row), vector in zip(batch, vectors):
+            embedded = embed_for_index([v['text'] for _, v in batch], client=client)
+            for ((kind, rid), row), item in zip(batch, embedded, strict=True):
                 fk={'skills':'skill_id','courses':'course_id','books':'isbn','certifications':'certification_id','jobs':'job_id','majors':'major_id'}[kind]
                 source_id=rid if kind in ('courses','books') else int(rid)
-                actual_sha = hashlib.sha256(row['text'].encode('utf-8')).hexdigest()
                 conn.execute(f'''INSERT INTO {TABLE}
                     (resource_type,resource_id,embedding_model,dimensions,input_version,input_sha256,embedding,{fk})
                     VALUES (%s,%s,%s,%s,%s,%s,%s::vector,%s)
                     ON CONFLICT (resource_type,resource_id,embedding_model) DO UPDATE SET
                     dimensions=EXCLUDED.dimensions,input_version=EXCLUDED.input_version,
                     input_sha256=EXCLUDED.input_sha256,embedding=EXCLUDED.embedding,updated_at=now()''',
-                    (kind, rid, MODEL, DIMENSIONS, INPUT_VERSION, row['hash'], json.dumps(vector), source_id))
-                conn.execute(f'''INSERT INTO {META_TABLE}
-                    (kind,source_id,source_sha256,actual_input_sha256,protocol,model_revision,token_count,created_at)
-                    VALUES (%s,%s,%s,%s,%s,%s,%s,now())
-                    ON CONFLICT (kind,source_id) DO UPDATE SET
-                    source_sha256=EXCLUDED.source_sha256,
-                    actual_input_sha256=EXCLUDED.actual_input_sha256,
-                    protocol=EXCLUDED.protocol,
-                    model_revision=EXCLUDED.model_revision,
-                    token_count=EXCLUDED.token_count,
-                    created_at=EXCLUDED.created_at''',
-                    (kind, str(rid), row['hash'], actual_sha, PROTOCOL, PROVENANCE['model_revision'],
-                     max(1, min(len(row['text'].split()), 8192))))
+                    (kind, rid, MODEL, DIMENSIONS, INPUT_VERSION, row['hash'], json.dumps(item.vector), source_id))
+                provenance.save(conn, kind, rid, row['hash'], actual_input_hash(row), item.protocol, item.token_count)
         if {k: v['hash'] for k, v in read_sources(conn).items()} != {k: v['hash'] for k, v in rows.items()}:
             raise ValueError('DB sources changed during embedding. Rolled back; retry with stable sources.')
         result = status(conn)

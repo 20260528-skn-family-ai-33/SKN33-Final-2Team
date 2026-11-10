@@ -6,7 +6,8 @@ import math
 from pathlib import Path
 
 from psycopg.types.json import Jsonb
-from src.shared.bge_embeddings import MODEL, DIMENSIONS, embed_texts, vector_values
+from src.database.vectors import provenance
+from src.shared.bge_embeddings import MODEL, DIMENSIONS, embed_for_index, embed_texts, vector_values
 
 CATEGORIES = ('수자원공사 정보', '사내 생활안내')
 FILES = {'company_info_chunks.jsonl': (137, CATEGORIES[0]),
@@ -68,16 +69,20 @@ def reconstruct(row: dict) -> dict:
 
 SOURCE_SQL = '''SELECT c.*,d.category,d.title AS document_title,d.document_kind
     FROM knowledge.chunks c JOIN knowledge.documents d USING(document_id)'''
+META_SQL = f"""SELECT source_id,source_sha256 AS meta_sha256,actual_input_sha256,model_revision,protocol,token_count
+    FROM {provenance.META_TABLE} WHERE kind='knowledge'"""
 
 
 def prepare(conn, rows: list[dict]) -> list[dict]:
     """Idempotent identical inputs; reject changed IDs before any paid call/write."""
     validate_rows(rows)
+    provenance.require_table(conn)
     if not conn.execute("SELECT to_regclass('knowledge.chunks') AS id").fetchone()['id']:
         return rows
     old = {row['chunk_id']: row for row in conn.execute(SOURCE_SQL).fetchall()}
     docs = {r['document_id']: (r['category'], r['title'], r['document_kind'])
             for r in conn.execute('SELECT * FROM knowledge.documents').fetchall()}
+    meta = {row['source_id']: row for row in conn.execute(META_SQL).fetchall()}
     pending = []
     for row in rows:
         info = (row['category'], row['document_title'], row['document_kind'])
@@ -90,6 +95,8 @@ def prepare(conn, rows: list[dict]) -> list[dict]:
             pending.append(row)
         elif previous['embedding_model'] != MODEL or previous['input_sha256'] != row['chunk_text_sha256']:
             raise ValueError('기존 벡터의 모델·본문 해시가 다릅니다.')
+        elif not provenance.is_current(meta.get(row['chunk_id']), row['chunk_text_sha256'], row['chunk_text_sha256']):
+            pending.append(row)
     return pending
 
 
@@ -102,8 +109,8 @@ def insert(conn, rows: list[dict], *, client=None) -> dict:
     for start in range(0, len(pending), 16):
         batch = pending[start:start + 16]
         # Exact supplied chunk_text only. No title prefix, truncation or rechunking.
-        vectors = embed_texts([row['chunk_text'] for row in batch], client=client)
-        for row, vector in zip(batch, vectors):
+        embedded = embed_for_index([row['chunk_text'] for row in batch], client=client)
+        for row, item in zip(batch, embedded, strict=True):
             conn.execute('''INSERT INTO knowledge.documents(document_id,category,title,document_kind)
                 VALUES (%s,%s,%s,%s) ON CONFLICT(document_id) DO NOTHING''',
                          (row['document_id'], row['category'], row['document_title'], row['document_kind']))
@@ -116,7 +123,9 @@ def insert(conn, rows: list[dict], *, client=None) -> dict:
                     embedding=EXCLUDED.embedding,embedded_at=EXCLUDED.embedded_at''',
                          (row['chunk_id'], row['document_id'], row['display_order'], row['chunk_text'],
                           row['chunk_text_sha256'], row['is_virtual'], Jsonb({k: v for k, v in row.items() if k not in CORE}),
-                          MODEL, DIMENSIONS, row['chunk_text_sha256'], json.dumps(vector)))
+                          MODEL, DIMENSIONS, row['chunk_text_sha256'], json.dumps(item.vector)))
+            provenance.save(conn, 'knowledge', row['chunk_id'], row['chunk_text_sha256'],
+                            row['chunk_text_sha256'], item.protocol, item.token_count)
             saved += 1
         print(f'Embedded document chunks {saved}/{len(pending)}', flush=True)
     expected = {row['chunk_id']: row for row in rows}

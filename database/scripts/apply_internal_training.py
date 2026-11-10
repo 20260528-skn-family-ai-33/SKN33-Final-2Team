@@ -17,8 +17,8 @@ from psycopg.types.json import Jsonb
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from src.database.vectors import resource_vectors as vectors
-from src.shared.bge_embeddings import PROVENANCE, embed_texts, vector_values
+from src.database.vectors import provenance, resource_vectors as vectors
+from src.shared.bge_embeddings import ACCEPTED_PROTOCOLS, MAX_TOKENS, PROVENANCE, embed_for_index, vector_values
 
 SOURCE = 'INTERNAL_TRAINING_PILOT'
 PACKAGE_INDEX = ROOT / 'config/internal_training_packages.json'
@@ -185,9 +185,9 @@ def _current_rows(conn, sources: dict, ids: list[str]) -> dict:
 def _validate_vector(row: dict, source: dict) -> list[float]:
     if (row['dimensions'] != vectors.DIMENSIONS or row['input_version'] != vectors.INPUT_VERSION
             or row['input_sha256'] != source['hash']
-            or row['actual_input_sha256'] != hashlib.sha256(source['text'].encode('utf-8')).hexdigest()
-            or row['model_revision'] != PROVENANCE['model_revision'] or row['protocol'] != vectors.PROTOCOL
-            or type(row['token_count']) is not int or not 1 <= row['token_count'] <= 8192):
+            or row['actual_input_sha256'] != vectors.actual_input_hash(source)
+            or row['model_revision'] != PROVENANCE['model_revision'] or row['protocol'] not in ACCEPTED_PROTOCOLS
+            or type(row['token_count']) is not int or not 1 <= row['token_count'] <= MAX_TOKENS):
         raise ValueError('벡터 원문 해시·버전·모델 이력이 일치하지 않습니다.')
     vector = vector_values(row['vector'])
     if abs(math.hypot(*vector) - 1) >= .001:
@@ -296,11 +296,10 @@ def install(conn, courses: list[dict], *, apply: bool = False, refresh: bool = F
                     row = cached
                     reused += 1
                 else:
-                    vector = embed_texts([source['text']], client=client)[0]
-                    # token_count는 기존 resource_vectors와 같은 공백 기준 추정값이다.
-                    # 실제 8192 토큰 한도는 canonical 서버가 자르지 않고 검사한다.
-                    row = dict(actual_input_sha256=hashlib.sha256(source['text'].encode('utf-8')).hexdigest(),
-                               token_count=max(1, min(len(source['text'].split()), 8192)), protocol=vectors.PROTOCOL)
+                    item = embed_for_index([source['text']], client=client)[0]
+                    vector = item.vector
+                    row = dict(actual_input_sha256=vectors.actual_input_hash(source),
+                               token_count=item.token_count, protocol=item.protocol)
                     _validate_vector(dict(row, input_sha256=source['hash'], input_version=vectors.INPUT_VERSION,
                         dimensions=vectors.DIMENSIONS, model_revision=PROVENANCE['model_revision'], vector=vector), source)
                     generated += 1
@@ -310,12 +309,8 @@ def install(conn, courses: list[dict], *, apply: bool = False, refresh: bool = F
                     DO UPDATE SET input_sha256=EXCLUDED.input_sha256,input_version=EXCLUDED.input_version,
                     dimensions=EXCLUDED.dimensions,embedding=EXCLUDED.embedding,updated_at=now()''',
                     (rid,rid,vectors.MODEL,vectors.DIMENSIONS,vectors.INPUT_VERSION,source['hash'],json.dumps(vector)))
-                conn.execute('''INSERT INTO growpath_bge_meta.inputs(kind,source_id,source_sha256,actual_input_sha256,
-                    protocol,model_revision,token_count) VALUES('courses',%s,%s,%s,%s,%s,%s)
-                    ON CONFLICT(kind,source_id) DO UPDATE SET source_sha256=EXCLUDED.source_sha256,
-                    actual_input_sha256=EXCLUDED.actual_input_sha256,protocol=EXCLUDED.protocol,
-                    model_revision=EXCLUDED.model_revision,token_count=EXCLUDED.token_count''',
-                    (rid,source['hash'],row['actual_input_sha256'],row['protocol'],PROVENANCE['model_revision'],row['token_count']))
+                provenance.save(conn, 'courses', rid, source['hash'], row['actual_input_sha256'],
+                                row['protocol'], row['token_count'])
             final_sources = vectors.sources(conn)
             if any(final_sources[key]['hash'] != source['hash'] for key, source in selected.items()):
                 raise ValueError('적재 중 원문 변경을 감지했습니다. 전체 롤백합니다.')

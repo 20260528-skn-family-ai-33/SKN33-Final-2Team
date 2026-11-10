@@ -128,12 +128,13 @@ class PackageTests(unittest.TestCase):
         source = dict(hash='a' * 64, text='확인할 원문')
         row = dict(dimensions=1024, input_version=training.vectors.INPUT_VERSION, input_sha256=source['hash'],
                    actual_input_sha256=hashlib.sha256(source['text'].encode()).hexdigest(),
-                   model_revision=training.PROVENANCE['model_revision'], protocol=training.vectors.PROTOCOL,
+                   model_revision=training.PROVENANCE['model_revision'], protocol=training.ACCEPTED_PROTOCOLS[0],
                    token_count=4, vector=[1.] + [0.] * 1023)
-        self.assertEqual(len(training._validate_vector(row, source)), 1024)
+        for protocol in training.ACCEPTED_PROTOCOLS:
+            self.assertEqual(len(training._validate_vector(dict(row, protocol=protocol), source)), 1024)
         for change in ({'input_sha256': 'b' * 64}, {'actual_input_sha256': 'c' * 64},
                        {'model_revision': 'other'}, {'dimensions': 1536}, {'vector': [2.] + [0.] * 1023},
-                       {'vector': [float('nan')] + [0.] * 1023}, {'token_count': 0}):
+                       {'vector': [float('nan')] + [0.] * 1023}, {'token_count': 0}, {'protocol': 'unknown'}):
             with self.subTest(change=list(change)), self.assertRaises(ValueError):
                 training._validate_vector(dict(row, **change), source)
 
@@ -181,7 +182,7 @@ class IsolatedDatabaseTests(unittest.TestCase):
             empty_state = fingerprints(conn, ids, external=False)
             schema_before = conn.execute("""SELECT md5(string_agg(pg_get_constraintdef(oid),'|' ORDER BY oid)) AS hash
                 FROM pg_constraint WHERE connamespace NOT IN (SELECT oid FROM pg_namespace WHERE nspname='pg_catalog')""").fetchone()
-            with patch.object(training, 'embed_texts', side_effect=AssertionError('캐시 검사 중 추론 금지')):
+            with patch.object(training, 'embed_for_index', side_effect=AssertionError('캐시 검사 중 추론 금지')):
                 preview = training.install(conn, courses, vector_cache=cache, cache_only=True)
                 self.assertEqual((preview['inserted'], preview['pending_vectors']), (412, 412))
                 self.assertEqual(fingerprints(conn, ids, external=False), empty_state)

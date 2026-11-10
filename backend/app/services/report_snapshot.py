@@ -17,7 +17,10 @@ def capture(plan,progress,now=None):
 
 def matches(snapshot,plan,progress):
     current=capture(plan,progress)
-    return snapshot.get('version')==current['version'] and snapshot.get('activities')==current['activities']
+    # 도서를 진척에서 빼기 전에 만든 보고서도 확인할 수 있게 지금 기준의 활동만 비교한다. 같은 버전이면 활동 구성은 같다.
+    ids={act['id'] for act in current['activities']}
+    recorded=[act for act in snapshot.get('activities') or [] if act['id'] in ids]
+    return snapshot.get('version')==current['version'] and recorded==current['activities']
 
 
 def evidence(snapshot):

@@ -20,6 +20,16 @@ def chunk(text='등록 자료 원문'):
             'chunk_text_sha256': hashlib.sha256(text.encode()).hexdigest()}
 
 
+def indexed(vector=VECTOR):
+    return embeddings.IndexedEmbedding(vector, 'bge-m3/cls-l2-fp32/v1', 3)
+
+
+def provenance_of(sha):
+    return {'meta_sha256': sha, 'actual_input_sha256': sha,
+            'model_revision': embeddings.PROVENANCE['model_revision'],
+            'protocol': 'bge-m3/cls-l2-fp16/v1', 'token_count': 3}
+
+
 class KnowledgeEmbeddingTest(unittest.TestCase):
     def setUp(self):
         settings = patch.dict(os.environ, ASSISTANT_SEARCH_MODE='vector')
@@ -93,8 +103,9 @@ class KnowledgeEmbeddingTest(unittest.TestCase):
 
     def test_identical_input_reuses_stored_vector(self):
         source = chunk()
-        stored = dict(source, input_sha256=source['chunk_text_sha256'], dimensions=1024)
-        with patch.object(search.db, 'all_', return_value=[stored]), patch.object(embeddings, 'embed') as embed, patch.object(search.db, 'tx') as write:
+        stored = dict(source, input_sha256=source['chunk_text_sha256'], dimensions=1024,
+                      **provenance_of(source['chunk_text_sha256']))
+        with patch.object(search.db, 'all_', return_value=[stored]), patch.object(embeddings, 'embed_for_index') as embed, patch.object(search.db, 'tx') as write:
             self.assertEqual(search.ensure_vectors([source]), 0)
         embed.assert_not_called()
         write.assert_not_called()
@@ -109,12 +120,46 @@ class KnowledgeEmbeddingTest(unittest.TestCase):
             def tx():
                 yield transaction
 
-            with self.subTest(stored=stored), patch.object(search.db, 'all_', return_value=stored), patch.object(embeddings, 'embed', return_value=[VECTOR]) as embed, patch.object(search.db, 'tx', tx):
+            with self.subTest(stored=stored), patch.object(search.db, 'all_', return_value=stored), patch.object(embeddings, 'embed_for_index', return_value=[indexed()]) as embed, patch.object(search.db, 'tx', tx):
                 self.assertEqual(search.ensure_vectors([source]), 1)
             embed.assert_called_once_with([source['chunk_text']])
             self.assertIn('UPDATE knowledge.chunks', transaction.run.call_args.args[0])
             self.assertNotIn('INSERT INTO', transaction.run.call_args.args[0])
             self.assertEqual(transaction.run.call_args.kwargs['dims'], 1024)
+
+    def test_missing_or_invalid_provenance_is_reindexed(self):
+        source = chunk()
+        sha = source['chunk_text_sha256']
+        base = dict(source, input_sha256=sha, dimensions=1024)
+        for changes in ({'meta_sha256': None}, {'meta_sha256': 'old'}, {'actual_input_sha256': 'old'},
+                        {'model_revision': 'old'}, {'protocol': 'old'}, {'token_count': 0}, {'token_count': 8193}):
+            transaction = Mock()
+            transaction.run.return_value = 1
+
+            @contextmanager
+            def tx():
+                yield transaction
+
+            row = {**base, **provenance_of(sha), **changes}
+            with self.subTest(changes=changes), patch.object(search.db, 'all_', return_value=[row]), patch.object(embeddings, 'embed_for_index', return_value=[indexed()]), patch.object(search.db, 'tx', tx):
+                self.assertEqual(search.ensure_vectors([source]), 1)
+
+    def test_save_records_reported_protocol_and_tokens_without_estimating(self):
+        transaction = Mock()
+        transaction.run.return_value = 1
+
+        @contextmanager
+        def tx():
+            yield transaction
+
+        source = chunk('공백 없는원문')
+        reported = embeddings.IndexedEmbedding(VECTOR, 'bge-m3/cls-l2-fp32/v1', 11)
+        with patch.object(search.db, 'all_', return_value=[]), patch.object(embeddings, 'embed_for_index', return_value=[reported]), patch.object(search.db, 'tx', tx):
+            search.ensure_vectors([source])
+        meta = transaction.run.call_args_list[0].kwargs
+        self.assertEqual((meta['protocol'], meta['token_count']), ('bge-m3/cls-l2-fp32/v1', 11))
+        self.assertEqual(meta['source_id'], 'c1')
+        self.assertNotIn('dims', meta)
 
     def test_bad_source_hash_and_invalid_vectors_never_write(self):
         bad = dict(chunk(), chunk_text_sha256='bad')
@@ -122,7 +167,7 @@ class KnowledgeEmbeddingTest(unittest.TestCase):
             with self.assertRaisesRegex(llm.LlmError, '원문 해시'):
                 search.ensure_vectors([bad])
             for vector in ([0.0] * 1024, [1.0] * 1536, [float('nan')] * 1024):
-                with patch.object(search.db, 'all_', return_value=[]), patch.object(embeddings, 'embed', return_value=[vector]):
+                with patch.object(search.db, 'all_', return_value=[]), patch.object(embeddings, 'embed_for_index', return_value=[indexed(vector)]):
                     with self.assertRaises(llm.LlmError):
                         search.ensure_vectors([chunk()])
         write.assert_not_called()
@@ -133,8 +178,11 @@ class KnowledgeEmbeddingTest(unittest.TestCase):
         transaction = Mock()
 
         def save(sql, **params):
-            stored[params['id']] = {'chunk_id': params['id'], 'dimensions': params['dims'],
-                                    'input_sha256': params['sha']}
+            if 'UPDATE knowledge.chunks' in sql:
+                stored.setdefault(params['id'], {}).update(
+                    chunk_id=params['id'], dimensions=params['dims'], input_sha256=params['sha'])
+            else:
+                stored.setdefault(params['source_id'], {}).update(provenance_of(params['source_sha256']))
             return 1
 
         transaction.run.side_effect = save
@@ -144,11 +192,11 @@ class KnowledgeEmbeddingTest(unittest.TestCase):
             yield transaction
 
         with patch.object(search.db, 'all_', side_effect=lambda *a, **kw: list(stored.values())), patch.object(search.db, 'tx', tx):
-            with patch.object(embeddings, 'embed', side_effect=[[VECTOR] * 4, llm.LlmError('BGE-M3 연결 실패')]):
+            with patch.object(embeddings, 'embed_for_index', side_effect=[[indexed()] * 4, llm.LlmError('BGE-M3 연결 실패')]):
                 with self.assertRaises(llm.LlmError):
                     search.ensure_vectors(chunks)
             self.assertEqual(len(stored), 4)
-            with patch.object(embeddings, 'embed', return_value=[VECTOR]) as embed:
+            with patch.object(embeddings, 'embed_for_index', return_value=[indexed()]) as embed:
                 self.assertEqual(search.ensure_vectors(chunks), 1)
                 embed.assert_called_once_with([chunks[-1]['chunk_text']])
             self.assertEqual(len(stored), 5)

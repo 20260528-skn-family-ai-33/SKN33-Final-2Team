@@ -17,6 +17,17 @@ from app import bge_regulation_search as search, config, llm, regulation_embeddi
 VECTOR = [1.0] + [0.0] * 1023
 
 
+def indexed(vector=VECTOR):
+    return embeddings.IndexedEmbedding(vector, 'bge-m3/cls-l2-fp32/v1', 3)
+
+
+def stored_row(sha='sha', **changes):
+    return {'dimensions': 1024, 'input_sha256': sha, 'input_version': search.INPUT_VERSION,
+            'meta_sha256': sha, 'actual_input_sha256': sha,
+            'model_revision': embeddings.PROVENANCE['model_revision'],
+            'protocol': 'bge-m3/cls-l2-fp16/v1', 'token_count': 3, **changes}
+
+
 class RegulationEmbeddingTest(unittest.TestCase):
     def setUp(self):
         self.settings = patch.dict(os.environ, BGE_M3_BASE_URL='http://127.0.0.1:18671/v1', BGE_M3_TIMEOUT='15', ASSISTANT_SEARCH_MODE='vector')
@@ -101,6 +112,36 @@ class RegulationEmbeddingTest(unittest.TestCase):
             with self.assertRaises(llm.LlmError):
                 embeddings.embed(['첫째', '둘째'])
 
+    def test_index_embedding_records_reported_precision_and_tokens(self):
+        rows = [{'index': 1, 'embedding': VECTOR, 'token_count': 11},
+                {'index': 0, 'embedding': list(reversed(VECTOR)), 'token_count': 5}]
+        for precision, protocol in (('float32', 'bge-m3/cls-l2-fp32/v1'), ('float16', 'bge-m3/cls-l2-fp16/v1')):
+            with self.subTest(precision=precision), self.response({'model': embeddings.BGE_MODEL, 'precision': precision, 'data': rows}):
+                result = embeddings.embed_for_index(['첫째', '둘째'])
+            self.assertEqual([(item.protocol, item.token_count) for item in result], [(protocol, 5), (protocol, 11)])
+            self.assertEqual(result[0].vector, list(reversed(VECTOR)))
+
+    def test_index_embedding_refuses_unknown_precision_or_token_count(self):
+        good = {'index': 0, 'embedding': VECTOR, 'token_count': 3}
+        cases = [{'data': [good]}, {'precision': 'float8', 'data': [good]}, {'precision': None, 'data': [good]},
+                 {'precision': 'float32', 'data': [{'index': 0, 'embedding': VECTOR}]}]
+        cases += [{'precision': 'float32', 'data': [dict(good, token_count=bad)]} for bad in (0, 8193, True, 1.5, '3')]
+        for case in cases:
+            with self.subTest(case=str(case)[:50]), self.response({'model': embeddings.BGE_MODEL, **case}):
+                with self.assertRaisesRegex(llm.LlmError, '다시 빌드'):
+                    embeddings.embed_for_index(['문서'])
+
+    def test_query_embedding_still_works_before_server_rebuild(self):
+        with self.response({'model': embeddings.BGE_MODEL, 'data': [{'index': 0, 'embedding': VECTOR}]}):
+            self.assertEqual(embeddings.embed(['질문']), [VECTOR])
+
+    def test_index_embedding_rejects_blank_input_and_skips_empty_list(self):
+        with patch.object(llm, '_http') as http:
+            self.assertEqual(embeddings.embed_for_index([]), [])
+            with self.assertRaises(llm.LlmError):
+                embeddings.embed_for_index([' '])
+        http.assert_not_called()
+
     def test_large_batches_split_without_changing_input_order(self):
         texts = ['가' * 3000, '나' * 3000, '짧은 문서']
         with patch.object(embeddings, '_bge_request', side_effect=lambda batch: [VECTOR for _ in batch]) as request:
@@ -131,7 +172,7 @@ class RegulationEmbeddingTest(unittest.TestCase):
                 embeddings.embed(['질문'])
 
     def test_bge_search_only_queries_matching_model_dimensions_and_pool(self):
-        with patch.object(regstore, 'pool', return_value=[{'id': 'a'}]), patch.object(search, '_inputs', return_value={'a': ('text', 'sha')}), patch.object(search, '_stored', return_value={'a': {'dimensions': 1024, 'input_sha256': 'sha', 'input_version': search.INPUT_VERSION}}), patch.object(embeddings, 'embed', return_value=[VECTOR]), patch.object(regstore.db, 'all_', return_value=[{'rag_chunk_id': 'a', 'score': .9}]) as query, patch.object(regstore.db, 'tx') as tx:
+        with patch.object(regstore, 'pool', return_value=[{'id': 'a'}]), patch.object(search, '_inputs', return_value={'a': ('text', 'sha')}), patch.object(search, '_stored', return_value={'a': stored_row()}), patch.object(embeddings, 'embed', return_value=[VECTOR]), patch.object(regstore.db, 'all_', return_value=[{'rag_chunk_id': 'a', 'score': .9}]) as query, patch.object(regstore.db, 'tx') as tx:
             self.assertEqual(search.search('병가', 4, '일반직'), [{'id': 'a', 'score': .9}])
         tx.assert_not_called()
         self.assertIn('regulations.rag_chunk_embeddings', query.call_args.args[0])
@@ -140,7 +181,7 @@ class RegulationEmbeddingTest(unittest.TestCase):
         self.assertEqual(query.call_args.kwargs['i'], ['a'])
 
     def test_failure_does_not_search_keywords(self):
-        with patch.object(regstore, 'pool', return_value=[{'id': 'a'}]), patch.object(search, '_inputs', return_value={'a': ('text', 'sha')}), patch.object(search, '_stored', return_value={'a': {'dimensions': 1024, 'input_sha256': 'sha', 'input_version': search.INPUT_VERSION}}), patch.object(embeddings, 'embed', side_effect=llm.LlmError('BGE-M3 연결 실패')), patch.object(regstore, 'keyword_search') as keyword:
+        with patch.object(regstore, 'pool', return_value=[{'id': 'a'}]), patch.object(search, '_inputs', return_value={'a': ('text', 'sha')}), patch.object(search, '_stored', return_value={'a': stored_row()}), patch.object(embeddings, 'embed', side_effect=llm.LlmError('BGE-M3 연결 실패')), patch.object(regstore, 'keyword_search') as keyword:
             with self.assertRaises(llm.LlmError):
                 search.search('질문', 4, '일반직')
             keyword.assert_not_called()
@@ -148,8 +189,9 @@ class RegulationEmbeddingTest(unittest.TestCase):
     def test_matching_hash_skips_but_stale_hash_updates_only_auxiliary_table(self):
         sha = hashlib.sha256('본문'.encode()).hexdigest()
         for stored_sha, expected in [(sha, 0), ('old', 1)]:
-            row = {'rag_chunk_id': 'a', 'dimensions': 1024, 'input_sha256': stored_sha, 'input_version': search.INPUT_VERSION}
-            with self.subTest(stored_sha=stored_sha), patch.object(regstore.db, 'all_', return_value=[row]), patch.object(regstore, 'article', return_value={}), patch.object(search, 'input_text', return_value='본문'), patch.object(embeddings, 'embed', return_value=[VECTOR]) as embed, patch.object(regstore.db, 'tx') as tx:
+            row = {'rag_chunk_id': 'a', **stored_row(stored_sha)}
+            with self.subTest(stored_sha=stored_sha), patch.object(regstore.db, 'all_', return_value=[row]), patch.object(regstore, 'article', return_value={}), patch.object(search, 'input_text', return_value='본문'), patch.object(embeddings, 'embed_for_index', return_value=[indexed()]) as embed, patch.object(regstore.db, 'tx') as tx:
+                tx.return_value.__enter__.return_value.all.return_value = [{'rag_chunk_id': 'a', 'current_sha': sha}]
                 self.assertEqual(search.ensure_vectors(['a']), expected)
                 if expected:
                     sql = tx.return_value.__enter__.return_value.run.call_args
@@ -161,7 +203,7 @@ class RegulationEmbeddingTest(unittest.TestCase):
                     tx.assert_not_called()
 
     def test_incomplete_document_batch_is_not_written(self):
-        with patch.object(regstore.db, 'all_', return_value=[]), patch.object(regstore, 'article', return_value={}), patch.object(search, 'input_text', return_value='본문'), patch.object(embeddings, 'embed', return_value=[]), patch.object(regstore.db, 'tx') as tx:
+        with patch.object(regstore.db, 'all_', return_value=[]), patch.object(regstore, 'article', return_value={}), patch.object(search, 'input_text', return_value='본문'), patch.object(embeddings, 'embed_for_index', return_value=[]), patch.object(regstore.db, 'tx') as tx:
             with self.assertRaises(llm.LlmError):
                 search.ensure_vectors(['a'])
             tx.assert_not_called()

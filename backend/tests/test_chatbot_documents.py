@@ -222,7 +222,11 @@ class DocumentScopeTest(unittest.TestCase):
             vector = [1.] + [0.] * 1023
             with (patch.object(regulation_embeddings, 'embed', return_value=[vector]),
                   patch.object(bge_regulation_search, '_inputs', return_value={'a': ('text', 'sha')}),
-                  patch.object(bge_regulation_search, '_stored', return_value={'a': {'dimensions': 1024, 'input_sha256': 'sha', 'input_version': bge_regulation_search.INPUT_VERSION}}),
+                  patch.object(bge_regulation_search, '_stored', return_value={'a': {
+                      'dimensions': 1024, 'input_sha256': 'sha', 'input_version': bge_regulation_search.INPUT_VERSION,
+                      'meta_sha256': 'sha', 'actual_input_sha256': 'sha', 'token_count': 3,
+                      'model_revision': regulation_embeddings.PROVENANCE['model_revision'],
+                      'protocol': 'bge-m3/cls-l2-fp16/v1'}}),
                   patch.dict(os.environ, ASSISTANT_SEARCH_MODE='vector'),
                   patch.object(regstore.db, 'all_', return_value=[{'rag_chunk_id': 'a', 'score': 1}]) as query):
                 self.assertEqual(regstore.search('교육', 4, '일반직', 'ollama'), [])
