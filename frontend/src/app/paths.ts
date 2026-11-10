@@ -53,7 +53,6 @@ export const NEW_ORDER = [
   paths.newResultEdit,
   paths.newGen,
   paths.newOptions,
-  paths.newMaterials,
   paths.newReview,
 ] as string[];
 
@@ -67,7 +66,8 @@ const NEW_ID_TO_PATH: Record<string, string> = {
   'new-result-edit': paths.newResultEdit,
   'new-gen': paths.newGen,
   'new-options': paths.newOptions,
-  'new-materials': paths.newMaterials,
+  // 자료 선택은 '로드맵·자료 선택' 화면으로 합쳐졌다. 예전에 이 단계로 저장된 작성 위치도 그 화면으로 잇는다
+  'new-materials': paths.newOptions,
   'new-review': paths.newReview,
 };
 export const newIdToPath = (id: string | null | undefined): string => (id && NEW_ID_TO_PATH[id]) || paths.newGoal;

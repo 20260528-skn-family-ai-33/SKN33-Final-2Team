@@ -51,12 +51,11 @@ export const optsOf = (d: DraftDoc): PlanContent[] => optionIds(d).map((id) => b
 const regenBusy = (d: DraftDoc, pid: string) => !!(d.gen && d.gen.regenRun && d.gen.regenRun[pid]);
 const regenErr = (d: DraftDoc, pid: string) => (d.gen && d.gen.regenErr && d.gen.regenErr[pid] ? cause(d.gen.regenErr[pid]) : null);
 
-export async function choose(go: ReturnType<typeof useGo>, id: string, save?:()=>Promise<boolean>): Promise<void> {
+export async function choose(go: ReturnType<typeof useGo>, id: string, save:()=>Promise<boolean>): Promise<void> {
   try {
     await flush();
     takeDraft(await draftsApi.select(ws().draftId as string, id, comparisonEvidence(ws().draft.gen)));
-    if(save){if(!await completeMaterialSelection(save,go))toast('자료 선택을 저장하지 못했어요. 선택은 유지됩니다. 다시 시도해 주세요.');}
-    else go(paths.newMaterials);
+    if(!await completeMaterialSelection(save,go))toast('자료 선택을 저장하지 못했어요. 선택은 유지됩니다. 다시 시도해 주세요.');
   } catch (err) {
     if (!(err instanceof DraftSaveError)) failToast(err, '안을 고르지 못했어요');
   }
