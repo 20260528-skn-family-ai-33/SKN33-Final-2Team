@@ -111,7 +111,7 @@
 | `POST /drafts/{id}/options` · `GET .../options` · `POST .../options/{pid}/retry` · `.../options/accept-partial` | 3안 작성 시작(문서에 진행을 적음)·다시 읽기·실패한 안 다시·일부만 받기 |
 | `POST /drafts/{id}/options/{pid}/regenerate` | 한 안 다시 만들기. 본문 `{request: {wish, quick[], removeActs[{key,title}], replaceActs[{key,title}]} \| null}` |
 | `POST /drafts/{id}/options/support/retry` | 지원 조건 다시 확인. 본문 `{perspective: 안 ID \| null(세 안 모두)}` |
-| `POST /drafts/{id}/selection` · `POST /drafts/{id}/confirm` | 안 고르기 · 확정(→ `{planId}`). 확정 본문은 선택 `{startMode: together \| after \| archive}`이고, 진행 중인 로드맵이 있을 때만 의미가 있어요. 없으면 `together`(함께 진행), `after`는 모두 끝난 다음 주를 `plan.startDate`에 저장(이미 지났으면 저장 안 함), `archive`는 진행 중인 로드맵을 확정과 같은 트랜잭션에서 보관해요. 다른 값은 422 `BAD_START_MODE` |
+| `POST /drafts/{id}/selection` · `POST /drafts/{id}/confirm` | 안 고르기 · 확정(→ `{planId}`). 확정 본문은 선택 `{startMode: together \| after \| archive}`이고, 진행 중인 로드맵이 있을 때만 의미가 있어요. 없으면 `together`(함께 진행), `after`는 모두 끝난 다음 주를 `plan.startDate`에 저장(이미 지났으면 저장 안 함), `archive`는 진행 중인 로드맵을 확정과 같은 트랜잭션에서 보관해요. 다른 값은 422 `BAD_START_MODE`. 화면은 작성 탭에 들어올 때 고른 값을 작성 문서의 `startMode`로 자동 저장(`POST`·`PATCH /drafts`, 잘못된 값은 같은 422)했다가 확정 때 보내요 |
 
 ### 확정 로드맵·점검·보고서 — `plans.ts`
 

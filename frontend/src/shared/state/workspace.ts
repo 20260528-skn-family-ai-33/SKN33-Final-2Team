@@ -34,6 +34,7 @@ export const freshDraft = (): DraftDoc => ({
   genPrefs: null,
   quizRun: null,
   diagRun: null,
+  startMode: null,
 });
 
 /** 부서장이 쓰는 중인 코멘트(열쇠: '직원~로드맵' · 고치는 중이면 '직원~로드맵~코멘트') */

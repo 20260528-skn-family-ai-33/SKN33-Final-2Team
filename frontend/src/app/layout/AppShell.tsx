@@ -5,6 +5,7 @@ import { paths } from '@/app/paths';
 import { AdminSide } from '@/features/admin/AdminSide';
 import { AssistantHost } from '@/features/assistant/AssistantHost';
 import { DraftNavGuard } from '@/features/draft/stale';
+import { StartModeNavGuard } from '@/features/draft/startModeSheet';
 import { NotificationBell } from '@/features/notifications/NotificationBell';
 import { canClearHiddenDemoSettings, connFor, PROV, useAi, useAiMode } from '@/shared/state/ai';
 import { isSup, meOf, useSession } from '@/shared/state/session';
@@ -162,6 +163,7 @@ export function AppShell() {
       </div>
       {booted && acct?.accountType === 'employee' ? <AssistantHost /> : null}
       {booted && acct && !admin ? <DraftNavGuard /> : null}
+      {booted && acct && !admin ? <StartModeNavGuard /> : null}
       <SheetHost />
       <ToastHost />
     </>

@@ -1,10 +1,10 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 const mock=vi.hoisted(()=>({
-  state:{pendingFlow:undefined as 'materials'|undefined,owner:'u' as string|null,draftId:'d' as string|null,lastNew:'old' as string|null,draft:{goal:'검색 구현',prefs:{hours:4},chosen:'A1',v2Assessment:{generationId:'g',materialsKey:'m'}}},
+  state:{pendingFlow:undefined as 'materials'|undefined,owner:'u' as string|null,draftId:'d' as string|null,lastNew:'old' as string|null,plans:{} as Record<string,{status:string}>,draft:{goal:'검색 구현',prefs:{hours:4},chosen:'A1',startMode:null as string|null,v2Assessment:{generationId:'g',materialsKey:'m'}}},
   flush:vi.fn(),confirm:vi.fn(),reload:vi.fn(),toast:vi.fn(),notice:vi.fn(),ensurePostQuiz:vi.fn(),
 }));
 vi.mock('@/shared/state/ui',()=>({toast:mock.notice}));
-vi.mock('@/shared/state/workspace',()=>({ws:()=>mock.state,updateWs:(fn:(s:typeof mock.state)=>void)=>fn(mock.state)}));
+vi.mock('@/shared/state/workspace',()=>({ws:()=>mock.state,updateWs:(fn:(s:typeof mock.state)=>void)=>fn(mock.state),recs:(s:typeof mock.state,status:string)=>Object.values(s.plans).filter(R=>R.status===status)}));
 vi.mock('@/api/endpoints/drafts',()=>({draftsApi:{confirm:mock.confirm}}));
 vi.mock('@/features/assessment/postActions',()=>({ensurePostQuiz:mock.ensurePostQuiz}));
 vi.mock('@/shared/lib/fail',()=>({failToast:mock.toast}));
@@ -12,7 +12,7 @@ vi.mock('../draftSync',()=>({flush:mock.flush,reloadWorkspace:mock.reload,DraftS
 import { confirmReview } from './confirmReview';
 function deferred<T>() {let resolve!:(value:T)=>void; const work=new Promise<T>(done=>{resolve=done;});return {work,resolve};}
 beforeEach(()=>{
-  vi.resetAllMocks();mock.state.pendingFlow=undefined;mock.state.owner='u';mock.state.draftId='d';mock.state.lastNew='old';mock.state.draft.goal='검색 구현';mock.state.draft.chosen='A1';
+  vi.resetAllMocks();mock.state.pendingFlow=undefined;mock.state.owner='u';mock.state.draftId='d';mock.state.lastNew='old';mock.state.draft.goal='검색 구현';mock.state.draft.chosen='A1';mock.state.draft.startMode=null;mock.state.plans={};
   mock.flush.mockResolvedValue(undefined);mock.confirm.mockResolvedValue({planId:'plan'});mock.reload.mockResolvedValue(true);mock.ensurePostQuiz.mockResolvedValue(undefined);
 });
 it('연속 확정 클릭은 산출물 저장·확정·화면 이동을 각각 한 번만 실행한다',async()=>{
@@ -51,14 +51,17 @@ it('확정 오류는 자동 재시도하지 않고 사용자가 다시 클릭할
   expect(await confirmReview(go)).toBe(true);expect(mock.confirm).toHaveBeenCalledTimes(2);
 });
 
-it('고른 시작 방식을 확정 요청에 실어 보내고, 끝나고 시작은 보관 안내를 띄우지 않는다',async()=>{
-  const go=vi.fn();expect(await confirmReview(go,undefined,'after')).toBe(true);
+it('작성 문서에 저장된 시작 방식을 확정 요청에 실어 보내고, 끝나고 시작은 보관 안내를 띄우지 않는다',async()=>{
+  mock.state.draft.startMode='after';mock.state.plans={a:{status:'active'}};const go=vi.fn();expect(await confirmReview(go)).toBe(true);
   expect(mock.confirm).toHaveBeenCalledExactlyOnceWith('d','after');expect(mock.notice).not.toHaveBeenCalled();
 });
 it('보관하고 시작은 확정이 끝난 뒤에만 보관했다고 알린다',async()=>{
-  const go=vi.fn();mock.confirm.mockRejectedValueOnce(Error('offline'));
-  expect(await confirmReview(go,undefined,'archive')).toBe(false);expect(mock.notice).not.toHaveBeenCalled();
-  expect(await confirmReview(go,undefined,'archive')).toBe(true);expect(mock.confirm).toHaveBeenLastCalledWith('d','archive');expect(mock.notice).toHaveBeenCalledOnce();
+  mock.state.draft.startMode='archive';mock.state.plans={a:{status:'active'}};const go=vi.fn();mock.confirm.mockRejectedValueOnce(Error('offline'));
+  expect(await confirmReview(go)).toBe(false);expect(mock.notice).not.toHaveBeenCalled();
+  expect(await confirmReview(go)).toBe(true);expect(mock.confirm).toHaveBeenLastCalledWith('d','archive');expect(mock.notice).toHaveBeenCalledOnce();
+});
+it('고른 뒤 기존 로드맵이 끝나 보관할 것이 없으면 보관했다고 알리지 않는다',async()=>{
+  mock.state.draft.startMode='archive';const go=vi.fn();expect(await confirmReview(go)).toBe(true);expect(mock.notice).not.toHaveBeenCalled();
 });
 it('자료 선택을 저장하지 않으면 이전 산출물 저장과 확정 API를 호출하지 않는다',async()=>{
  mock.state.pendingFlow='materials';const save=vi.fn(),go=vi.fn();

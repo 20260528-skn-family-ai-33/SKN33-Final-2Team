@@ -9,6 +9,7 @@ import { newIdToPath, paths } from '@/app/paths';
 import type { PendingRevision, PlanContent, PlanRecord, RevForm } from '@/api/types/plan';
 import { CertPicker } from '@/features/draft/details/CertPicker';
 import { RevSupView } from '@/features/draft/options/support';
+import { enterNewRoadmap } from '@/features/draft/startModeSheet';
 import { D } from '@/shared/constants/data';
 import { useGo } from '@/shared/hooks/useGo';
 import { clone } from '@/shared/lib/format';
@@ -281,17 +282,18 @@ function GoalRow({ R }: { R: PlanRecord }) {
             <button
               type="button"
               className="btn line sm"
-              onClick={() => {
-                updateWs((s) => {
-                  s.draft = freshDraft();
-                  s.draft.prefs = { ...emptyPrefs(), ...clone(pl.prefs || emptyPrefs()) };
-                  s.draftId = null;
-                  s.draftPlan = null;
-                  s.plans[R.id].rev = null;
-                });
-                go(paths.newGoal);
-                toast('지금 로드맵의 학습 여건을 채워 뒀어요. 새 목표를 적어 주세요');
-              }}
+              onClick={() =>
+                enterNewRoadmap(go, paths.newGoal, () => {
+                  updateWs((s) => {
+                    s.draft = { ...freshDraft(), startMode: s.draft.startMode };
+                    s.draft.prefs = { ...emptyPrefs(), ...clone(pl.prefs || emptyPrefs()) };
+                    s.draftId = null;
+                    s.draftPlan = null;
+                    s.plans[R.id].rev = null;
+                  });
+                  toast('지금 로드맵의 학습 여건을 채워 뒀어요. 새 목표를 적어 주세요');
+                })
+              }
             >
               <Icon name="pen" />
               지금 조건으로 새 로드맵 작성

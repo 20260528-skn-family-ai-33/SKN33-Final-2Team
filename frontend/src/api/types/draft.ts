@@ -270,6 +270,8 @@ export interface RegenRequest {
 export interface SelectedSkill { name: string; application: string; reason?: string }
 export interface DraftDoc {
   readonly demoSeeded?: boolean;
+  /** 작성 탭에 들어올 때 고른 시작 방식. 확정할 때 서버에 보낸다 */
+  startMode?: StartMode | null;
   selectionNotice?: string;
   selectedSkills?: SelectedSkill[];
   skillCandidates?: SelectedSkill[];
