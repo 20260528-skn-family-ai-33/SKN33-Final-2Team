@@ -320,11 +320,14 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
   );
 }
 
+/** 하루 단위 칸이 보이는 배율을 처음 화면이자 '원래 크기'로 쓴다. */
+const DEFAULT_ZOOM = 1.5;
+
 /** 머리 줄(칸 이름 두 줄) + 세로 칸 선·이번 주 칸 + 줄들 + 범례 */
 function Card({ title, link, heads, cols, days, rows, note, cls }: { title: ReactNode; link: ReactNode; heads: [string, string]; cols: GtCol[]; days?: GtCol[]; rows: ReactNode; note: string; cls?: string }) {
   const tip = useTip();
   const scroll = useRef<HTMLDivElement>(null);
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(DEFAULT_ZOOM);
   const daily = !!days && Math.round(zoom * 100) >= 150;
   const visibleCols = daily ? days! : cols;
   const [timelineSize, setTimelineSize] = useState({ available: 0, base: cols.length * 34 });
@@ -364,15 +367,17 @@ function Card({ title, link, heads, cols, days, rows, note, cls }: { title: Reac
     element.scrollLeft = 0;
   };
   /* 일정이 칸보다 넓어 옆으로 밀리면 이번 주 칸이 이름 칸 바로 옆(한 칸 띄움)에 오게 맞춘다.
-     시연 기준 날짜를 옮기면 지금 표시 중인 칸(주·일 단위)을 다시 따라간다. 시연이 아니면 첫 표시 때만 맞춘다 */
+     시연 기준 날짜를 옮기면 지금 표시 중인 칸(주·일 단위)을 다시 따라간다. 시연이 아니면 첫 표시 때만 맞춘다.
+     첫 측정 뒤에 일정표 폭이 넓어질 수 있어 측정이 끝나면 한 번 더 맞춘다 */
   const demoDay = useDemoDay();
+  const measured = timelineSize.available > 0;
   useEffect(() => {
     const sc = scroll.current;
     const on = sc?.querySelector<HTMLElement>('.gt-h .on');
     if (!sc || !on || sc.scrollWidth <= sc.clientWidth) return;
     const l = sc.querySelector<HTMLElement>('.gt-h .gt-l');
     sc.scrollLeft += on.getBoundingClientRect().left - sc.getBoundingClientRect().left - (l?.offsetWidth || 0) - on.offsetWidth;
-  }, [demoDay]);
+  }, [demoDay, measured]);
   return (
     <div className="card gt-card">
       <div className="sec-h">
@@ -382,7 +387,7 @@ function Card({ title, link, heads, cols, days, rows, note, cls }: { title: Reac
           <span aria-live="polite">{Math.round(zoom * 100)}%</span>
           <button type="button" onClick={() => changeZoom(zoom + .1)} disabled={zoom >= 1.5} aria-label="일정표 확대">+</button>
           <button type="button" onClick={fit}>전체 맞춤</button>
-          <button type="button" onClick={() => changeZoom(1)} disabled={zoom === 1}>원래 크기</button>
+          <button type="button" onClick={() => changeZoom(DEFAULT_ZOOM)} disabled={zoom === DEFAULT_ZOOM}>원래 크기</button>
           {link}
         </div>
       </div>
@@ -482,7 +487,7 @@ export function GanttOne({ R }: { R: PlanRecord }) {
       cols={colsOne(R)}
       days={dailyCols(base, 7 * n)}
       rows={<Stages R={R} off={0} T={7 * n} up={[]} onToggle={toggle} />}
-      note={`1주차는 시작일(${md(base)})부터 ${md(addDays(base, 6))}까지예요. 150% 이상 확대하면 하루 단위로 보여요.`}
+      note={`1주차는 시작일(${md(base)})부터 ${md(addDays(base, 6))}까지예요. 150%보다 줄이면 주 단위로 보여요.`}
     />
   );
 }
@@ -527,6 +532,6 @@ export function GanttAll({ list }: { list: PlanRecord[] }) {
     );
   });
   return (
-    <Card title="전체 일정" link={null} heads={['', '주 시작일']} cols={cols} days={dailyCols(axis, T)} rows={rows} note="로드맵 시작일부터 7일을 1주로 세요. 150% 이상 확대하면 하루 단위로 보여요." cls="all" />
+    <Card title="전체 일정" link={null} heads={['', '주 시작일']} cols={cols} days={dailyCols(axis, T)} rows={rows} note="로드맵 시작일부터 7일을 1주로 세요. 150%보다 줄이면 주 단위로 보여요." cls="all" />
   );
 }
