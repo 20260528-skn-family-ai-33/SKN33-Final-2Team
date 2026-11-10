@@ -192,11 +192,6 @@ export function LoginPage() {
             로그인 <Icon name="arrow" />
           </button>
         </form>
-        <div className="or">또는</div>
-        <button className="btn line block" onClick={() => toast('시연에서는 기관 통합인증을 연결하지 않았어요. 사번과 비밀번호로 로그인해 주세요')}>
-          <Icon name="users" />
-          기관 통합인증(SSO)으로 로그인
-        </button>
         <Note>
           관리자에게 받은 초기 비밀번호로 로그인해 주세요. 관리자 화면은 관리자 전용 계정으로 들어가요.
           다른 계정으로 바꾸려면 로그아웃한 뒤 다시 로그인해 주세요.

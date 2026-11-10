@@ -37,11 +37,6 @@ def api_login(body: dict, response: Response):
     return _me(a)
 
 
-@r.get('/auth/sso/start')
-def api_sso():
-    raise ApiError(501, 'SSO_NOT_CONNECTED', '시연에서는 기관 통합인증을 연결하지 않았어요. 사번과 비밀번호로 로그인해 주세요')
-
-
 @r.post('/auth/logout', status_code=204)
 def api_logout(request: Request):
     resp = Response(status_code=204)

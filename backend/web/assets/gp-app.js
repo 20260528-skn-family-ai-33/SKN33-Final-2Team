@@ -1339,13 +1339,11 @@
               ${GP.DEMO && GP.DEMO.adminLogin ? `<optgroup label="관리자"><option value="${esc(GP.DEMO.adminLogin)}">관리자 전용 계정 (${esc(GP.DEMO.adminLogin)})</option></optgroup>` : ''}</select></div>
           <div class="field"><label for="lgId">사번 또는 관리자 아이디</label><input class="input" id="lgId" maxlength="40" autocomplete="username" placeholder="8자리 사번 (예: 20200001)"></div>
           <div class="field"><label for="lgPw">비밀번호</label><div class="pw"><input class="input" id="lgPw" type="password" autocomplete="current-password" placeholder="비밀번호를 입력해 주세요"><button type="button" class="eye" data-act="pw-toggle" aria-label="비밀번호 보기">${icon('eye')}</button></div></div>
-          <div class="row" style="margin-top:14px"><label class="check"><input type="checkbox" id="lgKeep" checked>로그인 상태 유지</label><span class="grow"></span><button type="button" class="link quiet" data-act="login-help" data-arg="pw">비밀번호 찾기</button></div>
+          <div class="row" style="margin-top:14px"><label class="check"><input type="checkbox" id="lgKeep" checked>로그인 상태 유지</label><span class="grow"></span><button type="button" class="link quiet" data-act="login-help">비밀번호 찾기</button></div>
           <p class="err" id="lgErr" role="alert" hidden></p>
           <button class="btn pri block" type="submit" style="margin-top:18px">로그인 ${icon('arrow')}</button>
         </form>
-        <div class="or">또는</div>
-        <button class="btn line block" data-act="login-help" data-arg="sso">${icon('users')}기관 통합인증(SSO)으로 로그인</button>
-        ${P.note(`시연용 화면이에요. 기관 통합인증은 연결하지 않았어요. 팀 DB(PostgreSQL) 직원의 사번으로 들어올 수 있고, 관리자에게 받은 초기 비밀번호를 사용해 주세요. 비밀번호는 서버가 해시로만 확인해요. 관리자 화면은 관리자 전용 계정으로 들어가요. 다른 계정으로 바꾸려면 로그아웃한 뒤 다시 로그인해 주세요.`)}
+        ${P.note(`시연용 화면이에요. 팀 DB(PostgreSQL) 직원의 사번으로 들어올 수 있고, 관리자에게 받은 초기 비밀번호를 사용해 주세요. 비밀번호는 서버가 해시로만 확인해요. 관리자 화면은 관리자 전용 계정으로 들어가요. 다른 계정으로 바꾸려면 로그아웃한 뒤 다시 로그인해 주세요.`)}
       </section>
       <aside class="login-side">
         <span class="pill">${icon('spark')}개발·운영 직원 AI 역량 성장지원</span>
@@ -1388,7 +1386,7 @@
     }
   };
   GP.act['pw-toggle'] = (a, el) => { const i = document.getElementById('lgPw'); i.type = i.type === 'password' ? 'text' : 'password'; el.setAttribute('aria-label', i.type === 'password' ? '비밀번호 보기' : '비밀번호 숨기기'); };
-  GP.act['login-help'] = k => GP.toast(k === 'sso' ? '시연에서는 기관 통합인증을 연결하지 않았어요. 사번과 비밀번호로 로그인해 주세요' : '비밀번호는 관리자에게 문의해 주세요. 관리자에게 받은 초기 비밀번호로 로그인해 주세요.');
+  GP.act['login-help'] = () => GP.toast('비밀번호는 관리자에게 문의해 주세요. 관리자에게 받은 초기 비밀번호로 로그인해 주세요.');
 
   /* ───────── 앞 단계를 바꾼 채로 뒤 단계 화면에 들어오면 (10/14) ─────────
      '다음'을 누를 때 묻지 못한 경우(홈에서 이어서 작성, 브라우저 뒤로·앞으로, 새로 고침)에도 결과를 몰래 다시 만들지 않도록
