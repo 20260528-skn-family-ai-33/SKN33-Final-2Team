@@ -1,5 +1,6 @@
 import copy
 import unittest
+from contextlib import contextmanager
 from unittest.mock import Mock, patch
 
 from app.errors import ApiError
@@ -68,17 +69,65 @@ class OptionRecoveryTests(unittest.TestCase):
         mutate.assert_called_once()
         self.assertEqual(w['draft']['genRun']['rows']['A2']['st'], 'fail')
 
+    @contextmanager
+    def partial_store(self, w):
+        def read(*_):
+            return {'draft_choices': {'gp5': 1, **copy.deepcopy(w)}}
+        with patch.object(drafts.db, 'tx'), patch.object(drafts, '_row', side_effect=read), \
+             patch.object(drafts, '_write', side_effect=lambda t, pid, saved: w.update(copy.deepcopy(saved))) as write, \
+             patch.object(drafts.jobs, 'alive', return_value={'live'}), \
+             patch.object(drafts, 'present', side_effect=lambda state, _: state), \
+             patch('app.services.material_preparation.prepare') as prepare:
+            yield write, prepare
+
     def test_partial_accept_heals_orphan_and_keeps_success(self):
         w = self.state()
         rows = w['draft']['genRun']['rows']
         rows['A1'].update(st='ok', out={'id': 'A1'})
         rows['A2'].update(st='run', jobId=None)
-        with patch.object(drafts, '_mutate', side_effect=self.mutate(w)), \
-             patch.object(drafts.jobs, 'alive', return_value=set()), \
-             patch.object(drafts, 'present', side_effect=lambda state, _: state):
+        with self.partial_store(w):
             drafts.accept_partial(1, 'draft')
         self.assertEqual(w['draft']['gen']['options'], {'A1': {'id': 'A1'}})
         self.assertEqual(w['draft']['gen']['missing'], ['A2', 'A3'])
+
+    def test_duplicate_accept_preserves_selected_revision_and_does_not_prepare_again(self):
+        w = self.state()
+        w['v2Survey'] = {'ready': True}
+        v1, v2 = {'id': 'A2', 'name': '원안'}, {'id': 'A2', 'name': '수정안'}
+        for pid in ('A1', 'A2'):
+            w['draft']['genRun']['rows'][pid].update(st='ok', out=v1 if pid == 'A2' else {'id': pid})
+        with self.partial_store(w) as (write, prepare):
+            drafts.accept_partial(1, 'draft')
+            d = w['draft']
+            d['chosen'] = 'A2'
+            d['gen']['options']['A2'] = v2
+            d['gen'].update(hist={'A2': [v1, v2]}, cur={'A2': 1})
+            w['draftPlan'] = {'opt': 'A2', 'acts': [{'id': 'keep'}]}
+            w['courseRecommendations'] = {'A2': {'selectedCourses': ['keep']}}
+            for phase in ('fail', 'run', 'ok'):
+                with self.subTest(phase=phase):
+                    d['genRun']['rows']['A3'].update(st=phase, jobId='live' if phase == 'run' else None)
+                    if phase == 'ok':
+                        d['gen']['missing'] = []
+                        d['gen']['options']['A3'] = {'id': 'A3'}
+                    before = copy.deepcopy(w)
+                    self.assertEqual(drafts.accept_partial(1, 'draft'), before)
+                    self.assertEqual(w, before)
+            write.assert_called_once()
+            prepare.assert_called_once_with(1, 'draft')
+
+    def test_first_accept_requires_a_success_and_no_live_generation(self):
+        for running in (False, True):
+            with self.subTest(running=running):
+                w = self.state()
+                if running:
+                    w['draft']['genRun']['rows']['A1'].update(st='ok', out={'id': 'A1'})
+                    w['draft']['genRun']['rows']['A2'].update(st='run', jobId='live')
+                with self.partial_store(w) as (write, prepare), self.assertRaises(ApiError) as caught:
+                    drafts.accept_partial(1, 'draft')
+                self.assertEqual(caught.exception.code, 'NOTHING_TO_ACCEPT')
+                write.assert_not_called()
+                prepare.assert_not_called()
 
     def test_option_retry_heals_ended_job_before_check(self):
         w = self.state()

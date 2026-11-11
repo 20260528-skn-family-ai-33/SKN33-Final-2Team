@@ -1,11 +1,18 @@
+import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { draftsApi } from '@/api/endpoints/drafts';
 import type { EducationGuide as Guide } from '@/api/types/draft';
-import { useWs } from '@/shared/state/workspace';
+import { updateWs, useWs } from '@/shared/state/workspace';
 
 export function EducationGuide({ saved }: { saved?: Guide }) {
   const draftId = useWs(s => s.draftId);
   const owner = useWs(s => s.owner);
+  useEffect(() => {
+    if (!draftId) return;
+    updateWs(s => {
+      if (s.draftId === draftId) s.educationGuideShownFor = draftId;
+    });
+  }, [draftId]);
   const query = useQuery({
     queryKey: ['education-guide', owner, draftId],
     queryFn: () => draftsApi.educationGuide(draftId!),

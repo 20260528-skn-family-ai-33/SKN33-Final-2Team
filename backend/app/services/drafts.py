@@ -845,19 +845,26 @@ def option_retry(employee_id: int, draft_id: str, pid: str) -> dict:
 
 def accept_partial(employee_id: int, draft_id: str) -> dict:
     """작성된 안만으로 진행(API-30). 실패한 안은 저장하지 않는다"""
-    def fn(t, w):
-        _heal(t, w)
+    with db.tx() as t:
+        w = _wrap(_row(t, employee_id, draft_id)['draft_choices'])
         d = w['draft']
         r = d.get('genRun')
-        rows = [r['rows'][x] for x in D['optionOrder']] if r else []
-        if not r or any(x['st'] == 'run' for x in rows) or not any(x['st'] == 'ok' for x in rows):
+        if not r:
             raise ApiError(409, 'NOTHING_TO_ACCEPT', '작성된 안이 없어요')
-        d['gen'] = {'key': r['key'], 'options': {x: r['rows'][x]['out'] for x in D['optionOrder'] if r['rows'][x]['st'] == 'ok'},
-                    'missing': [x for x in D['optionOrder'] if r['rows'][x]['st'] != 'ok']}
-        d['chosen'] = None
-        w['draftPlan'] = None
-    w = _mutate(employee_id, draft_id, fn)
-    if w.get("v2Survey"):
+        # 같은 생성 결과를 다시 수락해도 비교표에서 고른 버전과 계획을 보존한다.
+        gen = d.get('gen')
+        already_accepted = gen is not None and gen.get('key') == r['key']
+        if not already_accepted:
+            _heal(t, w)
+            rows = {pid: r['rows'][pid] for pid in D['optionOrder']}
+            if any(row['st'] == 'run' for row in rows.values()) or not any(row['st'] == 'ok' for row in rows.values()):
+                raise ApiError(409, 'NOTHING_TO_ACCEPT', '작성된 안이 없어요')
+            d['gen'] = {'key': r['key'], 'options': {pid: row['out'] for pid, row in rows.items() if row['st'] == 'ok'},
+                        'missing': [pid for pid, row in rows.items() if row['st'] != 'ok']}
+            d['chosen'] = None
+            w['draftPlan'] = None
+            _write(t, draft_id, w)
+    if not already_accepted and w.get("v2Survey"):
         from app.services.material_preparation import prepare as prepare_materials
         prepare_materials(employee_id,draft_id)
     return present(w, draft_id)

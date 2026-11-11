@@ -21,7 +21,7 @@ import { AgentRow, FailPage, Note, OpsBox, Page, runSub, Thumb, via } from '@/sh
 import { ResPicker } from '@/shared/ui/ResPicker';
 import { DetailsForm } from '../details/DetailsForm';
 import { draftCall, pullDraft } from '../draftSync';
-import { deepOnOf, diagKey, dv, edited, editMissing, editOk, FIX, startOf, staleOf } from '../model';
+import { deepOnOf, diagKey, dv, edited, editMissing, editOk, FIX, roadmapEntry, startOf, staleOf } from '../model';
 import { prepareRoadmaps } from '../prepareRoadmaps';
 import { openStaleSheet } from '../stale';
 import { Stepper } from '../Stepper';
@@ -47,11 +47,7 @@ const stageLabel = (n: number) => `${n}단계 ‘${D.stages.find((s) => s.n === 
 
 /** 로드맵 생성(API-27): 서버가 전달 내용을 정리하고 세 안을 병렬로 쓰기 시작한다. 같은 내용으로 세 안을 모두 받은 적이 있으면 그 결과를 쓴다 */
 export async function genStart(go: ReturnType<typeof useGo>): Promise<void> {
-  // 미리 생성한 안도 안내를 읽고 비교표로 넘어간다. 생성 기록이 없는 옛 초안은 바로 연다.
-  const openGeneration = () => {
-    const { gen, genRun } = ws().draft;
-    go(gen && !genRun ? paths.newOptions : paths.newGen, { force: true });
-  };
+  const openGeneration = () => go(roadmapEntry(ws()), { force: true });
   /* 바꾼 앞 단계가 남아 있으면 먼저 확인 */
   const st = staleOf(ws().draft);
   if (st) {

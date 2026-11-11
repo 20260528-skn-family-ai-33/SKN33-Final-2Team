@@ -23,6 +23,15 @@ export const STEPS: [StepKey, string, string][] = [
 export const SUB: Record<string, StepKey> = { [paths.newResultEdit]: 'result', [paths.newGen]: 'options' };
 export const stepOfPath = (p: string): StepKey | undefined => STEPS.find((x) => x[2] === p)?.[0] || SUB[p];
 
+/** 결과 화면의 다음 버튼과 단계 표시줄·이어 쓰기가 같은 경로로 들어간다. */
+export function roadmapEntry({ draft, draftId, educationGuideShownFor }: WsState): string {
+  const { gen, genRun, handoff } = draft;
+  if (!gen) return paths.newGen;
+  const currentRun = genRun && genRun.key === gen.key && handoff?.key === gen.key;
+  const guideShown = !!draft.educationGuide || (!!draftId && educationGuideShownFor === draftId);
+  return currentRun && !guideShown && !gen.missing?.length && !draft.chosen ? paths.newGen : paths.newOptions;
+}
+
 /* ── 검사 ── */
 export const goalOk = (d: DraftDoc): boolean => (d.goal || '').trim().length >= 4;
 /** 심화 질문(10/23): 고른 사람은 객관식에 모두 답해야 넘어간다('잘 모르겠어요' 포함 · 서술형은 비워도 됨) */
