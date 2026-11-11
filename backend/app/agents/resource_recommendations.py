@@ -254,6 +254,7 @@ def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
     # 원문·개인 식별정보 대신 프로젝트 맥락과 확인된 자료 후보를 전달한다.
     from app.services import crash_courses
     from app.services import book_candidates
+    from app.services.course_focus import MIN_COURSE_CANDIDATES, distinct_courses
     crash_cache = {}
     is_crash = crash_courses.is_crash(course)
     track = (course or {}).get('id')
@@ -273,8 +274,13 @@ def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
                     courses.append(row)
                 else:
                     rejected.append(row)
-            if rejected and not courses:
-                rejected_diagnostics[pool['name']] = _course_gap(pool['name'], rejected, crash_cache)
+            courses = distinct_courses(courses)
+            if rejected and len(courses) < MIN_COURSE_CANDIDATES:
+                foundation = [row for row in rejected if resource_evidence.course_applicable(
+                    crash_cache[row['id']], skill, allow_audit_gap=True)]
+                courses = distinct_courses([*courses, *foundation])[:MIN_COURSE_CANDIDATES]
+                if not courses:
+                    rejected_diagnostics[pool['name']] = _course_gap(pool['name'], rejected, crash_cache)
             filtered.append({**pool, 'courses': courses})
         pools = filtered
     if is_crash:
@@ -302,7 +308,8 @@ def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
             crash_cache[rid] = resource_evidence.facts(items.get(rid, original), project, selection)
     skill_specs = {skill['name']: skill for skill in selection['skills']}
     course_eligibility = {rid: [name for name in names if name in (items.get(rid, original).get('skills') or [])
-                               and (track not in ('A1', 'A2', 'A3') or resource_evidence.course_applicable(crash_cache[rid], skill_specs[name]))
+                               and (track not in ('A1', 'A2', 'A3') or resource_evidence.course_applicable(
+                                   crash_cache[rid], skill_specs[name], allow_audit_gap=rid in local_courses[name]))
                                and (not is_crash or rid in local_courses[name]
                                     or resource_evidence.suitable(crash_cache[rid], name))]
                           for rid, (_, original) in provided['courses'].items()}

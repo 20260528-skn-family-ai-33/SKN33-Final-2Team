@@ -52,6 +52,54 @@ class CoursePolicyTests(unittest.TestCase):
         self.assertTrue(allowed(goal, 'SQL로 인증 이벤트 분석', 'SQL로 접근 로그의 거절 건수를 집계하는 실습'))
         self.assertTrue(allowed('SQL로 주문 내역을 조회한다', 'SQL 입문', 'SQL 주문 테이블 조회 실습'))
 
+    def test_audit_scope_fills_only_missing_slots_in_model_candidates(self):
+        name = 'SQL 기본 문법 & 조인'
+        goal = '계정 권한과 접근 로그의 정상·거절 사례를 데이터 분석 기법으로 분류하고 점검 결과를 해석하는 방법을 배우고 싶어요.'
+        spec = {'name': name, 'application': goal}
+        pre = {'project': {'goal': goal}, 'selection': {'skills': [spec]}}
+
+        def search(kind, ids, vector, limit, free):
+            return [dict(resource_id=rid, similarity=.8, current_cost=items[rid]['cost']) for rid in ids]
+
+        def model(ctx, system, payload, role):
+            cards = payload['skills'][0]['courses']
+            self.assertEqual({row['title'] for row in cards}, expected)
+            self.assertEqual(len(cards), len(expected))
+            for row in cards:
+                self.assertIn(name, row['eligibleSkills'])
+                self.assertEqual(row['learningEvidence']['scopeMatch'], row['title'].startswith('직접'))
+                if not row['learningEvidence']['scopeMatch']:
+                    self.assertIn('접근 로그 분석', row['learningEvidence']['unverifiedTargetTopics'])
+            return {'skills': [{'name': name, 'courses': [{'key': cards[0]['choiceKey']}], 'books': []}]}
+
+        for track, level in [('A1', 'BEGINNER'), ('A2', 'INTERMEDIATE'), ('A3', 'ADVANCED')]:
+            with self.subTest(track=track):
+                items = {rid: {**self.item(rid, level, lesson='SQL 주문 테이블 조회 실습'), 'skills': [name]}
+                         for rid in ('기초1', '기초2', '기초3', '이수', '중복', '코스 밖', '태그만')}
+                items['중복']['title'] = '기초1'
+                items['태그만']['curriculum']['items'][0]['title'] = '사용자 인터뷰 실습'
+                if track == 'A1':
+                    items['코스 밖']['cost'] = 1000
+                else:
+                    items['코스 밖']['difficulty'] = 'ADVANCED' if track == 'A2' else 'BEGINNER'
+                course = {'id': track, 'learningSkills': [spec]}
+                with patch('app.catalog.items', return_value=items), \
+                     patch.object(rag, 'cached_vectors', side_effect=lambda ts: [[1.] * rag.DIMENSIONS for _ in ts]), \
+                     patch.object(rag, 'search_vectors', side_effect=search), \
+                     patch('app.agents.runtime.llm_json', side_effect=model):
+                    for expected, completed in [({'기초1', '기초2', '기초3'}, {'이수'}),
+                                                ({'기초1', '기초2'}, {'이수', '기초3'})]:
+                        result = recommend_from_catalog(Mock(live=True), pre, course, completed=frozenset(completed))
+                        self.assertIn('접근 로그 분석', result['skills'][0]['courses'][0]['unverifiedTargetTopics'])
+                    for count in range(1, 5):
+                        rid = f'직접{count}'
+                        items[rid] = {**self.item(rid, level, lesson='SQL로 권한별 접근 로그의 거절 건수를 집계하고 검증하는 실습'),
+                                      'skills': [name]}
+                        expected = {f'직접{i}' for i in range(1, count + 1)}
+                        expected.update(f'기초{i}' for i in range(1, 4 - count))
+                        result = recommend_from_catalog(Mock(live=True), pre, course, completed=frozenset({'이수'}))
+                        self.assertTrue(result['skills'][0]['selectedCourse'].startswith('직접'))
+
     def test_cross_skill_key_preserves_other_choices_and_retries_only_empty_skill(self):
         project = {'goal': 'Python으로 로그를 집계하고 Docker로 API를 배포한다'}
         specs = [{'name': n} for n in ('Python', 'Docker')]

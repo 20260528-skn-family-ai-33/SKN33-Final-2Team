@@ -6,6 +6,8 @@ import unicodedata
 from app import catalog_candidates, course_levels
 from app.english_patterns import english_token
 
+MIN_COURSE_CANDIDATES = 3
+
 # Django 과정의 API 실습은 '구현'이라는 단어 없이도 구체적인 구성 요소와 작업으로 기술된다.
 _drf_api = r'django\s+rest\s+framework|\bdrf\b|\b\w*apiview\b|\b\w*viewset\b|\b\w*serializer\b|\bmultipartparser\b|\bapiclient\b'
 _api_work = r'선언|검증|구성|구현|작성|저장|반환|거절|테스트|전송|제한|처리'
@@ -187,9 +189,7 @@ def course_window(matches, items, skill, topics, track, limit, has_learning_evid
     """벡터와 실습 근거가 있는 공통 후보에서 조건에 맞는 최대 20개를 자세히 검토한다."""
     index = catalog_candidates.cached_index(items) if topics and matches else {}
     scores = {row['resource_id']: curriculum_score(index, row['resource_id'], topics) for row in matches}
-    seen = set()
-    relevant = matches
-    relevant = [r for r in relevant if course_levels.eligible(
+    relevant = [r for r in matches if course_levels.eligible(
         {**items[r['resource_id']], 'cost': r['current_cost']}, track)]
 
     def order(row):
@@ -205,15 +205,19 @@ def course_window(matches, items, skill, topics, track, limit, has_learning_evid
             return duration, -scores[rid], -row['similarity'], rid
         return band, -scores[rid], -row['similarity'], rid
 
+    ordered = sorted(relevant, key=order)
+    seen = set()
     window = []
-    for row in sorted(relevant, key=order):
-        rid = row['resource_id']
-        # 서로 다른 가격·난이도를 먼저 평가한 뒤 동일 제공처의 재게시 강좌를 한 번만 검토한다.
-        record = items[rid]
-        key = identity(record, rid)
-        if key not in seen and (not topics or scores[rid]) and has_learning_evidence(rid, skill):
-            seen.add(key)
-            window.append(row)
-            if len(window) == limit:
-                break
+    for allow_audit_gap in (False, True):
+        target = min(limit, MIN_COURSE_CANDIDATES) if allow_audit_gap else limit
+        if len(window) >= target:
+            break
+        for row in ordered:
+            rid = row['resource_id']
+            key = identity(items[rid], rid)
+            if key not in seen and (not topics or scores[rid]) and has_learning_evidence(rid, skill, allow_audit_gap):
+                seen.add(key)
+                window.append(row)
+                if len(window) == target:
+                    break
     return window

@@ -390,13 +390,14 @@ def suitable(info: dict, skill: str) -> bool:
             and not (info.get('hasAnchors') and not info.get('anchorHits')))
 
 
-def course_applicable(info: dict, skill: dict) -> bool:
+def course_applicable(info: dict, skill: dict, *, allow_audit_gap: bool = False) -> bool:
     """세 코스가 공유하는 목표·스킬·실제 학습 근거 문턱. 계획의 코스별 예시는 요구하지 않는다."""
     name = skill['name']
     profile = info['suitability'][name]
-    return bool(name in info['supported'] and info['scopeEvidence'][name]
+    foundation = allow_audit_gap and profile.get('auditScopeFoundation', False)
+    return bool(name in info['supported']
+                and (foundation or (info['scopeEvidence'][name] and profile['evidenceLevel'] in ('applied', 'conceptual')))
                 and not profile['missingStack'] and not profile['conflictingStack']
-                and profile['evidenceLevel'] in ('applied', 'conceptual')
                 and (not requested_topics(skill) or info.get('focusScores', {}).get(name, 0)))
 
 
@@ -410,7 +411,7 @@ def suitability_key(info: dict, skill: str) -> tuple:
 
 
 def _profile(skill: dict, project: dict, rows: list, descriptions: list[str], text: str, supported: bool, scope: bool,
-             *, terms, discussion_context: bool = False, focused_units=frozenset()) -> dict:
+             *, terms, discussion_context: bool = False, focused_units=frozenset(), audit_only_gap=False) -> dict:
     stage = _stage(project, skill)
     name = normalize(skill['name'])
     etl_targets = _dbt_targets(skill)
@@ -512,6 +513,9 @@ def _profile(skill: dict, project: dict, rows: list, descriptions: list[str], te
             'appliedDescription': applied_claims,
             'suitable': bool(supported and scope and gap == 0 and not missing and not conflicts)}
     missing_targets = _missing_targets(skill, name, stage, applied)
+    if audit_only_gap:
+        # 보안 실습 단계에서는 일반 SQL 조회 실습도 mention이 된다. 기초 차시·설명의 근거를 따로 확인한다.
+        result['auditScopeFoundation'] = any(applied_evidence('conceptual'))
     if linux_security or missing_targets:
         result['unverifiedTargetTopics'] = [label for label, request, proof in _linux_security_topics
             if linux_security and request.search(_skill_context(skill))
@@ -612,6 +616,7 @@ def facts(item: dict, project: dict, selection: dict) -> dict:
     scope = {}
     document_gaps = set()
     audit_gaps = set()
+    missing_audit = set()
     for skill in selection['skills']:
         context = _goal_context(project, skill) + ' ' + _skill_context(skill)
         scoped_analysis = bool(re.search(r'python|파이썬|EDA|탐색적', skill['name'], re.I) and _analysis_scope.search(context))
@@ -624,8 +629,9 @@ def facts(item: dict, project: dict, selection: dict) -> dict:
                            if _audit_analysis.search(unit) and (_audit_records.search(unit) or _audit_records.search(title))]
             audit_units.extend(line for line in claims(descriptions)
                                if _audit_records.search(line) and _audit_analysis.search(line))
-            scope[skill['name']] &= bool(audit_units)
-            if audit_units and _access_denial.search(context) and not any(_access_denial.search(u) for u in audit_units):
+            if not audit_units:
+                missing_audit.add(skill['name'])
+            elif _access_denial.search(context) and not any(_access_denial.search(u) for u in audit_units):
                 audit_gaps.add(skill['name'])
         if skill.get('fromEmployeeGoal') and re.search(_en('sql|rdbms'), skill['name'], re.I):
             wanted = {k for k, pattern in _sql_engines.items() if pattern.search(context)}
@@ -666,14 +672,21 @@ def facts(item: dict, project: dict, selection: dict) -> dict:
         if _linux.search(context) and re.search(r'멀티스레딩|동시성', skill['name'], re.I):
             # Windows 전용 GUI·시스템 동기화는 POSIX 서비스의 적용 근거로 공유하지 않는다.
             scope[skill['name']] &= not (_windows.search(title) and not _linux.search(title))
+    # 다른 범위 검사까지 실패한 강좌는 접근 로그 차시만 미확인인 보충 후보에 넣지 않는다.
+    audit_only_gaps = {name for name in missing_audit if scope[name]}
+    for name in missing_audit:
+        scope[name] = False
     discussion_context = bool(_discussion.search(normalize(item.get('title')) + '\n' + '\n'.join(descriptions)))
     profiles = {skill['name']: _profile(skill, project, rows, profile_descriptions(descriptions, focused[skill['name']]), text,
                                        skill['name'] in supported, scope[skill['name']], terms=terms[skill['name']],
-                                       discussion_context=discussion_context, focused_units=focused[skill['name']]) for skill in selection['skills']}
+                                       discussion_context=discussion_context, focused_units=focused[skill['name']],
+                                       audit_only_gap=skill['name'] in audit_only_gaps) for skill in selection['skills']}
     for name in document_gaps:
         profiles[name]['unverifiedTargetTopics'] = [*target_gaps({'suitability': profiles}, name), '문서 입력·전처리']
     for name in audit_gaps:
         profiles[name].setdefault('unverifiedTargetTopics', []).append('접근 거절 사례 판별')
+    for name in missing_audit:
+        profiles[name].setdefault('unverifiedTargetTopics', []).append('접근 로그 분석')
     return {'rows': rows, 'descriptions': descriptions, 'title': title, 'supported': supported,
             'focusScores': focus_scores, 'focusedUnits': focused,
             'scopeEvidence': scope, 'suitability': profiles, 'topicHits': hits,
@@ -832,6 +845,6 @@ def rank_applicable(rows: list[dict], project: dict, selection: dict, skill: dic
             continue
         if row['id'] not in cache:
             cache[row['id']] = facts(sources.get(row['id'], row), project, selection)
-        if course_applicable(cache[row['id']], skill):
+        if course_applicable(cache[row['id']], skill, allow_audit_gap=True):
             eligible.append(row)
     return distinct_courses(sorted(eligible, key=key))[:limit]

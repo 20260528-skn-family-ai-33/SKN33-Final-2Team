@@ -13,7 +13,7 @@ from app.services import book_candidates, course_focus, resource_evidence
 
 MODEL = embeddings.BGE_MODEL
 DIMENSIONS = embeddings.BGE_DIMENSIONS
-VERSION = 'resource-pgvector-rag/v34-nosql-course-evidence'
+VERSION = 'resource-pgvector-rag/v35-audit-min-three'
 PER_KIND = 6
 COURSE_REVIEW = 20
 FIELDS = ('id','title','provider','cost','hours','estimated','image','url','skills','content','curriculum')
@@ -105,12 +105,12 @@ def retrieve(project, selection, items, course=None, *, embed=None, search=None)
     matches = []
     from app.services import crash_courses
     crash_cache = {}
-    def has_learning_evidence(rid, name):
+    def has_learning_evidence(rid, name, allow_audit_gap):
         if rid not in crash_cache:
             crash_cache[rid] = resource_evidence.facts(items[rid], project, shared)
         info = crash_cache[rid]
         spec = next(skill for skill in shared['skills'] if skill['name'] == name)
-        return resource_evidence.course_applicable(info, spec)
+        return resource_evidence.course_applicable(info, spec, allow_audit_gap=allow_audit_gap)
 
     for index in active:
         for key, kind, prefix in [('courses','courses',''), ('books','books','book_')]:
