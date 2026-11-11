@@ -12,7 +12,7 @@
      skin.css 에서 상단 메뉴 규칙은 &:not([data-nav="side"]) { … }, 좌측 메뉴 규칙은 &[data-nav="side"] { … } 안에 둔다.
    - 본문 폭도 두 가지: 넓은 본문 폭(기본 · gp.css) · 이전 본문 폭(<html data-width="narrow"> · width.css). 테마와 상관없이 고른다.
    - 테마 추가 = 폴더 추가, 빼기 = 폴더 삭제. 이 파일이 폴더를 알아서 찾는다.
-   - 고를 때: 왼쪽 아래 '화면 테마' 상자(접힌 채 시작, 펼치면 테마 → 메뉴 위치 → 본문 폭), 또는 주소 뒤 ?skin=<id>[:side][:narrow]
+   - 고를 때: 왼쪽 아래 '화면 테마' 상자(접힌 채 시작, 펼치면 테마 → 메뉴 위치 → 본문 폭 · 로그인 화면은 테마만), 또는 주소 뒤 ?skin=<id>[:side][:narrow]
      (형식은 pick.ts). 고른 값은 이 브라우저에 기억한다.
    - 최종 결정 뒤에는 최신 main 에서 새 브랜치를 만들고 고른 폴더만 가져가 정식으로 적용한다. 이 고르기 장치(width.css 포함)는 가져가지 않는다. */
 import { type Choice, formatChoice, pickChoice } from './pick';

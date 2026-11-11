@@ -1,6 +1,6 @@
 /* 화면 테마 고르기 상자(비교 브랜치 전용) — 어느 테마에서도 같은 모양이 되게 값을 직접 적는다.
    좌측 메뉴 버전에서는 메뉴 아래(로그아웃 버튼)를 가리지 않게 메뉴 폭(--side-w)만큼 비켜 둔다.
-   펼치면 제목 아래에 고르는 칸 3개가 놓인다(첫 줄 테마 / 둘째 줄 메뉴 위치 · 본문 폭) */
+   펼치면 제목 아래에 고르는 칸 3개가 놓인다(첫 줄 테마 / 둘째 줄 메뉴 위치 · 본문 폭). 로그인 화면은 첫 줄 테마만 */
 .skin-pick {
   position: fixed; z-index: 70; left: calc(var(--side-w, 0px) + 12px); bottom: 12px;
   display: flex; flex-direction: column; gap: 5px; padding: 4px;
