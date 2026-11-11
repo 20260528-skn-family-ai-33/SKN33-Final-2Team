@@ -75,7 +75,6 @@ class OptionRecoveryTests(unittest.TestCase):
         rows['A2'].update(st='run', jobId=None)
         with patch.object(drafts, '_mutate', side_effect=self.mutate(w)), \
              patch.object(drafts.jobs, 'alive', return_value=set()), \
-             patch.object(drafts, '_maybe_support'), \
              patch.object(drafts, 'present', side_effect=lambda state, _: state):
             drafts.accept_partial(1, 'draft')
         self.assertEqual(w['draft']['gen']['options'], {'A1': {'id': 'A1'}})
@@ -142,8 +141,7 @@ class OptionRecoveryTests(unittest.TestCase):
         row.update(jobId='new-job', tries=2)
         with patch.object(drafts, '_mutate', side_effect=self.mutate(w)), \
              patch.object(drafts.rt, 'context', return_value=Mock(provider='openai', fail_sim={})), \
-             patch.object(drafts.RM, 'option', return_value={'id': 'old-result'}), \
-             patch.object(drafts, '_maybe_support'):
+             patch.object(drafts.RM, 'option', return_value={'id': 'old-result'}):
             workers[0](Mock(job_id='old-job'))
         self.assertEqual(row['jobId'], 'new-job')
         self.assertIsNone(row['out'])

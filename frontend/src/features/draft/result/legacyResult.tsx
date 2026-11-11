@@ -47,13 +47,21 @@ const stageLabel = (n: number) => `${n}단계 ‘${D.stages.find((s) => s.n === 
 
 /** 로드맵 생성(API-27): 서버가 전달 내용을 정리하고 세 안을 병렬로 쓰기 시작한다. 같은 내용으로 세 안을 모두 받은 적이 있으면 그 결과를 쓴다 */
 export async function genStart(go: ReturnType<typeof useGo>): Promise<void> {
-  /* 바꾼 앞 단계가 남아 있으면(홈에서 이어서 들어온 경우 등) 먼저 확인 */
+  // 미리 생성한 안도 안내를 읽고 비교표로 넘어간다. 생성 기록이 없는 옛 초안은 바로 연다.
+  const openGeneration = () => {
+    const { gen, genRun } = ws().draft;
+    go(gen && !genRun ? paths.newOptions : paths.newGen, { force: true });
+  };
+  /* 바꾼 앞 단계가 남아 있으면 먼저 확인 */
   const st = staleOf(ws().draft);
   if (st) {
     openStaleSheet(go, st, paths.newResult);
     return;
   }
-  if(ws().draft.gen){go(paths.newOptions,{force:true});return;}
+  if (ws().draft.gen) {
+    openGeneration();
+    return;
+  }
   if (ws().draft.v2Assessment?.completed) {
     try {
       await prepareRoadmaps();
@@ -61,12 +69,12 @@ export async function genStart(go: ReturnType<typeof useGo>): Promise<void> {
       failToast(err, '로드맵 생성을 시작하지 못했어요');
       return;
     }
-    go(ws().draft.gen ? paths.newOptions : paths.newGen, { force: true });
+    openGeneration();
     return;
   }
   const r = await draftCall('로드맵 생성을 시작하지 못했어요', (id) => draftsApi.optionsStart(id));
   if (!r) return;
-  go(ws().draft.gen ? paths.newOptions : paths.newGen, { force: true });
+  openGeneration();
 }
 
 function Preview() {

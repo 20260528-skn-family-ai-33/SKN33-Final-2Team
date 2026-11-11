@@ -1,7 +1,7 @@
 /* 5. 3안 생성 (로드맵 계획 에이전트 · 관점별 병렬 · 서버 작업 셋 · 5차 scr['new-gen'])
    하위 에이전트마다 따로 실행하고, API 오류를 가데이터로 대신하지 않는다. 실패한 줄은 빨간 X로 바뀌고
    그 안만 '다시 시도'(API-29)하거나, '로드맵 확인하기'(API-30)로 작성된 안만 가지고 다음 단계로 넘어갈 수 있다.
-   진행 상태는 서버 작성 문서(genRun)에 있어 새로 고쳐도 이어서 보이고, 지원 조건은 세 안이 정해지면 서버가 규정 에이전트로 확인한다 */
+   진행 상태는 서버 작성 문서(genRun)에 있어 새로 고쳐도 이어서 보이고, 교육비 규정 안내는 생성 화면에서만 보여 준다 */
 import { useEffect, useState } from 'react';
 import { draftsApi } from '@/api/endpoints/drafts';
 import type { DraftDoc, Handoff } from '@/api/types/draft';
@@ -11,15 +11,14 @@ import { useGo } from '@/shared/hooks/useGo';
 import { won } from '@/shared/lib/format';
 import { ai, cause, userText, userTodo } from '@/shared/state/ai';
 import { useCatalog } from '@/shared/state/catalog';
-import { onDataReset } from '@/shared/state/events';
 import { updateWs, useWs, ws } from '@/shared/state/workspace';
 import { Icon } from '@/shared/ui/Icon';
 import { AgentRow, FailPage, OpsBox, Page, via } from '@/shared/ui/parts';
-import { draftCall, takeDraft } from '../draftSync';
+import { draftCall, syncGenCur } from '../draftSync';
 import { startEdit, genStart } from '../result/ResultStep';
 import { Stepper } from '../Stepper';
 import { useDraftWatch } from '../useDraftWatch';
-import { supRetry, syncGenCur } from '../options/support';
+import { EducationGuide } from './EducationGuide';
 
 let hoOpen = false;
 export function HandoffView({ h }: { h: Handoff }) {
@@ -88,39 +87,6 @@ const genState = (rows: NonNullable<DraftDoc['genRun']>['rows']) => {
   return { running: ps.some((x) => x.st === 'run'), ok: ps.filter((x) => x.st === 'ok').length, fail: ps.filter((x) => x.st === 'fail').length };
 };
 
-/* 서버를 다시 켜서 끊긴 지원 조건 확인을 이어서 시작한다(실패한 확인은 건드리지 않음 · 화면에 들어올 때 한 번).
-   4초 뒤에 부를 때 그때의 작성 문서·계정이 처음 본 것과 같은지 다시 확인한다(계정·초안을 바꾸는 사이 다른 초안에 요청하지 않게) */
-const supKicked = new Set<string>();
-onDataReset(() => supKicked.clear());
-export function useKickSupport(): void {
-  const info = useWs((s) => {
-    const g = curOut(s.draft);
-    if (!g || !s.draftId || !s.owner) return '';
-    const pid = D.optionOrder.find((x) => g.options[x] && !g.options[x].support && !g.options[x].supportFail);
-    return pid ? JSON.stringify([s.owner, s.draftId, g.key, pid, g.cur || {}]) : '';
-  });
-  useEffect(() => {
-    if (!info || supKicked.has(info)) return;
-    supKicked.add(info);
-    const [owner, draftId, , pid] = JSON.parse(info) as [string, string, string, string];
-    let fired = false;
-    const t = setTimeout(() => {
-      fired = true;
-      if (ws().owner !== owner || ws().draftId !== draftId) return;
-      draftsApi
-        .supportRetry(draftId, pid)
-        .then((r) => {
-          if (ws().owner === owner && ws().draftId === draftId) takeDraft(r, true);
-        })
-        .catch(() => {});
-    }, 4000);
-    return () => {
-      clearTimeout(t);
-      if (!fired) supKicked.delete(info);
-    };
-  }, [info]);
-}
-
 const rowName = (id: string) => `${D.perspectives[id].name}`;
 
 async function genRetry(id: string): Promise<void> {
@@ -151,45 +117,6 @@ function GenRowView({ d, id }: { d: DraftDoc; id: string }) {
       onRetry={() => void genRetry(id)}
       detail={c.user || userText(c.kind)}
     />
-  );
-}
-
-/** 규정 에이전트 줄: 3안이 정해지기 전에는 기다림, 확인 중, 안별 결과, 실패(다시 시도는 눌러야만) */
-function SupRow({ d }: { d: DraftDoc }) {
-  const g = curOut(d);
-  const options = g
-    ? D.optionOrder.map((id) => g.options[id]).filter(Boolean)
-    : [];
-
-  const failed = options.some((option) => option.supportFail);
-  const done =
-    options.length > 0 &&
-    options.every((option) => !!option.support);
-
-  const state = failed ? 'failed' : !g ? 'waiting' : done ? 'done' : 'running';
-
-  const text = {
-    waiting: '규정 확인 대기',
-    running: '규정 확인 중',
-    done: '규정 확인 완료',
-    failed: '규정 확인 실패',
-  }[state];
-
-  return (
-    <div className="reg-check" role="status" aria-live="polite">
-      <span className={`reg-check-icon ${state}`} aria-hidden="true" />
-      <span>{text}</span>
-
-      {failed ? (
-        <button
-          type="button"
-          className="link quiet"
-          onClick={() => void supRetry('all')}
-        >
-          다시 확인
-        </button>
-      ) : null}
-    </div>
   );
 }
 
@@ -229,11 +156,10 @@ export function GenerationStep() {
   const h = d.handoff;
   const r = curGen(d);
   useDraftWatch();
-  useKickSupport();
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const cur = ws().draft;
-      if (cur.v2Assessment && !curGen(cur)) {
+      if (cur.v2Assessment && !curGen(cur) && !curOut(cur)) {
         void genStart(go);
         return;
       }
@@ -254,7 +180,7 @@ export function GenerationStep() {
       {D.optionOrder.map((id) => (
         <GenRowView key={id} d={d} id={id} />
       ))}
-      <SupRow d={d} />
+      {r && <EducationGuide saved={d.educationGuide} />}
     </div>
   );
   if (g.fail && r) {
@@ -316,7 +242,7 @@ export function GenerationStep() {
         title={done ? '로드맵 3안을 다 썼어요' : '로드맵 계획 에이전트가 3안을 쓰고 있어요'}
         lead={
           done
-            ? '‘로드맵 계획 미리보기’를 눌러 비교해 보세요. 지원 조건 확인이 끝나지 않았어도 넘어갈 수 있어요(비교표에서 이어서 보여 줘요).'
+            ? '‘로드맵 계획 미리보기’를 눌러 비교해 보세요.'
             : ai.mode() === 'ollama'
               ? '관점별 하위 에이전트 셋이 진단 에이전트가 넘긴 같은 내용으로 동시에 요청해요. AI 서버 사정에 따라 차례대로 처리돼 시간이 더 걸릴 수 있어요. 화면을 떠나도 서버가 이어서 써요.'
               : '관점별 하위 에이전트 셋이 진단 에이전트가 넘긴 같은 내용으로 동시에 작성해요. 화면을 떠나도 서버가 이어서 써요.'

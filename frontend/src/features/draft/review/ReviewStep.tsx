@@ -11,8 +11,6 @@ import { Icon } from '@/shared/ui/Icon';
 import { Page, Stats } from '@/shared/ui/parts';
 import { StagesView } from '@/shared/ui/StagesView';
 import { confirmReview } from './confirmReview';
-import { useKickSupport } from '../generation/GenerationStep';
-import { SupCell, SupNote } from '../options/support';
 import { Stepper } from '../Stepper';
 import { useDraftWatch } from '../useDraftWatch';
 import { reviewScope } from './reviewScope';
@@ -32,7 +30,6 @@ export function ReviewStep() {
   const pl = useWs((s) => s.draftPlan);
   const g = useWs((s) => s.draft.gen);
   useDraftWatch();
-  useKickSupport();
   async function submit() {
     if (busy || submitting || (assessment && !ready)) return;
     setSubmitting(true);
@@ -46,7 +43,6 @@ export function ReviewStep() {
     {assessment && (reviewPlan ? <Stats pl={reviewPlan} bare periodLabel="자료 학습 예상 기간" /> : <p role="status">{reviewError ? '검토 시간을 계산하지 못했어요. 아래에서 다시 불러와 주세요.' : '검토할 자료와 선택한 과제 시간을 계산 중…'}</p>)}
     {assessment ? <DeliverableSelection ref={deliverables} onReadyChange={setReady} onBusyChange={setBusy} onPlanChange={setReview} /> : <p role="status">최종 검토 결과를 불러오는 중…</p>}
   </Page></>;
-  const o = (g && g.options[pl.opt]) || pl.def;
   return (
     <>
       <Stepper cur="review" busy={submitting} />
@@ -74,18 +70,6 @@ export function ReviewStep() {
         {assessment && <DeliverableSelection ref={deliverables} onReadyChange={setReady} onBusyChange={setBusy} onPlanChange={setReview} />}
         {!assessment && <><SkillMap pl={pl} /><div className="sec"><StagesView pl={pl} /></div></>}
         <p className="small muted">자료를 바꾸려면 <button className="link" onClick={() => go(paths.newOptions)}>자료 선택으로 돌아가기</button></p>
-        <div className="sec">
-          <details className="card flat"><summary>지원 조건 보기</summary>
-            <dl className="kv">
-              <dt>지원 조건</dt>
-              <dd>
-                <SupCell o={o} />
-              </dd>
-            </dl>
-          </details>
-          <SupNote />
-        </div>
-
       </Page>
     </>
   );

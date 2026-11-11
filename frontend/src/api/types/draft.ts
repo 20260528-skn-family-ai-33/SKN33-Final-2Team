@@ -208,6 +208,10 @@ export interface GenRow {
   [k: string]: unknown;
 }
 
+export interface EducationGuide {
+  basis: { name: string; article: string; text: string; page: number | null; version: string; chunkId: string } | null;
+}
+
 export interface GenRun {
   key?: string;
   rows: Record<string, GenRow>;
@@ -296,6 +300,7 @@ export interface DraftDoc {
   quizFail: FailState | null;
   diagFail: FailState | null;
   genRun: GenRun | null;
+  educationGuide?: EducationGuide;
   doc: DocState | null;
   genPrefs: Prefs | null;
   quizRun: RunState | null;

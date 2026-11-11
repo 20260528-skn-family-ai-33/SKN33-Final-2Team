@@ -206,19 +206,9 @@ export function clearLog(): void {
   useAssistant.setState({ running: false, hint: '' });
 }
 
-export function openAssistant(question?: string): void {
+export function openAssistant(): void {
   useAssistant.setState({ open: true, fresh: false });
   ss.set(OPEN_KEY, '1');
-  if (!question) return;
-  /* 다른 화면의 '도우미에게 묻기': 답을 쓰는 중이면 보내지 않고 입력창에 넣어 둔다(써 둔 글이 있으면 그대로 둠) */
-  if (!run) {
-    ask(question);
-    return;
-  }
-  if (!get().input.trim()) {
-    setInput(question);
-    setHint('앞 질문의 답을 쓰는 중이라 질문을 입력창에 넣어 뒀어요. 다 쓰면 보내 주세요.');
-  } else setHint('앞 질문의 답을 쓰는 중이에요. 입력 중인 글은 그대로 뒀어요.');
 }
 
 export function closeAssistant(): void {

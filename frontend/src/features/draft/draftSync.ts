@@ -1,7 +1,7 @@
 import { inputSignature, invalidateDraft } from './invalidation';
 /* 작성 중인 로드맵 서버 동기화 (5차 gp-parts.js 의 syncDraft·flush·ensureDraft·takeDraft·pullDraft 를 옮김)
    화면이 고치는 값(목표·기획서 이름·세부 사항·응답·고른 안·수정 화면 입력·마지막 단계)은 고친 뒤 0.4초 기다렸다가 서버에 저장한다.
-   에이전트 결과(문항·진단·3안·지원 조건·기획서 요약 상태)는 서버만 쓰고, 화면은 서버 응답으로 받는다 */
+   에이전트 결과(문항·진단·3안·기획서 요약 상태)는 서버만 쓰고, 화면은 서버 응답으로 받는다 */
 import { ApiError } from '@/api/client';
 import { accountApi } from '@/api/endpoints/account';
 import { draftsApi } from '@/api/endpoints/drafts';
@@ -239,3 +239,15 @@ export const reloadWorkspace = async (accept: () => boolean = () => true): Promi
   lastSent = snap(ws());
   return true;
 };
+
+/** 다시 만든 버전을 보고 있으면 options[관점] 을 그 버전으로 맞춘다 */
+export function syncGenCur(): void {
+  updateWs((s) => {
+    const g = s.draft.gen;
+    if (g && g.hist)
+      Object.keys(g.hist).forEach((pid) => {
+        const v = g.hist?.[pid][(g.cur || {})[pid] || 0];
+        if (v) g.options[pid] = v;
+      });
+  });
+}

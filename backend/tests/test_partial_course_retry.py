@@ -17,7 +17,7 @@ class PartialCourseRetryTests(unittest.TestCase):
             before_start('mock-job')
             fn(Mock(job_id='mock-job'))
             return 'mock-job'
-        with patch.object(drafts,'_mutate',side_effect=mutate),patch.object(drafts.jobs,'start',side_effect=start),patch.object(drafts.rt,'context',return_value=Mock(provider='openai',fail_sim={})),patch.object(drafts.RM,'option',side_effect=AgentError('실패') if fail else None,return_value={'id':'A2','acts':[]}),patch.object(drafts,'_maybe_support'):
+        with patch.object(drafts,'_mutate',side_effect=mutate),patch.object(drafts.jobs,'start',side_effect=start),patch.object(drafts.rt,'context',return_value=Mock(provider='openai',fail_sim={})),patch.object(drafts.RM,'option',side_effect=AgentError('실패') if fail else None,return_value={'id':'A2','acts':[]}):
             return drafts._run_option(1,'draft','A2')
 
     def test_retry_fills_only_missing_course_and_keeps_selected_plan(self):

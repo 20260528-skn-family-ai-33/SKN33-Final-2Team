@@ -318,7 +318,7 @@ function UseCard({ e }: { e: User }) {
         <div className="row top">
           <Icon name="scale" />
           <span>
-            <b>사내 생활 도우미·지원 조건 확인</b> · 규정 에이전트가 직원 구분·직급을 봐요.{' '}
+            <b>사내 생활 도우미</b> · 규정 질문에는 직원 구분을 참고해요.{' '}
             {regApplies() && set
               ? `${e.empGroup || ''} 직원이라 등록된 ${set.label}(${set.regs
                   .filter((r) => !r.overseas)

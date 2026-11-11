@@ -15,7 +15,7 @@ import json
 import threading
 from datetime import date
 
-from .. import catalog, db, docread, jobs, regstore
+from .. import catalog, db, docread, jobs
 from ..agents import deepcheck as DC
 from ..agents import diag as DG
 from ..agents import doc as DOC
@@ -246,13 +246,6 @@ def _res_keys(w: dict) -> list[str]:
     return [k for k in keys if k]
 
 
-def _basis_ids(w: dict) -> list[str]:
-    ids = []
-    for o in list(((w['draft'].get('gen') or {}).get('options') or {}).values()) + [o for l in ((w['draft'].get('gen') or {}).get('hist') or {}).values() for o in l]:
-        ids += list((o.get('support') or {}).get('basis') or [])
-    return ids
-
-
 def present(w: dict | None, draft_id: str | None) -> dict:
     """화면에 줄 모양: 작성 문서 + 쓰인 자료·규정 근거"""
     if not w:
@@ -280,7 +273,7 @@ def present(w: dict | None, draft_id: str | None) -> dict:
         # 심화 질문 정답·해설·모범 답안은 점검 결과가 나온 뒤에만 보낸다(10/23 · 화면에서는 접어 둠)
         d = dict(d, quiz=dict(q, deep=DC.public(q['deep'], bool((d.get('diag') or {}).get('deep')))))
     return {'draftId': draft_id, 'draft': dict(d, demoSeeded=w.get('demoSeeded') is True), 'draftPlan': displayed_plan, 'lastNew': w.get('lastNew'),
-            'res': catalog.resources_for(_res_keys(w)), 'reg': regstore.bundle(_basis_ids(w))}
+            'res': catalog.resources_for(_res_keys(w)), 'reg': {'articles': {}, 'regs': {}}}
 
 
 def _run_jobs(w: dict) -> list[str]:
@@ -716,21 +709,17 @@ def overrides(employee_id: int, draft_id: str, body: dict) -> dict:
 
 
 # ── 3안 (API-27~33) ──
-def _sup_input(pid: str, name: str, pl: dict) -> dict:
-    items = catalog.items()
-    used = list(dict.fromkeys(a['res'] for a in pl['acts'] if a.get('res')))
-    paid = [r for r in used if (items.get(r) or {}).get('cost')]
-    unknown = [r for r in used if r in items and items[r]['cost'] is None and items[r]['kind'] != '자격']
-    cert = next((a['res'] for a in pl['acts'] if a.get('res') and (items.get(a['res']) or {}).get('kind') == '자격'), None)
-    view = lambda r: {'title': items[r]['title'], 'provider': items[r]['provider'], 'costWon': items[r]['cost'], 'kind': items[r]['kind']}  # noqa: E731
-    return {'pid': pid, 'name': f'{pid} {course_name(pid, name)}', 'weeks': pl['weeks'], 'weeklyHours': pl['hours'], 'totalCostWon': pl['cost'],
-            'paidResources': [view(r) for r in paid], 'unknownCostResources': [view(r) for r in unknown], 'certification': items[cert]['title'] if cert else None,
-            'onlineOnly': True}
-
-
-def _plans_brief(employee_id: int) -> list:
-    return [{'goal': r['plan']['goal'], 'name': course_name(r['plan']['opt'], r['plan']['name']), 'weeklyHours': r['plan']['hours'], 'costWon': r['plan']['cost']}
-            for r in PL.records(employee_id, statuses=('active',)).values()]
+def education_guide(employee_id: int, draft_id: str) -> dict:
+    """생성 화면에서 요청한 공통 근거를 초안에 한 번만 기록한다. 동시 요청도 같은 행을 잠근다."""
+    with db.tx() as t:
+        w = _wrap(_row(t, employee_id, draft_id)['draft_choices'])
+        draft = w['draft']
+        if not draft.get('genRun') and not draft.get('gen'):
+            raise ApiError(409, 'GENERATION_REQUIRED', '로드맵 생성이 시작된 뒤 확인할 수 있어요.')
+        if 'educationGuide' not in draft:
+            draft['educationGuide'] = REG.education_guide(t, PF.employee_group(employee_id, t=t))
+            _write(t, draft_id, w)
+        return draft['educationGuide']
 
 
 def options_start(employee_id: int, draft_id: str) -> dict:
@@ -827,7 +816,6 @@ def _run_option(employee_id: int, draft_id: str, pid: str, *, expected_key: str 
         if updated.get("v2Survey"):
             from app.services.material_preparation import prepare as prepare_materials
             prepare_materials(employee_id,draft_id)
-        _maybe_support(employee_id, draft_id)
         if failure:
             raise failure
         return {'pid': pid}
@@ -872,7 +860,6 @@ def accept_partial(employee_id: int, draft_id: str) -> dict:
     if w.get("v2Survey"):
         from app.services.material_preparation import prepare as prepare_materials
         prepare_materials(employee_id,draft_id)
-    _maybe_support(employee_id, draft_id)
     return present(w, draft_id)
 
 
@@ -890,80 +877,6 @@ def _hist(g: dict, pid: str) -> list:
         g['hist'][pid] = [g['options'][pid]]
         g['cur'][pid] = 0
     return g['hist'][pid]
-
-
-_sup_busy: set = set()
-_sup_lock = threading.Lock()
-
-
-def _maybe_support(employee_id: int, draft_id: str, force: list | None = None) -> str | None:
-    """3안이 정해지면 규정 에이전트를 한 번 불러 안별 지원 조건을 확인한다(다시 만든 안은 그 안만). 실패는 안(버전)마다 남긴다"""
-    with _sup_lock:
-        if draft_id in _sup_busy:
-            return None
-        with db.tx() as t:
-            w = _wrap(_row(t, employee_id, draft_id, lock=False)['draft_choices'])
-        g = w['draft'].get('gen')
-        if not g:
-            return None
-        _sync(g)
-        need = [pid for pid in D['optionOrder'] if g['options'].get(pid) and not g['options'][pid].get('support') and not g['options'][pid].get('supportFail')]
-        if not need:
-            return None
-        _sup_busy.add(draft_id)
-    h = w['draft']['handoff']
-    sigs = {pid: json.dumps(g['options'][pid]['acts'], ensure_ascii=False, sort_keys=True) for pid in need}
-    plans = [_sup_input(pid, g['options'][pid]['name'], RM.build_plan(g['options'][pid], RM.params_of(h, g['options'][pid]), h['goal'])) for pid in need]
-
-    def work(job: jobs.JobCtx):
-        try:
-            ctx = rt.context(employee_id)
-            context = REG.reg_context(ctx.me, _plans_brief(employee_id), None)
-            out, err = None, None
-            try:
-                out = REG.support(ctx, plans, context, sim=rt.sim_once(ctx, 'sup', g['key']))
-            except AgentError as e:
-                err = e.info
-
-            def save(t, w2):
-                g2 = w2['draft'].get('gen')
-                if not g2 or g2['key'] != g['key']:
-                    return
-                _sync(g2)
-                for pid in need:
-                    o = g2['options'].get(pid)
-                    if not o or json.dumps(o['acts'], ensure_ascii=False, sort_keys=True) != sigs[pid]:
-                        continue
-                    if err:
-                        o['supportFail'] = {'cause': err}
-                    else:
-                        o['support'] = (out or {}).get(pid) or {'level': 'missing', 'summary': '이 안은 확인 결과를 받지 못했어요. 담당 부서에 확인해 주세요.', 'basis': [], 'missing': []}
-                        o.pop('supportFail', None)
-            _mutate(employee_id, draft_id, save)
-            if err:
-                raise AgentError(err['raw'] or err['text'])
-            return {'ok': True}
-        finally:
-            with _sup_lock:
-                _sup_busy.discard(draft_id)
-            # 확인하는 동안 다시 만든 안이 생겼으면 그 안도 확인
-            _maybe_support(employee_id, draft_id)
-    work._resume = {'operation':'drafts._maybe_support','kwargs':{'employee_id':employee_id,'draft_id':draft_id,'force':force}}
-    return jobs.start('support', employee_id, draft_id, work)
-
-
-def support_retry(employee_id: int, draft_id: str, pid: str | None) -> dict:
-    def fn(t, w):
-        g = w['draft'].get('gen')
-        if not g:
-            return
-        _sync(g)
-        for x in D['optionOrder']:
-            if g['options'].get(x) and (not pid or pid == 'all' or x == pid):
-                g['options'][x].pop('supportFail', None)
-    w = _mutate(employee_id, draft_id, fn)
-    jid = _maybe_support(employee_id, draft_id)
-    return dict(present(w, draft_id), jobs={'support': jid} if jid else {})
 
 
 def regenerate(employee_id: int, draft_id: str, pid: str, req: dict | None) -> dict:
@@ -1030,7 +943,6 @@ def regenerate(employee_id: int, draft_id: str, pid: str, req: dict | None) -> d
         if updated.get("v2Survey"):
             from app.services.material_preparation import prepare as prepare_materials
             prepare_materials(employee_id,draft_id,[pid])
-        _maybe_support(employee_id, draft_id)
         return {'pid': pid, 'version': info['variant'] + 1}
     work._resume = {'operation':'drafts.regenerate','kwargs':{'employee_id':employee_id,'draft_id':draft_id,'pid':pid,'req':req}}
     jid = jobs.start('regenerate', employee_id, f'{draft_id}:{pid}', work)

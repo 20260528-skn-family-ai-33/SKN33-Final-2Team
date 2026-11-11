@@ -144,16 +144,11 @@ def api_options(draft_id: str, a: Account = Depends(require_employee)):
 
 @r.get('/drafts/{draft_id}/options/events')
 def api_options_events(draft_id: str, a: Account = Depends(require_employee)):
-    """3안 작성·지원 조건 확인 진행 알림(API-28 · SSE). 바뀔 때마다 안별 상태를 보낸다"""
+    """3안 작성 진행 알림(API-28 · SSE). 바뀔 때마다 안별 상태를 보낸다"""
     def state():
         d = DR.get(a.id, draft_id)['draft']
         rows = ((d.get('genRun') or {}).get('rows') or {})
-        g = d.get('gen') or {}
-        out = {pid: {'status': {'run': 'running', 'ok': 'done', 'fail': 'failed'}.get((rows.get(pid) or {}).get('st'), 'waiting')} for pid in ('A1', 'A2', 'A3')}
-        opts = g.get('options') or {}
-        sup = 'waiting' if not opts else 'failed' if any(o.get('supportFail') for o in opts.values()) else 'done' if all(o.get('support') for o in opts.values()) else 'running'
-        out['regulation'] = {'status': sup}
-        return out
+        return {pid: {'status': {'run': 'running', 'ok': 'done', 'fail': 'failed'}.get((rows.get(pid) or {}).get('st'), 'waiting')} for pid in ('A1', 'A2', 'A3')}
 
     def stream():
         last, end = None, time.time() + 600
@@ -165,7 +160,7 @@ def api_options_events(draft_id: str, a: Account = Depends(require_employee)):
             if s != last:
                 yield f"data: {json.dumps(s, ensure_ascii=False)}\n\n"
                 last = s
-            if all(v['status'] not in ('running',) for k, v in s.items() if k != 'regulation') and s['regulation']['status'] != 'running':
+            if all(v['status'] != 'running' for v in s.values()):
                 break
             time.sleep(0.5)
     return StreamingResponse(stream(), media_type='text/event-stream', headers={'Cache-Control': 'no-store'})
@@ -176,9 +171,14 @@ def api_accept_partial(draft_id: str, a: Account = Depends(require_employee)):
     return DR.accept_partial(a.id, draft_id)
 
 
+@r.post('/drafts/{draft_id}/education-guide')
+def api_education_guide(draft_id: str, a: Account = Depends(require_employee)):
+    return DR.education_guide(a.id, draft_id)
+
+
 @r.post('/drafts/{draft_id}/options/support/retry')
-def api_support_retry(draft_id: str, body: dict | None = None, a: Account = Depends(require_employee)):
-    return DR.support_retry(a.id, draft_id, (body or {}).get('perspective'))
+def api_support_retry(draft_id: str, a: Account = Depends(require_employee)):
+    raise ApiError(410, 'SUPPORT_RETIRED', '교육비 규정은 3안 생성 화면에서 확인해 주세요.')
 
 
 @r.post('/drafts/{draft_id}/options/{pid}/retry')
@@ -206,7 +206,7 @@ def api_confirm(draft_id: str, body: dict | None = None, a: Account = Depends(re
 def api_plans(status: str = '', detail: int = 0, a: Account = Depends(require_employee)):
     recs = PL.records(a.id, statuses=(status,) if status else None)
     if detail:
-        return {'plans': recs, 'res': PL.resources_of(recs), 'reg': PL.reg_of(recs)}
+        return {'plans': recs, 'res': PL.resources_of(recs), 'reg': {'articles': {}, 'regs': {}}}
     return [{'planId': k, 'goal': v['plan']['goal'], 'perspective': v['plan']['opt'], 'version': v['plan']['version'], 'status': v['status'],
              'done': sum(1 for x in PL.tracked_acts(v['plan']) if (v['progress'].get(x['id']) or {}).get('status') == 'done'), 'total': len(PL.tracked_acts(v['plan'])),
              'newComments': sum(1 for c in v['comments'] if c['status'] == 'new'), 'weeks': v['plan']['weeks'], 'weeklyHours': v['plan']['hours'],
@@ -215,7 +215,7 @@ def api_plans(status: str = '', detail: int = 0, a: Account = Depends(require_em
 
 def _plan_out(rec: dict) -> dict:
     one = {rec['id']: rec}
-    return {'plan': rec, 'res': PL.resources_of(one), 'reg': PL.reg_of(one)}
+    return {'plan': rec, 'res': PL.resources_of(one), 'reg': {'articles': {}, 'regs': {}}}
 
 
 @r.get('/plans/{plan_id}')
@@ -289,9 +289,8 @@ def api_revise(plan_id: str, request: Request, body: dict, a: Account = Depends(
 
 
 @r.post('/plans/{plan_id}/revisions/support/retry')
-def api_rev_support(plan_id: str, request: Request, version: int | None = None, a: Account = Depends(require_employee)):
-    jid = PL.revision_support_retry(a.id, plan_id, version)
-    return job_response(request, jid, a.id)
+def api_rev_support(plan_id: str, a: Account = Depends(require_employee)):
+    raise ApiError(410, 'SUPPORT_RETIRED', '교육비 규정은 3안 생성 화면에서 확인해 주세요.')
 
 
 def _rev_owner(a: Account, revision_id: str) -> str:

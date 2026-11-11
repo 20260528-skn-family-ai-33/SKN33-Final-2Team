@@ -39,12 +39,6 @@ class StoredPlanNameTests(unittest.TestCase):
         self.assertEqual(changes['c']['perspective'], 'A2 Crash Course')
         selection = drafts.selection_of({'id': 'A2', 'name': 'Fast Track'})
         self.assertEqual((selection['name'], selection['agent']), ('Crash Course', '로드맵 계획 에이전트 · A2 Crash Course'))
-        with patch.object(drafts.catalog, 'items', return_value={}):
-            support = drafts._sup_input('A3', 'Challenge Track', {'acts': [], 'weeks': 4, 'hours': 3, 'cost': 0})
-        self.assertEqual(support['name'], 'A3 Challenge Course')
-        old = {'opt': 'A1', 'name': 'Free Track', 'goal': 'g', 'hours': 3, 'cost': 0}
-        with patch.object(drafts.PL, 'records', return_value={'p': {'plan': old}}):
-            self.assertEqual(drafts._plans_brief(1)[0]['name'], 'Free Course')
 
     def test_rebuilt_plan_from_old_option_gets_official_name(self):
         option = {'id': 'A2', 'name': 'Fast Track', 'short': 'Fast', 'tagline': 't', 'acts': []}

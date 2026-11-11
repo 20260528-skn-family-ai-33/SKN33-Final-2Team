@@ -14,10 +14,9 @@ import json
 import uuid
 from datetime import date, timedelta
 
-from .. import catalog, course_time, db, jobs, regstore
+from .. import catalog, course_time, db, jobs
 from ..agents import deepcheck as DC
 from ..agents import diag as DG
-from ..agents import regulation as REG
 from ..agents import roadmap as RM
 from ..agents import runtime as rt
 from ..agents.demo import D, course_id, course_name
@@ -322,14 +321,6 @@ def resources_of(recs: dict, reps: list | None = None) -> dict:
     return catalog.resources_for(keys)
 
 
-def reg_of(recs: dict) -> dict:
-    ids = []
-    for r in recs.values():
-        for v in [r['plan']] + r['versions'] + ([r['pending']['to']] if r.get('pending') else []):
-            ids += list(((v.get('def') or {}).get('support') or {}).get('basis') or [])
-    return regstore.bundle(ids)
-
-
 def workspace(employee_id: int) -> dict:
     recs = records(employee_id)
     from .post_quiz import prepare as prepare_post_quiz
@@ -337,7 +328,7 @@ def workspace(employee_id: int) -> dict:
         if r.get('status') == 'active' and not (r.get('post') or {}).get('quizSurvey'):
             prepare_post_quiz(employee_id, r['id'], r['plan'])
     reps = reports(employee_id)
-    return {'plans': recs, 'reports': reps, 'res': resources_of(recs), 'reg': reg_of(recs)}
+    return {'plans': recs, 'reports': reps, 'res': resources_of(recs), 'reg': {'articles': {}, 'regs': {}}}
 
 
 # ── 진행 기록 (API-38) ──
@@ -603,16 +594,9 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
             pd['commentStamp'] = comment['stamp']
         if skill:
             pd['skillComment'] = {'stamp': comment['stamp'], 'targets': [a['id'] for a in targets.values()]}
-        # 지원 조건: 자료·자격·기간·비용이 그대로면 이전 버전의 확인 결과, 바뀌었으면 규정 에이전트가 이 버전을 다시 확인(설계서 v1.7 SCR-RM-06)
-        sup = (base.get('def') or {}).get('support')
-        if sup and RM.sup_sig(to) == RM.sup_sig(base):
-            to['def']['support'] = copy.deepcopy(sup)
-            pd['supSame'] = True
         with db.tx() as t:
             t.run("UPDATE app_ext.roadmap_revisions SET status = 'ready', result = :p, updated_at = now() WHERE revision_id = CAST(:i AS uuid) AND status = 'running'",
                   p=db.J(pd), i=rev_id)
-        if not to['def'].get('support'):
-            revision_support(employee_id, roadmap_id, rev_id)
         return {'revisionId': rev_id}
     work._resume = {'operation':'plans.revise_start','kwargs':{'employee_id':employee_id,'roadmap_id':roadmap_id,'body':body}}
     jid = jobs.start('revision', employee_id, roadmap_id, work)
@@ -621,91 +605,6 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
     with db.tx() as t:
         t.run('UPDATE app_ext.roadmap_revisions SET job_id = CAST(:j AS uuid) WHERE revision_id = CAST(:i AS uuid)', j=jid, i=rev_id)
     return {'revisionId': rev_id, 'jobId': jid}
-
-
-def revision_support(employee_id: int, roadmap_id: str, rev_id: str, accepted: bool = False) -> str | None:
-    """수정안의 지원 조건 확인(바뀐 경우만). 실패하면 '확인 필요'로 두고 다시 확인은 사용자가 누를 때만"""
-    rv = db.one('SELECT result, status FROM app_ext.roadmap_revisions WHERE revision_id = CAST(:i AS uuid)', i=rev_id)
-    if not rv or rv['status'] != ('accepted' if accepted else 'ready'):
-        return None
-    pd = rv['result']
-    signature = RM.sup_sig(pd['to'])
-    from .drafts import _sup_input, _plans_brief
-
-    def work(job: jobs.JobCtx):
-        ctx = rt.context(employee_id)
-        err, out = None, None
-        try:
-            out = REG.support(ctx, [_sup_input(pd['to']['opt'], pd['to']['name'], pd['to'])], REG.reg_context(ctx.me, _plans_brief(employee_id), None),
-                              sim=rt.sim_once(ctx, 'sup', 'rev|' + str(pd.get('key'))))
-        except AgentError as e:
-            err = e.info
-        with db.tx() as t:
-            cur = t.one('SELECT result, status FROM app_ext.roadmap_revisions WHERE revision_id = CAST(:i AS uuid) FOR UPDATE', i=rev_id)
-            if not cur:
-                # 확인하는 동안 수정안이 지워졌으면(시연 초기화 등으로 로드맵과 함께 지워짐) 결과를 쓸 곳이 없다.
-                # 성공으로 바꾸지 않고 이유를 적어 작업을 실패로 남긴다(작업 표 error · 서버 오류 추적은 남기지 않음)
-                raise ApiError(409, 'REVISION_GONE', '확인하는 동안 수정안이 지워져 지원 조건 확인 결과를 저장하지 않았어요')
-            res = cur['result']
-            if RM.sup_sig(res['to']) != signature:
-                return {'ok': False}
-            if err:
-                res['supFail'] = {'cause': err}
-            else:
-                res['to']['def']['support'] = (out or {}).get(res['to']['opt']) or {'level': 'missing', 'summary': '이 버전은 확인 결과를 받지 못했어요. 담당 부서에 확인해 주세요.', 'basis': [], 'missing': []}
-                res.pop('supFail', None)
-            if cur['status'] in ('ready', 'accepted'):
-                t.run('UPDATE app_ext.roadmap_revisions SET result = :r, updated_at = now() WHERE revision_id = CAST(:i AS uuid)', r=db.J(res), i=rev_id)
-            if cur['status'] == 'accepted' and not err:
-                # 확인 중에 확정했으면 확정한 버전에 남긴다
-                _patch_current_support(roadmap_id, res['to']['def']['support'], res['to']['version'])
-        if err:
-            raise AgentError(err['raw'] or err['text'])
-        return {'ok': True}
-    work._resume = {'operation':'plans.revision_support','kwargs':{'employee_id':employee_id,'roadmap_id':roadmap_id,'rev_id':rev_id,'accepted':accepted}}
-    return jobs.start('revision-support', employee_id, f'{roadmap_id}:{rev_id}:accepted' if accepted else roadmap_id, work)
-
-
-def _patch_current_support(roadmap_id: str, support: dict, version: int) -> None:
-    with db.tx() as t:
-        row = t.one('SELECT content FROM public.roadmaps WHERE roadmap_id = CAST(:r AS uuid) FOR UPDATE', r=roadmap_id)
-        if not row or row['content'].get('version') != version:
-            return
-        content = row['content']
-        content.setdefault('def', {})['support'] = support
-        content.pop('supportCheckPending', None)
-        t.run('UPDATE public.roadmaps SET content = :c, updated_at = now() WHERE roadmap_id = CAST(:r AS uuid)', c=db.J(content), r=roadmap_id)
-        t.run("UPDATE app_ext.roadmap_versions SET plan = :c WHERE roadmap_id = CAST(:r AS uuid) AND version = :v", c=db.J(content), r=roadmap_id, v=content.get('version'))
-
-
-def revision_support_retry(employee_id: int, roadmap_id: str, version: int | None = None) -> str | None:
-    row = _owned(employee_id, roadmap_id)
-    plan = row['content']
-    if version is not None:
-        if plan.get('version') != version:
-            raise ApiError(409, 'REVISION_CHANGED', '로드맵 버전이 바뀌었어요. 새로고침해 주세요.')
-        if not plan.get('supportCheckPending'):
-            return None
-        from .generation_lock import generation_guard
-        with generation_guard('accepted-support', str(row['roadmap_id'])):
-            rv = db.one("""SELECT revision_id FROM app_ext.roadmap_revisions
-                          WHERE roadmap_id = :r AND status = 'accepted' AND result->'to'->>'version' = :v
-                          ORDER BY updated_at DESC LIMIT 1""", r=row['roadmap_id'], v=str(plan['version']))
-            if not rv:
-                raise ApiError(409, 'NO_REVISION', '다시 확인할 확정 버전이 없어요')
-            rev_id = str(rv['revision_id'])
-            ref = f'{roadmap_id}:{rev_id}:accepted'
-            running = db.val("SELECT job_id FROM app_ext.jobs WHERE employee_id = :e AND kind = 'revision-support' AND ref = :r AND status = 'running'",
-                             e=employee_id, r=ref)
-            return str(running) if running else revision_support(employee_id, roadmap_id, rev_id, accepted=True)
-    rv = _revision(roadmap_id)
-    if not rv or rv['status'] != 'ready':
-        raise ApiError(409, 'NO_REVISION', '다시 확인할 수정안이 없어요')
-    res = rv['result']
-    res.pop('supFail', None)
-    with db.tx() as t:
-        t.run('UPDATE app_ext.roadmap_revisions SET result = :r WHERE revision_id = :i', r=db.J(res), i=rv['revision_id'])
-    return revision_support(employee_id, roadmap_id, str(rv['revision_id']))
 
 
 def _mix_revision_skills(current: dict, proposal: dict, handoff: dict, selected: list[str], done: set[str]) -> dict:
@@ -754,8 +653,6 @@ def _mix_revision_skills(current: dict, proposal: dict, handoff: dict, selected:
     for a in option['acts']:
         a.pop('key', None)
     result = RM.build_plan(option, {'start': current['start'], 'hours': current['hours'], 'format': current.get('format')}, current['goal'])
-    if RM.sup_sig(result) == RM.sup_sig(current) and current['def'].get('support'):
-        result['def']['support'] = copy.deepcopy(current['def']['support'])
     return result
 
 
@@ -778,10 +675,6 @@ def accept_revision(employee_id: int, roadmap_id: str, revision_id: str, selecte
             handoff = cur.get('handoff') or pd['handoff']
             proposal = pd['to']
             mixed = _mix_revision_skills(cur, proposal, handoff, selected_skills, done)
-            if (proposal['opt'], proposal['hours'], RM.sup_sig(proposal)) == (mixed['opt'], mixed['hours'], RM.sup_sig(mixed)):
-                support = proposal['def'].get('support')
-                if support:
-                    mixed['def']['support'] = copy.deepcopy(support)
             pd = dict(pd, to=mixed,
                       prefsTo=cur.get('prefs'), handoff=handoff)
 
@@ -820,8 +713,6 @@ def accept_revision(employee_id: int, roadmap_id: str, revision_id: str, selecte
         plan.pop('selectionEvidence', None)
         if isinstance(evidence, dict):
             plan['selectionEvidence'] = copy.deepcopy(evidence)
-        if selected_skills is not None and not plan['def'].get('support'):
-            plan['supportCheckPending'] = True
         validate_free_plan(t, plan)
         # 로드맵 내용이 바뀌면 팀 DB 트리거가 코멘트에 '수정 완료' 시각만 적는다. 그 갱신은 작성자 검사 트리거(본문·작성자·로드맵 열)를 거치지 않는다
         t.run('UPDATE public.roadmaps SET content = :c, strategy_type = :st, strategy_title = :tt, summary = :s, updated_at = now() WHERE roadmap_id = :r',
@@ -833,12 +724,6 @@ def accept_revision(employee_id: int, roadmap_id: str, revision_id: str, selecte
         if pd.get('fromComment'):
             t.run("""INSERT INTO app_ext.comment_meta(comment_id, status, applied_version) VALUES(CAST(:c AS uuid), 'applied', :v)
                      ON CONFLICT (comment_id) DO UPDATE SET status = 'applied', applied_version = :v""", c=pd['fromComment'], v=plan['version'])
-    if plan.get('supportCheckPending'):
-        try:
-            revision_support_retry(employee_id, roadmap_id, plan['version'])
-        except Exception:
-            import logging
-            logging.getLogger(__name__).exception('Accepted revision support scheduling failed')
     return record(_owned(employee_id, roadmap_id))
 
 
@@ -1233,5 +1118,5 @@ def member_state(head_id: int, member_id: int) -> dict:
     if member_id not in profile.member_ids(head_id):
         raise forbidden('소속 직원이 아니에요')
     recs = records(member_id, for_mgr=True)
-    return {'user': profile.team_view(profile.view(member_id)), 'plans': recs, 'reports': reports(member_id, for_mgr=True), 'res': resources_of(recs), 'reg': reg_of(recs),
+    return {'user': profile.team_view(profile.view(member_id)), 'plans': recs, 'reports': reports(member_id, for_mgr=True), 'res': resources_of(recs), 'reg': {'articles': {}, 'regs': {}},
             'unseen': NT.unseen_targets(head_id, member_id)}

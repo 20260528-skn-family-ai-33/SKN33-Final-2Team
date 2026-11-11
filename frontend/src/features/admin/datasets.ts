@@ -11,7 +11,7 @@ export const isDataset = (x: string | undefined): x is DatasetId => !!x && x in 
 export const REG = {
   title: '규정 데이터',
   icon: 'scale',
-  lead: '사내 생활 도우미와 지원 조건 확인이 근거로 쓰는 규정이에요. 규정은 이 화면에서 고치지 않아요. 새 규정이나 개정된 규정은 원문 PDF로 올리면 서비스 운영팀이 받아 도우미 검색에 반영해요.',
+  lead: '사내 생활 도우미와 교육비 안내가 근거로 쓰는 규정이에요. 규정은 이 화면에서 고치지 않아요. 새 규정이나 개정된 규정은 원문 PDF로 올리면 서비스 운영팀이 받아 도우미 검색에 반영해요.',
 } as const;
 /** 변경 이력의 데이터 이름(예전 규정 엑셀 기록 포함) */
 export const datasetTitle = (ds: string): string => (isDataset(ds) ? DS[ds].title : ds === 'regulations' ? REG.title : ds);

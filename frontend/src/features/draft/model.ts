@@ -124,7 +124,7 @@ export const busyDraft = (d: DraftDoc): boolean =>
     d.diagRun ||
     (d.doc && d.doc.status === 'reading') ||
     (d.genRun && Object.values(d.genRun.rows || {}).some((x) => x.st === 'run')) ||
-    (d.gen && ((d.gen.regenRun && Object.keys(d.gen.regenRun).length) || Object.values(d.gen.options || {}).some((o) => !o.support && !o.supportFail)))
+    Object.keys(d.gen?.regenRun || {}).length
   );
 
 /* ── 점검 결과 ── */
