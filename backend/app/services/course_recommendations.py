@@ -96,15 +96,30 @@ def merge_scope(base,scoped):
     return result
 
 def completed_course_ids(t: db.Tx, employee_id: int) -> frozenset[str]:
-    """이 직원이 실제 로드맵에서 완료한 강좌 ID. 보관한 로드맵의 이수도 포함한다."""
+    """본인의 현재 완료 강좌와, 이수 후 수정안에서 빠진 강좌를 함께 조회한다."""
     rows = t.all("""
-        SELECT DISTINCT resource.course_id
-        FROM public.projects p
-        JOIN public.roadmaps r ON r.project_id = p.project_id
-        JOIN public.roadmap_steps step ON step.roadmap_id = r.roadmap_id
+        WITH owned AS (
+            SELECT r.roadmap_id FROM public.projects p
+            JOIN public.roadmaps r USING (project_id)
+            WHERE p.employee_id = :employee_id
+              AND (p.draft_choices ->> 'demoSeeded') IS DISTINCT FROM 'true'
+        )
+        SELECT resource.course_id FROM owned
+        JOIN public.roadmap_steps step USING (roadmap_id)
         JOIN public.roadmap_step_resources resource ON resource.step_id = step.step_id
-        WHERE p.employee_id = :employee_id AND step.is_completed AND resource.course_id IS NOT NULL
-          AND (p.draft_choices ->> 'demoSeeded') IS DISTINCT FROM 'true'
+        WHERE step.is_completed AND resource.course_id IS NOT NULL
+        UNION
+        SELECT course.course_id FROM owned
+        JOIN app_ext.activity_progress progress USING (roadmap_id)
+        -- 진행 상태를 저장한 시점의 확정본에서 활동 ID를 강좌 ID로 변환한다.
+        CROSS JOIN LATERAL (
+            SELECT v.plan FROM app_ext.roadmap_versions v
+            WHERE v.roadmap_id = progress.roadmap_id AND v.confirmed_at <= progress.updated_at
+            ORDER BY v.version DESC LIMIT 1
+        ) snapshot
+        CROSS JOIN LATERAL jsonb_path_query(snapshot.plan, '$.acts[*]') AS activity(value)
+        JOIN public.courses course ON course.course_id = activity.value->>'res'
+        WHERE progress.status = 'done' AND progress.activity_id = activity.value->>'id'
         """, employee_id=employee_id)
     return frozenset(row['course_id'] for row in rows)
 
