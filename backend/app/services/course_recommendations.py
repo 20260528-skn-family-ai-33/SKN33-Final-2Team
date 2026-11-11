@@ -45,11 +45,13 @@ def cap_selection(saved):
     """이전 상한(5개)으로 완료한 점검은 새 공통 추천에 사용자 순서의 앞 3개만 쓴다. 저장 원본은 바꾸지 않는다."""
     rows=(saved.get('selection') or {}).get('skills')
     if not isinstance(rows,list) or len(rows)<=track_policy.MAX_SKILLS:return saved
+    by_name={row.get('name'):row for row in rows if isinstance(row,dict)}
+    # 사용자가 바꾼 skillOrder를 우선하고, 순서에 없는 스킬만 최초 선정 순서로 뒤에 붙인다(코스별 scope_view와 같은 기준).
+    order=[name for name in dict.fromkeys(saved.get('skillOrder') or []) if name in by_name]
+    keep=(order+[name for name in by_name if name not in order])[:track_policy.MAX_SKILLS]
     capped=deepcopy(saved)
-    capped['selection']['skills']=rows[:track_policy.MAX_SKILLS]
-    names={row.get('name') for row in capped['selection']['skills'] if isinstance(row,dict)}
-    if isinstance(capped.get('skillOrder'),list):
-        capped['skillOrder']=[name for name in capped['skillOrder'] if name in names]
+    capped['selection']['skills']=[deepcopy(by_name[name]) for name in keep]
+    capped['skillOrder']=list(keep)
     return capped
 
 def scope_view(saved,course,option=None):

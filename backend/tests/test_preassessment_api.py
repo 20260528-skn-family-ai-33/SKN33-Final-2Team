@@ -287,6 +287,15 @@ class RecommendationVersionViewTests(unittest.TestCase):
         from app.agents.resource_recommendations import candidate_pools
         pools = candidate_pools(pre['project'], pre['selection'], {})
         self.assertEqual([row['name'] for row in pools], names[:3])
+        # 사용자가 순서를 바꾼 점검은 그 순서의 앞 3개를 쓴다.
+        for order, expected in ((['E', 'D', 'C', 'B', 'A'], ['E', 'D', 'C']), (['D'], ['D', 'A', 'B']), ([], names[:3])):
+            with self.subTest(order=order):
+                reordered = dict(saved, skillOrder=order)
+                with patch.object(api, 'recommendation_context', return_value=reordered):
+                    pre = api.course_context(Mock(), 1, 'project', None, completed=frozenset())
+                self.assertEqual([row['name'] for row in pre['selection']['skills']], expected)
+                self.assertEqual(pre['skillOrder'], expected)
+                self.assertEqual(reordered['skillOrder'], order)
 
     def test_no_recommendation_remains_none(self):
         self.assertIsNone(api.recommendation_view({'generationId': 'g'})['recommendations'])
