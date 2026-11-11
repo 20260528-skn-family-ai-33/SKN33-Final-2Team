@@ -45,7 +45,8 @@ class CachedSelectionTests(TestCase):
                   'skillOrder': ['SQL'], 'courseRecommendations': {'A2': self.saved}}
         self.rec['retrieval']['version'] = version_for('A2')
         updated = {'generationId': 'g', 'recommendations': {'id': 'new'}}
-        with patch.object(api, 'recommendation_context', return_value=scoped), \
+        with patch.object(api, 'completed_course_ids', return_value=frozenset()), \
+             patch.object(api, 'recommendation_context', return_value=scoped), \
              patch.object(drafts, '_row', return_value={'draft_choices': {'draft': draft}}), \
              patch.object(catalog, 'items', return_value={'book': self.items['book']}), \
              patch.object(api.db, 'tx', return_value=nullcontext(Mock())), \

@@ -16,6 +16,7 @@ from app.auth import Account, require_employee
 from app.agents import runtime
 from app.errors import ApiError
 from app.services import profile
+from app.services.course_recommendations import completed_course_ids
 from app.services.drafts import doc_summary
 from app.agents.skill_selection import SelectionError, select_from_catalog
 from app.agents.survey_generation import SurveyError, generate_survey, profile_input
@@ -165,12 +166,15 @@ def recommendation_context(t, employee_id: int, project_id: str) -> dict:
     return saved
 
 
-def course_context(t, employee_id: int, project_id: str, course: str | None = None) -> dict:
+def course_context(t, employee_id: int, project_id: str, course: str | None = None, *,
+                   completed: frozenset[str] | None = None) -> dict:
     saved = recommendation_context(t, employee_id, project_id)
     from app.services.resource_rag import version_for
     from app.services.course_recommendations import compatible_recommendations, scope_view
+    if completed is None:
+        completed = completed_course_ids(t, employee_id)
     if not course:
-        recommendations = compatible_recommendations(saved, version_for())
+        recommendations = compatible_recommendations(saved, version_for(), completed)
         if recommendations is not None:
             return dict(saved, recommendations=recommendations)
         return dict(saved, recommendations=None, resourceChoices={}, durationEstimates={})
@@ -185,7 +189,7 @@ def course_context(t, employee_id: int, project_id: str, course: str | None = No
                                      (saved.get('selection') or {}).get('skills', []) if s.get('application')}
     expected_names = {row['name'] for row in scoped['selection']['skills']}
     cached_names = {row['name'] for row in (scoped.get('recommendations') or {}).get('skills', [])}
-    scoped['recommendations'] = (compatible_recommendations(scoped, version_for(course))
+    scoped['recommendations'] = (compatible_recommendations(scoped, version_for(course), completed)
                                  if expected_names == cached_names else None)
     if scoped['recommendations'] is None:
         scoped['resourceChoices']={}
@@ -239,15 +243,19 @@ def get_recommendations(project_id: UUID, a: Account = Depends(require_employee)
 def generate_recommendations(project_id: UUID, a: Account = Depends(require_employee), course: str | None = None):
     with generation_guard('draft-materials', f'{project_id}:{course or "base"}'):
         with db.tx() as t:
-            pre = course_context(t, a.id, str(project_id), course)
+            completed = completed_course_ids(t, a.id)
+            pre = course_context(t, a.id, str(project_id), course, completed=completed)
             selected_course = course_input(t, a.id, str(project_id), course)
             if pre.get('recommendations'):
                 return recommendation_view(pre)
         ctx = runtime.context(a.id)
-        result = recommend_from_catalog(ctx, pre, selected_course)
+        result = recommend_from_catalog(ctx, pre, selected_course, completed=completed)
         with db.tx() as t:
             t.one("SELECT project_id FROM public.projects WHERE project_id=CAST(:p AS uuid) AND employee_id=:e AND status='DRAFTING' FOR UPDATE",p=str(project_id),e=a.id)
-            current = course_context(t, a.id, str(project_id), course)
+            latest_completed = completed_course_ids(t, a.id)
+            current = course_context(t, a.id, str(project_id), course, completed=latest_completed)
+            if any(card['id'] in latest_completed for row in result.get('skills', []) for card in row['courses']):
+                raise ApiError(409, 'RECOMMENDATIONS_CHANGED', '추천 중 강좌 이수 기록이 변경됐어요. 다시 추천받아 주세요.')
             from app.services.course_recommendations import dependency_key
             if dependency_key(current) != dependency_key(pre):
                 raise ApiError(409, 'RECOMMENDATIONS_CHANGED', '생성 중 역량·순서 또는 선택한 계획이 변경됐어요. 최신 조건으로 다시 추천받아 주세요.')

@@ -25,6 +25,7 @@ def transaction(t):
 
 class ApiTests(unittest.TestCase):
     def setUp(self):
+        self.enterContext(patch.object(api, 'completed_course_ids', return_value=frozenset()))
         guard = patch.object(api, 'generation_guard', side_effect=lambda *args: nullcontext())
         guard.start(); self.addCleanup(guard.stop)
         fixture = fixtures.SurveyTests(); fixture.setUp()

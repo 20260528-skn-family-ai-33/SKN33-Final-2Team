@@ -449,13 +449,16 @@ def validate_choices(recommendations: dict, choices: dict) -> None:
             raise RecommendationError('추천한 도서는 최대 3권까지 선택할 수 있습니다.')
 
 
-def recommend_from_catalog(ctx: Any, pre: dict, course: dict | None = None) -> dict:
+def recommend_from_catalog(ctx: Any, pre: dict, course: dict | None = None, *,
+                           completed: frozenset[str] = frozenset()) -> dict:
     from app import catalog
     from app.agents import runtime
     if not ctx.live:
         raise RecommendationError('AI 추천에는 사용 가능한 실제 모델이 필요합니다.')
     from app.services.resource_rag import retrieve
     items = catalog.items()
+    if completed:
+        items = {rid: item for rid, item in items.items() if rid not in completed or item['type'] != 'course'}
     from app.learner_knowledge import from_profile,hr_context
     project=dict(pre['project'],learnerKnowledge=from_profile(pre.get('profile')),hrContext=hr_context(pre.get('profile')))
     project['selectedCourse'] = deepcopy(course)

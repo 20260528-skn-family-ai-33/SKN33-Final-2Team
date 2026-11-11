@@ -2,6 +2,7 @@
 from copy import deepcopy
 from hashlib import sha256
 import json
+from app import db
 FIELDS=('recommendations','resourceChoices','durationEstimates','activityProposal','activityVersions','materialsSelectionKey','skillSelectionKey','learningOutcomes')
 
 def option_cache_key(option):
@@ -94,7 +95,22 @@ def merge_scope(base,scoped):
     result.setdefault('courseRecommendations',{})[course] = cache
     return result
 
-def available_recommendations(recommendations: dict, course: str | None, *, refresh: bool = False) -> dict:
+def completed_course_ids(t: db.Tx, employee_id: int) -> frozenset[str]:
+    """이 직원이 실제 로드맵에서 완료한 강좌 ID. 보관한 로드맵의 이수도 포함한다."""
+    rows = t.all("""
+        SELECT DISTINCT resource.course_id
+        FROM public.projects p
+        JOIN public.roadmaps r ON r.project_id = p.project_id
+        JOIN public.roadmap_steps step ON step.roadmap_id = r.roadmap_id
+        JOIN public.roadmap_step_resources resource ON resource.step_id = step.step_id
+        WHERE p.employee_id = :employee_id AND step.is_completed AND resource.course_id IS NOT NULL
+          AND (p.draft_choices ->> 'demoSeeded') IS DISTINCT FROM 'true'
+        """, employee_id=employee_id)
+    return frozenset(row['course_id'] for row in rows)
+
+
+def available_recommendations(recommendations: dict, course: str | None, *, refresh: bool = False,
+                              completed: frozenset[str] = frozenset()) -> dict:
     """추천 근거는 보존하고 현재 선택할 수 없는 후보와 기본 선택만 제거한다."""
     from app import catalog
     rows = recommendations.get('skills') or []
@@ -107,7 +123,8 @@ def available_recommendations(recommendations: dict, course: str | None, *, refr
 
     filtered = []
     for row in rows:
-        courses = catalog.refresh_course_levels([item for item in row['courses'] if available(item, 'course')], items)
+        courses = catalog.refresh_course_levels([item for item in row['courses']
+                                                if item['id'] not in completed and available(item, 'course')], items)
         books = catalog.refresh_book_links([item for item in row['books'] if available(item, 'book')], items)
         result = dict(row, courses=courses, books=books)
         if 'selectedCourse' in row and not any(item['id'] == row['selectedCourse'] for item in courses):
@@ -116,10 +133,14 @@ def available_recommendations(recommendations: dict, course: str | None, *, refr
             book_ids = {item['id'] for item in books}
             result['selectedBooks'] = [rid for rid in row['selectedBooks'] if rid in book_ids]
         filtered.append(result)
-    return dict(recommendations, skills=filtered)
+    result = dict(recommendations, skills=filtered)
+    retrieval = recommendations.get('retrieval') or {}
+    if completed and 'matches' in retrieval:
+        result['retrieval'] = dict(retrieval, matches=[m for m in retrieval['matches'] if m['resourceId'] not in completed])
+    return result
 
 
-def compatible_recommendations(saved: dict, version: str) -> dict | None:
+def compatible_recommendations(saved: dict, version: str, completed: frozenset[str] = frozenset()) -> dict | None:
     """선택이 유효하면 추천 규칙이 바뀌어도 남은 후보를 재사용한다."""
     from app.agents.resource_recommendations import RecommendationError, validate_choices
     recommendations = saved.get('recommendations')
@@ -129,7 +150,10 @@ def compatible_recommendations(saved: dict, version: str) -> dict | None:
     outdated = (recommendations.get('retrieval') or {}).get('version') != version
     if outdated and (not recommendations.get('skills') or not choices):
         return None
-    available = available_recommendations(recommendations, saved.get('_course'))
+    available = available_recommendations(recommendations, saved.get('_course'), completed=completed)
+    # 이전에 제시한 강좌를 모두 이수했다면 빈 캐시 대신 더 낮은 순위의 후보를 다시 검색한다.
+    if any(row['courses'] and all(c['id'] in completed for c in row['courses']) for row in recommendations['skills']):
+        return None
     if choices:
         try:
             validate_choices(available, choices)

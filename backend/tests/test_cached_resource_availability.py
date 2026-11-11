@@ -45,6 +45,7 @@ class CachedResourceAvailabilityTests(TestCase):
         self.draft = {'chosen': 'A3', 'gen': {'options': {'A3': {}, 'A1': {}}}}
         self.raw = {'v2Survey': self.saved, 'draft': self.draft}
         self.tx = Mock()
+        self.tx.all.return_value = []
         self.tx.one.return_value = {'draft_choices': self.raw}
         self.tx.run.return_value = 1
         self.client = TestClient(api_app)
@@ -97,6 +98,43 @@ class CachedResourceAvailabilityTests(TestCase):
         stored = json.loads(self.tx.run.call_args.kwargs['value'])
         self.assertEqual(stored['courseRecommendations']['A3']['resourceChoices'], response.json()['choices'])
         self.assertEqual(stored['courseRecommendations']['A1']['resourceChoices'], self.choices)
+
+    def test_completion_after_cache_hides_course_and_rejects_old_selection(self):
+        self.tx.all.return_value = [{'course_id': 'alt-course'}]
+        response = self.client.get(self.url, params={'course': 'A3'})
+        self.assertEqual(response.status_code, 200, response.text)
+        row = response.json()['recommendations']['skills'][0]
+        self.assertEqual([c['id'] for c in row['courses']], ['course'])
+        self.assertEqual(response.json()['choices'], self.choices)
+        self.assertIsNone(row['selectedCourse'])
+        self.assertEqual(self.put(course_id='alt-course').status_code, 422)
+        self.tx.run.assert_not_called()
+
+    def test_completion_after_initial_check_is_rechecked_on_save(self):
+        self.tx.all.side_effect = [[], [{'course_id': 'course'}]]
+        self.assertEqual(self.put().status_code, 422)
+        self.tx.run.assert_not_called()
+
+    def test_cached_selected_completed_course_requires_new_candidates(self):
+        self.tx.all.return_value = [{'course_id': 'course'}]
+        response = self.client.get(self.url, params={'course': 'A3'})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertIsNone(response.json()['recommendations'])
+        self.assertEqual(self.put().status_code, 409)
+        self.tx.run.assert_not_called()
+
+    def test_course_completed_while_model_runs_is_not_saved(self):
+        self.cache.pop('recommendations')
+        self.tx.all.side_effect = [[], [{'course_id': 'course'}]]
+        self.generate.side_effect = None
+        self.generate.return_value = self.rec
+        self.enterContext(patch.object(api, 'generation_guard', return_value=nullcontext()))
+        self.enterContext(patch.object(api, 'course_input', return_value={'id': 'A3'}))
+        self.enterContext(patch.object(api.runtime, 'context', return_value=Mock(live=True)))
+        response = self.client.post(self.url, params={'course': 'A3'})
+        self.assertEqual(response.status_code, 409, response.text)
+        self.assertEqual(response.json()['error']['code'], 'RECOMMENDATIONS_CHANGED')
+        self.tx.run.assert_not_called()
 
     def test_deleted_after_get_is_rejected_even_if_catalog_snapshot_still_lists_it(self):
         response = self.client.get(self.url, params={'course': 'A3'})

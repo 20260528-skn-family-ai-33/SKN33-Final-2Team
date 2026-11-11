@@ -156,6 +156,7 @@ class ResourceScheduleTests(TestCase):
         self.assertEqual(self.option['acts'], [])
         self.assertEqual(self.saved['recommendations'], before['recommendations'])
         tx = Mock(); tx.one.return_value = {'draft_choices': {'v2Survey': self.saved, 'draft': self.draft}}; tx.run.return_value = 1
+        tx.all.return_value = []
         with patch('app.catalog.items', return_value={key: dict(item, usable=True) for key, item in self.resources.items()}):
             saved = survey_store.save_resource_choices(tx, 1, 'p', 'g', 'r', self.choices, skill_order=self.order)
         self.assertEqual(saved['durationEstimates'], expected)
