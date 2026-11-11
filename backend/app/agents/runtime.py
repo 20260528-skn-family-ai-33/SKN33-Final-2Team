@@ -224,7 +224,7 @@ def parse_json(t: str) -> dict:
 
 
 def llm_json(ctx: Ctx, system: str, inp, role: str = 'default', images: list | None = None, history: list | None = None,
-             temperature: float | None = None) -> dict:
+             temperature: float | None = None, response_schema: dict | None = None) -> dict:
     """실제 모델에 JSON 응답을 요청한다. ctx.mode 가 ollama/openai 일 때만 부른다"""
     # 로드맵·자료 추천은 JSON 값·순서·문자열을 보존하고 구분자 공백만 줄인다.
     options = {'separators': (',', ':')} if role in ('roadmap', 'resources') else {}
@@ -233,6 +233,8 @@ def llm_json(ctx: Ctx, system: str, inp, role: str = 'default', images: list | N
         user['images'] = images
     messages = [{'role': 'system', 'content': system}] + list(history or []) + [user]
     options = {} if temperature is None else {'temperature': temperature}
+    if response_schema is not None:
+        options['response_schema'] = response_schema
     # 에이전트 동작 기록: 실제로 보낸 메시지와 받은 원문 전체(이미지는 크기 때문에 개수만)
     call = {'role': role, 'model': llm.model_name(ctx.mode, role) if ctx.mode in ('ollama', 'openai') else '', 'system': system,
             'messages': [{'role': m.get('role', ''), 'content': _text(m.get('content') or '')} for m in messages[1:]],
