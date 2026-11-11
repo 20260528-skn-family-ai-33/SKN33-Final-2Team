@@ -144,7 +144,7 @@ def _ollama_takes(model: str, level: str) -> bool:
 
 
 def chat(provider: str, messages: list, role: str = 'default', json_mode: bool = True, reasoning: str | None = None,
-         temperature: float | None = None) -> dict:
+         temperature: float | None = None, response_schema: dict | None = None) -> dict:
     """한 번의 대화 호출 → {content, model, provider, loadMs, totalMs}.
     reasoning: 직원이 화면에서 고른 추론 정도(단계 이름). 없으면 .env 기본값(OLLAMA_THINK / OPENAI_REASONING_EFFORT),
     그것도 비면 보내지 않아 모델 기본값을 따른다. 이미지 읽기 모델은 화면에서 고르지 않아 직원 값을 쓰지 않는다.
@@ -156,7 +156,7 @@ def chat(provider: str, messages: list, role: str = 'default', json_mode: bool =
         model = model_name('ollama', role)
         payload = {'model': model, 'messages': _with_images(messages, 'ollama'), 'stream': False}
         if json_mode:
-            payload['format'] = 'json'
+            payload['format'] = response_schema if response_schema is not None else 'json'
         if S.ollama_num_ctx:
             payload['options'] = {'num_ctx': S.ollama_num_ctx}
         if role == 'roadmap':

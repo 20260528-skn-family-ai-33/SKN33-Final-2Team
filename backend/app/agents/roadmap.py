@@ -21,6 +21,7 @@ from uuid import uuid4
 
 from .. import catalog, catalog_budget, catalog_candidates, db, llm, roadmap_input, track_policy
 from . import runtime as rt
+from .roadmap_schema import compact_plan_guidance, fixed_plan_schema, initial_activity_limit
 from .demo import D, TEMPLATES, TEMPLATES_ALT, course_name, domain_of
 
 AUTO_HOURS = D['autoHours']
@@ -460,6 +461,21 @@ def _track_catalog(pid: str, handoff: dict, extra_ids: list | None = None) -> li
     return agent_catalog(handoff, extra_ids, free_only=pid == 'A1', track=pid)
 
 
+def _resolve_free_resource_ids(raw: dict, candidates: list[dict]) -> None:
+    offered = {row['id'] for row in candidates}
+    for index, act in enumerate(raw.get('acts') or []):
+        if not isinstance(act, dict):
+            continue
+        ref = act.get('res')
+        if ref is None or isinstance(ref, str):
+            continue
+        rid = ref.get('id') if isinstance(ref, dict) else None
+        if not isinstance(rid, str) or rid not in offered:
+            raise llm.LlmError(f'Free 활동 acts[{index}].res에 후보 자료 ID가 필요해요.')
+        # 가격·시간 등 모델이 복사한 메타데이터는 사용하지 않고 카탈로그에서 조회한다.
+        act['res'] = rid
+
+
 def _validate_learning_acts(raw,handoff):
     from app.learner_knowledge import exclusion,from_profile
     knowledge=handoff.get('learnerKnowledge') or from_profile(handoff.get('profile'))
@@ -505,10 +521,23 @@ def option(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
                 system += FIXED_SELECTION_CONTRACT if inp['handoff'].get('selectedSkillsFixed') else CONTRACT
             if inp['handoff'].get('selectedSkillsFixed'):
                 system += '\n사용자가 선정한 skillOrder는 확정이다. 이 목록과 순서를 모두 유지하고 learningSkills에 반환한다. 관점 때문에 역량을 빼거나 더하지 않는다.'
+        fixed_ollama = ctx.mode == 'ollama' and inp['handoff'].get('selectedSkillsFixed') and inp['handoff'].get('courseSkillSelection')
+        chosen_skills = inp['handoff'].get('skillOrder') or inp['handoff'].get('skillNames')
+        activity_limit = None
+        if (fixed_ollama and pid in ('A1', 'A3') and isinstance(chosen_skills, list) and chosen_skills
+                and not (inp.get('previous') or inp.get('request') or inp.get('variant'))):
+            activity_limit = initial_activity_limit(len(chosen_skills))
+            system += compact_plan_guidance(activity_limit)
         payload = _catalog_payload(pid, {'handoff': inp['handoff'], 'skillTags': catalog.skill_names(),
                                         'previous': inp.get('previous'), 'previousLearningSkills': (inp.get('previousDef') or {}).get('learningSkills'), 'request': inp.get('request')}, system, prev_ids,
                                    rt.S.ollama_num_ctx if ctx.mode == 'ollama' else catalog_budget.DEFAULT_CONTEXT)
-        r = rt.llm_json(ctx, system, payload, role='roadmap')
+        output_options = {}
+        if fixed_ollama and (pid in ('A2', 'A3') or activity_limit is not None):
+            output_options['response_schema'] = fixed_plan_schema(pid, payload, regeneration=bool(inp.get('request')),
+                                                                  activity_limit=activity_limit)
+        r = rt.llm_json(ctx, system, payload, role='roadmap', **output_options)
+        if fixed_ollama and pid == 'A1':
+            _resolve_free_resource_ids(r, payload.get('catalog', []))
         _validate_learning_acts(r,inp['handoff'])
         o = finish_option(pid, r, ctx.mode, preserve_learning_skills=False)
         if provenance:
