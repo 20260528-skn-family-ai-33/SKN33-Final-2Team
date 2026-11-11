@@ -8,13 +8,11 @@ import copy
 
 from .. import db
 from ..agents import diag as DG
-from ..agents import regulation as REG
 from ..agents import roadmap as RM
 from ..agents.demo import D
 from ..errors import ApiError
 from . import drafts as DR
 from . import plans as PL
-from . import profile
 
 STAGES = ['start', 'details', 'quiz', 'result', 'options', 'review', 'active', 'multi', 'comment', 'post', 'report']
 
@@ -113,10 +111,6 @@ def jump(employee_id: int, stage: str) -> dict:
         d['handoff'] = DR.build_handoff(d)
         d['genPrefs'] = copy.deepcopy(d['prefs'])
         d['gen'] = {'key': d['handoff']['key'], 'options': {pid: RM._mock_option({'pid': pid, 'handoff': d['handoff']}) for pid in D['optionOrder']}, 'missing': []}
-        me = profile.view(employee_id, t=t)
-        for pid, o in d['gen']['options'].items():
-            o['support'] = REG._mock_support_one(DR._sup_input(pid, o['name'], RM.build_plan(o, RM.params_of(d['handoff'], o), d['goal'])), me) \
-                if REG.regstore.set_for(me.get('empGroup')) else REG.support_scope(me)
         if stage == 'options':
             w['lastNew'] = 'new-options'
             DR._write(t, pj, w)

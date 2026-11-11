@@ -28,6 +28,8 @@ def invoke(spec,employee):
         run._resume=spec
         return jobs.start('learning_generation',employee,'recovery:'+spec['function'],run)
     if kw.get('employee_id')!=employee:raise ApiError(403,'FORBIDDEN','본인의 작업만 다시 준비할 수 있어요.')
+    if op in ('drafts._maybe_support', 'plans.revision_support'):
+        return None  # 구버전에서 중단된 안별 확인 작업은 재실행하지 않는다.
     if op=='post-quiz':
         row=plans._owned(employee,kw['plan_id'])
         return post_quiz.prepare(employee,kw['plan_id'],row['content'])
@@ -43,9 +45,9 @@ def invoke(spec,employee):
         run._resume=spec
         return jobs.start('learning_generation',employee,kw['draft_id']+':'+kw['course'],run)
     allowed={'drafts.doc_summary_start':drafts.doc_summary_start,'drafts.assessment_start':drafts.assessment_start,
-        'drafts.diagnosis_start':drafts.diagnosis_start,'drafts.option_retry':drafts.option_retry,'drafts._maybe_support':drafts._maybe_support,
+        'drafts.diagnosis_start':drafts.diagnosis_start,'drafts.option_retry':drafts.option_retry,
         'drafts.regenerate':drafts.regenerate,'plans.post_deep_start':plans.post_deep_start,'plans.revise_start':plans.revise_start,
-        'plans.revision_support':plans.revision_support,'plans.report_start':plans.report_start,'goals.request':goals.request}
+        'plans.report_start':plans.report_start,'goals.request':goals.request}
     if op not in allowed:raise ApiError(409,'RECOVERY_UNAVAILABLE','다시 준비할 요청을 확인하지 못했어요.')
     if op.startswith('drafts.'):
         with db.tx() as t:

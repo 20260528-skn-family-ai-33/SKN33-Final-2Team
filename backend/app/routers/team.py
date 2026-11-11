@@ -45,7 +45,7 @@ def api_team_plan(plan_id: str, a: Account = Depends(require_employee)):
     uid = _owner_of(head, plan_id)
     rec = PL.record(PL._base_rows(uid, plan_id)[0], for_mgr=True)
     one = {rec['id']: rec}
-    return {'userId': str(uid), 'plan': rec, 'reports': [x for x in PL.reports(uid, for_mgr=True) if x['planId'] == plan_id], 'res': PL.resources_of(one), 'reg': PL.reg_of(one)}
+    return {'userId': str(uid), 'plan': rec, 'reports': [x for x in PL.reports(uid, for_mgr=True) if x['planId'] == plan_id], 'res': PL.resources_of(one), 'reg': {'articles': {}, 'regs': {}}}
 
 
 @r.post('/plans/{plan_id}/comments')

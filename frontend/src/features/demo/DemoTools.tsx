@@ -38,7 +38,6 @@ const FAILS: [string, string][] = [
   ['quiz', '역량 테스트 문항 생성'],
   ['diag', '점검 결과(수준 진단)'],
   ['gen', '로드맵 3안 (Crash Course·Challenge Course)'],
-  ['sup', '지원 조건 확인'],
   ['report', '결과 보고서'],
   ['reg', '사내 생활 도우미 답변'],
   ['rev', '수정안 작성'],

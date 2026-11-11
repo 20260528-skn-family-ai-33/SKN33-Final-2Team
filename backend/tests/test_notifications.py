@@ -452,7 +452,6 @@ class TeamUnseenTests(unittest.TestCase):
             stack.enter_context(patch.object(plans, 'records', return_value={}))
             stack.enter_context(patch.object(plans, 'reports', return_value=[]))
             stack.enter_context(patch.object(plans, 'resources_of', return_value={}))
-            stack.enter_context(patch.object(plans, 'reg_of', return_value={}))
             q = stack.enter_context(patch.object(NT, 'unseen_targets', return_value=unseen))
             out = plans.member_state(7, 8)
         q.assert_called_once_with(7, 8)

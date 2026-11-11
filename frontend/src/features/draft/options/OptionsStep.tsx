@@ -33,11 +33,9 @@ import { BText } from '@/shared/ui/bound';
 import { Icon } from '@/shared/ui/Icon';
 import { ActThumb, Note, OpsBox, Page } from '@/shared/ui/parts';
 import { Skeleton } from '@/shared/ui/Skeleton';
-import { DraftSaveError, draftCall, flush, takeDraft } from '../draftSync';
-import { useKickSupport } from '../generation/GenerationStep';
+import { syncGenCur, DraftSaveError, draftCall, flush, takeDraft } from '../draftSync';
 import { Stepper } from '../Stepper';
 import { useDraftWatch } from '../useDraftWatch';
-import { SupCell, SupNote, syncGenCur } from './support';
 
 /** 고른 안의 계획 계산 매개변수(진단 에이전트가 넘긴 학습 선호 기준) */
 export function paramsOf(d: DraftDoc, opt?: OptionDef) {
@@ -221,7 +219,6 @@ function useRegenToast(): void {
 
 export function OptionsStep() {
   usePrepareMaterials();
-  const [supportOpen, setSupportOpen] = useState(false);
   const [summariesOpen, setSummariesOpen] = useState(false);
   const [selecting,setSelecting]=useState(false);
   const [materialsOpen,setMaterialsOpen]=useState(true);
@@ -281,7 +278,6 @@ export function OptionsStep() {
   };
   useCatalog((s) => s.res);
   useDraftWatch();
-  useKickSupport();
   useRegenToast();
   useEffect(() => {
     syncGenCur();
@@ -422,9 +418,6 @@ export function OptionsStep() {
               ))}
               {row('예상 금액',p=><span>{currentTotals(p)?`${currentTotals(p)!.amount.toLocaleString()}원${currentTotals(p)!.unknown?' + 가격 미확인':''}`:'자료 선택 후 계산'}<small className="muted"> · 선택 강좌 기준</small></span>)}
               <tr><td className="k">학습 자료</td><td colSpan={3} className="material-expand-cell"><button type="button" className={`btn line small material-expand${materialsOpen?' is-open':''}`} aria-expanded={materialsOpen} aria-controls="roadmap-material-comparison" disabled={selecting} onClick={()=>materialsOpen?setMaterialsOpen(false):openMaterials()}><Icon name="book"/>{materialsOpen?'자료 비교 접기':'자료 비교하기'}</button></td></tr>
-              <tr><td className="k"><button className="link" aria-expanded={supportOpen} onClick={() => setSupportOpen(open => !open)}>지원 조건 {supportOpen ? '접기' : '보기'}</button></td>
-                {D.optionOrder.map(id => { const p = ps.find(plan => plan.opt === id); return <td key={id} data-col={id} className={p ? colCls(p) : undefined}>{p && supportOpen && <SupCell o={p.def} />}</td>; })}
-              </tr>
             </tbody>
           </table>
           <MaterialBasis />
@@ -441,7 +434,6 @@ export function OptionsStep() {
           </section>)}</div>
           </div>
         </section>
-        <SupNote />
         {missing.length ? (
           <Note>
             {missing.map((id) => `${D.perspectives[id].name}`).join(', ')}은 생성되지 않았어요. 코스 이름 옆 ‘재생성’으로 해당 코스만 다시 받을 수 있어요. 성공한 코스는 유지됩니다.

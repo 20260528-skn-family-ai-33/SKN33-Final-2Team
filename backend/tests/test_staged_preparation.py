@@ -61,7 +61,7 @@ class StagedPreparationTests(TestCase):
         with patch.object(plans,'_owned',return_value={'status':'IN_PROGRESS','roadmap_id':'p','content':plan}),patch.object(db,'one',return_value={'deep':{'v2Quiz':{'cached':True}}}),patch.object(post_quiz,'generate') as model:
             self.assertEqual(post_quiz.ensure_generated(1,'p'),{'cached':True})
             model.assert_not_called()
-        with patch.object(plans,'records',return_value={'p':{'id':'p','status':'active','plan':plan,'versions':[plan],'post':{'quizSurvey':None}}}),patch.object(plans,'reports',return_value=[]),patch.object(plans,'resources_of',return_value={}),patch.object(plans,'reg_of',return_value={}),patch.object(post_quiz,'prepare') as prep:
+        with patch.object(plans,'records',return_value={'p':{'id':'p','status':'active','plan':plan,'versions':[plan],'post':{'quizSurvey':None}}}),patch.object(plans,'reports',return_value=[]),patch.object(plans,'resources_of',return_value={}),patch.object(post_quiz,'prepare') as prep:
             plans.workspace(1)
             prep.assert_called_once_with(1,'p',plan)
     def test_material_preparation_is_version_scoped_and_reuses_pending_job(self):

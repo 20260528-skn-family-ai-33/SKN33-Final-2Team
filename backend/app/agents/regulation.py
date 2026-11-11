@@ -1,4 +1,4 @@
-"""규정 에이전트 · 사내 생활 도우미(API-09) / 안별 지원 조건 확인 (4차 gp-ai.js · 4차 묶음 5·7).
+"""규정 에이전트 · 사내 생활 도우미(API-09) / 교육비 규정 안내 (4차 gp-ai.js · 4차 묶음 5·7).
 
 실제 모드는 로컬 RoBERTa로 먼저 질문을 4분류하고, 규정 검색·LLM 답변으로 연결한다.
 가데이터 챗봇은 추천 질문에 시연용 답을 제공한다.
@@ -14,7 +14,7 @@ import copy
 import json
 import re
 
-from .. import hybrid_search, knowledge, llm, question_classifier, regstore
+from .. import db, hybrid_search, knowledge, llm, question_classifier, regstore
 from ..errors import AgentError
 from . import runtime as rt
 from . import grounded_answer
@@ -537,87 +537,24 @@ def answer(ctx: rt.Ctx, question: str, history: list, context: dict, sim: str | 
     return scope_answer(a, me) if a['kind'] == 'regulation' and a.get('evidenceStatus') != 'refused' and not regstore.set_for(me.get('empGroup')) else a
 
 
-def reg_context(me: dict, plans: list, drafting: dict | None) -> dict:
-    """규정 에이전트가 볼 사용자 상황: 로그인한 직원, 진행 중인 로드맵 전부와 작성 중인 안"""
-    s = regstore.set_for(me.get('empGroup'))
-    return {'name': me.get('name'), 'employeeGroup': me.get('empGroup'), 'grade': me.get('grade'), 'department': me.get('dept'), 'job': me.get('job'),
-            'registeredRegulation': {'appliesTo': s['group'], 'regulations': [r['name'] for r in s['regs'] if not r['overseas']],
-                                     'overseasOnly': [r['name'] for r in s['regs'] if r['overseas']]} if s else {'appliesTo': regstore.groups(), 'regulations': []},
-            'regulationApplies': bool(s), 'plans': plans, 'drafting': drafting}
-
-
-# ── 안별 지원 조건 확인 ──
-SUP_QUERY = {'일반직': '위탁교육 교육경비 지급 교육신청 학습시간 인정 개인학습 근무시간 교육출장', '실무직': '교육훈련 교육비 지원 근무시간 학습 인정 복무'}
-SUP_SYS = """너는 GrowPath '규정 에이전트'다. 로드맵 후보(plans)마다 교육비 지원과 근무시간 중 학습 인정을 받을 수 있는지, 입력의 articles(사용자에게 적용되는 등록 규정에서 찾은 조항 · regulation은 규정 이름)만 근거로 확인한다.
-- articles에 쓰인 내용만 근거로 쓴다. 지원 여부·금액·한도·절차·승인 주체를 조항에 없는데 추측하거나 지어내지 않는다.
-- 일반 상식, 다른 기관 사례, 인터넷·웹 검색 정보로 답하지 않는다.
-- 조항이 등록되지 않은 규정·별표나 '사장이(담당 부서의 장이) 따로 정한다'는 기준으로 넘기면 그 기준은 모른다. level은 unclear 또는 missing으로 하고 missing에 그 규정·별표·기준 이름을 넣는다.
-- plans의 unknownCostResources는 수강료·도서 가격·응시료를 아직 모르는 자료다. 비용이 든다고 단정하지 말고 확인이 필요하다고 쓴다.
-- level: ok(조항으로 확인됨) / unclear(일부만 확인) / missing(관련 자료 미확보). ok나 unclear면 basis에 근거 id를 넣는다.
-- summary: 그 안의 유료 자료·비용·자격을 짚어, 무엇을 확인해야 하는지 1~2문장(해요체). 규정 이름과 조 번호를 함께 쓰고, 확인되지 않은 것을 확정처럼 쓰지 않는다.
-JSON 형식: {"plans":[{"pid":"A1","level":"unclear","summary":"...","basis":["근거 id"],"missing":["국내 위탁교육 경비 지급기준"]}]}"""
-
-
-def won(n) -> str:
-    return f'{int(n):,}원'
-
-
-def _mock_support_one(x: dict, me: dict) -> dict:
-    paid, unknown = x.get('paidResources') or [], x.get('unknownCostResources') or []
-    total = sum(r.get('costWon') or 0 for r in paid)
-    if me.get('empGroup') == '일반직':
-        ids17, ids24, ids7 = regstore.find_article('인재개발규정', '제17조'), regstore.find_article('인재개발규정', '제24조', '제1항'), regstore.find_article('인재개발규정', '제7조', '제2항')
-        if paid or unknown:
-            what = f'유료 자료 {len(paid)}개({won(total)})' if paid else f'비용을 확인해야 하는 자료 {len(unknown)}개(수강료·도서 가격)'
-            head = (f'이 안의 {what}가 외부 교육기관 과정이면 위탁교육(「인재개발규정」 제17조)에 해당하는지 먼저 확인해야 해요. '
-                    '국내 위탁교육 경비의 지급기준은 사장이 따로 정한다고만 되어 있어(제24조) 지원 여부와 금액은 확인할 수 없어요.')
-            return {'level': 'unclear', 'summary': head + (' 자격 응시료 지원은 등록된 조항에서 찾지 못했어요.' if x.get('certification') else ''),
-                    'basis': ids17 + ids24, 'missing': ['국내 위탁교육 경비 지급기준(사장이 따로 정함)']}
-        head = '이 안은 비용이 0원으로 확인된 자료만 써서 교육비가 들지 않아요. 개인학습도 학습시간에 포함되지만(「인재개발규정」 제7조 ②), 세부 인정기준은 인재개발담당부서의 장이 따로 정해 근무시간 중 학습 인정은 확인이 필요해요.'
-        return {'level': 'unclear', 'summary': head + (' 자격 응시료 지원은 등록된 조항에서 찾지 못했어요.' if x.get('certification') else ''),
-                'basis': ids7, 'missing': ['학습시간 인정기준(인재개발담당부서의 장이 따로 정함)']}
-    a35, a15 = regstore.find_article('실무직 관리규정', '제35조'), regstore.find_article('실무직 관리규정', '제15조')
-    head = (f"이 안의 {'유료 자료 %d개(%s)' % (len(paid), won(total)) if paid else '비용을 확인해야 하는 자료 %d개' % len(unknown)}가 교육비 지원 대상인지는 「인재개발규정」을 따르는데(제35조), 실무직 기준은 확인할 수 없어요."
-            if paid or unknown else '이 안은 비용이 0원으로 확인된 자료만 써서 교육비가 들지 않아요. 근무시간 중 학습 인정은 「취업규칙」(제15조)·「인재개발규정」(제35조)을 따르는데 실무직 기준은 확인할 수 없어요.')
-    return {'level': 'missing', 'summary': head + (' 자격 응시료 지원도 같은 이유로 확인이 필요해요.' if x.get('certification') else ''),
-            'basis': a35 if (paid or unknown) else a15 + a35, 'missing': ['인재개발규정'] if (paid or unknown) else ['취업규칙', '인재개발규정']}
-
-
-def support_scope(me: dict) -> dict:
-    grp = me.get('empGroup') or '직원 구분이 확인되지 않은 직원'
-    return {'level': 'scope', 'summary': f"등록된 규정은 {'·'.join(regstore.groups())} 대상이라, {grp}인 {me.get('name') or '사용자'} 님의 교육비 지원·근무시간 중 학습 인정은 확인할 수 없어요. {grp} 대상 규정이 등록되면 확인할 수 있어요.",
-            'basis': [], 'missing': []}
-
-
-def support(ctx: rt.Ctx, plans: list[dict], context: dict, sim: str | None = None) -> dict:
-    """plans: [{pid, name, weeks, weeklyHours, totalCostWon, paidResources[], unknownCostResources[], certification, onlineOnly}] → {pid: 결과}"""
-    me = ctx.me
-    if not regstore.set_for(me.get('empGroup')):
-        return {x['pid']: support_scope(me) for x in plans}
-
-    def api(_):
-        hits = regstore.search(SUP_QUERY.get(me.get('empGroup'), SUP_QUERY['일반직']), 6, me.get('empGroup'), ctx.mode,
-                               all_groups=False)
-        arts = [regstore.article(h['id']) for h in hits if regstore.article(h['id'])]
-        ids = [a['id'] for a in arts]
-        r = rt.llm_json(ctx, SUP_SYS, {'plans': plans, 'user': context, 'articles': [_art_in(a) for a in arts]}, role='regulation')
-        out = {}
-        for x in r.get('plans') if isinstance(r.get('plans'), list) else []:
-            pid = str(x.get('pid') or '')
-            if not any(p['pid'] == pid for p in plans):
-                continue
-            basis = [str(i) for i in x.get('basis') or [] if str(i) in ids]
-            level = x.get('level') if x.get('level') in ('ok', 'unclear', 'missing') else 'missing'
-            summary = str(x.get('summary') or '').strip()
-            # 근거 없이 확인됐다고 하면 믿지 않는다: 문장은 버리고 '관련 자료 미확보'로 낮춘다
-            if level != 'missing' and not basis:
-                level, summary = 'missing', '등록된 규정에서 이 안의 지원 조건을 뒷받침하는 조항을 찾지 못해 확인할 수 없어요. 담당 부서에 확인해 주세요.'
-            elif basis and not nums_ok(summary, basis, re.findall(r'\d+', json.dumps(next((p for p in plans if p['pid'] == pid), {}), ensure_ascii=False))):
-                level, summary = 'unclear', '관련 조항은 찾았지만, 확인 문장의 숫자가 조항 원문과 맞지 않아 그대로 보여 드리지 않아요. 근거 조항 원문을 확인해 주세요.'
-            if summary:
-                out[pid] = {'level': level, 'summary': summary, 'basis': basis, 'missing': [str(m) for m in x.get('missing') or [] if str(m)][:3]}
-        if not out:
-            raise llm.LlmError('지원 조건 확인 결과가 비어 있어요')
-        return out
-    return rt.run(ctx, '규정 에이전트', '안별 지원 조건 확인', {'plans': plans}, lambda i: {x['pid']: _mock_support_one(x, me) for x in i['plans']}, api,
-                  role='regulation', sim=sim, mock_delay=0.8)
+def education_guide(t: db.Tx, group: str | None) -> dict:
+    """국내 위탁교육에 관한 현행 원문만 반환한다. 직원별 지급액이나 승인 여부는 판정하지 않는다."""
+    reg = t.one("""SELECT r.name, v.regulation_version_id, v.version_label
+        FROM regulations.regulations r
+        JOIN app_ext.regulation_meta m ON m.regulation_id = r.regulation_id
+        JOIN regulations.regulation_versions v ON v.regulation_id = r.regulation_id
+        WHERE m.short_key = 'dev' AND m.search_enabled AND m.employee_group = :g
+          AND v.availability_status = 'available'
+        ORDER BY v.effective_from DESC NULLS LAST, v.version_label DESC LIMIT 1""", g=group)
+    if reg:
+        row = t.one(regstore.CHUNK_SQL + """
+            WHERE c.regulation_version_id = :version AND c.search_status = 'active'
+              AND p.node_type = 'article' AND p.label = '제24조'
+              AND n.node_type = 'paragraph' AND n.label = '제1항'
+            ORDER BY c.rag_chunk_id LIMIT 1""", version=reg['regulation_version_id'])
+        if row:
+            article = regstore.art_of(row, {'short_key': 'dev', 'employee_group': group, 'overseas_only': False})
+            if article['text'].strip():
+                return {'basis': {'name': reg['name'], 'article': article['no'], 'text': article['text'],
+                                  'page': article['page'], 'version': reg['version_label'], 'chunkId': article['id']}}
+    return {'basis': None}

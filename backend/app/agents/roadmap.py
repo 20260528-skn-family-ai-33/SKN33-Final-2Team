@@ -14,7 +14,6 @@ skills 를 받지 않는다. 목록에 없는 이름은 finish_option 이 버리
 from __future__ import annotations
 
 import copy
-import json
 import math
 import re
 import hashlib
@@ -141,11 +140,6 @@ def params_of(handoff: dict, opt: dict | None) -> dict:
     """주당 시간: 사용자가 적은 값, '알아서'면 그 안을 쓴 하위 에이전트가 정한 값 (4차 P.params)"""
     pr = handoff['prefs']
     return {'start': handoff['startStage'], 'hours': pr.get('weeklyHours') or (opt or {}).get('weeklyHours') or AUTO_HOURS, 'format': pr.get('formatKey'), 'patch': {}}
-
-
-def sup_sig(pl: dict) -> str:
-    """지원 조건에 영향을 주는 값: 쓰는 자료(자격 포함)·기간·비용 (설계서 v1.7 SCR-RM-06)"""
-    return json.dumps([sorted({a['res'] for a in pl['acts'] if a.get('res')}), pl['weeks'], pl['cost']], ensure_ascii=False)
 
 
 def keep_ids(d: dict, base: dict, ver: int) -> dict:

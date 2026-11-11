@@ -78,47 +78,26 @@ class RevisionSelectionEvidenceTests(TestCase):
 
 
 class AcceptedRevisionSupportTests(TestCase):
-    def test_accepted_job_uses_final_combination_and_rejects_stale_proposal(self):
-        final = {'opt': 'A2', 'name': 'Crash', 'version': 2, 'hours': 4, 'weeks': 2, 'cost': 0,
-                 'acts': [{'res': 'kept'}], 'def': {}}
-        proposal = dict(final, acts=[{'res': 'replaced'}])
-        ready = {'status': 'ready', 'result': {'to': proposal}}
-        accepted = {'status': 'accepted', 'result': {'to': final}}
-        for start, accepted_job in ((ready, False), (accepted, True)):
-            with self.subTest(accepted_job=accepted_job):
-                tx = Mock()
-                tx.one.return_value = deepcopy(accepted)
-                with patch.object(plans.db, 'one', return_value=deepcopy(start)), \
-                     patch.object(plans.db, 'tx', return_value=transaction(tx)), \
-                     patch.object(plans.jobs, 'start', side_effect=lambda kind, employee, ref, work: work(None)), \
-                     patch.object(plans.rt, 'context', return_value=Mock()), \
-                     patch.object(plans.rt, 'sim_once', return_value=None), \
-                     patch.object(plans.REG, 'reg_context'), \
-                     patch.object(plans.REG, 'support', return_value={'A2': {'level': 'ok'}}), \
-                     patch('app.services.drafts._sup_input') as sup_input, \
-                     patch('app.services.drafts._plans_brief'), \
-                     patch.object(plans, '_patch_current_support') as apply:
-                    result = plans.revision_support(1, 'roadmap', 'revision', accepted=accepted_job)
-                self.assertEqual(result, {'ok': accepted_job})
-                self.assertEqual(sup_input.call_args.args[2], start['result']['to'])
-                if accepted_job:
-                    apply.assert_called_once_with('roadmap', {'level': 'ok'}, 2)
-                else:
-                    apply.assert_not_called()
-                    tx.run.assert_not_called()
-
-    def test_pending_accepted_version_can_retry_after_registration_failure(self):
-        row = {'roadmap_id': 'roadmap', 'content': {'version': 2, 'supportCheckPending': True}}
+    def test_accepting_selected_skills_preserves_selection_without_starting_a_support_job(self):
+        current = {'opt': 'A2', 'version': 1, 'prefs': {}, 'handoff': {'goal': 'demo'}}
+        proposal = {'opt': 'A2', 'def': {}, 'name': 'Crash', 'tagline': 'revised', 'acts': []}
+        mixed = dict(proposal, tagline='selected skill')
+        revision = {'from': current, 'to': proposal, 'label': 'revision', 'handoff': current['handoff']}
+        row = {'roadmap_id': 'roadmap', 'content': current}
+        tx = Mock()
+        tx.one.side_effect = [{'status': 'ready', 'result': revision}, {'content': current}, {'baseline_content': {}}]
+        tx.all.return_value = []
         with patch.object(plans, '_owned', return_value=row), \
-             patch('app.services.generation_lock.generation_guard', side_effect=lambda *_: transaction(None)), \
-             patch.object(plans.db, 'one', return_value={'revision_id': 'rev'}) as lookup, \
-             patch.object(plans.db, 'val', side_effect=[None, None, 'job']), \
-             patch.object(plans, 'revision_support', side_effect=[RuntimeError('queue unavailable'), 'job']) as schedule:
-            with self.assertRaisesRegex(RuntimeError, 'queue unavailable'):
-                plans.revision_support_retry(1, 'roadmap', 2)
-            self.assertTrue(row['content']['supportCheckPending'])
-            self.assertEqual(plans.revision_support_retry(1, 'roadmap', 2), 'job')
-            self.assertEqual(plans.revision_support_retry(1, 'roadmap', 2), 'job')
-            self.assertEqual(schedule.call_count, 2)
-            schedule.assert_called_with(1, 'roadmap', 'rev', accepted=True)
-            self.assertEqual(lookup.call_args.kwargs['v'], '2')
+             patch.object(plans.db, 'tx', return_value=transaction(tx)), \
+             patch.object(plans, '_mix_revision_skills', return_value=mixed) as mix, \
+             patch.object(plans, 'validate_free_plan'), \
+             patch.object(plans, '_write_steps') as write, \
+             patch.object(plans, 'record'), \
+             patch.object(plans.jobs, 'start') as schedule:
+            plans.accept_revision(1, 'roadmap', 'revision', ['SQL'])
+        mix.assert_called_once_with(current, proposal, current['handoff'], ['SQL'], set())
+        saved = write.call_args.args[2]
+        self.assertEqual(saved['tagline'], 'selected skill')
+        self.assertEqual(saved['version'], 2)
+        self.assertNotIn('supportCheckPending', saved)
+        schedule.assert_not_called()
