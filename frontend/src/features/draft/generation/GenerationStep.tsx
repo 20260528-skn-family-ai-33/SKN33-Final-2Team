@@ -18,6 +18,7 @@ import { startEdit, genStart } from '../result/ResultStep';
 import { Stepper } from '../Stepper';
 import { useDraftWatch } from '../useDraftWatch';
 import { EducationGuide } from './EducationGuide';
+import { genStartedAt } from './genStartedAt';
 
 let hoOpen = false;
 export function HandoffView({ h }: { h: Handoff }) {
@@ -86,7 +87,8 @@ async function genRetry(id: string): Promise<void> {
   if (!r || !r.rows[id] || r.rows[id].st !== 'fail') return;
   updateWs((s) => {
     const rr = curGen(s.draft);
-    if (rr) rr.rows[id].st = 'run';
+    // 서버 응답이 새 시작 시각을 줄 때까지 이전 시도의 시각으로 세지 않게 지금 시각을 둔다
+    if (rr) Object.assign(rr.rows[id], { st: 'run', startedAt: Date.now() });
   });
   await draftCall(`${D.perspectives[id].name}을 다시 쓰지 못했어요`, (did) => draftsApi.optionRetry(did, id));
 }
@@ -112,13 +114,15 @@ function GenRowView({ d, id }: { d: DraftDoc; id: string }) {
   );
 }
 
-/** 3안 진행 막대: 결과는 다음 화면(비교표)에서 보이므로 결과 모양을 흉내 내지 않고, 몇 안이 끝났는지와 이 화면에서 기다린 시간을 보여 준다 */
+/** 3안 진행 막대: 결과는 다음 화면(비교표)에서 보이므로 결과 모양을 흉내 내지 않고, 몇 안이 끝났는지와 작성을 요청한 뒤 기다린 시간을 보여 준다.
+    시작 시각은 서버 기록(genStartedAt)을 쓰고, 기록이 없는 이전 작업만 이 화면을 연 시각부터 센다 */
 function GenProgress({ d, done }: { d: DraftDoc; done: boolean }) {
   const r = curGen(d);
   const sts = D.optionOrder.map((id) => r?.rows[id]?.st || 'run');
   const ok = sts.filter((st) => st === 'ok').length;
-  const [start] = useState(() => Date.now());
-  const [now, setNow] = useState(start);
+  const [opened] = useState(() => Date.now());
+  const [now, setNow] = useState(opened);
+  const start = genStartedAt(r) ?? opened;
   useEffect(() => {
     if (done) return;
     const t = window.setInterval(() => setNow(Date.now()), 1000);

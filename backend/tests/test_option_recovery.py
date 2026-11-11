@@ -1,4 +1,5 @@
 import copy
+import time
 import unittest
 from contextlib import contextmanager
 from unittest.mock import Mock, patch
@@ -175,6 +176,24 @@ class OptionRecoveryTests(unittest.TestCase):
             with patch.object(drafts.jobs, 'start', side_effect=accepted):
                 self.assertEqual(drafts._run_option(1, 'draft', 'A2'), 'retry-job')
             self.assertEqual(row['tries'], 2)
+
+    def test_start_records_request_time_and_retry_renews_it(self):
+        w = self.state()
+        def start(kind, employee, ref, work, *, before_start):
+            before_start('job-' + ref)
+            return 'job-' + ref
+        before = int(time.time() * 1000)
+        with patch.object(drafts, '_mutate', side_effect=self.mutate(w)), \
+             patch.object(drafts.jobs, 'alive', return_value=set()), \
+             patch.object(drafts.jobs, 'start', side_effect=start):
+            drafts._run_option(1, 'draft', 'A2')
+            row = w['draft']['genRun']['rows']['A2']
+            self.assertLessEqual(before, row['startedAt'])
+            self.assertLessEqual(row['startedAt'], int(time.time() * 1000))
+            row.update(st='fail', jobId=None, startedAt=1)
+            drafts._run_option(1, 'draft', 'A2')
+        self.assertLessEqual(before, row['startedAt'])
+        self.assertNotIn('startedAt', w['draft']['genRun']['rows']['A1'])
 
     def test_old_worker_cannot_overwrite_replacement(self):
         w = self.state()

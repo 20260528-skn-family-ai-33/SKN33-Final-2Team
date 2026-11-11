@@ -13,6 +13,7 @@ import copy
 import hashlib
 import json
 import threading
+import time
 from datetime import date
 
 from .. import catalog, db, docread, jobs
@@ -782,7 +783,8 @@ def _run_option(employee_id: int, draft_id: str, pid: str, *, expected_key: str 
                 raise ApiError(409, 'OPTION_RUNNING', '이미 작성 중인 계획이에요')
             if row.get('st') == 'ok':
                 raise ApiError(409, 'OPTION_READY', '이미 작성된 계획이에요')
-            row.update(st='run', err=None, jobId=jid, tries=(row.get('tries') or 0) + 1)
+            # startedAt(밀리초): 화면의 '기다린 시간'이 화면을 다시 열어도 처음 요청한 때부터 이어서 세도록 서버가 기록한다
+            row.update(st='run', err=None, jobId=jid, tries=(row.get('tries') or 0) + 1, startedAt=int(time.time() * 1000))
             info.update(h=copy.deepcopy(w2['draft']['handoff']), key=r['key'], tries=row['tries'], jid=jid)
         _mutate(employee_id, draft_id, save_run)
 
