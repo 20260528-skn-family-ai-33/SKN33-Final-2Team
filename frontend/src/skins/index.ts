@@ -1,10 +1,10 @@
 /* 화면 테마(스킨) 비교 — 템플릿 후보를 같은 화면·같은 데이터에서 바꿔 보며 비교하는 비교 브랜치 전용 장치
    규칙
-   - 테마 하나 = 폴더 하나(skins/<id>/): index.ts(이름·묶음·출처·글꼴) + skin.css + 사진. 테마 때문에 다른 곳의 화면 코드는 고치지 않는다.
+   - 테마 하나 = 폴더 하나(skins/<id>/): index.ts(이름·출처·글꼴) + skin.css + 사진. 테마 때문에 다른 곳의 화면 코드는 고치지 않는다.
      움직임이 필요한 테마는 같은 폴더에 스크립트를 둘 수 있다(예: tm612/motion.ts). 폴더를 모두 한꺼번에 불러오므로 스크립트는
      그 테마를 고른 때만 동작하고, 화면 코드를 고치지 않고 바깥에서 CSS 변수·data- 속성만 붙여야 한다.
-   - 묶음(group): templatemo 에서 education 태그가 붙은 템플릿은 'education', 나머지(자매 사이트 Tooplate 템플릿 포함)는 'other'.
-     고르기 상자의 첫 칸이 이 묶음이다. 폴더 이름은 templatemo 는 tm<번호>, Tooplate 는 tp<번호>.
+   - 폴더 이름은 templatemo 템플릿 번호를 따라 tm<번호>. 고르기 상자에는 폴더 이름 순서로 나온다.
+     후보는 2026-11-11에 7종(464 · 486 · 503 · 557 · 590 · 606 · 612)으로 줄였고(#197), 묶음(education · 그 외) 구분도 그때 뺐다.
    - skin.css 는 전부 :root[data-skin="<id>"] { … } 안에 적는다 → 고르지 않은 테마는 화면에 영향이 없다.
    - 기본 테마는 464 Ultra Profile · 상단 메뉴(pick.ts DEFAULT_SKIN). 테마를 덧씌우지 않은 '원래 화면'은 고르기에서 뺐지만,
      원래 화면의 CSS(styles/gp*.css)는 모든 테마가 그 위에 얹히므로 그대로 둔다.
@@ -12,22 +12,14 @@
      skin.css 에서 상단 메뉴 규칙은 &:not([data-nav="side"]) { … }, 좌측 메뉴 규칙은 &[data-nav="side"] { … } 안에 둔다.
    - 본문 폭도 두 가지: 넓은 본문 폭(기본 · gp.css) · 이전 본문 폭(<html data-width="narrow"> · width.css). 테마와 상관없이 고른다.
    - 테마 추가 = 폴더 추가, 빼기 = 폴더 삭제. 이 파일이 폴더를 알아서 찾는다.
-   - 고를 때: 왼쪽 아래 '화면 테마' 상자(묶음 → 테마 → 메뉴 위치 → 본문 폭), 또는 주소 뒤 ?skin=<id>[:side][:narrow]
+   - 고를 때: 왼쪽 아래 '화면 테마' 상자(접힌 채 시작, 펼치면 테마 → 메뉴 위치 → 본문 폭), 또는 주소 뒤 ?skin=<id>[:side][:narrow]
      (형식은 pick.ts). 고른 값은 이 브라우저에 기억한다.
    - 최종 결정 뒤에는 최신 main 에서 새 브랜치를 만들고 고른 폴더만 가져가 정식으로 적용한다. 이 고르기 장치(width.css 포함)는 가져가지 않는다. */
 import { type Choice, formatChoice, pickChoice } from './pick';
 import './width.css';
 
-export type SkinGroup = 'education' | 'other';
-export const GROUPS: { id: SkinGroup; name: string }[] = [
-  { id: 'education', name: 'education 템플릿' },
-  { id: 'other', name: '그 외 템플릿' },
-];
-
 export interface SkinMeta {
   name: string;
-  /** templatemo 의 education 태그가 붙은 템플릿이면 'education', 아니면(Tooplate 포함) 'other' */
-  group: SkinGroup;
   /** 원본 템플릿 주소 */
   source: string;
   /** 이 테마를 고른 때만 불러올 글꼴 CSS 주소 */

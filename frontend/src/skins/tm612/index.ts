@@ -6,7 +6,6 @@ import './motion';
 
 const meta: SkinMeta = {
   name: '612 Parallax Starter (시차 스크롤)',
-  group: 'other',
   source: 'https://templatemo.com/tm-612-parallax-starter',
   fonts: [
     'https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600;700&family=Source+Sans+3:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap',
