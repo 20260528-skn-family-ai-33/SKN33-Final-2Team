@@ -135,7 +135,7 @@ export function PlanGate({ make, fallback, needActive, children }: { make: (pid:
   const { pid } = useParams();
   const R = useWs((s) => (pid ? s.plans[pid] : undefined));
   const act = useWs((s) => recs(s, 'active').map((x) => x.id).join(','));
-  if (R && (!needActive || R.status === 'active')) return <>{children(R)}</>;
+  if (R && (!needActive || R.status === 'active' || R.post.running || R.post.reportId)) return <>{children(R)}</>;
   if (R) return <Navigate to={paths.roadmap(R.id)} replace />;
   const ids = act ? act.split(',') : [];
   return <Navigate to={ids.length === 1 ? make(ids[0]) : fallback} replace />;
@@ -228,7 +228,7 @@ export function openPostAnswers(pid: string): void {
     '진행 중'인 활동이 남아 있으면 한 번 확인한다(이미 답하기 시작했으면 묻지 않음) */
 export function postStart(go: ReturnType<typeof useGo>, pid: string): void {
   const R = ws().plans[pid];
-  if (!R || R.status !== 'active') return;
+  if (!R || R.status !== 'active' || R.post.running) return;
   if (R.plan.assess?.v2 && !R.post.quizSurvey) void ensurePostQuiz(R.id).catch(() => {});
   const progress = count(R.plan, R.progress);
   const left = progress.t - progress.done;

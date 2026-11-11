@@ -1,7 +1,7 @@
 /* 좌측 메뉴 (5차 gp-core.js sidebar · aiBox) — 직원 화면 공통 */
 import { newIdToPath, paths } from '@/app/paths';
 import { useState } from 'react';
-import { DemoTools } from '@/features/demo/DemoTools';
+import { NotificationBell } from '@/features/notifications/NotificationBell';
 import { useGo } from '@/shared/hooks/useGo';
 import { ai, canClearHiddenDemoSettings, clearDemoSettings, levelLabel, ping, PROV, resetConn, setChoice, setReasoning, useAi, useAiMode, type UiProvider } from '@/shared/state/ai';
 import { logoutAndReset } from '@/features/auth/actions';
@@ -163,7 +163,7 @@ export function Sidebar({ active }: { active: string }) {
         <NavLink to={paths.resources} active={active === 'resources'} icon="book" label="학습 자료" />
       </nav>
       <div className="side-foot">
-        <DemoTools />
+        <NotificationBell />
         <button className="btn ghost sm logout" aria-label="로그아웃" onClick={() => void logoutAndReset(go)}>
           <Icon name="logout" />
           <span className="lbl">로그아웃</span>

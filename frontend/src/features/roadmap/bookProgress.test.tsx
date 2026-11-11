@@ -110,13 +110,49 @@ describe('마친 로드맵의 완료·조기 종료 표시', () => {
   };
 
   it.each(cases)('내 로드맵: %s', (_name, R, label) => {
-    expect(render(R, <RoadmapList />)).toContain(`<span class="roadmap-info-badge">${label}</span>`);
+    const tone = label === '완료' ? ' done' : ' early';
+    expect(render(R, <RoadmapList />)).toContain(`<span class="roadmap-info-badge${tone}">${label}</span>`);
+  });
+
+  it('내 로드맵의 완료한 로드맵 목록은 최신순으로 정렬한다', () => {
+    const older = { ...record([course], { course: { status: 'done' } }, 'done'), id: 'r-old', createdAt: '2026-09-01', doneAt: '2026-09-15', plan: { ...record([course]).plan, goal: '이전 로드맵' } };
+    const newerA = { ...record([course], { course: { status: 'done' } }, 'done'), id: 'r-new-1', createdAt: '2026-11-11', doneAt: '2026-11-11', plan: { ...record([course]).plan, goal: '오늘 먼저 마친 로드맵' } };
+    const newerB = { ...record([course], { course: { status: 'done' } }, 'done'), id: 'r-new-2', createdAt: '2026-11-11', doneAt: '2026-11-11', plan: { ...record([course]).plan, goal: '오늘 나중에 마친 로드맵' } };
+    useWs.setState({ plans: { [older.id]: older, [newerA.id]: newerA, [newerB.id]: newerB }, reports: [] });
+    const html = inRouter(<RoadmapList />);
+    expect(html.indexOf('오늘 나중에 마친 로드맵')).toBeLessThan(html.indexOf('오늘 먼저 마친 로드맵'));
+    expect(html.indexOf('오늘 먼저 마친 로드맵')).toBeLessThan(html.indexOf('이전 로드맵'));
   });
 
   it.each(cases)('점검·보고서: %s', (_name, R, label, percent) => {
+    const tone = label === '완료' ? ' done' : ' early';
     const html = render(R, <ChecksPage />);
-    expect(html).toContain(`<span class="roadmap-info-badge">${label}</span>`);
+    expect(html).toContain(`<span class="roadmap-info-badge${tone}">${label}</span>`);
     expect(html).toMatch(new RegExp(`class="check-plan-percent"[^>]*>${percent}<`));
+  });
+
+  it('점검·보고서 기록을 완료와 미완료로 나누고 각 영역을 최신순으로 정렬한다', () => {
+    const completedOld = { ...record([course], { course: { status: 'done' } }, 'done'), id: 'c-old', createdAt: '2026-09-01', plan: { ...record([course]).plan, goal: '이전 완료 로드맵' } };
+    const completedNew = { ...record([course], { course: { status: 'done' } }, 'done'), id: 'c-new', createdAt: '2026-11-11', plan: { ...record([course]).plan, goal: '최근 완료 로드맵' } };
+    const incompleteOld = { ...record([course], {}, 'done'), id: 'i-old', createdAt: '2026-08-01', plan: { ...record([course]).plan, goal: '이전 조기 종료 로드맵' } };
+    const incompleteNew = { ...record([course], {}, 'active'), id: 'i-new', createdAt: '2026-11-11', plan: { ...record([course]).plan, goal: '최근 진행 중 로드맵' } };
+    useWs.setState({
+      plans: {
+        [completedOld.id]: completedOld,
+        [completedNew.id]: completedNew,
+        [incompleteOld.id]: incompleteOld,
+        [incompleteNew.id]: incompleteNew,
+      },
+      reports: [],
+    });
+    const html = inRouter(<ChecksPage />);
+    expect(html).toContain('<h2 class="st">완료 2</h2>');
+    expect(html).toContain('<h2 class="st">미완료 2</h2>');
+    const completedHeadingIdx = html.indexOf('<h2 class="st">완료 2</h2>');
+    const incompleteHeadingIdx = html.indexOf('<h2 class="st">미완료 2</h2>');
+    expect(completedHeadingIdx).toBeLessThan(incompleteHeadingIdx);
+    expect(html.indexOf('최근 완료 로드맵', completedHeadingIdx)).toBeLessThan(html.indexOf('이전 완료 로드맵', completedHeadingIdx));
+    expect(html.indexOf('최근 진행 중 로드맵', incompleteHeadingIdx)).toBeLessThan(html.indexOf('이전 조기 종료 로드맵', incompleteHeadingIdx));
   });
 });
 

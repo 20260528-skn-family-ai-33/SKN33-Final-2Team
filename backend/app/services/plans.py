@@ -161,7 +161,7 @@ def _post(row: dict, plan: dict) -> dict:
     pc = db.one('SELECT goal_self, attachment, running, fail, job_id, deep FROM app_ext.post_checks WHERE roadmap_id = :r', r=row['roadmap_id']) or {}
     from .post_quiz import public_assessment
     post_survey=(pc.get('deep') or {}).get('v2Quiz')
-    public_survey=public_assessment({'v2':{'survey':post_survey}})['v2']['survey'] if post_survey else None
+    public_survey=public_assessment({'v2':{'survey':post_survey}}, reveal=True)['v2']['survey'] if post_survey else None
     return {'quizSurvey': public_survey, 'quizAnswers': (pc.get('deep') or {}).get('v2Answers') or {}, 'answers': ans, 'goalSelf': str(pc['goal_self']) if pc.get('goal_self') else '', 'file': pc.get('attachment'), 'running': bool(pc.get('running')),
             'fail': pc.get('fail'), 'jobId': str(pc['job_id']) if pc.get('job_id') and pc.get('running') else None, 'deep': _post_deep(plan, pc.get('deep'))}
 

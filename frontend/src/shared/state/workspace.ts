@@ -184,13 +184,16 @@ export function prepRec(R: PlanRecord, rev: RevForm | null | undefined): PlanRec
 export function putRec(s: WsState, R: PlanRecord): PlanRecord {
   const old = s.plans[R.id];
   const prev = old && old.rev ? JSON.parse(JSON.stringify(old.rev)) : null;
+  const reportId = old?.post?.reportId;
   s.plans[R.id] = prepRec(R, prev);
+  if (reportId !== undefined) s.plans[R.id].post.reportId = reportId;
   if (old && old.rev && !R.revision) s.plans[R.id].rev = old.rev.running ? null : prev;
   return s.plans[R.id];
 }
 
 /** 서버 작업 공간(작성 중인 로드맵·확정 로드맵·보고서) → 상태 */
 export function fromWorkspace(w: Workspace, id: string, takeDraftInto: (s: WsState, r: Workspace['draft']) => void): WsState {
+  const cur = ws();
   const st = freshWs(id);
   const ui = readUi(id);
   UI_FIELDS.forEach((k) => {
@@ -198,7 +201,9 @@ export function fromWorkspace(w: Workspace, id: string, takeDraftInto: (s: WsSta
   });
   const revs = ui.revs || {};
   Object.entries(w.plans || {}).forEach(([pid, R]) => {
+    const reportId = cur.owner === id ? cur.plans[pid]?.post?.reportId : undefined;
     st.plans[pid] = prepRec(R, revs[pid]);
+    if (reportId !== undefined) st.plans[pid].post.reportId = reportId;
   });
   st.reports = w.reports || [];
   mergeRes(w.res);

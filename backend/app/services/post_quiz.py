@@ -51,15 +51,17 @@ def report_details(survey, answers):
             rows.append(dict(id=question['id'], skill=group['skill'],
                              question=question.get('q') or question.get('text') or '',
                              selected=options[selected], correct=options[correct],
+                             options=options, selectedIndex=selected, correctIndex=correct,
                              isCorrect=selected == correct, explanation=question.get('explain') or ''))
     return rows
 
 
-def public_assessment(assessment):
+def public_assessment(assessment, reveal=False):
     value=deepcopy(assessment)
     for group in (value.get('v2') or {}).get('survey',{}).get('groups',[]):
         for q in group.get('quizzes',[]):
-            q.pop('answer',None);q.pop('explain',None)
+            if not reveal:
+                q.pop('answer',None);q.pop('explain',None)
             for key in ('concept','questionType','difficulty'):
                 q.pop(key,None)
     return value

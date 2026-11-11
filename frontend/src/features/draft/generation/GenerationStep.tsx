@@ -10,7 +10,6 @@ import { D } from '@/shared/constants/data';
 import { useGo } from '@/shared/hooks/useGo';
 import { won } from '@/shared/lib/format';
 import { ai, cause, userText, userTodo } from '@/shared/state/ai';
-import { useCatalog } from '@/shared/state/catalog';
 import { updateWs, useWs, ws } from '@/shared/state/workspace';
 import { Icon } from '@/shared/ui/Icon';
 import { AgentRow, FailPage, OpsBox, Page, via } from '@/shared/ui/parts';
@@ -22,7 +21,6 @@ import { EducationGuide } from './EducationGuide';
 
 let hoOpen = false;
 export function HandoffView({ h }: { h: Handoff }) {
-  const res = useCatalog((s) => s.res);
   return (
     <details className="card flat handoff" id="hoView" open={hoOpen} onToggle={(e) => (hoOpen = (e.target as HTMLDetailsElement).open)}>
       <summary>
@@ -40,18 +38,14 @@ export function HandoffView({ h }: { h: Handoff }) {
             </>
           ) : null}
         </dd>
-        <dt>시작 단계</dt>
-        <dd>
-          {h.startStage}단계 · {h.startReason}
-        </dd>
         <dt>익힐 역량</dt>
         <dd>{h.focus.join(', ')}</dd>
         <dt>이미 할 수 있는 것</dt>
         <dd>{h.known.join(', ') || '없음'}</dd>
         <dt>학습 선호</dt>
         <dd>
-          방식 {h.prefs.format} · 주당 {h.prefs.weeklyHours ? `${h.prefs.weeklyHours}시간` : '알아서'} · 기간 {h.prefs.deadlineWeeks ? h.prefs.deadlineWeeks + '주' : '없음'} ·
-          예산 {h.prefs.budgetLimit != null ? won(h.prefs.budgetLimit) : h.prefs.budgetAuto ? '알아서' : '없음'} · 자격증 {h.prefs.certPlan}
+          주당 {h.prefs.weeklyHours ? `${h.prefs.weeklyHours}시간` : '알아서'} · 기간 제한 {h.prefs.deadlineWeeks ? h.prefs.deadlineWeeks + '주' : '없음'} ·
+          예산 {h.prefs.budgetLimit != null ? won(h.prefs.budgetLimit) : h.prefs.budgetAuto ? '알아서' : '없음'}
         </dd>
         {h.projectSummary ? (
           <>
@@ -67,8 +61,6 @@ export function HandoffView({ h }: { h: Handoff }) {
         ) : null}
         <dt>메모</dt>
         <dd>{h.userNotes.concat(h.agentNotes).join(' / ') || '없음'}</dd>
-        <dt>자료 후보</dt>
-        <dd>{h.resourceHints.map((id) => (res[id] ? res[id].title : id)).join(', ') || '없음'}</dd>
         {h.userEdited && h.userEdited.length ? (
           <>
             <dt>직접 고친 항목</dt>

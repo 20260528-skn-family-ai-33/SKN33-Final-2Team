@@ -45,6 +45,10 @@ class PostQuizTests(unittest.TestCase):
         value=public_assessment(self.plan['assess'])
         self.assertNotIn('answer',value['v2']['survey']['groups'][0]['quizzes'][0])
         self.assertNotIn('concept',value['v2']['survey']['groups'][0]['quizzes'][0])
+        revealed=public_assessment(self.plan['assess'],reveal=True)
+        self.assertEqual(revealed['v2']['survey']['groups'][0]['quizzes'][0]['answer'],0)
+        self.assertEqual(revealed['v2']['survey']['groups'][0]['quizzes'][0]['explain'],'근거')
+        self.assertNotIn('concept',revealed['v2']['survey']['groups'][0]['quizzes'][0])
         self.assertEqual(self.plan['assess']['v2']['survey']['groups'][0]['quizzes'][0]['answer'],0)
     def test_legacy_plan_has_no_required_v2_quiz(self):
         self.assertEqual(validate({'assess':{}},{},True),{})
