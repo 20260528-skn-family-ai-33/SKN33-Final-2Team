@@ -20,7 +20,7 @@ from ..services import drafts as DR
 from ..services import plans as PL
 from ..services import profile
 from ..services import report_tasks as RT
-from . import job_response
+from . import job_response, validated_uuid
 from .team import attachment_response
 
 r = APIRouter(prefix='/api/v1')
@@ -30,17 +30,20 @@ MAX_DOC = 15_000_000
 # ── 작업 ──
 @r.get('/jobs/{job_id}')
 def api_job(job_id: str, wait: float = 0, a: Account = Depends(require_account)):
+    job_id = validated_uuid(job_id, ApiError(404, 'JOB_NOT_FOUND', '작업을 찾을 수 없어요'))
     return jobs.view(job_id, a.id if a.type == 'employee' else None, wait)
 
 
 @r.post('/jobs/{job_id}/resume')
 def api_job_resume(job_id: str,a: Account=Depends(require_employee)):
     from app.services.job_recovery import resume
+    job_id = validated_uuid(job_id, ApiError(404, 'JOB_NOT_FOUND', '작업을 찾을 수 없어요'))
     return {'jobId':resume(job_id,a.id)}
 
 
 @r.post('/jobs/{job_id}/cancel')
 def api_job_cancel(job_id: str, a: Account = Depends(require_account)):
+    job_id = validated_uuid(job_id, ApiError(404, 'JOB_NOT_FOUND', '작업을 찾을 수 없어요'))
     return {'jobId': job_id, 'status': jobs.cancel(job_id, a.id if a.type == 'employee' else None)}
 
 
