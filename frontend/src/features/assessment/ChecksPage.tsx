@@ -61,7 +61,7 @@ export function ChecksPage() {
       {act.length ? (
         <div className="card acc">
           <h2 className="st">로드맵을 마쳤나요?</h2>
-          <p className="muted">역량 테스트와 같은 문항에 다시 답하면 진단 에이전트가 결과 보고서를 만들어 드려요. 활동이 남아 있어도 시작할 수 있어요.</p>
+          <p className="muted">설문은 같은 문항에 다시 답하고, 퀴즈는 같은 개념의 다른 문항을 풀어요. 응답을 제출하면 진단 에이전트가 결과 보고서를 만들어 드려요. 활동이 남아 있어도 시작할 수 있어요.</p>
           <div className="list ck-list">
             {act.map((R) => {
               const c = count(R.plan, R.progress);

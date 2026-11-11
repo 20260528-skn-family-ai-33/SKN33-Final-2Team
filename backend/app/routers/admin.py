@@ -13,6 +13,7 @@ from fastapi.responses import Response
 from .. import admin_io, db, llm, regfiles
 from ..auth import Account, require_admin
 from ..errors import ApiError, provider_label, unavailable_reason
+from . import validated_uuid
 
 r = APIRouter(prefix='/api/v1/admin')
 MAX_FILE = 20_000_000
@@ -80,17 +81,20 @@ def api_edit(ds: str, body: dict, a: Account = Depends(require_admin)):
 
 @r.get('/uploads/{upload_id}')
 def api_upload(upload_id: str, a: Account = Depends(require_admin)):
+    upload_id = validated_uuid(upload_id, ApiError(404, 'NO_UPLOAD', '미리보기 기록을 찾을 수 없어요'))
     return admin_io.one(upload_id)
 
 
 @r.post('/uploads/{upload_id}/apply')
 def api_apply(upload_id: str, body: dict | None = None, a: Account = Depends(require_admin)):
     mode = (body or {}).get('goalMode')
+    upload_id = validated_uuid(upload_id, ApiError(404, 'NO_UPLOAD', '미리보기 기록을 찾을 수 없어요'))
     return admin_io.apply(upload_id, a.id, 'mock' if mode == 'mock' else None)
 
 
 @r.delete('/uploads/{upload_id}', status_code=204)
 def api_discard(upload_id: str, a: Account = Depends(require_admin)):
+    upload_id = validated_uuid(upload_id, ApiError(404, 'NO_UPLOAD', '미리보기 기록을 찾을 수 없어요'))
     admin_io.discard(upload_id)
 
 

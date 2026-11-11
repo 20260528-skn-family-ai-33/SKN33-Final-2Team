@@ -1,11 +1,20 @@
 """API 라우터 (/api/v1 · 설계서 v1.7 6.1)."""
 from __future__ import annotations
 
+from uuid import UUID
+
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
 from .. import jobs
 from ..errors import ApiError
+
+
+def validated_uuid(value: str, error: ApiError) -> str:
+    try:
+        return str(UUID(value))
+    except ValueError:
+        raise error from None
 
 
 def wants_async(request: Request) -> bool:
