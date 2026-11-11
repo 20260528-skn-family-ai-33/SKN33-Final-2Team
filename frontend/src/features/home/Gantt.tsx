@@ -127,8 +127,8 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
         const skillLabel=course.skills.join(' and ');
         const show=()=>openSheet({title:course.title,sub:`공통 강좌 · ${skillLabel}`,body:()=> <div>{course.activities.map(activity=><section key={activity.id}><h3>{activity.skill}</h3><ul className="acts"><ActRow a={activity} R={R}/></ul></section>)}</div>});
         return <Row key={`shared:${course.id}`} lv={1} ins={up}
-          label={<button className="gt-a" aria-label={`${course.title} 공통 강좌 · ${skillLabel} · 관련 스킬 기록 열기`} onClick={show}><span className="gt-name">{course.title}<small>{skillLabel}</small></span></button>}
-          bar={<button type="button" className={`gt-bar act gt-materials-open${done?' done':''}`} aria-label={`${course.title} · ${skillLabel} · ${course.from}~${course.to}주차`} onClick={show} style={gtPos(off+7*(course.from-1),off+7*course.to,T)}/>}
+          label={<button className="gt-a" aria-label={`${course.title} 공통 강좌 · ${skillLabel} · 관련 스킬 기록 열기`} onClick={show}><span className="gt-name">{course.title}<small>{skillLabel}</small></span>{done?<Icon name="check" cls="gt-ok"/>:null}</button>}
+          bar={<button type="button" className={`gt-bar act gt-materials-open${done?' done':''}`} aria-label={`${course.title} · ${skillLabel} · ${course.from}~${course.to}주차`} onClick={show} style={gtPos(off+7*(course.from-1),off+7*course.to,T)}>{done?<Icon name="check"/>:null}</button>}
           tip={{v:when(course.from,course.to),t:course.title,m:`${skillLabel}에 연결된 공통 강좌 · 배정 범위 표시`}}/>;
       })}
       {(() => {
@@ -223,6 +223,8 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
                   const resource = resources[activity.res!];
                   return resource?.type === 'course' || resource?.kind === '강좌';
                 }).length;
+                // 과제 줄과 같은 기준: 이 줄에 그린 자료를 모두 완료하면 막대를 채운다
+                const materialsDone = separateMaterials.length > 0 && separateMaterials.every(activity => st(R.progress, activity.id) === 'done');
                 const materialLabel =
                   [courses ? `강좌 ${courses}개` : '', separateMaterials.length > courses ? `기타 ${separateMaterials.length - courses}개` : '']
                     .filter(Boolean)
@@ -246,17 +248,20 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
                             <span className="gt-name">
                               자료 학습 <small>{materialLabel}</small>
                             </span>
+                            {materialsDone ? <Icon name="check" cls="gt-ok" /> : null}
                           </button>
                         }
                         bar={
                           separateMaterials.length ? (
                             <button
                               type="button"
-                              className="gt-bar act gt-materials-open"
-                              aria-label={`${name} 학습 자료 열기`}
+                              className={`gt-bar act gt-materials-open${materialsDone ? ' done' : ''}`}
+                              aria-label={`${name} 학습 자료 열기${materialsDone ? ' · 완료' : ''}`}
                               onClick={showMaterials}
                               style={gtPos(off + 7 * (Math.min(...separateMaterials.map(activity => activity.wFrom)) - 1), off + 7 * Math.max(...separateMaterials.map(activity => activity.wTo)), T)}
-                            />
+                            >
+                              {materialsDone ? <Icon name="check" /> : null}
+                            </button>
                           ) : (
                             <span className="gt-shared-note">공통 강좌 연결 표시 참조</span>
                           )
