@@ -213,14 +213,29 @@ def api_status(provider: str = 'ollama', a: Account = Depends(require_account)):
         return JSONResponse({'error': {'code': c['code'], 'message': c['user'], 'kind': c['kind'], 'cause': c['text'], 'hint': c['hint'], 'raw': c['raw'], 'retryable': c['retryable']}}, status_code=502)
 
 
+def _named_logs(L: list[dict]) -> list[dict]:
+    """기록에 누구의 일이었는지(employee) 이름을 붙인다. 정렬용 시각 t 는 뺀다"""
+    ids = sorted({e['employeeId'] for e in L if e.get('employeeId')})
+    names = {x['employee_id']: x['name'] for x in db.all_('SELECT employee_id, name FROM public.employees WHERE employee_id = ANY(:i)', i=ids)} if ids else {}
+    return [{k: v for k, v in dict(e, employee=names.get(e.get('employeeId'), '')).items() if k != 't'} for e in L]
+
+
 @r.get('/ai/log', dependencies=[Depends(require_demo_mode)])
 def api_log(a: Account = Depends(require_account)):
     """에이전트 동작 보기(시연·디버그 도구 · 운영에서는 아무도 쓰지 않음): 누가 호출했든 모든 계정의 최근 호출, 서버 메모리에만 있다.
-    employee 는 그 호출이 누구의 일이었는지, by 는 관리자 화면에서 시작했는지"""
-    L = rt.all_logs()
-    ids = sorted({e['employeeId'] for e in L if e.get('employeeId')})
-    names = {x['employee_id']: x['name'] for x in db.all_('SELECT employee_id, name FROM public.employees WHERE employee_id = ANY(:i)', i=ids)} if ids else {}
-    return {'log': [{k: v for k, v in dict(e, employee=names.get(e.get('employeeId'), '')).items() if k != 't'} for e in L]}
+    employee 는 그 호출이 누구의 일이었는지, by 는 관리자 화면에서 시작했는지.
+    입력·출력·모델 호출 전문은 길어서 목록에는 넣지 않고 펼칠 때 /ai/log/{id} 로 받는다(callCount 는 모델 호출 수)"""
+    return {'log': [dict({k: v for k, v in e.items() if k not in ('input', 'output', 'calls')}, callCount=len(e.get('calls') or []))
+                    for e in _named_logs(rt.all_logs())]}
+
+
+@r.get('/ai/log/{entry_id}', dependencies=[Depends(require_demo_mode)])
+def api_log_entry(entry_id: int, a: Account = Depends(require_account)):
+    """기록 한 건의 전문: 에이전트 입력·출력과 그 안의 모델 호출마다 보낸 메시지·받은 원문(자르지 않음)"""
+    e = rt.log_entry(entry_id)
+    if e is None:
+        raise ApiError(404, 'LOG_NOT_FOUND', '오래된 기록이라 지워졌어요. 목록을 다시 열어 주세요')
+    return _named_logs([e])[0]
 
 
 # ── 시연 도구 ──

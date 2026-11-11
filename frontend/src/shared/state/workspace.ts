@@ -185,10 +185,8 @@ export function putRec(s: WsState, R: PlanRecord): PlanRecord {
   const old = s.plans[R.id];
   const prev = old && old.rev ? JSON.parse(JSON.stringify(old.rev)) : null;
   const reportId = old?.post?.reportId;
-  const keepRunning = !!(old?.post?.running && !old?.post?.reportId && R.status === 'done' && !R.post.fail);
   s.plans[R.id] = prepRec(R, prev);
   if (reportId !== undefined) s.plans[R.id].post.reportId = reportId;
-  if (keepRunning) s.plans[R.id].post.running = true;
   if (old && old.rev && !R.revision) s.plans[R.id].rev = old.rev.running ? null : prev;
   return s.plans[R.id];
 }

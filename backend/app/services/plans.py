@@ -160,9 +160,10 @@ def _post(row: dict, plan: dict) -> dict:
         t.run(lost_deep, f=json.dumps({'cause': jobs.lost_cause()}, ensure_ascii=False), r=row['roadmap_id'])
     pc = db.one('SELECT goal_self, attachment, running, fail, job_id, deep FROM app_ext.post_checks WHERE roadmap_id = :r', r=row['roadmap_id']) or {}
     from .post_quiz import public_assessment
-    post_survey=(pc.get('deep') or {}).get('v2Quiz')
-    reveal=bool(pc.get('running')) or STATUS.get(row.get('status'))=='done'
-    public_survey=public_assessment({'v2':{'survey':post_survey}}, reveal=reveal)['v2']['survey'] if post_survey else None
+    dp_raw = pc.get('deep') or {}
+    post_survey = dp_raw.get('v2Quiz')
+    reveal = bool(pc.get('running')) or bool(dp_raw.get('v2Submitted')) or STATUS.get(row.get('status')) == 'done'
+    public_survey = public_assessment({'v2': {'survey': post_survey}}, reveal=reveal)['v2']['survey'] if post_survey else None
     return {'quizSurvey': public_survey, 'quizAnswers': (pc.get('deep') or {}).get('v2Answers') or {}, 'answers': ans, 'goalSelf': str(pc['goal_self']) if pc.get('goal_self') else '', 'file': pc.get('attachment'), 'running': bool(pc.get('running')),
             'fail': pc.get('fail'), 'jobId': str(pc['job_id']) if pc.get('job_id') and pc.get('running') else None, 'deep': _post_deep(plan, pc.get('deep'))}
 
@@ -917,11 +918,19 @@ def save_post(employee_id: int, roadmap_id: str, body: dict) -> dict:
     pc_row=db.one('SELECT running, deep FROM app_ext.post_checks WHERE roadmap_id = :r',r=row['roadmap_id']) or {}
     if pc_row.get('running'):
         raise ApiError(409,'REPORT_BUSY','보고서가 이미 작성 중이에요.')
+    stored=pc_row.get('deep') or {}
     if 'quizAnswers' in body:
         from .post_quiz import with_survey,questions
-        stored=pc_row.get('deep') or {}
         if questions(row['content']) and not stored.get('v2Quiz'):raise ApiError(409,'POST_QUIZ_REQUIRED','사후 퀴즈를 먼저 생성해 주세요.')
         quiz_answers=validate_quiz(with_survey(row['content'],stored['v2Quiz']) if stored.get('v2Quiz') else row['content'],body['quizAnswers'])
+    if stored.get('v2Submitted'):
+        if quiz_answers is not None and quiz_answers != (stored.get('v2Answers') or {}):
+            raise ApiError(409, 'POST_LOCKED', '이미 제출한 사후 점검 응답은 수정할 수 없어요.')
+        if 'clearFail' in body:
+            with db.tx() as t:
+                t.run('UPDATE app_ext.post_checks SET fail = NULL WHERE roadmap_id = :r', r=row['roadmap_id'])
+            return record(_owned(employee_id, roadmap_id))
+        raise ApiError(409, 'POST_LOCKED', '이미 제출한 사후 점검 응답은 수정할 수 없어요.')
     with db.tx() as t:
         pre = t.all("SELECT question_id, skill, question, options, sequence_no FROM public.assessment_questions WHERE diagnostic_round_id = :d AND assessment_type = 'PRE' ORDER BY sequence_no",
                     d=row['diagnostic_round_id'])
@@ -1093,7 +1102,11 @@ def report_start(employee_id: int, roadmap_id: str) -> str:
     try:
         with db.tx() as t:
             def mark(jid: str) -> None:
-                if not t.run("""UPDATE app_ext.post_checks SET running = true, fail = NULL, job_id = CAST(:j AS uuid)
+                if not t.run("""UPDATE app_ext.post_checks
+                             SET running = true,
+                                 fail = NULL,
+                                 job_id = CAST(:j AS uuid),
+                                 deep = jsonb_set(coalesce(deep, '{}'::jsonb), '{v2Submitted}', 'true'::jsonb)
                              WHERE roadmap_id = :r AND NOT running""", j=jid, r=row['roadmap_id']):
                     raise ApiError(409, 'REPORT_BUSY', '보고서가 이미 작성 중이거나 사후 점검 기록이 없어요.')
             return jobs.start('report', employee_id, roadmap_id, work, before_start=mark, transaction=t)
@@ -1107,6 +1120,18 @@ def report_start(employee_id: int, roadmap_id: str) -> str:
             if existing:
                 return str(existing)
         raise
+
+
+def revealed_post_quiz(employee_id: int, roadmap_id: str) -> dict | None:
+    row = _owned(employee_id, roadmap_id)
+    pc = db.one('SELECT running, deep FROM app_ext.post_checks WHERE roadmap_id = :r', r=row['roadmap_id']) or {}
+    dp = pc.get('deep') or {}
+    post_survey = dp.get('v2Quiz')
+    if not post_survey:
+        return None
+    from .post_quiz import public_assessment
+    reveal = bool(pc.get('running')) or bool(dp.get('v2Submitted')) or STATUS.get(row.get('status')) == 'done'
+    return public_assessment({'v2': {'survey': post_survey}}, reveal=reveal)['v2']['survey']
 
 
 def confirm_report(employee_id: int, report_id: str) -> dict:

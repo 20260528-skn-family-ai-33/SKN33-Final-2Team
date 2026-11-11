@@ -11,7 +11,7 @@ import { failToast } from '@/shared/lib/fail';
 import { onBound } from '@/shared/state/bind';
 import { me } from '@/shared/state/session';
 import { toast } from '@/shared/state/ui';
-import { updateWs, ws } from '@/shared/state/workspace';
+import { planReports, updateWs, ws } from '@/shared/state/workspace';
 
 /** 사후 심화 답은 문항이 준비되고 보고서를 만들기 전까지만 보낸다(보고서를 만든 뒤에는 서버가 고정) */
 export const deepOpen = (dp: PostDeep | null | undefined) => !!(dp && dp.status === 'ready' && !dp.judge);
@@ -99,19 +99,32 @@ export async function waitReport(_go: ReturnType<typeof useGo>, pid: string, job
       updateWs((s) => { if (s.plans[pid]?.post.reportId) s.plans[pid].post.reportId = null; });
       toast('결과 보고서가 나왔어요 · 점검·보고서에서 볼 수 있어요');
     }
-  } else await pullPlan(pid);
+  } else {
+    const updated = await pullPlan(pid);
+    if (updated?.status === 'done' && !updated.post.running) {
+      try {
+        if (!await reloadWorkspace()) return;
+      } catch {
+        return;
+      }
+      const repId = planReports(ws(), updated)[0]?.id;
+      if (repId && here()) updateWs((s) => { if (s.plans[pid]) s.plans[pid].post.reportId = repId; });
+      else if (repId) toast('결과 보고서가 나왔어요 · 점검·보고서에서 볼 수 있어요');
+    }
+  }
 }
 
 export async function makeReport(go: ReturnType<typeof useGo>, pid: string): Promise<void> {
   const R = ws().plans[pid];
   if (!R || R.post.running) return;
   clearTimeout(postT);
+  const alreadySubmitted = (R.post.quizSurvey?.groups || []).some((g) => g.quizzes.some((q) => typeof q.answer === 'number'));
   updateWs((s) => {
     s.plans[pid].post.running = true;
     s.plans[pid].post.reportId = null;
     s.plans[pid].post.fail = null;
   });
-  if (!(await savePost(pid, R.post.fail ? { clearFail: true } : null))) {
+  if ((!alreadySubmitted || R.post.fail) && !(await savePost(pid, R.post.fail ? { clearFail: true } : null))) {
     updateWs((s) => {
       if (s.plans[pid]) s.plans[pid].post.running = false;
     });
@@ -123,9 +136,9 @@ export async function makeReport(go: ReturnType<typeof useGo>, pid: string): Pro
       if (s.plans[pid]) {
         s.plans[pid].post.running = true;
         s.plans[pid].post.jobId = j.jobId;
+        if (j.quizSurvey) s.plans[pid].post.quizSurvey = j.quizSurvey;
       }
     });
-    void pullPlan(pid);
     void waitReport(go, pid, j.jobId);
   } catch (err) {
     updateWs((s) => void (s.plans[pid].post.running = false));

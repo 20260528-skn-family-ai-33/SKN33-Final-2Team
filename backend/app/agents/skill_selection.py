@@ -104,4 +104,4 @@ def select_from_catalog(ctx: Any, project: dict[str, Any]) -> dict[str, Any]:
     from app.agents import runtime
 
     return select_skills(project, catalog.skill_names(),
-                         lambda system, payload: runtime.llm_json(ctx, system, payload))
+                         runtime.model(ctx, '진단 에이전트', '목표 스킬 선정'))

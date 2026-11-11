@@ -1,0 +1,452 @@
+/* 화면 테마 tm612 · templatemo 612 Parallax Starter
+   원본: https://templatemo.com/tm-612-parallax-starter — 무료 · 상업/비상업 사용 허용. 사진도 템플릿에 들어 있던 것(Unsplash).
+   전부 :root[data-skin="tm612"] 안에 적어 이 테마를 고른 때만 적용된다(@keyframes 만 규칙상 맨 바깥에 두고 이름에 tm612- 를 붙였다).
+   메뉴 위치가 다른 두 버전: 상단 메뉴(&:not([data-nav="side"])) · 좌측 메뉴(&[data-nav="side"]).
+   움직임은 motion.ts 가 CSS 변수(--tm612-py)와 data- 속성(data-tm612-scrolled · data-tm612-rv)만 붙이고, 모양은 전부 여기에 있다.
+
+   템플릿에서 가져온 것
+   - 구간마다 다른 큰 사진 + 검은 막 위의 흰 제목 → 메뉴마다 다른 사진을 화면 머리(제목 자리)에 깔았다.
+     원본은 글이 적어 사진 위에 바로 쓰지만, 이 서비스는 표·목록이 빽빽해 사진 위에서는 읽기 어렵다
+     → 사진은 머리와 맨 아래 띠에만 두고, 내용 상자는 비치지 않는 어두운 바탕으로 했다.
+   - 시차: 머리 사진이 본문보다 느리게 올라간다(원본과 같은 감속 곡선). 맨 아래 띠는 사진이 창에 고정된 채 띠만 지나간다.
+   - 반투명 흐림(blur 8px) 상단 메뉴: 맨 위에서는 거의 투명(.25), 80px 넘게 내려가면 짙어짐(.9)
+   - Oswald 대문자 제목·메뉴(한글은 자간을 줄이고 굵기를 올려 읽기 쉽게) · Source Sans 3 본문
+   - 뒤집히는 버튼: 테두리 버튼은 마우스를 올리면 흰 바탕 + 검은 글자로(원본 EXPLORE), 주 버튼은 그 반대로
+   - 나타나기: 화면에 들어올 때 30px 아래에서 0.8초 동안 떠오른다(한 번만) */
+
+@keyframes tm612-pan { from { background-position-y: 0%; } to { background-position-y: 100%; } }
+
+:root[data-skin="tm612"] {
+  color-scheme: dark;
+  --accent: #FFFFFF !important;
+  --accent-ink: #E6E6E6;
+  --accent-soft: rgba(255, 255, 255, .08);
+  --accent-soft2: rgba(255, 255, 255, .14);
+  --accent-line: rgba(255, 255, 255, .4);
+  --tm-on-accent: #111111;
+  --tm-wrap: 1240px;
+  --nav-h: 70px;
+  --tm-w90: rgba(255, 255, 255, .9);
+  --tm-w70: rgba(255, 255, 255, .72);
+  --tm-w40: rgba(255, 255, 255, .45);
+  --tm-w20: rgba(255, 255, 255, .2);
+  --tm-w12: rgba(255, 255, 255, .12);
+  --tm-head: 'Oswald', 'Pretendard Variable', Pretendard, -apple-system, 'Malgun Gothic', sans-serif;
+  --tm-ease: cubic-bezier(.22, 1, .36, 1);
+  /* 머리 사진 위의 검은 막: 글자가 놓이는 왼쪽은 조금 더 어둡게, 아래로 갈수록 바탕색에 녹아든다 */
+  --tm-dim: .5;
+  --tm-veil:
+    linear-gradient(90deg, rgba(0, 0, 0, .4) 0%, rgba(0, 0, 0, .18) 50%, rgba(0, 0, 0, 0) 85%),
+    linear-gradient(180deg, rgba(0, 0, 0, var(--tm-dim)) 0%, rgba(0, 0, 0, var(--tm-dim)) 38%, rgba(14, 14, 14, .88) 78%, #0E0E0E 100%);
+  --bg: #0E0E0E; --surface: #191919; --surface-2: #141414; --sunk: #272727; --line: #303030; --line-2: #4A4A4A;
+  --ink: #FFFFFF; --ink-2: #E0E0E0; --ink-3: #B0B0B0; --ink-4: #8F8F8F;
+  --warn: #FBBF24; --warn-soft: rgba(251, 191, 36, .12);
+  --danger: #F87171; --danger-soft: rgba(248, 113, 113, .12); --danger-line: rgba(248, 113, 113, .4);
+  --ok: #4ADE80; --ok-soft: rgba(74, 222, 128, .12);
+  /* 사전 점검 설문(style.css)이 읽는 색 */
+  --card: var(--surface); --soft: var(--sunk); --muted: var(--ink-3);
+  --side-w: 0px; --r-lg: 0px; --r-md: 0px;
+  --shadow-pop: 0 24px 60px rgba(0, 0, 0, .7), 0 0 0 1px #303030;
+
+  /* 사진 층(body::before)이 body 바탕 아래에 깔리므로 바탕색은 html 에 두고 body 는 비운다 */
+  & { background: var(--bg); }
+  body {
+    background: transparent; color: var(--ink-2);
+    font-family: 'Source Sans 3', 'Pretendard Variable', Pretendard, -apple-system, 'Malgun Gothic', sans-serif;
+  }
+
+  /* ── 머리 사진: 창 위쪽에 고정해 두고 motion.ts 가 준 만큼(본문의 45%)만 올린다 → 본문보다 느리게 움직인다 ── */
+  body::before {
+    content: ''; position: fixed; z-index: -1; top: 0; left: 0; right: 0; height: max(560px, 72vh); pointer-events: none;
+    background: var(--tm-veil), url('./bg-01.jpg') center 45% / cover no-repeat;
+    transform: translate3d(0, var(--tm612-py, 0px), 0);
+    /* 본문으로 내려가면 사진을 거둔다(상자 옆 여백으로 밝은 사진이 비쳐 눈에 걸리지 않게) */
+    opacity: var(--tm612-o, 1);
+    transition: transform .5s var(--tm-ease), opacity .5s ease;
+    will-change: transform, opacity;
+  }
+  /* 메뉴마다 다른 사진(원본의 구간마다 다른 사진): 홈 복도 · 새 로드맵 빌딩 · 내 로드맵 밤의 지구 · 점검 책상 · 직원 사무실 */
+  &:has(.side .nav:not(.nav-appx) a:nth-child(2).on) body::before { background-image: var(--tm-veil), url('./bg-04.jpg'); background-position-y: 30%; }
+  &:has(.side .nav:not(.nav-appx) a:nth-child(3).on) body::before { background-image: var(--tm-veil), url('./bg-03.jpg'); background-position-y: 62%; }
+  &:has(.side .nav:not(.nav-appx) a:nth-child(4).on) { --tm-dim: .64; }
+  &:has(.side .nav:not(.nav-appx) a:nth-child(4).on) body::before { background-image: var(--tm-veil), url('./bg-05.jpg'); background-position-y: 50%; }
+  &:has(.side .nav-sup a.on) body::before { background-image: var(--tm-veil), url('./bg-02.jpg'); background-position-y: 30%; }
+  &:has(.side .nav-appx:not(.nav-sup) a.on) { --tm-dim: .68; }
+  &:has(.side .nav-appx:not(.nav-sup) a.on) body::before { background-image: var(--tm-veil), url('./bg-02.jpg'); background-position-y: 78%; }
+  /* 로그인: 빌딩 사진이 화면 전체(원본 첫 구간) */
+  body.auth::before {
+    height: 125vh;
+    background: linear-gradient(rgba(0, 0, 0, .5), rgba(0, 0, 0, .62)), url('./bg-04.jpg') center / cover no-repeat;
+    transform: translate3d(0, calc(var(--tm612-py, 0px) * .3), 0);
+    opacity: 1;
+  }
+
+  /* ── 맨 아래 띠: 사진은 창에 고정되고 띠만 지나가는 시차(원본의 구간 사이 사진 느낌) ── */
+  /* 내용이 짧아도 띠가 창 맨 아래에 놓이게 본문 높이를 채운다. 띠 위쪽은 서서히 나타나게 해서(mask) 머리 사진과 겹쳐도 끊겨 보이지 않는다 */
+  .main { position: relative; box-sizing: border-box; min-height: calc(100vh - var(--rib-h) - var(--nav-h)); padding: 56px 40px 190px; }
+  body:not(.auth) .main::after {
+    content: ''; position: absolute; z-index: -1; left: 0; right: 0; bottom: 0; height: 340px; pointer-events: none;
+    background: linear-gradient(rgba(14, 14, 14, .52), rgba(14, 14, 14, .62)), url('./bg-03.jpg') center 35% / cover fixed no-repeat;
+    -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 60%); mask-image: linear-gradient(180deg, transparent 0%, #000 60%);
+  }
+
+  /* ── 공통 모서리: 템플릿처럼 각지게 ── */
+  .list, .stage, .opt, .tblwrap, .roadmap-preview, .check-plan-group, .connbox, .cm-item, .gsug, .docbox, .cause,
+  .sheet, .regp, .login-card, .login-side, .loading, .stats, .agent, .diff .d, .alert, .callout, .ck-list, .rec-res, .pstrip div,
+  .api-picker-panel, .cp-pop, .feat, .ls-card, .card { border-radius: 0; }
+  .btn, .btn.sm, .back, .fab, .toast { border-radius: 0; }
+  .input, .textarea, .cp-btn { border-radius: 0; }
+  .tag, .ls-no, .ribbon .mode, .api-picker-button, .login-side .pill { border-radius: 0; }
+  .v2-survey section, .v2-survey fieldset { border-radius: 0; }
+  .v2-survey button { border-radius: 0; }
+
+  /* ── 상단 띠(AI 모델 고르기): 메뉴와 함께 내려가면 짙어진다 ── */
+  .ribbon {
+    padding: 0 max(20px, calc((100% - var(--tm-wrap)) / 2));
+    background-color: rgba(0, 0, 0, .38); color: var(--tm-w70); border-bottom: 1px solid rgba(255, 255, 255, .08);
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+    font-size: 12px; transition: background-color .3s ease;
+  }
+  &[data-tm612-scrolled] .ribbon { background-color: rgba(8, 8, 8, .92); }
+  .ribbon .mode { background: var(--tm-w12); color: #fff; font-family: var(--tm-head); letter-spacing: 1.5px; text-transform: uppercase; }
+  .api-picker-button { padding: 5px 12px; font-size: 12px; font-family: var(--tm-head); letter-spacing: 1.5px; text-transform: uppercase; }
+  body.auth .ribbon { display: none; }
+
+  /* 상단 메뉴가 있으면 관리자 고치기 창은 그 아래에서 시작(좌측 메뉴 버전은 --nav-h: 0) */
+  .adm-panel { top: calc(var(--rib-h) + var(--nav-h) + 12px); border-radius: 0; }
+  @media (max-width: 1100px) { .adm-panel { top: calc(var(--rib-h) + var(--nav-h)); border-radius: 0; } }
+
+  /* ── 상단 메뉴 버전(기본): 템플릿의 반투명 흐림 메뉴 ── */
+  &:not([data-nav="side"]) {
+    @media (min-width: 901px) {
+      & { scroll-padding-top: calc(var(--rib-h) + var(--nav-h) + 12px); }
+      .app { display: block; }
+      .side {
+        position: sticky; top: var(--rib-h); z-index: 39;
+        height: var(--nav-h); min-height: var(--nav-h); overflow: visible;
+        flex-direction: row; flex-wrap: nowrap; align-items: center; gap: 0 12px;
+        padding: 0 max(30px, calc((100% - var(--tm-wrap)) / 2));
+        border: 0; background-color: rgba(0, 0, 0, .25); color: #fff;
+        -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+        transition: background-color .3s ease, box-shadow .3s ease;
+      }
+      &[data-tm612-scrolled] .side { background-color: rgba(8, 8, 8, .9); box-shadow: 0 1px 0 rgba(255, 255, 255, .08); }
+      .side:empty { display: none; }
+      .side .brand { order: 0; margin-right: 0; padding: 0; font-family: var(--tm-head); font-size: 22px; font-weight: 600; letter-spacing: 4px; text-transform: uppercase; }
+      .side .brand .logo { display: none; }
+      /* 버전: 메뉴 아래 한 줄을 따로 쓰지 않고 로고 옆에 작게 */
+      .app .side > .app-version {
+        order: 0; flex: 0 0 auto; margin: 4px auto 0 0; padding: 0; text-align: left;
+        font-size: 11px; letter-spacing: .5px; color: var(--tm-w40); white-space: nowrap;
+      }
+      .side > .app-version .app-version-name { display: none; }
+      .side .nav { order: 1; flex-direction: row; align-items: stretch; gap: 0; }
+      .side .nav a {
+        position: relative; height: var(--nav-h); padding: 0 13px; border-radius: 0; background: transparent; white-space: nowrap;
+        color: rgba(255, 255, 255, .8); font-family: var(--tm-head); font-size: 14px; font-weight: 500; letter-spacing: 1px; text-transform: uppercase;
+        transition: color .3s ease;
+      }
+      .side .nav a svg { display: none; }
+      .side .nav a:hover, .side .nav a.on { background: transparent; color: #fff; }
+      /* 현재 메뉴: 글자 아래 흰 줄이 가운데서 펼쳐진다 */
+      .side .nav a::after {
+        content: ''; position: absolute; left: 13px; right: 13px; bottom: 17px; height: 2px; background: #fff;
+        transform: scaleX(0); transition: transform .35s var(--tm-ease);
+      }
+      .side .nav a:hover::after { transform: scaleX(.45); }
+      .side .nav a.on::after { transform: scaleX(1); }
+      .side .nav a .dot { margin: 0 0 12px 3px; }
+      .side .nav-appx { order: 2; display: flex; align-items: center; margin: 0; padding: 0; border: 0; }
+      .side .nav-appx::before { content: ''; width: 1px; height: 18px; margin: 0 4px; background: var(--tm-w20); }
+      .side .nav-appx .lbl { display: none; }
+      .side .me { order: 3; margin: 0 0 0 6px; padding: 4px 12px 4px 4px; gap: 8px; border: 1px solid var(--tm-w20); border-radius: 0; background: transparent; transition: border-color .3s ease; }
+      .side .me .avatar { width: 30px; height: 30px; font-size: 11px; border-radius: 0; background: #fff; color: #111; }
+      .side .me small, .side .me .me-go { display: none; }
+      .side .me b { font-size: 13px; white-space: nowrap; }
+      .side a.me:hover, .side a.me.on { box-shadow: none; border-color: #fff; }
+      .side .side-foot { order: 4; margin: 0; padding: 0; display: flex; align-items: center; gap: 6px; }
+      .side .side-foot .foot-lbl { display: none; }
+      .side .logout { height: 34px; padding: 0 10px; color: var(--tm-w70); }
+      .side .logout:hover { background: transparent; color: #fff; }
+      .side .logout .lbl { display: none; }
+      /* 시연 도구: 메뉴 줄에는 버튼만, 펼치면 메뉴 아래 오른쪽에 떠 있는 창(자리는 비워 두어 메뉴가 밀리지 않게) */
+      .side .demo { order: -1; color: inherit; }
+      .side .demo > summary {
+        width: 96px; height: 34px; justify-content: center; padding: 0 8px; border: 1px dashed var(--tm-w40); border-radius: 0;
+        font-size: 12px; font-weight: 600; white-space: nowrap; color: var(--tm-w70);
+      }
+      .side .demo > summary:hover { border-color: #fff; color: #fff; }
+      .side .side-foot:has(> .demo[open]) { padding-left: 102px; }
+      .side .demo[open] {
+        position: fixed; z-index: 45; top: calc(var(--rib-h) + var(--nav-h) + 10px);
+        right: max(20px, calc((100% - var(--tm-wrap)) / 2));
+        width: 300px; max-height: calc(100vh - var(--rib-h) - var(--nav-h) - 32px); overflow-y: auto;
+        padding: 0 16px 16px; border: 1px solid var(--line); border-radius: 0; background: var(--surface); color: var(--ink-3); box-shadow: var(--shadow-pop);
+      }
+      .side .demo[open] > summary {
+        width: auto; height: 46px; margin: 0 -16px 12px; padding: 0 16px; justify-content: flex-start;
+        border: 0; border-bottom: 1px solid var(--line); border-radius: 0; color: var(--ink);
+      }
+      .side .demo[open] .foot-lbl { display: block; font-weight: 600; }
+    }
+    /* 좁은 데스크톱: 메뉴가 넘치지 않게 조금 줄인다 */
+    @media (min-width: 901px) and (max-width: 1240px) {
+      --nav-h: 64px;
+      .side { padding-inline: 20px; }
+      .side .brand { font-size: 18px; letter-spacing: 3px; }
+      .side > .app-version { display: none; }
+      .side .brand { margin-right: auto; }
+      .side .nav a { padding: 0 8px; font-size: 13px; letter-spacing: 0; }
+      .side .nav a::after { left: 8px; right: 8px; bottom: 15px; }
+      .side .me { padding: 3px; }
+      .side .me .grow { display: none; }
+    }
+  }
+
+  /* ── 좌측 메뉴 버전(data-nav="side"): 사진 위 반투명 검은 흐림 메뉴, 현재 메뉴는 왼쪽 흰 줄 ── */
+  &[data-nav="side"] {
+    --nav-h: 0px;
+    @media (min-width: 901px) {
+      --side-w: 248px;
+      .side { background: rgba(8, 8, 8, .72); border-right: 1px solid var(--tm-w12); color: #fff; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+      .side .brand { font-family: var(--tm-head); font-size: 20px; font-weight: 600; letter-spacing: 4px; text-transform: uppercase; }
+      .side .brand .logo { border-radius: 0; background: #fff; color: #111; }
+      .side .me { border: 1px solid var(--tm-w20); border-radius: 0; background: transparent; }
+      .side .me small, .side .me .me-go { color: var(--tm-w70); }
+      .side .me .avatar { border-radius: 0; background: #fff; color: #111; }
+      .side a.me:hover, .side a.me.on { box-shadow: none; border-color: #fff; }
+      .side .nav a { border-radius: 0; color: rgba(255, 255, 255, .8); font-family: var(--tm-head); font-size: 14.5px; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; transition: color .3s, background .3s; }
+      .side .nav a:hover { background: rgba(255, 255, 255, .08); color: #fff; }
+      .side .nav a.on { background: rgba(255, 255, 255, .12); color: #fff; box-shadow: inset 2px 0 0 #fff; }
+      .side .nav-appx { border-top-color: var(--tm-w12); }
+      .side .nav-appx .lbl, .side .foot-lbl { color: var(--tm-w40); }
+      .side .logout { color: var(--tm-w70); }
+      .side .logout:hover { background: rgba(255, 255, 255, .08); color: #fff; }
+      .side .demo { color: var(--tm-w70); }
+      .side .demo[open] { padding: 10px 12px 12px; border: 1px solid var(--line); border-radius: 0; background: var(--surface); color: var(--ink-3); }
+      .side .demo[open] summary { color: var(--ink-2); }
+      .side .demo[open] .foot-lbl { color: var(--ink-4); }
+    }
+  }
+
+  /* ── 어두운 바탕: 원래 CSS 가 흰색을 직접 적은 상자들(606·512 와 같은 보정) ── */
+  .choice, .scale label, .lik label, .chip, .drop, .back, .btn.line, .list, .stats, .stage, .opt, .tblwrap, .diff .d, .agent, .hero,
+  .chatbar, .sheet, .ans, .login-card, .connbox, .loading, .logi, .cm-item, .ck-list, .gs-it, .gs-fail, .rg-act, .cp-pop, .cp-back,
+  .regp, .dq-opt, .rthumb.cert, .rthumb.md, .docbox .agent, .cmp th .regen, .cmp th .vnav button, .demo select, .aim-effort select,
+  .stepper .sn, .gt-tg, .api-picker-button, .api-picker-panel, .deep-tg .box, .pstrip div, .roadmap-preview, .check-plan-group, .record-sort {
+    background-color: var(--surface);
+  }
+  .input, .textarea, select.input, .cp-btn, .docbox .textarea { background-color: #101010; border-color: var(--line-2); color: #fff; }
+  .input::placeholder, .textarea::placeholder { color: var(--ink-4); }
+  .dq-opt::before { background: #101010; }
+  .seg button.on, .mini-seg label:has(input:checked) { background: var(--line-2); color: var(--ink); box-shadow: none; }
+  .seg { background: var(--sunk); }
+  .bar, .bars .track, .bars .track.dual::before, .bars .track.dual::after { background: var(--sunk); }
+  .callout { color: #FCD34D; }
+  .callout.soft { color: var(--ink-2); }
+  .cause { border-color: rgba(245, 158, 11, .3); background: rgba(245, 158, 11, .08); color: #FCD34D; }
+  .cause b { color: #FBBF24; }
+  .fail-card .ico { background: rgba(248, 113, 113, .18); }
+  .conn.checking, .conn.cold, .conn-err.cold { background: rgba(245, 158, 11, .1); color: #FCD34D; }
+  .conn-err.cold { border-color: rgba(245, 158, 11, .3); }
+  .adm-row.error { background: rgba(248, 113, 113, .08); }
+  .api-picker-panel { color: var(--ink); }
+  .api-picker-button.gray { color: #A3A3A3; }
+  .api-picker-button.red { color: #F87171; }
+  .api-picker-button.green { color: #4ADE80; }
+  .api-picker-button.orange { color: #FBBF24; }
+  .api-picker-button.blue { color: #60A5FA; }
+  .gt.all .gt-roadmap-group { background: rgba(255, 255, 255, .03); }
+  .gt.all .gt-roadmap-group .gt-l { background: var(--surface-2); }
+  .gt.all .gt-roadmap-group + .gt-roadmap-group { border-top-color: var(--surface); }
+  .gt-card:has(.gt.all) > .sec-h > h2 { background: transparent; }
+  .gt-row:hover { background: rgba(255, 255, 255, .04); }
+  .gt-scroll { scrollbar-color: #4A4A4A var(--surface); }
+  .gt-scroll::-webkit-scrollbar-track { background: var(--surface); }
+  .gt-scroll::-webkit-scrollbar-thumb { background: #4A4A4A; border-color: var(--surface); }
+  .sm-wrap { background: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, .08) 1px, transparent 0) 0 0 / 22px 22px var(--surface-2); }
+  .sm-e { stroke: #4A4A4A; }
+  /* 아직 배우지 않은 스킬: 원래의 흐림(.38)은 어두운 바탕에서 글자가 안 읽혀 덜 흐리게 */
+  .sm-n.off { opacity: .62; }
+  .sm-n .dot { fill: var(--surface); stroke: #5A5A5A; }
+  .sm-n text { stroke: rgba(13, 13, 13, .92); }
+  /* 내 스킬 지도(누적): 이 테마의 화살표 색 규칙이 기본 규칙보다 우선하므로 지나온 길 색을 다시 적는다 */
+  .sm-e.trail { stroke: var(--accent); }
+
+  /* 강조색(흰색) 바탕 위 글자는 검게 */
+  .btn.pri, .chip:has(input:checked), .chip.on, .scale label:has(input:checked), .li .idx.on, .stepper li.cur .sn, .stt.done,
+  .choice:has(input:checked) .n, .choice:has(input:checked) .ck, .agent.ok .sp, .gt-bar.act, .deep-tg[aria-pressed="true"] .box,
+  .msg.me, .fab, .chatbar .go, .badge-ico, .ribbon .mode.api, .next {
+    color: var(--tm-on-accent);
+  }
+  .lik label:has(input:checked) b, .lik label:has(input:checked) span { color: var(--tm-on-accent); }
+  /* 위 '어두운 바탕' 묶음이 원래의 선택·마우스 상태 바탕보다 우선하게 되어 다시 적는다 */
+  .scale label:has(input:checked), .lik label:has(input:checked), .stepper li.cur .sn, .deep-tg[aria-pressed="true"] .box { background-color: var(--accent); }
+  .dq-opt:has(input:checked) { background-color: var(--accent-soft2); }
+  .drop:hover, .gs-it:hover { background-color: var(--accent-soft); }
+  .sm-n .tag text { fill: var(--tm-on-accent); }
+
+  /* 어두운 상자·창 공통 */
+  .choice, .chip, .scale label, .lik label, .dq-opt { border-color: var(--line-2); }
+  .choice:hover, .chip:hover, .scale label:hover, .lik label:hover, .dq-opt:hover { border-color: var(--tm-w70); }
+  .tag { background: var(--sunk); color: var(--ink-2); }
+  .tag.line, .tag.dash { background: transparent; }
+  .cmp thead th { background: var(--surface-2); }
+  .btn.ghost { color: var(--ink-2); }
+  .btn.ghost:hover { background: rgba(255, 255, 255, .08); color: #fff; }
+  .back { border-color: var(--line-2); color: var(--ink-2); }
+  .back:hover { border-color: #fff; color: #fff; }
+  .stepper li.done .sn { background: var(--accent-soft2); border-color: var(--accent-line); color: var(--accent-ink); }
+  .ov { background: rgba(0, 0, 0, .68); }
+  .sheet, .regp, .adm-panel { border: 1px solid var(--line); }
+  .sheet-h, .sheet-f, .chat-f, .adm-ph, .adm-pf { border-color: var(--line); }
+  .adm-pf, .adm-panel { background: var(--surface); }
+  .adm-foot { background: var(--surface); }
+  .toast, .gt-tip { background: var(--sunk); border: 1px solid var(--line-2); color: var(--ink); }
+  .msg.bot .plain { background: var(--sunk); }
+  /* 도우미 답변의 출처 상자(gp.css)는 --ink-2 바탕에 흰 글자라 어두운 테마에서는 바탕이 밝아져 글자가 묻힌다 */
+  .ans .company-sources { background: var(--sunk); color: var(--ink-2); }
+  /* #47 로 들어온 화면(홈 자료 묶음 · 3안 검토 자료 카드 · 로드맵 이번 주차 · 보고서 설문 비교)도 옅은 바탕색을 직접 적어,
+     글자가 밝은 어두운 테마에서는 글자가 묻힌다 → 어두운 상자로 바꾸고, 원래 초록 표시는 이 테마의 강조색으로 */
+  .home-material-group, .home-material-group[data-kind="도서"] { background: var(--surface-2); }
+  .review-resource-card, .review-task-choice { border-color: var(--line); }
+  .review-resource-card[data-kind=course] { border-left-color: #60A5FA; background: rgba(96, 165, 250, .06); }
+  .review-resource-card[data-kind=book] { border-left-color: #D6B57E; background: rgba(214, 181, 126, .06); }
+  .review-resource-card[data-kind=course] .review-kind-badge { color: #93C5FD; }
+  .review-resource-card[data-kind=book] .review-kind-badge { color: #E5C995; }
+  .review-task-choice:has(input:checked) { border-color: var(--accent-line); background: var(--accent-soft); }
+  .review-generation-status { background: var(--accent-soft); color: var(--accent-ink); }
+  .review-skill-block.is-current-week, .roadmap-learning-group.is-current-week { border-color: var(--accent-line); background: var(--accent-soft); box-shadow: inset 4px 0 0 var(--accent); }
+  .roadmap-learning-anchor.is-current-week { background: var(--accent-soft2); }
+  /* 결과 보고서의 사전·사후 색(#116): 어두운 바탕에서는 강조색을 낮추지 않고 그대로 쓴다 */
+  .cmp-summary, .learning-check, .report-survey, .rpt-viz { --cmp-post: var(--accent); }
+  /* #59 로 들어온 역량 테스트 결과 보기도 정답·오답 칸과 문항 번호에 옅은 바탕색을 직접 적어, 어두운 화면에서 밝은 상자로 튄다 */
+  .v2-survey-review label.answer-correct { border-color: rgba(96, 165, 250, .5); background: rgba(96, 165, 250, .12); color: #93C5FD; }
+  .v2-survey-review label.answer-wrong { border-color: rgba(248, 113, 113, .5); background: rgba(248, 113, 113, .12); color: #FCA5A5; }
+  .v2-survey-review label.answer-chosen-correct { border-color: #4ADE80; background: rgba(74, 222, 128, .12); color: #86EFAC; }
+  .v2-survey-review label.answer-correct input { accent-color: #60A5FA; }
+  .v2-survey-review label.answer-wrong input { accent-color: #F87171; }
+  .v2-survey-review label.answer-chosen-correct input { accent-color: #4ADE80; }
+  .v2-survey-review .quiz-result-number.correct { border-color: rgba(74, 222, 128, .45); background: rgba(74, 222, 128, .12); color: #86EFAC; }
+  .v2-survey-review .quiz-result-number.wrong { border-color: rgba(248, 113, 113, .45); background: rgba(248, 113, 113, .12); color: #FCA5A5; }
+  .adm-tbl th { background: var(--surface-2); }
+  .v2-survey .primary { color: var(--tm-on-accent); }
+
+  /* ── 상자: 사진이 비치지 않는 어두운 상자 + 가는 테두리. 마우스를 올리면 테두리가 희게 ── */
+  .card { border-color: var(--line); background: var(--surface); }
+  .list, .stage, .opt, .tblwrap, .stats, .roadmap-preview, .check-plan-group, .pstrip div, .ls-card { border-color: var(--line); }
+  .card.flat, .docbox, .gsug, .basis .art, .ef-sub, .lg-pick, .ops-b, .agent .detail, .reg-long { background: var(--surface-2); }
+  .card.tap, .opt, .gs-it, .pstrip div, .li { transition: border-color .3s ease, background-color .3s ease; }
+  .card.tap:hover, .opt:hover, .pstrip div:hover { border-color: #fff; background-color: #1F1F1F; box-shadow: none; }
+  .pstrip div { padding: 14px; }
+  .pstrip div b { color: #fff; }
+
+  /* ── 글자: Oswald 대문자 제목. 한글은 원본의 가는 굵기·넓은 자간이 읽기 어려워 굵기를 올리고 자간을 줄였다 ── */
+  .eyebrow { font-family: var(--tm-head); font-size: 13px; font-weight: 500; letter-spacing: 2px; text-transform: uppercase; color: var(--tm-w70); }
+  .t { font-family: var(--tm-head); font-size: 40px; font-weight: 500; letter-spacing: .03em; line-height: 1.25; text-transform: uppercase; color: #fff; }
+  .t.lg { font-size: 46px; }
+  .lead { font-size: 16.5px; color: var(--tm-w90); line-height: 1.75; }
+  /* 머리 사진 위에 놓이는 글자는 사진 밝기에 묻히지 않게 그림자를 깐다 */
+  .view > .eyebrow, .view > .t, .view > .lead, .view > .page-title-row .t { text-shadow: 0 1px 16px rgba(0, 0, 0, .6); }
+  .st, .hp-t { font-family: var(--tm-head); font-weight: 600; letter-spacing: .03em; color: #fff; }
+  .muted { color: var(--ink-3); }
+  .link { color: #fff; text-decoration: underline; text-decoration-color: var(--tm-w40); text-underline-offset: 3px; transition: text-decoration-color .3s ease; }
+  .link:hover { color: #fff; text-decoration-color: #fff; }
+
+  /* ── 버튼: 템플릿의 뒤집히는 버튼. 주 버튼은 흰 바탕 → 테두리만, 테두리 버튼은 테두리만 → 흰 바탕 ── */
+  .btn {
+    font-family: var(--tm-head); font-size: 13.5px; font-weight: 500; letter-spacing: 1px; text-transform: uppercase;
+    transition: background-color .3s ease, color .3s ease, border-color .3s ease;
+  }
+  .btn.pri { background: #fff; border: 1px solid #fff; }
+  .btn.pri:hover { background: transparent; border-color: #fff; color: #fff; }
+  .btn.pri:disabled, .btn.pri:disabled:hover { background: #2A2A2A; border-color: #2A2A2A; color: #7A7A7A; }
+  .btn.line { background: transparent; border-color: rgba(255, 255, 255, .55); color: #fff; }
+  .btn.line:hover:not(:disabled) { background: #fff; border-color: #fff; color: #111; }
+  .chip:has(input:checked), .chip.on { background: #fff; border-color: #fff; }
+  .choice:has(input:checked) { border-color: #fff; background: var(--accent-soft); box-shadow: inset 0 0 0 1px #fff; }
+  .input, .textarea, .cp-btn { transition: border-color .3s ease; }
+  .input:focus, .textarea:focus, .cpick.open .cp-btn { border-color: #fff; box-shadow: 0 0 0 3px rgba(255, 255, 255, .12); }
+  .next { background: #fff; }
+  .next .btn { background: #111; border-color: #111; color: #fff; }
+  .next .btn:hover { background: transparent; color: #111; }
+  .fab { background: #fff; }
+  .fab:hover { background: #D9D9D9; }
+  .msg.me { background: #fff; }
+
+  /* ── 첫 화면 띠(.hero): 템플릿 첫 구간처럼 사진 위 가운데 큰 제목 ── */
+  .hero {
+    padding: 64px 32px; text-align: center; border-color: var(--line);
+    background: linear-gradient(rgba(0, 0, 0, .58), rgba(0, 0, 0, .58)), url('./bg-02.jpg') center / cover no-repeat;
+  }
+  .hero .t, .hero .lead { text-shadow: 0 1px 16px rgba(0, 0, 0, .6); }
+  .hero .actions { justify-content: center; }
+  .hero .actions .btn.pri { flex: 0 1 auto; padding-inline: 45px; }
+
+  /* ── 홈 '나의 학습 공간' 카드: 사진(모서리 8px · 템플릿 About 사진) + 흰 번호 ── */
+  .ls-card .ls-art { height: 170px; margin: 22px 0 20px; border-radius: 8px; background-size: cover; background-position: center; mix-blend-mode: normal; }
+  .ls-card:nth-child(1) .ls-art { background-image: url('./bg-03.jpg'); }
+  .ls-card:nth-child(2) .ls-art { background-image: url('./about-02.jpg'); }
+  .ls-card:nth-child(3) .ls-art { background-image: url('./bg-05.jpg'); }
+  .ls-card { transition: border-color .3s ease, background-color .3s ease; }
+  .ls-card:hover { border-color: #fff; background-color: #1F1F1F; box-shadow: none; transform: none; }
+  .ls-card:nth-child(n) { --ls-c: #fff; }
+  .ls-no { color: #111; }
+  .ls-go { font-family: var(--tm-head); font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; color: #fff; }
+
+  /* ── 로그인: 빌딩 사진 위에 놓인 상자. 입력 상자는 거의 비치지 않게, 소개는 사진이 조금 비치게 ── */
+  body.auth .app { min-height: 100vh; }
+  body.auth .main { min-height: 100vh; display: flex; align-items: center; padding-bottom: 56px; }
+  body.auth .view { width: 100%; }
+  .login-card { border: 1px solid var(--tm-w20); background-color: rgba(14, 14, 14, .9); }
+  .login-side { background: rgba(0, 0, 0, .55); border: 1px solid var(--tm-w20); color: #fff; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+  .login-side::after { display: none; }
+  .login-side h2 { font-family: var(--tm-head); font-weight: 500; letter-spacing: .03em; }
+  .login-side > p, .login-side .small { color: var(--tm-w90); }
+  .login-side .pill { border: 1px solid var(--tm-w40); background: transparent; color: #fff; font-family: var(--tm-head); letter-spacing: 1.5px; }
+  .feat { border-color: var(--tm-w20); background: rgba(0, 0, 0, .35); }
+  .feat .ico { background: #fff; color: #111; }
+  .feat small { color: var(--tm-w70); }
+  .demo-acc button { background: rgba(255, 255, 255, .06); border-color: var(--tm-w20); }
+
+  /* ── 좁은 화면(900px 이하): 두 버전 모두 원래의 한 줄 메뉴 배치에 색만 ── */
+  @media (max-width: 900px) {
+    .side { border-bottom: 0; background: rgba(8, 8, 8, .9); color: #fff; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+    .side .brand { font-family: var(--tm-head); letter-spacing: 3px; text-transform: uppercase; }
+    .side .brand .logo { border-radius: 0; background: #fff; color: #111; }
+    .side .nav a { color: rgba(255, 255, 255, .8); }
+    .side .nav a.on { background: transparent; color: #fff; box-shadow: inset 0 -2px 0 #fff; }
+    .side a.me { border-color: var(--tm-w20); background: transparent; color: #fff; }
+    .side .logout { color: inherit; }
+    .main { padding: 32px 16px 170px; }
+    .t { font-size: 26px; }
+    .t.lg { font-size: 30px; }
+    .hero { padding: 40px 20px; }
+    body.auth .main { padding: 24px 16px; }
+    .adm-panel { top: var(--rib-h); }
+  }
+  /* 원본처럼 좁은 화면에서는 시차를 끈다(맨 아래 띠의 사진 고정도 풀어 둔다) */
+  @media (max-width: 768px) {
+    body:not(.auth) .main::after { background-attachment: scroll, scroll; }
+  }
+
+  /* ════════════ 움직임 ════════════ */
+  @media (prefers-reduced-motion: no-preference) {
+    /* 화면에 들어올 때 한 번 떠오른다. 덩어리마다 따로 움직이므로 본문 전체의 짧은 등장(gp.css rise)은 끈다.
+       wait·in 은 motion.ts 가 잠깐 붙였다 떼는 상태라, 상자마다 다른 transition 규칙보다 우선하게 한다 */
+    .view { animation: none; }
+    [data-tm612-rv="wait"] { opacity: 0 !important; translate: 0 30px; }
+    [data-tm612-rv="in"] { transition: opacity .8s ease var(--tm612-d, 0s), translate .8s ease var(--tm612-d, 0s) !important; }
+
+    /* 첫 화면 띠·홈 카드 사진: 화면을 지나가는 동안 사진이 위→아래로 움직인다(지원하는 브라우저에서만) */
+    @supports (animation-timeline: view()) {
+      @media (min-width: 769px) {
+        .hero, .ls-card .ls-art { animation: tm612-pan linear both; animation-timeline: view(); }
+      }
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    body::before { transition: none; }
+    body:not(.auth) .main::after { background-attachment: scroll, scroll; }
+  }
+}

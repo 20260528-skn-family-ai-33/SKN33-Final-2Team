@@ -120,7 +120,8 @@ function Post({ R }: { R: PlanRecord }) {
   }, [R.id, quizPending, quizAttempt]);
   const running = !!R.post.running;
   const reportId = R.post.reportId;
-  const locked = running || !!reportId;
+  const submitted = (R.post.quizSurvey?.groups || []).some((group) => group.quizzes.some((q) => typeof q.answer === 'number'));
+  const locked = running || !!reportId || submitted;
   const curPhase = locked && hasQuiz ? 'quizzes' : phase;
   const jobId = R.post.jobId;
   useEffect(() => () => {

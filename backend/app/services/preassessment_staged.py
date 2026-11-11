@@ -29,7 +29,8 @@ def generate_for(employee_id, project_id):
             if api.project_input(t,employee_id,project_id)!=project or api.profile_input(api.profile.view(employee_id) or {})!=personal:
                 raise ApiError(409,'SURVEY_INPUT_CHANGED','생성 중 입력이 변경됐어요. 다시 준비해 주세요.')
         def generate(phase):
-            return api.generate_survey(project,selection,personal,lambda system,payload:api.runtime.llm_json(ctx,system,payload),require_measurement=True,phase=phase)
+            task='역량 테스트 설문 문항 생성' if phase=='surveys' else '역량 테스트 퀴즈 문항 생성'
+            return api.generate_survey(project,selection,personal,api.runtime.model(ctx,'진단 에이전트',task),require_measurement=True,phase=phase)
         if not same:
             partial=generate('surveys')
             with api.db.tx() as t:
