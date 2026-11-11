@@ -90,14 +90,13 @@ class PostQuizTests(unittest.TestCase):
         plan = {'assess': {'questions': [], **self.plan['assess']}}
         row = {'roadmap_id': 'r1', 'status': 'IN_PROGRESS', 'project_id': 1, 'diagnostic_round_id': 1, 'content': plan}
         tx = MagicMock()
-        with patch.object(plans, '_owned', return_value=row), patch.object(plans, 'record', return_value={'post': True}), patch.object(plans.db, 'tx') as transaction:
+        tx.all.return_value = []
+        with patch.object(plans, '_owned', return_value=row), patch.object(plans, 'record', return_value={'post': True}), patch.object(plans.db, 'J', side_effect=lambda x: x), patch.object(plans.db, 'tx') as transaction:
             transaction.return_value.__enter__.return_value = tx
             with patch.object(plans.db, 'one', return_value={'running': False, 'deep': {'v2Quiz': survey, 'v2Answers': {'q': '0'}, 'v2Submitted': True}}):
                 with self.assertRaises(ApiError) as err:
                     plans.save_post(1, 'r1', {'answers': {}, 'quizAnswers': {'q': '1'}, 'goalSelf': '1'})
                 self.assertEqual(err.exception.code, 'POST_LOCKED')
-                with self.assertRaises(ApiError) as err2:
-                    plans.save_post(1, 'r1', {'answers': {}, 'quizAnswers': {'q': '0'}, 'goalSelf': '2'})
-                self.assertEqual(err2.exception.code, 'POST_LOCKED')
-                self.assertEqual(plans.save_post(1, 'r1', {'answers': {}, 'quizAnswers': {'q': '0'}, 'goalSelf': '1', 'clearFail': True}), {'post': True})
+                self.assertEqual(plans.save_post(1, 'r1', {'answers': {}, 'quizAnswers': {'q': '0'}, 'goalSelf': '1'}), {'post': True})
+                self.assertEqual(plans.save_post(1, 'r1', {'answers': {}, 'goalSelf': '1'}), {'post': True})
 

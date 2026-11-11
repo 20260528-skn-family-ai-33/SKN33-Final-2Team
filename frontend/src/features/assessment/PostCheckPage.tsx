@@ -120,8 +120,9 @@ function Post({ R }: { R: PlanRecord }) {
   }, [R.id, quizPending, quizAttempt]);
   const running = !!R.post.running;
   const reportId = R.post.reportId;
-  const submitted = (R.post.quizSurvey?.groups || []).some((group) => group.quizzes.some((q) => typeof q.answer === 'number'));
-  const locked = running || !!reportId || submitted;
+  const submitted = !!R.post.submitted;
+  const locked = running || !!reportId;
+  const quizLocked = locked || submitted;
   const curPhase = locked && hasQuiz ? 'quizzes' : phase;
   const jobId = R.post.jobId;
   useEffect(() => () => {
@@ -181,7 +182,7 @@ function Post({ R }: { R: PlanRecord }) {
   return (
     <Page
       back={paths.checks}
-      title={<span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>사후 점검<button type="button" className="btn line" style={{ height: 26, minHeight: 0, padding: '3px 9px', fontSize: 11 }} disabled={locked} onClick={() => {
+      title={<span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>사후 점검<button type="button" className="btn line" style={{ height: 26, minHeight: 0, padding: '3px 9px', fontSize: 11 }} disabled={quizLocked} onClick={() => {
         updateWs(state => {
           fillRandomPost(state.plans[R.id]);
         });
@@ -237,7 +238,7 @@ function Post({ R }: { R: PlanRecord }) {
           dq={deepOpen(dp) && dp?.quiz ? { quiz: dp.quiz, mcq: `${base}.deep.mcq`, essay: `${base}.deep.essay` } : null}
         />}
         {curPhase === 'quizzes' && quizPending && <div className="card" role={quizError ? 'alert' : 'status'}>{quizError ? <><p>{quizError}</p><button className="btn line small" onClick={() => { setQuizError(''); setQuizAttempt(value => value + 1); }}>퀴즈 다시 준비하기</button></> : <><p><span className="sp" /> 사후 퀴즈 생성 중… 같은 개념의 새 문제를 준비하고 있어요.</p><Skeleton kind="quiz" /></>}</div>}
-        {curPhase === 'quizzes' && <PostQuiz R={R} disabled={locked} review={locked} />}
+        {curPhase === 'quizzes' && <PostQuiz R={R} disabled={quizLocked} review={quizLocked} />}
         {curPhase === 'surveys' && <>
         <div className="card">
           <h2 className="st">처음 목표를 얼마나 이뤘나요?</h2>

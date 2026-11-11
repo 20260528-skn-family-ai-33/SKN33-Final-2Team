@@ -102,6 +102,7 @@ export interface PostDeep {
 export interface PostCheck {
   quizSurvey?: import('@/features/draft/quiz/assessment/flow').Survey | null;
   quizAnswers?: Record<string, string>;
+  submitted?: boolean;
   answers: Record<string, string>;
   goalSelf: string;
   file: { name: string; size?: number; fileId?: string } | null;

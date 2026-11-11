@@ -48,7 +48,7 @@ export function savePost(pid: string, extra?: Record<string, unknown> | null): P
          immer 는 draft 를 고치면서 값도 돌려주면 예외를 던지므로 Object.assign 의 결과를 돌려주지 않는다(#48) */
       const mine = ws().plans[pid]?.post;
       const keep = mine && deepOpen(mine.deep) ? { mcq: mine.deep!.mcq, essay: mine.deep!.essay } : null;
-      const keepAnswers = mine ? { answers: { ...mine.answers }, quizAnswers: { ...mine.quizAnswers }, goalSelf: mine.goalSelf, ...(mine.running ? { running: true } : {}), ...(mine.reportId ? { reportId: mine.reportId } : {}), ...(mine.jobId ? { jobId: mine.jobId } : {}) } : null;
+      const keepAnswers = mine ? { answers: { ...mine.answers }, quizAnswers: { ...mine.quizAnswers }, goalSelf: mine.goalSelf, ...(mine.submitted ? { submitted: true } : {}), ...(mine.running ? { running: true } : {}), ...(mine.reportId ? { reportId: mine.reportId } : {}), ...(mine.jobId ? { jobId: mine.jobId } : {}) } : null;
       takePlan(res);
       if (keepAnswers && ws().plans[pid]) updateWs(s => { Object.assign(s.plans[pid].post, keepAnswers); });
       if (keep && deepOpen(ws().plans[pid]?.post.deep)) updateWs((s) => void Object.assign(s.plans[pid].post.deep as PostDeep, keep));
@@ -118,13 +118,12 @@ export async function makeReport(go: ReturnType<typeof useGo>, pid: string): Pro
   const R = ws().plans[pid];
   if (!R || R.post.running) return;
   clearTimeout(postT);
-  const alreadySubmitted = (R.post.quizSurvey?.groups || []).some((g) => g.quizzes.some((q) => typeof q.answer === 'number'));
   updateWs((s) => {
     s.plans[pid].post.running = true;
     s.plans[pid].post.reportId = null;
     s.plans[pid].post.fail = null;
   });
-  if ((!alreadySubmitted || R.post.fail) && !(await savePost(pid, R.post.fail ? { clearFail: true } : null))) {
+  if (!(await savePost(pid, R.post.fail ? { clearFail: true } : null))) {
     updateWs((s) => {
       if (s.plans[pid]) s.plans[pid].post.running = false;
     });
@@ -134,6 +133,7 @@ export async function makeReport(go: ReturnType<typeof useGo>, pid: string): Pro
     const j = await plansApi.makeReport(pid);
     updateWs((s) => {
       if (s.plans[pid]) {
+        s.plans[pid].post.submitted = true;
         s.plans[pid].post.running = true;
         s.plans[pid].post.jobId = j.jobId;
         if (j.quizSurvey) s.plans[pid].post.quizSurvey = j.quizSurvey;
