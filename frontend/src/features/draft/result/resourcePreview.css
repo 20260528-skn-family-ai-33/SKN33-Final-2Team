@@ -1,0 +1,37 @@
+.roadmap-resource-preview {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  width: min(400px, calc(100vw - 32px));
+  max-height: min(72dvh, 620px);
+  padding: 0;
+  border: 1px solid var(--line-2);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-pop);
+}
+.roadmap-resource-preview[open] { display: flex; flex-direction: column; }
+.roadmap-resource-preview::backdrop { background: rgb(20 22 24 / 16%); }
+.roadmap-resource-preview header {
+  display: flex; align-items: center; justify-content: space-between; flex: none;
+  padding: 10px 16px; border-bottom: 1px solid var(--line); font-size: 13px; font-weight: 600;
+}
+.roadmap-resource-preview header button { border: 0; border-radius: 6px; padding: 5px 9px; background: var(--surface-2); }
+.resource-preview-body { overflow-y: auto; overscroll-behavior: contain; padding: 16px; font-size: 13px; }
+.resource-preview-title { display: flex; align-items: flex-start; gap: 12px; }
+.resource-preview-title img { width: 48px; max-height: 70px; object-fit: contain; }
+.resource-preview-title h2 { margin: 0 0 5px; font-size: 17px; line-height: 1.4; }
+.resource-preview-title p, .resource-preview-body li p { color: var(--ink-2); }
+.resource-preview-body h3 { margin: 16px 0 5px; font-size: 14px; }
+.resource-preview-body section p { white-space: pre-line; }
+.resource-preview-body ol { margin: 0; padding-left: 22px; }
+.resource-preview-body li + li { margin-top: 5px; }
+.resource-preview-more { margin-top: 4px; padding: 2px 0; background: none; border: 0; color: var(--accent-ink); text-decoration: underline; }
+.roadmap-resource-preview footer { flex: none; display: flex; justify-content: flex-end; padding: 8px 16px; border-top: 1px solid var(--line); }
+.roadmap-resource-preview footer a { padding: 4px 10px; border: 1px solid var(--line-2); border-radius: 6px; font-size: 13px; }
+html:has(.roadmap-resource-preview[open]) { overflow: hidden; }
+@media (max-width: 600px) {
+  .roadmap-resource-preview { max-height: 65dvh; }
+}
