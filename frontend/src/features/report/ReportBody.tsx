@@ -1,12 +1,13 @@
+import { ComparisonSummary } from './ComparisonSummary';
 import { QuizLearningCheck } from './QuizLearningCheck';
+import { SurveyDumbbell } from './SurveyDumbbell';
+import { SURVEY_CHOICES, surveyComparison } from './comparison';
 /* 보고서 본문: 직원 화면과 부서장 화면(소속 직원 보고서 · 10/15 전체 공개)이 함께 쓴다 (5차 P.reportBody · P.reportDeep) */
 import type { PlanRecord, Report } from '@/api/types/plan';
 import { DeepReveal } from '@/features/assessment/quizParts';
 import { ansLabel } from '@/shared/lib/prefs';
 import { Note } from '@/shared/ui/parts';
 import './surveyComparison.css';
-
-const SURVEY_CHOICES = ['전혀 아니다', '아니다', '보통이다', '그렇다', '매우 그렇다'];
 
 function SurveyComparisonRow({ phase, value }: { phase: 'pre' | 'post'; value?: string | number | null }) {
   const label = phase === 'pre' ? '사전' : '사후';
@@ -25,14 +26,19 @@ export function ReportBody({ r }: { r: Report }) {
   return (
     <>
       {r.executionSnapshot && <div className="card"><h2 className="st">{r.executionSnapshot.early ? '조기 종료 기준 기록' : '학습 종료 기준 기록'}</h2><p className="small muted">기준 시점: {new Date(r.executionSnapshot.asOf).toLocaleString('ko-KR')} · 이 시점까지 저장된 활동·메모·제출 여부를 반영했어요. 첨부 내용은 검증하지 않았어요.</p></div>}
+      <ComparisonSummary r={r} />
       {!!r.surveyEvidence?.length && <details className="card report-survey">
         <summary><span>설문 응답 비교</span></summary>
         <p className="small muted">동일한 문항의 사전·사후 선택을 비교해요.</p>
-        <ol className="report-survey-questions">{r.surveyEvidence.map((row, index) => <li key={row.id}>
-          <b className="small muted">{row.skill || row.area}</b><p className={row.pre && row.post ? Number(row.post) > Number(row.pre) ? 'report-survey-post' : 'report-survey-pre' : undefined}>{index + 1}. {row.text}</p>
-          <SurveyComparisonRow phase="pre" value={row.pre} />
-          <SurveyComparisonRow phase="post" value={row.post} />
-        </li>)}</ol>
+        <SurveyDumbbell survey={surveyComparison(r.surveyEvidence)} />
+        <details className="cmp-more">
+          <summary>선택지로 보기</summary>
+          <ol className="report-survey-questions">{r.surveyEvidence.map((row, index) => <li key={row.id}>
+            <b className="small muted">{row.skill || row.area}</b><p className={row.pre && row.post ? Number(row.post) > Number(row.pre) ? 'report-survey-post' : 'report-survey-pre' : undefined}>{index + 1}. {row.text}</p>
+            <SurveyComparisonRow phase="pre" value={row.pre} />
+            <SurveyComparisonRow phase="post" value={row.post} />
+          </li>)}</ol>
+        </details>
       </details>}
       {!!(r.quizEvidence?.length || r.postQuizDetails?.length) && <QuizLearningCheck evidence={r.quizEvidence ?? []} postDetails={r.postQuizDetails} />}
       <div className="card" style={{ marginTop: 12 }}>

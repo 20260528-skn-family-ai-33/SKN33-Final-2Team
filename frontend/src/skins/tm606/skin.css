@@ -296,10 +296,8 @@
   .review-generation-status { background: var(--accent-soft); color: var(--accent-ink); }
   .review-skill-block.is-current-week, .roadmap-learning-group.is-current-week { border-color: var(--accent-line); background: var(--accent-soft); box-shadow: inset 4px 0 0 var(--accent); }
   .roadmap-learning-anchor.is-current-week { background: var(--accent-soft2); }
-  .report-survey-pre, .report-answer-pre .report-answer-phase { color: #F87171; }
-  .report-survey-post, .report-answer-post .report-answer-phase { color: #60A5FA; }
-  .report-answer-pre .is-selected { border-color: #F87171; background: rgba(248, 113, 113, .12); color: #FCA5A5; }
-  .report-answer-post .is-selected { border-color: #60A5FA; background: rgba(96, 165, 250, .12); color: #93C5FD; }
+  /* 결과 보고서의 사전·사후 색(#116): 어두운 바탕에서는 강조색을 낮추지 않고 그대로 쓴다 */
+  .cmp-summary, .learning-check, .report-survey { --cmp-post: var(--accent); }
   /* #59 로 들어온 역량 테스트 결과 보기도 정답·오답 칸과 문항 번호에 옅은 바탕색을 직접 적어, 어두운 화면에서 밝은 상자로 튄다
      → 어두운 바탕에 밝은 글자로(파랑 정답 · 빨강 오답 · 초록 고른 정답은 그대로) */
   .v2-survey-review label.answer-correct { border-color: rgba(96, 165, 250, .5); background: rgba(96, 165, 250, .12); color: #93C5FD; }

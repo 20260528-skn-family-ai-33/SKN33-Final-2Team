@@ -12,8 +12,9 @@
 .report-answer-options>li{display:flex;align-items:center;justify-content:center;gap:5px;flex-wrap:wrap;border:1px solid var(--line);border-radius:7px;padding:7px 4px;font-size:11px;color:var(--muted);min-width:0}
 .report-answer-number{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border:1px solid currentColor;border-radius:50%;font-size:10px}
 .report-answer-mark{font-size:10px;font-weight:650}
-.report-survey-pre,.report-answer-pre .report-answer-phase{color:#b73d35}
-.report-survey-post,.report-answer-post .report-answer-phase{color:#2465b3}
-.report-answer-pre .is-selected{border-color:#b73d35;background:#fff0ed;color:#a52e28;font-weight:600}
-.report-answer-post .is-selected{border-color:#2465b3;background:#edf5ff;color:#1b579c;font-weight:600}
+/* 사전 = 테마의 회색, 사후 = 테마 강조색(값은 comparisonViz.css 의 --cmp-*). 높아진 문항의 글만 강조색으로 둔다 */
+.report-answer-pre .report-answer-phase{color:var(--ink-2)}
+.report-survey-post,.report-answer-post .report-answer-phase{color:var(--cmp-post-ink)}
+.report-answer-pre .is-selected{border-color:var(--cmp-pre);background:var(--cmp-pre-soft);color:var(--ink-2);font-weight:600}
+.report-answer-post .is-selected{border-color:var(--cmp-post);background:var(--cmp-post-soft);color:var(--cmp-post-ink);font-weight:600}
 @media(max-width:600px){.report-survey>summary{gap:7px;flex-wrap:wrap}.report-answer-options{gap:3px}.report-answer-options>li{flex-direction:column;gap:3px;padding:6px 2px;font-size:10px}}
