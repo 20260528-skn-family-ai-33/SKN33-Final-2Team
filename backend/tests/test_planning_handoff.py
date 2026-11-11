@@ -27,3 +27,14 @@ class PlanningHandoffTests(unittest.TestCase):
   self.assertEqual(h['trackPolicyVersion'],track_policy.VERSION)
   with patch.object(track_policy,'VERSION','changed'):
    self.assertNotEqual(h['key'],build_handoff(saved,{},{})['key'])
+
+ def test_saved_five_skills_follow_user_order_for_first_three(self):
+  names=['A','B','C','D','E']
+  for order,expected in ((['E','D','C','B','A'],['E','D','C']),(['D'],['D','A','B']),(list(names),['A','B','C'])):
+   with self.subTest(order=order):
+    s=self.saved();s['selection']={'skills':[{'name':n,'application':n} for n in names]};s['skillOrder']=list(order)
+    h=build_handoff(s,{},{})
+    self.assertEqual(h['skillOrder'],expected)
+    self.assertEqual([row['name'] for row in h['skillDetails']],expected)
+    self.assertEqual(sorted(h['excludedSkills']),sorted(set(names)-set(expected)))
+    self.assertEqual(s['skillOrder'],order)

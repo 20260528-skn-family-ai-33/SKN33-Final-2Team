@@ -8,8 +8,12 @@ def build_handoff(saved, prefs, profile):
     if not saved.get('completed'):
         raise ValueError('사전 점검을 먼저 완료해 주세요.')
     independent = bool((saved.get('selection') or {}).get('skills')) or not saved.get('recommendations')
+    selected_names = None
     if independent:
-        saved=deepcopy(saved)
+        from app.services.course_recommendations import cap_selection
+        selected_names=[row['name'] for row in (saved.get('selection') or {}).get('skills') or []]
+        # 이전 상한 4~5개는 저장된 사용자 skillOrder 기준 앞 3개만 계획에 넘긴다(자료 추천과 같은 기준).
+        saved=deepcopy(cap_selection(saved))
         rows=(saved.get('selection') or {}).get('skills') or []
         saved['recommendations']={'skills':[{'name':row['name'],'courses':[],'books':[]} for row in rows]}
         saved['skillOrder']=[row['name'] for row in rows]
@@ -42,7 +46,7 @@ def build_handoff(saved, prefs, profile):
         'skillNames':list(names),'trackPolicyVersion':track_policy.VERSION,
         'skillDetails':[deepcopy(details[name]) for name in names if name in details],
         'skillMaterials':{name:deepcopy(choices[name]) for name in names},
-        'excludedSkills':[name for name in order if name not in names],
+        'excludedSkills':[name for name in (selected_names or order) if name not in names],
         'assessment':{'groups':deepcopy(saved['survey']['groups']),'answers':deepcopy(saved['answers'])},
         'durationEstimates':{name:deepcopy((saved.get('durationEstimates') or {}).get(name)) for name in names},
         'assessmentGenerationId':saved['generationId']}
