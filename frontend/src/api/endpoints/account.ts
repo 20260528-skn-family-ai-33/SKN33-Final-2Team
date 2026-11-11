@@ -69,7 +69,9 @@ export interface AiStatusResponse {
   [k: string]: unknown;
 }
 
+/** 에이전트 동작 기록 목록의 한 줄(요약). 입력·출력 전문은 길어서 펼칠 때 aiApi.logEntry(id) 로 받는다 */
 export interface AgentLogEntry {
+  id: number;
   at: string;
   /** 그 호출이 누구의 일이었는지(직원 번호·이름) · 시연·디버그용이라 모든 계정의 호출이 온다 */
   employeeId?: number;
@@ -82,8 +84,28 @@ export interface AgentLogEntry {
   mode: string;
   ms: number;
   error?: string;
-  input: string;
+  /** 그 기록 안에서 실제 모델을 부른 횟수 */
+  callCount: number;
+}
+
+/** 모델 호출 한 번: 실제로 보낸 메시지와 받은 원문 전체(자르지 않음 · 이미지는 개수만) */
+export interface AgentModelCall {
+  role: string;
+  model: string;
+  ms: number;
+  error?: string;
+  system: string;
+  /** 시스템 지시 뒤의 메시지(이전 대화 → 마지막이 이번 입력) */
+  messages: { role: string; content: string }[];
+  images: number;
   output: string;
+}
+
+/** 기록 한 건의 전문. 에이전트 실행 기록에만 input·output 이 있고, 모델을 바로 부른 기록은 calls 하나뿐 */
+export interface AgentLogDetail extends Omit<AgentLogEntry, 'callCount'> {
+  input?: string;
+  output?: string;
+  calls: AgentModelCall[];
 }
 
 export const aiApi = {
@@ -92,6 +114,7 @@ export const aiApi = {
   setReasoning: (provider: ServerProvider, level: string | null) => http.put<{ reasoning: ReasoningPicks }>('/me/reasoning', { provider, level }),
   status: (provider: ServerProvider) => http.get<AiStatusResponse>(`/ai/status?provider=${enc(provider)}`),
   log: () => http.get<{ log: AgentLogEntry[] }>('/ai/log'),
+  logEntry: (id: number) => http.get<AgentLogDetail>(`/ai/log/${enc(String(id))}`),
 };
 
 export const demoApi = {

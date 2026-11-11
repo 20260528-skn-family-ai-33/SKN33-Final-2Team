@@ -58,8 +58,9 @@ def evaluate_change(ctx, course: str, baseline_prompt: str, candidate_prompt: st
         items = catalog.items()
         materials = [{**{key: deepcopy(items[rid].get(key)) for key in ('id','title','type','cost','skills')},
                       **catalog_evidence.evidence(items[rid], [handoff['goal']] + list(handoff.get('focus') or []))} for rid in sorted(ids) if rid in items]
-        graded = runtime.llm_json(ctx, JUDGE_SYSTEM, {'case': handoff, 'course': course, 'left': left, 'right': right,
-                                                     'revision': revision, 'rubric': rubric or [], 'materials': materials, 'checkNames': sorted(CHECKS), 'scoreNames': sorted(SCORES)}, role='roadmap')
+        judge = runtime.model(ctx, '프롬프트 개선', f'개선안 비교 평가 · {case_id}', role='roadmap')
+        graded = judge(JUDGE_SYSTEM, {'case': handoff, 'course': course, 'left': left, 'right': right,
+                                      'revision': revision, 'rubric': rubric or [], 'materials': materials, 'checkNames': sorted(CHECKS), 'scoreNames': sorted(SCORES)})
         if not isinstance(graded, dict) or not isinstance(graded.get('left'), dict) or not isinstance(graded.get('right'), dict):
             raise ImprovementError('별도 비교 평가 결과가 불완전합니다.')
         before, after = (graded['right'], graded['left']) if swapped else (graded['left'], graded['right'])

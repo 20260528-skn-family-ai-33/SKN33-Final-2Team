@@ -246,6 +246,14 @@ details.handoff + .agents { margin-top: 14px; }
 .logi summary { display: flex; align-items: center; gap: 10px; list-style: none; cursor: pointer; font-size: 13.5px; }
 .logi summary::-webkit-details-marker { display: none; }
 .logi pre { max-height: 260px; margin: 4px 0 10px; padding: 10px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); font-size: 11.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-all; }
+/* 입력·출력은 자르지 않는다: 칸 안에서 스크롤하거나 '크게 보기'로 높이 제한을 푼다 */
+.logi pre.big { max-height: none; }
+.log-text { margin-top: 8px; }
+.log-text-h { display: flex; align-items: center; gap: 6px; }
+.log-text-h > span { flex: 1; min-width: 0; }
+.log-call { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.log-call-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin: 0; font-size: 13px; }
+.log-err { margin: 8px 0; color: var(--warn); }
 
 @media (max-width: 900px) {
   .dform { grid-template-columns: 1fr; gap: 18px; }

@@ -3,7 +3,7 @@
    VITE_DEMO_TOOLS가 명시적 on이고 서버도 demoMode:true를 알릴 때만 표시한다. 서버 조회 실패·구버전 응답은 숨긴다. */
 import { useState } from 'react';
 import { legacyToPath, paths } from '@/app/paths';
-import { aiApi, demoApi, type AgentLogEntry } from '@/api/endpoints/account';
+import { demoApi } from '@/api/endpoints/account';
 import { reloadWorkspace } from '@/features/draft/draftSync';
 import { addDays, md, ymd } from '@/features/home/ganttCalc';
 import { useGo } from '@/shared/hooks/useGo';
@@ -17,6 +17,7 @@ import { useMe } from '@/shared/state/session';
 import { closeSheet, openSheet, toast } from '@/shared/state/ui';
 import { updateWs, useWs } from '@/shared/state/workspace';
 import { Icon } from '@/shared/ui/Icon';
+import { showAgentLog } from './AgentLog';
 
 export const JUMPS: [string, string][] = [
   ['start', '처음부터'],
@@ -42,64 +43,6 @@ const FAILS: [string, string][] = [
   ['reg', '사내 생활 도우미 답변'],
   ['rev', '수정안 작성'],
 ];
-
-const LOG_TAG: Record<string, [string, string]> = {
-  ollama: ['tag acc', 'RunPod-Ollama'],
-  api: ['tag acc', 'OpenAI API'],
-  mock: ['tag', '가데이터'],
-  error: ['tag fail', '호출 오류 · 실패 안내'],
-  sim: ['tag fail', '실패 시연'],
-  off: ['tag fail', '모드 사용 불가 · 실패 안내'],
-  stop: ['tag', '사용자가 멈춤'],
-};
-
-export async function showAgentLog(): Promise<void> {
-  let L: AgentLogEntry[] = [];
-  try {
-    L = (await aiApi.log()).log || [];
-  } catch {
-    L = [];
-  }
-  openSheet({
-    title: '에이전트 동작 기록',
-    sub: '모든 계정의 최근 호출이 위에 보여요(시연·디버그용) · 서버 메모리에만 있어 서버를 다시 켜면 지워져요 (DB에는 처리 시간·결과 같은 기록만 남아요)',
-    wide: true,
-    body: () =>
-      L.length ? (
-        <div className="log">
-          {L.map((e, i) => (
-            <details className="logi" key={i}>
-              <summary>
-                <span className="muted small num">{e.at}</span>
-                {e.employee ? <span className="small">{e.employee}</span> : null}
-                <b>{e.agent}</b>
-                <span className="grow small">
-                  {e.task}
-                  {e.model && e.mode !== 'mock' ? ` · ${e.model}` : ''}
-                </span>
-                {e.by ? <span className="tag">{e.by} 실행</span> : null}
-                {LOG_TAG[e.mode] ? <span className={LOG_TAG[e.mode][0]}>{LOG_TAG[e.mode][1]}</span> : null}
-                <span className="small muted num">{e.ms}ms</span>
-              </summary>
-              {e.error ? (
-                <p className="small" style={{ color: 'var(--warn)', margin: '8px 0' }}>
-                  {e.error}
-                </p>
-              ) : null}
-              <p className="small muted" style={{ marginTop: 8 }}>
-                입력
-              </p>
-              <pre>{e.input}</pre>
-              <p className="small muted">출력</p>
-              <pre>{e.output}</pre>
-            </details>
-          ))}
-        </div>
-      ) : (
-        <p className="muted">아직 호출한 에이전트가 없어요.</p>
-      ),
-  });
-}
 
 /** 서버 설정 한 줄(.env 의 모델 연결 상태) — 직원·관리자 시연 도구 공통 */
 function serverLine(status: { checked: boolean; server?: boolean }): string {

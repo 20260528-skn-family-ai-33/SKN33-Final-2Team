@@ -121,4 +121,4 @@ def run(ctx, current_prompts: dict, events: list[dict], minimum_decisions: int =
     if minimum_decisions < MINIMUM_DECISIONS:
         raise ImprovementError('최소 30건의 최종 확정 비교 표본이 필요합니다.')
     return propose(current_prompts, events, minimum_decisions,
-                   lambda system, payload: runtime.llm_json(ctx, system, payload, role='roadmap'))
+                   runtime.model(ctx, '프롬프트 개선', '월간 개선안 작성', role='roadmap'))
