@@ -1,6 +1,6 @@
 /* 인증·내 정보 (API-01~08) · AI 모델·시연 도구 (API-10~12) */
 import { enc, http } from '../client';
-import type { Account, DemoAccounts, GoalSuggestions, ProfileView, ReasoningPicks, ServerProvider, UserSettings } from '../types/account';
+import type { Account, DemoAccounts, GoalSuggestions, ProfileView, ProviderPolicy, ReasoningPicks, ServerProvider, UserSettings } from '../types/account';
 import type { JobStarted } from '../types/common';
 import type { Workspace } from '../types/plan';
 
@@ -15,7 +15,7 @@ export const accountApi = {
     http.put<null>('/me/password', { currentPassword, newPassword }),
   saveSelf: (body: Record<string, unknown>) => http.put<ProfileView>('/me/profile/self', body),
   revertSelf: () => http.del<ProfileView>('/me/profile/self'),
-  consent: (period: string, consent: boolean) => http.put<{ period: string; consent: boolean }>(`/me/evaluations/${enc(period)}/consent`, { consent }),
+
   goals: () => http.get<GoalSuggestions>('/me/goal-suggestions'),
   goalsEnsure: () => http.post<GoalSuggestions>('/me/goal-suggestions/ensure'),
   goalsRegenerate: () => http.post<Partial<JobStarted> & Partial<GoalSuggestions>>('/me/goal-suggestions/regenerate'),
@@ -45,6 +45,8 @@ export interface ThinkLevels {
 
 export interface ProvidersResponse {
   current: ServerProvider;
+  policy?: ProviderPolicy;
+  employeeReasoning?: ReasoningPicks;
   /** 서버의 시연 허용 여부. 구버전 응답의 누락은 허용하지 않는 것으로 처리한다. */
   demoMode?: boolean;
   providers: ProviderInfo[];

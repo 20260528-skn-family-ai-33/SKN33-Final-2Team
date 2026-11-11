@@ -62,6 +62,7 @@ export interface User {
 }
 
 export type ServerProvider = 'ollama' | 'openai';
+export type ProviderPolicy = ServerProvider | 'employee';
 export type FailSim = Record<string, boolean>;
 
 export interface UserSettings {

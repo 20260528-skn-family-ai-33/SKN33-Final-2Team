@@ -275,23 +275,59 @@ class AppContractTests(unittest.TestCase):
         self.assertEqual(self.db.one('SELECT * FROM public.employee_input_profiles WHERE employee_id=:e', e=self.ids['member']), before)
         self.assertIsNone(self.db.one('SELECT * FROM app_ext.employee_self_inputs WHERE employee_id=:e', e=self.ids['member']))
 
-    def test_consent_grant_withdrawal_and_invalid_body(self):
+    def test_corrupt_policy_marks_queued_goal_failed_in_admin_overview(self):
+        from dataclasses import replace
+        from tempfile import TemporaryDirectory
+        from fastapi import FastAPI
+        from app import auth, errors, jobs, provider_policy
+        from app.routers import admin
+
+        api = FastAPI()
+        api.include_router(admin.r)
+        api.add_exception_handler(errors.ApiError, errors.api_error_handler)
+        api.dependency_overrides[auth.require_admin] = lambda: auth.Account('admin', 1, 'test')
+        client = self.enterContext(self.TestClient(api))
+        var_dir = Path(self.enterContext(TemporaryDirectory()))
+        eid = self.ids['member']
         with self.db.tx() as t:
-            t.run("INSERT INTO app_ext.employee_evaluations(employee_id,period,consent_default) VALUES(:e,'fixture',false)", e=self.ids['member'])
+            candidates = self.goals.G.defaults()
+            self.goals._save(t, eid, candidates)
+        baseline = client.get('/api/v1/admin/overview').json()['goals']
+        with (patch.object(provider_policy, 'S', replace(provider_policy.S, var_dir=var_dir, employee_ai_selection=True)),
+              patch.object(self.goals, 'request', self.actual_goal_request),
+              patch.object(jobs.POOL, 'submit') as submit, patch.object(self.goals.G, 'run') as model):
+            result = client.post('/api/v1/admin/goal-suggestions/regenerate-all',
+                                 json={'expectedPolicy': 'employee', 'employeeIds': [eid]})
+            self.assertEqual(result.status_code, 200, result.text)
+            self.assertEqual(result.json()['started'], 1)
+            before = client.get('/api/v1/admin/overview').json()['goals']
+            self.assertEqual(before['running'], baseline.get('running', 0) + 1)
+            (var_dir / 'ai-provider').write_text('unknown')
+            submit.call_args.args[0]()  # 등록 후 파일 손상. 직원의 후보 조회 없이 관리자 개요부터 읽는다.
+            after = client.get('/api/v1/admin/overview').json()['goals']
+            self.assertEqual(after.get('running', 0), baseline.get('running', 0))
+            self.assertEqual(after['failed'], baseline.get('failed', 0) + 1)
+            model.assert_not_called()
+        row = self.db.one("""SELECT g.status, g.error, j.status AS job_status, j.error AS job_error
+            FROM app_ext.goal_suggestion_runs g JOIN app_ext.jobs j USING (job_id) WHERE g.employee_id=:e""", e=eid)
+        self.assertEqual((row['status'], row['job_status']), ('failed', 'failed'))
+        self.assertEqual(row['error']['code'], 'BAD_PROVIDER_POLICY')
+        self.assertEqual(row['error'], row['job_error'])
+        kept = self.db.all_('SELECT prompt_text FROM public.employee_recommended_prompts WHERE employee_id=:e ORDER BY display_order', e=eid)
+        self.assertEqual([r['prompt_text'] for r in kept], [c['goal'] for c in candidates])
+
+    def test_retired_appraisals_are_hidden_and_preserved(self):
+        eid = self.ids['member']
+        with self.db.tx() as t:
+            t.run("INSERT INTO app_ext.employee_evaluations(employee_id,period,consent_default) VALUES(:e,'fixture',true)", e=eid)
         c = self.client('member')
-        path = '/api/v1/me/evaluations/fixture/consent'
-        self.assertEqual(c.put(path, json={'consent': True}).status_code, 200)
-        self.assertTrue(self.db.val("SELECT consent FROM app_ext.employee_evaluations WHERE employee_id=:e AND period='fixture'", e=self.ids['member']))
-        for invalid in ({}, {'consent': 'false'}, {'consent': None}, {'consent': 1}):
-            with self.subTest(body=invalid):
-                self.assertEqual(c.put(path, json=invalid).status_code, 422)
-        self.assertTrue(self.db.val("SELECT consent FROM app_ext.employee_evaluations WHERE employee_id=:e AND period='fixture'", e=self.ids['member']))
-        for _ in range(2):
-            self.assertEqual(c.put(path, json={'consent': False}).status_code, 200)
-        row = self.db.one("SELECT * FROM app_ext.employee_evaluations WHERE employee_id=:e AND period='fixture'", e=self.ids['member'])
-        self.assertIsNone(row['consent'])  # Inherit false default, not an erased evaluation.
-        self.assertIsNotNone(row['consent_changed_at'])
-        self.assertEqual(self.client('peer').put(path, json={'consent': True}).status_code, 404)
+        profile = c.get('/api/v1/me/profile').json()
+        self.assertEqual(profile['evaluations'], [])
+        self.assertEqual(profile['view']['evals'], [])
+        self.assertEqual(c.put('/api/v1/me/evaluations/fixture/consent', json={'consent': False}).status_code, 404)
+        row = self.db.one("SELECT consent,consent_default FROM app_ext.employee_evaluations WHERE employee_id=:e AND period='fixture'", e=eid)
+        self.assertIsNone(row['consent'])
+        self.assertTrue(row['consent_default'])
 
     def test_database_work_description_reaches_model_self_override_and_revert(self):
         from app.agents.goals import goal_input
@@ -541,22 +577,6 @@ class AppContractTests(unittest.TestCase):
             self.assertEqual(self._wait_goal(eid)['status'],'ready')
             self.assertEqual(generate.call_count,3)
 
-    def test_goal_preload_follows_website_evaluation_consent_changes(self):
-        eid,out=self._goal_setup()
-        with self.db.tx() as t:
-            t.run("INSERT INTO app_ext.employee_evaluations(employee_id,period,grade,consent_default) VALUES(:e,'2026','A',false)",e=eid)
-        with patch.object(self.goals,'request',self.actual_goal_request),patch.object(self.goals.G,'run',return_value=out) as generate:
-            c=self.client('member')
-            self.assertEqual(c.post('/api/v1/me/goal-suggestions/ensure').status_code,200)
-            self.assertEqual(self._wait_goal(eid)['status'],'ready')
-            self.assertEqual(c.put('/api/v1/me/evaluations/2026/consent',json={'consent':False}).status_code,200)
-            self.assertEqual(generate.call_count,1)
-            self.assertEqual(c.put('/api/v1/me/evaluations/2026/consent',json={'consent':True}).status_code,200)
-            self.assertEqual(self._wait_goal(eid)['status'],'ready')
-            self.assertEqual(generate.call_count,2)
-            self.assertEqual(c.put('/api/v1/me/evaluations/2026/consent',json={'consent':True}).status_code,200)
-            self.assertEqual(generate.call_count,2)
-
     def test_department_rename_preloads_affected_members_after_admin_save(self):
         from app.admin_io import base,hr
         eid,out=self._goal_setup()
@@ -567,7 +587,7 @@ class AppContractTests(unittest.TestCase):
             self.client('member').post('/api/v1/me/goal-suggestions/ensure')
             self.assertEqual(self._wait_goal(eid)['status'],'ready')
             with patch.object(hr,'_inst',return_value=self.inst):
-                cur={sheet:hr.current(sheet) for sheet in ('부서','직원','평정')}
+                cur={sheet:hr.current(sheet) for sheet in ('부서','직원')}
                 with self.db.tx() as t:result=hr.apply(t,{'부서':[row]},cur,{})
             self.assertEqual(set(result['goal_ids']),{self.ids[key] for key in ('head','member','peer','child_head','child_member')})
             self.assertEqual(generate.call_count,1)

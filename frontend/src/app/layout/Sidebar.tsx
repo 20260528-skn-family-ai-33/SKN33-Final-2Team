@@ -32,7 +32,7 @@ export function AiBox() {
     }
   }
   // 모델 상태(사용 가능 여부)·추론 정도는 ai.* 로 읽으므로, 바뀌면 다시 그리도록 구독만 한다(연결 확인 결과는 useAiMode 의 conn)
-  useAi((s) => s.status);
+  const policy = useAi((s) => s.status.policy);
   useAi((s) => s.settings.reasoning);
   const pick = (p: UiProvider) => {
     setChoice(p)
@@ -92,12 +92,16 @@ export function AiBox() {
     </label>
   );
   return (
-    <div className="aim" role="radiogroup" aria-label="AI 모델">
+    <div className="aim" role={policy && policy !== 'employee' ? 'group' : 'radiogroup'} aria-label="AI 모델">
       <span className="lbl">AI 모델</span>
-      {opt('ollama', 'RunPod-Ollama', '로컬 LLM·sLLM')}
-      {effort('ollama')}
-      {opt('api', 'OpenAI API', ai.openaiModel())}
-      {effort('api')}
+      {policy && policy !== 'employee' ? (
+        <p>관리자 지정 · {PROV[policy]} · {policy === 'openai' ? ai.openaiModel() : ai.ollamaInfo().model} · 추론 {levelLabel(ai.reasoning(policy === 'openai' ? 'api' : 'ollama') || '기본값')}</p>
+      ) : <>
+        {opt('ollama', 'RunPod-Ollama', '로컬 LLM·sLLM')}
+        {effort('ollama')}
+        {opt('api', 'OpenAI API', ai.openaiModel())}
+        {effort('api')}
+      </>}
       {showRecovery && <button type="button" className="btn line sm" disabled={clearing} onClick={() => void clearSettings()}>
         {clearing ? '해제 중…' : '가데이터·실패 시연 해제'}
       </button>}

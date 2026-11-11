@@ -2,18 +2,20 @@
    규정은 원문 PDF 개수만 보인다(2026-10-26 · 규정 색인은 서비스 운영팀이 하므로 관리자 화면에서 뺌) */
 import type { ReactNode } from 'react';
 import { adminApi } from '@/api/endpoints/admin';
-import type { AdminOverview, GoalMode } from '@/api/types/admin';
+import type { ProviderPolicy } from '@/api/types/account';
+import type { AdminOverview } from '@/api/types/admin';
 import { paths } from '@/app/paths';
 import { useGo } from '@/shared/hooks/useGo';
 import { failToast } from '@/shared/lib/fail';
-import { canUseDemo } from '@/shared/lib/demoAccess';
-import { ai, useAi } from '@/shared/state/ai';
+import { useQuery } from '@tanstack/react-query';
+import { levelLabel } from '@/shared/state/ai';
 import { closeSheet, openSheet, toast } from '@/shared/state/ui';
 import { Icon } from '@/shared/ui/Icon';
-import { Loading, Note, Page } from '@/shared/ui/parts';
+import { Loading, Page } from '@/shared/ui/parts';
 import { refreshGoals, useGoalEmployees, useOverview } from './adminData';
-import { adm, pickGoal, requireDemoGoalAllowed, setChoice, setGoal, useAdmin } from './adminStore';
+import { adm, pickGoal, setGoal, useAdmin } from './adminStore';
 import { DS, EDU_KIND, REG } from './datasets';
+import { ProviderSettings } from './ProviderSettings';
 import { FailBox, Num, UploadList } from './parts';
 
 const PAGE_HEAD = { eyebrow: '관리자', title: '데이터 관리' };
@@ -36,12 +38,12 @@ function Card({ head, to, children }: { head: { title: string; icon: string }; t
   );
 }
 
-/* ── 목표 후보 다시 만들기: 대상(재직 직원 모두 / 고른 직원만) × 모델(가데이터 · 각 직원의 AI 모드 · 관리자가 고른 모델) ──
-   관리자가 고른 모델은 이번 작업에만 쓰고 직원이 고른 AI 모드는 바꾸지 않는다(2026-10-26) */
 const GOAL_STATUS: Record<string, string> = { ready: '준비됨', default: '기본 후보', running: '만드는 중', failed: '실패' };
 const GOAL_SRC: Record<string, string> = { mock: '가데이터', ollama: 'RunPod-Ollama', openai: 'OpenAI API' };
 const MODE_LABEL: Record<string, string> = { mock: '가데이터', employee: '각 직원의 AI 모드', ollama: 'RunPod-Ollama', openai: 'OpenAI API' };
-const withModel = (label: string, model: string) => (model ? `${label} · ${model}` : label);
+function useProviderSettings() {
+  return useQuery({ queryKey: ['admin', 'ai-provider'], queryFn: adminApi.providerSettings });
+}
 
 function GoalPicker() {
   const q = useGoalEmployees();
@@ -84,18 +86,9 @@ function GoalPicker() {
 }
 
 function GoalsAllBody({ active }: { active: number }) {
-  const v = useAdmin((s) => s.choice.goalsAll);
   const target = useAdmin((s) => s.goal.target);
-  // 모델 사용 가능 여부는 서버 설정(/ai/providers)에서 받으므로 받은 뒤 다시 그린다
-  const status = useAi((s) => s.status);
-  const mode = (value: string, label: string, note: string, ok = true, why = '') => (
-    <label className={`radio${ok ? '' : ' off'}`}>
-      <input type="radio" name="admGoalMode" value={value} checked={v === value} disabled={!ok} onChange={() => setChoice('goalsAll', value)} />
-      <span>
-        {label} <span className="small muted">· {ok ? note : `지금 쓸 수 없어요 · ${why}`}</span>
-      </span>
-    </label>
-  );
+  const q = useProviderSettings();
+  const policy = q.data?.policy;
   return (
     <>
       <p style={{ marginTop: 0 }}>목표 후보를 다시 만들어요. 본인 입력이 없는 직원은 AI 활용 업무 기본 후보로 바로 저장해요.</p>
@@ -116,28 +109,23 @@ function GoalsAllBody({ active }: { active: number }) {
       </div>
       {target === 'pick' ? <GoalPicker /> : null}
       <p className="small" style={{ margin: '14px 0 6px' }}>
-        <b>어떤 모델로</b>
+        <b>적용 모델</b>
       </p>
-      <div className="stack" style={{ gap: 6 }}>
-        {canUseDemo(status.demoMode) ? mode('mock', '시연용 가데이터', '비용 없음 · 바로 끝나요') : null}
-        {mode('employee', '각 직원이 고른 AI 모드', '실제 모델 호출(OpenAI API는 비용이 들어요) · 모드가 설정되지 않은 직원은 실패로 남아요')}
-        {mode('ollama', withModel('RunPod-Ollama', ai.ollamaInfo().model), '직원이 고른 모드와 관계없이 이 모델로 만들어요 · 직원 설정은 바꾸지 않아요', ai.available('ollama'), ai.unavailableWhy('ollama'))}
-        {mode('openai', withModel('OpenAI API', ai.openaiModel()), '직원 한 명마다 한 번 호출해서 비용이 들어요 · 직원 설정은 바꾸지 않아요', ai.available('api'), ai.unavailableWhy('api'))}
-      </div>
-      {v === 'mock' && !canUseDemo(status.demoMode) ? <Note>시연 모드가 꺼져 있어요. 사용할 AI 모드를 다시 골라 주세요.</Note> : null}
+      {q.isError ? <FailBox err={q.error} what="모델 설정을 불러오지 못했어요" /> :
+        <p>{q.data?.policyStatus === 'invalid' ? 'AI 모델 설정을 먼저 복구해 주세요.' : !policy ? '모델 설정을 불러오는 중…' : policy === 'employee' ? '직원별 선택 (베타) · 각 직원이 저장한 모델 사용' :
+          `${MODE_LABEL[policy]} · ${q.data!.providers[policy].model} · 추론 ${q.data?.level ? levelLabel(q.data.level) : '기본값'}`}
+          {policy === 'openai' && ' · 호출 비용이 발생해요'}</p>}
     </>
   );
 }
 
-async function goalsAllOk() {
+async function goalsAllOk(policy: ProviderPolicy, level: string | null) {
   const s = adm();
-  const m = s.choice.goalsAll;
   const pick = s.goal.target === 'pick' ? s.goal.picked : undefined;
   if (pick && !pick.length) return;
   try {
-    requireDemoGoalAllowed(m, canUseDemo(ai.demoAllowed()));
     closeSheet();
-    const r = await adminApi.goalsAll(m === 'employee' ? null : (m as GoalMode), pick);
+    const r = await adminApi.goalsAll(policy, level, pick);
     toast(`직원 ${r.employees}명 · 작업 ${r.started}개 시작 · 기본 후보 ${r.defaults}명 저장 · ${MODE_LABEL[r.mode] || r.mode}`);
     /* 작업이 조금 진행된 뒤에 개수를 다시 받는다 */
     setTimeout(refreshGoals, 1500);
@@ -148,15 +136,14 @@ async function goalsAllOk() {
 
 function GoalsAllFoot() {
   const empty = useAdmin((s) => s.goal.target === 'pick' && !s.goal.picked.length);
-  const mode = useAdmin((s) => s.choice.goalsAll);
-  const status = useAi((s) => s.status);
-  const unavailable = mode === 'mock' ? !canUseDemo(status.demoMode) : (mode === 'ollama' || mode === 'openai') && !ai.available(mode);
+  const { data, isError } = useProviderSettings();
+  const unavailable = isError || !data?.policy || (data.policy !== 'employee' && !data.providers[data.policy].available);
   return (
     <>
       <button className="btn line" onClick={closeSheet}>
         취소
       </button>
-      <button className="btn pri" disabled={empty || unavailable} title={empty ? '다시 만들 직원을 골라 주세요' : unavailable ? '사용할 수 있는 AI 모드를 골라 주세요' : undefined} onClick={() => void goalsAllOk()}>
+      <button className="btn pri" disabled={empty || unavailable} title={empty ? '다시 만들 직원을 골라 주세요' : unavailable ? '관리자 AI 모델 설정을 확인해 주세요' : undefined} onClick={() => data?.policy && void goalsAllOk(data.policy, data.level)}>
         다시 만들기
       </button>
     </>
@@ -164,7 +151,6 @@ function GoalsAllFoot() {
 }
 
 function openGoalsAll(o: AdminOverview) {
-  setChoice('goalsAll', 'ollama');
   setGoal({ target: 'all', picked: [], q: '' });
   openSheet({
     title: '목표 후보를 다시 만들까요?',
@@ -192,20 +178,19 @@ export function OverviewPage() {
   const e = o.education;
   const g = o.goals || {};
   const rg = o.regulations;
-  const pv = o.providers;
   return (
     <Page
       {...PAGE_HEAD}
       lead="인적·교육 데이터는 화면에서 한 건씩 고치거나, 여러 건은 엑셀·CSV로 내려받아 고친 뒤 다시 올려요. 어느 쪽이든 같은 규칙으로 검사하고, 오류가 있으면 저장하지 않아요. 규정은 원문 PDF로 올리고 내려받아요."
     >
       <div className="adm-grid">
+        <ProviderSettings />
         <Card head={DS.hr} to={paths.adminData('hr')}>
           <div className="adm-num">
             <Num l="재직" v={o.hr.active} />
             <Num l="퇴직" v={o.hr.retired} />
             <Num l="부서" v={o.hr.departments} />
             <Num l="부서장" v={o.hr.heads} />
-            <Num l="평정" v={o.hr.evaluations} />
           </div>
           {o.hr.noNumber ? (
             <p className="small muted" style={{ margin: 0 }}>
@@ -281,9 +266,6 @@ export function OverviewPage() {
         </div>
         <UploadList list={o.uploads} />
       </div>
-      <Note>
-        RunPod-Ollama {pv.ollama.available ? '설정됨' : '설정 안 됨'} · OpenAI API {pv.openai.available ? '설정됨' : '설정 안 됨'}. 관리자 계정은 직원의 로드맵·점검·보고서를 보지 않아요.
-      </Note>
     </Page>
   );
 }

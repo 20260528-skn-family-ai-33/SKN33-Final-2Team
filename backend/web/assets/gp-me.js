@@ -1,7 +1,7 @@
 /* GrowPath 5차 목업 (Claude) · 내 정보 (API-04~08)
    로그인한 직원이 팀 DB에 있는 자기 정보를 본다. 좌측 위 계정 칸이나 좌측 메뉴 '내 정보'로 들어온다.
-   인사 정보·권한(부서·부서장)은 읽기 전용(관리자 화면의 인적 데이터 엑셀로 바뀜), 본인 입력 프로필과 평정의 목표 추천 활용 동의는 직접 고친다.
-   고친 값은 서버(app_ext.employee_self_inputs·employee_evaluations)에 저장하고, 저장하면 서버가 목표 후보를 새 값으로 다시 만든다(FR-05) */
+   인사 정보·권한(부서·부서장)은 읽기 전용(관리자 화면의 인적 데이터 엑셀로 바뀜), 본인 입력 프로필은 직접 고친다.
+   고친 값은 서버(app_ext.employee_self_inputs)에 저장하고, 저장하면 서버가 목표 후보를 새 값으로 다시 만든다(FR-05) */
 (function () {
   'use strict';
   const GP = window.GP, AI = GP.AI, P = GP.P, API = GP.API, { esc, icon } = GP;
@@ -92,25 +92,16 @@
     S().meEdit = null; GP.save(); GP.render(false);
     GP.toast(AI.profileEnough(GP.me()) ? '본인 입력 정보를 저장했어요 · 목표 후보를 새 정보로 다시 만들고 있어요' : '본인 입력 정보를 저장했어요');
   };
-  GP.act['me-revert'] = () => GP.sheet('<p style="margin-top:0">직접 고친 본인 입력 정보(업무 설명·경험·기술 스택·자격·교육·프로젝트)를 지우고 팀 DB에 처음 들어온 값으로 되돌려요. 평정의 목표 추천 활용 동의는 그대로예요.</p>',
+  GP.act['me-revert'] = () => GP.sheet('<p style="margin-top:0">직접 고친 본인 입력 정보(업무 설명·경험·기술 스택·자격·교육·프로젝트)를 지우고 팀 DB에 처음 들어온 값으로 되돌려요.</p>',
     { title: '처음 값으로 되돌릴까요?', foot: '<button class="btn line" data-act="sheet-close">취소</button><button class="btn pri" data-act="me-revert-ok">되돌리기</button>' });
   GP.act['me-revert-ok'] = async () => {
     GP.closeSheet();
     try { takeView(await API.revertSelf()); GP.render(false); GP.toast('처음 값으로 되돌렸어요 · 목표 후보도 다시 만들어요'); } catch (x) { GP.fail(x, '되돌리지 못했어요'); }
   };
 
-  /* ── 근무성적평정 (본인 입력 평가) · 목표 추천 활용 동의만 고친다 ── */
-  const evalCard = e => {
-    const ev = e.evals || [];
-    return `<div class="card"><div class="sec-h"><h2 class="st">근무성적평정</h2><span class="tag line">본인 입력 평가</span></div>
-      ${ev.length ? `<div class="list me-evals">${ev.map(v => `<div class="li"><div class="tx"><b>${esc(v.period)} · ${esc(v.grade)}${v.score ? ` · ${esc(v.score)}` : ''}</b><small>${esc(v.title)}</small></div>
-        <label class="check sm"><input type="checkbox" data-me-consent="${esc(v.period)}" ${v.consent ? 'checked' : ''}>목표 추천 활용 동의</label></div>`).join('')}</div>` : '<p class="muted small" style="margin:0">등록된 평정이 없어요.</p>'}
-      <p class="small muted me-foot">목표 추천 활용에 동의한 평정만 목표 후보 제안에 참고로 넘겨요. 등급·점수로 목표를 정하거나 문장에 쓰지 않아요. 동의는 언제든 바꿀 수 있어요.</p></div>`;
-  };
-
   /* ── 이 정보가 쓰이는 곳 ── */
   const useCard = e => `<div class="card flat"><h2 class="st">이 정보가 쓰이는 곳</h2><div class="stack">
-    <div class="row top">${icon('spark')}<span><b>목표 후보 제안</b> · 진단 에이전트가 직급·부서·직무·담당 업무와 본인 입력 정보, 목표 추천 활용에 동의한 평정만 보고 목표 후보 3개를 미리 만들어 둬요. 여기서 저장하면 서버가 새 정보로 다시 만들어요. <button class="link" data-go="${GP.newRoute ? GP.newRoute() : 'new-goal'}">새 로드맵 작성 ${icon('right')}</button></span></div>
+    <div class="row top">${icon('spark')}<span><b>목표 후보 제안</b> · 진단 에이전트가 직급·부서·직무·담당 업무와 본인 입력 정보만 보고 목표 후보 3개를 미리 만들어 둬요. 여기서 저장하면 서버가 새 정보로 다시 만들어요. <button class="link" data-go="${GP.newRoute ? GP.newRoute() : 'new-goal'}">새 로드맵 작성 ${icon('right')}</button></span></div>
     <div class="row top">${icon('scale')}<span><b>사내 생활 도우미·지원 조건 확인</b> · 규정 에이전트가 직원 구분·직급을 봐요. ${AI.regApplies() ? `${esc(e.empGroup || '')} 직원이라 등록된 ${esc(AI.regSet().label)}(${esc(AI.regSet().regs.filter(r => !r.overseas).map(r => r.name).slice(0, 3).join('·'))} 등)에서 근거를 찾아요. 국외근무 규정은 국외근무를 물을 때만 봐요.` : `${e.empGroup ? `${esc(e.empGroup)} 직원에게 맞는 규정 묶음이 아직 등록되지 않아` : '직원 구분이 없어'} 규정 질문에는 ‘적용 대상 아님’으로 안내해요. 등록된 규정 묶음: ${esc(Object.keys(AI.REG_SETS).join('·') || '없음')}.`}</span></div>
   </div></div>`;
 
@@ -120,28 +111,19 @@
       const e = GP.me(), ed = S().meEdit;
       return P.page({
         eyebrow: '내 정보', title: `${esc(e.name)} 님의 정보`,
-        lead: '인사 정보와 권한은 팀 DB의 인사 데이터에서 가져와 고칠 수 없어요. 본인 입력 정보와 평정의 목표 추천 활용 동의는 직접 고칠 수 있고, 목표 후보 제안에 쓰여요.',
+        lead: '인사 정보와 권한은 팀 DB의 인사 데이터에서 가져와 고칠 수 없어요. 본인 입력 정보는 직접 고칠 수 있고, 목표 후보 제안에 쓰여요.',
         body: `<div class="me-page">${hrCard(e)}
           <div class="card"><div class="sec-h"><h2 class="st">본인 입력 정보</h2><span class="tag ${e.edited ? 'acc' : 'line'}">${e.edited ? `직접 고침${e.editedAt ? ` · ${esc(e.editedAt)}` : ''}` : '처음 값'}</span>${ed ? '' : `<button class="btn line sm me-ed" data-act="me-edit">${icon('edit')}수정</button>`}</div>
             ${ed ? selfForm(ed) : selfView(e)}
             ${ed ? '<div class="actions me-act"><button class="btn pri" data-act="me-save">저장</button><button class="btn line" data-act="me-cancel">취소</button></div>' : ''}
             <p class="small muted me-foot">고친 내용은 서버(팀 DB 보조 표)에 저장되고, 처음 들어온 값은 따로 남아요.${e.edited && !ed ? ' <button class="link quiet" data-act="me-revert">처음 값으로 되돌리기</button>' : ''}</p></div>
-          ${evalCard(e)}${permCard(e)}${useCard(e)}</div>`
+          ${permCard(e)}${useCard(e)}</div>`
       });
     },
     after(root) {
       /* '없어요' 확인란: 고치는 중인 값에만 둔다(저장을 눌러야 반영) */
       root.querySelectorAll('[data-me-none]').forEach(c => c.addEventListener('change', () => { const ed = S().meEdit; if (ed) { ed[c.dataset.meNone + 'None'] = c.checked; GP.save(); } }));
-      /* 목표 추천 활용 동의: 바로 저장(API-07). 바뀌면 서버가 목표 후보를 다시 만든다 */
-      root.querySelectorAll('[data-me-consent]').forEach(c => c.addEventListener('change', async () => {
-        const per = c.dataset.meConsent;
-        try {
-          await API.consent(per, c.checked);
-          const v = (GP.me().evals || []).find(x => x.period === per); if (v) v.consent = c.checked;
-          if (GP.dropGoals) GP.dropGoals();
-          GP.toast(c.checked ? '이 평정을 목표 추천에 활용하도록 동의했어요' : '이 평정은 목표 추천에 쓰지 않아요');
-        } catch (x) { c.checked = !c.checked; GP.fail(x, '동의를 저장하지 못했어요'); }
-      }));
+
     }
   };
 })();

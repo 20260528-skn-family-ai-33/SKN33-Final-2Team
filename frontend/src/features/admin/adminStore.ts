@@ -37,8 +37,8 @@ export interface Pending {
   token: string;
 }
 
-/** 창·화면의 고르기 값 (목표 후보 모드 · goalsAll 은 mock·employee·ollama·openai) */
-export type Choice = 'goalsAll' | 'editGoal' | 'applyGoal';
+/** 창·화면의 고르기 값 (인적 데이터 수정·파일 반영 뒤 목표 후보 생성) */
+export type Choice = 'editGoal' | 'applyGoal';
 
 /** 목표 후보 다시 만들기 창: 대상(재직 직원 모두 / 고른 직원만)·고른 직원·찾기 글자 */
 export interface GoalPick {
@@ -73,7 +73,7 @@ const fresh = (): AdminUi => ({
   edit: null,
   pending: null,
   saving: false,
-  choice: { goalsAll: 'ollama', editGoal: 'employee', applyGoal: 'employee' },
+  choice: { editGoal: 'employee', applyGoal: 'employee' },
   goal: { target: 'all', picked: [], q: '' },
 });
 

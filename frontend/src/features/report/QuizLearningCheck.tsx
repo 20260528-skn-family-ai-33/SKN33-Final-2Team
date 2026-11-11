@@ -41,12 +41,13 @@ function Score({ phase, tally }: { phase: Phase; tally: Tally }) {
   );
 }
 
-export function QuizLearningCheck({ evidence, postDetails }: { evidence: Evidence; postDetails?: Report['postQuizDetails'] }) {
+/** open: 처음에 펼쳐 둘지. 위에 스킬별 요약이 있으면 접어 둔다 */
+export function QuizLearningCheck({ evidence, postDetails, open = true }: { evidence: Evidence; postDetails?: Report['postQuizDetails']; open?: boolean }) {
   if (!evidence.length && !postDetails?.length) return null;
   const quiz = quizComparison(evidence);
   const skillCount = evidence.length ? quiz.skills.length : new Set((postDetails ?? []).map((row) => row.skill)).size;
   return (
-    <details className="card report-survey learning-check" open>
+    <details className="card report-survey learning-check" open={open}>
       <summary>
         <span>학습 점검</span>
         <span className="learning-check-count">{skillCount}개 스킬</span>

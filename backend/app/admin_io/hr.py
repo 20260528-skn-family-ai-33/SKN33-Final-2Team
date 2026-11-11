@@ -1,4 +1,4 @@
-"""인적 데이터: 부서 · 직원(인사이동·부서장 권한 포함) · 근무성적평정 (2026-10-21 사용자 결정).
+"""인적 데이터: 부서 · 직원(인사이동·부서장 권한 포함).
 
 - 인사이동 = 직원 시트의 '부서 코드'를 고치면 된다. 반영할 때 이동 이력을 app_ext.employee_transfers 에 남긴다.
 - 부서장 권한 부여·회수 = 직원 시트의 '부서장' Y/N. 한 부서에 부서장은 한 명(팀 DB 고유 색인)이라 미리보기에서 막는다.
@@ -51,20 +51,12 @@ EMP = Sheet('직원', ('code',), [
     Col('변경 사유', 'change_reason', example='정기 인사', width=14),
 ], help='직원 인사 정보·부서 배치·부서장 권한. 삭제 Y는 퇴직 처리예요(기록은 남아요)')
 
-EVAL = Sheet('평정', ('code', 'period'), [
-    Col('사번', 'code', required=True, width=11),
-    Col('기간', 'period', required=True, example='2025', width=9),
-    Col('이름', 'name', readonly=True, width=9),
-    Col('평정명', 'title', example='2025년 근무성적평정', width=22),
-    Col('등급', 'grade', example='A', width=8),
-    Col('점수', 'score', width=8),
-    Col('목표 추천 활용 기본 동의', 'consent', 'bool', help='직원이 내 정보에서 바꾸면 직원이 정한 값이 우선해요', width=12, default=False),
-], help='근무성적평정. 목표 추천 활용에 동의한 평정만 목표 후보 제안에 참고로 넘겨요')
-
-SHEETS = [DEPT, EMP, EVAL]
+SHEETS = [DEPT, EMP]
+# 이전 평정 CSV에는 직원 CSV와 같은 사번·이름·삭제 열이 있다.
+RETIRED_CSV_HEADERS = ('기간', '평정명', '등급', '점수', '목표 추천 활용 기본 동의')
 DELETE_LABEL = {'직원': '퇴직 처리'}
 GUIDE = [
-    '인적 데이터(부서·직원·평정)를 엑셀로 내려받아 고친 뒤 다시 올려요. 올리면 먼저 미리보기를 보여 주고, 오류가 없을 때만 ‘반영’할 수 있어요.',
+    '인적 데이터(부서·직원)를 엑셀로 내려받아 고친 뒤 다시 올려요. 올리면 먼저 미리보기를 보여 주고, 오류가 없을 때만 ‘반영’할 수 있어요.',
     '· 파일에 없는 행은 그대로 둬요. 지우려면 ‘삭제’ 열에 Y를 적어요(직원은 지우지 않고 퇴직 처리해요).',
     '· 파일에 없는 열은 바꾸지 않아요. 있는 열의 빈 칸은 값을 비워요. 회색 머리글 열은 참고용이라 고쳐도 반영되지 않아요.',
     '· 인사이동: 직원 시트의 ‘부서 코드’를 고치면 이동 이력이 자동으로 남아요. 부서장 권한은 ‘부서장’ Y/N으로 주고 거둬요.',
@@ -101,11 +93,6 @@ def current(sheet: str) -> dict:
             'dept_code': r['department_code'], 'dept_name': r['dept_name'], 'grade': r['grade'], 'position': r['position'], 'job_family': r['job_family'],
             'job': r['job'], 'task': r['task'], 'head': bool(r['is_department_head']), 'valid_from': str(r['valid_from']) if r['valid_from'] else None,
             'change_reason': r['change_reason'], '_id': r['employee_id'], '_dept_id': r['department_id']} for r in rows}
-    if sheet == '평정':
-        rows = db.all_("""SELECT e.employee_number, e.name, v.period, v.title, v.grade, v.score, v.consent_default FROM app_ext.employee_evaluations v
-            JOIN public.employees e ON e.employee_id = v.employee_id WHERE e.employee_number IS NOT NULL ORDER BY e.employee_number, v.period DESC""")
-        return {(r['employee_number'], r['period']): {'code': r['employee_number'], 'period': r['period'], 'name': r['name'], 'title': r['title'], 'grade': r['grade'],
-                                                       'score': r['score'], 'consent': bool(r['consent_default'])} for r in rows}
     return {}
 
 
@@ -120,9 +107,6 @@ def options(sheet: str) -> dict:
                 'grade': {'items': [{'value': r['name']} for r in db.all_('SELECT DISTINCT name FROM public.job_grades ORDER BY name')]},
                 'emp_group': {'items': [{'value': r['g']} for r in db.all_("""SELECT DISTINCT g FROM (SELECT employee_group AS g FROM app_ext.employee_hr
                     UNION SELECT substring(name from '^([^ ]+직) ') FROM public.job_grades) x WHERE g IS NOT NULL ORDER BY 1""")]}}
-    if sheet == '평정':
-        return {'code': {'strict': True, 'items': [{'value': r['employee_number'], 'label': r['name']}
-                                                   for r in db.all_('SELECT employee_number, name FROM public.employees WHERE employee_number IS NOT NULL ORDER BY employee_number')]}}
     return {}
 
 
@@ -135,7 +119,7 @@ def label(sheet: str, v: dict) -> str:
 
 
 def check(found: dict[str, list[Row]], cur: dict[str, dict]) -> None:
-    """시트를 오가는 검사: 부서가 있는지·순환·부서장 한 명·이메일·평정의 직원. 태그(인사이동·부서장 지정 등)도 단다"""
+    """시트를 오가는 검사: 부서가 있는지·순환·부서장 한 명·이메일. 태그(인사이동·부서장 지정 등)도 단다"""
     depts = dict(cur.get('부서') or current('부서'))
     emps = dict(cur.get('직원') or current('직원'))
     drows = found.get('부서', [])
@@ -234,16 +218,12 @@ def check(found: dict[str, list[Row]], cur: dict[str, dict]) -> None:
             r.err('삭제', f"아래 부서가 있어 지울 수 없어요({', '.join(kids[:4])})")
         elif any(v.get('dept_code') == r.key[0] for v in final_e.values()):
             r.err('삭제', '퇴직한 직원 기록이 이 부서에 남아 있어 지울 수 없어요(부서 이름만 바꿔 주세요)')
-    # 평정: 직원이 있어야
-    for r in found.get('평정', []):
-        if r.action in ('add', 'update') and r.key[0] not in final_e:
-            r.err('사번', f"‘{r.key[0]}’ 직원이 없어요")
 
 
 def apply(t: db.Tx, found: dict[str, list[Row]], cur: dict[str, dict], ctx: dict) -> dict:
     inst = _inst(t)
     depts, emps = cur.get('부서') or current('부서'), cur.get('직원') or current('직원')
-    res = {'부서': {'add': 0, 'update': 0, 'delete': 0}, '직원': {'add': 0, 'update': 0, 'delete': 0}, '평정': {'add': 0, 'update': 0, 'delete': 0},
+    res = {'부서': {'add': 0, 'update': 0, 'delete': 0}, '직원': {'add': 0, 'update': 0, 'delete': 0},
            'transfers': 0, 'goal_ids': []}
     # 1) 부서 추가·이름 바꾸기(상위 부서는 다 넣은 뒤 정한다 · 새 부서끼리 서로 가리킬 수 있어서)
     ids = {k[0]: v['_id'] for k, v in depts.items()}
@@ -314,25 +294,6 @@ def apply(t: db.Tx, found: dict[str, list[Row]], cur: dict[str, dict], ctx: dict
             t.run("DELETE FROM app_ext.sessions WHERE account_type = 'employee' AND account_id = :e", e=eid)
         res['직원'][r.action] += 1
         if v.get('status') != '퇴직':
-            res['goal_ids'].append(eid)
-    # 3) 평정
-    code_ids = {k[0]: v['_id'] for k, v in emps.items()}
-    code_ids.update({c: t.val('SELECT employee_id FROM public.employees WHERE institution_id = :i AND employee_number = :c', i=inst, c=c)
-                     for c in finals if c not in code_ids})
-    evals = cur.get('평정') or current('평정')
-    for r in found.get('평정', []):
-        if r.action not in ('add', 'update', 'delete'):
-            continue
-        eid = code_ids.get(r.key[0])
-        if r.action == 'delete':
-            t.run('DELETE FROM app_ext.employee_evaluations WHERE employee_id = :e AND period = :p', e=eid, p=r.key[1])
-        else:
-            v = merged(r, evals.get(r.key))
-            t.run("""INSERT INTO app_ext.employee_evaluations(employee_id, period, title, grade, score, consent_default) VALUES(:e, :p, :ti, :g, :s, :c)
-                     ON CONFLICT (employee_id, period) DO UPDATE SET title = EXCLUDED.title, grade = EXCLUDED.grade, score = EXCLUDED.score, consent_default = EXCLUDED.consent_default""",
-                  e=eid, p=r.key[1], ti=v.get('title'), g=v.get('grade'), s=v.get('score'), c=bool(v.get('consent')))
-        res['평정'][r.action] += 1
-        if eid and eid not in res['goal_ids']:
             res['goal_ids'].append(eid)
     # 부서 이름/상위 부서 변경도 직무 문맥에 쓰인다. 해당 부서와 직속 하위 부서 직원을 포함한다.
     if drows:
