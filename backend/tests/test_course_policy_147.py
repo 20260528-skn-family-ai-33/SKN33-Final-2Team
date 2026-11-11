@@ -100,6 +100,40 @@ class CoursePolicyTests(unittest.TestCase):
                         result = recommend_from_catalog(Mock(live=True), pre, course, completed=frozenset({'이수'}))
                         self.assertTrue(result['skills'][0]['selectedCourse'].startswith('직접'))
 
+    def test_audit_fallback_requires_join_evidence_in_the_lesson(self):
+        name = 'SQL 기본 문법 & 조인'
+        goal = 'SQL 조인으로 계정 권한과 접근 로그의 거절 사례를 분석한다'
+        skill = {'name': name, 'application': goal}
+        # 제목은 둘 다 조인을 언급한다. 주문 조회 차시만 있는 강좌는 조인 범위 검사를 통과할 수 없다.
+        items = {rid: {**self.item(rid, lesson=lesson), 'title': title, 'skills': [name]}
+                 for rid, title, lesson in [
+                     ('join', 'SQL 조인 기초', 'SQL로 두 테이블을 내부 조인하는 실습'),
+                     ('query', 'SQL 조인 입문', 'SQL 주문 테이블 조회 실습')]}
+        model = Mock(return_value={'skills': [{'name': name, 'courses': [], 'books': []}]})
+        recommend_resources({'goal': goal}, {'skills': [skill]}, items, model,
+                            course={'id': 'A1', 'learningSkills': [skill]})
+        cards = model.call_args.args[1]['skills'][0]['courses']
+        self.assertEqual([row['title'] for row in cards], ['SQL 조인 기초'])
+        self.assertIn('접근 로그 분석', cards[0]['learningEvidence']['unverifiedTargetTopics'])
+
+    def test_audit_fallback_key_is_only_eligible_in_its_own_skill_pool(self):
+        sql, ml = 'SQL 기본 문법 & 조인', '머신러닝 지도/비지도 학습'
+        goal = '계정 권한과 접근 로그의 정상·거절 사례를 분류하고 해석한다'
+        skills = [{'name': name, 'application': goal} for name in (sql, ml)]
+        course = {**self.item('foundation', lesson='SQL로 테이블을 조회하고 머신러닝 분류 모델을 학습하는 실습'),
+                  'skills': [sql, ml]}
+        # 두 스킬 모두 기초 강좌로 사용할 수 있지만, 이번 검색에서는 SQL에만 제공했다.
+        pools = [{'name': sql, 'courses': [course], 'books': []},
+                 {'name': ml, 'courses': [], 'books': []}]
+        model = Mock(return_value={'skills': [{'name': name, 'courses': [], 'books': []} for name in (sql, ml)]})
+        recommend_resources({'goal': goal}, {'skills': skills}, {'foundation': course}, model,
+                            course={'id': 'A1', 'learningSkills': skills}, retrieved_pools=pools)
+        sql_pool, ml_pool = model.call_args.args[1]['skills']
+        card, = sql_pool['courses']
+        self.assertEqual(card['eligibleSkills'], [sql])
+        self.assertTrue(card['learningEvidence']['auditScopeFoundation'])
+        self.assertEqual(ml_pool['courses'], [])
+
     def test_cross_skill_key_preserves_other_choices_and_retries_only_empty_skill(self):
         project = {'goal': 'Python으로 로그를 집계하고 Docker로 API를 배포한다'}
         specs = [{'name': n} for n in ('Python', 'Docker')]
