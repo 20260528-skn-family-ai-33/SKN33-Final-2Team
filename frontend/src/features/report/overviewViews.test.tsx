@@ -99,6 +99,20 @@ describe('ReportSchedule', () => {
     expect(html).toContain('<small>자료</small>');
   });
 
+  it('주차가 많으면 머리글을 숫자만 적고, 칸 수를 최소 너비 계산에 넘긴다', () => {
+    const html = renderToStaticMarkup(
+      <ReportSchedule
+        snapshot={{ asOf: '2026-11-11T01:00:00+00:00', early: false, version: 1, activities: [] }}
+        schedule={{ weeks: 52, rows: [{ key: 'a1', res: null, task: true, title: '긴 과제', spans: [[1, 52]], done: false }] }}
+      />,
+    );
+    expect(html).toContain('class="rpt-gantt" style="--n:52"');
+    expect(html).toContain('<span>52</span>');
+    expect(html).not.toContain('52주</span>');
+    expect(html).toContain('활동 · 주차');
+    expect(count(html, '<i class="on">')).toBe(52);
+  });
+
   it('떨어진 주차 구간은 사이 주를 비워 둔다', () => {
     const html = renderToStaticMarkup(
       <ReportSchedule

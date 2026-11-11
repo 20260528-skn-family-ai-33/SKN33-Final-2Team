@@ -24,34 +24,37 @@ export function ReportSchedule({ schedule, snapshot }: { schedule: Schedule; sna
         </span>
       </div>
       <p className="rpt-card-sub">막대는 계획한 기간이에요. 완료 여부는 이 시점까지 저장된 기록 기준이고, 첨부 내용은 검증하지 않았어요.</p>
-      <div className="rpt-gantt">
-        <div className="rpt-gantt-head" aria-hidden="true">
-          <span>활동</span>
-          <span className="rpt-gantt-weeks" style={columns}>
-            {weeks.map((week) => (
-              <span key={week}>{schedule.weeks > 8 ? week : `${week}주`}</span>
-            ))}
-          </span>
-          <span>상태</span>
-        </div>
-        <ul className="rpt-gantt-rows">
-          {schedule.rows.map((row) => (
-            <li className="rpt-gantt-row" key={row.key}>
-              <span className="rpt-gantt-label">
-                <small>{row.task ? '과제' : (row.res && resources[row.res]?.kind) || '자료'}</small>
-                <span className="rpt-gantt-title" title={row.title}>
-                  {row.title}
+      {/* 주차가 많으면 칸이 읽을 수 없게 좁아지므로 최소 너비를 지키고, 넘치면 이 안에서만 가로로 넘긴다 */}
+      <div className="rpt-gantt" style={columns} tabIndex={0} role="group" aria-label={`주차별 일정 · ${schedule.weeks}주`}>
+        <div className="rpt-gantt-inner">
+          <div className="rpt-gantt-head" aria-hidden="true">
+            <span>활동{schedule.weeks > 6 ? ' · 주차' : ''}</span>
+            <span className="rpt-gantt-weeks" style={columns}>
+              {weeks.map((week) => (
+                <span key={week}>{schedule.weeks > 6 ? week : `${week}주`}</span>
+              ))}
+            </span>
+            <span>상태</span>
+          </div>
+          <ul className="rpt-gantt-rows">
+            {schedule.rows.map((row) => (
+              <li className="rpt-gantt-row" key={row.key}>
+                <span className="rpt-gantt-label">
+                  <small>{row.task ? '과제' : (row.res && resources[row.res]?.kind) || '자료'}</small>
+                  <span className="rpt-gantt-title" title={row.title}>
+                    {row.title}
+                  </span>
                 </span>
-              </span>
-              <span className="rpt-gantt-weeks" style={columns} role="img" aria-label={`${row.spans.map(([from, to]) => (from === to ? from : `${from}~${to}`)).join(', ')}주차`}>
-                {weeks.map((week) => (
-                  <i key={week} className={row.spans.some(([from, to]) => week >= from && week <= to) ? (row.done ? 'on done' : 'on') : undefined} />
-                ))}
-              </span>
-              <span className={`rpt-gantt-state${row.done ? ' done' : ''}`}>{row.done ? '완료' : '미완료'}</span>
-            </li>
-          ))}
-        </ul>
+                <span className="rpt-gantt-weeks" style={columns} role="img" aria-label={`${row.spans.map(([from, to]) => (from === to ? from : `${from}~${to}`)).join(', ')}주차`}>
+                  {weeks.map((week) => (
+                    <i key={week} className={row.spans.some(([from, to]) => week >= from && week <= to) ? (row.done ? 'on done' : 'on') : undefined} />
+                  ))}
+                </span>
+                <span className={`rpt-gantt-state${row.done ? ' done' : ''}`}>{row.done ? '완료' : '미완료'}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
       <ul className="cmp-legend rpt-gantt-key">
         <li>
