@@ -30,7 +30,7 @@ GrowPath 백엔드 ──(Bearer 키)──> 공개IP:외부포트 ──> Pod 1
 1. Pods → Deploy
 2. GPU 기종은 정해 두지 않았어요. 팀 예산과 시간당 요금을 보고 고르되, 두 모델이 문맥용 메모리와 함께 GPU 하나에 다 들어가야 해요.
    - 두 모델 파일만 약 25GB예요(27b Q4_K_M 16.55GB + 4b BF16 8.42GB). 여기에 두 모델 각각의 문맥용 메모리가 더 필요해요.
-   - A40(46GB)에서 두 모델이 문맥용 메모리까지 함께 올라가 GPU 메모리를 약 26GB 썼어요(2026-10-29 · 맨 아래 확인 범위). 다른 GPU를 고르면 배포한 뒤 2-5에서 두 모델이 함께 들어가는지 확인해요.
+   - A40(46GB)에서 두 모델이 문맥용 메모리까지 함께 올라가 GPU 메모리를 약 26GB 썼어요(2026-10-29 · 맨 아래 확인 범위). 이 값은 문맥 길이 16384일 때 잰 거예요. 지금 기준인 20480에서는 문맥용 메모리가 더 들고, 아직 다시 재지 않았어요. 어느 GPU든 배포한 뒤 2-5에서 두 모델이 함께 들어가는지 확인해요.
    - 4b는 양자화하지 않은 BF16이에요. 팀원이 Q8_0이나 Q4_K_M으로 양자화해 올리면 약 4~6GB를 줄일 수 있어요.
 3. 템플릿은 **Runpod PyTorch**(최신)를 고르고 Edit Template에서 아래처럼 설정해요.
 
@@ -83,7 +83,7 @@ export OLLAMA_MODELS=/workspace/ollama-models
 export OLLAMA_NUM_PARALLEL=3
 export OLLAMA_MAX_LOADED_MODELS=2
 export OLLAMA_KEEP_ALIVE=30m
-export OLLAMA_CONTEXT_LENGTH=16384
+export OLLAMA_CONTEXT_LENGTH=20480
 nohup ollama serve > /workspace/ollama.log 2>&1 &
 sleep 5
 curl -s http://127.0.0.1:11435/api/version
@@ -104,7 +104,7 @@ grep -m1 "inference compute" /workspace/ollama.log
 | `OLLAMA_NUM_PARALLEL=3` | 로드맵 3안(A1·A2·A3) 요청 세 개를 차례대로가 아니라 동시에 처리해요. 모델마다 따로 적용돼서 문맥용 메모리도 모델마다 그만큼 잡혀요. |
 | `OLLAMA_MAX_LOADED_MODELS=2` | 27b와 4b를 GPU에 함께 올려 둬요. Ollama 기본값(GPU 하나에 3개)으로도 되지만 이 구성을 분명히 하려고 적어요. 메모리가 모자라면 이 값과 관계없이 한 모델을 내려요(2-5에서 확인). |
 | `OLLAMA_KEEP_ALIVE=30m` | 요청이 없어도 30분 동안 모델을 GPU에 올려 둬요(기본 5분). 두 모델에 각각 적용돼요. |
-| `OLLAMA_CONTEXT_LENGTH=16384` | 앱이 보내는 문맥 길이(`OLLAMA_NUM_CTX`)와 맞춰요. 다르면 앱의 첫 호출 때 모델을 다시 불러와요. 앱은 두 모델에 같은 길이를 보내요. |
+| `OLLAMA_CONTEXT_LENGTH=20480` | 앱이 보내는 문맥 길이(`OLLAMA_NUM_CTX` · `.env.example` 기본 20480)와 맞춰요. 다르면 앱의 첫 호출 때 모델을 다시 불러와요. 앱은 두 모델에 같은 길이를 보내요. 20480은 로드맵 입력 11000 + 출력 7000 + 여유 1024 토큰을 담는 길이예요(#67 · `backend/app/catalog_budget.py`). 16384로 두면 로드맵 입력 상한이 8360 토큰으로 줄어요. |
 
 ⚠️ `export` 값은 이 터미널 창에서만 살아 있어요. 새 창에서 `ollama` 명령을 쓰려면 먼저 `export OLLAMA_HOST=127.0.0.1:11435`를 실행해요.
 
@@ -238,7 +238,8 @@ grep "template selection" /workspace/ollama.log | tail -n 2
 - ✅ 두 모델 모두 `Thinking...` 없이 한국어로 답해요.
 - ❌ 4b가 `Thinking...` 뒤에 같은 말을 길게 되풀이하다 답하면 `--think=false`가 빠진 거예요. `ollama run`은 `--think`를 주지 않으면 모델 기본값대로 생각 모드를 켜는데, 4b는 생각을 끄고 학습한 모델이에요(2-4). 팀 4b에는 Ollama 라이브러리 `qwen3.5:4b`에 있는 반복 억제 설정(`presence_penalty 1.5`)도 없어서 생각이 길게 반복될 수 있어요. 앱은 `think: false`를 보내서 이 문제가 없어요.
 - ✅ 마지막 줄(Ollama 기록)에 두 모델의 `selected=renderer_parser`가 보여요. `selected=none`이면 채팅 형식 없이 돌고 있는 거라 2-4 '채팅 형식 붙이기'를 다시 해요.
-- ✅ `ollama ps`에 **두 줄**이 보이고, 두 줄 모두 PROCESSOR가 `100% GPU`, CONTEXT가 `16384`예요.
+- ✅ `ollama ps`에 **두 줄**이 보이고, 두 줄 모두 PROCESSOR가 `100% GPU`, CONTEXT가 `20480`이에요.
+- ❌ CONTEXT가 `16384` 등 다른 값이면 2-3의 `OLLAMA_CONTEXT_LENGTH`가 빠졌거나 예전 값이에요. 2-3을 다시 하고(`pkill -f "ollama serve"` 뒤) 이 블록을 다시 실행해요.
 - ❌ 한 줄만 보이면(먼저 올린 27b가 사라짐) 두 모델이 GPU 하나에 같이 들어가지 않는 거예요. 이대로 쓰면 진단·로드맵과 도우미를 오갈 때마다 모델을 다시 불러와서 호출이 1분 넘게 걸릴 수 있어요. 더 큰 GPU로 다시 배포해요. `OLLAMA_NUM_PARALLEL`을 줄이면 문맥용 메모리가 줄지만 로드맵 3안을 차례로 처리해서 느려져요.
 - ❌ PROCESSOR에 CPU가 섞여 있으면(예: `20%/80% CPU/GPU`) GPU 메모리가 부족한 거예요. 더 큰 GPU로 다시 배포해요.
 
@@ -318,7 +319,7 @@ curl.exe -H "Authorization: Bearer <키>" http://<공개IP>:<외부포트>/api/t
 
 ### 3-2. `.env` 고치기
 
-저장소 맨 위 `.env`의 Ollama 줄을 이렇게 맞춰요. `.env`가 없으면 [`.env.example`](../.env.example)을 복사해 만들고 주소(`OLLAMA_BASE_URL`)와 키(`OLLAMA_API_KEY`)만 채우면 돼요. 모델 줄은 비워 두면 팀 모델을 불러요. 예전 `.env`의 모델 줄에 값이 남아 있으면(예: `OLLAMA_MODEL=qwen3.8:27b`) 그 모델로 도니 비워 둬요. `OLLAMA_MODEL_ROADMAP`은 없어졌어요(로드맵은 `OLLAMA_MODEL`과 같은 모델 · `.env`는 Git에 넣지 않음). 같은 파일의 `OPENAI_API_KEY`도 있어야 해요(규정 검색 임베딩 · 아래 설명).
+저장소 맨 위 `.env`의 Ollama 줄을 이렇게 맞춰요. `.env`가 없으면 [`.env.example`](../.env.example)을 복사해 만들고 주소(`OLLAMA_BASE_URL`)와 키(`OLLAMA_API_KEY`)만 채우면 돼요. 모델 줄은 비워 두면 팀 모델을 불러요. 예전 `.env`의 모델 줄에 값이 남아 있으면(예: `OLLAMA_MODEL=qwen3.8:27b`) 그 모델로 도니 비워 둬요. `OLLAMA_MODEL_ROADMAP`은 없어졌어요(로드맵은 `OLLAMA_MODEL`과 같은 모델 · `.env`는 Git에 넣지 않음). 검색은 BGE-M3로 하기 때문에 RunPod-Ollama만 쓰면 `OPENAI_API_KEY`는 비워 둬도 돼요(아래 설명).
 
 ```text
 OLLAMA_BASE_URL=http://<공개IP>:<외부포트>
@@ -327,11 +328,13 @@ OLLAMA_MODEL=
 OLLAMA_MODEL_REGULATION=
 OLLAMA_VISION_MODEL=
 OLLAMA_TIMEOUT=600
-OLLAMA_NUM_CTX=16384
+OLLAMA_NUM_CTX=20480
 OLLAMA_KEEP_ALIVE=30m
 OLLAMA_THINK=off
 ```
 
+- ✅ `OLLAMA_NUM_CTX`가 Pod의 `OLLAMA_CONTEXT_LENGTH`(2-3)와 같은 20480이에요.
+- ✅ 예전 `.env`를 그대로 쓰고 있다면 `OLLAMA_NUM_CTX=16384`, `OLLAMA_TIMEOUT=300`이 남아 있지 않은지 봐요. 둘 다 위 값으로 바꿔요(16384면 로드맵 입력이 줄고 Pod와 달라 모델을 다시 불러와요 · 300이면 긴 작업이 Pod보다 먼저 끊겨요).
 - ✅ 주소가 `https`가 아니라 `http://`로 시작해요(TCP로 직접 붙으면 HTTPS가 없어요).
 - ✅ `=` 앞뒤에 공백과 따옴표가 없어요.
 - ✅ 같은 이름의 줄이 두 번 들어가 있지 않아요.
@@ -342,7 +345,7 @@ OLLAMA_THINK=off
   2. `.env`에 `ollama list` 이름을 적어요(예: `OLLAMA_MODEL=qwen3.8:27b`, `OLLAMA_MODEL_REGULATION=qwen3.5:4b`). 하나만 적으면 그 역할만 바뀌어요. 원본 27b는 이미지 입력이 있어 `OLLAMA_VISION_MODEL=qwen3.8:27b`로 이미지 읽기도 볼 수 있어요.
   3. 3-3을 하고, 좌측 'AI 모델'과 '에이전트 동작 보기'에서 바뀐 이름을 확인해요. 끝나면 모델 줄을 다시 비우고 3-3을 해요.
   - 허깅페이스 이름(`hf.co/…`)은 적지 않아요(채팅 형식이 붙지 않은 상태). 원본까지 함께 올리면 VRAM이 더 필요해요(원본 27b 약 18GB · 팀 모델 둘과 함께면 A40에서는 빠듯함).
-- **모든 검색 임베딩은 생성 모델과 독립적인 BGE-M3입니다.** [공유 BGE DB·공식 CPU 서버 준비](README.md#공유-bge-m3-db-연결-124)를 완료하세요. RunPod-Ollama만 생성에 쓰면 검색을 위한 OpenAI 키는 필요하지 않습니다. BGE 서버에 연결할 수 없으면 오류를 반환하고 다른 임베딩 모델로 전환하지 않습니다.
+- **모든 검색 임베딩은 생성 모델과 독립적인 BGE-M3입니다.** [공유 BGE DB·공식 CPU 서버 준비](README.md#공유-bge-m3-db-연결-124)를 완료하세요. RunPod-Ollama만 생성에 쓰면 검색을 위한 OpenAI 키는 필요하지 않습니다(#133). `OPENAI_API_KEY`는 생성 모델로 OpenAI API 모드를 쓸 때만 필요합니다. BGE 서버에 연결할 수 없으면 오류를 반환하고 다른 임베딩 모델로 전환하지 않습니다.
 
 ### 3-3. 백엔드 다시 만들기
 
@@ -380,7 +383,7 @@ docker compose exec -T backend printenv OLLAMA_BASE_URL OLLAMA_MODEL OLLAMA_MODE
 | `RunPod 프록시 HTTP 504: Ollama 응답이 아니에요…` | `.env`의 `OLLAMA_TIMEOUT`이 600보다 커서 Pod nginx가 600초에 먼저 끊음(화면은 'Pod가 꺼져 있거나 시작 중'으로 안내하지만 Pod는 켜져 있음) | `OLLAMA_TIMEOUT`을 600 이하로 두고 3-3, 또는 Pod에서 2-6의 `proxy_read_timeout`·`proxy_send_timeout`도 같이 늘림 |
 | `‘<모델 이름>’ 모델이 Ollama에 없어요` | 모델을 안 받았거나 2-4 '채팅 형식 붙이기'를 안 해서 `growpath-27b`·`growpath-regulation-4b` 이름이 Pod에 없음. `.env` 모델 줄에 원본 이름을 넣었다면 그 이름이 `ollama list`와 다름. 4b만 없으면 규정 에이전트(도우미 답변·지원 조건 확인)만 실패하고 진단·로드맵은 돼요 | 2-4, 3-2 |
 | `Ollama 시간 초과: 300초…` 또는 `600초…` | 동시 요청이 몰렸거나 긴 작업이라 오래 걸림(생각 모드를 켰다면 더 길어짐). 600초는 Pod nginx(2-6 `proxy_read_timeout 600s`)가 기다리는 최대 시간이에요 | `.env`가 300이면 `OLLAMA_TIMEOUT=600`으로 바꾸고 3-3. 600에서도 나면 `OLLAMA_THINK=off`인지, 여러 작업을 동시에 돌리지 않았는지 확인. 더 길게 기다리려면 위 504 행처럼 nginx도 같이 늘림 |
-| `규정 검색 임베딩에 필요한 OpenAI 키가 없어요` (도우미 규정 질문) | `.env`에 `OPENAI_API_KEY`가 없음 | 키를 넣고 3-3 |
+| `BGE-M3 연결 실패…` (도우미 질문·자료 추천) | BGE-M3 임베딩 서버가 꺼져 있거나 연결 설정이 틀림. OpenAI 키와는 관계없어요(검색은 BGE-M3만 사용 · #133) | [공유 BGE-M3 DB 연결](README.md#공유-bge-m3-db-연결-124)의 확인 명령으로 서버 상태를 봄 |
 
 ## 4. 끝낼 때
 
@@ -396,6 +399,8 @@ docker compose exec -T backend printenv OLLAMA_BASE_URL OLLAMA_MODEL OLLAMA_MODE
 
 - 외부 포트는 다시 켤 때마다 바뀌어요. Community Cloud는 IP도 바뀔 수 있어요.
 - 2-4는 건너뛰어요. 키도 그대로예요.
+- 2-3은 이 문서의 현재 블록을 그대로 써요(`OLLAMA_CONTEXT_LENGTH=20480`). 예전에 적어 둔 명령을 붙이면 16384로 켜질 수 있어요.
+- 3-2에서 주소를 바꿀 때 같은 `.env`의 `OLLAMA_NUM_CTX`가 20480, `OLLAMA_TIMEOUT`이 600인지도 함께 봐요(예전 값 16384·300이면 바꾸고 3-3).
 
 ## 부록 B. 키 바꾸기 (키가 새어 나갔을 때)
 
@@ -407,7 +412,7 @@ rm /workspace/ollama_key.txt
 
 ## 부록 C. 팀원과 같이 쓸 때
 
-- 주소와 키는 개인 메시지로 보내요. 팀원은 각자 `.env`의 `OLLAMA_BASE_URL`, `OLLAMA_API_KEY` 두 줄을 넣어요(모델 줄은 비워 두면 팀 모델). 도우미 규정 검색에는 각자의 `OPENAI_API_KEY`도 필요해요. 생각 모드를 끄려면 `OLLAMA_THINK=off`도 넣어요. 팀 모델 기본값, `OLLAMA_MODEL_REGULATION`, `OLLAMA_THINK`는 참고용 백엔드 `backend/`에만 있어요.
+- 주소와 키는 개인 메시지로 보내요. 팀원은 각자 `.env`의 `OLLAMA_BASE_URL`, `OLLAMA_API_KEY` 두 줄을 넣어요(모델 줄은 비워 두면 팀 모델). 검색은 BGE-M3라서 `OPENAI_API_KEY`는 필요 없어요(OpenAI API 모드로 생성할 때만 필요). `OLLAMA_NUM_CTX=20480`도 Pod와 같게 둬요. 생각 모드를 끄려면 `OLLAMA_THINK=off`도 넣어요. 팀 모델 기본값, `OLLAMA_MODEL_REGULATION`, `OLLAMA_THINK`는 참고용 백엔드 `backend/`에만 있어요.
 - TCP로 직접 붙으면 키가 암호화 없이 전송돼요. 공용 와이파이에서는 조심하고, 실제 개인 정보는 넣지 마세요. 더 안전하게 하려면 Tailscale이나 SSH 터널을 써야 하는데, 팀원마다 설치·설정이 늘어요.
 - 누가 두드리는지는 `tail -n 20 /workspace/ollama-nginx-access.log`로 봐요. `401`이 계속 찍히면 누군가 키 없이 접속을 시도하고 있다는 뜻이에요.
 
@@ -422,6 +427,8 @@ rm /workspace/ollama_key.txt
 ## 확인 범위 (2026-10-26)
 
 아래 Pod 확인은 모두 A40(48GB) 한 종류로 했어요. 확인할 때 쓴 GPU일 뿐, 팀이 쓸 GPU로 정한 것은 아니에요.
+
+- **문맥 길이 20480 (#189 · 2026-11-11):** 아래 기록은 모두 문맥 길이 16384로 잰 거예요(GPU 메모리 약 26GB 포함). #67에서 기준을 20480으로 올린 뒤 2-3·2-5·3-2를 20480으로 바꿨지만, **20480으로 실제 Pod에서 2-5(`ollama ps` 두 줄 `100% GPU`·`20480`)와 GPU 메모리 사용량은 아직 다시 재지 않았어요.** 다시 재면 GPU 기종과 메모리 사용량을 여기에 적어요.
 
 - **2-6·2-7(nginx 키 확인):** PC의 nginx 1.28 Docker 컨테이너와 가짜 Ollama로 네 가지 경우를 확인했어요.
   - 처음 켜기
@@ -447,7 +454,7 @@ rm /workspace/ollama_key.txt
 - **팀 모델 저장소(2026-10-29):** 허깅페이스 API와 모델 카드에서 공개 여부, GGUF 파일 수·이름·정밀도·크기, vision projector 미포함을 확인했어요. Ollama가 받는 주소(`https://hf.co/v2/<저장소>/manifests/<태그>`)는 태그 없이(`latest`) 두 모델 모두 200, 27b의 `:Q4_K_M`은 400이었어요. 두 모델에는 template·renderer·parser 설정이 없고, Ollama 라이브러리 `qwen3.8:27b`는 `renderer qwen3.8`·`parser qwen3.5`, `qwen3.5:4b`는 `renderer qwen3.5`·`parser qwen3.5`예요(2-4 '채팅 형식 붙이기'의 근거).
 - **실제 Pod에서 두 모델 (2026-10-29):** 확인용 A40(46GB) Pod · 볼륨 47G · Ollama 0.40.12에서 이 절차를 그대로(웹 터미널 대신 SSH로) 실행하고, 이 저장소의 #33 코드로 띄운 격리 스택(`OLLAMA_THINK=off`, OpenAI 키 있음)에 붙였어요.
   - 2-4: 받는 데 27b 321초, 4b 175초. `ollama list` 이름은 `hf.co/…:latest`(16 GB · 8.4 GB)이고, 받은 그대로는 `template source gguf_chat_template`였어요. '채팅 형식 붙이기' 뒤에는 두 모델 모두 `template source renderer_parser`, 디스크는 24G 그대로였어요. 생각 모드 단계는 27b `false, low, medium, xhigh`, 4b `false, true`예요.
-  - 2-5: `ollama ps`에 두 줄 모두 `100% GPU` · `16384`, GPU 메모리 약 26GB/46GB. Ollama 기록은 두 모델 모두 `selected=renderer_parser`. 첫 `ollama run`(생각 켬)은 27b 83초, 4b 93초 걸렸어요.
+  - 2-5: `ollama ps`에 두 줄 모두 `100% GPU` · `16384`(당시 기준), GPU 메모리 약 26GB/46GB. Ollama 기록은 두 모델 모두 `selected=renderer_parser`. 첫 `ollama run`(생각 켬)은 27b 83초, 4b 93초 걸렸어요.
   - 2-6·2-7·3-1: 키 없으면 401, 키 있으면 통과(Pod 안·PC 모두). 화면 좌측 'AI 모델'은 `연결됨`(그때는 모델 이름과 `외 1`도 함께 보였고, 지금은 '로컬 LLM·sLLM'만 표시).
   - 앱 호출: 로드맵 3안(27b · 세 안 동시 요청)은 A2 35초, A1 97초, A3 168초로 모두 JSON 형식에 맞게 성공했어요. 안별 지원 조건 확인(4b)은 17.8초에 성공했고 세 안 모두 '확인 필요'였어요. 도우미(4b)는 규정 질문 9.9초(근거 조항 1개와 답), 일반 질문 5.5초에 답했어요. 시험하는 동안 두 모델이 번갈아 내려가지 않았어요.
   - 모델 줄을 비운 기본값으로 다시 돌린 앱 호출(같은 날): 진단 에이전트 목표 후보 제안(27b) 14.3초, 3안(27b) A1 63초·A3 115초·A2 167초, 지원 조건 확인(4b) 6.7초, 도우미(4b · 3안과 동시) 17.3초로 모두 성공했고, 두 모델이 끝까지 함께 올라가 있었어요(GPU 약 26GB).
