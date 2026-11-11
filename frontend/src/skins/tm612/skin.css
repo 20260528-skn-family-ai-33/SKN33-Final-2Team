@@ -2,7 +2,8 @@
    원본: https://templatemo.com/tm-612-parallax-starter — 무료 · 상업/비상업 사용 허용. 사진도 템플릿에 들어 있던 것(Unsplash).
    전부 :root[data-skin="tm612"] 안에 적어 이 테마를 고른 때만 적용된다(@keyframes 만 규칙상 맨 바깥에 두고 이름에 tm612- 를 붙였다).
    메뉴 위치가 다른 두 버전: 상단 메뉴(&:not([data-nav="side"])) · 좌측 메뉴(&[data-nav="side"]).
-   움직임은 motion.ts 가 CSS 변수(--tm612-py)와 data- 속성(data-tm612-scrolled · data-tm612-rv)만 붙이고, 모양은 전부 여기에 있다.
+   움직임은 motion.ts 가 CSS 변수(--tm612-py · --tm612-o)와 data- 속성(data-tm612-scrolled)만 붙이고, 모양은 전부 여기에 있다.
+   나타나기는 다른 테마와 함께 쓰는 skins/reveal.ts · reveal.css 가 맡는다(index.ts 의 reveal: true).
 
    템플릿에서 가져온 것
    - 구간마다 다른 큰 사진 + 검은 막 위의 흰 제목 → 메뉴마다 다른 사진을 화면 머리(제목 자리)에 깔았다.
@@ -431,13 +432,8 @@
   }
 
   /* ════════════ 움직임 ════════════ */
+  /* 나타나기(화면에 들어올 때 한 번 떠오르기)는 여러 테마가 함께 쓰는 skins/reveal.css 에 있다(index.ts 의 reveal: true) */
   @media (prefers-reduced-motion: no-preference) {
-    /* 화면에 들어올 때 한 번 떠오른다. 덩어리마다 따로 움직이므로 본문 전체의 짧은 등장(gp.css rise)은 끈다.
-       wait·in 은 motion.ts 가 잠깐 붙였다 떼는 상태라, 상자마다 다른 transition 규칙보다 우선하게 한다 */
-    .view { animation: none; }
-    [data-tm612-rv="wait"] { opacity: 0 !important; translate: 0 30px; }
-    [data-tm612-rv="in"] { transition: opacity .8s ease var(--tm612-d, 0s), translate .8s ease var(--tm612-d, 0s) !important; }
-
     /* 첫 화면 띠·홈 카드 사진: 화면을 지나가는 동안 사진이 위→아래로 움직인다(지원하는 브라우저에서만) */
     @supports (animation-timeline: view()) {
       @media (min-width: 769px) {

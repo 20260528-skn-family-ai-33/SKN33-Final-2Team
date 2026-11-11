@@ -3,6 +3,8 @@
    - 테마 하나 = 폴더 하나(skins/<id>/): index.ts(이름·출처·글꼴) + skin.css + 사진. 테마 때문에 다른 곳의 화면 코드는 고치지 않는다.
      움직임이 필요한 테마는 같은 폴더에 스크립트를 둘 수 있다(예: tm612/motion.ts). 폴더를 모두 한꺼번에 불러오므로 스크립트는
      그 테마를 고른 때만 동작하고, 화면 코드를 고치지 않고 바깥에서 CSS 변수·data- 속성만 붙여야 한다.
+   - 여러 테마가 함께 쓰는 움직임은 나타나기 하나다(reveal.ts · reveal.css · 612 원본에서 옮김). meta 에 reveal: true 를 둔 테마를
+     고르면 <html data-reveal> 이 붙고 그때만 움직인다. 최종 결정 때 고른 테마가 이것을 쓰면 두 파일도 함께 가져간다.
    - 폴더 이름은 templatemo 템플릿 번호를 따라 tm<번호>. 고르기 상자에는 폴더 이름 순서로 나온다.
      후보는 2026-11-11에 7종(464 · 486 · 503 · 557 · 590 · 606 · 612)으로 줄였고(#197), 묶음(education · 그 외) 구분도 그때 뺐다.
    - skin.css 는 전부 :root[data-skin="<id>"] { … } 안에 적는다 → 고르지 않은 테마는 화면에 영향이 없다.
@@ -17,6 +19,8 @@
    - 최종 결정 뒤에는 최신 main 에서 새 브랜치를 만들고 고른 폴더만 가져가 정식으로 적용한다. 이 고르기 장치(width.css 포함)는 가져가지 않는다. */
 import { type Choice, formatChoice, pickChoice } from './pick';
 import './width.css';
+import './reveal.css';
+import './reveal';
 
 export interface SkinMeta {
   name: string;
@@ -24,6 +28,8 @@ export interface SkinMeta {
   source: string;
   /** 이 테마를 고른 때만 불러올 글꼴 CSS 주소 */
   fonts?: string[];
+  /** 본문 덩어리가 화면에 들어올 때 한 번 떠오르는 나타나기(reveal.ts)를 쓴다 */
+  reveal?: boolean;
 }
 export interface Skin extends SkinMeta {
   id: string;
@@ -60,6 +66,8 @@ function apply(c: Choice): void {
   const skinChanged = root.dataset.skin !== skin?.id;
   if (skin) root.dataset.skin = skin.id;
   else delete root.dataset.skin;
+  if (skin?.reveal) root.dataset.reveal = '';
+  else delete root.dataset.reveal;
   if (skin && c.side) root.dataset.nav = 'side';
   else delete root.dataset.nav;
   if (c.narrow) root.dataset.width = 'narrow';
