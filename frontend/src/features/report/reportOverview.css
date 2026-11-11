@@ -1,0 +1,76 @@
+/* 결과 보고서 개요 — 전체 일정 · 스킬별 사전·사후 레이더 · 학습 결과
+   색은 comparisonViz.css 의 --cmp-* (테마 강조색·테마 회색에서 만든 값)를 같이 쓴다 */
+.rpt-card-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px}
+.rpt-card-head .st{margin:0}
+.rpt-card-meta{margin-left:auto;font-size:12px;font-variant-numeric:tabular-nums;color:var(--ink-3)}
+.rpt-card-sub{margin:4px 0 0;font-size:12px;line-height:1.6;color:var(--ink-3)}
+.rpt-skill-card .st{margin:0}
+.rpt-card-foot{margin:12px 0 0;padding-top:12px;border-top:1px dashed var(--line);font-size:12px;line-height:1.7;color:var(--ink-2);text-align:center}
+.rpt-card-foot b{font-variant-numeric:tabular-nums;color:var(--ink)}
+
+/* 전체 일정: 칸 하나 = 한 주 */
+.rpt-schedule{margin-block:12px;min-width:0;max-width:100%}
+.rpt-gantt{margin-top:14px;overflow-x:auto}
+/* 한 주 칸이 14px(두 자리 주차 숫자) 아래로 줄지 않게 한다: 이름 96px + 상태 48px + 열 간격 + 주차 칸과 칸 간격 */
+.rpt-gantt-inner{min-width:calc(96px + 48px + 28px + var(--n) * 17px - 3px)}
+.rpt-gantt-head,.rpt-gantt-row{display:grid;grid-template-columns:minmax(96px,min(36%,340px)) minmax(0,1fr) 48px;gap:14px;align-items:center}
+.rpt-gantt-head{padding-bottom:6px;font-size:11px;color:var(--ink-3)}
+.rpt-gantt-head>:last-child,.rpt-gantt-state{text-align:right}
+.rpt-gantt-rows{margin:0;padding:0;list-style:none}
+.rpt-gantt-row{min-height:36px;padding:7px 0;border-top:1px solid var(--line);font-size:13px;line-height:1.45}
+.rpt-gantt-label{display:flex;gap:8px;min-width:0}
+.rpt-gantt-label small{flex-shrink:0;font-size:12px;line-height:1.6;color:var(--ink-3)}
+.rpt-gantt-title{display:-webkit-box;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow-wrap:anywhere}
+.rpt-gantt-weeks{display:grid;grid-template-columns:repeat(var(--n),minmax(14px,1fr));gap:3px;align-items:center;font-variant-numeric:tabular-nums}
+.rpt-gantt-weeks i{height:8px;border-radius:2px;background:var(--cmp-track)}
+.rpt-gantt-weeks i.on,.rpt-gantt-swatch{background:color-mix(in srgb,var(--cmp-post) 30%,var(--cmp-surface));box-shadow:inset 0 0 0 1.5px var(--cmp-post)}
+.rpt-gantt-weeks i.on.done,.rpt-gantt-swatch.done{background:var(--cmp-post);box-shadow:none}
+.rpt-gantt-state{font-size:12px;white-space:nowrap;color:var(--ink-3)}
+.rpt-gantt-state.done{font-weight:650;color:var(--cmp-post-ink)}
+.rpt-gantt-swatch{width:16px;height:8px;border-radius:2px;flex-shrink:0}
+.rpt-gantt-key{margin-top:12px}
+
+/* 스킬별 사전·사후 카드 두 장: 넓으면 나란히, 좁으면 위아래 */
+.rpt-pair{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px;margin-block:12px}
+.rpt-skill-card{display:flex;flex-direction:column;min-width:0}
+.rpt-skill-chart{margin-top:12px}
+.rpt-radar{position:relative;width:100%;margin-inline:auto}
+.rpt-radar svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.rpt-radar-ring{fill:none;stroke:var(--line);stroke-width:1}
+.rpt-radar-ring.outer{stroke:var(--line-2,var(--line))}
+.rpt-radar-axis{stroke:var(--line);stroke-width:1}
+.rpt-radar-area{stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.rpt-radar-area.pre{fill:none;stroke:var(--cmp-pre);stroke-dasharray:5 4}
+.rpt-radar-area.post{fill:var(--cmp-post);fill-opacity:.14;stroke:var(--cmp-post)}
+.rpt-radar-mark.pre{fill:var(--cmp-surface);stroke:var(--cmp-pre);stroke-width:2}
+.rpt-radar-mark.post{fill:var(--cmp-post);stroke:var(--cmp-surface);stroke-width:1.5}
+.rpt-radar-label{position:absolute;display:grid;gap:1px;width:max-content;max-width:120px;font-size:12px;line-height:1.35;text-align:center}
+.rpt-radar-label.above{--shift:-50%;transform:translate(var(--shift),-100%)}
+.rpt-radar-label.below{--shift:-50%;transform:translate(var(--shift),0)}
+.rpt-radar-label.out-right{--shift:-40%}
+.rpt-radar-label.out-left{--shift:-60%}
+.rpt-radar-label.right{max-width:84px;transform:translate(0,-50%);text-align:left}
+.rpt-radar-label.left{max-width:84px;transform:translate(-100%,-50%);text-align:right}
+.rpt-radar-name{display:-webkit-box;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow-wrap:anywhere;font-weight:600;color:var(--ink)}
+.rpt-radar-value{font-size:11px;font-variant-numeric:tabular-nums;color:var(--ink-3)}
+.rpt-radar-value b{font-weight:650;color:var(--ink)}
+.rpt-skill-key{justify-content:center;margin-top:auto;padding-top:6px}
+.rpt-key-line{flex-shrink:0}
+
+/* 학습 결과: 잘된 점 · 보완할 점 → 다음 로드맵 제안 */
+.rpt-result{margin-top:12px}
+.rpt-result-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:20px 28px}
+.rpt-result-col{padding-left:14px;border-left:2px solid var(--accent-line,var(--line))}
+.rpt-result-col h3{margin:0 0 8px;font-size:13px;font-weight:650;color:var(--accent-ink,var(--ink))}
+.rpt-result-col .plain-list{font-size:14px;line-height:1.6}
+.rpt-result-bridge{margin:22px 0 10px;font-size:12px;text-align:center;color:var(--ink-3)}
+.rpt-next-eyebrow{margin:0 0 6px;font-size:12px;font-weight:650;color:var(--accent-ink,var(--ink-2))}
+.rpt-next-goal{margin:0;font-weight:650}
+.rpt-next-why{margin:4px 0 0}
+.rpt-result-note{margin:10px 0 0}
+
+@media(max-width:560px){
+  .rpt-gantt-head,.rpt-gantt-row{grid-template-columns:minmax(96px,min(40%,122px)) minmax(0,1fr) 40px;gap:8px}
+  .rpt-gantt-label{flex-direction:column;gap:0}
+  .rpt-card-meta{margin-left:0}
+}

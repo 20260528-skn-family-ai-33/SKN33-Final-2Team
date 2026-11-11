@@ -1,10 +1,10 @@
 /* 결과 보고서 사전·사후 비교 시각화 (#116) — 요약 띠 · 스킬별 점 격자 · 설문 덤벨
    사후 = 테마 강조색 · 사전 = 테마의 회색. 색을 못 봐도 읽히게 채움·빈 원·빗금과 글자를 함께 쓴다.
    보고서 안의 사전·사후 색(설문 선택지, 개념별 정답 수)도 이 값을 같이 쓴다 */
-.cmp-summary,.learning-check,.report-survey{--cmp-post:var(--accent,#0e7c66);--cmp-pre:var(--ink-3,#7a7e85);--cmp-ring:var(--ink-4,#a6a9ae);--cmp-track:var(--sunk,#f0f0ec);--cmp-surface:var(--surface,#fff);--cmp-post-soft:color-mix(in srgb,var(--cmp-post) 12%,var(--cmp-surface));--cmp-post-ink:color-mix(in srgb,var(--cmp-post) 80%,var(--ink,#18191b));--cmp-pre-soft:color-mix(in srgb,var(--cmp-pre) 14%,var(--cmp-surface));--cmp-hatch:repeating-linear-gradient(135deg,var(--cmp-pre) 0 2px,transparent 2px 5px)}
+.cmp-summary,.learning-check,.report-survey,.rpt-viz{--cmp-post:var(--accent,#0e7c66);--cmp-pre:var(--ink-3,#7a7e85);--cmp-ring:var(--ink-4,#a6a9ae);--cmp-track:var(--sunk,#f0f0ec);--cmp-surface:var(--surface,#fff);--cmp-post-soft:color-mix(in srgb,var(--cmp-post) 12%,var(--cmp-surface));--cmp-post-ink:color-mix(in srgb,var(--cmp-post) 80%,var(--ink,#18191b));--cmp-pre-soft:color-mix(in srgb,var(--cmp-pre) 14%,var(--cmp-surface));--cmp-hatch:repeating-linear-gradient(135deg,var(--cmp-pre) 0 2px,transparent 2px 5px)}
 /* 밝은 테마: 강조색의 색상·채도는 그대로 두고, 노랑·연두처럼 너무 밝은 강조색만 흰 바탕에서 보이는 밝기(OKLCH L 0.62)까지 낮춘다.
    이 문법을 모르는 브라우저는 위의 강조색을 그대로 쓴다. 어두운 테마는 skin.css 에서 강조색을 그대로 쓰게 되돌린다 */
-@supports (color:oklch(from red l c h)){.cmp-summary,.learning-check,.report-survey{--cmp-post:oklch(from var(--accent,#0e7c66) min(l,.62) c h)}}
+@supports (color:oklch(from red l c h)){.cmp-summary,.learning-check,.report-survey,.rpt-viz{--cmp-post:oklch(from var(--accent,#0e7c66) min(l,.62) c h)}}
 
 /* 요약 띠 */
 .cmp-summary{margin-block:12px}
