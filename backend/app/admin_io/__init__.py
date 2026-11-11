@@ -110,6 +110,10 @@ def preview(ds: str, admin_id: int, file_name: str, raw: bytes, sheet_hint: str 
 def apply(upload_id: str, admin_id: int, goal_mode: str | None = None) -> dict:
     from ..services import goals
     goals.validate_mode(goal_mode)
+    try:
+        upload_id = str(uuid.UUID(upload_id))
+    except ValueError:
+        raise ApiError(404, 'NO_UPLOAD', '미리보기 기록을 찾을 수 없어요') from None
     up = db.one('SELECT * FROM app_ext.admin_uploads WHERE upload_id = CAST(:u AS uuid)', u=upload_id)
     if not up:
         raise ApiError(404, 'NO_UPLOAD', '미리보기 기록을 찾을 수 없어요')

@@ -88,7 +88,6 @@ def api_upload(upload_id: str, a: Account = Depends(require_admin)):
 @r.post('/uploads/{upload_id}/apply')
 def api_apply(upload_id: str, body: dict | None = None, a: Account = Depends(require_admin)):
     mode = (body or {}).get('goalMode')
-    upload_id = validated_uuid(upload_id, ApiError(404, 'NO_UPLOAD', '미리보기 기록을 찾을 수 없어요'))
     return admin_io.apply(upload_id, a.id, 'mock' if mode == 'mock' else None)
 
 
