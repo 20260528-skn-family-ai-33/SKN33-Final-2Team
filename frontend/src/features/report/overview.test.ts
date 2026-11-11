@@ -18,9 +18,16 @@ describe('surveyBySkill', () => {
     ]);
   });
 
-  it('사전 응답이 없는 스킬은 0점이 아니라 값 없음으로 둔다', () => {
+  it('사전 응답이 없는 스킬은 0점이 아니라 값 없음으로 두고, 사후는 응답한 문항으로 낸다', () => {
     const [axis] = surveyBySkill(surveyComparison([survey('q1', 'SQL', null, '4'), survey('q2', 'SQL', '9', '3')]));
     expect(axis).toEqual({ skill: 'SQL', pre: null, post: 0.7, preText: '–', postText: '3.5' });
+  });
+
+  it('한쪽만 응답한 문항은 평균에서 빼 변화 수와 같은 문항으로 맞춘다', () => {
+    // 양쪽 응답 문항은 4 → 3(낮아짐)뿐이다. 사후만 응답한 5점을 넣으면 평균이 오른 것처럼 보인다
+    const comparison = surveyComparison([survey('q1', 'SQL', '4', '3'), survey('q2', 'SQL', null, '5')]);
+    expect(comparison.counts).toMatchObject({ up: 0, down: 1, unknown: 1 });
+    expect(surveyBySkill(comparison)).toEqual([{ skill: 'SQL', pre: 0.8, post: 0.6, preText: '4', postText: '3' }]);
   });
 });
 
@@ -66,17 +73,26 @@ describe('buildSchedule', () => {
     expect(schedule).toEqual({
       weeks: 5,
       rows: [
-        { key: 'a1', res: 'c1', task: false, title: '활동 a1', from: 1, to: 2, done: true },
-        { key: 'a2', res: null, task: true, title: '활동 a2', from: 2, to: 2, done: false },
-        { key: 'a3', res: null, task: true, title: '활동 a3', from: 3, to: 4, done: true },
+        { key: 'a1', res: 'c1', task: false, title: '활동 a1', spans: [[1, 2]], done: true },
+        { key: 'a2', res: null, task: true, title: '활동 a2', spans: [[2, 2]], done: false },
+        { key: 'a3', res: null, task: true, title: '활동 a3', spans: [[3, 4]], done: true },
       ],
     });
   });
 
   it('같은 강좌가 여러 활동으로 나뉘어 있으면 한 줄로 합치고 모두 끝나야 완료로 본다', () => {
     const schedule = buildSchedule([act('a1', 1, 1, 'c1'), act('a2', 2, 3, 'c1')], snapshot([recorded('a1', 'done'), recorded('a2', 'doing')]));
-    expect(schedule?.rows).toEqual([{ key: 'a1', res: 'c1', task: false, title: '활동 a1', from: 1, to: 3, done: false }]);
+    expect(schedule?.rows).toEqual([{ key: 'a1', res: 'c1', task: false, title: '활동 a1', spans: [[1, 3]], done: false }]);
     expect(schedule?.weeks).toBe(3);
+  });
+
+  it('같은 강좌가 떨어진 주차에 나뉘어 있으면 사이 주를 잇지 않는다', () => {
+    const schedule = buildSchedule([act('a1', 5, 6, 'c1'), act('a2', 1, 2, 'c1'), act('a3', 2, 3, 'c1')], snapshot([recorded('a1', 'done'), recorded('a2', 'done'), recorded('a3', 'done')]));
+    expect(schedule?.rows[0].spans).toEqual([
+      [1, 3],
+      [5, 6],
+    ]);
+    expect(schedule?.weeks).toBe(6);
   });
 
   it('주차를 알 수 없는 활동이 있으면 일부만 그리지 않는다', () => {

@@ -43,9 +43,9 @@ export function ReportSchedule({ schedule, snapshot }: { schedule: Schedule; sna
                   {row.title}
                 </span>
               </span>
-              <span className="rpt-gantt-weeks" style={columns} role="img" aria-label={`${row.from === row.to ? row.from : `${row.from}~${row.to}`}주차`}>
+              <span className="rpt-gantt-weeks" style={columns} role="img" aria-label={`${row.spans.map(([from, to]) => (from === to ? from : `${from}~${to}`)).join(', ')}주차`}>
                 {weeks.map((week) => (
-                  <i key={week} className={week >= row.from && week <= row.to ? (row.done ? 'on done' : 'on') : undefined} />
+                  <i key={week} className={row.spans.some(([from, to]) => week >= from && week <= to) ? (row.done ? 'on done' : 'on') : undefined} />
                 ))}
               </span>
               <span className={`rpt-gantt-state${row.done ? ' done' : ''}`}>{row.done ? '완료' : '미완료'}</span>

@@ -80,8 +80,8 @@ describe('ReportSchedule', () => {
         schedule={{
           weeks: 4,
           rows: [
-            { key: 'a1', res: 'c1', task: false, title: 'SQL 기초 강좌', from: 1, to: 2, done: true },
-            { key: 'a2', res: null, task: true, title: '조회 쿼리 과제', from: 3, to: 3, done: false },
+            { key: 'a1', res: 'c1', task: false, title: 'SQL 기초 강좌', spans: [[1, 2]], done: true },
+            { key: 'a2', res: null, task: true, title: '조회 쿼리 과제', spans: [[3, 3]], done: false },
           ],
         }}
       />,
@@ -96,5 +96,17 @@ describe('ReportSchedule', () => {
     expect(html).toContain('>미완료</span>');
     expect(html).toContain('<small>과제</small>');
     expect(html).toContain('<small>자료</small>');
+  });
+
+  it('떨어진 주차 구간은 사이 주를 비워 둔다', () => {
+    const html = renderToStaticMarkup(
+      <ReportSchedule
+        snapshot={{ asOf: '2026-11-11T01:00:00+00:00', early: false, version: 1, activities: [] }}
+        schedule={{ weeks: 6, rows: [{ key: 'a1', res: 'c1', task: false, title: '나뉜 강좌', spans: [[1, 2], [5, 6]], done: true }] }}
+      />,
+    );
+    expect(html).toContain('aria-label="1~2, 5~6주차"');
+    expect(count(html, '<i class="on done">')).toBe(4);
+    expect(count(html, '<i></i>')).toBe(2);
   });
 });

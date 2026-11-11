@@ -1,5 +1,5 @@
 /* 결과 보고서 맨 위 개요 — 일정 줄과 스킬별 사전·사후 값. 화면과 분리한 순수 계산
-   - 설문: 스킬마다 그 시점에 응답한 문항의 1~5 평균. 응답이 없는 문항은 평균에서 뺀다
+   - 설문: 스킬마다 사전·사후를 모두 응답한 문항의 1~5 평균. 카드 아래 높아짐·같음·낮아짐 수와 같은 문항을 쓴다
    - 퀴즈: 스킬마다 채점한 문항 중 맞힌 수. 0개여도 도형이 중심에 뭉치지 않게 눈금을 한 칸 밀어(0개 = 첫 눈금) 그린다.
      사전·사후가 같은 개념의 다른 문제라 차이 값은 만들지 않는다
    - 일정: 계획의 주차와 보고서 시점에 고정한 완료 여부를 활동 ID로 맞춘다 */
@@ -24,20 +24,24 @@ function scoreText(value: number | null): string {
   return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
 }
 
+/** 사전·사후를 모두 응답한 문항끼리 평균을 낸다(변화 수를 세는 문항과 같아야 도형과 숫자가 어긋나지 않는다).
+    그런 문항이 없는 스킬은 사전 값을 만들지 않고, 사후는 응답한 문항으로만 낸다 */
 export function surveyBySkill(survey: SurveyComparison): SkillValue[] {
-  const groups = new Map<string, { pre: number[]; post: number[] }>();
+  const groups = new Map<string, { pre: number[]; post: number[]; postOnly: number[] }>();
   for (const item of survey.items) {
     let group = groups.get(item.skill);
     if (!group) {
-      group = { pre: [], post: [] };
+      group = { pre: [], post: [], postOnly: [] };
       groups.set(item.skill, group);
     }
-    if (item.pre !== null) group.pre.push(item.pre);
-    if (item.post !== null) group.post.push(item.post);
+    if (item.pre !== null && item.post !== null) {
+      group.pre.push(item.pre);
+      group.post.push(item.post);
+    } else if (item.post !== null) group.postOnly.push(item.post);
   }
   return [...groups].map(([skill, group]) => {
     const pre = mean(group.pre);
-    const post = mean(group.post);
+    const post = mean(group.post.length ? group.post : group.postOnly);
     return { skill, pre: pre === null ? null : pre / 5, post: post === null ? null : post / 5, preText: scoreText(pre), postText: scoreText(post) };
   });
 }
@@ -78,8 +82,8 @@ export interface ScheduleRow {
   res: string | null;
   task: boolean;
   title: string;
-  from: number;
-  to: number;
+  /** 계획한 주차 구간 [시작, 끝]. 떨어진 구간은 따로 두어 사이 주를 칠하지 않는다 */
+  spans: [number, number][];
   done: boolean;
 }
 export interface Schedule {
@@ -100,13 +104,23 @@ export function buildSchedule(acts: Pick<Activity, 'id' | 'res' | 'wFrom' | 'wTo
     // 한 강좌가 여러 스킬에 걸려 활동이 나뉘어 있으면 한 줄로 합친다(모두 완료해야 완료)
     const same = act.res ? rows.find((row) => row.res === act.res) : undefined;
     if (same) {
-      same.from = Math.min(same.from, act.wFrom);
-      same.to = Math.max(same.to, act.wTo);
+      same.spans = mergeSpans([...same.spans, [act.wFrom, act.wTo]]);
       same.done = same.done && done;
       continue;
     }
-    rows.push({ key: recorded.id, res: act.res || null, task: recorded.task, title: recorded.title, from: act.wFrom, to: act.wTo, done });
+    rows.push({ key: recorded.id, res: act.res || null, task: recorded.task, title: recorded.title, spans: [[act.wFrom, act.wTo]], done });
   }
   if (!rows.length) return null;
-  return { weeks: Math.max(planWeeks, ...rows.map((row) => row.to)), rows };
+  return { weeks: Math.max(planWeeks, ...rows.flatMap((row) => row.spans.map((span) => span[1]))), rows };
+}
+
+/** 겹치거나 바로 이어지는 구간만 합친다 */
+function mergeSpans(spans: [number, number][]): [number, number][] {
+  const merged: [number, number][] = [];
+  for (const [from, to] of [...spans].sort((a, b) => a[0] - b[0])) {
+    const last = merged[merged.length - 1];
+    if (last && from <= last[1] + 1) last[1] = Math.max(last[1], to);
+    else merged.push([from, to]);
+  }
+  return merged;
 }
