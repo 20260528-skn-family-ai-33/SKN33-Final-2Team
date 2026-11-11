@@ -36,7 +36,7 @@ class DemoAccessTests(unittest.TestCase):
 
     def test_enabled_ai_log_requires_login_and_preserves_authenticated_access(self):
         with patch.object(account, 'S', replace(account.S, demo_mode=True)), \
-             patch.object(rt, 'all_logs', return_value=[{'employeeId': 1, 't': 10, 'output': 'test'}]) as logs, \
+             patch.object(rt, 'all_logs', return_value=[{'employeeId': 1, 't': 10, 'task': 'test', 'output': '전문'}]) as logs, \
              patch.object(account.db, 'all_', return_value=[{'employee_id': 1, 'name': '시험 직원'}]):
             self.assertEqual(self.client.get('/api/v1/ai/log').status_code, 401)
             logs.assert_not_called()
@@ -44,7 +44,8 @@ class DemoAccessTests(unittest.TestCase):
                 with self.subTest(role=role), patch.object(auth, 'account_of', return_value=auth.Account(role, 1, 'test')):
                     response = self.client.get('/api/v1/ai/log')
                     self.assertEqual(response.status_code, 200)
-                    self.assertEqual(response.json()['log'], [{'employeeId': 1, 'output': 'test', 'employee': '시험 직원'}])
+                    # 입력·출력 전문은 목록에 넣지 않고 /ai/log/{id} 로 받는다
+                    self.assertEqual(response.json()['log'], [{'employeeId': 1, 'task': 'test', 'employee': '시험 직원', 'callCount': 0}])
 
     def test_providers_reports_demo_mode_to_authenticated_accounts(self):
         self.assertEqual(self.client.get('/api/v1/ai/providers').status_code, 401)

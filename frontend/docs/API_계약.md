@@ -70,7 +70,7 @@
 | `GET /me/workspace` | 로그인 뒤 내 기록 전체(작성 문서·로드맵·보고서) |
 | `GET /me/profile` · `PUT`/`DELETE /me/profile/self` | 내 정보 |
 | `GET /me/goal-suggestions` · `POST /me/goal-suggestions/ensure` · `POST /me/goal-suggestions/regenerate` | 저장된 후보 조회 · 누락/변경 확인 · 명시적 다시 만들기 |
-| `GET /ai/providers` · `PUT /me/ai-provider` · `GET /ai/status?provider=` · `GET /ai/log` | 좌측 AI 모델 고르기·연결 상태·에이전트 동작 보기(시연·디버그 전용 · 직원·관리자 계정 모두 · 누가 호출했든 모든 계정의 최근 호출을 `employee`(누구의 일)·`by`(관리자 화면에서 시작하면 '관리자')와 함께 줌 · 운영에서는 끔) |
+| `GET /ai/providers` · `PUT /me/ai-provider` · `GET /ai/status?provider=` · `GET /ai/log` · `GET /ai/log/{id}` | 좌측 AI 모델 고르기·연결 상태·에이전트 동작 보기(시연·디버그 전용 · 직원·관리자 계정 모두 · 누가 호출했든 모든 계정의 최근 호출을 `employee`(누구의 일)·`by`(관리자 화면에서 시작하면 '관리자')와 함께 줌 · 운영에서는 끔). 목록은 요약과 `callCount`(모델 호출 수)만, `/ai/log/{id}`는 그 기록의 에이전트 입력·출력과 모델 호출마다 보낸 메시지·응답 원문(`calls`)을 자르지 않고 줌(이미지는 개수만). 오래돼 밀려난 기록은 `404 LOG_NOT_FOUND` |
 | `PUT /me/reasoning` | 좌측 AI 모델에서 모델별 추론 정도 고르기(직원 계정만) |
 | `GET /demo/accounts` | 베타 로그인 직원 선택. `GP5_BETA_ACCOUNT_PICKER=on`일 때만 인증 없이 DB 직원 목록·관리자 로그인 아이디 제공. 비밀번호는 제외 |
 | `PUT /me/demo-settings` · `POST /demo/reset` · `POST /demo/jump` | 시연 전용(가데이터·실패 시연·단계 이동·초기화) |
@@ -81,7 +81,7 @@
 
 `GP5_BETA_ACCOUNT_PICKER`는 시연 모드와 독립적입니다. 베타 예시는 on이며, 미설정 또는 off이면 `GET /demo/accounts`는 DB 조회 전에 `404 / NOT_FOUND`를 반환하고 화면에서 직원 선택을 숨깁니다. 베타 종료 시 off로 변경하고 백엔드를 다시 생성한 뒤 화면을 새로고침합니다. on일 때도 비밀번호를 반환하지 않으며 직원 선택은 사번만 채웁니다. 직접 입력 로그인은 어느 설정에서도 유지합니다.
 
-`GP5_DEMO_MODE=off`이면 위 시연 전용 3개 API와 `GET /ai/log`는 인증·조회 전에 `404 / NOT_FOUND`를 반환합니다. 직원·관리자 모두 같은 제한을 받습니다. `GET /me`와 실행 컨텍스트는 off에서 저장된 `demo_mock`·`fail_sim`을 무시하고 `demoMock: false`, `failSim: {}`를 사용하며 DB 원본·선택한 AI 제공자·추론값은 유지합니다.
+`GP5_DEMO_MODE=off`이면 위 시연 전용 3개 API와 `GET /ai/log`·`GET /ai/log/{id}`는 인증·조회 전에 `404 / NOT_FOUND`를 반환합니다. 직원·관리자 모두 같은 제한을 받습니다. `GET /me`와 실행 컨텍스트는 off에서 저장된 `demo_mock`·`fail_sim`을 무시하고 `demoMock: false`, `failSim: {}`를 사용하며 DB 원본·선택한 AI 제공자·추론값은 유지합니다.
 
 `GET /ai/providers`에는 서버 시연 허용 여부인 최상위 `demoMode: boolean`이 추가됩니다. 예를 들어 `{ "current": "ollama", "demoMode": false, "providers": [...], "docLibs": {...} }`이면 화면은 시연 도구와 관리자 가데이터 선택지를 숨깁니다. 값이 없거나 조회가 실패해도 표시하지 않습니다. 서버 `GP5_DEMO_MODE`와 프런트 `VITE_DEMO_TOOLS`는 미설정·빈 값·공백·알 수 없는 값이면 off이며, 앞뒤 공백과 대소문자를 정리한 on만 허용합니다. 서버는 빈 환경변수도 파일 설정보다 우선합니다. 두 설정이 모두 on일 때만 시연 도구가 표시됩니다. 직원의 미설정 AI 기본값은 `ollama`이며 OpenAI 키 설정만으로 선택이 바뀌지 않습니다.
 

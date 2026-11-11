@@ -167,5 +167,5 @@ def generate_from_profile(ctx: Any, project: dict[str, Any], selection: dict[str
     if me is None:
         raise SurveyError('개인 DB 프로필을 찾을 수 없습니다.')
     return generate_survey(project, selection, profile_input(me),
-                           lambda system, payload: runtime.llm_json(ctx, system, payload),
+                           runtime.model(ctx, '진단 에이전트', '역량 테스트 문항 생성'),
                            require_measurement=True)

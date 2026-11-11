@@ -83,7 +83,7 @@ def generate_for(employee_id: int, project_id: str, *, staged: bool = False) -> 
         else:
             selection = select_from_catalog(ctx, dict(project,learnerKnowledge=from_profile(personal),hrContext=hr_context(personal)))
         survey = generate_survey(project, selection, personal,
-                                 lambda system, payload: runtime.llm_json(ctx, system, payload),
+                                 runtime.model(ctx, '진단 에이전트', '역량 테스트 문항 생성'),
                                  require_measurement=True)
         if profile_input(profile.view(employee_id) or {}) != personal:
             raise ApiError(409, 'PROFILE_CHANGED', '생성 중 개인 정보가 변경됐어요. 다시 생성해 주세요.')
@@ -321,7 +321,7 @@ def propose_activities(project_id: UUID,a: Account=Depends(require_employee),reg
         if existing and not regenerate and not skill:return activities.view(saved,d)
         ctx=runtime.context(a.id)
         if not ctx.live:raise ApiError(503,'MODEL_REQUIRED','실제 모델 연결이 필요해요.')
-        model=lambda system,payload:runtime.llm_json(ctx,system,payload,role='roadmap')
+        model=runtime.model(ctx,f'로드맵 계획 · {course}','스킬 활동 다시 제안' if skill else '학습 활동 제안',role='roadmap')
         proposal=activities.repropose_skill(saved,d,skill,model,ctx.mode) if skill else activities.propose(saved,d,model,ctx.mode,previous=activities.versions(saved,d) if regenerate else None)
         def save(t,w):
             current,draft=activities.context(t,a.id,str(project_id),**({'course':course} if course else {}))
@@ -391,7 +391,7 @@ def generate_learning_outcomes(project_id:UUID,a:Account=Depends(require_employe
             if existing is not None:return {'summaries':existing}
         ctx=runtime.context(a.id)
         if not ctx.live:raise ApiError(503,'MODEL_REQUIRED','실제 모델 연결이 필요해요.')
-        result=learning_outcomes.generate(saved,draft,lambda system,payload:runtime.llm_json(ctx,system,payload,role='roadmap'))
+        result=learning_outcomes.generate(saved,draft,runtime.model(ctx,f'로드맵 계획 · {course}','학습 결과 요약',role='roadmap'))
         def save(t,w):
             latest,d=activity_selection.context(t,a.id,str(project_id),**({'course':course} if course else {}))
             if activity_selection.fingerprint(latest,d)!=result['key']:raise ApiError(409,'MATERIALS_CHANGED','선택한 자료가 변경됐어요. 다시 확인해 주세요.')

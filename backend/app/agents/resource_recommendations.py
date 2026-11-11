@@ -465,7 +465,7 @@ def recommend_from_catalog(ctx: Any, pre: dict, course: dict | None = None, *,
     selection = dict(pre['selection'], commonApplications=pre.get('_commonApplications') or {})
     pools, retrieval = retrieve(project, selection, items, course)
     result = recommend_resources(project, selection, items,
-        lambda system, payload: runtime.llm_json(ctx, system, payload, role='resources'), course=course, retrieved_pools=pools)
+        runtime.model(ctx, '자료 추천', '스킬별 학습 자료 추천', role='resources'), course=course, retrieved_pools=pools)
     result['retrieval'] = retrieval
     return result
 
