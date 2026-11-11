@@ -1,7 +1,9 @@
 """DB 프롬프트는 유지하고 Fast 후보 선정·전달 입력에 적용하는 추가 기준."""
 from __future__ import annotations
 
-VERSION = '20261103-course-preparation-no-period-cap-v7'
+VERSION = '20261111-skill-cap-3-v8'
+# 선정 스킬 상한(모든 코스). 이전에 4~5개로 저장된 목록은 사용자 순서의 앞 3개만 쓴다.
+MAX_SKILLS = 3
 FAST_SKILLS = 3
 FAST_MIN_OUTLINE_UNITS = 6
 FAST_MIN_FOCUS = 1 / 3

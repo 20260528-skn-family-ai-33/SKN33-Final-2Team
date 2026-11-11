@@ -81,7 +81,7 @@ def shortest_bundle(pools: list[dict], project: dict, selection: dict, cache: di
             courses.setdefault(rid, row)
             coverage[rid] = coverage.get(rid, 0) | bit
 
-    # 스킬 최대 5개, 상태 최대 32개. 20개 검토 창 전체에서도 강좌마다 한 번만 시간을 합산한다.
+    # 스킬 최대 3개, 상태 최대 32개. 20개 검토 창 전체에서도 강좌마다 한 번만 시간을 합산한다.
     best = {0: (0, 0, 0., 0, ())}
     for rid, row in sorted(courses.items()):
         certainty = time_certainty(row)

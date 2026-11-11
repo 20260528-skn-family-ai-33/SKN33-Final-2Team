@@ -3,6 +3,8 @@ from copy import deepcopy
 import hashlib
 import json
 
+from app.track_policy import MAX_SKILLS
+
 CONTRACT = """
 [로드맵별 지식·역량 추천]
 기존 Track 정책과 후보 조건을 유지한다. 이 로드맵에서 실제 익힐 핵심 지식·역량을
@@ -63,7 +65,7 @@ def crash_core_fields(row: dict, required: bool = False) -> dict:
 
 
 def validate_recommendations(rows, allowed, course, *, require_depth=False, max_skills=None):
-    limit = max_skills if max_skills is not None else (3 if course == 'A2' else 5)
+    limit = max_skills if max_skills is not None else MAX_SKILLS
     if not isinstance(rows, list) or not 1 <= len(rows) <= limit:
         raise ValueError('로드맵별 지식·역량 추천을 확인하지 못했어요. 새 안을 만들어 주세요.')
     result=[]; seen=set()

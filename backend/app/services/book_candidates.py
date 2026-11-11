@@ -45,7 +45,7 @@ def common_pool(pools: list[dict], items: dict, *, limit: int | None = None,
         ranked.append(_rank(rows, details.get(pool['name'], pool)))
 
     selected = {}
-    # 최대 5스킬이므로 기본 한도 30권 안에서 스킬별 3권(최대 15권)을 보존할 수 있다.
+    # 최대 3스킬이므로 기본 한도 30권 안에서 스킬별 3권(최대 9권)을 보존할 수 있다.
     for rows in ranked:
         for row in rows[:MIN_PER_SKILL]:
             selected.setdefault(row['id'], row)

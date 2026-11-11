@@ -1,4 +1,4 @@
-"""#67: 3,000자 이상 가상 기획서·확정 1~5스킬·3코스의 실제 토크나이저 검증.
+"""#67: 3,000자 이상 가상 기획서·확정 1~3스킬·3코스의 실제 토크나이저 검증.
 모델·DB는 모의하며 실제 저장/모델 품질 검증으로 보고하지 않는다.
 """
 from copy import deepcopy
@@ -35,7 +35,7 @@ class SurveyMemory:
         return 1
 
 
-def scenario(count=5,long_summary=False):
+def scenario(count=3,long_summary=False):
     summary='\n'.join(f'{label}: {SUMMARY[key]}' for key,label in doc.DOC_FIELDS)
     if long_summary:summary=PROJECT
     selected=[{'name':name,'reason':'공개 규정 검색의 근거·입출력 검증 필요','application':f'{name}을 공개 규정 검색의 입력·근거·오류 검증에 적용'} for name in SKILLS[:count]]
@@ -121,22 +121,22 @@ class Issue67ScenarioTests(unittest.TestCase):
 
     def test_synthetic_project_and_saved_answers_survive_compaction(self):
         self.assertGreaterEqual(len(PROJECT),3000)
-        case=scenario(5)
-        self.assertEqual(len(case['saved']['survey']['groups']),5)
-        self.assertEqual(len(case['saved']['answers']),30)
+        case=scenario(3)
+        self.assertEqual(len(case['saved']['survey']['groups']),3)
+        self.assertEqual(len(case['saved']['answers']),18)
         self.assertEqual(case['handoff']['assessment']['groups'],case['saved']['survey']['groups'])
         self.assertEqual(case['handoff']['assessment']['answers'],case['saved']['answers'])
         self.assertEqual(case['saved']['project']['projectSourceHash'],hashlib.sha256(PROJECT.encode()).hexdigest())
 
     def test_long_project_all_tracks_generation_regeneration_revision_fit(self):
-        for count in range(1,6):
+        for count in range(1,4):
             with self.subTest(skills=count):
                 rows=matrix(scenario(count,long_summary=True))
                 self.assertEqual(len(rows),9)
                 self.assertTrue(all(row['requiredPresent'] for row in rows))
 
-    def test_six_skills_are_rejected_instead_of_silently_truncated(self):
-        rows=scenario(5)['selection']+[{'name':'SQL 기본 문법 & 조인','application':'조인 검증'}]
+    def test_four_skills_are_rejected_instead_of_silently_truncated(self):
+        rows=scenario(3)['selection']+[{'name':'SQL 기본 문법 & 조인','application':'조인 검증'}]
         with self.assertRaises(skill_selection.SelectionError):checked_skills(rows,TAGS)
 
 
@@ -145,7 +145,7 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('--output',required=True);args=parser.parse_args()
     rows=[]
     for long_summary in (False,True):
-        for count in range(1,6):
+        for count in range(1,4):
             packet=scenario(count,long_summary)
             for row in matrix(packet):row['summaryMode']='long' if long_summary else 'structured';rows.append(row)
     out={'mockOnly':True,'inputLimit':budget.INPUT_TOKENS,'outputLimit':budget.OUTPUT_RESERVE,'defaultContext':budget.DEFAULT_CONTEXT,'contextReserve':budget.CONTEXT_RESERVE,'projectChars':len(PROJECT),'tokenizer':'fixed Qwen; runtime JSON serialization; framing reserve 128','rows':rows}

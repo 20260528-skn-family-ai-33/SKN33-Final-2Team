@@ -33,9 +33,11 @@ class CandidateSelectionTests(unittest.TestCase):
     def test_per_skill_twenty_and_fair_union(self):
         rows = resources(5)
         selected = candidates.select(rows, [f'skill-{n}' for n in range(5)], ['SQL'], 'A3')
-        self.assertEqual(list(selected.per_skill.values()), [20] * 5)
-        self.assertEqual(len(selected.records), 100)
-        self.assertEqual({r['skills'][0] for r in selected.records[:5]}, set(selected.skills))
+        # 선정 스킬은 최대 3개다. 4~5개 입력은 순서의 앞 3개만 검색한다.
+        self.assertEqual(selected.skills, ['skill-0', 'skill-1', 'skill-2'])
+        self.assertEqual(list(selected.per_skill.values()), [20] * 3)
+        self.assertEqual(len(selected.records), 60)
+        self.assertEqual({r['skills'][0] for r in selected.records[:3]}, set(selected.skills))
 
     def test_same_course_across_skills_and_duplicate_provider_title_not_repeated(self):
         first = resource('one', skills=['s1', 's2'], title='SQL 강좌')
@@ -388,12 +390,13 @@ class CandidateBudgetTests(unittest.TestCase):
         rows = resources(skills)
         return candidates.select(rows, [f'skill-{s}' for s in range(skills)], ['SQL'], 'A3', required)
 
-    def test_default32_and_four_skill40(self):
-        for n, expected in [(3, 32), (4, 40), (5, 40)]:
+    def test_default32_for_every_skill_count_after_three_skill_cap(self):
+        # 스킬 4~5개로 40개를 늘리던 분기는 상한 3개 이후 사용하지 않는다.
+        for n in (3, 4, 5):
             with self.subTest(skills=n):
                 out = budget.pack(self.selection(n))
-                self.assertEqual(len(out['catalog']), expected)
-                self.assertEqual(len(out['catalogSkillMap']), n)
+                self.assertEqual(len(out['catalog']), 32)
+                self.assertEqual(len(out['catalogSkillMap']), min(n, 3))
                 self.assertTrue(all(r['curriculum'] for r in out['catalog']))
 
     def test_full_previous_plan_and_request_reduce_candidates_not_input(self):
@@ -590,11 +593,20 @@ class RoadmapIntegrationTests(unittest.TestCase):
             # 재추정 근거가 없을 때도 사라진 이름이나 임의 스킬을 만들어내지 않는다.
             self.assertEqual(catalog.roadmap_skills(['무관한 목표'], ['SQL 옛 이름']), [])
 
-    def test_stale_names_recover_via_keyword_rules_and_keep_five_skill_limit(self):
+    def test_stale_names_recover_via_keyword_rules_and_keep_three_skill_limit(self):
         rows = {str(n): resource(str(n), f'new-{n}') for n in range(8)}
         with patch.object(catalog, 'items', return_value=rows), \
                 patch.object(catalog, 'skills_for', return_value=[f'new-{n}' for n in range(8)]):
-            self.assertEqual(catalog.roadmap_skills(['목표'], ['old']), [f'new-{n}' for n in range(5)])
+            self.assertEqual(catalog.roadmap_skills(['목표'], ['old']), [f'new-{n}' for n in range(3)])
+
+    def test_saved_four_or_five_skills_use_first_three_in_order(self):
+        rows = {str(n): resource(str(n), f'skill-{n}') for n in range(6)}
+        with patch.object(catalog, 'items', return_value=rows):
+            for count in (3, 4, 5, 6):
+                names = [f'skill-{n}' for n in reversed(range(count))]
+                with self.subTest(count=count):
+                    self.assertEqual(catalog.roadmap_skills(['목표'], list(names)), names[:3])
+                    self.assertEqual(catalog.roadmap_skills(['목표'], list(names), preserve_skills=True), names[:3])
 
     def test_stale_saved_skills_allow_generation_regeneration_and_revision(self):
         rows = {'sql': resource('sql', 'SQL 새 이름', title='SQL 조인 강좌')}
@@ -655,7 +667,7 @@ class RoadmapIntegrationTests(unittest.TestCase):
 
     def test_invalid_or_too_many_skills_fail(self):
         with patch.object(catalog, 'items', return_value=resources(6)):
-            for skills in ('skill-0', [None], [1], [f'skill-{n}' for n in range(6)]):
+            for skills in ('skill-0', [None], [1]):
                 with self.subTest(skills=skills), self.assertRaises(llm.LlmError):
                     rm._catalog_payload('A2', {'handoff': {'goal': 'SQL', 'prefs': {}, 'skillNames': skills}})
 
@@ -689,7 +701,9 @@ class RoadmapIntegrationTests(unittest.TestCase):
         self.assertEqual(out['trackGuidance']['coreSkills'], ['skill-4', 'skill-2', 'skill-1'])
         self.assertEqual({r['id'] for r in out['catalog']}, {'4-00', '2-00', '1-00'})
         self.assertEqual(out['skillTags'], names)
-        self.assertEqual(h['skillNames'], ['skill-4', 'skill-2', 'skill-1', 'skill-0'])
+        # 이전 상한으로 저장된 점검은 포함 순서의 앞 3개만 넘기고 나머지는 제외 스킬로 남긴다.
+        self.assertEqual(h['skillNames'], ['skill-4', 'skill-2', 'skill-1'])
+        self.assertEqual(h['excludedSkills'], ['skill-3', 'skill-0'])
 
 
 if __name__ == '__main__':
@@ -697,8 +711,8 @@ if __name__ == '__main__':
 
 
 class FixedCrashSkillCandidatesTests(unittest.TestCase):
-    def test_fixed_four_and_five_skills_reach_final_model_catalog(self):
-        for count in (4,5):
+    def test_saved_fixed_four_and_five_skills_send_first_three_to_model_catalog(self):
+        for count in (3,4,5):
             with self.subTest(count=count):
                 names=[f'skill-{i}' for i in range(count)]
                 handoff={'goal':'SQL 조인','prefs':{'weeklyHours':4},'selectedSkillsFixed':True,'skillNames':names,'skillOrder':names,'focus':names,
@@ -706,19 +720,19 @@ class FixedCrashSkillCandidatesTests(unittest.TestCase):
                 before=copy.deepcopy(handoff)
                 with patch.object(catalog,'items',return_value=resources(count)),patch.object(budget,'tokens',side_effect=measured):
                     result=rm._catalog_payload('A2',{'handoff':handoff})
-                self.assertEqual(list(result['catalogSkillMap'].values()),names)
+                self.assertEqual(list(result['catalogSkillMap'].values()),names[:3])
                 referenced={skill for row in result['catalog'] for skill in row['skills']}
                 self.assertEqual(referenced,set(result['catalogSkillMap']))
-                self.assertEqual(result['trackGuidance']['maxCoreSkills'],count)
-                self.assertEqual(result['handoff']['skillOrder'],names)
+                self.assertEqual(result['trackGuidance']['maxCoreSkills'],3)
+                self.assertEqual(result['handoff']['skillOrder'],names[:3])
                 self.assertEqual(handoff,before)
 
     def test_fixed_crash_does_not_hide_a_missing_skills_empty_candidate_pool(self):
-        names=[f'skill-{i}' for i in range(5)]
-        selected=candidates.select(resources(4),names,['SQL'],'A2',preserve_skills=True)
+        names=[f'skill-{i}' for i in range(3)]
+        selected=candidates.select(resources(2),names,['SQL'],'A2',preserve_skills=True)
         self.assertEqual(selected.skills,names)
-        self.assertEqual(selected.per_skill['skill-4'],0)
-        self.assertNotIn('skill-4',{skill for row in selected.records for skill in row['skills']})
+        self.assertEqual(selected.per_skill['skill-2'],0)
+        self.assertNotIn('skill-2',{skill for row in selected.records for skill in row['skills']})
 
     def test_legacy_crash_focus_remains_three_without_fixed_selection(self):
         selected=candidates.select(resources(5),[f'skill-{i}' for i in range(5)],['SQL'],'A2')

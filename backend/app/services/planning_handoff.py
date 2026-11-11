@@ -21,7 +21,8 @@ def build_handoff(saved, prefs, profile):
     from app.agents.resource_recommendations import validate_choices, validate_skill_order
     validate_choices(rec, choices)
     validate_skill_order(rec, order)
-    names = [name for name in order if choices[name].get('enabled', True)]
+    # 이전 상한(5개)으로 저장된 점검은 사용자 순서의 앞 3개만 계획에 넘긴다.
+    names = [name for name in order if choices[name].get('enabled', True)][:track_policy.MAX_SKILLS]
     if not names:
         raise ValueError('계획에 포함할 스킬을 하나 이상 선택해 주세요.')
     hints = list(dict.fromkeys(rid for name in names for rid in ([choices[name]['course']] + choices[name]['books']) if rid))

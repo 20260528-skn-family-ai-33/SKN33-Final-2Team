@@ -15,8 +15,8 @@ from app.services.planning_handoff import build_handoff
 from test_catalog_candidates import resource, resources
 
 
-def completed_five():
-    names = [f'skill-{i}' for i in range(5)]
+def completed(count=3):
+    names = [f'skill-{i}' for i in range(count)]
     profile = {'department': '데이터 운영', 'job': '사내 규정 검색 업무',
                'task': '규정 PDF와 조회 API를 운영하고 오류 신고를 확인한다.',
                'education': ['컴퓨터공학 학사'],
@@ -50,7 +50,7 @@ def completed_five():
 
 class InputProjectionTests(unittest.TestCase):
     def test_answers_correctness_and_all_personal_context_survive_without_mutating_saved_input(self):
-        saved, h = completed_five()
+        saved, h = completed()
         h['customConstraint'] = '주말에는 업무망을 사용할 수 없다.'
         before = deepcopy((saved, h))
         result = roadmap_input.project({'handoff': h, 'learnerKnowledge': h['learnerKnowledge'],
@@ -66,7 +66,7 @@ class InputProjectionTests(unittest.TestCase):
         self.assertEqual(out['profile']['self']['projects'], saved['profile']['self']['projects'])
         self.assertNotIn('tech', out['profile']['self'])
         self.assertNotIn('learnerKnowledge', result)
-        self.assertEqual(len(out['assessment']['groups']), 5)
+        self.assertEqual(len(out['assessment']['groups']), 3)
         for group in out['assessment']['groups']:
             self.assertEqual([q['rating'] for q in group['surveys']], [2, 3, 4])
             self.assertEqual([q['correct'] for q in group['quizzes']], [True, False, True])
@@ -76,7 +76,7 @@ class InputProjectionTests(unittest.TestCase):
             self.assertNotIn('options', group['quizzes'][0])
 
     def test_unmatched_personal_fields_and_conflicting_profile_snapshots_are_kept(self):
-        _, h = completed_five()
+        _, h = completed()
         h['profile']['self']['tech'] = ['Rust 프로젝트 경험']
         h['profile']['job'] = '최근 변경된 업무 설명'
         h['profile']['extendedPersonalInput'] = '사내 문서 대신 공개 샘플만 사용한다.'
@@ -88,14 +88,24 @@ class InputProjectionTests(unittest.TestCase):
         self.assertEqual(out['assessment']['additionalAnswers']['legacy-free-text'], h['assessment']['answers']['legacy-free-text'])
 
     def test_unanswered_quiz_is_not_marked_incorrect(self):
-        saved, h = completed_five()
+        saved, h = completed()
         key = saved['survey']['groups'][0]['quizzes'][0]['id']
         del h['assessment']['answers'][key]
         out = roadmap_input.project({'handoff': h})
         self.assertIsNone(out['handoff']['assessment']['groups'][0]['quizzes'][0]['correct'])
 
+    def test_saved_five_skill_assessment_hands_off_first_three_and_their_evidence_only(self):
+        saved, h = completed(5)
+        self.assertEqual(h['skillOrder'], ['skill-0', 'skill-1', 'skill-2'])
+        self.assertEqual(h['excludedSkills'], ['skill-3', 'skill-4'])
+        self.assertEqual([row['name'] for row in h['skillDetails']], h['skillOrder'])
+        self.assertEqual(list(h['skillMaterials']), h['skillOrder'])
+        self.assertEqual(len(saved['selection']['skills']), 5)
+        out = roadmap_input.project({'handoff': h})['handoff']
+        self.assertEqual([group['skill'] for group in out['assessment']['groups']], h['skillOrder'])
+
     def test_projection_is_idempotent_and_legacy_input_is_supported(self):
-        _, h = completed_five()
+        _, h = completed()
         first = roadmap_input.project({'handoff': h})
         self.assertEqual(roadmap_input.project(first), first)
         legacy = {'handoff': {'goal': 'SQL', 'deepCheck': {'essays': [{'answer': '정합성을 대조한다.'}]},
@@ -128,9 +138,10 @@ class SkillIdentityTests(unittest.TestCase):
             self.assertEqual(h, before)
 
     def test_confirmed_order_is_authoritative_and_all_related_fields_follow_it(self):
+        # 이전 상한(5개)으로 확정한 handoff는 확정 순서의 앞 3개만 모델 입력에 쓴다.
         names = [f'skill-{i}' for i in range(5)]
-        order = list(reversed(names))
-        h = {'goal': 'SQL', 'skillNames': names, 'skillOrder': order, 'selectedSkillsFixed': True,
+        order = list(reversed(names))[:3]
+        h = {'goal': 'SQL', 'skillNames': list(reversed(names)), 'skillOrder': list(reversed(names)), 'selectedSkillsFixed': True,
              'focus': names, 'coreSkills': names,
              'skillDetails': [{'name': name, 'application': f'SQL {name}'} for name in names]}
         with patch.object(catalog, 'items', return_value=resources(5)), patch.object(budget, 'tokens', return_value=1):
@@ -141,8 +152,8 @@ class SkillIdentityTests(unittest.TestCase):
             self.assertNotIn(key, out['handoff'])
         self.assertEqual([r['name'] for r in out['handoff']['skillDetails']], order)
         self.assertEqual(out['trackGuidance']['coreSkills'], order)
-        self.assertEqual(out['trackGuidance']['maxCoreSkills'], 5)
-        self.assertEqual(h['skillNames'], names)
+        self.assertEqual(out['trackGuidance']['maxCoreSkills'], 3)
+        self.assertEqual(h['skillNames'], list(reversed(names)))
 
     def test_inconsistent_or_duplicate_fixed_names_are_not_guessed(self):
         for names, order in ((['SQL'], ['Python']), (['SQL', 'SQL'], ['SQL', 'SQL'])):
@@ -237,8 +248,8 @@ class RealTokenizerBudgetTests(unittest.TestCase):
         if not Path(budget.tokenizer_path()).is_file():
             self.skipTest('고정 토크나이저 설치 후 실행하는 실제 토큰 검사')
 
-    def test_five_skill_completed_assessment_all_tracks_keep_useful_candidates_and_input(self):
-        saved, h = completed_five()
+    def test_three_skill_completed_assessment_all_tracks_keep_useful_candidates_and_input(self):
+        saved, h = completed()
         before = deepcopy((saved, h))
         with patch.object(catalog, 'items', return_value=resources(5)), patch.object(catalog, 'skill_names', return_value=h['skillNames']):
             for pid in ('A1', 'A2', 'A3'):
@@ -255,15 +266,15 @@ class RealTokenizerBudgetTests(unittest.TestCase):
         self.assertEqual((saved, h), before)
 
     def test_oversized_personal_input_fails_without_truncation(self):
-        _, h = completed_five()
+        _, h = completed()
         h['profile']['self']['profile'] = '제약 문서 전송 금지 및 결과 검증 필요. ' * 12000
         before = deepcopy(h)
         with patch.object(catalog, 'items', return_value=resources(5)), self.assertRaisesRegex(llm.LlmError, '입력량 한도'):
             rm._catalog_payload('A3', {'handoff': h}, 'system')
         self.assertEqual(h, before)
 
-    def test_fixed_five_generation_regeneration_revision_keep_evidence_order_and_required_resources(self):
-        saved, h = completed_five()
+    def test_fixed_three_generation_regeneration_revision_keep_evidence_order_and_required_resources(self):
+        saved, h = completed()
         before = deepcopy(h)
         names = h['skillOrder']
         rows = resources(5)
@@ -274,7 +285,7 @@ class RealTokenizerBudgetTests(unittest.TestCase):
             self.assertEqual(kwargs['role'], 'roadmap')
             self.assertEqual(payload['handoff']['skillOrder'], names)
             self.assertEqual([r['name'] for r in payload['handoff']['skillDetails']], names)
-            self.assertEqual(len(payload['handoff']['assessment']['skills']), 5)
+            self.assertEqual(len(payload['handoff']['assessment']['skills']), 3)
             self.assertEqual(payload['handoff']['assessment']['skills'][0]['quizzes'][0]['result'], 'correct')
             self.assertEqual(payload['skillTags'], names + ['Docker'])
             self.assertLessEqual(budget.tokens(system) + budget.tokens(payload) + budget.FRAMING_RESERVE, budget.INPUT_TOKENS)

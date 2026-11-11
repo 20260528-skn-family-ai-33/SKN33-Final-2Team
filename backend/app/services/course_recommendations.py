@@ -2,7 +2,7 @@
 from copy import deepcopy
 from hashlib import sha256
 import json
-from app import db
+from app import db, track_policy
 FIELDS=('recommendations','resourceChoices','durationEstimates','activityProposal','activityVersions','materialsSelectionKey','skillSelectionKey','learningOutcomes')
 
 def option_cache_key(option):
@@ -56,11 +56,11 @@ def scope_view(saved,course,option=None):
     from app.services.course_skills import selected
     learning=selected(option or {})
     if (saved.get('project') or {}).get('selectedSkills'):
-        fixed=(saved.get('selection') or {}).get('skills') or []
+        fixed=((saved.get('selection') or {}).get('skills') or [])[:track_policy.MAX_SKILLS]
         by_name={row['name']:row for row in learning or []}
         learning=[dict(row,**{k:v for k,v in by_name.get(row['name'],{}).items() if k not in ('name','application','enabled')},enabled=True) for row in fixed]
     if learning is not None:
-        active=[row for row in learning if row['enabled']]
+        active=[row for row in learning if row['enabled']][:track_policy.MAX_SKILLS]
         scoped['selection']={'skills':[{k:v for k,v in row.items() if k!='enabled'} for row in active]}
         scoped['skillOrder']=[row['name'] for row in active]
         from hashlib import sha256
@@ -75,8 +75,9 @@ def scope_view(saved,course,option=None):
         return scoped
     for name,choice in scoped['resourceChoices'].items():
         choice['enabled']=(saved.get('resourceChoices') or {}).get(name,{}).get('enabled',True)
-    if course=='A2':
-        active=[name for name in (saved.get('skillOrder') or []) if (saved.get('resourceChoices') or {}).get(name,{}).get('enabled',True)][:3]
+    limit=track_policy.FAST_SKILLS if course=='A2' else track_policy.MAX_SKILLS
+    if course=='A2' or len(saved.get('skillOrder') or [])>limit:
+        active=[name for name in (saved.get('skillOrder') or []) if (saved.get('resourceChoices') or {}).get(name,{}).get('enabled',True)][:limit]
         scoped['skillOrder']=active
         scoped['selection']=deepcopy(saved.get('selection') or {'skills':[]})
         scoped['selection']['skills']=[next(row for row in saved['selection']['skills'] if row['name']==name) for name in active]

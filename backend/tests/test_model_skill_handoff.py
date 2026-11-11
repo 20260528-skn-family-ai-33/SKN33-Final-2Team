@@ -15,8 +15,8 @@ class ModelSkillHandoffTests(unittest.TestCase):
                 'focus': list(names), 'skillNames': list(names), 'domain': ' · '.join(names),
                 'assessment': {'groups': [], 'answers': {}}, 'key': 'stored-key'}
 
-    def test_all_tracks_keep_one_to_five_fixed_skills_without_duplicate_model_fields(self):
-        for count in range(1, 6):
+    def test_all_tracks_keep_one_to_three_fixed_skills_without_duplicate_model_fields(self):
+        for count in range(1, 4):
             for course in ('A1', 'A2', 'A3'):
                 with self.subTest(count=count, course=course):
                     h = self.handoff(count)
@@ -32,12 +32,25 @@ class ModelSkillHandoffTests(unittest.TestCase):
                     self.assertEqual(h, before)
 
     def test_search_uses_fixed_order_instead_of_obsolete_duplicate_lists(self):
-        h = self.handoff(5)
+        h = self.handoff(3)
         h['focus'] = h['skillNames'] = ['old-skill']
-        with patch.object(catalog, 'items', return_value=resources(5, 1)), patch.object(budget, 'tokens', side_effect=measured):
+        with patch.object(catalog, 'items', return_value=resources(3, 1)), patch.object(budget, 'tokens', side_effect=measured):
             result = roadmap._catalog_payload('A2', {'handoff': h})
         self.assertEqual(list(result['catalogSkillMap'].values()), h['skillOrder'])
-        self.assertEqual({row['id'] for row in result['catalog']}, {f'{i}-00' for i in range(5)})
+        self.assertEqual({row['id'] for row in result['catalog']}, {f'{i}-00' for i in range(3)})
+
+    def test_saved_four_and_five_fixed_skills_send_first_three_on_every_track(self):
+        for count in (4, 5):
+            for course in ('A1', 'A2', 'A3'):
+                with self.subTest(count=count, course=course):
+                    h = self.handoff(count)
+                    before = copy.deepcopy(h)
+                    with patch.object(catalog, 'items', return_value=resources(count, 2)), patch.object(budget, 'tokens', side_effect=measured):
+                        result = roadmap._catalog_payload(course, {'handoff': h})
+                    self.assertEqual(result['handoff']['skillOrder'], before['skillOrder'][:3])
+                    self.assertEqual(list(result['catalogSkillMap'].values()), before['skillOrder'][:3])
+                    self.assertEqual([row['name'] for row in result['handoff']['skillDetails']], before['skillOrder'][:3])
+                    self.assertEqual(h, before)
 
     def test_duplicates_are_removed_before_token_budget_is_measured(self):
         h = self.handoff(2)

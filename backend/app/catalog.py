@@ -364,9 +364,8 @@ def roadmap_skills(texts: list[str], skill_names: list[str] | None = None, *, pr
                                 or len(set(skill_names)) != len(skill_names)):
             raise ValueError('확정한 스킬 이름을 현재 목록에서 확인할 수 없습니다. 스킬을 다시 선택하고 순서를 확인해 주세요.')
         # 구판 추정 스킬만 남은 이름을 보존하거나 목표에서 다시 추정한다.
-        want = list(dict.fromkeys(s for s in skill_names if s in known))
-        if len(want) > catalog_candidates.MAX_SKILLS:
-            raise ValueError('선정 스킬은 최대 5개입니다.')
+        # 이전 상한(5개)으로 저장된 목록은 사용자 순서의 앞 3개만 사용한다. 저장 원본은 바꾸지 않는다.
+        want = list(dict.fromkeys(s for s in skill_names if s in known))[:catalog_candidates.MAX_SKILLS]
         if want:
             return want
     if preserve_skills:

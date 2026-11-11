@@ -47,7 +47,9 @@ class CourseRecommendationTests(unittest.TestCase):
   self.assertEqual([s['name'] for s in view['selection']['skills']],list('EDC'))
   base['resourceChoices']['D']['enabled']=False
   self.assertEqual(scope_view(base,'A2')['skillOrder'],list('ECB'))
-  self.assertEqual(len(scope_view(base,'A3')['selection']['skills']),5)
+  # 이전 상한으로 저장된 5개는 Free·Challenge도 포함 순서의 앞 3개만 쓴다.
+  self.assertEqual(scope_view(base,'A3')['skillOrder'],list('ECB'))
+  self.assertEqual([s['name'] for s in scope_view(base,'A1')['selection']['skills']],list('ECB'))
  def test_model_can_return_only_resource_keys_without_explanations(self):
   result=recommend_resources({}, {'skills':[{'name':'SQL'}]},self.items(),lambda *_:{'skills':[{'name':'SQL','courses':[{'key':'S1-C1'}],'books':[]}]},course={'id':'A1'})
   self.assertEqual(result['skills'][0]['courses'][0]['cost'],0)
