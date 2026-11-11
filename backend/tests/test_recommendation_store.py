@@ -7,6 +7,7 @@ from app.agents.resource_recommendations import RecommendationError
 class RecommendationStoreTests(unittest.TestCase):
     def setUp(self):
         self.tx=Mock();self.tx.run.return_value=1
+        self.tx.all.return_value = []
         self.pre={'version':1,'generationId':'pre','completed':True,'survey':{},'answers':{'q':0}}
         self.tx.one.return_value={'draft_choices':{store.KEY:self.pre}}
         items = {'c': {'id': 'c', 'type': 'course', 'cost': 0, 'usable': True},

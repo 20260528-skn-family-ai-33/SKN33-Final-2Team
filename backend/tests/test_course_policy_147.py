@@ -1,11 +1,11 @@
 """#147: 관련성은 공통으로 검사하고 가격·난이도·실제 시간 정책만 코스별로 적용한다."""
 from copy import deepcopy
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from app import course_levels
 from app.agents.resource_instructions import instructions
-from app.agents.resource_recommendations import recommend_resources
+from app.agents.resource_recommendations import recommend_from_catalog, recommend_resources
 from app.services import resource_rag as rag
 from app.services import resource_evidence as evidence
 
@@ -122,6 +122,45 @@ class CoursePolicyTests(unittest.TestCase):
         cards = self.retrieve(items, 'A3')[0]['courses']
         self.assertEqual(len(cards), 6)
         self.assertTrue(all(row['difficulty'] == 'ADVANCED' for row in cards))
+
+    def test_completed_ids_excluded_before_vector_limit_for_all_tracks(self):
+        skill = {'name': self.name, 'application': self.goal}
+        pre = {'project': {'goal': self.goal}, 'selection': {'skills': [skill]}}
+        items = {f'{level}-{i}': self.item(f'{level}-{i}', level)
+                 for level in ('INTERMEDIATE', 'ADVANCED') for i in range(7)}
+        # 같은 제목이라도 재수강 여부는 ID로만 판단한다.
+        for level in ('INTERMEDIATE', 'ADVANCED'):
+            items[f'{level}-0']['title'] = items[f'{level}-1']['title']
+        completed = frozenset({'INTERMEDIATE-0', 'ADVANCED-0'})
+
+        def search(kind, ids, vector, limit, free):
+            self.assertTrue(completed.isdisjoint(ids))
+            return [dict(resource_id=rid, similarity=.9, current_cost=0) for rid in ids[:limit]]
+
+        def model(ctx, system, payload, role):
+            row, = payload['skills']
+            self.assertEqual(len(row['courses']), 6)
+            return {'skills': [{'name': row['name'], 'courses': [{'key': row['courses'][0]['choiceKey']}], 'books': []}]}
+
+        with patch('app.catalog.items', return_value=items), \
+             patch.object(rag, 'cached_vectors', side_effect=lambda ts: [[1.] * rag.DIMENSIONS for _ in ts]), \
+             patch.object(rag, 'search_vectors', side_effect=search), \
+             patch('app.agents.runtime.llm_json', side_effect=model) as llm:
+            for track in ('A1', 'A2', 'A3'):
+                option = {'id': track, 'learningSkills': [skill]}
+                result = recommend_from_catalog(Mock(live=True), pre, option, completed=completed)
+                matches = {r['resourceId'] for r in result['retrieval']['matches']}
+                self.assertEqual(len(matches), 6)
+                self.assertTrue(completed.isdisjoint(matches))
+                selected = result['skills'][0]['selectedCourse']
+                self.assertIn(selected, matches)
+                if track == 'A3':
+                    self.assertEqual(items[selected]['difficulty'], 'ADVANCED')
+            self.assertEqual(llm.call_count, 3)
+            empty = recommend_from_catalog(Mock(live=True), pre, option, completed=frozenset(items))
+            self.assertIsNone(empty['skills'][0]['selectedCourse'])
+            self.assertEqual(llm.call_count, 3)
+        self.assertTrue(completed.issubset(items))
 
     def test_challenge_fills_only_the_shortfall_with_upper_intermediate(self):
         items = {f'high{i}': self.item(f'high{i}', 'ADVANCED') for i in range(2)}

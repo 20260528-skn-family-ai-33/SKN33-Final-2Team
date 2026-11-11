@@ -13,6 +13,7 @@ from test_preassessment_api import api_app
 
 class FlowCompatibilityTests(unittest.TestCase):
  def setUp(self):
+  self.enterContext(patch.object(api, 'completed_course_ids', return_value=frozenset()))
   guard=patch.object(api,'generation_guard',side_effect=lambda *args:nullcontext())
   guard.start();self.addCleanup(guard.stop)
 
@@ -77,6 +78,7 @@ class FlowCompatibilityTests(unittest.TestCase):
 
  def test_material_edit_clears_all_tasks_versions_outcomes_and_old_review(self):
   w,scoped=self.state();t=Mock();t.one.return_value={'draft_choices':w};t.run.return_value=1
+  t.all.return_value = []
   choices={'S':{'course':'c','books':[],'enabled':True}}
   with patch('app.catalog.items', return_value={'c': {'type': 'course', 'cost': 0, 'usable': True}, 'b': {'type': 'book', 'usable': True}}):
    result=survey_store.save_resource_choices(t,1,'p','g','r',choices,skill_order=['S'],course='A1')

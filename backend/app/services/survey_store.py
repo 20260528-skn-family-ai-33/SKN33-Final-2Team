@@ -156,7 +156,7 @@ def save_recommendations(t: Any, employee_id: int, project_id: str, generation_i
 def save_resource_choices(t: Any, employee_id: int, project_id: str, generation_id: str,
                           recommendation_id: str, choices: dict, *, skill_order: list[str] | None = None, course: str | None = None) -> dict:
     from app.agents.resource_recommendations import validate_choices, validate_skill_order
-    from app.services.course_recommendations import available_recommendations, scope_view, merge_scope
+    from app.services.course_recommendations import available_recommendations, completed_course_ids, scope_view, merge_scope
     raw = _owned(t, employee_id, project_id, lock=True)
     current = deepcopy(raw.get(KEY))
     if not isinstance(current, dict) or current.get('generationId') != generation_id or not current.get('completed'):
@@ -166,7 +166,8 @@ def save_resource_choices(t: Any, employee_id: int, project_id: str, generation_
     recommendations = current.get('recommendations')
     if not recommendations or recommendations.get('id') != recommendation_id:
         raise StoreError('추천 자료가 변경되었습니다. 다시 조회해 주세요.')
-    recommendations = available_recommendations(recommendations, course, refresh=True)
+    recommendations = available_recommendations(recommendations, course, refresh=True,
+                                                completed=completed_course_ids(t, employee_id))
     validate_choices(recommendations, choices)
     order = skill_order if skill_order is not None else current.get('skillOrder', [row['name'] for row in recommendations['skills']])
     validate_skill_order(recommendations, order)
