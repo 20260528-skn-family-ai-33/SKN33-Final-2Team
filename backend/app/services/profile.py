@@ -22,9 +22,9 @@ EDU_LEVEL = {'middle_school_or_lower': '중학교 이하', 'high_school': '고�
 EMP_GROUP_SQL = "coalesce(h.employee_group, substring(coalesce(g.name, e.grade) from '^([^ ]+직) '))"
 
 
-def employee_group(employee_id: int) -> str | None:
+def employee_group(employee_id: int, *, t: db.Tx | None = None) -> str | None:
     """인증된 직원 한 명의 규정 적용 직원 구분을 조회한다."""
-    row = db.one(f"""SELECT {EMP_GROUP_SQL} AS employee_group
+    row = (t.one if t else db.one)(f"""SELECT {EMP_GROUP_SQL} AS employee_group
         FROM public.employees e
         LEFT JOIN public.job_grades g ON g.job_grade_id = e.job_grade_id
         LEFT JOIN app_ext.employee_hr h ON h.employee_id = e.employee_id

@@ -288,7 +288,6 @@ function UseCard() {
             </button>
           </span>
         </div>
-
       </div>
     </div>
   );

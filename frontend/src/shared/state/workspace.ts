@@ -65,6 +65,8 @@ export interface RegenReq {
 }
 
 export interface WsState {
+  /** 안내 조회가 늦거나 실패해도 같은 초안에서 비교표로 넘어갈 수 있다. */
+  educationGuideShownFor: string | null;
   pendingFlow?: 'inputs' | 'answers' | 'options' | 'materials';
   owner: string | null;
   draft: DraftDoc;
@@ -87,6 +89,7 @@ export interface WsState {
 
 export const freshWs = (owner: string | null = null): WsState => ({
   owner,
+  educationGuideShownFor: null,
   draft: freshDraft(),
   draftId: null,
   draftPlan: null,
@@ -111,7 +114,7 @@ export const ws = (): WsState => useWs.getState();
 
 /* ── 브라우저 저장소 (화면 상태만 · 직원별) ── */
 const UI_KEY = (id: string) => 'growpath.ui.' + id;
-const UI_FIELDS = ['demoOpen', 'mgr', 'mcEdit', 'meEdit', 'regenReq', 'picks'] as const;
+const UI_FIELDS = ['demoOpen', 'mgr', 'mcEdit', 'meEdit', 'regenReq', 'picks', 'educationGuideShownFor'] as const;
 
 export const store = {
   get(k: string): string | null {

@@ -33,7 +33,6 @@ export interface PlanContent {
   goal: string;
   displayTitle?: string;
   def: OptionDef;
-  supportCheckPending?: boolean;
   params: PlanParams;
   start: number;
   hours: number;

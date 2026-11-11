@@ -14,7 +14,6 @@ import { useEffect, useId, useState } from 'react';
 import { newIdToPath, paths } from '@/app/paths';
 import type { PendingRevision, PlanContent, PlanRecord, RevForm } from '@/api/types/plan';
 import { CertPicker } from '@/features/draft/details/CertPicker';
-import { RevSupView } from '@/features/draft/options/support';
 import { enterNewRoadmap } from '@/features/draft/startModeSheet';
 import { D } from '@/shared/constants/data';
 import { useGo } from '@/shared/hooks/useGo';
@@ -543,7 +542,6 @@ function Revise({ R }: { R: PlanRecord }) {
         </div> : mixed ? <SkillRevisionChoices pd={pd} selected={selectedSkills} retrying={retrying} onRetry={skill => void retrySkill(skill)} onPick={(skill, recommended) =>
           setPicks({ revisionId, skills: recommended ? [...new Set([...selectedSkills, skill])] : selectedSkills.filter(name => name !== skill) })
         } /> : <DiffView pd={pd} />}
-        {!mixed && <RevSupView pd={pd} pid={R.id} onPulled={async () => void (await pullPlan(R.id))} />}
       </>
     );
   const cmt = cm ? (

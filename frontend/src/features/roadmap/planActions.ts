@@ -31,9 +31,9 @@ export async function pullPlan(pid: string): Promise<PlanRecord | null> {
   }
 }
 
-/** 수정안을 만드는 중이거나 수정안의 지원 조건을 확인하는 중이면 그 로드맵을 다시 읽는다 */
+/** 수정안을 만드는 중이면 그 로드맵을 다시 읽는다 */
 export const busyPlan = (R: PlanRecord | null | undefined): boolean =>
-  !!(R && ((R.revision && R.revision.status === 'running') || (R.pending && !R.pending.to.def.support && !R.pending.supFail)));
+  R?.revision?.status === 'running';
 
 /** 진행 중인 수정안 작업이 있으면 1.2초마다 그 로드맵을 다시 읽는다(화면을 떠나면 멈춤 · 5차 P.watchPlan) */
 export function usePlanWatch(pid: string | undefined): void {

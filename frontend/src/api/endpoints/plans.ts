@@ -14,7 +14,6 @@ export const plansApi = {
   archive: (id: string) => http.post<PlanResponse>(`/plans/${enc(id)}/archive`),
   resume: (id: string) => http.post<PlanResponse>(`/plans/${enc(id)}/resume`),
   revise: (id: string, body: Record<string, unknown>) => http.post<JobStarted>(`/plans/${enc(id)}/revisions`, body, a),
-  reviseSupportRetry: (id: string, version?: number) => http.post<JobStarted>(`/plans/${enc(id)}/revisions/support/retry${version === undefined ? "" : `?version=${version}`}`, {}, a),
   acceptRevision: (rid: string, selectedSkills?: string[]) => http.post<PlanResponse>(`/revisions/${enc(rid)}/accept`, selectedSkills ? { selectedSkills } : {}),
   dropRevision: (rid: string) => http.del<null>(`/revisions/${enc(rid)}`),
   commentRead: (id: string, cid: string) => http.post<PlanResponse>(`/plans/${enc(id)}/comments/${enc(cid)}/read`),

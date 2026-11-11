@@ -29,7 +29,6 @@ class CrashRequirementJobStateTests(unittest.TestCase):
             fn(self.tx, state)
             return state
         self.enterContext(patch.object(drafts, '_mutate', side_effect=mutate))
-        self.enterContext(patch.object(drafts, '_maybe_support'))
         self.enterContext(patch.object(drafts.RM, 'option', side_effect=self.check_input))
 
     @staticmethod

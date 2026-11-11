@@ -3,7 +3,7 @@ import { useState, type ReactNode } from 'react';
 import { paths } from '@/app/paths';
 import { ws, type WsState } from '@/shared/state/workspace';
 import { StepGate, useRememberStep } from './guard';
-import { blockedTo, diagKey, docBusy, type StepKey } from './model';
+import { blockedTo, diagKey, docBusy, roadmapEntry, type StepKey } from './model';
 import { confirmInFlight } from './review/confirmReview';
 import { StaleStepGuard } from './stale';
 import { needsStartMode, StartModeRedirect } from './startModeSheet';
@@ -35,5 +35,14 @@ export function DraftScreen({ step, extra, remember = true, children }: { step?:
 /* 하위 화면의 진입 조건 (5차 guard 그대로) */
 export const editGate = (s: WsState) => (s.draft.diag && s.draft.diag.key === diagKey(s.draft) ? null : paths.newResult);
 /* 3안 작성·선택 화면은 앞 단계 결과(handoff·gen)만 보고 들어오므로, 기획서를 다시 읽는 중이면 따로 1단계로 돌려보낸다(#81 리뷰) */
-export const genGate = (s: WsState) => (docBusy(s) ? paths.newGoal : s.draft.handoff || s.draft.v2Assessment?.completed ? null : blockedTo(s, 'options') || paths.newResult);
-export const optionsGate = (s: WsState) => (docBusy(s) ? paths.newGoal : s.draft.gen ? null : s.draft.handoff || s.draft.v2Assessment?.completed ? paths.newGen : blockedTo(s, 'options') || paths.newResult);
+export function genGate(s: WsState) {
+  if (docBusy(s)) return paths.newGoal;
+  if (s.draft.gen?.missing?.length) return paths.newOptions;
+  return s.draft.handoff || s.draft.v2Assessment?.completed ? null : blockedTo(s, 'options') || paths.newResult;
+}
+
+export function optionsGate(s: WsState) {
+  if (docBusy(s)) return paths.newGoal;
+  if (s.draft.gen) return roadmapEntry(s) === paths.newOptions ? null : paths.newGen;
+  return s.draft.handoff || s.draft.v2Assessment?.completed ? paths.newGen : blockedTo(s, 'options') || paths.newResult;
+}

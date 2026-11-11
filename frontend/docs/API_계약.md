@@ -14,7 +14,7 @@
 | 오류 | 2xx 가 아니면 본문 `{"error": {code, message, hint, retryable, kind, cause, raw}}`. `message`는 사용자 문구, `cause`·`hint`·`raw`는 "자세히 보기(운영자용)" | `ApiError`, `shared/state/ai.ts` `cause()` |
 | 오래 걸리는 작업 | 요청 머리에 `Prefer: respond-async`를 붙이면 `202 {jobId, status:'running'}`. 화면은 `GET /jobs/{id}?wait=10`(서버가 최대 10초 붙잡음)을 끝날 때까지 되풀이. 멈추기는 `POST /jobs/{id}/cancel` | `api/jobs.ts` |
 | 작업 결과 | `{jobId, kind, status: running·done·failed·cancelled, progress, result, error}`. 실패 원인은 `error`(위 오류와 같은 칸) | `JobView` |
-| 문서에 진행을 적는 작업 | 3안 작성·다시 만들기·지원 조건 확인처럼 서버가 진행 상태를 작성 문서(로드맵 기록)에 적는 일은 202 대신 문서를 바로 돌려주고, 화면이 문서를 다시 읽어 진행을 봄 | `useDraftWatch`·`usePlanWatch` |
+| 문서에 진행을 적는 작업 | 3안 작성·다시 만들기처럼 서버가 진행 상태를 작성 문서(로드맵 기록)에 적는 일은 202 대신 문서를 바로 돌려주고, 화면이 문서를 다시 읽어 진행을 봄 | `useDraftWatch`·`usePlanWatch` |
 | 규정·자료 묶음 | 규정 조항·학습 자료가 나오는 응답에는 화면이 그릴 조항·자료를 `reg`·`res` 묶음으로 함께 보냄(화면이 따로 조회하지 않게) | `mergeReg`·`mergeRes` |
 | 작성 문서 자동 저장 | 화면이 고칠 때마다 400ms 뒤 `PATCH /drafts/{id}`로 바뀐 칸만 보냄. `genCur`(3안별 보고 있는 버전)는 바뀐 때만 보냄 | `features/draft/draftSync.ts` |
 
@@ -81,14 +81,14 @@
 
 서버 ON·프런트 OFF에서 직원이 AI 모델 메뉴의 해제를 누르면 기존 `PUT /me/demo-settings`에 `demoMock: false`와 지원하는 모든 `failSim` 항목의 `false`를 한 번에 보냅니다. 버튼은 적용 중인 시연 설정이 있을 때만 표시합니다.
 
-`GET /ai/providers`의 `providers[].models`는 `{default, roadmap, regulation, embed, vision}`이에요. `default`는 진단 에이전트, `roadmap`은 로드맵 에이전트, `regulation`은 규정 에이전트(사내 생활 도우미 답변·안별 지원 조건 확인), `vision`은 기획서 이미지 읽기 모델이에요. `regulation`이 없는 옛 응답이면 화면은 `default`를 써요. `GET /ai/status?provider=ollama`의 `models[]`는 `{role, name, installed, loaded, think}`이고(`think`는 아래 추론 정도 · 진단·로드맵 모델만), `default` 다음에는 `default`와 이름이 다른 `roadmap`·`regulation`만 들어가요(같은 이름이면 Ollama에 한 번만 올라가서) (#33).
+`GET /ai/providers`의 `providers[].models`는 `{default, roadmap, regulation, embed, vision}`이에요. `default`는 진단 에이전트, `roadmap`은 로드맵 에이전트, `regulation`은 규정 에이전트(사내 생활 도우미 답변), `vision`은 기획서 이미지 읽기 모델이에요. `regulation`이 없는 옛 응답이면 화면은 `default`를 써요. `GET /ai/status?provider=ollama`의 `models[]`는 `{role, name, installed, loaded, think}`이고(`think`는 아래 추론 정도 · 진단·로드맵 모델만), `default` 다음에는 `default`와 이름이 다른 `roadmap`·`regulation`만 들어가요(같은 이름이면 Ollama에 한 번만 올라가서) (#33).
 
 추론 정도 요청은 `{ "provider": "ollama" | "openai", "level": "<단계 이름>" | null }`이고 그 모드의 값만 바꿔(다른 모드 값은 그대로 · 동시에 저장해도 사라지지 않음) 모드별로 저장한 전체 `{reasoning: {ollama?, openai?}}`를 돌려준다. 화면은 저장을 하나씩 차례로 보내고 마지막 선택의 응답만 화면에 맞춘다. `null`은 그 모드를 서버 기본값으로 되돌린다. 단계 이름은 소문자·숫자·`_`·`-` 20자 이내만 받고 `true`·`false` 같은 값은 받지 않는다(`422 / BAD_REASONING`). OpenAI는 서버의 단계 목록 밖이면 같은 오류다. 고를 수 있는 단계는 이렇게 온다.
 
 - OpenAI: `GET /ai/providers`의 openai 항목 `reasoning: {levels, default, modelDefault}`. `levels`는 `.env`의 `OPENAI_REASONING_LEVELS`이고 비면 기본 모델 gpt-6-luna의 코드 값(`none`~`xhigh`)이다(다른 모델이면 빈 목록 = 고르지 못함). `default`는 `.env`의 `OPENAI_REASONING_EFFORT`(비면 `null` = 보내지 않음), `modelDefault`는 보내지 않을 때 모델이 쓰는 값(gpt-6-luna `medium` · 모르는 모델이면 `null`)이고 화면 '기본값 · 보통' 표시에만 쓴다.
 - RunPod-Ollama: 진단·로드맵 모델에만 고르고, 모델마다 달라 `GET /ai/providers`의 `reasoning.levels`는 `null`이다(`default`는 `.env` 기본값). `GET /ai/status?provider=ollama`에서 진단·로드맵 모델(`role: default`)의 `models[].think: {levels, default}`(Ollama `/api/show` `thinking.values` · 켜고 끄기는 `off`·`on`)로 온다. 확인하지 못하면 `null`, 고를 단계가 없으면 빈 목록이다. 규정 모델 줄의 `think`는 늘 `null`이다.
 
-직원이 고른 값은 `GET /me`·`PUT /me/demo-settings` 응답의 `reasoning`으로 온다. 서버는 고른 값 → `.env` 기본값 순으로(고른 값이 지금 모델이 받는 단계가 아니면 — 모델을 바꾼 뒤 남은 옛 선택 등 — `.env` 기본값 · 단계를 확인하지 못하면 고른 값 그대로) Ollama에는 `think`(on/off는 true/false, 나머지는 단계 이름), OpenAI에는 `reasoning_effort`로 보내고, 둘 다 없으면 보내지 않아 모델 기본값을 따른다. **RunPod-Ollama 규정 에이전트(사내 생활 도우미·안별 지원 조건 확인) 호출은 생각을 끄고 학습한 모델이라 고른 값·`.env`와 관계없이 늘 `think: false`다.** 이미지 읽기 모델에는 직원 값을 쓰지 않는다. 관리자가 모델을 골라 목표 후보를 다시 만들 때는 직원 값 대신 `.env` 기본값을 쓴다.
+직원이 고른 값은 `GET /me`·`PUT /me/demo-settings` 응답의 `reasoning`으로 온다. 서버는 고른 값 → `.env` 기본값 순으로(고른 값이 지금 모델이 받는 단계가 아니면 — 모델을 바꾼 뒤 남은 옛 선택 등 — `.env` 기본값 · 단계를 확인하지 못하면 고른 값 그대로) Ollama에는 `think`(on/off는 true/false, 나머지는 단계 이름), OpenAI에는 `reasoning_effort`로 보내고, 둘 다 없으면 보내지 않아 모델 기본값을 따른다. **RunPod-Ollama 규정 에이전트(사내 생활 도우미) 호출은 생각을 끄고 학습한 모델이라 고른 값·`.env`와 관계없이 늘 `think: false`다.** 이미지 읽기 모델에는 직원 값을 쓰지 않는다. 관리자가 모델을 골라 목표 후보를 다시 만들 때는 직원 값 대신 `.env` 기본값을 쓴다.
 
 평정 동의 요청은 `{ "consent": true }` 또는 `{ "consent": false }`만 받는다. 누락·NULL·문자열·숫자는 `422 / CONSENT_REQUIRED`이며 기존 동의값을 보존한다. 개인 입력의 `devYears`가 숫자로 바뀌지 않거나 0~50년 범위를 벗어나면 `422 / DEV_YEARS_RANGE`를 반환하고 기존 입력을 보존한다. #15의 격리 DB·실제 인증 API 검사로 확인했다.
 
@@ -110,7 +110,8 @@
 | `POST /drafts/{id}/assessment` · `POST .../diagnosis` · `PUT .../diagnosis/overrides` | 사전 점검 문항(작업) · 진단(작업) · 점검 결과 수정 |
 | `POST /drafts/{id}/options` · `GET .../options` · `POST .../options/{pid}/retry` · `.../options/accept-partial` | 3안 작성 시작(문서에 진행을 적음)·다시 읽기·실패한 안 다시·일부만 받기 |
 | `POST /drafts/{id}/options/{pid}/regenerate` | 한 안 다시 만들기. 본문 `{request: {wish, quick[], removeActs[{key,title}], replaceActs[{key,title}]} \| null}` |
-| `POST /drafts/{id}/options/support/retry` | 지원 조건 다시 확인. 본문 `{perspective: 안 ID \| null(세 안 모두)}` |
+| `POST /drafts/{id}/education-guide` | 본인의 3안 생성 화면 최초 진입 시 빈 본문으로 요청. 초안에 저장한 `{basis: {name, article, text, page, version, chunkId} ∣ null}`을 재사용. 초안 생성 전이나 계획 생성 전에는 404 또는 409. |
+| 기존 안별·수정안별 지원 조건 재시도 | 410 `SUPPORT_RETIRED` |
 | `POST /drafts/{id}/selection` · `POST /drafts/{id}/confirm` | 안 고르기 · 확정(→ `{planId}`). 확정 본문은 선택 `{startMode: together \| after \| archive}`이고, 진행 중인 로드맵이 있을 때만 의미가 있어요. 없으면 `together`(함께 진행), `after`는 모두 끝난 다음 주를 `plan.startDate`에 저장(이미 지났으면 저장 안 함), `archive`는 진행 중인 로드맵을 확정과 같은 트랜잭션에서 보관해요. 다른 값은 422 `BAD_START_MODE`. 화면은 작성 탭에 들어올 때 고른 값을 작성 문서의 `startMode`로 자동 저장(`POST`·`PATCH /drafts`, 잘못된 값은 같은 422)했다가 확정 때 보내요 |
 
 ### 확정 로드맵·점검·보고서 — `plans.ts`
@@ -120,7 +121,7 @@
 | `GET /plans/{id}` · `PUT /plans/{id}/activities/{act}/progress` | 로드맵 읽기 · 활동 기록(완료·메모) |
 | `POST /plans/{id}/activities/{act}/attachments` | 결과물·수료증 첨부(사후 점검 파일도 `act='post'`로 같은 곳) · 본인의 진행 중 로드맵과 그 로드맵의 활동만(아니면 404·409) |
 | `POST /plans/{id}/archive` · `.../resume` | 보관·다시 진행 |
-| `POST /plans/{id}/revisions` · `.../revisions/support/retry` · `POST /revisions/{rid}/accept` · `DELETE /revisions/{rid}` | 수정 요청(작업) · 지원 조건 다시 · 수정안 확정 · 버리기 |
+| `POST /plans/{id}/revisions` · `POST /revisions/{rid}/accept` · `DELETE /revisions/{rid}` | 수정 요청(작업) · 수정안 확정 · 버리기 |
 | `POST /plans/{id}/comments/{cid}/read` | 부서장 코멘트 읽음 |
 | `PUT /plans/{id}/post-assessment` · `POST .../post-assessment/deep` | 사후 점검 저장 · 심화 질문 사후 문제(작업 · 설계서 밖 추가 10/23) |
 | `POST /plans/{id}/reports` · `GET /reports?planId=` · `POST /reports/{rid}/confirm` | 보고서 만들기(작업) · 목록 · 확인 |
