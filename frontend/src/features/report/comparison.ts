@@ -1,6 +1,6 @@
 /* 결과 보고서의 사전·사후 비교 집계 (#116) — 화면과 분리한 순수 계산
-   - 퀴즈: 사전·사후가 같은 개념의 다른 문제다. 개념마다 문항이 보통 1개라 정답 수는 스킬·전체 단위로 모은다
-   - 설문: 같은 문항의 1~5 응답이다. 여기서는 문항별 높아짐·같음·낮아짐만 센다(스킬별 평균은 overview.ts)
+   - 퀴즈: 사전·사후가 같은 개념의 다른 문제다. 개념마다 문항이 보통 1개라 비율은 스킬·전체 단위에서만 낸다
+   - 설문: 같은 문항의 1~5 응답이다. 평균 점수는 만들지 않고 높아짐·같음·낮아짐 문항 수만 센다
    - '채점 근거 없음'·응답 없음은 0점으로 세지 않고 분모에서 뺀다 */
 import type { Report } from '@/api/types/plan';
 
@@ -32,11 +32,16 @@ export interface SkillQuiz {
   pre: Tally;
   post: Tally;
 }
+/** 사전 → 사후: 오답→정답 · 정답→정답 · 정답→오답 · 오답→오답 */
+export type Shift = 'gained' | 'kept' | 'lost' | 'missed';
 export interface QuizComparison {
   skills: SkillQuiz[];
   pre: Tally;
   post: Tally;
-  /** 사전이나 사후에 채점 근거가 없는 문항 수 */
+  shifts: Record<Shift, number>;
+  /** 사전·사후를 모두 채점해 변화를 셀 수 있는 문항 수 */
+  compared: number;
+  /** 사전이나 사후에 채점 근거가 없어 변화에서 뺀 문항 수 */
   ungraded: number;
 }
 
@@ -47,10 +52,16 @@ function count(tally: Tally, mark: Mark): void {
   tally.graded += 1;
   if (mark === 'correct') tally.correct += 1;
 }
+const shiftOf = (pre: Mark, post: Mark): Shift => (post === 'correct' ? (pre === 'correct' ? 'kept' : 'gained') : pre === 'correct' ? 'lost' : 'missed');
+
+/** 채점한 문항이 없으면 비율을 만들지 않는다(0%로 보이지 않게 null) */
+export function percentOf(tally: Tally): number | null {
+  return tally.graded ? Math.round((tally.correct / tally.graded) * 100) : null;
+}
 
 export function quizComparison(evidence: QuizEvidence): QuizComparison {
   const bySkill = new Map<string, SkillQuiz>();
-  const total: QuizComparison = { skills: [], pre: emptyTally(), post: emptyTally(), ungraded: 0 };
+  const total: QuizComparison = { skills: [], pre: emptyTally(), post: emptyTally(), shifts: { gained: 0, kept: 0, lost: 0, missed: 0 }, compared: 0, ungraded: 0 };
   for (const row of evidence) {
     let skill = bySkill.get(row.skill);
     if (!skill) {
@@ -69,6 +80,10 @@ export function quizComparison(evidence: QuizEvidence): QuizComparison {
     for (const tally of [conceptRow.pre, skill.pre, total.pre]) count(tally, item.pre);
     for (const tally of [conceptRow.post, skill.post, total.post]) count(tally, item.post);
     if (item.pre === 'none' || item.post === 'none') total.ungraded += 1;
+    else {
+      total.compared += 1;
+      total.shifts[shiftOf(item.pre, item.post)] += 1;
+    }
   }
   return total;
 }

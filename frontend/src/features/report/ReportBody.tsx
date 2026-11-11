@@ -1,9 +1,10 @@
+import { ComparisonSummary } from './ComparisonSummary';
 import { QuizLearningCheck } from './QuizLearningCheck';
 import { ReportRadars } from './ReportRadars';
 import { ReportSchedule } from './ReportSchedule';
 import { SurveyDumbbell } from './SurveyDumbbell';
 import { SURVEY_CHOICES, surveyComparison } from './comparison';
-import { buildSchedule } from './overview';
+import { buildSchedule, evidenceSkillCount } from './overview';
 /* 보고서 본문: 직원 화면과 부서장 화면(소속 직원 보고서 · 10/15 전체 공개)이 함께 쓴다 (5차 P.reportBody · P.reportDeep) */
 import type { PlanRecord, Report } from '@/api/types/plan';
 import { DeepReveal } from '@/features/assessment/quizParts';
@@ -28,14 +29,16 @@ function SurveyComparisonRow({ phase, value }: { phase: 'pre' | 'post'; value?: 
 /** R: 본인 화면에서만 넘긴다. 보고서 시점의 계획 주차로 전체 일정을 그리는 데 쓴다 */
 export function ReportBody({ r, R }: { r: Report; R?: PlanRecord }) {
   const snapshot = r.executionSnapshot;
-  const plan = snapshot && R ? [R.plan, ...(R.versions || [])].find((version) => version.version === snapshot.version) : undefined;
+  // 스킬이 3개 이상이어야 레이더가 도형이 된다. 2개 이하(근거가 없는 부서장 화면·이전 보고서 포함)는 요약 띠를 쓰는 이전 구성으로 보여 준다
+  const overview = evidenceSkillCount(r) >= 3;
+  const plan = overview && snapshot && R ? [R.plan, ...(R.versions || [])].find((version) => version.version === snapshot.version) : undefined;
   const schedule = snapshot && plan ? buildSchedule(plan.acts, snapshot, plan.weeks) : null;
   // 일정 카드가 활동별 완료 여부를 보여 주면 실행 기록에는 목표 달성·결과물만 남긴다
   const showRecord = !schedule || r.goalSelf !== undefined || r.file !== undefined;
   return (
     <>
       {snapshot && schedule ? <ReportSchedule schedule={schedule} snapshot={snapshot} /> : snapshot && <div className="card"><h2 className="st">{snapshot.early ? '조기 종료 기준 기록' : '학습 종료 기준 기록'}</h2><p className="small muted">기준 시점: {new Date(snapshot.asOf).toLocaleString('ko-KR')} · 이 시점까지 저장된 활동·메모·제출 여부를 반영했어요. 첨부 내용은 검증하지 않았어요.</p></div>}
-      <ReportRadars r={r} />
+      {overview ? <ReportRadars r={r} /> : <ComparisonSummary r={r} />}
       {!!r.surveyEvidence?.length && <details className="card report-survey">
         <summary><span>설문 응답 비교</span></summary>
         <p className="small muted">동일한 문항의 사전·사후 선택을 비교해요.</p>
@@ -49,7 +52,7 @@ export function ReportBody({ r, R }: { r: Report; R?: PlanRecord }) {
           </li>)}</ol>
         </details>
       </details>}
-      {!!(r.quizEvidence?.length || r.postQuizDetails?.length) && <QuizLearningCheck evidence={r.quizEvidence ?? []} postDetails={r.postQuizDetails} open={!r.quizEvidence?.length} />}
+      {!!(r.quizEvidence?.length || r.postQuizDetails?.length) && <QuizLearningCheck evidence={r.quizEvidence ?? []} postDetails={r.postQuizDetails} open={!overview} />}
       {showRecord && <div className="card" style={{ marginTop: 12 }}>
         <h2 className="st">실행 기록</h2>
         <dl className="kv">
@@ -84,38 +87,75 @@ export function ReportBody({ r, R }: { r: Report; R?: PlanRecord }) {
           ) : null}
         </dl>
       </div>}
-      <section className="card rpt-result" aria-label="학습 결과">
-        <h2 className="st">학습 결과</h2>
-        <div className="rpt-result-cols">
-          <div className="rpt-result-col">
-            <h3>잘된 점</h3>
-            <ul className="plain-list">
-              {r.good.map((t, i) => (
-                <li key={i}>{t}</li>
-              ))}
-            </ul>
-          </div>
-          <div className="rpt-result-col">
-            <h3>보완할 점</h3>
-            <ul className="plain-list">
-              {r.improve.map((t, i) => (
-                <li key={i}>{t}</li>
-              ))}
-            </ul>
-          </div>
-        </div>
-        {r.next ? (
-          <>
-            <p className="rpt-result-bridge">이 기록을 바탕으로 제안해요 ↓</p>
-            <div className="card acc">
-              <p className="rpt-next-eyebrow">다음 로드맵 제안 · 참고용</p>
-              <p className="rpt-next-goal">{r.next.goal}</p>
-              <p className="small muted rpt-next-why">{r.next.why}</p>
+      {overview ? (
+        <section className="card rpt-result" aria-label="학습 결과">
+          <h2 className="st">학습 결과</h2>
+          <div className="rpt-result-cols">
+            <div className="rpt-result-col">
+              <h3>잘된 점</h3>
+              <ul className="plain-list">
+                {r.good.map((t, i) => (
+                  <li key={i}>{t}</li>
+                ))}
+              </ul>
             </div>
-            <p className="small muted rpt-result-note">새 로드맵은 ‘새 로드맵 작성’에서 목표를 직접 적어 시작해요.</p>
-          </>
-        ) : null}
-      </section>
+            <div className="rpt-result-col">
+              <h3>보완할 점</h3>
+              <ul className="plain-list">
+                {r.improve.map((t, i) => (
+                  <li key={i}>{t}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          {r.next ? (
+            <>
+              <p className="rpt-result-bridge">이 기록을 바탕으로 제안해요 ↓</p>
+              <div className="card acc">
+                <p className="rpt-next-eyebrow">다음 로드맵 제안 · 참고용</p>
+                <p className="rpt-next-goal">{r.next.goal}</p>
+                <p className="small muted rpt-next-why">{r.next.why}</p>
+              </div>
+              <p className="small muted rpt-result-note">새 로드맵은 ‘새 로드맵 작성’에서 목표를 직접 적어 시작해요.</p>
+            </>
+          ) : null}
+        </section>
+      ) : (
+        <>
+          <div className="sec">
+            <h2 className="st">잘된 점</h2>
+            <div className="card">
+              <ul className="plain-list">
+                {r.good.map((t, i) => (
+                  <li key={i}>{t}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          <div className="sec">
+            <h2 className="st">보완할 점</h2>
+            <div className="card">
+              <ul className="plain-list">
+                {r.improve.map((t, i) => (
+                  <li key={i}>{t}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          <div className="sec">
+            <h2 className="st">다음 로드맵 제안</h2>
+            <div className="card acc">
+              <p style={{ fontWeight: 650 }}>{r.next?.goal}</p>
+              <p className="small muted" style={{ marginTop: 4 }}>
+                {r.next?.why}
+              </p>
+            </div>
+            <p className="small muted" style={{ marginTop: 8 }}>
+              참고용 제안이에요. 새 로드맵은 ‘새 로드맵 작성’에서 목표를 직접 적어 시작해요.
+            </p>
+          </div>
+        </>
+      )}
       <Note>자기보고 응답의 변화예요. 실제 개발 역량이나 인사평가 결과로 보지 않아요. 진단 에이전트가 계산한 수준값은 저장만 하고 보여주지 않아요.</Note>
     </>
   );

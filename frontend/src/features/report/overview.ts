@@ -1,6 +1,7 @@
 /* 결과 보고서 맨 위 개요 — 일정 줄과 스킬별 사전·사후 값. 화면과 분리한 순수 계산
    - 설문: 스킬마다 그 시점에 응답한 문항의 1~5 평균. 응답이 없는 문항은 평균에서 뺀다
-   - 퀴즈: 스킬마다 채점한 문항 중 맞힌 비율. 사전·사후가 같은 개념의 다른 문제라 차이 값은 만들지 않는다
+   - 퀴즈: 스킬마다 채점한 문항 중 맞힌 수. 0개여도 도형이 중심에 뭉치지 않게 눈금을 한 칸 밀어(0개 = 첫 눈금) 그린다.
+     사전·사후가 같은 개념의 다른 문제라 차이 값은 만들지 않는다
    - 일정: 계획의 주차와 보고서 시점에 고정한 완료 여부를 활동 ID로 맞춘다 */
 import type { Activity, Report } from '@/api/types/plan';
 import type { QuizComparison, SurveyComparison, Tally } from './comparison';
@@ -41,18 +42,34 @@ export function surveyBySkill(survey: SurveyComparison): SkillValue[] {
   });
 }
 
-const ratioOf = (tally: Tally): number | null => (tally.graded ? tally.correct / tally.graded : null);
 const tallyText = (tally: Tally): string => (tally.graded ? `${tally.correct}/${tally.graded}` : NO_VALUE);
 
-export function quizBySkill(quiz: QuizComparison): SkillValue[] {
-  return quiz.skills.map((skill) => ({ skill: skill.skill, pre: ratioOf(skill.pre), post: ratioOf(skill.post), preText: tallyText(skill.pre), postText: tallyText(skill.post) }));
-}
-
 /** 모든 스킬이 같은 수의 문항을 채점했으면 그 수(눈금 한 칸 = 1문항). 다르면 null → 비율 눈금을 쓴다 */
-export function quizRingCount(quiz: QuizComparison): number | null {
+export function quizStepCount(quiz: QuizComparison): number | null {
   const counts = new Set(quiz.skills.flatMap((skill) => [skill.pre.graded, skill.post.graded]).filter((graded) => graded > 0));
   const [only] = counts;
   return counts.size === 1 && only <= 6 ? only : null;
+}
+/** 문항 수가 스킬마다 다를 때 쓰는 비율 눈금의 칸 수 */
+const RATIO_STEPS = 3;
+
+/** 퀴즈 레이더의 눈금 수. 0개 맞힘이 첫 눈금, 모두 맞힘이 마지막 눈금이라 칸 수보다 하나 많다 */
+export function quizRingCount(quiz: QuizComparison): number {
+  return (quizStepCount(quiz) ?? RATIO_STEPS) + 1;
+}
+
+/** 값은 (1 + 맞힌 칸 수) / 눈금 수: 하나도 못 맞혀도 첫 눈금에 놓여 도형이 유지된다. 글자는 실제 정답 수 그대로 */
+export function quizBySkill(quiz: QuizComparison): SkillValue[] {
+  const steps = quizStepCount(quiz) ?? RATIO_STEPS;
+  const place = (tally: Tally): number | null => (tally.graded ? (1 + (steps * tally.correct) / tally.graded) / (steps + 1) : null);
+  return quiz.skills.map((skill) => ({ skill: skill.skill, pre: place(skill.pre), post: place(skill.post), preText: tallyText(skill.pre), postText: tallyText(skill.post) }));
+}
+
+/** 보고서 근거에 나오는 스킬 수(설문·퀴즈 중 많은 쪽). 근거가 없으면 0 */
+export function evidenceSkillCount(report: Pick<Report, 'surveyEvidence' | 'quizEvidence'>): number {
+  const survey = new Set((report.surveyEvidence ?? []).map((row) => row.skill || row.area));
+  const quiz = new Set((report.quizEvidence ?? []).map((row) => row.skill));
+  return Math.max(survey.size, quiz.size);
 }
 
 export interface ScheduleRow {

@@ -55,13 +55,6 @@
 .rpt-skill-key{justify-content:center;margin-top:auto;padding-top:6px}
 .rpt-key-line{flex-shrink:0}
 
-/* 스킬이 1~2개일 때의 막대 */
-.rpt-bars{display:grid;gap:14px;margin:0 0 14px;padding:0;list-style:none}
-.rpt-bars b{font-size:13px;font-weight:600}
-.rpt-bars li>b{display:block;margin-bottom:4px}
-/* 막대일 때는 범례가 없어 아래 줄을 카드 바닥으로 민다 */
-.rpt-skill-chart+.rpt-card-foot{margin-top:auto}
-
 /* 학습 결과: 잘된 점 · 보완할 점 → 다음 로드맵 제안 */
 .rpt-result{margin-top:12px}
 .rpt-result-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:20px 28px}

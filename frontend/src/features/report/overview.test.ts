@@ -1,7 +1,7 @@
 /* 보고서 개요의 스킬별 값과 일정 줄 계산 */
 import { describe, expect, it } from 'vitest';
 import { quizComparison, surveyComparison } from './comparison';
-import { buildSchedule, quizBySkill, quizRingCount, surveyBySkill } from './overview';
+import { buildSchedule, evidenceSkillCount, quizBySkill, quizRingCount, surveyBySkill } from './overview';
 
 const quiz = (skill: string, concept: string, pre: string, post: string) => ({ skill, concept, question: '', pre, post });
 const survey = (id: string, skill: string, pre: string | null, post: string) => ({ id, area: skill, skill, text: `문항 ${id}`, pre, post });
@@ -25,20 +25,38 @@ describe('surveyBySkill', () => {
 });
 
 describe('quizBySkill', () => {
-  it('스킬마다 채점한 문항 중 맞힌 비율과 분모를 함께 돌려준다', () => {
-    const comparison = quizComparison([quiz('SQL', '조인', '오답', '정답'), quiz('SQL', '집계', '정답', '정답'), quiz('SQL', '인덱스', '오답', '오답'), quiz('API', '인증', '채점 근거 없음', '정답')]);
+  it('하나도 못 맞혀도 첫 눈금에 놓고, 글자는 실제 정답 수를 그대로 적는다', () => {
+    const comparison = quizComparison([
+      quiz('SQL', '조인', '오답', '정답'),
+      quiz('SQL', '집계', '오답', '정답'),
+      quiz('SQL', '인덱스', '오답', '정답'),
+      quiz('API', '인증', '정답', '오답'),
+      quiz('API', '오류', '오답', '오답'),
+      quiz('API', '버전', '오답', '정답'),
+    ]);
+    expect(quizRingCount(comparison)).toBe(4);
     expect(quizBySkill(comparison)).toEqual([
-      { skill: 'SQL', pre: 1 / 3, post: 2 / 3, preText: '1/3', postText: '2/3' },
-      { skill: 'API', pre: null, post: 1, preText: '–', postText: '1/1' },
+      { skill: 'SQL', pre: 1 / 4, post: 1, preText: '0/3', postText: '3/3' },
+      { skill: 'API', pre: 2 / 4, post: 2 / 4, preText: '1/3', postText: '1/3' },
     ]);
   });
 
-  it('채점 문항 수가 모두 같을 때만 눈금 한 칸을 1문항으로 쓴다', () => {
-    const same = quizComparison([quiz('SQL', '조인', '오답', '정답'), quiz('SQL', '집계', '정답', '정답'), quiz('API', '인증', '오답', '정답'), quiz('API', '오류', '오답', '오답')]);
-    expect(quizRingCount(same)).toBe(2);
-    const mixed = quizComparison([quiz('SQL', '조인', '오답', '정답'), quiz('SQL', '집계', '정답', '정답'), quiz('API', '인증', '오답', '정답')]);
-    expect(quizRingCount(mixed)).toBeNull();
-    expect(quizRingCount(quizComparison([quiz('SQL', '조인', '채점 근거 없음', '채점 근거 없음')]))).toBeNull();
+  it('채점 문항 수가 스킬마다 다르면 비율 눈금(4칸)을 쓰고, 채점 근거가 없으면 값을 만들지 않는다', () => {
+    const comparison = quizComparison([quiz('SQL', '조인', '오답', '정답'), quiz('SQL', '집계', '정답', '정답'), quiz('SQL', '인덱스', '오답', '오답'), quiz('API', '인증', '채점 근거 없음', '정답')]);
+    expect(quizRingCount(comparison)).toBe(4);
+    expect(quizBySkill(comparison)).toEqual([
+      { skill: 'SQL', pre: 0.5, post: 0.75, preText: '1/3', postText: '2/3' },
+      { skill: 'API', pre: null, post: 1, preText: '–', postText: '1/1' },
+    ]);
+    expect(quizRingCount(quizComparison([quiz('SQL', '조인', '채점 근거 없음', '채점 근거 없음')]))).toBe(4);
+  });
+});
+
+describe('evidenceSkillCount', () => {
+  it('설문·퀴즈 근거 중 스킬이 많은 쪽의 수를 세고, 근거가 없으면 0이다', () => {
+    expect(evidenceSkillCount({})).toBe(0);
+    expect(evidenceSkillCount({ surveyEvidence: [survey('q1', 'SQL', '1', '2'), survey('q2', 'SQL', '1', '2'), survey('q3', 'API', '1', '2')] })).toBe(2);
+    expect(evidenceSkillCount({ surveyEvidence: [survey('q1', 'SQL', '1', '2')], quizEvidence: [quiz('SQL', '조인', '오답', '정답'), quiz('API', '인증', '오답', '정답'), quiz('테스트', '단위', '오답', '정답')] })).toBe(3);
   });
 });
 

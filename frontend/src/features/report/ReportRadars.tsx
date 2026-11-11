@@ -1,10 +1,10 @@
 /* 결과 보고서 개요: 스킬별 사전·사후를 레이더로 겹쳐 보여 주는 카드 두 장
    - 사전 = 점선·빈 원, 사후 = 실선·채운 원(색을 못 봐도 구분된다). 값은 축 이름 아래에 글자로도 적는다
-   - 스킬이 3개보다 적으면 레이더가 선이 되므로 막대로 바꿔 그린다
+   - 스킬이 3개보다 적으면 레이더가 선이 되므로 그 카드는 그리지 않는다(보고서 전체가 2개 이하면 ReportBody 가 이전 구성을 쓴다)
    - 본인 보고서에만 오는 근거로 그린다. 근거가 없는 이전 보고서와 부서장 화면에서는 아무것도 그리지 않는다 */
 import type { Report } from '@/api/types/plan';
 import { quizComparison, surveyComparison } from './comparison';
-import { quizBySkill, quizRingCount, surveyBySkill, type SkillValue } from './overview';
+import { quizBySkill, quizRingCount, quizStepCount, surveyBySkill, type SkillValue } from './overview';
 import './comparisonViz.css';
 import './reportOverview.css';
 
@@ -97,39 +97,6 @@ function Radar({ axes, rings }: { axes: SkillValue[]; rings: number }) {
   );
 }
 
-/** 스킬이 1~2개일 때: 스킬마다 사전·사후 막대 */
-function Bars({ axes }: { axes: SkillValue[] }) {
-  return (
-    <ul className="rpt-bars">
-      {axes.map((axis) => (
-        <li key={axis.skill}>
-          <b>{axis.skill}</b>
-          {(['pre', 'post'] as const).map((phase) => {
-            const value = axis[phase];
-            return (
-              <span className="cmp-meter-row" key={phase}>
-                <span>{PHASE_TEXT[phase]}</span>
-                {value === null ? (
-                  <span className="cmp-meter-empty">값 없음</span>
-                ) : (
-                  <>
-                    <span className="cmp-meter-track">
-                      <span className={`cmp-meter-fill ${phase}`} style={{ width: `${Math.round(value * 100)}%` }} />
-                    </span>
-                    <span className="cmp-meter-value">
-                      <b>{axis[`${phase}Text`]}</b>
-                    </span>
-                  </>
-                )}
-              </span>
-            );
-          })}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 function PhaseKey({ phase }: { phase: Phase }) {
   return (
     <svg className="rpt-key-line" viewBox="0 0 30 12" width="30" height="12" aria-hidden="true">
@@ -143,29 +110,27 @@ const spoken = (text: string) => (text === '–' ? '없음' : text);
 
 function SkillCard({ title, sub, axes, rings, unit, children }: { title: string; sub: string; axes: SkillValue[]; rings: number; unit: string; children: React.ReactNode }) {
   const label = `${title}: ${axes.map((axis) => `${axis.skill} 사전 ${spoken(axis.preText)}, 사후 ${spoken(axis.postText)}`).join(' · ')}`;
-  const radar = axes.length >= 3;
+  if (axes.length < 3) return null;
   return (
     <section className="card rpt-viz rpt-skill-card" aria-label={title}>
       <h2 className="st">{title}</h2>
       <p className="rpt-card-sub">{sub}</p>
       <div className="rpt-skill-chart" role="img" aria-label={label}>
-        {radar ? <Radar axes={axes} rings={rings} /> : <Bars axes={axes} />}
+        <Radar axes={axes} rings={rings} />
       </div>
-      {radar ? (
-        <ul className="cmp-legend rpt-skill-key">
-          <li>
-            <PhaseKey phase="pre" />
-            사전
-          </li>
-          <li>
-            <PhaseKey phase="post" />
-            사후
-          </li>
-          <li>
-            <small>눈금 한 칸 = {unit}</small>
-          </li>
-        </ul>
-      ) : null}
+      <ul className="cmp-legend rpt-skill-key">
+        <li>
+          <PhaseKey phase="pre" />
+          사전
+        </li>
+        <li>
+          <PhaseKey phase="post" />
+          사후
+        </li>
+        <li>
+          <small>눈금 한 칸 = {unit}</small>
+        </li>
+      </ul>
       <p className="rpt-card-foot">{children}</p>
     </section>
   );
@@ -175,7 +140,6 @@ export function ReportRadars({ r }: { r: Report }) {
   const survey = r.surveyEvidence?.length ? surveyComparison(r.surveyEvidence) : null;
   const quiz = r.quizEvidence?.length ? quizComparison(r.quizEvidence) : null;
   if (!survey && !quiz) return null;
-  const quizRings = quiz ? quizRingCount(quiz) : null;
   return (
     <div className="rpt-pair">
       {survey ? (
@@ -191,7 +155,7 @@ export function ReportRadars({ r }: { r: Report }) {
         </SkillCard>
       ) : null}
       {quiz ? (
-        <SkillCard title="학습 점검 결과" sub="스킬별 퀴즈 정답 수 · 사전·사후는 같은 개념의 다른 문제" axes={quizBySkill(quiz)} rings={quizRings ?? 4} unit={quizRings ? '1문항' : '정답률 25%'}>
+        <SkillCard title="학습 점검 결과" sub="스킬별 퀴즈 정답 수 · 사전·사후는 같은 개념의 다른 문제" axes={quizBySkill(quiz)} rings={quizRingCount(quiz)} unit={quizStepCount(quiz) ? '1문항 · 가장 안쪽 = 0문항' : '정답률 약 33% · 가장 안쪽 = 0%'}>
           전체 정답 사전{' '}
           {quiz.pre.graded ? (
             <b>

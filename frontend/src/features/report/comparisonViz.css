@@ -1,12 +1,19 @@
-/* 결과 보고서 사전·사후 비교 시각화 (#116) — 스킬별 점 격자 · 설문 덤벨 · 막대
-   사후 = 테마 강조색 · 사전 = 테마의 회색. 색을 못 봐도 읽히게 채움·빈 원·점선과 글자를 함께 쓴다.
-   보고서 안의 사전·사후 색(설문 선택지, 개념별 정답 수, 일정·레이더 카드)도 이 값을 같이 쓴다 */
-.learning-check,.report-survey,.rpt-viz{--cmp-post:var(--accent,#0e7c66);--cmp-pre:var(--ink-3,#7a7e85);--cmp-ring:var(--ink-4,#a6a9ae);--cmp-track:var(--sunk,#f0f0ec);--cmp-surface:var(--surface,#fff);--cmp-post-soft:color-mix(in srgb,var(--cmp-post) 12%,var(--cmp-surface));--cmp-post-ink:color-mix(in srgb,var(--cmp-post) 80%,var(--ink,#18191b));--cmp-pre-soft:color-mix(in srgb,var(--cmp-pre) 14%,var(--cmp-surface))}
+/* 결과 보고서 사전·사후 비교 시각화 (#116) — 요약 띠 · 스킬별 점 격자 · 설문 덤벨
+   사후 = 테마 강조색 · 사전 = 테마의 회색. 색을 못 봐도 읽히게 채움·빈 원·빗금과 글자를 함께 쓴다.
+   보고서 안의 사전·사후 색(설문 선택지, 개념별 정답 수)도 이 값을 같이 쓴다 */
+.cmp-summary,.learning-check,.report-survey,.rpt-viz{--cmp-post:var(--accent,#0e7c66);--cmp-pre:var(--ink-3,#7a7e85);--cmp-ring:var(--ink-4,#a6a9ae);--cmp-track:var(--sunk,#f0f0ec);--cmp-surface:var(--surface,#fff);--cmp-post-soft:color-mix(in srgb,var(--cmp-post) 12%,var(--cmp-surface));--cmp-post-ink:color-mix(in srgb,var(--cmp-post) 80%,var(--ink,#18191b));--cmp-pre-soft:color-mix(in srgb,var(--cmp-pre) 14%,var(--cmp-surface));--cmp-hatch:repeating-linear-gradient(135deg,var(--cmp-pre) 0 2px,transparent 2px 5px)}
 /* 밝은 테마: 강조색의 색상·채도는 그대로 두고, 노랑·연두처럼 너무 밝은 강조색만 흰 바탕에서 보이는 밝기(OKLCH L 0.62)까지 낮춘다.
    이 문법을 모르는 브라우저는 위의 강조색을 그대로 쓴다. 어두운 테마는 skin.css 에서 강조색을 그대로 쓰게 되돌린다 */
-@supports (color:oklch(from red l c h)){.learning-check,.report-survey,.rpt-viz{--cmp-post:oklch(from var(--accent,#0e7c66) min(l,.62) c h)}}
+@supports (color:oklch(from red l c h)){.cmp-summary,.learning-check,.report-survey,.rpt-viz{--cmp-post:oklch(from var(--accent,#0e7c66) min(l,.62) c h)}}
 
-/* 사전·사후 막대 */
+/* 요약 띠 */
+.cmp-summary{margin-block:12px}
+.cmp-summary-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,270px),1fr));gap:22px 36px}
+.cmp-block h3{margin:0 0 10px;font-size:14px;font-weight:650}
+.cmp-sub{margin:12px 0 6px;font-size:12px;line-height:1.6;color:var(--ink-3)}
+.cmp-block h3+.cmp-sub{margin-top:0}
+.cmp-note{margin:16px 0 0;padding-top:12px;border-top:1px dashed var(--line);font-size:11px;line-height:1.7;color:var(--ink-3)}
+
 .cmp-meter-row{display:grid;grid-template-columns:28px minmax(0,1fr) 92px;gap:10px;align-items:center;min-height:26px;font-size:12px;color:var(--ink-3)}
 .cmp-meter-track{height:8px;border-radius:4px;background:var(--cmp-track);overflow:hidden}
 .cmp-meter-fill{display:block;height:100%;border-radius:4px}
@@ -14,12 +21,24 @@
 .cmp-meter-fill.post{background:var(--cmp-post)}
 .cmp-meter-value{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .cmp-meter-value b{font-size:15px;font-weight:700;color:var(--ink)}
+.cmp-meter-value small{display:inline-block;min-width:34px;font-size:11px}
 .cmp-meter-empty{grid-column:2/-1}
+
+/* 변화 띠: 칸 너비가 문항 수에 비례한다 */
+.cmp-band{display:flex;gap:2px;height:14px}
+.cmp-seg{min-width:6px;border-radius:2px}
+.cmp-seg:first-child{border-top-left-radius:4px;border-bottom-left-radius:4px}
+.cmp-seg:last-child{border-top-right-radius:4px;border-bottom-right-radius:4px}
+.cmp-fill.gained,.cmp-fill.up{background:var(--cmp-post)}
+.cmp-fill.kept{background:color-mix(in srgb,var(--cmp-post) 30%,var(--cmp-surface));box-shadow:inset 0 0 0 1.5px var(--cmp-post)}
+.cmp-fill.lost,.cmp-fill.down{background:var(--cmp-hatch);box-shadow:inset 0 0 0 1.5px var(--cmp-pre)}
+.cmp-fill.missed,.cmp-fill.same{background:var(--cmp-surface);box-shadow:inset 0 0 0 1.5px var(--cmp-ring)}
 
 .cmp-legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin:8px 0 0;padding:0;list-style:none;font-size:12px;line-height:1.5;color:var(--ink-2)}
 .cmp-legend li{display:inline-flex;align-items:center;gap:6px}
 .cmp-legend b{font-variant-numeric:tabular-nums;color:var(--ink)}
 .cmp-legend small{font-size:11px;color:var(--ink-3)}
+.cmp-swatch{width:12px;height:12px;border-radius:3px;flex-shrink:0}
 
 /* 스킬별 점 격자: 점 하나 = 문항 하나, 같은 자리 = 같은 개념 */
 .cmp-dots{display:inline-flex;flex-wrap:wrap;align-items:center;gap:5px}

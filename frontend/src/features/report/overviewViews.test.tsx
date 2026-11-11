@@ -47,14 +47,28 @@ describe('ReportRadars', () => {
     expect(html).not.toContain('학습 점검 결과');
   });
 
-  it('스킬이 3개보다 적으면 레이더 대신 막대로 그린다', () => {
-    const html = renderToStaticMarkup(<ReportRadars r={report({ quizEvidence: [quiz('SQL', '조인', '오답', '정답'), quiz('SQL', '집계', '정답', '정답'), quiz('API', '인증', '채점 근거 없음', '정답')] })} />);
-    expect(html).not.toContain('<polygon');
-    expect(html).toContain('rpt-bars');
-    expect(html).toContain('width:50%');
-    expect(html).toContain('<b>1/2</b>');
-    expect(html).toContain('값 없음');
-    expect(html).toContain('채점 근거가 없는 1문항은 빼고 셌어요');
+  it('스킬이 3개보다 적은 근거는 카드를 그리지 않는다', () => {
+    const html = renderToStaticMarkup(
+      <ReportRadars
+        r={report({
+          surveyEvidence: [survey('q1', 'SQL', '2', '4'), survey('q2', 'API', '3', '4'), survey('q3', '테스트', '2', '3')],
+          quizEvidence: [quiz('SQL', '조인', '오답', '정답'), quiz('API', '인증', '오답', '정답')],
+        })}
+      />,
+    );
+    expect(html).toContain('설문 응답 결과');
+    expect(html).not.toContain('학습 점검 결과');
+  });
+
+  it('퀴즈를 하나도 못 맞힌 스킬도 중심이 아니라 첫 눈금에 점을 찍는다', () => {
+    const html = renderToStaticMarkup(
+      <ReportRadars r={report({ quizEvidence: [quiz('SQL', '조인', '오답', '오답'), quiz('API', '인증', '오답', '오답'), quiz('테스트', '단위', '오답', '정답')] })} />,
+    );
+    expect(html).toContain('SQL 사전 0/1, 사후 0/1');
+    expect(html).toContain('가장 안쪽 = 0문항');
+    // 축 3개 · 눈금 2개(0문항·1문항): 맨 위 축의 0문항 점은 중심(160,148)이 아니라 첫 눈금(160,102)에 있다
+    expect(html).toContain('<circle class="rpt-radar-mark pre" cx="160" cy="102" r="5">');
+    expect(html).not.toContain('cx="160" cy="148"');
   });
 });
 
