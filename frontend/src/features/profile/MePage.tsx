@@ -33,8 +33,7 @@ const lines = (t: unknown) =>
   String(t || '')
     .split('\n')
     .map((x) => x.trim())
-    .filter(Boolean)
-    .slice(0, 36);
+    .filter(Boolean);
 const profileEnough = (e: User | null) => !!(e && ((e.profile && (e.profile.workDesc || e.profile.expSummary)) || (e.tech || []).length || (e.projects || []).length));
 
 function HrCard({ e }: { e: User }) {
@@ -315,6 +314,7 @@ export function MePage() {
     const yrs = ed.devYears === '' || ed.devYears == null ? null : Number(ed.devYears);
     if (yrs != null && !(yrs >= 0 && yrs <= 50)) return setErr('개발 경험은 0~50년 사이로 적거나 비워 주세요.');
     const ls = { tech: lines(ed.tech), certs: lines(ed.certs), learning: lines(ed.learning), projects: e.projects || [] };
+    if (ls.learning.length > 20) return setErr('교육 이력은 최대 20개까지 저장할 수 있어요.');
     try {
       const r = await accountApi.saveSelf({
         workDesc: wd,
