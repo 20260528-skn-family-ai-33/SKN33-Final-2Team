@@ -1,0 +1,11 @@
+/* 나타나기(reveal.ts)의 모양 — meta 에 reveal: true 를 둔 테마를 고른 때(<html data-reveal>)만 적용된다.
+   화면에 들어올 때 한 번 떠오른다. 덩어리마다 따로 움직이므로 본문 전체의 짧은 등장(gp.css rise)은 끈다.
+   wait·in 은 reveal.ts 가 잠깐 붙였다 떼는 상태라, 상자마다 다른 transition 규칙보다 우선하게 한다
+   (그래서 떠오르는 0.8초 남짓 동안은 테마의 마우스 올림 효과가 부드럽게 바뀌지 않고 바로 바뀐다). */
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-reveal] {
+    .view { animation: none; }
+    [data-rv="wait"] { opacity: 0 !important; translate: 0 30px; }
+    [data-rv="in"] { transition: opacity .8s ease var(--rv-d, 0s), translate .8s ease var(--rv-d, 0s) !important; }
+  }
+}
