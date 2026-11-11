@@ -170,14 +170,14 @@ def course_context(t, employee_id: int, project_id: str, course: str | None = No
                    completed: frozenset[str] | None = None) -> dict:
     saved = recommendation_context(t, employee_id, project_id)
     from app.services.resource_rag import version_for
-    from app.services.course_recommendations import compatible_recommendations, scope_view
+    from app.services.course_recommendations import cap_selection, compatible_recommendations, scope_view
     if completed is None:
         completed = completed_course_ids(t, employee_id)
     if not course:
         recommendations = compatible_recommendations(saved, version_for(), completed)
         if recommendations is not None:
             return dict(saved, recommendations=recommendations)
-        return dict(saved, recommendations=None, resourceChoices={}, durationEstimates={})
+        return dict(cap_selection(saved), recommendations=None, resourceChoices={}, durationEstimates={})
     from app.services import drafts as draft_service
     draft = draft_service._row(t, employee_id, project_id, lock=False)['draft_choices']['draft']
     if course not in ('A1','A2','A3') or course not in (draft.get('gen') or {}).get('options', {}):

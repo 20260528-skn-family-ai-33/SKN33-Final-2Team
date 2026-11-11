@@ -41,6 +41,17 @@ def prune_course_versions(w, course):
     saved['courseRecommendationVersions'][course] = {key: value for key, value in versions.items() if key in keep}
 
 
+def cap_selection(saved):
+    """이전 상한(5개)으로 완료한 점검은 새 공통 추천에 사용자 순서의 앞 3개만 쓴다. 저장 원본은 바꾸지 않는다."""
+    rows=(saved.get('selection') or {}).get('skills')
+    if not isinstance(rows,list) or len(rows)<=track_policy.MAX_SKILLS:return saved
+    capped=deepcopy(saved)
+    capped['selection']['skills']=rows[:track_policy.MAX_SKILLS]
+    names={row.get('name') for row in capped['selection']['skills'] if isinstance(row,dict)}
+    if isinstance(capped.get('skillOrder'),list):
+        capped['skillOrder']=[name for name in capped['skillOrder'] if name in names]
+    return capped
+
 def scope_view(saved,course,option=None):
     if not course:return deepcopy(saved)
     scoped=deepcopy(saved)

@@ -755,9 +755,11 @@ def revise(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
     skill_targets = _revision_skill_targets(pl, inp['handoff'])[:track_policy.MAX_SKILLS]
     course_changed = pid != pl['opt']
     report = (pl.get('def') or {}).get('learningReport') or {}
-    target_names = list(dict.fromkeys(report.get('skillOrder') or inp['handoff'].get('skillOrder')
-                                     or inp['handoff'].get('skillNames') or [row['name'] for row in skill_targets]))
-    target_names = [name for name in target_names if (report.get('choices', {}).get(name) or {}).get('enabled', True)][:track_policy.MAX_SKILLS]
+    from app.services.material_plan import revision_skill_names
+    target_names, dropped = revision_skill_names(dict(report, skillOrder=report.get('skillOrder') or inp['handoff'].get('skillOrder')
+                                                      or inp['handoff'].get('skillNames') or [row['name'] for row in skill_targets]))
+    # 이전 상한으로 확정된 4·5번째 스킬의 활동은 모델 입력에서 빼고 재구성에서도 넣지 않는다.
+    live_acts = [a for a in pl['acts'] if a.get('skill') not in dropped]
     refresh_targets = course_changed and bool(target_names)
     by_name = {row['name']: row for row in (inp['handoff'].get('skillDetails') or []) + skill_targets}
     fresh_inputs = [{'name': name, 'application': by_name.get(name, {}).get('application') or inp['handoff'].get('goal') or name}
@@ -779,9 +781,9 @@ def revise(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
     def api(_):
         current = {'perspective': f"{pl['opt']} {pl['name']}", 'weeklyHours': pl['hours'], 'startStage': pl['start'],
                    'acts': [dict({'key': a['id'], 'stage': a['stage'], 'title': a['title'], 'res': a.get('res'), 'hours': a.get('hours'), 'how': a.get('how') or '', 'done': a.get('done'), 'skill': a.get('skill')},
-                                 **({} if a.get('res') else {'skills': a.get('skills') or []})) for a in pl['acts']]}
+                                 **({} if a.get('res') else {'skills': a.get('skills') or []})) for a in live_acts]}
         removed = {a.get('key') for a in (inp['changes'].get('removeActs') or []) + (inp['changes'].get('replaceActs') or [])}
-        extra_ids = [a.get('res') for a in pl['acts'] if a['id'] not in removed] + list(inp['changes'].get('addResources') or [])
+        extra_ids = [a.get('res') for a in live_acts if a['id'] not in removed] + list(inp['changes'].get('addResources') or [])
         # 이전 자료 선택 스냅샷이 제외·교체 요청을 다시 필수 후보로 되살리지 않게 한다.
         handoff = copy.deepcopy(inp['handoff'])
         gone_resources = {a.get('res') for a in pl['acts'] if a['id'] in removed and a.get('res')} - set(extra_ids)

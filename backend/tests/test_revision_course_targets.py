@@ -160,8 +160,34 @@ class CourseTransitionTargetsTests(TestCase):
         self.assertEqual(payload['handoff']['skillOrder'], names[:3])
         self.assertEqual([row['name'] for row in payload['skillTargets']], names[:3])
         self.assertEqual(out['learningSkills'], targets)
+        self.assertNotIn('SQL', [act.get('skill') for act in payload['current']['acts']])
+        self.assertEqual(out['learningReport']['skillOrder'], names[:3])
+        self.assertEqual([act['skill'] for act in out['acts']], names[:3])
         with self.assertRaises(llm.LlmError):
             self.revise_input(inp, [self.target('A2', name) for name in names], catalog_items=items)
+
+    def test_saved_five_skills_same_course_revision_rebuilds_first_three(self):
+        names = ['Docker', 'ETL', 'Python', 'SQL', 'Linux']
+        inp = self.revision_input('A2', 'A2', names=names)
+        before = deepcopy(inp)
+        out, captured, _ = self.revise_input(inp, None)
+        self.assertEqual(inp, before)
+        self.assertEqual([act['skill'] for act in captured['payload']['current']['acts']], names[:3])
+        self.assertEqual([row['name'] for row in out['learningSkills']], names[:3])
+        self.assertEqual([row['name'] for row in out['learningSkillSelection']], names[:3])
+        self.assertEqual(out['learningSkillsKey'], recommendation_key(out))
+        self.assertEqual(out['learningReport']['skillOrder'], names[:3])
+        self.assertEqual(list(out['learningReport']['choices']), names[:3])
+        self.assertEqual([row['name'] for row in out['learningReport']['skillDetails']], names[:3])
+        self.assertEqual([act['skill'] for act in out['acts']], names[:3])
+
+    def test_three_skill_revision_keeps_disabled_target_rows(self):
+        names = ['Docker', 'ETL', 'Python', 'SQL']
+        inp = self.revision_input('A2', 'A2', names=names, disabled=('ETL',))
+        out, _, _ = self.revise_input(inp, None)
+        self.assertEqual([row['name'] for row in out['learningSkills']], names)
+        self.assertEqual(out['learningSkillsKey'], 'old-key')
+        self.assertEqual(out['learningReport']['skillOrder'], ['Docker', 'Python', 'SQL'])
 
     def test_next_revision_uses_converted_targets_with_stale_handoff(self):
         inp = self.revision_input('A3', 'A2')

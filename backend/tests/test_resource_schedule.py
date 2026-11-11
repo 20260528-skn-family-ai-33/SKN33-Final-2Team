@@ -78,8 +78,10 @@ class ResourceScheduleTests(TestCase):
         revision = dict(deepcopy(preview['def']), acts=[dict(a, key=a['id']) for a in preview['acts']])
         rebuilt = material_plan.rebuild_revision(revision, preview, self.draft['handoff'])
         revised = roadmap.build_plan(rebuilt, {'hours': 6, 'start': 2}, 'Goal')
-        self.assertEqual(revised['weeks'], 7)
-        self.assertEqual(revised['totalH'], 24.3)
+        # 이전 상한으로 확정된 4개 계획은 수정 시 앞 3개만 다시 구성한다(MLOps 8.7시간 제외).
+        self.assertEqual(rebuilt['learningReport']['skillOrder'], self.order[:3])
+        self.assertEqual(revised['weeks'], 5)
+        self.assertEqual(revised['totalH'], 15.6)
 
     def test_book_only_shared_selection_reorder_disable_and_reselect(self):
         for row in self.rec['skills']:
@@ -179,8 +181,11 @@ class ResourceScheduleTests(TestCase):
         revision = dict(deepcopy(option), acts=[dict(a, key=a['id']) for a in confirmed['acts']])
         rebuilt = material_plan.rebuild_revision(revision, confirmed, self.draft['handoff'])
         revised = roadmap.build_plan(rebuilt, {'hours': 6, 'start': 2}, 'Goal')
-        self.assertEqual(revised['weeks'], 7)
-        self.assertEqual(revised['totalH'], 124.3)
+        # 이전 상한으로 확정된 4개 계획은 수정 시 앞 3개만 다시 구성한다(MLOps 8.7시간 제외).
+        self.assertEqual(rebuilt['learningReport']['skillOrder'], self.order[:3])
+        self.assertEqual([a['id'] for a in revised['acts']], [a['id'] for a in confirmed['acts'] if a.get('skill') != 'MLOps'])
+        self.assertEqual(revised['weeks'], 5)
+        self.assertEqual(revised['totalH'], 115.6)
         self.assertEqual(confirmed, source)
 
     def test_empty_materials_and_all_disabled_do_not_allocate_future_slots(self):

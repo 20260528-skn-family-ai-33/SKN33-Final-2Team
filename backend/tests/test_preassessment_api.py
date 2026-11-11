@@ -272,6 +272,22 @@ class RecommendationVersionViewTests(unittest.TestCase):
                     self.assertEqual(saved, before)
                     self.assertNotIn('outdated', rec)
 
+    def test_saved_five_skills_use_first_three_for_new_common_recommendations(self):
+        names = ['A', 'B', 'C', 'D', 'E']
+        saved = dict(generationId='g', project={'goal': '주문 데이터 처리'}, completed=True, recommendations=None, resourceChoices={},
+                     selection={'skills': [{'name': name, 'application': name} for name in names]},
+                     skillOrder=list(names))
+        before = copy.deepcopy(saved)
+        with patch.object(api, 'recommendation_context', return_value=saved):
+            pre = api.course_context(Mock(), 1, 'project', None, completed=frozenset())
+        self.assertEqual([row['name'] for row in pre['selection']['skills']], names[:3])
+        self.assertEqual(pre['skillOrder'], names[:3])
+        self.assertIsNone(pre['recommendations'])
+        self.assertEqual(saved, before)
+        from app.agents.resource_recommendations import candidate_pools
+        pools = candidate_pools(pre['project'], pre['selection'], {})
+        self.assertEqual([row['name'] for row in pools], names[:3])
+
     def test_no_recommendation_remains_none(self):
         self.assertIsNone(api.recommendation_view({'generationId': 'g'})['recommendations'])
 
