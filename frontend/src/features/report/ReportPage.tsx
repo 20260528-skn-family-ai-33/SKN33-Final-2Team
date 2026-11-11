@@ -39,7 +39,7 @@ export function ReportPage() {
       foot={R ? <button className="btn line" onClick={() => go(paths.roadmap(R.id))}>로드맵 보기</button> : undefined}
     >
       <MemberReportTasks planId={r.planId} />
-      <ReportBody r={r} />
+      <ReportBody r={r} R={R} />
       <ReportDeep r={r} R={R} />
       {sup ? <Note>이 보고서는 내 계획을 보는 부서장 {sup.name} 님도 볼 수 있어요.</Note> : null}
     </Page>
