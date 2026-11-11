@@ -82,7 +82,7 @@ def _compact(entries: list[dict], selection: candidates.Selection) -> list[dict]
 
 def pack(selection: candidates.Selection, system: str = '', payload: dict | None = None,
          context_limit: int = DEFAULT_CONTEXT) -> dict:
-    """32개가 기본. 스킬 4~5개 또는 필수 자료가 많은 경우에만 40개를 먼저 검토한다.
+    """32개가 기본. 필수 자료가 많은 경우에만 40개를 먼저 검토한다.
 
     OpenAI에서도 같은 입력 비용 정책을 사용하지만 Qwen 계산값이 OpenAI의 과금 토큰 수는 아니다.
     요청 본문과 시스템 지시는 자르지 않는다. 필수 자료가 안 들어가면 명시적으로 실패한다.
@@ -119,7 +119,7 @@ def pack(selection: candidates.Selection, system: str = '', payload: dict | None
     def fits(result: dict, budget: int) -> bool:
         return tokens(result['catalog']) <= budget and system_tokens + tokens(result) <= limit
 
-    expanded = len(selection.skills) >= 4 or required_count > candidates.DEFAULT_COUNT
+    expanded = required_count > candidates.DEFAULT_COUNT
     target = min(candidates.MAX_COUNT if expanded else candidates.DEFAULT_COUNT, len(entries))
     budget = EXPANDED_CATALOG_TOKENS if expanded else CATALOG_TOKENS
     compact_entries = _compact(entries, selection)

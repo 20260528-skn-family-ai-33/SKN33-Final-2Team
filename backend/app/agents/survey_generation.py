@@ -8,6 +8,8 @@ import json
 import random
 from typing import Any
 
+from app.track_policy import MAX_SKILLS
+
 SYSTEM = """[입력·출제 기준]
 선정한 skills의 핵심 지식·수행 역량 측정용 설문·퀴즈 생성. projectSummary는 기획서 요약, desiredCompetencies는 희망 역량, profile은 소속·학력·전공·본인 입력 정보.
 측정 기준은 skills, 수행 범위는 각 skills.application. 프로젝트는 업무 상황·예시에만 활용, 별도 desiredCompetencies 제공 시 희망 역량, 미제공 시 goal 기준으로 스킬 내 세부 주제 조정.
@@ -62,7 +64,8 @@ def _text(value: Any, label: str) -> str:
 
 def generate_survey(project: dict[str, Any], selection: dict[str, Any], profile: dict[str, Any],
                     generate: Callable[[str, dict[str, Any]], dict[str, Any]], *,
-                    require_measurement: bool = False, phase: str | None = None) -> dict[str, Any]:
+                    require_measurement: bool = False, phase: str | None = None,
+                    max_skills: int = MAX_SKILLS) -> dict[str, Any]:
     if not isinstance(project, dict) or not isinstance(selection, dict) or not isinstance(profile, dict):
         raise SurveyError('프로젝트·스킬·프로필 입력 형식을 확인해 주세요.')
     goal = _text(project.get('goal'), '목표')
@@ -72,8 +75,8 @@ def generate_survey(project: dict[str, Any], selection: dict[str, Any], profile:
     summary = summary.strip() or None if isinstance(summary, str) else None
     desired = _text(project.get('desiredCompetencies'), '키우고 싶은 역량')
     skills = selection.get('skills')
-    if not isinstance(skills, list) or not 1 <= len(skills) <= 5:
-        raise SurveyError('선정 스킬은 1~5개여야 합니다.')
+    if not isinstance(skills, list) or not 1 <= len(skills) <= max_skills:
+        raise SurveyError(f'선정 스킬은 1~{max_skills}개여야 합니다.')
     names = [_text(row.get('name') if isinstance(row, dict) else None, '스킬') for row in skills]
     if len(set(names)) != len(names):
         raise SurveyError('선정 스킬이 중복되었습니다.')

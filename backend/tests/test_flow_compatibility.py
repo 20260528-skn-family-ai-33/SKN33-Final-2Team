@@ -76,6 +76,27 @@ class FlowCompatibilityTests(unittest.TestCase):
   self.assertEqual(restored['resourceChoices']['S']['books'],['b'])
   self.assertEqual(w['v2Survey']['courseRecommendations']['A3'],{'marker':'보존'})
 
+ def test_saved_five_fixed_skills_accept_common_choices_for_first_three(self):
+  names=['A','B','C','D','E']
+  rec={'id':'r','skills':[{'name':name,'courses':[{'id':f'c{name}','type':'course','hours':2,'cost':0}],'books':[]} for name in names[:3]]}
+  saved={'generationId':'g','completed':True,'project':{'goal':'G','selectedSkills':names},
+         'selection':{'skills':[{'name':name,'application':name} for name in names]},
+         'recommendations':rec,'resourceChoices':{},'skillOrder':names[:3]}
+  w={'v2Survey':saved,'draft':{}}
+  choices={name:{'course':f'c{name}','books':[],'enabled':True} for name in names[:3]}
+  items={f'c{name}':{'type':'course','cost':0,'hours':2,'usable':True} for name in names}
+  for order,ok in ((names[:3],True),(['B','A','C'],False)):
+   with self.subTest(order=order):
+    t=Mock();t.one.return_value={'draft_choices':copy.deepcopy(w)};t.run.return_value=1;t.all.return_value=[]
+    with patch('app.catalog.items',return_value=items):
+     if not ok:
+      with self.assertRaises(survey_store.StoreError):
+       survey_store.save_resource_choices(t,1,'p','g','r',choices,skill_order=order)
+      continue
+     result=survey_store.save_resource_choices(t,1,'p','g','r',choices,skill_order=order)
+    self.assertEqual(result['skillOrder'],names[:3])
+    self.assertEqual([row['name'] for row in result['selection']['skills']],names)
+
  def test_material_edit_clears_all_tasks_versions_outcomes_and_old_review(self):
   w,scoped=self.state();t=Mock();t.one.return_value={'draft_choices':w};t.run.return_value=1
   t.all.return_value = []

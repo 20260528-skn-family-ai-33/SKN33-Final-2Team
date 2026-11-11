@@ -2,7 +2,7 @@
 from copy import deepcopy
 from hashlib import sha256
 import json
-from app import db
+from app import db, track_policy
 FIELDS=('recommendations','resourceChoices','durationEstimates','activityProposal','activityVersions','materialsSelectionKey','skillSelectionKey','learningOutcomes')
 
 def option_cache_key(option):
@@ -41,6 +41,19 @@ def prune_course_versions(w, course):
     saved['courseRecommendationVersions'][course] = {key: value for key, value in versions.items() if key in keep}
 
 
+def cap_selection(saved):
+    """이전 상한(5개)으로 완료한 점검은 새 공통 추천에 사용자 순서의 앞 3개만 쓴다. 저장 원본은 바꾸지 않는다."""
+    rows=(saved.get('selection') or {}).get('skills')
+    if not isinstance(rows,list) or len(rows)<=track_policy.MAX_SKILLS:return saved
+    by_name={row.get('name'):row for row in rows if isinstance(row,dict)}
+    # 사용자가 바꾼 skillOrder를 우선하고, 순서에 없는 스킬만 최초 선정 순서로 뒤에 붙인다(코스별 scope_view와 같은 기준).
+    order=[name for name in dict.fromkeys(saved.get('skillOrder') or []) if name in by_name]
+    keep=(order+[name for name in by_name if name not in order])[:track_policy.MAX_SKILLS]
+    capped=deepcopy(saved)
+    capped['selection']['skills']=[deepcopy(by_name[name]) for name in keep]
+    capped['skillOrder']=list(keep)
+    return capped
+
 def scope_view(saved,course,option=None):
     if not course:return deepcopy(saved)
     scoped=deepcopy(saved)
@@ -56,11 +69,11 @@ def scope_view(saved,course,option=None):
     from app.services.course_skills import selected
     learning=selected(option or {})
     if (saved.get('project') or {}).get('selectedSkills'):
-        fixed=(saved.get('selection') or {}).get('skills') or []
+        fixed=((saved.get('selection') or {}).get('skills') or [])[:track_policy.MAX_SKILLS]
         by_name={row['name']:row for row in learning or []}
         learning=[dict(row,**{k:v for k,v in by_name.get(row['name'],{}).items() if k not in ('name','application','enabled')},enabled=True) for row in fixed]
     if learning is not None:
-        active=[row for row in learning if row['enabled']]
+        active=[row for row in learning if row['enabled']][:track_policy.MAX_SKILLS]
         scoped['selection']={'skills':[{k:v for k,v in row.items() if k!='enabled'} for row in active]}
         scoped['skillOrder']=[row['name'] for row in active]
         from hashlib import sha256
@@ -75,8 +88,9 @@ def scope_view(saved,course,option=None):
         return scoped
     for name,choice in scoped['resourceChoices'].items():
         choice['enabled']=(saved.get('resourceChoices') or {}).get(name,{}).get('enabled',True)
-    if course=='A2':
-        active=[name for name in (saved.get('skillOrder') or []) if (saved.get('resourceChoices') or {}).get(name,{}).get('enabled',True)][:3]
+    limit=track_policy.FAST_SKILLS if course=='A2' else track_policy.MAX_SKILLS
+    if course=='A2' or len(saved.get('skillOrder') or [])>limit:
+        active=[name for name in (saved.get('skillOrder') or []) if (saved.get('resourceChoices') or {}).get(name,{}).get('enabled',True)][:limit]
         scoped['skillOrder']=active
         scoped['selection']=deepcopy(saved.get('selection') or {'skills':[]})
         scoped['selection']['skills']=[next(row for row in saved['selection']['skills'] if row['name']==name) for name in active]

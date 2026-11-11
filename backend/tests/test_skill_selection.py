@@ -16,8 +16,8 @@ class SkillSelectionTests(unittest.TestCase):
     def select(self, rows):
         return select_skills(self.project, self.tags, lambda *_: {'skills': rows})
 
-    def test_one_three_and_five_kept_without_padding_or_reordering(self):
-        for count in (1, 3, 5):
+    def test_one_two_and_three_kept_without_padding_or_reordering(self):
+        for count in (1, 2, 3):
             with self.subTest(count=count):
                 rows = [self.row(tag) for tag in reversed(self.tags[:count])]
                 self.assertEqual(self.select(rows)['skills'], rows)
@@ -29,7 +29,8 @@ class SkillSelectionTests(unittest.TestCase):
         for key in ('goal', 'projectSummary', 'details', 'desiredCompetencies'):
             self.assertEqual(payload[key], self.project[key])
         self.assertEqual(payload['availableSkills'], self.tags)
-        self.assertEqual(payload['maxSkills'], 5)
+        self.assertEqual(payload['maxSkills'], 3)
+        self.assertIn('최대 3개', system)
 
     def test_only_exact_duplicate_desired_competencies_is_omitted_without_mutation(self):
         from copy import deepcopy
@@ -49,10 +50,15 @@ class SkillSelectionTests(unittest.TestCase):
                 self.assertEqual(result, {'skills': [self.row(self.tags[0])]})
                 self.assertIn('미제공 시 goal 기준', system)
 
-    def test_zero_or_more_than_five_is_rejected_without_silent_truncation(self):
-        for count in (0, 6):
-            with self.subTest(count=count), self.assertRaises(SelectionError):
-                self.select([self.row(tag) for tag in self.tags[:count]])
+    def test_zero_is_rejected(self):
+        with self.assertRaises(SelectionError):
+            self.select([])
+
+    def test_four_or_five_suggestions_keep_only_first_three_in_order(self):
+        for count in (4, 5):
+            with self.subTest(count=count):
+                rows = [self.row(tag) for tag in self.tags[:count]]
+                self.assertEqual(self.select(rows)['skills'], rows[:3])
 
     def test_unknown_and_duplicate_tag_is_rejected(self):
         for rows in ([self.row('임의 태그')], [self.row(self.tags[0])] * 2):

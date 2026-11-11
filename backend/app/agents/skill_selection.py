@@ -1,17 +1,18 @@
-"""프로젝트의 핵심 스킬 최대 5개 선정 실험. 기존 서비스에는 아직 연결하지 않는다."""
+"""프로젝트의 핵심 스킬 최대 3개 선정 실험. 기존 서비스에는 아직 연결하지 않는다."""
 from __future__ import annotations
 
 import re
 from collections.abc import Callable
 from typing import Any
 
-MAX_SKILLS = 5
+from app.track_policy import MAX_SKILLS
+
 SYSTEM = """[입력·선정 범위]
 goal(프로젝트 목표)·projectSummary(기획서 요약)·details(세부사항)·desiredCompetencies(희망 역량)의 전체 맥락을 근거로 프로젝트 수행에 필요한 IT 개발 핵심 스킬 선정. 프로젝트 포함 범위 안에서 별도 desiredCompetencies 제공 시 희망 역량 우선 반영, 미제공 시 goal 기준. 제외 범위 작업 추가 금지.
 산업·현장 업무 지식 자체가 아닌 데이터 처리·모델 개발·서비스 연계 등 구현 역량 중심. 현재 숙련도가 아닌 프로젝트의 필요 역량을 선정 기준으로 사용.
 
 [태그·우선순위]
-availableSkills의 DB 태그 이름과 정확히 일치하는 스킬만 중요도 순으로 최대 5개 선정. 새 태그 생성·무관한 IT 태그 대체·개수 채우기 금지. 관련 태그 부재 시 skills 빈 배열 반환.
+availableSkills의 DB 태그 이름과 정확히 일치하는 스킬만 중요도 순으로 최대 3개 선정. 새 태그 생성·무관한 IT 태그 대체·개수 채우기 금지. 관련 태그 부재 시 skills 빈 배열 반환.
 유사 후보의 핵심 역량 통합. 기반 지식과 응용 기술의 중복 시 각각의 독립 선정 필요성 검토.
 프로젝트 범위에 모델 배포·서빙·모니터링 포함 시 MLOps 후보 검토.
 
@@ -78,10 +79,11 @@ def select_skills(
     rows = _skill_rows(raw)
     if not isinstance(rows, list):
         raise SelectionError('스킬 목록 형식이 올바르지 않습니다.')
-    if not 1 <= len(rows) <= MAX_SKILLS:
-        raise SelectionError('핵심 스킬은 1~5개여야 합니다. 프로젝트와 DB 태그를 확인해 주세요.')
+    if not rows:
+        raise SelectionError('핵심 스킬을 찾지 못했습니다. 프로젝트와 DB 태그를 확인해 주세요.')
+    # 모델이 상한보다 많이 내도 오류로 막지 않고 중요도 순 앞 3개만 제시한다.
     selected, seen = [], set()
-    for row in rows:
+    for row in rows[:MAX_SKILLS]:
         if not isinstance(row, dict):
             raise SelectionError('스킬 항목 형식이 올바르지 않습니다.')
         name = row.get('name')

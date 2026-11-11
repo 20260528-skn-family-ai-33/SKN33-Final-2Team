@@ -85,12 +85,18 @@ class SurveyTests(unittest.TestCase):
             model.assert_not_called()
 
     def test_exact_counts_for_every_allowed_skill_count(self):
-        for n in range(1, 6):
+        for n in range(1, 4):
             with self.subTest(n=n):
                 result = self.run_result(self.result(n), n)
                 self.assertEqual(result['questionCount'], 10 if n == 1 else n * 6)
                 ids = [row['id'] for g in result['groups'] for k in ('surveys', 'quizzes') for row in g[k]]
                 self.assertEqual(len(ids), len(set(ids)))
+
+    def test_four_skills_are_rejected_before_model_call(self):
+        model = Mock(return_value=self.result(4))
+        with self.assertRaises(SurveyError):
+            generate_survey(self.project, self.selection(4), self.profile, model)
+        model.assert_not_called()
 
     def test_summary_desired_skills_and_full_profile_pass_without_raw_document(self):
         model = Mock(return_value=self.result(2))
@@ -152,7 +158,7 @@ class SurveyTests(unittest.TestCase):
         with self.assertRaises(SurveyError): self.run_result(raw)
 
     def test_all_surveys_precede_all_quizzes(self):
-        for n in range(1, 6):
+        for n in range(1, 4):
             with self.subTest(n=n):
                 result = self.run_result(self.result(n), n)
                 self.assertEqual([phase['kind'] for phase in result['phases']], ['surveys', 'quizzes'])

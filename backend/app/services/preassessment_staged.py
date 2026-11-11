@@ -2,6 +2,7 @@
 from copy import deepcopy
 from app.errors import ApiError
 from app.services import survey_store as store
+from app.track_policy import LEGACY_MAX_SKILLS, MAX_SKILLS
 
 
 def generate_for(employee_id, project_id):
@@ -25,12 +26,14 @@ def generate_for(employee_id, project_id):
         else:
             from app.learner_knowledge import from_profile,hr_context
             selection=api.select_from_catalog(ctx,dict(project,learnerKnowledge=from_profile(personal),hrContext=hr_context(personal)))
+        # 저장된 점검을 이어 만들 때는 이전 상한으로 고른 4~5개도 그대로 완료시킨다. 이후 단계는 앞 3개만 쓴다.
+        limit=LEGACY_MAX_SKILLS if same else MAX_SKILLS
         def current(t):
             if api.project_input(t,employee_id,project_id)!=project or api.profile_input(api.profile.view(employee_id) or {})!=personal:
                 raise ApiError(409,'SURVEY_INPUT_CHANGED','생성 중 입력이 변경됐어요. 다시 준비해 주세요.')
         def generate(phase):
             task='역량 테스트 설문 문항 생성' if phase=='surveys' else '역량 테스트 퀴즈 문항 생성'
-            return api.generate_survey(project,selection,personal,api.runtime.model(ctx,'진단 에이전트',task),require_measurement=True,phase=phase)
+            return api.generate_survey(project,selection,personal,api.runtime.model(ctx,'진단 에이전트',task),require_measurement=True,phase=phase,max_skills=limit)
         if not same:
             partial=generate('surveys')
             with api.db.tx() as t:
@@ -51,7 +54,7 @@ def generate_for(employee_id, project_id):
                 combined=deepcopy(value['survey'])
                 quiz_rows={g['skill']:g['quizzes'] for g in quizzes['groups']}
                 for group in combined['groups']:group['quizzes']=quiz_rows[group['skill']]
-                value['survey']=api.generate_survey(project,selection,personal,lambda *_:combined,require_measurement=True)
+                value['survey']=api.generate_survey(project,selection,personal,lambda *_:combined,require_measurement=True,max_skills=limit)
                 value['quizStatus']='ready';store._write(t,employee_id,project_id,value)
                 return store.public_view(value)
         except Exception:

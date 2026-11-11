@@ -10,7 +10,7 @@ from .english_patterns import english_token as _en
 from . import track_policy
 
 PER_SKILL = 20
-MAX_SKILLS = 5
+MAX_SKILLS = track_policy.MAX_SKILLS
 DEFAULT_COUNT = 32
 MAX_COUNT = 40
 

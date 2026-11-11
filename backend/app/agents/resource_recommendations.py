@@ -9,6 +9,7 @@ from typing import Any
 
 from .resource_instructions import COMMON as SYSTEM, instructions
 from app import course_levels
+from app.track_policy import MAX_SKILLS
 
 logger = logging.getLogger(__name__)
 
@@ -202,8 +203,8 @@ def _finalize_crash(result: list[dict], pools: list[dict], selection: dict, proj
 def candidate_pools(project: dict, selection: dict, items: dict[str, dict], limit: int = 6, *, free_only: bool = False,
                     course: dict | None = None, rank_courses: bool = True) -> list[dict]:
     rows = selection.get('skills')
-    if not isinstance(rows, list) or not 1 <= len(rows) <= 5:
-        raise RecommendationError('선정 스킬 1~5개가 필요합니다.')
+    if not isinstance(rows, list) or not 1 <= len(rows) <= MAX_SKILLS:
+        raise RecommendationError(f'선정 스킬 1~{MAX_SKILLS}개가 필요합니다.')
     names = [row.get('name') if isinstance(row, dict) else None for row in rows]
     if any(not isinstance(name, str) or not name.strip() for name in names) or len(set(names)) != len(names):
         raise RecommendationError('선정 스킬 이름을 확인해 주세요.')

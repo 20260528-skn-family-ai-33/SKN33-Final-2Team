@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from copy import deepcopy
 
+from .track_policy import MAX_SKILLS
+
 
 def skill_reference(handoff: dict) -> list[str] | None:
     names, order = handoff.get('skillNames'), handoff.get('skillOrder')
@@ -16,6 +18,33 @@ def skill_reference(handoff: dict) -> list[str] | None:
     if names is None:
         return order
     return list(dict.fromkeys([name for name in order or [] if name in names] + names))
+
+
+def cap_skills(handoff: dict) -> dict:
+    """이전 상한으로 저장된 4~5개 handoff는 사용자 순서의 앞 3개만 모델 입력에 쓴다. 원본은 바꾸지 않는다."""
+    try:
+        order = skill_reference(handoff) or []
+    except ValueError:
+        return handoff  # 형식 오류는 기존 검사 위치에서 같은 오류로 알린다.
+    if len(order) <= MAX_SKILLS:
+        return handoff
+    keep, dropped = order[:MAX_SKILLS], order[MAX_SKILLS:]
+    capped = deepcopy(handoff)
+    for field in ('skillNames', 'skillOrder', 'focus', 'coreSkills'):
+        if isinstance(capped.get(field), list):
+            capped[field] = [name for name in capped[field] if name not in dropped]
+    if isinstance(capped.get('skillDetails'), list):
+        capped['skillDetails'] = [row for row in capped['skillDetails'] if not isinstance(row, dict) or row.get('name') not in dropped]
+    materials = capped.get('skillMaterials') if isinstance(capped.get('skillMaterials'), dict) else {}
+    gone = {rid for name in dropped for rid in [(materials.get(name) or {}).get('course')] + list((materials.get(name) or {}).get('books') or []) if rid}
+    gone -= {rid for name in keep for rid in [(materials.get(name) or {}).get('course')] + list((materials.get(name) or {}).get('books') or []) if rid}
+    for field in ('skillMaterials', 'durationEstimates'):
+        if isinstance(capped.get(field), dict):
+            capped[field] = {name: value for name, value in capped[field].items() if name not in dropped}
+    if isinstance(capped.get('resourceHints'), list):
+        capped['resourceHints'] = [rid for rid in capped['resourceHints'] if rid not in gone]
+    capped['excludedSkills'] = list(dict.fromkeys(list(capped.get('excludedSkills') or []) + dropped))
+    return capped
 
 
 def synchronize_skills(handoff: dict, skills: list[str]) -> None:

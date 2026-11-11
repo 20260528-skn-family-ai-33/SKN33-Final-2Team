@@ -5,7 +5,7 @@ import { invalidateDraft } from '../invalidation';
 import { useDraftWatch } from '../useDraftWatch';
 import { skillInputKey, skillsReady, hasExistingSkillProgress, shouldRecommendSkills } from './skillInput';
 import { loadSkills, summaryStage } from './skillRequest';
-import { reorderSkills } from './skillOrder';
+import { MAX_SKILLS, canIncludeSkill, overSkillLimit, reorderSkills } from './skillOrder';
 import { Icon } from '@/shared/ui/Icon';
 import { Skeleton } from '@/shared/ui/Skeleton';
 import './inputSkills.css';
@@ -40,6 +40,7 @@ export function InputSkills(){
   function save(rows:SelectedSkill[]){updateWs(s=>{s.draft.selectedSkills=rows;s.draft.skillInputKey=current;invalidateDraft(s);});}
   function move(source:string,target:string){if(busy)return;const next=reorderSkills(selected,source,target);if(next!==selected)save(next);}
   const excluded=available.filter(row=>!selected.some(item=>item.name===row.name));
+  const canInclude=canIncludeSkill(selected),over=overSkillLimit(selected);
   return <section className="card input-skills" aria-labelledby="inputSkillsTitle">
     <header className="input-skills-header">
       <div><h2 id="inputSkillsTitle">학습할 스킬과 순서</h2><p className="small muted">목표·프로젝트 요약·내 정보를 바탕으로 자동 제안해요.</p></div>
@@ -66,8 +67,9 @@ export function InputSkills(){
           </div>
         </li>)}
       </ol>
-      {excluded.length>0&&<div className="input-skills-excluded"><span>제외한 스킬</span><div>{excluded.map(row=><button type="button" className="btn line small" key={row.name} disabled={busy} onClick={()=>save([...selected,row])}><Icon name="plus"/>{row.name} 포함</button>)}</div></div>}
-      <p className="input-skills-count-note">목표에 필요한 핵심 스킬을 최대 5개 제안하며, 개수를 채우기 위해 무관한 스킬을 추가하지 않아요.</p>
+      {excluded.length>0&&<div className="input-skills-excluded"><span>제외한 스킬</span><div>{excluded.map(row=><button type="button" className="btn line small" key={row.name} disabled={busy||!canInclude} title={canInclude?undefined:`스킬은 최대 ${MAX_SKILLS}개까지 고를 수 있어요`} onClick={()=>save([...selected,row])}><Icon name="plus"/>{row.name} 포함</button>)}</div></div>}
+      {over>0&&<p className="err small" role="alert">스킬은 최대 {MAX_SKILLS}개까지 고를 수 있어요. {over}개를 제외해 주세요.</p>}
+      <p className="input-skills-count-note">목표에 필요한 핵심 스킬을 최대 {MAX_SKILLS}개 제안하며, 개수를 채우기 위해 무관한 스킬을 추가하지 않아요.</p>
     </>}
     {error&&stage==='ready'&&<p className="err small" role="alert">{error}</p>}
   </section>;

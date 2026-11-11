@@ -51,6 +51,39 @@ class StagedPreparationTests(TestCase):
             api.generate_for(1,'p',staged=True)
             self.assertEqual(calls,['surveys','quizzes'])
 
+    def test_saved_five_skill_survey_can_finish_failed_quizzes(self):
+        """이전 상한(5개)으로 설문까지 저장된 점검은 퀴즈 재시도로 완료할 수 있다."""
+        from functools import partial
+        from app.agents.survey_generation import generate_survey
+        f=fixture.SurveyTests();f.setUp()
+        project={k:v for k,v in f.project.items() if k!='rawText'}
+        project['selectedSkills']=f.selection(5)['skills']
+        memory=SurveyMemory({'goal':project['goal']})
+        @contextmanager
+        def transaction():yield memory
+        surveys=f.result(5)
+        for group in surveys['groups']:group['quizzes']=[]
+        with patch.object(store,'generate_survey',partial(generate_survey,max_skills=5)):
+            saved=store.save_generated(memory,1,'p',project,f.selection(5),f.profile,surveys,phase='surveys')
+        value=deepcopy(memory.raw['v2Survey'])
+        value['quizStatus']='failed';store._write(memory,1,'p',value)
+        calls=[]
+        def model(ctx,system,payload):
+            calls.append(payload['quizzesPerSkill'] and 'quizzes')
+            result=f.result(5)
+            for group in result['groups']:
+                group['surveys']=[]
+                for q in group['quizzes']:q.update(concept=q['q'],questionType='오류 원인 판단',difficulty='적용')
+            return result
+        names=[row['name'] for row in f.selection(5)['skills']]
+        with patch.object(api.db,'tx',side_effect=transaction),patch.object(api,'project_input',return_value=project),patch.object(api.profile,'view',return_value=f.profile),patch.object(api,'profile_input',side_effect=lambda x:x),patch('app.catalog.skill_names',return_value=names),patch.object(api.runtime,'context',return_value=SimpleNamespace(live=True)),patch.object(api.runtime,'llm_json',side_effect=model):
+            final=api.generate_for(1,'p',staged=True)
+        self.assertEqual(calls,['quizzes'])
+        self.assertEqual(final['generationId'],saved['generationId'])
+        self.assertEqual(final['quizStatus'],'ready')
+        self.assertEqual([g['skill'] for g in final['groups']],names)
+        self.assertTrue(all(len(g['quizzes'])==3 for g in final['groups']))
+
     def test_confirm_preparation_queues_and_cached_post_quiz_is_reused(self):
         plan={'assess':{'v2':{'survey':{'groups':[{'skill':'S','quizzes':[{'id':'q'}]}]}}}}
         from app import jobs,db

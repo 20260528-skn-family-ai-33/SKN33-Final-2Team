@@ -1,5 +1,6 @@
 """자료 저장 이후의 검토 초안. 이전 계획의 활동·기간을 재사용하지 않는다."""
 from copy import deepcopy
+from app import track_policy
 from app.agents import roadmap
 from app.services.duration_proposals import resource_schedule, schedule_rows, calculate_durations
 
@@ -44,6 +45,26 @@ def preview(saved,draft):
     return roadmap.build_plan(option,roadmap.params_of(draft['handoff'],option),draft['goal'])
 
 
+def revision_skill_names(report):
+    """포함 스킬 중 사용자 순서의 앞 3개와, 이전 상한(5개)으로 확정돼 이번 수정에서 빠지는 나머지."""
+    order = list(dict.fromkeys((report or {}).get('skillOrder') or []))
+    enabled = [name for name in order if ((report or {}).get('choices', {}).get(name) or {}).get('enabled', True)]
+    return enabled[:track_policy.MAX_SKILLS], enabled[track_policy.MAX_SKILLS:]
+
+
+def _drop_learning_skills(option, dropped):
+    rows = option.get('learningSkills')
+    if not isinstance(rows, list):
+        return
+    option['learningSkills'] = [row for row in rows if not (isinstance(row, dict) and row.get('name') in dropped)]
+    if isinstance(option.get('learningSkillSelection'), list):
+        option['learningSkillSelection'] = [row for row in option['learningSkillSelection']
+                                            if not (isinstance(row, dict) and row.get('name') in dropped)]
+    if 'learningSkillsKey' in option:
+        from app.services.course_skills import recommendation_key
+        option['learningSkillsKey'] = recommendation_key(option)
+
+
 def rebuild_revision(option, plan, handoff):
     """스킬형 계획만 재구성. 불명확한 소속은 실패시켜 기존 계획을 보존한다."""
     from app import llm
@@ -57,13 +78,15 @@ def rebuild_revision(option, plan, handoff):
     old_report = prior.get('learningReport')
     if not isinstance(old_report, dict):
         return option  # 구형 계획의 기존 기간 계산 유지
-    names = list(dict.fromkeys(old_report.get('skillOrder') or []))
-    names = [name for name in names if (old_report.get('choices', {}).get(name) or {}).get('enabled', True)]
+    names, dropped = revision_skill_names(old_report)
     if not names:
         raise llm.LlmError('수정할 계획의 스킬 순서를 확인할 수 없어요.')
+    if dropped and not course_changed:
+        _drop_learning_skills(option, set(dropped))
     old_acts = plan['acts']
     used = set()
     resources = {name: {} for name in names}
+    kept = []
     for activity in option['acts']:
         key = activity.get('key')
         matches = [a for a in old_acts if a['id'] not in used and
@@ -77,6 +100,8 @@ def rebuild_revision(option, plan, handoff):
             activity['key'] = old['id']
             activity['skill'] = old.get('skill')
             used.add(old['id'])
+        if activity.get('skill') in dropped:
+            continue  # 앞 3개 밖 스킬의 활동은 수정본에 넣지 않는다. 진행 기록 행은 지우지 않는다.
         resource = roadmap._res(activity.get('res')) if activity.get('res') else None
         if not activity.get('skill'):
             tags = set((resource or {}).get('skills') or activity.get('skills') or [])
@@ -90,6 +115,8 @@ def rebuild_revision(option, plan, handoff):
                 raise llm.LlmError('스킬별 학습 자료는 강좌 또는 도서여야 합니다.')
             if resource.get('type') in ('course', 'book') and activity['stage'] >= handoff.get('startStage', plan['start']):
                 resources[activity['skill']][resource['id']] = deepcopy(resource)
+        kept.append(activity)
+    option['acts'] = kept
     weekly = (handoff.get('prefs') or {}).get('weeklyHours') or option.get('weeklyHours') or plan['hours']
     rec, choices = [], {}
     for name in names:

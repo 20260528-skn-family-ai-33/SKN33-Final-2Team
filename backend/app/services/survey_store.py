@@ -7,6 +7,7 @@ from uuid import uuid4
 from typing import Any
 
 from app.agents.survey_generation import generate_survey
+from app.track_policy import MAX_SKILLS
 
 KEY = 'v2Survey'
 
@@ -173,6 +174,9 @@ def save_resource_choices(t: Any, employee_id: int, project_id: str, generation_
     validate_skill_order(recommendations, order)
     if (current.get('project') or {}).get('selectedSkills'):
         fixed=[row['name'] for row in current['selection']['skills']]
+        # 이전 상한으로 확정된 4~5개 점검의 새 공통 추천은 앞 3개로만 만들어진다. 저장된 선정 원본은 그대로 둔다.
+        if len(fixed)>MAX_SKILLS and {row['name'] for row in recommendations['skills']}==set(fixed[:MAX_SKILLS]):
+            fixed=fixed[:MAX_SKILLS]
         if list(order)!=fixed or any(not choices[name].get('enabled',True) for name in fixed):
             raise StoreError('스킬과 순서는 앞 단계에서 변경해 주세요.')
     if current.get('resourceChoices')!=choices or current.get('skillOrder')!=list(order):

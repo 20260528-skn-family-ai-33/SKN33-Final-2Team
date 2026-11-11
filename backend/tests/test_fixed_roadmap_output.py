@@ -9,7 +9,7 @@ from app.agents import roadmap, runtime
 
 
 class FixedRoadmapOutputTests(unittest.TestCase):
-    def generate(self, course, *, fixed=True, provider="ollama", request=None, resource=None, cost=0, count=5):
+    def generate(self, course, *, fixed=True, provider="ollama", request=None, resource=None, cost=0, count=3):
         names = ["스킬 A", "스킬 B", "스킬 C", "스킬 D", "스킬 E"][:count]
         handoff = {"skillOrder": names, "selectedSkillsFixed": fixed, "skillDetails": [],
                    "courseSkillSelection": fixed}
@@ -47,7 +47,7 @@ class FixedRoadmapOutputTests(unittest.TestCase):
                 body, option = self.generate(course)
                 fields = body["format"]["properties"]
                 skills = fields["learningSkills"]
-                self.assertEqual((skills["minItems"],skills["maxItems"]), (5,5))
+                self.assertEqual((skills["minItems"],skills["maxItems"]), (3,3))
                 self.assertEqual([row["properties"]["name"]["const"] for row in skills["prefixItems"]],
                                  [row["name"] for row in option["learningSkills"]])
                 for row in skills["prefixItems"]:
@@ -66,7 +66,7 @@ class FixedRoadmapOutputTests(unittest.TestCase):
 
     def test_initial_free_and_challenge_bound_activities_in_prompt_and_schema(self):
         for course in ("A1", "A3"):
-            for count, limit in ((1, 4), (3, 8), (5, 12)):
+            for count, limit in ((1, 4), (2, 6), (3, 8)):
                 with self.subTest(course=course, count=count):
                     body, _ = self.generate(course, count=count)
                     schema = body["format"]
