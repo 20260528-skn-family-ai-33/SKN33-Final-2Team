@@ -1,6 +1,6 @@
 /* 결과 보고서 개요: 스킬별 사전·사후를 레이더로 겹쳐 보여 주는 카드 두 장
    - 사전 = 점선·빈 원, 사후 = 실선·채운 원(색을 못 봐도 구분된다). 값은 축 이름 아래에 글자로도 적는다
-   - 스킬이 3개보다 적으면 레이더가 선이 되므로 그 카드는 그리지 않는다(보고서 전체가 2개 이하면 ReportBody 가 이전 구성을 쓴다)
+   - 스킬이 3개보다 적으면 레이더가 선이 되므로 그 카드는 그리지 않는다(보고서 전체가 2개 이하면 ReportBody 가 이 자리에 요약 띠를 둔다)
    - 본인 보고서에만 오는 근거로 그린다. 근거가 없는 이전 보고서와 부서장 화면에서는 아무것도 그리지 않는다 */
 import type { Report } from '@/api/types/plan';
 import { quizComparison, surveyComparison } from './comparison';
@@ -173,6 +173,13 @@ export function ReportRadars({ r }: { r: Report }) {
             '채점 근거 없음'
           )}
           {quiz.ungraded > 0 ? ` · 채점 근거가 없는 ${quiz.ungraded}문항은 빼고 셌어요` : ''}
+          {/* 요약 띠가 없는 이 화면에서 같은 개념끼리 짝지은 변화를 숫자로 남긴다 */}
+          {quiz.compared > 0 ? (
+            <>
+              <br />
+              새로 맞힘 <b>{quiz.shifts.gained}</b> · 계속 맞힘 <b>{quiz.shifts.kept}</b> · 다시 확인 <b>{quiz.shifts.lost}</b> · 보완 필요 <b>{quiz.shifts.missed}</b>
+            </>
+          ) : null}
         </SkillCard>
       ) : null}
     </div>

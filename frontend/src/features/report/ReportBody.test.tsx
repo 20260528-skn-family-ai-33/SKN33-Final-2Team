@@ -1,4 +1,4 @@
-/* 스킬 수에 따라 보고서 구성이 갈리는지: 3개 이상은 일정·레이더·학습 결과, 2개 이하는 요약 띠를 쓰는 이전 구성 */
+/* 보고서 구성은 같고, 스킬 수에 따라 사전·사후 자리만 갈리는지: 3개 이상은 레이더, 2개 이하는 요약 띠 */
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it } from 'vitest';
 import type { PlanRecord, Report } from '@/api/types/plan';
@@ -21,20 +21,21 @@ it('스킬이 3개 이상이면 일정·레이더·학습 결과 카드로 보�
   expect(html).not.toContain('미완료 활동');
 });
 
-it('스킬이 2개 이하면 요약 띠를 쓰는 이전 구성으로 보여 준다', () => {
+it('스킬이 2개 이하면 도형 자리에만 요약 띠를 두고 나머지 구성은 같다', () => {
   const html = renderToStaticMarkup(<ReportBody r={report(['SQL', 'API'])} R={record} />);
   expect(html).toContain('사전·사후 한눈에 보기');
-  expect(html).toContain('학습 종료 기준 기록');
-  expect(html).toContain('미완료 활동');
-  expect(html).toContain('<h2 class="st">다음 로드맵 제안</h2>');
   expect(html).not.toContain('rpt-radar');
-  expect(html).not.toContain('전체 학습·과제 일정');
-  expect(html).not.toContain('rpt-result');
+  expect(html).toContain('전체 학습·과제 일정');
+  expect(html).toContain('rpt-result');
+  expect(html).not.toContain('미완료 활동');
+  expect(html).not.toContain('<details class="card report-survey learning-check" open');
 });
 
-it('근거가 오지 않는 부서장 화면과 이전 보고서도 이전 구성을 쓴다', () => {
+it('근거가 오지 않는 부서장 화면과 이전 보고서는 실행 기록과 학습 결과 카드만 보여 준다', () => {
   const html = renderToStaticMarkup(<ReportBody r={base as unknown as Report} />);
-  expect(html).toContain('<h2 class="st">잘된 점</h2>');
-  expect(html).not.toContain('rpt-');
+  expect(html).toContain('미완료 활동');
+  expect(html).toContain('rpt-result');
   expect(html).not.toContain('한눈에 보기');
+  expect(html).not.toContain('rpt-radar');
+  expect(html).not.toContain('전체 학습·과제 일정');
 });

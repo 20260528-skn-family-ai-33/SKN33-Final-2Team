@@ -33,6 +33,7 @@ describe('ReportRadars', () => {
     expect(html).toContain('같은 문항 3개 중 높아짐 <b>3</b> · 같음 <b>0</b> · 낮아짐 <b>0</b>');
     expect(html).toContain('<b>1 / 3</b>');
     expect(html).toContain('<b>2 / 3</b>');
+    expect(html).toContain('새로 맞힘 <b>1</b> · 계속 맞힘 <b>1</b> · 다시 확인 <b>0</b> · 보완 필요 <b>1</b>');
     expect(html).toContain('같은 개념의 다른 문제');
     expect(html).toContain('눈금 한 칸 = 1문항');
   });
