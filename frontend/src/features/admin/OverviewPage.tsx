@@ -112,7 +112,7 @@ function GoalsAllBody({ active }: { active: number }) {
         <b>적용 모델</b>
       </p>
       {q.isError ? <FailBox err={q.error} what="모델 설정을 불러오지 못했어요" /> :
-        <p>{!policy ? '모델 설정을 불러오는 중…' : policy === 'employee' ? '직원별 선택 (베타) · 각 직원이 저장한 모델 사용' :
+        <p>{q.data?.policyStatus === 'invalid' ? 'AI 모델 설정을 먼저 복구해 주세요.' : !policy ? '모델 설정을 불러오는 중…' : policy === 'employee' ? '직원별 선택 (베타) · 각 직원이 저장한 모델 사용' :
           `${MODE_LABEL[policy]} · ${q.data!.providers[policy].model} · 추론 ${q.data?.level ? levelLabel(q.data.level) : '기본값'}`}
           {policy === 'openai' && ' · 호출 비용이 발생해요'}</p>}
     </>
@@ -137,13 +137,13 @@ async function goalsAllOk(policy: ProviderPolicy, level: string | null) {
 function GoalsAllFoot() {
   const empty = useAdmin((s) => s.goal.target === 'pick' && !s.goal.picked.length);
   const { data, isError } = useProviderSettings();
-  const unavailable = isError || !data || (data.policy !== 'employee' && !data.providers[data.policy].available);
+  const unavailable = isError || !data?.policy || (data.policy !== 'employee' && !data.providers[data.policy].available);
   return (
     <>
       <button className="btn line" onClick={closeSheet}>
         취소
       </button>
-      <button className="btn pri" disabled={empty || unavailable} title={empty ? '다시 만들 직원을 골라 주세요' : unavailable ? '관리자 AI 모델 설정을 확인해 주세요' : undefined} onClick={() => data && void goalsAllOk(data.policy, data.level)}>
+      <button className="btn pri" disabled={empty || unavailable} title={empty ? '다시 만들 직원을 골라 주세요' : unavailable ? '관리자 AI 모델 설정을 확인해 주세요' : undefined} onClick={() => data?.policy && void goalsAllOk(data.policy, data.level)}>
         다시 만들기
       </button>
     </>

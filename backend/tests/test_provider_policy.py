@@ -58,6 +58,31 @@ class ProviderPolicyTests(unittest.TestCase):
         self.identity.return_value = None
         self.assertEqual(self.save('openai').status_code, 401)
 
+    def test_admin_repairs_invalid_file_without_enabling_inference_or_bulk_work(self):
+        path = Path(self.directory, 'ai-provider')
+        endpoint = '/api/v1/admin/ai-provider'
+        for raw in (b'', b'unknown\n', b'employee\nhigh\n', b'\xff'):
+            with self.subTest(raw=raw):
+                path.write_bytes(raw)
+                self.assertEqual(self.client.get('/api/v1/me').status_code, 200)  # 관리자 로그인 유지
+                state = self.client.get(endpoint).json()
+                self.assertEqual((state['policy'], state['level'], state['policyStatus']), (None, None, 'invalid'))
+                with self.assertRaises(ApiError) as err:
+                    runtime.context(1, {})
+                self.assertEqual((err.exception.status, err.exception.code), (503, 'BAD_PROVIDER_POLICY'))
+                with patch.object(admin.db, 'all_') as employees:
+                    self.assertEqual(self.client.post('/api/v1/admin/goal-suggestions/regenerate-all', json={}).status_code, 503)
+                    employees.assert_not_called()
+                self.assertEqual(self.save('unknown').status_code, 422)
+                self.assertEqual(path.read_bytes(), raw)
+                self.identity.return_value = auth.Account('employee', 1, 'test')
+                self.assertEqual(self.save('openai').status_code, 403)
+                self.identity.return_value = auth.Account('admin', 1, 'test')
+                response = self.client.put(endpoint, json={'policy': 'openai', 'level': 'high'})
+                self.assertEqual(response.json()['policyStatus'], 'active')
+                self.assertEqual(self.save('openai').json()['level'], 'high')  # 이전 클라이언트 호환
+                self.assertEqual(runtime.context(1, {}).reasoning, {'openai': 'high'})
+
     def test_private_key_rotation_and_permissions(self):
         path = '/api/v1/admin/ai-provider/openai/key'
         def info(response):
@@ -158,10 +183,18 @@ class ProviderPolicyTests(unittest.TestCase):
         self.assertEqual(set_level('employee', None).status_code, 200)
 
     def test_post_beta_disables_personal_selection(self):
+        endpoint = '/api/v1/admin/ai-provider'
         self.assertEqual(provider_policy.current(), 'employee')
-        self.save('employee')
-        with patch.object(provider_policy, 'S', replace(self.settings, employee_ai_selection=False)):
-            self.assertEqual(provider_policy.current(), 'ollama')
+        settings = replace(self.settings, employee_ai_selection=False)
+        with patch.object(provider_policy, 'S', settings), patch.object(admin, 'S', settings):
+            for raw in (None, 'employee\n'):
+                with self.subTest(raw=raw):
+                    if raw:
+                        Path(self.directory, 'ai-provider').write_text(raw)
+                    state = self.client.get(endpoint).json()
+                    self.assertEqual((state['policy'], state['policyStatus']), ('ollama', 'default_ollama'))
+                    self.assertFalse(state['employeeSelectionAllowed'])
+            self.assertEqual(self.save('ollama').json()['policyStatus'], 'active')
             self.assertEqual(self.save('employee').status_code, 409)
             self.assertEqual(self.save('openai').status_code, 200)
             self.assertEqual(runtime.context(1, {}).provider, 'openai')

@@ -7,13 +7,15 @@ from .config import S, level_ok
 from .errors import ApiError, unavailable_reason
 
 
-def selection() -> tuple[str, str | None]:
+def _read_selection() -> tuple[str, str | None, str]:
     # 첫 줄은 기존 제공자 파일과 호환된다. 선택한 단계가 있을 때만 둘째 줄을 쓴다.
     path = S.var_dir / 'ai-provider'
     try:
         lines = path.read_text(encoding='utf-8').splitlines()
     except FileNotFoundError:
         lines = ['employee']
+    except UnicodeDecodeError as exc:
+        raise ApiError(503, 'BAD_PROVIDER_POLICY', '저장된 AI 설정을 확인해 주세요') from exc
     if len(lines) not in (1, 2) or lines[0] not in ('employee', 'ollama', 'openai'):
         raise ApiError(503, 'BAD_PROVIDER_POLICY', '저장된 AI 설정을 확인해 주세요')
     mode = lines[0]
@@ -21,10 +23,25 @@ def selection() -> tuple[str, str | None]:
     if level is not None and (mode == 'employee' or not level_ok(level)):
         raise ApiError(503, 'BAD_PROVIDER_POLICY', '저장된 추론 정도를 확인해 주세요')
     if mode == 'employee' and not S.employee_ai_selection:
-        return 'ollama', None
+        return 'ollama', None, 'default_ollama'
     if mode == 'openai' and level not in S.openai_reasoning_levels:
         level = None
+    return mode, level, 'active'
+
+
+def selection() -> tuple[str, str | None]:
+    mode, level, _ = _read_selection()
     return mode, level
+
+
+def admin_selection() -> tuple[str | None, str | None, str]:
+    """실행 경로는 손상된 설정을 거부하되, 관리자는 새 값으로 복구할 수 있다."""
+    try:
+        return _read_selection()
+    except ApiError as exc:
+        if exc.code != 'BAD_PROVIDER_POLICY':
+            raise
+        return None, None, 'invalid'
 
 
 def current() -> str:

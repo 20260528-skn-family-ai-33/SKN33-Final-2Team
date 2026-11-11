@@ -28,18 +28,21 @@ def api_provider_policy(a: Account = Depends(require_admin)):
         providers[p] = {'available': bool(credential.value) if p == 'openai' else bool(S.ollama_url),
                         'model': llm.model_name(p), 'keyConfigured': bool(credential.value),
                         'keySource': credential.source, 'hasDefaultKey': bool(S.openai_key if p == 'openai' else S.ollama_key)}
-    policy, level = provider_policy.selection()
+    policy, level, status = provider_policy.admin_selection()
     providers['openai']['levels'] = list(S.openai_reasoning_levels)
     return {'policy': policy, 'level': level, 'employeeSelectionAllowed': S.employee_ai_selection,
-            'providers': providers}
+            'policyStatus': status, 'providers': providers}
 
 
 @r.put('/ai-provider')
 def api_save_provider(body: dict, a: Account = Depends(require_admin)):
     if 'policy' not in body or set(body) - {'policy', 'level'}:
         raise ApiError(422, 'BAD_PROVIDER', '제공자와 추론 정도를 확인해 주세요')
-    current, level = provider_policy.selection()
-    provider_policy.save(body['policy'], body.get('level', level if current == body['policy'] else None))
+    level = body.get('level')
+    if 'level' not in body:
+        current, previous_level, _ = provider_policy.admin_selection()
+        level = previous_level if current == body['policy'] else None
+    provider_policy.save(body['policy'], level)
     return api_provider_policy(a)
 
 

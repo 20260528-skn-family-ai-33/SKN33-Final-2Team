@@ -81,14 +81,17 @@ export function ProviderSettings() {
     <section className="card">
       <h2 className="st">AI 모델 설정</h2>
       {q.isError && <FailBox err={q.error} what="AI 설정을 불러오지 못했어요" />}
-      {data && selected ? <>
-        <p>현재 적용 · <strong>{label(data.policy)}</strong></p>
-        <label>사용할 모델 <select className="input" value={selected} disabled={save.isPending || check.isPending}
+      {data ? <>
+        {data.policy ? <p>현재 적용 · <strong>{label(data.policy)}</strong></p> :
+          <p role="alert">저장된 모델 설정을 읽을 수 없어요. 사용할 모델을 선택하고 저장해 주세요.</p>}
+        {data.policyStatus === 'default_ollama' && <p className="small muted">직원별 선택이 꺼져 있고 지정된 모델이 없어 Ollama를 사용 중이에요.</p>}
+        <label>사용할 모델 <select className="input" value={selected ?? ''} disabled={save.isPending || check.isPending}
           onChange={(event) => { setSelection(event.target.value as ProviderPolicy); setDraftLevel(undefined); setNotice(''); check.reset(); save.reset(); }}>
+          {!selected && <option value="" disabled>모델을 선택해 주세요</option>}
           {data.employeeSelectionAllowed && <option value="employee">{label('employee')}</option>}
           {(['openai', 'ollama'] as const).map((p) => <option key={p} value={p}>{label(p)} · {data.providers[p].model}</option>)}
         </select></label>
-        {selected !== 'employee' && <>
+        {selected && selected !== 'employee' && <>
           <label>추론 정도 <select className="input" value={level} disabled={save.isPending || check.isPending || (!choices.length && !level)}
             onChange={event => { setDraftLevel(event.target.value); setNotice(''); save.reset(); }}>
             <option value="">서버 기본값</option>
@@ -97,12 +100,12 @@ export function ProviderSettings() {
           </select></label>
           {selected === 'ollama' && <p className="small muted">{!levels ? '연결 확인 후 추론 단계를 선택할 수 있어요. ' : ''}진단·로드맵에 적용되며 규정 에이전트는 추론을 끕니다.</p>}
         </>}
-        {selected !== 'employee' && <ProviderKey key={selected} provider={selected} settings={data.providers[selected]} />}
+        {selected && selected !== 'employee' && <ProviderKey key={selected} provider={selected} settings={data.providers[selected]} />}
         <div className="actions">
-          {selected !== 'employee' && <button className="btn line sm" disabled={save.isPending || check.isPending || !data.providers[selected].available}
+          {selected && selected !== 'employee' && <button className="btn line sm" disabled={save.isPending || check.isPending || !data.providers[selected].available}
             onClick={() => { setNotice(''); check.mutate(selected); }}>{check.isPending ? '확인 중…' : '연결 확인'}</button>}
-          <button className="btn pri sm" disabled={(selected === data.policy && level === savedLevel) || !validLevel || save.isPending || check.isPending || (selected !== 'employee' && !data.providers[selected].available)}
-            onClick={() => { setNotice(''); save.mutate({ policy: selected, level: level || null }); }}>설정 저장</button>
+          <button className="btn pri sm" disabled={!selected || (data.policyStatus !== 'default_ollama' && selected === data.policy && level === savedLevel) || !validLevel || save.isPending || check.isPending || (selected !== 'employee' && !data.providers[selected].available)}
+            onClick={() => { if (selected) { setNotice(''); save.mutate({ policy: selected, level: level || null }); } }}>설정 저장</button>
         </div>
         {save.isError && <FailBox err={save.error} what="AI 설정을 저장하지 못했어요" />}
         {check.isError && <p role="alert">모델 연결에 실패했어요. 서버 주소와 API 키 설정을 확인해 주세요.</p>}

@@ -18,7 +18,8 @@ import type {
 const qs = (o: Record<string, string | number>) => new URLSearchParams(Object.entries(o).map(([k, v]) => [k, String(v)])).toString();
 
 export interface AdminProviderSettings {
-  policy: ProviderPolicy;
+  policy: ProviderPolicy | null;
+  policyStatus: 'active' | 'invalid' | 'default_ollama';
   level: string | null;
   employeeSelectionAllowed: boolean;
   providers: Record<ServerProvider, { model: string; levels?: string[]; available: boolean; keyConfigured: boolean; keySource: 'admin' | 'env' | 'none'; hasDefaultKey: boolean }>;

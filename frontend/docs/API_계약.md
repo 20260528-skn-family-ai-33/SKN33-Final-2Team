@@ -2,6 +2,8 @@
 
 ## 관리자 LLM 선택 (#120)
 
+관리자 설정 응답의 `policyStatus`는 정상 시 `active`, 직원별 선택을 끄고 모델을 지정하지 않아 Ollama가 적용된 경우 `default_ollama`다. 설정 파일 형식이 잘못되면 관리자 조회는 `200`과 `{policy: null, level: null, policyStatus: "invalid", ...}`를 반환해 화면에서 새 설정을 저장할 수 있다. 이때 새 모델 실행과 목표 후보 일괄 재생성은 `503 BAD_PROVIDER_POLICY`로 중단된다.
+
 관리자 데이터 관리 화면은 `GET /api/v1/admin/ai-provider`로 현재 정책, 직원별 선택 허용 여부, 서버에 등록한 모델 이름·키 등록 여부·설정 가능 여부를 조회한다. 저장은 `PUT /api/v1/admin/ai-provider`에 `{"policy":"openai"}`, `{"policy":"ollama"}` 또는 베타의 `{"policy":"employee"}`를 보낸다. 고정 모델을 저장할 때 `level`에 지원하는 추론 단계나 `null`(서버 기본값)을 함께 보낸다. 직원별 선택은 단계를 지정할 수 없다. 직원·부서장으로 관리자 API를 사용하면 403, 환경 설정이 빠진 제공자를 저장하면 409를 반환한다. 기본 키는 서버 .env에서 읽는다. 관리자는 `PUT /admin/ai-provider/{provider}/key`에 `{"key":"새 키"}`를 보내 등록하고, `DELETE`로 해제한다. 응답에는 키 원문 없이 `keySource`(env/admin/none), `hasDefaultKey`, `keyConfigured`가 포함된다. 연결 확인은 기존 `GET /api/v1/ai/status?provider=...`를 쓴다.
 
 관리자가 제공자를 고정하면 직원·부서장에게는 해당 모델을 표시하고 제공자·추론 설정 변경 요청은 409를 반환한다. 직원별 선택으로 돌아가면 저장된 개인 선택을 다시 사용한다. 직원 화면은 로그인·새로고침·창 복귀·모델 정보 열기 때 유효한 정책을 읽는다.

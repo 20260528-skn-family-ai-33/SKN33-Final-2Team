@@ -88,7 +88,7 @@ services:
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8815}:8785"
     volumes:
-      # 관리자가 올린 규정 PDF 는 var/uploads/regulations/ 에 남는다(시스템 관리자가 docker compose cp 로 꺼냄)
+      # 규정 PDF를 공유할 때는 uploads/regulations/만 복사한다. 전체 볼륨에는 관리자 API 키도 있다.
       - uploads:/srv/growpath/var
       - ./team_db/regulations:/srv/growpath/regulation_files:ro
       - ./backend/models:/srv/growpath/models:ro
