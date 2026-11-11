@@ -68,8 +68,7 @@ export function activitiesOutsideSkillCards(plan: PlanContent): Activity[] {
       const activity = plan.acts.find(item => item.skill === name && item.res === resource.id);
       if (activity) shown.add(activity.id);
     }
-    const task = plan.acts.find(item => item.skill === name && !item.res);
-    if (task) shown.add(task.id);
+    for (const task of plan.acts.filter(item => item.skill === name && !item.res)) shown.add(task.id);
   }
   return plan.acts.filter(activity => !shown.has(activity.id));
 }

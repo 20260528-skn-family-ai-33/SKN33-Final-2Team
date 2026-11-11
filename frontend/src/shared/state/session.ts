@@ -2,6 +2,7 @@
    계정은 로그아웃한 뒤 다시 로그인해야만 바뀐다. 부서장 권한·소속 직원은 서버가 부서로 정한다.
    부서장의 소속 직원 목록은 부서장 화면에 들어갈 때 받는다(features/team/teamData.ts · 5차의 로그인 때 미리 받기는 쓰는 곳이 없어 뺌) */
 import { create } from 'zustand';
+import { ApiError } from '@/api/client';
 import { accountApi } from '@/api/endpoints/account';
 import type { Account, DemoAccounts, User } from '@/api/types/account';
 import { ai, applySettings, checkStatus, ping } from './ai';
@@ -10,6 +11,7 @@ import { freshWs, useWs } from './workspace';
 
 interface SessionState {
   booted: boolean;
+  bootError?: boolean;
   account: Account | null;
   demo: DemoAccounts | null;
 }
@@ -57,10 +59,16 @@ async function loadDemoAccounts(): Promise<void> {
 }
 
 export async function boot(): Promise<void> {
-  let acct: Account | null = await accountApi.me().catch(() => null);
+  useSession.setState({ bootError: false });
+  let acct: Account | null;
   try {
+    acct = await accountApi.me();
     await setAccount(acct);
-  } catch {
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.status !== 401) {
+      useSession.setState({ bootError: true });
+      return;
+    }
     acct = null;
     await setAccount(null);
   }

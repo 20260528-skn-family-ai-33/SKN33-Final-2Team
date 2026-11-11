@@ -6,6 +6,7 @@
 """
 from __future__ import annotations
 
+import logging
 import re
 import threading
 import time
@@ -151,6 +152,31 @@ def items(refresh: bool = False) -> dict[str, dict]:
         return _cache['items']
 
 
+def _refresh_search_items() -> None:
+    try:
+        _cache.update(_load(), at=time.time())
+    except Exception:
+        logging.getLogger(__name__).exception('학습 자료 캐시 갱신 실패')
+    finally:
+        _lock.release()
+
+
+def _search_items() -> dict[str, dict]:
+    snapshot = _cache.copy()
+    if not snapshot['at']:
+        return items()
+    if time.time() - snapshot['at'] > TTL_S and _lock.acquire(blocking=False):
+        if _cache['at'] != snapshot['at']:
+            _lock.release()
+        else:
+            try:
+                threading.Thread(target=_refresh_search_items, daemon=True).start()
+            except RuntimeError:
+                _lock.release()
+                logging.getLogger(__name__).exception('학습 자료 갱신 스레드 시작 실패')
+    return snapshot['items']
+
+
 def warmup_roadmap() -> None:
     """서버 시작 시 읽기만 수행해 검색 색인과 고정 토크나이저를 준비한다."""
     catalog_candidates.cached_index(items())
@@ -231,7 +257,7 @@ def search(kind: str = '', q: str = '', stage_min: int = 0, exclude: list | None
     ex = set(exclude or [])
     words = [_word_re(w) for w in re.split(r'\s+', (q or '').strip().lower()) if w]
     out = []
-    for r in items().values():
+    for r in _search_items().values():
         if not r['usable'] or r['id'] in ex or (kind and r['kind'] != kind) or (not include_certs and r['type'] == 'cert'):
             continue
         if stage_min and (r['stage'] or 2) < stage_min:

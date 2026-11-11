@@ -222,7 +222,6 @@ export function OptionsStep() {
   const [summariesOpen, setSummariesOpen] = useState(false);
   const [selecting,setSelecting]=useState(false);
   const [materialsOpen,setMaterialsOpen]=useState(true);
-  const [materialAttempt,setMaterialAttempt]=useState(0);
   const [preparation,reportPreparation]=useReducer(materialPreparation,initialMaterialPreparation);
   const materialPrepared=Object.fromEntries(Object.entries(preparation.courses).map(([course,value])=>[`${course}:${value.version}`,value.status]));
   const generationStatus=useWs(s=>JSON.stringify({unavailable:s.draft.gen?.missing||[],generating:[...Object.entries(s.draft.genRun?.rows||{}).filter(([,row])=>row?.st==='run').map(([course])=>course),...Object.keys(s.draft.gen?.regenRun||{})]}));
@@ -233,7 +232,21 @@ export function OptionsStep() {
       versions:Object.fromEntries(Object.entries(state.draft.gen?.options||{}).map(([key,option])=>[key,materialVersionKey(option)])),
       unavailable:progress.unavailable,regenerating:progress.generating});
   },[generationStatus]);
-  const [materialSkill,setMaterialSkill]=useState('');
+  const materialScope = useWs(s => JSON.stringify([s.owner, s.draftId, s.draft.v2Assessment?.generationId]));
+  const [materialTab, setMaterialTab] = useState<{ scope: string; skill: string } | null>(() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem('growpath:material-tab') ?? 'null');
+      return saved?.scope === materialScope && typeof saved.skill === 'string' ? saved : null;
+    } catch {
+      return null;
+    }
+  });
+  const materialSkill = materialTab?.scope === materialScope ? materialTab.skill : '';
+  function setMaterialSkill(skill: string) {
+    const next = { scope: materialScope, skill };
+    setMaterialTab(next);
+    try { sessionStorage.setItem('growpath:material-tab', JSON.stringify(next)); } catch { /* Current selection is still in memory. */ }
+  }
   const [materialSections,setMaterialSections]=useState({books:true,courses:true});
   const toggleMaterialSection=useCallback((kind:'books'|'courses',open:boolean)=>setMaterialSections(old=>old[kind]===open?old:{...old,[kind]:open}),[]);
   const materialTabsId=useId();
@@ -266,7 +279,7 @@ export function OptionsStep() {
   }
   const go = useGo();
   const d = useWs((s) => s.draft);
-  const comparisonScope=useWs(s=>JSON.stringify([s.owner,s.draftId,s.draft.v2Assessment?.generationId]));
+  const comparisonScope = materialScope;
   const availableVersions=Object.fromEntries(Object.entries(d.gen?.options||{}).map(([course,option])=>[course,materialVersionKey(option)]));
   const status=JSON.parse(generationStatus) as {unavailable:string[];generating:string[]};
   const readyToReveal=canRevealMaterials(preparation.courses,availableVersions,status.unavailable,status.generating);
@@ -286,7 +299,6 @@ export function OptionsStep() {
   if (!g || !d.handoff) return null;
   const ps = optsOf(d);
   const cur = d.chosen;
-  const materialsFailed=ps.some(p=>materialPrepared[`${p.opt}:${materialVersionKey(p.def)}`]==='failed');
   const materialNames=Array.from(new Set((d.selectedSkills || ps.flatMap(plan=>plan.def.learningSkills || [])).map(skill=>skill.name)));
   const activeMaterialSkill=materialNames.includes(materialSkill)?materialSkill:materialNames[0];
   const colCls = (p: PlanContent) => (regenBusy(d, p.opt) ? 'busy' : undefined);
@@ -424,13 +436,13 @@ export function OptionsStep() {
         </div>
         <section id="roadmap-material-comparison" ref={materialPanel} className="roadmap-material-panel full-width-materials" hidden={!materialsOpen} aria-label="스킬별 학습 자료 비교">
           <header className="roadmap-material-header"><div><span>학습 자료</span><h2>스킬별 자료 비교</h2></div><button type="button" className="btn line small" disabled={selecting} onClick={()=>setMaterialsOpen(false)}>접기 <Icon name="x"/></button></header>
-          {!comparisonVisible&&<div className="loading" role="status"><span className="sp" aria-hidden="true"/><span>{materialsFailed?'자료 제안 일부를 준비하지 못했어요. 다시 시도해 주세요.':'세 코스의 자료 제안을 준비하고 있어요. 완료되면 함께 표시합니다.'}</span>{materialsFailed&&<button type="button" className="btn line small" onClick={()=>{reportPreparation({type:'reset',scope:comparisonScope});setMaterialAttempt(n=>n+1);}}>다시 시도</button>}</div>}
-          {!comparisonVisible&&!materialsFailed&&<Skeleton kind="columns" count={ps.length||3}/>}
+          {!comparisonVisible && <div className="loading" role="status"><span className="sp" aria-hidden="true" /><span>코스별 자료 제안을 준비하고 있어요.</span></div>}
+          {!comparisonVisible&&<Skeleton kind="columns" count={ps.length||3}/>}
           <div hidden={!comparisonVisible}>
           <MaterialSkillTabs names={materialNames} active={activeMaterialSkill} onChange={setMaterialSkill} id={materialTabsId} panelId="material-comparison-panel"/>
           <div className="material-course-comparison" role="tabpanel" id="material-comparison-panel" aria-labelledby={`${materialTabsId}-tab-${materialNames.indexOf(activeMaterialSkill)}`}>{ps.map(p=><section className={`material-course-column${cur===p.opt?' is-selected':''}`} key={p.opt} aria-label={`${trackName(p.opt,p.name)} 자료`}>
             <header><h3>{trackName(p.opt,p.name)}</h3>{regenBusy(d,p.opt)?<span role="status"><span className="sp" aria-hidden="true"/> 이 코스의 로드맵을 다시 만드는 중…</span>:materialPrepared[`${p.opt}:${materialVersionKey(p.def)}`]!=='ready'?<span role="status">{materialPrepared[`${p.opt}:${materialVersionKey(p.def)}`]==='failed'?'이 코스의 자료 준비 실패':'이 코스의 자료 준비 중…'}</span>:null}<span hidden={regenBusy(d,p.opt)||materialPrepared[`${p.opt}:${materialVersionKey(p.def)}`]!=='ready'} title={materialSummary(p)}>{materialSummary(p)}</span></header>
-            <ResourceSelection key={`${materialAttempt}:${p.opt}:${p.def.optionId||p.tagline}`} ref={value=>{editors.current[p.opt]=value;}} courseId={p.opt} skillFilter={activeMaterialSkill} sectionOpen={materialSections} onSectionToggle={toggleMaterialSection} locked={regenBusy(d,p.opt)||selecting} onTotals={receiveTotals} onPrepared={receivePrepared} onChoicesChanged={()=>updateWs(state=>invalidateMaterialChoices(state,p.opt))}/>
+            <ResourceSelection key={`${p.opt}:${p.def.optionId||p.tagline}`} ref={value=>{editors.current[p.opt]=value;}} courseId={p.opt} skillFilter={activeMaterialSkill} sectionOpen={materialSections} onSectionToggle={toggleMaterialSection} locked={regenBusy(d,p.opt)||selecting} onTotals={receiveTotals} onPrepared={receivePrepared} onChoicesChanged={()=>updateWs(state=>invalidateMaterialChoices(state,p.opt))}/>
           </section>)}</div>
           </div>
         </section>

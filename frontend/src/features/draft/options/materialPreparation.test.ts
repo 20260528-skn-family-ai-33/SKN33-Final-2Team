@@ -36,9 +36,10 @@ it('a failed material recommendation allows the successful courses after all set
  let state=report(initialMaterialPreparation,'A1','ready');state=report(state,'A2','failed');state=report(state,'A3','ready');
  expect(state.revealed).toBe(true);expect(state.courses.A2.status).toBe('failed');
 });
-it('no successful materials must not be presented as ready',()=>{
+it('all failed courses stay visible during a single-course retry',()=>{
  let state=initialMaterialPreparation;for(const course of Object.keys(versions))state=report(state,course,'failed');
- expect(state.revealed).toBe(false);
+ expect(state.revealed).toBe(true);
+ expect(report(state,'A2','pending').revealed).toBe(true);
 });
 it('새로고침 후에도 한 코스 재생성이 나머지 두 코스 자료를 숨기지 않는다',()=>{
  const partial={A1:{version:'free1',status:'ready' as const},A3:{version:'challenge1',status:'ready' as const}};

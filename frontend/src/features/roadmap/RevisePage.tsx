@@ -362,7 +362,8 @@ function SkillRevisionChoices({ pd, selected, onPick, retrying, onRetry }: {
         const saved = report?.recommendations?.skills.find(item => item.name === skill);
         const activities = plan.acts.filter(activity => activity.skill === skill &&
           !isBookActivity(activity) && !saved?.books.some(book => book.id === activity.res));
-        const disabled = recommended && !activities.length;
+        const loading = recommended && retrying === skill;
+        const disabled = recommended && (loading || !activities.length);
         return <section key={label} className={`card rv-pick-card${recommended ? ' rv-recommendation-new' : ''}`}
           data-selected={selected.includes(skill) === recommended} data-disabled={disabled}
           onClick={event => {
@@ -374,7 +375,7 @@ function SkillRevisionChoices({ pd, selected, onPick, retrying, onRetry }: {
               disabled={disabled} onChange={() => onPick(skill, recommended)} /> {label}
           </label>{recommended && <button type="button" className="btn line sm" disabled={!!retrying}
             onClick={() => onRetry(skill)}>{retrying === skill ? '재요청 중…' : '재요청하기'}</button>}</div>
-          <div className="stack">
+          {loading ? <div role="status" aria-label="새로운 강좌와 산출물 추천 중"><Skeleton kind="cards" count={2} /></div> : <div className="stack">
             <section aria-label="강좌">
               <h4 className="st">강좌</h4>
               <div className="stack">{activities.filter(activity => activity.res).map(activity => {
@@ -395,7 +396,7 @@ function SkillRevisionChoices({ pd, selected, onPick, retrying, onRetry }: {
                 </div>)}
               {!activities.some(activity => !activity.res) && <p className="small muted">표시할 산출물이 없어요.</p>}
             </section>
-          </div>
+          </div>}
         </section>;
       })}
     </div>
@@ -490,7 +491,7 @@ function Revise({ R }: { R: PlanRecord }) {
     out = (
       <div className="agents">
         <AgentRow st="run" name={skillComment || mixed ? '새로운 강좌와 산출물 추천 중' : `${agent} · 수정안 작성`} sub={skillComment || mixed ? undefined : runSub('roadmap', '고른 항목과 요청 내용을 반영하고 있어요')} />
-        <Skeleton kind="rows" />
+        <Skeleton kind="cards" count={2} />
       </div>
     );
   else if (fail)

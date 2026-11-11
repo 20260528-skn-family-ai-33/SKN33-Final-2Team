@@ -5,8 +5,6 @@ import { useRef, useState, type FormEvent } from 'react';
 import { ApiError } from '@/api/client';
 import { accountApi } from '@/api/endpoints/account';
 import type { Account, DemoAccount } from '@/api/types/account';
-import { paths } from '@/app/paths';
-import { useGo } from '@/shared/hooks/useGo';
 import { ai, cause, ping } from '@/shared/state/ai';
 import { me, setAccount, useSession } from '@/shared/state/session';
 import { toast } from '@/shared/state/ui';
@@ -45,7 +43,6 @@ function deptGroups(accts: DemoAccount[]) {
 
 export function LoginPage() {
   const demo = useSession((s) => s.demo);
-  const go = useGo();
   const accts = demo?.accounts || [];
   const [code, setCode] = useState('');
   const [pw, setPw] = useState('');
@@ -85,8 +82,6 @@ export function LoginPage() {
       return setErr(`로그인했지만 기록을 불러오지 못했어요 · ${cause(x).user}`);
     }
     setPw('');
-    // 로그인 첫 화면은 늘 홈이다. 관리자 계정은 직원 홈을 쓸 수 없어 관리자 화면의 첫 화면으로 간다
-    go(acct.accountType === 'admin' ? paths.admin : paths.home, { force: true, replace: true });
     toast(acct.accountType === 'admin' ? `관리자 ${acct.admin.name} 님, 반가워요` : `${acct.user.name} 님, 반가워요`);
     if (me() && ai.live()) void ping();
   };

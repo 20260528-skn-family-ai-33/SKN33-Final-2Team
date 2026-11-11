@@ -228,6 +228,15 @@ class ResourceScheduleTests(TestCase):
         self.assertEqual(reversed_rows['RAG']['totalWeeks'], 7)
         self.assertEqual(rows['RAG']['resources'][0]['hours'], 6.9)
 
+    def test_first_skill_without_course_places_task_in_first_week(self):
+        self.choices['RAG']['course'] = None
+        report = material_plan.report(self.saved, {})
+        option = dict(self.option, learningReport=report, materialSchedule=[],
+                      acts=[{'id': 'task', 'skill': 'RAG', 'stage': 3, 'title': 'Task', 'res': None, 'hours': 2}])
+        plan = roadmap.build_plan(option, {'hours': 6, 'start': 2}, 'Goal')
+        self.assertGreater(plan['weeks'], 1)
+        self.assertEqual((plan['acts'][0]['wFrom'], plan['acts'][0]['wTo']), (1, 1))
+
     def test_task_only_plan_and_zero_material_plan_are_explicit_about_duration_basis(self):
         for row in self.rec['skills']:
             row['courses'] = []

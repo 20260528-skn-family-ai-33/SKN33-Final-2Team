@@ -47,27 +47,40 @@ export function QuizStep() {
   useEffect(() => {
     if (!id || !survey || (survey.quizStatus !== 'pending' && survey.quizStatus !== 'interrupted')) return;
     let active=true;
-    const poll=setInterval(() => {
-      void request(`/api/v2/drafts/${id}/survey`).then(result => {
+    let failures = 0;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = () => {
+      void request(`/api/v2/drafts/${id}/survey`, { signal: AbortSignal.timeout(10000) }).then(async result => {
         if (active && result && result.generationId===survey.generationId && ws().owner===owner && ws().draftId===id && inputSignature(ws().draft)===inputKey)
           {
+            failures = 0;
             if(result.quizStatus==='pending')return;
             if(result.quizStatus==='interrupted' && (recoveries.current[result.generationId]||0)<2){
               recoveries.current[result.generationId]=(recoveries.current[result.generationId]||0)+1;
-              void request(`/api/v2/drafts/${id}/survey`, { method: 'POST' }).catch(() => {});
+              await request(`/api/v2/drafts/${id}/survey`, { method: 'POST', signal: AbortSignal.timeout(10000) });
               return;
             }
-            if(result.quizStatus==='interrupted')result.quizStatus='failed';
-            setLoaded(old => old?.survey?.quizStatus==='ready' ? old : {key:requestKey,survey:result,error:''});
+            const settled = result.quizStatus === 'interrupted' ? { ...result, quizStatus: 'failed' as const } : result;
+            active = false;
+            setLoaded(old => old?.survey?.quizStatus==='ready' ? old : {key:requestKey,survey:settled,error:''});
             const currentPending = pendingAnswers(answerMemoryKey(owner, id, result.generationId, inputKey));
             updateWs(s => {
               const dirty = !result.completed && currentPending && !sameJ(currentPending.answers, result.answers);
-              s.draft.v2Assessment = surveyState(s.draft.v2Assessment, result, !!dirty);
+              s.draft.v2Assessment = surveyState(s.draft.v2Assessment, settled, !!dirty);
             });
           }
-      }).catch(() => {});
-    },1000);
-    return () => {active=false;clearInterval(poll);};
+      }).catch(() => {
+        if (active && ++failures >= 5) {
+          active = false;
+          setLoaded(old => old?.key === requestKey && old.survey
+            ? { ...old, survey: { ...old.survey, quizStatus: 'failed' } } : old);
+        }
+      }).finally(() => {
+        if (active) timer = setTimeout(poll, 1000);
+      });
+    };
+    timer = setTimeout(poll, 1000);
+    return () => { active = false; clearTimeout(timer); };
   },[id,owner,inputKey,requestKey,survey]);
   return <><Stepper cur="quiz" busy={saving} /><Page title={<span style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>역량 테스트
     <button type="button" className="btn line" style={{ fontSize: 12, padding: '5px 10px', minHeight: 0 }} disabled={!survey || survey.completed} onClick={() => surveyRef.current?.randomize()}>test용으로 삭제예정 · 무작위 선택</button>

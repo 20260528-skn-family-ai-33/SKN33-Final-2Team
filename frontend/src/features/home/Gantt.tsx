@@ -280,8 +280,9 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
                       const task = !a.res;
                       const taskWeek = a.wTo || t;
                       const nextCourseWeek = courseStarts.find(week => week > taskWeek) ?? taskWeek + 1;
-                      const taskMarkerStart = off + 7 * taskWeek - 3.5;
-                      const taskMarkerEnd = off + 7 * nextCourseWeek - 3.5;
+                      const withoutCourse = R.plan.def.materialSchedule?.some(slot => slot.skill === name && slot.weeks === 0);
+                      const taskMarkerStart = off + 7 * (taskWeek - 1) + (withoutCourse ? 0 : 3.5);
+                      const taskMarkerEnd = off + 7 * (withoutCourse ? taskWeek : nextCourseWeek - 0.5);
                       const activityFrom = a.wFrom || taskWeek;
                       const activityTo = taskWeek;
                       const done = st(R.progress, a.id) === 'done';
@@ -531,8 +532,8 @@ export function GanttAll({ list, onMove }: { list: PlanRecord[]; onMove?: (id: s
                 </small>
               </button>
               {onMove && list.length > 1 && <>
-                <button type="button" className="btn line sm" aria-label={`${pl.goal} 위로`} disabled={i === 0} onClick={() => onMove(R.id, -1)}>↑</button>
-                <button type="button" className="btn line sm" aria-label={`${pl.goal} 아래로`} disabled={i === list.length - 1} onClick={() => onMove(R.id, 1)}>↓</button>
+                <button type="button" className="gt-move" aria-label={`${pl.goal} 위로`} disabled={i === 0} onClick={() => onMove(R.id, -1)}>↑</button>
+                <button type="button" className="gt-move" aria-label={`${pl.goal} 아래로`} disabled={i === list.length - 1} onClick={() => onMove(R.id, 1)}>↓</button>
               </>}
             </>
           }

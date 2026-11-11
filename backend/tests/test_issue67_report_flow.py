@@ -34,7 +34,7 @@ class Issue67ReportTests(TestCase):
                 stack.enter_context(patch.object(target,name,return_value=value))
             stack.enter_context(patch.object(plans.db,'J',side_effect=lambda x:x))
             transaction=stack.enter_context(patch.object(plans.db,'tx'));transaction.return_value.__enter__.return_value=tx
-            stack.enter_context(patch.object(plans.jobs,'start',side_effect=lambda kind,e,ref,work:work(SimpleNamespace(job_id='j')) and 'j'))
+            stack.enter_context(patch.object(plans.jobs,'start',side_effect=lambda kind,e,ref,work, **kwargs:work(SimpleNamespace(job_id='j')) and 'j'))
             stack.enter_context(patch.object(plans.rt,'llm_json',side_effect=model))
             stack.enter_context(patch.object(plans.rt,'run',side_effect=lambda ctx,name,task,inp,mock,api,**kw:api(None)))
             plans.report_start(1,'p')

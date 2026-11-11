@@ -275,7 +275,7 @@ def save_self(employee_id: int, body: dict) -> None:
         raise ApiError(422, 'DEV_YEARS_RANGE', '개발 경험은 0~50년 사이의 숫자로 적거나 비워 주세요.') from None
     if yrs is not None and not 0 <= yrs <= 50:
         raise ApiError(422, 'DEV_YEARS_RANGE', '개발 경험은 0~50년 사이로 적거나 비워 주세요.')
-    lists = {k: [str(x).strip() for x in body.get(k) or [] if str(x).strip()][:20] for k in LISTS}
+    lists = {k: [str(x).strip() for x in body.get(k) or [] if str(x).strip()][:(36 if k == 'tech' else 20)] for k in LISTS}
     none = body.get('noneConfirmed') or {}
     if len(wd) > 500:
         raise ApiError(422, 'WORK_DESC_LENGTH', '업무 설명은 500자 이내로 적어 주세요.')

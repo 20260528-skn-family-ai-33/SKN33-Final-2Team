@@ -194,20 +194,22 @@ function MgrRepRow({ uid, r, unseen = false }: { uid: string; r: Report; unseen?
 function useMemberGate() {
   const { uid = '' } = useParams();
   const { team, member } = useMemberOf(uid);
-  const gone = !team.isPending && !member;
-  return { uid, member, gone, teamLoading: team.isPending };
+  const gone = team.isSuccess && !member;
+  return { uid, member, gone, teamLoading: team.isPending, team };
 }
 
 export function MemberPlansPage() {
-  const { uid, member: e, gone, teamLoading } = useMemberGate();
+  const { uid, member: e, gone, teamLoading, team } = useMemberGate();
   const q = useMemberState(uid);
+  if (team.isError && !e) return <Page back={paths.team} title="직원 정보를 불러오지 못했어요"><button className="btn line" onClick={() => void team.refetch()}>다시 시도</button></Page>;
   if (gone) return <Navigate to={paths.team} replace />;
   if (teamLoading || !e) return <Loading text="서버에서 불러오는 중…" />;
   if (!q.data) return <Page back={paths.team} eyebrow={who(e)} title={`${e.name} 님의 로드맵`}><MemberLoading q={q} /></Page>;
   const all = Object.values(q.data.plans);
   const act = all.filter((R) => R.status === 'active');
   const past = all.filter((R) => R.status !== 'active');
-  const reps = q.data.reports;
+  const pastIds = new Set(past.map(roadmap => roadmap.id));
+  const reps = q.data.reports.filter(report => !pastIds.has(report.planId));
   const seenNot = q.data.unseen || { plans: [], reports: [] };
   if (!all.length)
     return (
@@ -235,9 +237,15 @@ export function MemberPlansPage() {
             <h2 className="st">지난 로드맵 {past.length}</h2>
           </div>
           <div className="list">
-            {past.map((R) => (
-              <MgrRoadRow key={R.id} uid={uid} R={R} unseen={seenNot.plans.includes(R.id)} />
-            ))}
+            {past.map((R) => {
+              const reports = q.data.reports.filter(report => report.planId === R.id);
+              return <div key={R.id} className="card flat team-past-roadmap">
+                <MgrRoadRow uid={uid} R={R} unseen={seenNot.plans.includes(R.id)} />
+                {reports.length ? <div className="list team-past-reports" aria-label="이 로드맵의 결과 보고서">
+                  {reports.map(report => <MgrRepRow key={report.id} uid={uid} r={report} unseen={seenNot.reports.includes(report.id)} />)}
+                </div> : null}
+              </div>;
+            })}
           </div>
         </div>
       ) : null}
@@ -490,9 +498,10 @@ export function MemberRoadPage() {
   const [openComment, setOpenComment] = useState<{ planId: string; skill: string } | null>(null);
   const [adjustmentPlanId, setAdjustmentPlanId] = useState<string | null>(null);
   const { pid = '' } = useParams();
-  const { uid, member: e, gone, teamLoading } = useMemberGate();
+  const { uid, member: e, gone, teamLoading, team } = useMemberGate();
   const q = useMemberState(uid, !gone && !teamLoading && !!e);
   const key = mk(uid, pid);
+  if (team.isError && !e) return <Page back={paths.team} title="직원 정보를 불러오지 못했어요"><button className="btn line" onClick={() => void team.refetch()}>다시 시도</button></Page>;
   if (gone) return <Navigate to={paths.team} replace />;
   if (teamLoading || !e) return <Loading text="서버에서 불러오는 중…" />;
   if (!q.data) return <Page back={paths.member(uid)} eyebrow={who(e)} title="확정한 로드맵"><MemberLoading q={q} /></Page>;
@@ -590,8 +599,9 @@ export function MemberRoadPage() {
 
 export function MemberReportPage() {
   const { rid = '' } = useParams();
-  const { uid, member: e, gone, teamLoading } = useMemberGate();
+  const { uid, member: e, gone, teamLoading, team } = useMemberGate();
   const q = useMemberState(uid, !gone && !teamLoading && !!e);
+  if (team.isError && !e) return <Page back={paths.team} title="직원 정보를 불러오지 못했어요"><button className="btn line" onClick={() => void team.refetch()}>다시 시도</button></Page>;
   if (gone) return <Navigate to={paths.team} replace />;
   if (teamLoading || !e) return <Loading text="서버에서 불러오는 중…" />;
   if (!q.data) return <Page back={paths.member(uid)} eyebrow={who(e)} title="학습 결과 보고서"><MemberLoading q={q} /></Page>;
@@ -623,7 +633,8 @@ export function MemberReportPage() {
 export function CommentSentPage() {
   const go = useGo();
   const { pid = '' } = useParams();
-  const { uid, member: e, gone } = useMemberGate();
+  const { uid, member: e, gone, team } = useMemberGate();
+  if (team.isError && !e) return <Page back={paths.team} title="직원 정보를 불러오지 못했어요"><button className="btn line" onClick={() => void team.refetch()}>다시 시도</button></Page>;
   if (gone) return <Navigate to={paths.team} replace />;
   if (!e) return <Loading text="서버에서 불러오는 중…" />;
   return (

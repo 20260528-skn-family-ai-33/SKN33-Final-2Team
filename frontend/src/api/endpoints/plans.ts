@@ -25,6 +25,7 @@ export const plansApi = {
     return waitJob<PlanResponse>(job.jobId);
   },
   postDeep: (id: string) => http.post<JobStarted>(`/plans/${enc(id)}/post-assessment/deep`, {}, a),
+  report: (id: string) => http.get<Report>(`/reports/${enc(id)}`),
   reports: (planId?: string) => http.get<Report[]>(`/reports${planId ? `?planId=${enc(planId)}` : ''}`),
   confirmReport: (rid: string) => http.post<{ planStatus: string; planId: string }>(`/reports/${enc(rid)}/confirm`),
 };

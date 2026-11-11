@@ -4,13 +4,13 @@ export type PreparationAction={type:'reset';scope:string}|{type:'report';scope:s
 export const initialMaterialPreparation:MaterialPreparation={scope:'',revealed:false,courses:{}};
 /** Missing/failed roadmap columns must not block usable materials in other columns. */
 export function canRevealMaterials(courses:MaterialPreparation['courses'],versions:Record<string,string>,unavailable:string[],generating:string[]):boolean {
- const ready=(course:string)=>!!versions[course]&&courses[course]?.version===versions[course]&&courses[course]?.status==='ready';
+ const finished=(course:string)=>!!versions[course]&&courses[course]?.version===versions[course]&&['ready','failed'].includes(courses[course]?.status);
  const settled=['A1','A2','A3'].every(course=>{
   if(generating.includes(course))return !!versions[course];
   if(!versions[course])return unavailable.includes(course);
   return courses[course]?.version===versions[course]&&['ready','failed'].includes(courses[course]?.status);
  });
- return settled&&Object.keys(versions).some(ready);
+ return settled&&Object.keys(versions).some(finished);
 }
 /** Once revealed, a comparison stays visible while a single course is replaced. */
 export function materialPreparation(state:MaterialPreparation,action:PreparationAction):MaterialPreparation {

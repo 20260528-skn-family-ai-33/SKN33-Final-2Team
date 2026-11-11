@@ -537,10 +537,17 @@ a.me .me-go { width: 16px; height: 16px; flex: none; color: var(--ink-4); }
 .page-title-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; }
 .page-title-action { flex-shrink: 0; margin-inline-start: auto; }
 .page-title-action .btn { white-space: nowrap; }
+.team-past-roadmap { display: grid; gap: 8px; }
+.team-past-reports { padding-top: 8px; border-top: 1px solid var(--line); }
 .me-page { display: grid; gap: 12px; }
+.me-page > details.card:not([open]) { padding-block: 0; }
+.me-page > details.card:not([open]) > summary { min-height: 52px; margin: 0; }
+.me-page > details.card > summary .st { margin: 0; }
 .me-page .sec-h { align-items: center; }
 .me-page .sec-h .tag { margin-left: auto; }
-.me-page .sec-h .me-ed { margin-left: 4px; }
+.me-page > details.card:has(> .me-edit-actions) { position: relative; }
+.me-page > details.card[open]:has(> .me-edit-actions) > summary { min-height: 34px; padding-inline-end: 84px; }
+.me-edit-actions { position: absolute; inset-block-start: 22px; inset-inline-end: 24px; }
 .me-kv { grid-template-columns: 150px 1fr; }
 .me-kv dd { overflow-wrap: anywhere; }
 .me-list { gap: 2px; }
@@ -659,6 +666,8 @@ a.me .me-go { width: 16px; height: 16px; flex: none; color: var(--ink-4); }
 .gt-r .gt-name { font-size: 13.5px; font-weight: 650; color: var(--ink); }
 .gt-r small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; color: var(--ink-3); }
 .gt-r:hover .gt-name { color: var(--accent-ink); }
+.gt-move { flex: 0 0 24px; width: 24px; height: 24px; padding: 0; border: 1px solid var(--line-2); border-radius: 6px; background: var(--surface); color: var(--ink); font-size: 12px; line-height: 1; }
+.gt-move:disabled { opacity: .4; cursor: default; }
 .gt-bar { position: absolute; top: 50%; transform: translateY(-50%); overflow: hidden; border-radius: 4px; }
 .gt-bar i { display: block; height: 100%; }
 .gt-bar.rm { height: 12px; background: var(--accent-soft2); box-shadow: inset 0 0 0 1px var(--accent-line); }
@@ -716,6 +725,9 @@ a.me .me-go { width: 16px; height: 16px; flex: none; color: var(--ink-4); }
 /* 내 스킬 지도(누적): 점 위에 메달 뱃지(브론즈·실버·골드)를 얹고, 뱃지 스킬에서 이어진 화살표(지나온 길)를 강조한다 */
 .sm-card { --m-bronze: #CD8B52; --m-bronze-dk: #8A4F1D; --m-silver: #C9CED6; --m-silver-dk: #6F7884; --m-gold: #F4C534; --m-gold-dk: #9A6C00; }
 .sm-n .medal .coin { stroke-width: 1.6; }
+#mySmBox .sm-n.cov .dot { stroke: var(--accent); stroke-width: 2.5; }
+#mySmBox .sm-n.cov text:not(.cat) { font-weight: 800; }
+#mySmBox .sm-n .medal.gold .coin { stroke-width: 2.5; }
 .sm-n .medal .rim { fill: none; stroke: rgba(255, 255, 255, .7); stroke-width: 1.1; }
 .sm-n .medal.bronze .coin { fill: var(--m-bronze); stroke: var(--m-bronze-dk); }
 .sm-n .medal.bronze .star { fill: var(--m-bronze-dk); }

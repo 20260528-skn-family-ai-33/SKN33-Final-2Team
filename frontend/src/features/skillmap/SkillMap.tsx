@@ -101,7 +101,7 @@ function Info({ data, picked, cov, owned, onClose }: { data: SkillMapData; picke
   );
 }
 
-function Svg({ data, view, picked, onPick, big }: { data: SkillMapData; view: MapView; picked: number | null; onPick: (id: number) => void; big: boolean }) {
+function Svg({ data, view, picked, onPick, big, zoom }: { data: SkillMapData; view: MapView; picked: number | null; onPick: (id: number) => void; big: boolean; zoom: number }) {
   const m = useMemo(() => layoutOf(data), [data]);
   const tw = useMemo(() => canvasMeasure(), []);
   /* 꼬리표: 노드 오른쪽에 붙으므로 그림 너비에 넣는다 */
@@ -174,7 +174,7 @@ function Svg({ data, view, picked, onPick, big }: { data: SkillMapData; view: Ma
       viewBox={`${(b.x0 - pad).toFixed(1)} ${(b.y0 - pad).toFixed(1)} ${W} ${H}`}
       width={W}
       height={H}
-      style={!big ? { width: '100%', maxWidth: W, height: 'auto' } : { width: W, height: 'auto' }}
+      style={{ width: big ? W * zoom : `${zoom * 100}%`, maxWidth: W * zoom, height: 'auto' }}
       role="img"
       aria-label={view.label}
     >
@@ -218,14 +218,27 @@ function Svg({ data, view, picked, onPick, big }: { data: SkillMapData; view: Ma
 }
 
 /** 스킬 지도 틀: 자료를 불러와 요약·범례·그림·설명·안내를 차례로 놓는다. viewKey 가 바뀌면(다른 로드맵) 누른 스킬은 풀어 둔다 */
-export function MapBox({ id, title, viewKey, build }: { id: string; title: string; viewKey: string; build: (data: SkillMapData, picked: number | null) => MapView }) {
+export function MapBox({ id, title, viewKey, build, wheelZoom = false }: { id: string; title: string; viewKey: string; build: (data: SkillMapData, picked: number | null) => MapView; wheelZoom?: boolean }) {
   const q = useQuery({ queryKey: ['skills-map'], queryFn: catalogApi.skillMap, staleTime: Infinity });
   const [picked, setPicked] = useState<{ key: string; id: number | null }>({ key: viewKey, id: null });
   const [big, setBig] = useState(bigNow());
+  const [zoom, setZoom] = useState(1);
   const wrapRef = useRef<HTMLDivElement>(null);
   const keepScroll = useRef(false);
   const pid = picked.key === viewKey ? picked.id : null;
   const data = q.data;
+
+  useLayoutEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wheelZoom || !wrap) return;
+    const onWheel = (event: WheelEvent) => {
+      if (!event.ctrlKey || !event.deltaY) return;
+      event.preventDefault();
+      setZoom((value) => Math.min(3, Math.max(0.5, value * (event.deltaY < 0 ? 1.1 : 1 / 1.1))));
+    };
+    wrap.addEventListener('wheel', onWheel, { passive: false });
+    return () => wrap.removeEventListener('wheel', onWheel);
+  }, [data, q.error, wheelZoom]);
 
   // 실제 크기로 볼 때(좁은 화면·크게 보기)는 강조한 스킬이 가운데 오게 밀어 둔다
   useLayoutEffect(() => {
@@ -291,6 +304,7 @@ export function MapBox({ id, title, viewKey, build }: { id: string; title: strin
           onClick={() => {
             bigPref = !big;
             setBig(!big);
+            setZoom(1);
           }}
         >
           <Icon name={big ? 'minus' : 'plus'} />
@@ -300,8 +314,8 @@ export function MapBox({ id, title, viewKey, build }: { id: string; title: strin
       <p className="small muted sm-sum">{view.sum}</p>
       <div className="card flat sm-card">
         <div className="sm-key">{view.keys}</div>
-        <div className="sm-wrap" ref={wrapRef}>
-          <Svg data={data} view={view} picked={pid} onPick={pick} big={big} />
+        <div className="sm-wrap" ref={wrapRef} title={wheelZoom ? 'Ctrl + 스크롤로 확대·축소' : undefined}>
+          <Svg data={data} view={view} picked={pid} onPick={pick} big={big} zoom={zoom} />
         </div>
         <div className="sm-info" aria-live="polite">
           <InfoSlot render={view.info} close={() => pid != null && pick(pid)} />

@@ -32,7 +32,7 @@ class ReportSurveyTests(unittest.TestCase):
             stack.enter_context(patch.object(plans.rt,'sim_once',return_value=None))
             stack.enter_context(patch.object(plans.DG,'report',return_value={'good':[],'improve':[],'next':None}))
             stack.enter_context(patch.object(plans.DG,'level_of',return_value={}))
-            stack.enter_context(patch.object(plans.jobs,'start',side_effect=lambda kind,employee,ref,work: work(SimpleNamespace(job_id='j')) or 'j'))
+            stack.enter_context(patch.object(plans.jobs,'start',side_effect=lambda kind,employee,ref,work, **kwargs: work(SimpleNamespace(job_id='j')) or 'j'))
             plans.report_start(1,'p')
         saved = next(call.kwargs['c'] for call in transaction.val.call_args_list if 'c' in call.kwargs)
         evidence = saved['surveyEvidence']

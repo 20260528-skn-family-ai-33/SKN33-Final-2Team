@@ -82,7 +82,8 @@ def start(kind: str, employee_id: int | None, ref: str, fn: Callable[[JobCtx], A
             changed = t.run("UPDATE app_ext.jobs SET status = :s, result = :r, error = :e, updated_at = now() WHERE job_id = :j AND status = 'running'",
                             s=status, r=db.J(result), e=db.J(error), j=jid)
         # 사용자가 멈춘 작업(취소·stopped)은 알리지 않는다
-        if changed and employee_id is not None and not (error or {}).get('stopped'):
+        unchanged_revision = kind == 'revision' and status == 'done' and isinstance(result, dict) and result.get('noChanges') is True
+        if changed and employee_id is not None and not unchanged_revision and not (error or {}).get('stopped'):
             _notify_finished(kind, employee_id, ref, status, descriptor if isinstance(descriptor, dict) else None, jid)
 
     def work() -> None:

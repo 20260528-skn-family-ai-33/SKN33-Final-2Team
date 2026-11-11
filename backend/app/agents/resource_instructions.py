@@ -24,6 +24,7 @@ hrContext는 업무 맥락·예시·필요한 적용 범위의 참고, 직급·�
 
 [자료 진단·출력]
 강좌 빈 추천 또는 짧은 참고 조합보다 긴 강좌 선택 필요 시 해당 스킬에 courseDiagnostic 추가. reason은 no_candidates(제공 강좌 없음), insufficient_evidence(학습 근거 부족), stack_mismatch(명시 기술 불일치), scope_gap(필요 범위 부족), longer_for_coverage(짧은 후보로 충족되지 않는 구체적 내용 때문에 긴 강좌 선택) 중 하나. detail은 확인 근거·부족 학습 내용을 1~240자로 설명. 빈 추천의 나머지 사유는 제공 후보의 근거·명시 기술·범위 부족에 사용.
+추천 강좌가 목표의 핵심 요구를 일부 충족하지만 나머지 적용 범위를 확인할 수 없는 경우, 강좌를 유지하고 courseDiagnostic(reason=scope_gap)에 확인된 차시와 확인되지 않은 요구 범위를 함께 명시. 토큰 상한 같은 실행 제약은 그 자체가 학습 목표로 명시된 경우에만 강좌의 미충족 범위로 판단. 발췌 목차의 누락만으로 강좌 전체에서 해당 내용을 다루지 않는다고 단정 금지. Crash의 longer_for_coverage 조건이 함께 성립하면 해당 사유를 사용하고 남은 범위도 detail에 명시.
 courseDiagnostic 형식: {"reason":"no_candidates|insufficient_evidence|stack_mismatch|scope_gap|longer_for_coverage","detail":"확인 근거·부족한 내용"}
 도서가 빈 추천이면 bookDiagnostic을 추가. 제공 도서가 없을 때만 no_candidates, 제목과 소개로 학습 근거를 확인하기 어려우면 insufficient_evidence, 확인된 내용이 요구 범위와 다르면 scope_gap. 도서는 0권도 유효하다.
 bookDiagnostic 형식: {"reason":"no_candidates|insufficient_evidence|scope_gap","detail":"확인 근거·부족한 내용(1~240자)"}

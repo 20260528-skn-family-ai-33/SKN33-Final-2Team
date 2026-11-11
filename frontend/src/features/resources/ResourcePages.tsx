@@ -127,6 +127,7 @@ export function ResourcesPage() {
       return { ...r, kind, q: term };
     },
     initialPageParam: 0,
+    staleTime: 30_000,
     getNextPageParam: (last, pages) => {
       const n = pages.reduce((s, p) => s + p.items.length, 0);
       return n < last.total ? n : undefined;
@@ -146,7 +147,7 @@ export function ResourcesPage() {
     keep.q = text;
     setQ(text);
     const next = searchTerm(text);
-    if (next !== term) reload(kind, next);
+    if (next !== term) setTerm(next);
   };
   /** Enter·찾기·종류 칩·다시 시도: 지금 입력으로 다시 받는다 */
   const search = (k = kind) => reload(k, searchTerm(q));
@@ -210,27 +211,29 @@ export function ResourcesPage() {
           </button>
         </p>
       ) : null}
-      {shown && !items?.length && !err ? (
-        <p className="muted">{shown.q ? '맞는 자료가 없어요. 다른 검색어나 자료 종류로 찾아 보세요.' : '보여 줄 자료가 없어요.'}</p>
-      ) : null}
-      <div className="list" aria-busy={searching}>
-        {list.map((r) => (
-          <div className="li" style={{ display: 'block' }} key={r.id}>
-            <details className="more">
-              <summary style={{ color: 'var(--ink)', fontSize: 15, display: 'flex', width: '100%', gap: 12, alignItems: 'center' }}>
-                <Thumb r={r} />
-                <span className="grow">
-                  <b>{r.title}</b>
-                  <small className="muted" style={{ display: 'block', fontWeight: 400, fontSize: 13 }}>
-                    {r.kind} · {resourceSource(r)}{r.type === 'course' && ` · ${courseDifficulty(r)}`} · <span title={r.timeNote || undefined}>{resourceTime(r)}</span> · {costText(r)}
-                  </small>
-                </span>
-                {r.platform !== '사내교육' && (r.real ? <span className="tag line">실제 자료</span> : <span className="tag dash">가상</span>)}
-              </summary>
-              <ResKv r={r} />
-            </details>
-          </div>
-        ))}
+      <div style={{ minHeight: "65vh" }} aria-busy={searching}>
+        {shown && !items?.length && !err ? (
+          <p className="muted">{shown.q ? '맞는 자료가 없어요. 다른 검색어나 자료 종류로 찾아 보세요.' : '보여 줄 자료가 없어요.'}</p>
+        ) : null}
+        <div className="list">
+          {list.map((r) => (
+            <div className="li" style={{ display: 'block' }} key={r.id}>
+              <details className="more">
+                <summary style={{ color: 'var(--ink)', fontSize: 15, display: 'flex', width: '100%', gap: 12, alignItems: 'center' }}>
+                  <Thumb r={r} />
+                  <span className="grow">
+                    <b>{r.title}</b>
+                    <small className="muted" style={{ display: 'block', fontWeight: 400, fontSize: 13 }}>
+                      {r.kind} · {resourceSource(r)}{r.type === 'course' && ` · ${courseDifficulty(r)}`} · <span title={r.timeNote || undefined}>{resourceTime(r)}</span> · {costText(r)}
+                    </small>
+                  </span>
+                  {r.platform !== '사내교육' && (r.real ? <span className="tag line">실제 자료</span> : <span className="tag dash">가상</span>)}
+                </summary>
+                <ResKv r={r} />
+              </details>
+            </div>
+          ))}
+        </div>
       </div>
       {res.isFetchingNextPage ? (
         <Loading text="불러오는 중…" />
