@@ -4,6 +4,7 @@ import { courseDifficulty } from '@/shared/lib/courseDifficulty';
 import { materialVersionKey } from './materialVersion';
 import { loadRecommendations, recommendationUrl, requestMaterials as request, type Resource, type Result } from './materialRequests';
 import { MaterialReason } from './MaterialReason';
+import { ResourcePreviewButton } from './ResourcePreview';
 import { OutdatedRecommendations, UnverifiedTargets } from './ResourceNotices';
 import { MaterialSkillTabs } from './MaterialSkillTabs';
 import { AssessmentResults } from './AssessmentResults';
@@ -34,21 +35,21 @@ export function usePrepareMaterials() {
     }
   },[id,generation,optionsKey]);
 }
-function ResourceCard({ resource, kind, checked, disabled, onChange }: { resource: Resource; kind: 'course' | 'book'; checked: boolean; disabled?: boolean; onChange: () => void }) {
+function ResourceCard({ resource, kind, checked, disabled, preload = false, onChange }: { resource: Resource; kind: 'course' | 'book'; checked: boolean; disabled?: boolean; preload?: boolean; onChange: () => void }) {
+  const price = resource.cost == null ? (kind === 'book' ? null : '가격 미확인') : resource.cost === 0 ? '무료' : `${resource.cost.toLocaleString('ko-KR')}원`;
   return <article className={`v2-resource ${checked ? 'v2-resource-selected' : ''}`} role={kind === 'course' ? 'radio' : 'checkbox'} aria-checked={checked} aria-disabled={disabled} aria-label={resource.title} tabIndex={disabled ? -1 : 0}
-    onClick={event => { if (!disabled && !(event.target as HTMLElement).closest('a,input,label')) onChange(); }}
+    onClick={event => { if (!disabled && !(event.target as HTMLElement).closest('a,button,input,label')) onChange(); }}
     onKeyDown={event => { if (event.target === event.currentTarget && !disabled && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onChange(); } }}>
     <ResourceImage className="v2-resource-image" image={resource.image} type={kind} />
     <div className="v2-resource-info"><label className="v2-resource-choice">
       <input type={kind === 'course' ? 'radio' : 'checkbox'} checked={checked} disabled={disabled} onChange={onChange} />
       <span><b title={resource.title}>{resource.title}</b>{resource.aiRecommended && <span className="tag acc">AI 추천</span>}</span>
     </label>
-    <div className="v2-resource-meta"><span>{resource.provider || '출처 미확인'} · {resource.cost == null ? '가격 미확인' : resource.cost === 0 ? '무료' : `${Number(resource.cost).toLocaleString()}원`}</span>
+    <div className="v2-resource-meta"><span>{resource.provider || '출처 미확인'}{price && ` · ${price}`}</span>
     {kind === 'course' && resource.difficulty && <span>{courseDifficulty(resource)}</span>}
     <span>{kind === 'book' ? '일정 산정 제외' : resource.hours && resource.hours > 0 && resource.timeStatus !== 'unknown' ? `${hrs(resource.hours)}${resource.timeStatus === 'estimated' || resource.estimated?.includes('hours') ? ' (추정)' : ''}` : '시간 미확인 · 일정 1주 가정'}</span></div>
     {kind === 'course' && <UnverifiedTargets topics={resource.unverifiedTargetTopics} />}</div>
-    {resource.url && <a className="v2-resource-link" href={resource.url} draggable={false} target="_blank" rel="noreferrer" aria-label={`${resource.title} 바로가기`}>{resource.provider === '사내교육' ? '사내교육 안내 보기' : '바로가기'} ↗</a>}
-    {kind === 'course' && resource.provider === '사내교육' && !resource.url && <a className="v2-resource-link" href={paths.resource(resource.id)} target="_blank" rel="noreferrer">과정 상세 보기</a>}
+    <ResourcePreviewButton resource={resource} kind={kind} preload={preload} />
   </article>;
 
 }
@@ -194,7 +195,7 @@ function ResultSelection({ editorRef, onChoicesChanged, locked = false, courseId
           <MaterialReason kind="도서" diagnostic={skill.bookDiagnostic} hasOptions={skill.books.length > 0}
             fallback={hasLegacyBookCandidates ? '도서 후보는 있지만 이번 추천에서는 선정되지 않았어요.' : '이 스킬에 추천할 도서가 없어요.'} />
           </details><details className="material-kind material-kind-courses" open={sectionOpen?.courses??true} onToggle={event=>{if(sectionOpen&&event.currentTarget.open!==sectionOpen.courses)onSectionToggle?.('courses',event.currentTarget.open);}}><summary><span>강좌</span><small>{selected.course?'1개 선택됨':'1개 선택'}</small><span className="material-kind-chevron" aria-hidden="true">⌄</span></summary>
-          {courses.length > 0 && <div className="v2-resource-grid">{courses.map(resource => <ResourceCard key={resource.id} resource={resource} kind="course" checked={selected.course === resource.id} disabled={locked || busy || excluded} onChange={() => { onChoicesChanged?.(); setChoices(old => ({ ...old, [skill.name]: { ...selected, course: resource.id } })); }} />)}</div>}
+          {courses.length > 0 && <div className="v2-resource-grid">{courses.map(resource => <ResourceCard key={resource.id} resource={resource} kind="course" preload={skill.name === shownSkill && sectionOpen?.courses !== false} checked={selected.course === resource.id} disabled={locked || busy || excluded} onChange={() => { onChoicesChanged?.(); setChoices(old => ({ ...old, [skill.name]: { ...selected, course: resource.id } })); }} />)}</div>}
           <MaterialReason kind="강좌" diagnostic={skill.courseDiagnostic} hasOptions={courses.length > 0} fallback="프로젝트에 맞는 강좌를 찾지 못했어요." />
           </details>
         </section>;
@@ -216,7 +217,7 @@ function ResultSelection({ editorRef, onChoicesChanged, locked = false, courseId
       .v2-resource-choice input{flex-shrink:0;margin-top:3px}.v2-resource-choice b{overflow-wrap:anywhere}
       .v2-resource .tag{font-size:10px;padding:2px 5px;margin-left:5px;white-space:nowrap}
       .v2-resource-info{flex:1;min-width:0}.v2-resource-meta{display:flex;align-items:center;justify-content:flex-start;flex-wrap:wrap;gap:12px;margin-top:6px;font-size:11px;color:var(--muted,#777)}
-      .v2-resource-meta span{min-width:0;overflow-wrap:anywhere}.v2-resource-link{align-self:center;flex-shrink:0;font-size:12px;white-space:nowrap}
+      .v2-resource-meta span{min-width:0;overflow-wrap:anywhere}.v2-resource-link{align-self:center;flex-shrink:0;font:inherit;font-size:12px;white-space:nowrap;color:inherit;border:0;padding:0;background:transparent;cursor:pointer}.v2-resource-link:hover,.v2-resource-link:focus-visible{text-decoration:underline}
       @media(max-width:650px){.v2-resource{gap:10px}.v2-resource-meta{width:100%;justify-content:flex-start}.v2-skills-board>.v2-skill{padding:14px}}
       .course-material-editor .v2-skill h3{font-size:12px;line-height:1.5}
       .course-material-editor .v2-skill h3 .small{font-size:10px}
