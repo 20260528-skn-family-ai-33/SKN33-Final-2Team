@@ -102,10 +102,12 @@ export interface PostDeep {
 export interface PostCheck {
   quizSurvey?: import('@/features/draft/quiz/assessment/flow').Survey | null;
   quizAnswers?: Record<string, string>;
+  submitted?: boolean;
   answers: Record<string, string>;
   goalSelf: string;
   file: { name: string; size?: number; fileId?: string } | null;
   running?: boolean;
+  reportId?: string | null;
   fail?: { cause?: StoredCause } | null;
   jobId?: string | null;
   deep?: PostDeep | null;
@@ -190,7 +192,7 @@ export interface Report {
   /** 본인 보고서의 동일 설문 문항별 사전·사후 응답. 이전 보고서에는 없을 수 있음. */
   surveyEvidence?: { id: string; area: string; skill: string; text: string; pre: string | null; post: string }[];
   executionSnapshot?: { asOf: string; early: boolean; version: number; activities: { id: string; title: string; status: string; task: boolean; file?: { name: string } | null }[] };
-  postQuizDetails?: { id: string; skill: string; question: string; selected: string; correct: string; isCorrect: boolean; explanation: string }[];
+  postQuizDetails?: { id: string; skill: string; question: string; selected: string; correct: string; isCorrect: boolean; explanation: string; options?: string[]; selectedIndex?: number; correctIndex?: number }[];
   quizEvidence?: { concept?: string; skill: string; question: string; pre: string; post: string }[];
   id: string;
   planId: string;

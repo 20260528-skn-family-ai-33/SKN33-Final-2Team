@@ -18,12 +18,26 @@ import { useState } from 'react';
 import type { PlanRecord } from '@/api/types/plan';
 
 
-function recordRank(R: PlanRecord): number {
-  if (R.status === 'active') return 0;
-  if (R.status === 'archived') return 1;
-
-  return isPlanComplete(R.plan, R.progress) ? 3 : 2;
+function isCompletedRecord(R: PlanRecord): boolean {
+  return R.status === 'done' && isPlanComplete(R.plan, R.progress);
 }
+
+function sortByDateOrder(items: PlanRecord[], dateOrder: 'latest' | 'oldest'): PlanRecord[] {
+  return items
+    .map((R, idx) => ({ R, idx }))
+    .sort((a, b) => {
+      const aTime = Date.parse(a.R.createdAt || a.R.plan.confirmedAt || '');
+      const bTime = Date.parse(b.R.createdAt || b.R.plan.confirmedAt || '');
+
+      if (!Number.isFinite(aTime)) return Number.isFinite(bTime) ? 1 : 0;
+      if (!Number.isFinite(bTime)) return -1;
+      if (aTime !== bTime) return dateOrder === 'latest' ? bTime - aTime : aTime - bTime;
+
+      return dateOrder === 'latest' ? b.idx - a.idx : a.idx - b.idx;
+    })
+    .map(({ R }) => R);
+}
+
 export function ChecksPage() {
   const go = useGo();
   const me = useMe();
@@ -34,18 +48,18 @@ export function ChecksPage() {
   const all = recs({ plans });
   const act = recs({ plans }, 'active');
 
-  const sortedRecords = [...all].sort((a, b) => {
-    const statusDiff = recordRank(a) - recordRank(b);
-    if (statusDiff !== 0) return statusDiff;
-
-    const aTime = Date.parse(a.createdAt || a.plan.confirmedAt || '');
-    const bTime = Date.parse(b.createdAt || b.plan.confirmedAt || '');
-
-    if (!Number.isFinite(aTime)) return Number.isFinite(bTime) ? 1 : 0;
-    if (!Number.isFinite(bTime)) return -1;
-
-    return dateOrder === 'latest' ? bTime - aTime : aTime - bTime;
-  });
+  const completedRecords = sortByDateOrder(
+    all.filter((R) => isCompletedRecord(R)),
+    dateOrder,
+  );
+  const incompleteRecords = sortByDateOrder(
+    all.filter((R) => !isCompletedRecord(R)),
+    dateOrder,
+  );
+  const recordSections = [
+    { key: 'completed', title: '완료', items: completedRecords },
+    { key: 'incomplete', title: '미완료', items: incompleteRecords },
+  ].filter(({ items }) => items.length > 0);
   if (!all.length && !reports.length)
     return (
       <Page title="점검·보고서">
@@ -86,150 +100,157 @@ export function ChecksPage() {
         </div>
       ) : null}
       <MySkillMap />
-      <div className="sec">
-        <div className="sec-h">
-          <h2 className="st">기록</h2>
-          <select
-            className="record-sort"
-            aria-label="기록 날짜 정렬"
-            value={dateOrder}
-            onChange={(event) => setDateOrder(event.target.value === 'oldest' ? 'oldest' : 'latest')}
-          >
-            <option value="latest">최신순</option>
-            <option value="oldest">오래된순</option>
-          </select>
-        </div>
-        <div className="check-plan-groups">
-          {sortedRecords.map((R) => {
-            const linkedReports = reports.filter((report) => report.planId === R.id);
-            const hasPostAnswers = Object.values(R.post.answers || {}).some(Boolean);
-            const activity = count(R.plan, R.progress);
-            const complete = isPlanComplete(R.plan, R.progress);
-            const ratio = complete ? 1 : activity.done / (activity.t || 1);
-            const percent = Math.round(ratio * 100);
-            const hue = Math.max(0, Math.min(120, ratio * 120));
-            const statusText = R.status === 'archived'
-              ? '보관'
-              : R.status === 'done'
-                ? complete ? '완료' : '조기 종료'
-                : '진행 중';
-            return (
-              <section className="check-plan-group" key={R.id}>
-                <div className="check-plan-heading">
-                  <h3 className="check-plan-title">
+      {recordSections.map(({ key, title, items }, idx) => (
+        <div className="sec" key={key}>
+          <div className="sec-h">
+            <h2 className="st">
+              {title} {items.length}
+            </h2>
+            {idx === 0 ? (
+              <select
+                className="record-sort"
+                aria-label="기록 날짜 정렬"
+                value={dateOrder}
+                onChange={(event) => setDateOrder(event.target.value === 'oldest' ? 'oldest' : 'latest')}
+              >
+                <option value="latest">최신순</option>
+                <option value="oldest">오래된순</option>
+              </select>
+            ) : null}
+          </div>
+          <div className="check-plan-groups">
+            {items.map((R) => {
+              const linkedReports = reports.filter((report) => report.planId === R.id);
+              const hasPostAnswers = Object.values(R.post.answers || {}).some(Boolean);
+              const activity = count(R.plan, R.progress);
+              const complete = isPlanComplete(R.plan, R.progress);
+              const ratio = complete ? 1 : activity.done / (activity.t || 1);
+              const percent = Math.round(ratio * 100);
+              const hue = Math.max(0, Math.min(120, ratio * 120));
+              const statusText = R.status === 'archived'
+                ? '보관'
+                : R.status === 'done'
+                  ? complete ? '완료' : '조기 종료'
+                  : '진행 중';
+              const statusTone = R.status === 'done' ? (complete ? ' done' : ' early') : '';
+              return (
+                <section className="check-plan-group" key={R.id}>
+                  <div className="check-plan-heading">
+                    <h3 className="check-plan-title">
+                      <button
+                        type="button"
+                        className="check-plan-open"
+                        aria-label={`${R.plan.displayTitle || R.plan.goal} 로드맵 보기`}
+                        onClick={() => go(paths.roadmap(R.id))}
+                      >
+                        {R.plan.displayTitle || R.plan.goal}
+                      </button>
+                    </h3>
+                    <div className="check-plan-progress">
+                      <span
+                        className="check-plan-percent"
+                        style={{ color: `hsl(${hue}, 75%, 30%)` }}
+                        title={`활동 ${activity.done}/${activity.t} 완료`}
+                      >
+                        {percent}%
+                      </span>
+                      <span className={`roadmap-info-badge${statusTone}`}>{statusText}</span>
+                    </div>
+                  </div>
+
+                  <div className="list">
                     <button
                       type="button"
-                      className="check-plan-open"
-                      aria-label={`${R.plan.displayTitle || R.plan.goal} 로드맵 보기`}
-                      onClick={() => go(paths.roadmap(R.id))}
+                      className="li"
+                      onClick={() => openPreAnswers(R.id)}
                     >
-                      {R.plan.displayTitle || R.plan.goal}
-                    </button>
-                  </h3>
-                  <div className="check-plan-progress">
-                    <span
-                      className="check-plan-percent"
-                      style={{ color: `hsl(${hue}, 75%, 30%)` }}
-                      title={`활동 ${activity.done}/${activity.t} 완료`}
-                    >
-                      {percent}%
-                    </span>
-                    <span className="roadmap-info-badge">{statusText}</span>
-                  </div>
-                </div>
-
-                <div className="list">
-                  <button
-                    type="button"
-                    className="li"
-                    onClick={() => openPreAnswers(R.id)}
-                  >
-                    <span className="idx">
-                      <Icon name="file" />
-                    </span>
-                    <div className="tx">
-                      <b>역량 테스트 응답</b>
-                      <small>
-                        {R.createdAt} · {R.plan.assess?.questions.length || 0}문항
-                      </small>
-                    </div>
-                    <span className="end">
-                      <Icon name="right" />
-                    </span>
-                  </button>
-
-                  {!hasPostAnswers ? (
-                    <div className="li">
                       <span className="idx">
                         <Icon name="file" />
                       </span>
-
                       <div className="tx">
-                        <b>사후 점검 전</b>
-                        <small>아직 저장된 사후 점검 응답이 없어요.</small>
-                      </div>
-
-                      {R.status === 'active' ? (
-                        <button
-                          type="button"
-                          className="btn line sm"
-                          onClick={() => postStart(go, R.id)}
-                        >
-                          사후 점검
-                        </button>
-                      ) : null}
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      className="li"
-                      onClick={() => openPostAnswers(R.id)}
-                    >
-                      <span className="idx"><Icon name="file" /></span>
-                      <div className="tx">
-                        <b>사후 점검 응답</b>
+                        <b>역량 테스트 응답</b>
                         <small>
-                          응답 {Object.values(R.post.answers || {}).filter(Boolean).length}
-                          /{R.plan.assess?.questions.length || 0}문항
-                        </small>
-                      </div>
-                      <span className="end"><Icon name="right" /></span>
-                    </button>
-                  )}
-
-                  {linkedReports.map((report) => (
-                    <button
-                      type="button"
-                      className="li"
-                      key={report.id}
-                      onClick={() => go(paths.report(report.id))}
-                    >
-                      <span className="idx">
-                        <Icon name="chart" />
-                      </span>
-                      <div className="tx">
-                        <b>결과 보고서</b>
-                        <small>
-                          {report.createdAt}
+                          {R.createdAt} · {R.plan.assess?.questions.length || 0}문항
                         </small>
                       </div>
                       <span className="end">
                         <Icon name="right" />
                       </span>
                     </button>
-                  ))}
 
-                  {!linkedReports.length ? (
-                    <p className="check-plan-empty">
-                      아직 결과 보고서가 없어요.
-                    </p>
-                  ) : null}
-                </div>
-              </section>
-            );
-          })}
+                    {!hasPostAnswers ? (
+                      <div className="li">
+                        <span className="idx">
+                          <Icon name="file" />
+                        </span>
+
+                        <div className="tx">
+                          <b>사후 점검 전</b>
+                          <small>아직 저장된 사후 점검 응답이 없어요.</small>
+                        </div>
+
+                        {R.status === 'active' ? (
+                          <button
+                            type="button"
+                            className="btn line sm"
+                            onClick={() => postStart(go, R.id)}
+                          >
+                            사후 점검
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="li"
+                        onClick={() => openPostAnswers(R.id)}
+                      >
+                        <span className="idx"><Icon name="file" /></span>
+                        <div className="tx">
+                          <b>사후 점검 응답</b>
+                          <small>
+                            응답 {Object.values(R.post.answers || {}).filter(Boolean).length}
+                            /{R.plan.assess?.questions.length || 0}문항
+                          </small>
+                        </div>
+                        <span className="end"><Icon name="right" /></span>
+                      </button>
+                    )}
+
+                    {linkedReports.map((report) => (
+                      <button
+                        type="button"
+                        className="li"
+                        key={report.id}
+                        onClick={() => go(paths.report(report.id))}
+                      >
+                        <span className="idx">
+                          <Icon name="chart" />
+                        </span>
+                        <div className="tx">
+                          <b>결과 보고서</b>
+                          <small>
+                            {report.createdAt}
+                          </small>
+                        </div>
+                        <span className="end">
+                          <Icon name="right" />
+                        </span>
+                      </button>
+                    ))}
+
+                    {!linkedReports.length ? (
+                      <p className="check-plan-empty">
+                        아직 결과 보고서가 없어요.
+                      </p>
+                    ) : null}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      ))}
     </Page>
   );
 }

@@ -26,7 +26,9 @@ export function NotificationBell() {
   const [open, setOpen] = useState(false);
   // 2단계로 들어간 소속 직원 id. 창을 닫으면 처음 단계로 돌아간다
   const [staffId, setStaffId] = useState<string | null>(null);
+  const [panelStyle, setPanelStyle] = useState<React.CSSProperties>({});
   const boxRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const backRef = useRef<HTMLButtonElement>(null);
   // 2단계에서 돌아올 때 초점을 되돌릴 묶음(직원 id)
   const returnTo = useRef<string | null>(null);
@@ -72,14 +74,48 @@ export function NotificationBell() {
 
   useEffect(() => {
     if (!open) return;
+    const updatePosition = () => {
+      const rect = boxRef.current?.getBoundingClientRect();
+      if (!rect || (!rect.width && !rect.height)) return;
+      if (rect.top >= window.innerHeight / 2) {
+        setPanelStyle({
+          position: 'fixed',
+          top: 'auto',
+          bottom: `${Math.max(12, Math.round(window.innerHeight - rect.top + 8))}px`,
+          left: `${Math.max(12, Math.round(rect.left))}px`,
+          right: 'auto',
+          zIndex: 60,
+        });
+      } else {
+        setPanelStyle({
+          position: 'fixed',
+          top: `${Math.max(12, Math.round(rect.bottom + 8))}px`,
+          bottom: 'auto',
+          right: `${Math.max(12, Math.round(window.innerWidth - rect.right))}px`,
+          left: 'auto',
+          zIndex: 60,
+        });
+      }
+    };
+    updatePosition();
     const closeOutside = (event: PointerEvent) => {
-      if (event.target instanceof Node && !boxRef.current?.contains(event.target)) {
+      if (
+        event.target instanceof Node &&
+        !boxRef.current?.contains(event.target) &&
+        !panelRef.current?.contains(event.target)
+      ) {
         setOpen(false);
         setStaffId(null);
       }
     };
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
     document.addEventListener('pointerdown', closeOutside, true);
-    return () => document.removeEventListener('pointerdown', closeOutside, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+      document.removeEventListener('pointerdown', closeOutside, true);
+    };
   }, [open]);
 
   // 단계를 옮기면 초점도 옮긴다: 들어가면 '뒤로' 버튼, 돌아오면 눌렀던 묶음
@@ -90,7 +126,7 @@ export function NotificationBell() {
     }
     const id = returnTo.current;
     returnTo.current = null;
-    if (id) boxRef.current?.querySelector<HTMLButtonElement>(`[data-staff="${CSS.escape(id)}"]`)?.focus();
+    if (id) panelRef.current?.querySelector<HTMLButtonElement>(`[data-staff="${CSS.escape(id)}"]`)?.focus();
   }, [staffId]);
 
   const close = () => {
@@ -314,38 +350,43 @@ export function NotificationBell() {
         {unread ? <span className="notif-count">{unread > 99 ? '99+' : unread}</span> : null}
       </button>
 
-      {open ? (
-        <div
-          id="notif-panel"
-          className="api-picker-panel notif-panel"
-          role="dialog"
-          aria-label="알림"
-          onKeyDown={(event) => {
-            if (event.key !== 'Escape') return;
-            // 2단계에서는 Esc 가 한 단계 뒤로, 처음 단계에서는 창을 닫는다
-            if (group) back();
-            else close();
-          }}
-        >
-          <div className="notif-h">
-            <b>알림</b>
-            {unread ? (
-              <button type="button" className="link" onClick={() => void readAll()}>
-                모두 읽음
-              </button>
-            ) : null}
-          </div>
-          {q.isError ? (
-            <p className="notif-empty" role="alert">
-              알림을 불러오지 못했어요.{' '}
-              <button type="button" className="link" onClick={() => void q.refetch()}>
-                다시 시도
-              </button>
-            </p>
-          ) : null}
-          {body}
-        </div>
-      ) : null}
+      {open
+        ? createPortal(
+            <div
+              id="notif-panel"
+              ref={panelRef}
+              className="api-picker-panel notif-panel"
+              style={panelStyle}
+              role="dialog"
+              aria-label="알림"
+              onKeyDown={(event) => {
+                if (event.key !== 'Escape') return;
+                // 2단계에서는 Esc 가 한 단계 뒤로, 처음 단계에서는 창을 닫는다
+                if (group) back();
+                else close();
+              }}
+            >
+              <div className="notif-h">
+                <b>알림</b>
+                {unread ? (
+                  <button type="button" className="link" onClick={() => void readAll()}>
+                    모두 읽음
+                  </button>
+                ) : null}
+              </div>
+              {q.isError ? (
+                <p className="notif-empty" role="alert">
+                  알림을 불러오지 못했어요.{' '}
+                  <button type="button" className="link" onClick={() => void q.refetch()}>
+                    다시 시도
+                  </button>
+                </p>
+              ) : null}
+              {body}
+            </div>,
+            document.body,
+          )
+        : null}
       {floatBox}
     </div>
   );

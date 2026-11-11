@@ -64,14 +64,16 @@ function RoadLi({ R }: { R: PlanRecord }) {
   const n = newComments(R).length;
   const detailId = `roadmap-preview-${R.id}`;
 
+  const isDoneComplete = R.status === 'done' && isPlanComplete(pl, R.progress);
   const statusText =
   R.status === 'done'
-    ? isPlanComplete(pl, R.progress) ? '완료' : '조기 종료'
+    ? isDoneComplete ? '완료' : '조기 종료'
     : R.status === 'archived'
       ? '보관'
       : startsLater(R)
         ? `${monthDay(planStart(R))} 시작`
         : '진행 중';
+  const statusTone = R.status === 'done' ? (isDoneComplete ? ' done' : ' early') : '';
 
   const confirmedDate = (R.createdAt || pl.confirmedAt || '').slice(0, 10).replace(/-/g, '.');
 
@@ -94,7 +96,7 @@ function RoadLi({ R }: { R: PlanRecord }) {
                 {confirmedDate || '날짜 미확인'}
               </span>
 
-              <span className="roadmap-info-badge">{statusText}</span>
+              <span className={`roadmap-info-badge${statusTone}`}>{statusText}</span>
             </span>
             <small>
               {trackName(pl.opt, pl.name)} · 활동 {c.done}/{c.t} 완료
@@ -161,11 +163,30 @@ function RoadLi({ R }: { R: PlanRecord }) {
   );
 }
 
+function sortNewestFirst(items: PlanRecord[]): PlanRecord[] {
+  return items
+    .map((R, idx) => ({ R, idx }))
+    .sort((a, b) => {
+      const aTime = Date.parse(a.R.createdAt || a.R.plan.confirmedAt || '');
+      const bTime = Date.parse(b.R.createdAt || b.R.plan.confirmedAt || '');
+      if (!Number.isFinite(aTime)) return Number.isFinite(bTime) ? 1 : b.idx - a.idx;
+      if (!Number.isFinite(bTime)) return -1;
+      if (aTime !== bTime) return bTime - aTime;
+      const aDone = Date.parse(a.R.doneAt || '');
+      const bDone = Date.parse(b.R.doneAt || '');
+      if (Number.isFinite(aDone) && Number.isFinite(bDone) && aDone !== bDone) {
+        return bDone - aDone;
+      }
+      return b.idx - a.idx;
+    })
+    .map(({ R }) => R);
+}
+
 export function RoadmapList() {
   const all = useWs((s) => s.plans);
   const act = recs({ plans: all }, 'active');
   const archived = recs({ plans: all }, 'archived');
-  const completed = recs({ plans: all }, 'done');
+  const completed = sortNewestFirst(recs({ plans: all }, 'done'));
   if (!act.length && !archived.length && !completed.length)
     return (
       <Page title="내 로드맵">

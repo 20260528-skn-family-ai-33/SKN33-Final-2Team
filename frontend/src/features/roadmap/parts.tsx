@@ -135,7 +135,7 @@ export function PlanGate({ make, fallback, needActive, children }: { make: (pid:
   const { pid } = useParams();
   const R = useWs((s) => (pid ? s.plans[pid] : undefined));
   const act = useWs((s) => recs(s, 'active').map((x) => x.id).join(','));
-  if (R && (!needActive || R.status === 'active')) return <>{children(R)}</>;
+  if (R && (!needActive || R.status === 'active' || R.post.running || R.post.reportId)) return <>{children(R)}</>;
   if (R) return <Navigate to={paths.roadmap(R.id)} replace />;
   const ids = act ? act.split(',') : [];
   return <Navigate to={ids.length === 1 ? make(ids[0]) : fallback} replace />;
@@ -229,6 +229,11 @@ export function openPostAnswers(pid: string): void {
 export function postStart(go: ReturnType<typeof useGo>, pid: string): void {
   const R = ws().plans[pid];
   if (!R || R.status !== 'active') return;
+  if (R.post.running) {
+    closeSheet();
+    go(paths.post(R.id));
+    return;
+  }
   if (R.plan.assess?.v2 && !R.post.quizSurvey) void ensurePostQuiz(R.id).catch(() => {});
   const progress = count(R.plan, R.progress);
   const left = progress.t - progress.done;

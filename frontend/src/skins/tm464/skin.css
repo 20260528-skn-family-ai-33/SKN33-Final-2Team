@@ -42,7 +42,7 @@
   }
 
   /* ── 모서리: 템플릿처럼 2px (동그라미여야 하는 점·스피너·체크 표시는 그대로) ── */
-  .brand .logo, .me, .nav a, .seg, .seg button, .demo select, .btn, .btn.sm, .link, .back,
+  .brand .logo, .me, .nav a, .seg, .seg button, .demo, .demo > summary, .demo select, .btn, .btn.sm, .link, .back,
   .bar, .bar i, .choice, .choice .n, .choice .badge, .scale label, .chip, .input, .textarea, .drop, .drop .ico, .file-on,
   .stats, .tag, .callout, .flow span, .list, .li .idx, .bars .track, .bars .track i, .bars .track.dual::before, .bars .track.dual::after,
   .stage, .stage-h .no, .opt, .tblwrap, .diff .d, .agent, .hero, .next, .alert, .mini-seg, .mini-seg label,

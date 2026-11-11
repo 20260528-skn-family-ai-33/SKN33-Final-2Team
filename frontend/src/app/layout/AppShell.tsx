@@ -6,7 +6,7 @@ import { AdminSide } from '@/features/admin/AdminSide';
 import { AssistantHost } from '@/features/assistant/AssistantHost';
 import { DraftNavGuard } from '@/features/draft/stale';
 import { StartModeNavGuard } from '@/features/draft/startModeSheet';
-import { NotificationBell } from '@/features/notifications/NotificationBell';
+import { DemoTools } from '@/features/demo/DemoTools';
 import { canClearHiddenDemoSettings, checkStatus, connFor, PROV, useAi, useAiMode } from '@/shared/state/ai';
 import { boot, isSup, meOf, useSession } from '@/shared/state/session';
 import { SheetHost, ToastHost } from '@/shared/ui/SheetHost';
@@ -158,7 +158,7 @@ export function AppShell() {
     <>
       <header className="ribbon">
         <ModeChip />
-        {booted && acct?.accountType === 'employee' ? <NotificationBell /> : null}
+        {booted && acct?.accountType === 'employee' ? <DemoTools /> : null}
       </header>
       <div className="app">
         <aside className="side" id="side">

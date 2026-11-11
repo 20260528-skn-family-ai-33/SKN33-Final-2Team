@@ -174,7 +174,7 @@ def _item(n: dict) -> dict:
 
 
 def inbox(employee_id: int, limit: int = LIMIT) -> dict:
-    """읽지 않은 알림과 읽은 지 24시간 이내인 알림. 읽지 않은 수는 별도로 센다."""
+    """최근 24시간 이내의 알림. 읽지 않은 수는 별도로 센다."""
     rows = db.all_(f"""SELECT n.notification_id, n.kind, n.audience, n.actor_id, w.name AS actor_name, n.roadmap_id, n.draft_id, n.comment_id, n.task_id,
                               CASE WHEN n.kind IN ('task', 'task_result')  -- 과제는 로드맵에 묶여 있다. 보고서를 다시 만들어도 지금 보고서로 간다
                                    THEN (SELECT g.report_id FROM public.growth_reports g WHERE g.roadmap_id = n.roadmap_id ORDER BY g.created_at DESC LIMIT 1)
@@ -182,9 +182,9 @@ def inbox(employee_id: int, limit: int = LIMIT) -> dict:
                               n.job_kind, n.job_status, n.created_at, n.read_at,
                               coalesce(nullif(r.content->>'displayTitle', ''), r.content->>'goal', p.draft_choices->'draft'->>'goal', p.project_name) AS plan_title,
                               r.content->>'opt' AS track
-                       {_FROM} WHERE n.recipient_id = :e AND (n.read_at IS NULL OR n.read_at > now() - interval '24 hours') AND {_VISIBLE}
+                       {_FROM} WHERE n.recipient_id = :e AND n.created_at > now() - interval '24 hours' AND {_VISIBLE}
                        ORDER BY (n.read_at IS NULL) DESC, n.created_at DESC, n.notification_id LIMIT :n""", e=employee_id, n=limit)
-    unread = db.val(f'SELECT count(*) {_FROM} WHERE n.recipient_id = :e AND n.read_at IS NULL AND {_VISIBLE}', e=employee_id)
+    unread = db.val(f"SELECT count(*) {_FROM} WHERE n.recipient_id = :e AND n.read_at IS NULL AND n.created_at > now() - interval '24 hours' AND {_VISIBLE}", e=employee_id)
     return {'items': [_item(n) for n in rows], 'unread': int(unread or 0)}
 
 

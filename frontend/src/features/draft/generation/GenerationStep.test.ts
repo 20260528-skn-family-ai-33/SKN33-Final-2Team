@@ -14,7 +14,10 @@ it('shows work and personal project history separately from the uploaded proposa
       budgetLimit:null, weeklyHours:null, hoursAuto:true, deadlineWeeks:null },
   };
   const html = renderToStaticMarkup(createElement(HandoffView, { h }));
-  for (const value of ['본인 업무 설명', '현재 업무 설명', '본인 프로젝트 경험', '이전 프로젝트 경험', '기획서 요약', '새 기획서 요약']) {
+  for (const value of ['본인 업무 설명', '현재 업무 설명', '본인 프로젝트 경험', '이전 프로젝트 경험', '기획서 요약', '새 기획서 요약', '기간 제한 없음']) {
     expect(html).toContain(value);
+  }
+  for (const hidden of ['시작 단계', '방식 알아서', '자격증 없음', '자료 후보']) {
+    expect(html).not.toContain(hidden);
   }
 });

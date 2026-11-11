@@ -109,7 +109,7 @@ function Post({ R }: { R: PlanRecord }) {
   const pl = R.plan;
   const [quizError, setQuizError] = useState('');
   const [quizAttempt, setQuizAttempt] = useState(0);
-  const [phase, setPhase] = useState<'surveys' | 'quizzes'>('surveys');
+  const [phase, setPhase] = useState<'surveys' | 'quizzes'>(() => (pl.assess?.v2 && (R.post.running || R.post.reportId) ? 'quizzes' : 'surveys'));
   const hasQuiz = !!pl.assess?.v2;
   const quizPending = !!pl.assess?.v2 && !R.post.quizSurvey;
   useEffect(() => {
@@ -119,7 +119,19 @@ function Post({ R }: { R: PlanRecord }) {
     return () => { active = false; };
   }, [R.id, quizPending, quizAttempt]);
   const running = !!R.post.running;
+  const reportId = R.post.reportId;
+  const submitted = !!R.post.submitted;
+  const locked = running || !!reportId;
+  const quizLocked = locked || submitted;
+  const curPhase = locked && hasQuiz ? 'quizzes' : phase;
   const jobId = R.post.jobId;
+  useEffect(() => () => {
+    if (window.location.pathname !== paths.post(R.id)) {
+      updateWs((s) => {
+        if (s.plans[R.id]?.post.reportId) s.plans[R.id].post.reportId = null;
+      });
+    }
+  }, [R.id]);
   /* 새로 고침·재접속: 쓰던 보고서는 서버 작업을 이어서 기다린다(새 작업을 만들지 않음 · 10/20) */
   useEffect(() => {
     if (running && jobId) void waitReport(go, R.id, jobId);
@@ -170,7 +182,7 @@ function Post({ R }: { R: PlanRecord }) {
   return (
     <Page
       back={paths.checks}
-      title={<span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>사후 점검<button type="button" className="btn line" style={{ height: 26, minHeight: 0, padding: '3px 9px', fontSize: 11 }} disabled={running} onClick={() => {
+      title={<span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>사후 점검<button type="button" className="btn line" style={{ height: 26, minHeight: 0, padding: '3px 9px', fontSize: 11 }} disabled={quizLocked} onClick={() => {
         updateWs(state => {
           fillRandomPost(state.plans[R.id]);
         });
@@ -179,17 +191,33 @@ function Post({ R }: { R: PlanRecord }) {
       }}>test용으로 삭제예정 · 무작위 선택</button></span>}
       lead="설문은 사전과 같은 문항이고, 퀴즈는 같은 스킬·개념의 새 문제예요. 지금 기준으로 답해 주세요. 설문은 1~5점, 퀴즈는 보기 중 하나를 선택해요."
       foot={
-        running ? (
-          <button className="btn pri" disabled>
-            <span className="sp" />
-            진단 에이전트가 보고서를 쓰고 있어요…
-          </button>
-        ) : hasQuiz && phase === 'surveys' ? (
+        reportId ? (
+          <>
+            <button type="button" className="btn line" onClick={() => go(paths.home)}>
+              <Icon name="home" />
+              홈
+            </button>
+            <button type="button" className="btn pri" onClick={() => go(paths.report(reportId))}>
+              보고서 확인하러 가기
+            </button>
+          </>
+        ) : running ? (
+          <>
+            <button type="button" className="btn line" onClick={() => go(paths.home)}>
+              <Icon name="home" />
+              홈
+            </button>
+            <button type="button" className="btn pri" disabled role="status">
+              <span className="sp" aria-hidden="true" />
+              보고서 작성 중
+            </button>
+          </>
+        ) : hasQuiz && curPhase === 'surveys' ? (
           <button type="button" className="btn pri" onClick={() => { setPhase('quizzes'); window.scrollTo(0, 0); }}>다음: 퀴즈<Icon name="right" /></button>
         ) : (
           <>
           {hasQuiz && <button type="button" className="btn line" onClick={() => { setPhase('surveys'); window.scrollTo(0, 0); }}>이전: 설문</button>}
-          <button className="btn pri" disabled={!postValid(R)} onClick={() => void makeReport(go, R.id)}>
+          <button className="btn pri" disabled={!postValid(R)} onClick={() => { window.scrollTo(0, 0); void makeReport(go, R.id); }}>
             사후 점검 제출
           </button>
           </>
@@ -197,21 +225,21 @@ function Post({ R }: { R: PlanRecord }) {
       }
     >
       {hasQuiz && <div className="v2-survey"><nav aria-label="사후 점검 순서">
-        <button type="button" disabled={running} aria-current={phase === 'surveys' ? 'step' : undefined} onClick={() => setPhase('surveys')}>1. 설문</button>
-        <button type="button" disabled={running} aria-current={phase === 'quizzes' ? 'step' : undefined} onClick={() => setPhase('quizzes')}>2. 퀴즈</button>
+        <button type="button" disabled={locked} aria-current={curPhase === 'surveys' ? 'step' : undefined} onClick={() => setPhase('surveys')}>1. 설문</button>
+        <button type="button" disabled={locked} aria-current={curPhase === 'quizzes' ? 'step' : undefined} onClick={() => setPhase('quizzes')}>2. 퀴즈</button>
       </nav></div>}
       {left ? <Note>아직 ‘진행 중’인 활동이 {left}개 있어요. 결과 보고서에는 ‘진행 중’으로 남아요. 답한 내용은 서버에 저장되니 활동을 더 한 뒤 이어서 답해도 돼요.</Note> : null}
-      {phase === 'surveys' && <PostDeepCard R={R} />}
+      {curPhase === 'surveys' && <PostDeepCard R={R} />}
       <div className="stack">
-        {phase === 'surveys' && <QuizBody
+        {curPhase === 'surveys' && <QuizBody
           questions={pl.assess?.questions || []}
           path={`${base}.answers`}
           preMap={pl.assess?.answers}
           dq={deepOpen(dp) && dp?.quiz ? { quiz: dp.quiz, mcq: `${base}.deep.mcq`, essay: `${base}.deep.essay` } : null}
         />}
-        {phase === 'quizzes' && quizPending && <div className="card" role={quizError ? 'alert' : 'status'}>{quizError ? <><p>{quizError}</p><button className="btn line small" onClick={() => { setQuizError(''); setQuizAttempt(value => value + 1); }}>퀴즈 다시 준비하기</button></> : <><p><span className="sp" /> 사후 퀴즈 생성 중… 같은 개념의 새 문제를 준비하고 있어요.</p><Skeleton kind="quiz" /></>}</div>}
-        {phase === 'quizzes' && <PostQuiz R={R} disabled={running} />}
-        {phase === 'surveys' && <>
+        {curPhase === 'quizzes' && quizPending && <div className="card" role={quizError ? 'alert' : 'status'}>{quizError ? <><p>{quizError}</p><button className="btn line small" onClick={() => { setQuizError(''); setQuizAttempt(value => value + 1); }}>퀴즈 다시 준비하기</button></> : <><p><span className="sp" /> 사후 퀴즈 생성 중… 같은 개념의 새 문제를 준비하고 있어요.</p><Skeleton kind="quiz" /></>}</div>}
+        {curPhase === 'quizzes' && <PostQuiz R={R} disabled={quizLocked} review={quizLocked} />}
+        {curPhase === 'surveys' && <>
         <div className="card">
           <h2 className="st">처음 목표를 얼마나 이뤘나요?</h2>
           <div className="chips">

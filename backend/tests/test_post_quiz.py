@@ -45,6 +45,10 @@ class PostQuizTests(unittest.TestCase):
         value=public_assessment(self.plan['assess'])
         self.assertNotIn('answer',value['v2']['survey']['groups'][0]['quizzes'][0])
         self.assertNotIn('concept',value['v2']['survey']['groups'][0]['quizzes'][0])
+        revealed=public_assessment(self.plan['assess'],reveal=True)
+        self.assertEqual(revealed['v2']['survey']['groups'][0]['quizzes'][0]['answer'],0)
+        self.assertEqual(revealed['v2']['survey']['groups'][0]['quizzes'][0]['explain'],'근거')
+        self.assertNotIn('concept',revealed['v2']['survey']['groups'][0]['quizzes'][0])
         self.assertEqual(self.plan['assess']['v2']['survey']['groups'][0]['quizzes'][0]['answer'],0)
     def test_legacy_plan_has_no_required_v2_quiz(self):
         self.assertEqual(validate({'assess':{}},{},True),{})
@@ -58,3 +62,41 @@ class PostQuizTests(unittest.TestCase):
         self.assertEqual(comparison(self.plan,{'q':'1'},result)[0]['post'],'정답')
         row['q']='조인 구문'
         with self.assertRaises(ApiError):generate(self.plan,lambda *_:{'quizzes':[row]})
+
+    def test_post_record_only_reveals_quiz_answers_after_submission_starts_or_completes(self):
+        from unittest.mock import MagicMock, patch
+        from app.services import plans
+        survey = self.plan['assess']['v2']['survey']
+        row_active = {'roadmap_id': 'r1', 'diagnostic_round_id': 1, 'status': 'IN_PROGRESS'}
+        row_done = {'roadmap_id': 'r1', 'diagnostic_round_id': 1, 'status': 'COMPLETED'}
+        with patch.object(plans.db, 'all_', return_value=[]), patch.object(plans.db, 'tx', return_value=MagicMock()), patch.object(plans.db, 'J', side_effect=lambda x: x):
+            with patch.object(plans.db, 'one', return_value={'running': False, 'deep': {'v2Quiz': survey}}):
+                hidden = plans._post(row_active, {'assess': {'questions': []}})
+            with patch.object(plans.db, 'one', return_value={'running': True, 'deep': {'v2Quiz': survey}}):
+                running = plans._post(row_active, {'assess': {'questions': []}})
+            with patch.object(plans.db, 'one', return_value={'running': False, 'deep': {'v2Quiz': survey}}):
+                done = plans._post(row_done, {'assess': {'questions': []}})
+        self.assertNotIn('answer', hidden['quizSurvey']['groups'][0]['quizzes'][0])
+        self.assertNotIn('explain', hidden['quizSurvey']['groups'][0]['quizzes'][0])
+        self.assertEqual(running['quizSurvey']['groups'][0]['quizzes'][0]['answer'], 0)
+        self.assertEqual(running['quizSurvey']['groups'][0]['quizzes'][0]['explain'], '근거')
+        self.assertEqual(done['quizSurvey']['groups'][0]['quizzes'][0]['answer'], 0)
+        self.assertEqual(done['quizSurvey']['groups'][0]['quizzes'][0]['explain'], '근거')
+
+    def test_save_post_rejects_answer_changes_after_submission_even_if_report_failed(self):
+        from unittest.mock import MagicMock, patch
+        from app.services import plans
+        survey = self.plan['assess']['v2']['survey']
+        plan = {'assess': {'questions': [], **self.plan['assess']}}
+        row = {'roadmap_id': 'r1', 'status': 'IN_PROGRESS', 'project_id': 1, 'diagnostic_round_id': 1, 'content': plan}
+        tx = MagicMock()
+        tx.all.return_value = []
+        with patch.object(plans, '_owned', return_value=row), patch.object(plans, 'record', return_value={'post': True}), patch.object(plans.db, 'J', side_effect=lambda x: x), patch.object(plans.db, 'tx') as transaction:
+            transaction.return_value.__enter__.return_value = tx
+            with patch.object(plans.db, 'one', return_value={'running': False, 'deep': {'v2Quiz': survey, 'v2Answers': {'q': '0'}, 'v2Submitted': True}}):
+                with self.assertRaises(ApiError) as err:
+                    plans.save_post(1, 'r1', {'answers': {}, 'quizAnswers': {'q': '1'}, 'goalSelf': '1'})
+                self.assertEqual(err.exception.code, 'POST_LOCKED')
+                self.assertEqual(plans.save_post(1, 'r1', {'answers': {}, 'quizAnswers': {'q': '0'}, 'goalSelf': '1'}), {'post': True})
+                self.assertEqual(plans.save_post(1, 'r1', {'answers': {}, 'goalSelf': '1'}), {'post': True})
+
