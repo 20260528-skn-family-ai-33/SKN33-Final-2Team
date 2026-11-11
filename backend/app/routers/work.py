@@ -358,7 +358,11 @@ def api_reports(planId: str = '', a: Account = Depends(require_employee)):
 
 @r.get('/reports/{report_id}')
 def api_report_one(report_id: str, a: Account = Depends(require_employee)):
-    x = next((x for x in PL.reports(a.id) if x['id'] == report_id), None)
+    try:
+        report_id = str(uuid.UUID(report_id))
+    except ValueError:
+        raise not_found('결과 보고서') from None
+    x = next(iter(PL.reports(a.id, report_id=report_id)), None)
     if not x:
         raise not_found('결과 보고서')
     return x

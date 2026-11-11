@@ -33,6 +33,13 @@ const r = (path: string, element: React.ReactNode, handle: ScreenHandle): RouteO
 export const router = createBrowserRouter([
   {
     element: <AppShell />,
+    errorElement: <main role="alert" className="card">
+      <h1>화면을 불러오지 못했어요</h1>
+      <div className="actions">
+        <button type="button" className="btn pri" onClick={() => window.location.reload()}>다시 시도</button>
+        <a className="btn line" href={paths.home}>홈으로</a>
+      </div>
+    </main>,
     children: [
       r(paths.login, <LoginPage />, { title: '로그인', role: 'public' }),
       r(paths.home, <HomePage />, { nav: 'home', title: '홈', width: 'wide' }),

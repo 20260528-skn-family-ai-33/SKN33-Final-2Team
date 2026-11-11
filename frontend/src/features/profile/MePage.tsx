@@ -2,6 +2,8 @@
    인사 정보·권한(부서·부서장)은 읽기 전용(관리자 화면의 인적 데이터 엑셀로 바뀜), 본인 입력 프로필과 평정의 목표 추천 활용 동의는 직접 고친다.
    고친 값은 서버에 저장하고, 저장하면 서버가 목표 후보를 새 값으로 다시 만든다(FR-05) */
 import { Fragment, useState, type ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { catalogApi } from '@/api/endpoints/catalog';
 import { accountApi } from '@/api/endpoints/account';
 import type { User } from '@/api/types/account';
 import { newIdToPath, paths } from '@/app/paths';
@@ -9,10 +11,8 @@ import { dropGoals } from '@/features/draft/goal/goalStore';
 import { MySkillMap } from '@/features/skillmap/MySkillMap';
 import { useGo } from '@/shared/hooks/useGo';
 import { failToast } from '@/shared/lib/fail';
-import { regApplies, regGroups, regSet } from '@/shared/lib/reg';
 import { cause } from '@/shared/state/ai';
 import { setAt, useAt } from '@/shared/state/bind';
-import { useCatalog } from '@/shared/state/catalog';
 import { isSup, me as meNow, setMeView, useMe } from '@/shared/state/session';
 import { closeSheet, openSheet, toast } from '@/shared/state/ui';
 import { updateWs, useWs } from '@/shared/state/workspace';
@@ -34,19 +34,15 @@ const lines = (t: unknown) =>
     .split('\n')
     .map((x) => x.trim())
     .filter(Boolean)
-    .slice(0, 20);
+    .slice(0, 36);
 const profileEnough = (e: User | null) => !!(e && ((e.profile && (e.profile.workDesc || e.profile.expSummary)) || (e.tech || []).length || (e.projects || []).length));
 
 function HrCard({ e }: { e: User }) {
   return (
-    <div className="card">
-      <div className="sec-h">
+    <details className="card handoff">
+      <summary className="sec-h"><Icon name="right" />
         <h2 className="st">인사 정보</h2>
-        <span className="tag line">
-          <Icon name="lock" />
-          팀 DB · 읽기 전용
-        </span>
-      </div>
+      </summary>
       <dl className="kv me-kv">
         <dt>이름</dt>
         <dd>{e.name}</dd>
@@ -100,7 +96,7 @@ function HrCard({ e }: { e: User }) {
         <dd>{e.validFrom ? `${e.validFrom}부터${e.changeReason ? ` · ${e.changeReason}` : ''}` : <None />}</dd>
       </dl>
       <p className="small muted me-foot">인사 정보는 직접 고칠 수 없어요. 다르면 인사 담당 부서(인재경영실)에 정정을 요청해 주세요. 담당자가 관리자 화면의 인적 데이터로 고쳐요.</p>
-    </div>
+    </details>
   );
 }
 
@@ -110,14 +106,10 @@ function PermCard({ e }: { e: User }) {
   const ms = e.members || [];
   const my = e.mySupervisor;
   return (
-    <div className="card">
-      <div className="sec-h">
+    <details className="card handoff">
+      <summary className="sec-h"><Icon name="right" />
         <h2 className="st">권한·공개 범위</h2>
-        <span className="tag line">
-          <Icon name="lock" />
-          부서 · 관리자가 정함
-        </span>
-      </div>
+      </summary>
       <dl className="kv me-kv">
         <dt>서비스 역할</dt>
         <dd>
@@ -163,13 +155,12 @@ function PermCard({ e }: { e: User }) {
           화면에 보이지 않아요.
         </p>
       ) : null}
-    </div>
+    </details>
   );
 }
 
 function ListView({ e, k }: { e: User; k: (typeof LISTS)[number][0] }) {
   const items = e[k] || [];
-  const st = e.profile && e.profile.inputStatus ? e.profile.inputStatus[k] : null;
   if (items.length)
     return (
       <ul className="plain-list me-list">
@@ -178,130 +169,112 @@ function ListView({ e, k }: { e: User; k: (typeof LISTS)[number][0] }) {
         ))}
       </ul>
     );
-  return <span className="muted">{st === 'none_confirmed' ? '없음(확인함)' : '입력 안 함'}</span>;
+  return <span className="muted">없음</span>;
 }
 
 function SelfView({ e }: { e: User }) {
   const p = e.profile || {};
   return <>
     {e.profile ? null : <Note>본인 입력 프로필이 아직 없어요. ‘수정’을 눌러 업무 설명이나 프로젝트 경험을 채우면 내 업무에 맞는 목표 후보를 받을 수 있어요.</Note>}
-    <h3 style={{ fontSize: 14, margin: '0 0 8px' }}>권장</h3>
-    <p className="small muted">업무와 프로젝트를 적으면 목표·학습 추천에 도움이 돼요.</p>
-    <dl className="kv me-kv"><dt>업무 설명</dt><dd><Val v={p.workDesc} /></dd><dt>프로젝트</dt><dd><ListView e={e} k="projects" /></dd></dl>
+    <h3 style={{ fontSize: 14, margin: '0 0 8px' }}>권장 <span className="small muted" style={{ fontWeight: 400 }}>업무와 프로젝트를 적으면 목표·학습 추천에 도움이 돼요.</span></h3>
+    <dl className="kv me-kv"><dt>업무 설명</dt><dd><Val v={p.workDesc} /></dd></dl>
     <h3 style={{ fontSize: 14, margin: '20px 0 8px' }}>선택 사항</h3>
     <dl className="kv me-kv"><dt>경험 요약</dt><dd><Val v={p.expSummary} /></dd><dt>개발 경험</dt><dd>{p.devYears == null ? <None /> : `${p.devYears}년`}</dd>
-      {LISTS.filter(([key]) => key !== 'projects').map(([k, label]) => <Fragment key={k}><dt>{label}</dt><dd><ListView e={e} k={k} /></dd></Fragment>)}
+      {LISTS.filter(([key]) => key !== 'projects').map(([k, label]) => <Fragment key={k}><dt>{label}</dt><dd>{k === 'certs' ? (
+        <details className="handoff">
+          <summary>보유 자격증 {e.certs?.length || 0}개</summary>
+          <ListView e={e} k={k} />
+        </details>
+      ) : <ListView e={e} k={k} />}</dd></Fragment>)}
     </dl>
   </>;
 }
 
 function SelfForm({ err }: { err: string }) {
   const ed = useAt<Record<string, unknown>>('meEdit') || {};
-  const renderListField = ([k, l, ph]: (typeof LISTS)[number]) => (
-<div className="field" key={k}>
-          <label>
-            {l} <span className="muted small">{k === 'projects' ? '권장' : '선택'} · 한 줄에 하나씩</span>
-          </label>
-          <BText path={`meEdit.${k}`} className="textarea sm" maxLength={800} rows={3} ariaLabel={l} placeholder={ph} />
-          <label className="check sm">
-            <input type="checkbox" checked={!!ed[k + 'None']} onChange={(e) => setAt(`meEdit.${k}None`, e.target.checked)} />
-            없어요 (없음을 확인함)
-          </label>
-        </div>
+  const skills = useQuery({ queryKey: ['skills-map'], queryFn: catalogApi.skillMap, staleTime: Infinity });
+  const selected = lines(ed.tech);
+  const [certificateInput, setCertificateInput] = useState('');
+  const certificates = lines(ed.certs);
+  const certificate = certificateInput.trim();
+  const canAddCertificate = !!certificate && !certificates.includes(certificate) && certificates.length < 20;
+  const [showAllSkills, setShowAllSkills] = useState(false);
+  const catalogSkills = skills.data?.skills.map(skill => skill.name) || [];
+  const skillNames = [...new Set([...catalogSkills, ...selected])];
+  const visibleSkills = showAllSkills ? skillNames : skillNames.slice(0, 5);
+  const renderListField = ([k, label, placeholder]: (typeof LISTS)[number]) => (
+    <div className="field" key={k}>
+      <label>{label}</label>
+      <BText path={`meEdit.${k}`} className="textarea sm" maxLength={800} rows={3} ariaLabel={label} placeholder={placeholder} />
+    </div>
   );
   return (
     <div className="me-form">
-      <h3 style={{ fontSize: 14, margin: '0 0 8px' }}>권장</h3>
-      <p className="small muted">업무와 프로젝트를 적으면 목표·학습 추천에 도움이 돼요.</p>
       <div className="field">
-        <label>
-          업무 설명 <span className="muted small">권장 · 지금 하는 일과 AI로 줄이고 싶은 일</span>
-        </label>
-        <BText
-          path="meEdit.workDesc"
-          className="textarea sm"
-          maxLength={500}
-          rows={3}
-          ariaLabel="업무 설명"
-          placeholder="예: 사내 업무 시스템의 조회 기능을 유지보수해요. 규정 문서에서 근거를 찾는 데 시간이 오래 걸려요."
-        />
-      </div>
-      {renderListField(LISTS.find(([key]) => key === 'projects')!)}
-      <h3 style={{ fontSize: 14, margin: '20px 0 8px' }}>선택 사항</h3>
-      <div className="field">
-        <label>
-          경험 요약 <span className="muted small">선택</span>
-        </label>
-        <BText path="meEdit.expSummary" className="textarea sm" maxLength={500} rows={3} ariaLabel="경험 요약" placeholder="예: 백엔드 개발 경험은 있지만 RAG는 직접 구현해 본 적이 없어요." />
+        <label>업무 설명</label>
+        <BText path="meEdit.workDesc" className="textarea sm" maxLength={500} rows={3} ariaLabel="업무 설명" />
       </div>
       <div className="field">
-        <label>
-          개발 경험 <span className="muted small">선택 · 0.5년 단위</span>
-        </label>
+        <label>경험 요약</label>
+        <BText path="meEdit.expSummary" className="textarea sm" maxLength={500} rows={3} ariaLabel="경험 요약" />
+      </div>
+      <div className="field">
+        <label>개발 경험</label>
         <div className="unit">
           <BNum path="meEdit.devYears" min={0} max={50} step={0.5} placeholder="예: 1.5" ariaLabel="개발 경험 연수" />
           <span>년</span>
         </div>
       </div>
-      {LISTS.filter(([key]) => key !== 'projects').map(renderListField)}
-      <p className="err" id="meErr" role="alert" hidden={!err}>
-        {err}
-      </p>
-    </div>
-  );
-}
-
-function EvalCard({ e }: { e: User }) {
-  const ev = e.evals || [];
-  const consent = async (period: string, on: boolean) => {
-    try {
-      await accountApi.consent(period, on);
-      setMeView({ ...e, evals: ev.map((v) => (v.period === period ? { ...v, consent: on } : v)) });
-      dropGoals();
-      toast(on ? '이 평정을 목표 추천에 활용하도록 동의했어요' : '이 평정은 목표 추천에 쓰지 않아요');
-    } catch (x) {
-      failToast(x, '동의를 저장하지 못했어요');
-    }
-  };
-  return (
-    <div className="card">
-      <div className="sec-h">
-        <h2 className="st">근무성적평정</h2>
-        <span className="tag line">본인 입력 평가</span>
-      </div>
-      {ev.length ? (
-        <div className="list me-evals">
-          {ev.map((v) => (
-            <div className="li" key={v.period}>
-              <div className="tx">
-                <b>
-                  {v.period} · {v.grade}
-                  {v.score ? ` · ${v.score}` : ''}
-                </b>
-                <small>{v.title}</small>
-              </div>
-              <label className="check sm">
-                <input type="checkbox" checked={v.consent} onChange={(x) => void consent(v.period, x.target.checked)} />
-                목표 추천 활용 동의
-              </label>
-            </div>
+      <div className="field">
+        <label>기술 스택{skills.data ? ` · ${skills.data.skills.length}개 스킬에서 선택` : ''}</label>
+        {skills.isPending ? <p className="small muted">스킬을 불러오는 중…</p> : null}
+        {skills.isError ? <button type="button" className="btn line sm" onClick={() => void skills.refetch()}>스킬 다시 불러오기</button> : null}
+        <div className="chips" id="profile-tech-skills">
+          {visibleSkills.map(name => (
+            <label className="chip" key={name}>
+              <input type="checkbox" checked={selected.includes(name)} disabled={selected.length >= 36 && !selected.includes(name)} onChange={event => {
+                const next = event.target.checked ? [...selected, name] : selected.filter(item => item !== name);
+                setAt('meEdit.tech', next.join('\n'));
+              }} />{name}
+            </label>
           ))}
+          {skillNames.length > 5 ? (
+            <button type="button" className="btn line sm" aria-expanded={showAllSkills} aria-controls="profile-tech-skills" onClick={() => setShowAllSkills(value => !value)}>
+              {showAllSkills ? '접기' : '더보기'}
+            </button>
+          ) : null}
         </div>
-      ) : (
-        <p className="muted small" style={{ margin: 0 }}>
-          등록된 평정이 없어요.
-        </p>
-      )}
-      <p className="small muted me-foot">목표 추천 활용에 동의한 평정만 목표 후보 제안에 참고로 넘겨요. 등급·점수로 목표를 정하거나 문장에 쓰지 않아요. 동의는 언제든 바꿀 수 있어요.</p>
+      </div>
+      <div className="field">
+        <label htmlFor="profile-certificate">보유 자격</label>
+        <div className="addrow">
+          <input id="profile-certificate" className="input" style={{ minHeight: 32, paddingBlock: 4 }} value={certificateInput} maxLength={160}
+            onChange={event => setCertificateInput(event.target.value)} />
+          <button type="button" className="btn line sm" disabled={!canAddCertificate} onClick={() => {
+            setAt('meEdit.certs', [...certificates, certificate].join('\n'));
+            setCertificateInput('');
+          }}>추가</button>
+        </div>
+        <details className="handoff">
+          <summary>보유 자격증 {certificates.length}개</summary>
+          {certificates.length ? <ul className="plain-list me-list">
+          {certificates.map((name, index) => <li key={index}>
+            {name}{' '}
+            <button type="button" className="link quiet" aria-label={`${name} 삭제`}
+              onClick={() => setAt('meEdit.certs', certificates.filter((_, itemIndex) => itemIndex !== index).join('\n'))}>삭제</button>
+          </li>)}
+          </ul> : <p className="small muted">등록된 자격증이 없어요.</p>}
+        </details>
+      </div>
+      {LISTS.filter(([key]) => key === 'learning').map(renderListField)}
+      <p className="err" id="meErr" role="alert" hidden={!err}>{err}</p>
     </div>
   );
 }
 
-function UseCard({ e }: { e: User }) {
+function UseCard() {
   const go = useGo();
   const lastNew = useWs((s) => s.lastNew);
-  useCatalog((s) => s.regSets);
-  const set = regSet();
   return (
     <div className="card flat">
       <h2 className="st">이 정보가 쓰이는 곳</h2>
@@ -309,25 +282,13 @@ function UseCard({ e }: { e: User }) {
         <div className="row top">
           <Icon name="spark" />
           <span>
-            <b>목표 후보 제안</b> · 업무·프로젝트 등 추천에 쓰는 정보를 저장하면 후보 3개를 미리 준비해요. 로그인할 때는 저장된 후보를 사용하고, 후보가 없으면 목표 설정 화면에서 처음 준비해요.{' '}
+            <b>목표 후보 제안</b> · 저장한 정보로 목표 후보 3개를 준비해요.{' '}
             <button className="link" onClick={() => go(newIdToPath(lastNew))}>
               새 로드맵 작성 <Icon name="right" />
             </button>
           </span>
         </div>
-        <div className="row top">
-          <Icon name="scale" />
-          <span>
-            <b>사내 생활 도우미·지원 조건 확인</b> · 규정 에이전트가 직원 구분·직급을 봐요.{' '}
-            {regApplies() && set
-              ? `${e.empGroup || ''} 직원이라 등록된 ${set.label}(${set.regs
-                  .filter((r) => !r.overseas)
-                  .map((r) => r.name)
-                  .slice(0, 3)
-                  .join('·')} 등)에서 근거를 찾아요. 국외근무 규정은 국외근무를 물을 때만 봐요.`
-              : `${e.empGroup ? `${e.empGroup} 직원에게 맞는 규정 묶음이 아직 등록되지 않아` : '직원 구분이 없어'} 규정 질문에는 ‘적용 대상 아님’으로 안내해요. 등록된 규정 묶음: ${regGroups().join('·') || '없음'}.`}
-          </span>
-        </div>
+
       </div>
     </div>
   );
@@ -341,11 +302,9 @@ export function MePage() {
   if (!e) return null;
   const startEdit = () => {
     const p = e.profile || {};
-    const st = p.inputStatus || {};
     const v: Record<string, unknown> = { workDesc: p.workDesc || '', expSummary: p.expSummary || '', devYears: p.devYears == null ? '' : p.devYears };
     LISTS.forEach(([k]) => {
       v[k] = (e[k] || []).join('\n');
-      v[k + 'None'] = st[k] === 'none_confirmed';
     });
     setErr('');
     updateWs((s) => void (s.meEdit = v));
@@ -356,13 +315,13 @@ export function MePage() {
     const ex = String(ed.expSummary || '').trim();
     const yrs = ed.devYears === '' || ed.devYears == null ? null : Number(ed.devYears);
     if (yrs != null && !(yrs >= 0 && yrs <= 50)) return setErr('개발 경험은 0~50년 사이로 적거나 비워 주세요.');
-    const ls = Object.fromEntries(LISTS.map(([k]) => [k, lines(ed[k])]));
+    const ls = { tech: lines(ed.tech), certs: lines(ed.certs), learning: lines(ed.learning), projects: e.projects || [] };
     try {
       const r = await accountApi.saveSelf({
         workDesc: wd,
         expSummary: ex,
         devYears: yrs,
-        noneConfirmed: Object.fromEntries(LISTS.map(([k]) => [k, !!ed[k + 'None']])),
+        noneConfirmed: Object.fromEntries(LISTS.map(([k]) => [k, !ls[k].length])),
         ...ls,
       });
       if (r && r.view) setMeView(r.view);
@@ -378,7 +337,7 @@ export function MePage() {
       title: '처음 값으로 되돌릴까요?',
       body: () => (
         <p style={{ marginTop: 0 }}>
-          직접 고친 본인 입력 정보(업무 설명·경험·기술 스택·자격·교육·프로젝트)를 지우고 팀 DB에 처음 들어온 값으로 되돌려요. 평정의 목표 추천 활용 동의는 그대로예요.
+          직접 고친 본인 입력 정보(업무 설명·경험·기술 스택·자격·교육·프로젝트)를 지우고 팀 DB에 처음 들어온 값으로 되돌려요.
         </p>
       ),
       foot: () => (
@@ -410,21 +369,22 @@ export function MePage() {
       eyebrow="내 정보"
       title={`${e.name} 님의 정보`}
       titleAction={<button type="button" className="btn line sm" onClick={() => go(paths.password)}>비밀번호 변경</button>}
-      lead="인사 정보와 권한은 팀 DB의 인사 데이터에서 가져와 고칠 수 없어요. 본인 입력 정보와 평정의 목표 추천 활용 동의는 직접 고칠 수 있고, 목표 후보 제안에 쓰여요."
     >
+      <MySkillMap />
       <div className="me-page">
-        <HrCard e={e} />
-        <div className="card">
-          <div className="sec-h">
+        <details className="card handoff" open>
+          <summary className="sec-h"><Icon name="right" />
             <h2 className="st">본인 입력 정보</h2>
-            <span className={`tag ${e.edited ? 'acc' : 'line'}`}>{e.edited ? `직접 고침${e.editedAt ? ` · ${e.editedAt}` : ''}` : '처음 값'}</span>
-            {ed ? null : (
-              <button className="btn line sm me-ed" onClick={startEdit}>
+            {e.edited ? <span className="tag acc">{`수정일${e.editedAt ? ` · ${e.editedAt}` : ''}`}</span> : null}
+          </summary>
+          {ed ? null : (
+            <div className="me-edit-actions">
+              <button className="btn line sm" onClick={startEdit}>
                 <Icon name="edit" />
                 수정
               </button>
-            )}
-          </div>
+            </div>
+          )}
           {ed ? <SelfForm err={err} /> : <SelfView e={e} />}
           {ed ? (
             <div className="actions me-act">
@@ -441,12 +401,11 @@ export function MePage() {
               <button type="button" className="link quiet" onClick={revert}>처음 값으로 되돌리기</button>
             </p>
           ) : null}
-        </div>
-        <EvalCard e={e} />
+        </details>
+        <HrCard e={e} />
         <PermCard e={e} />
-        <UseCard e={e} />
+        <UseCard />
       </div>
-      <MySkillMap />
     </Page>
   );
 }

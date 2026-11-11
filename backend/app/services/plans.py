@@ -150,10 +150,10 @@ def _post(row: dict, plan: dict) -> dict:
         if 0 < r['sequence_no'] <= len(qs):
             ans[qs[r['sequence_no'] - 1]['id']] = str(r['score'])
     # 보고서를 쓰던 작업이 끊겼으면(서버 재시작) 실패로 바꾼다. 작업이 결과를 쓴 뒤 끝났으면 running 이 이미 false 라 바뀌지 않는다
-    lost_sql = """UPDATE app_ext.post_checks pc SET running = false, fail = :f WHERE pc.roadmap_id = :r AND pc.running AND pc.job_id IS NOT NULL
+    lost_sql = """UPDATE app_ext.post_checks pc SET running = false, fail = :f WHERE pc.roadmap_id = :r AND pc.running
                      AND NOT EXISTS (SELECT 1 FROM app_ext.jobs j WHERE j.job_id = pc.job_id AND j.status = 'running')"""
     # 사후 심화 질문을 만들던 작업이 끊겼어도 같은 방식으로 실패로 바꾼다(다시 시도는 사용자가 누를 때만)
-    lost_deep = """UPDATE app_ext.post_checks pc SET deep = jsonb_build_object('status', 'fail', 'fail', CAST(:f AS jsonb)) WHERE pc.roadmap_id = :r
+    lost_deep = """UPDATE app_ext.post_checks pc SET deep = (pc.deep - 'jobId') || jsonb_build_object('status', 'fail', 'fail', CAST(:f AS jsonb)) WHERE pc.roadmap_id = :r
                      AND pc.deep->>'status' = 'run' AND pc.deep->>'jobId' IS NOT NULL
                      AND NOT EXISTS (SELECT 1 FROM app_ext.jobs j WHERE j.job_id::text = pc.deep->>'jobId' AND j.status = 'running')"""
     with db.tx() as t:
@@ -289,16 +289,18 @@ def _owned(employee_id: int, roadmap_id: str) -> dict:
 MGR_HIDDEN = ('deep', 'goalSelf', 'file', 'executionSnapshot', 'postQuizDetails')
 
 
-def reports(employee_id: int, for_mgr: bool = False) -> list[dict]:
+def reports(employee_id: int, for_mgr: bool = False, *, report_id: str | None = None) -> list[dict]:
     from .post_quiz import report_details
 
     details_sql = "" if for_mgr else ", CASE WHEN pc.updated_at <= g.created_at THEN pc.deep END AS saved_post_check"
     details_join = "" if for_mgr else "LEFT JOIN app_ext.post_checks pc ON pc.roadmap_id = g.roadmap_id"
+    report_filter = "AND g.report_id = CAST(:report_id AS uuid)" if report_id else ""
+    params = {"e": employee_id, **({"report_id": report_id} if report_id else {})}
     rows = db.all_(f"""SELECT g.report_id, g.roadmap_id, g.report_content, g.created_at, coalesce(m.confirmed, false) AS confirmed
                        {details_sql}
                       FROM public.growth_reports g JOIN public.projects p ON p.project_id = g.project_id LEFT JOIN app_ext.report_meta m ON m.report_id = g.report_id
                        {details_join}
-                      WHERE p.employee_id = :e AND g.report_content ? 'gained' ORDER BY g.created_at DESC""", e=employee_id)
+                      WHERE p.employee_id = :e AND g.report_content ? 'gained' {report_filter} ORDER BY g.created_at DESC""", **params)
     out = []
     for r in rows:
         # 수준값은 화면에 보내지 않는다. 부서장 화면에는 심화 질문 결과(10/23)와 사후 점검 원본 응답·첨부(목표 달성 답·결과물 파일 · PR #23 리뷰)를 빼고 보낸다
@@ -492,6 +494,17 @@ def _skill_comment_option(out: dict, base: dict, targets: dict, skill: str, hand
         raise ApiError(422, 'SKILL_REVISION_INVALID', str(error)) from error
 
 
+def _revision_content(plan: dict, skills: set[str] | None = None) -> tuple:
+    activities = [
+        (activity.get('skill'), activity.get('res'), activity.get('title'), activity.get('how') or '',
+         activity.get('stage'), activity.get('hours'))
+        for activity in plan['acts']
+        if skills is None or activity.get('skill') in skills
+    ]
+    settings = tuple(plan.get(key) for key in ('opt', 'start', 'hours', 'weeks', 'cost'))
+    return settings, activities
+
+
 def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
     """수정안 작성(API-43). 확정하기 전까지 기존 로드맵은 그대로. 실패하면 가데이터로 대신하지 않는다"""
     from .drafts import handoff_prefs
@@ -594,7 +607,7 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
                                 i=rev_id, result=db.J(dict(pending, to=updated)), previous=db.J(pending))
                 if not changed:
                     raise ApiError(409, 'REVISION_CHANGED', '수정안이 변경됐어요. 다시 확인해 주세요.')
-            return {'revisionId': rev_id}
+            return {'revisionId': rev_id, 'noChanges': _revision_content(pending['to'], {retry_skill}) == _revision_content(updated, {retry_skill})}
         summary = str(out.get('summary') or '').strip()
         pd = {'from': base, 'to': to, 'key': body.get('key'), 'request': req, 'fromComment': rev.get('fromComment') or False, 'summary': summary, 'notes': out.get('notes') or [],
               'source': d.get('source'), 'prefsFrom': base.get('prefs'), 'prefsTo': ch['raw'], 'handoff': handoff,
@@ -613,7 +626,7 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
                   p=db.J(pd), i=rev_id)
         if not to['def'].get('support'):
             revision_support(employee_id, roadmap_id, rev_id)
-        return {'revisionId': rev_id}
+        return {'revisionId': rev_id, 'noChanges': _revision_content(base) == _revision_content(to) and (base.get('prefs') or {}) == ch['raw']}
     work._resume = {'operation':'plans.revise_start','kwargs':{'employee_id':employee_id,'roadmap_id':roadmap_id,'body':body}}
     jid = jobs.start('revision', employee_id, roadmap_id, work)
     if retry:
@@ -1100,6 +1113,8 @@ def report_start(employee_id: int, roadmap_id: str) -> str:
         raise ApiError(409, 'REPORT_COMPLETED', '종료된 로드맵의 결과 보고서는 다시 만들 수 없어요.')
     rec = record(row)
     pl, post = rec['plan'], rec['post']
+    if post.get('running') and post.get('jobId'):
+        return post['jobId']
     A = pl['assess']
     if not all(post['answers'].get(q['id']) for q in A['questions']) or not post['goalSelf']:
         raise ApiError(409, 'POST_INCOMPLETE', '사후 점검 문항과 목표 달성에 모두 답해 주세요')
@@ -1121,7 +1136,6 @@ def report_start(employee_id: int, roadmap_id: str) -> str:
     with db.tx() as t:
         if t.one('SELECT 1 FROM public.growth_reports g JOIN app_ext.report_meta m ON m.report_id = g.report_id WHERE g.roadmap_id = :r AND m.confirmed', r=row['roadmap_id']):
             raise ApiError(409, 'REPORT_CONFIRMED', '확인한 보고서가 있어 다시 만들 수 없어요')
-        t.run('UPDATE app_ext.post_checks SET running = true, fail = NULL WHERE roadmap_id = :r', r=row['roadmap_id'])
     level_pre = (db.val('SELECT diagnostic_result FROM public.diagnostic_rounds WHERE diagnostic_round_id = :d', d=row['diagnostic_round_id']) or {}).get('level')
 
     def work(job: jobs.JobCtx):
@@ -1187,10 +1201,23 @@ def report_start(employee_id: int, roadmap_id: str) -> str:
             raise ApiError(409, 'REPORT_STALE', message)
         return {'reportId': rep_id}
     work._resume = {'operation':'plans.report_start','kwargs':{'employee_id':employee_id,'roadmap_id':roadmap_id}}
-    jid = jobs.start('report', employee_id, roadmap_id, work)
-    with db.tx() as t:
-        t.run('UPDATE app_ext.post_checks SET job_id = CAST(:j AS uuid) WHERE roadmap_id = :r', j=jid, r=row['roadmap_id'])
-    return jid
+    try:
+        with db.tx() as t:
+            def mark(jid: str) -> None:
+                if not t.run("""UPDATE app_ext.post_checks SET running = true, fail = NULL, job_id = CAST(:j AS uuid)
+                             WHERE roadmap_id = :r AND NOT running""", j=jid, r=row['roadmap_id']):
+                    raise ApiError(409, 'REPORT_BUSY', '보고서가 이미 작성 중이거나 사후 점검 기록이 없어요.')
+            return jobs.start('report', employee_id, roadmap_id, work, before_start=mark, transaction=t)
+    except ApiError as error:
+        if error.code == 'REPORT_BUSY':
+            existing = db.val("""SELECT j.job_id FROM app_ext.post_checks pc
+                                  JOIN app_ext.jobs j ON j.job_id = pc.job_id
+                                  WHERE pc.roadmap_id = :r AND pc.running AND j.status = 'running'
+                                    AND j.employee_id = :e AND j.kind = 'report'""",
+                              r=row['roadmap_id'], e=employee_id)
+            if existing:
+                return str(existing)
+        raise
 
 
 def confirm_report(employee_id: int, report_id: str) -> dict:

@@ -29,7 +29,8 @@ import { won } from '@/shared/lib/format';
 
 function commentCounts(comments: NonNullable<PlanRecord['comments']>) {
   const deleted = comments.filter(comment => comment.deleted).length;
-  return `받은 코멘트 ${comments.length - deleted}개 · 삭제된 코멘트 ${deleted}개`;
+  const received = `받은 코멘트 ${comments.length - deleted}개`;
+  return <span title={`${received} · 삭제된 코멘트 ${deleted}개`}>{received}</span>;
 }
 
 async function markSkillCommentsRead(planId: string, comments: PlanRecord['comments']) {

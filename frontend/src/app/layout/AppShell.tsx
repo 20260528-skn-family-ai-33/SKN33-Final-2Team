@@ -8,7 +8,7 @@ import { DraftNavGuard } from '@/features/draft/stale';
 import { StartModeNavGuard } from '@/features/draft/startModeSheet';
 import { NotificationBell } from '@/features/notifications/NotificationBell';
 import { canClearHiddenDemoSettings, connFor, PROV, useAi, useAiMode } from '@/shared/state/ai';
-import { isSup, meOf, useSession } from '@/shared/state/session';
+import { boot, isSup, meOf, useSession } from '@/shared/state/session';
 import { SheetHost, ToastHost } from '@/shared/ui/SheetHost';
 import { Loading } from '@/shared/ui/parts';
 import { AppVersion } from '@/shared/ui/AppVersion';
@@ -121,6 +121,7 @@ function useHandle(): ScreenHandle {
 
 export function AppShell() {
   const booted = useSession((s) => s.booted);
+  const bootError = useSession((s) => s.bootError);
   const acct = useSession((s) => s.account);
   const h = useHandle();
   const admin = acct?.accountType === 'admin';
@@ -135,7 +136,8 @@ export function AppShell() {
 
   let body: ReactNode;
   let width = h.width || '';
-  if (!booted) body = <Loading text="서버에서 불러오는 중…" style={{ margin: '60px auto' }} />;
+  if (bootError) body = <div role="alert"><p>서버에 연결하지 못했어요.</p><button className="btn line" onClick={() => void boot()}>다시 시도</button></div>;
+  else if (!booted) body = <Loading text="서버에서 불러오는 중…" style={{ margin: '60px auto' }} />;
   else if (!acct && h.role !== 'public') body = <Navigate to={paths.login} replace />;
   else if (acct && h.role === 'public') body = <Navigate to={admin ? paths.admin : paths.home} replace />;
   else if (admin && h.role !== 'admin') body = <Navigate to={paths.admin} replace />;

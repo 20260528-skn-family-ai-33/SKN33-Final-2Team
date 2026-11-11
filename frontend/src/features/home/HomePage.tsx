@@ -184,6 +184,10 @@ export function HomePage() {
   const plans = useWs((s) => s.plans);
   const drafting = useWs((s) => draftActive(s));
   const act = recs({ plans }, 'active');
+  const runningReport = act.find(plan => plan.post.running);
+  const reportShortcut = runningReport
+    ? <button type="button" className="btn line sm" onClick={() => go(paths.post(runningReport.id))}>작성 중인 보고서 보기</button>
+    : null;
   const [savedGraphOrders, setSavedGraphOrders] = useState<Record<string, string[]>>({});
   const graphKey = me?.id ? `growpath:home-graph-order:${me.id}` : '';
   let savedOrder = savedGraphOrders[graphKey];
@@ -216,6 +220,7 @@ export function HomePage() {
           <h1 className="t lg">작성 중인 로드맵이 있어요</h1>
           <p className="lead">이어서 작성하면 마지막으로 작성하던 단계부터 이어가요.</p>
           <DraftBox />
+          {reportShortcut}
           <PastLink />
           <LearningSpace />
         </>
@@ -230,6 +235,7 @@ export function HomePage() {
             새 로드맵 작성
           </button>
         </div>
+        {reportShortcut}
         <PastLink />
         <div className="pstrip five" style={{ marginTop: 40 }}>
           {[
@@ -279,6 +285,7 @@ export function HomePage() {
           <DraftBox />
         </div>
       ) : null}
+      {reportShortcut}
       <PastLink />
       <LearningSpace />
     </>

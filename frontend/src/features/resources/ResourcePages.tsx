@@ -157,6 +157,9 @@ export function ResourcesPage() {
   const searching = res.isFetching && !res.isFetchingNextPage;
   const err = res.error ? cause(res.error) : null;
   const list = items || [];
+  const suggestions = term && shown?.q === term && !res.isPlaceholderData
+    ? [...new Set(list.map(item => item.title))].filter(title => title !== q).slice(0, 6)
+    : [];
   return (
     <Page
       eyebrow="부록"
@@ -181,6 +184,7 @@ export function ResourcesPage() {
         <input
           className="input"
           id="resQ"
+          list="resource-search-suggestions"
           autoComplete="off"
           aria-label="학습 자료 검색"
           value={q}
@@ -190,6 +194,9 @@ export function ResourcesPage() {
             if (e.key === 'Enter' && !e.nativeEvent.isComposing) search();
           }}
         />
+        <datalist id="resource-search-suggestions">
+          {suggestions.map(title => <option key={title} value={title} />)}
+        </datalist>
         <button className="btn line sm" onClick={() => search()}>
           찾기
         </button>

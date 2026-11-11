@@ -94,7 +94,12 @@ class ReportHookTests(unittest.TestCase):
             stack.enter_context(patch.object(plans.rt, 'sim_once', return_value=None))
             stack.enter_context(patch.object(plans.DG, 'report', **report))
             stack.enter_context(patch.object(plans.DG, 'level_of', return_value={}))
-            stack.enter_context(patch.object(plans.jobs, 'start', side_effect=lambda kind, e, ref, work: work(SimpleNamespace(job_id='j')) and 'j'))
+            def start_job(kind, employee, ref, work, *, before_start, transaction):
+                self.assertIs(transaction, t)
+                before_start('j')
+                work(SimpleNamespace(job_id='j'))
+                return 'j'
+            stack.enter_context(patch.object(plans.jobs, 'start', side_effect=start_job))
             notify = stack.enter_context(patch.object(NT, 'report_created'))
             try:
                 plans.report_start(7, RID)
@@ -108,6 +113,10 @@ class ReportHookTests(unittest.TestCase):
     def test_saved_report_notifies_in_the_same_transaction(self):
         notify, t = self.start({'return_value': {'good': [], 'improve': [], 'next': None}})
         notify.assert_called_once_with(t, 7, RID, 'report-1')
+        marks = [c for c in t.run.call_args_list if 'SET running = true' in c.args[0]]
+        self.assertEqual(len(marks), 1)
+        self.assertIn('job_id = CAST(:j AS uuid)', marks[0].args[0])
+        self.assertEqual(marks[0].kwargs['j'], 'j')
 
     def test_changed_snapshot_leaves_no_report_or_completion_notification(self):
         notify, t = self.start({'return_value': {'good': [], 'improve': [], 'next': None}}, stale=True)
@@ -319,6 +328,11 @@ class JobRunnerHookTests(unittest.TestCase):
             raise AgentError('Ollama 연결 실패')
         notify, _ = self.run_job(boom)
         notify.assert_called_once_with('revision', 7, RID, 'failed', None)
+
+    def test_unchanged_revision_is_saved_without_notification(self):
+        notify, transaction = self.run_job(lambda _: {'revisionId': RID, 'noChanges': True})
+        notify.assert_not_called()
+        self.assertEqual(transaction.run.call_args.kwargs['s'], 'done')
 
     def test_resume_info_reaches_the_notification(self):
         def work(_):

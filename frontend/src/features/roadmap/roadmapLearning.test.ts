@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Cert, ResourceMap } from '@/api/types/catalog';
 import type { Activity, PlanContent } from '@/api/types/plan';
-import { groupLearningActivities, matchingCertificates } from './roadmapLearningData';
+import { activitiesOutsideSkillCards, groupLearningActivities, matchingCertificates } from './roadmapLearningData';
 
 describe('skill activity groups', () => {
   it('keeps selected skill order, original activities and week/completion identifiers', () => {
@@ -40,4 +40,19 @@ describe('matching certificate recommendations', () => {
     expect(result[0].id).toBe('shared');
     expect(matchingCertificates([], ['SQL'])).toEqual([]);
   });
+});
+
+
+it.each([0, 1, 3])('excludes all %i tasks rendered by the selected skill card', count => {
+  const visibleTasks = Array.from({ length: count }, (_, i) => ({ id: `sql-${i}`, skill: 'SQL' }));
+  const otherTasks = [{ id: 'other', skill: 'Python' }, { id: 'untagged' }];
+  const plan = {
+    acts: [...visibleTasks, ...otherTasks],
+    def: { learningReport: {
+      recommendations: { skills: [{ name: 'SQL', courses: [], books: [] }, { name: 'Python', courses: [], books: [] }] },
+      choices: { SQL: { books: [] }, Python: { enabled: false, books: [] } },
+      skillOrder: ['SQL', 'Python'],
+    } },
+  } as unknown as PlanContent;
+  expect(activitiesOutsideSkillCards(plan)).toEqual(otherTasks);
 });

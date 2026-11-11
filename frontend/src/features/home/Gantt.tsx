@@ -526,8 +526,8 @@ export function GanttAll({ list, onMove }: { list: PlanRecord[]; onMove?: (id: s
                 </small>
               </button>
               {onMove && list.length > 1 && <>
-                <button type="button" className="btn line sm" aria-label={`${pl.goal} 위로`} disabled={i === 0} onClick={() => onMove(R.id, -1)}>↑</button>
-                <button type="button" className="btn line sm" aria-label={`${pl.goal} 아래로`} disabled={i === list.length - 1} onClick={() => onMove(R.id, 1)}>↓</button>
+                <button type="button" className="gt-move" aria-label={`${pl.goal} 위로`} disabled={i === 0} onClick={() => onMove(R.id, -1)}>↑</button>
+                <button type="button" className="gt-move" aria-label={`${pl.goal} 아래로`} disabled={i === list.length - 1} onClick={() => onMove(R.id, 1)}>↓</button>
               </>}
             </>
           }

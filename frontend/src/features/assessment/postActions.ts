@@ -85,7 +85,13 @@ export async function waitReport(go: ReturnType<typeof useGo>, pid: string, jobI
   if (!me()) return;
   const here = () => window.location.pathname === paths.post(pid);
   if (out && out.reportId) {
-    await reloadWorkspace();
+    try {
+      if (!await reloadWorkspace()) return;
+    } catch (error) {
+      failToast(error, '보고서는 저장됐어요. 보고서 화면에서 다시 불러와 주세요.');
+      if (here()) go(paths.report(out.reportId));
+      return;
+    }
     if (here()) go(paths.report(out.reportId));
     else toast('결과 보고서가 나왔어요 · 점검·보고서에서 볼 수 있어요');
   } else await pullPlan(pid);

@@ -71,7 +71,7 @@ class ReportSnapshotTests(unittest.TestCase):
             stack.enter_context(patch.object(plans.DG,'report',report))
             stack.enter_context(patch.object(plans.db,'J',side_effect=lambda value:value))
             stack.enter_context(patch.object(plans.db,'tx')).return_value.__enter__.return_value=transaction
-            stack.enter_context(patch.object(plans.jobs,'start',side_effect=lambda kind,employee,ref,work:work(SimpleNamespace(job_id='j')) or 'j'))
+            stack.enter_context(patch.object(plans.jobs,'start',side_effect=lambda kind,employee,ref,work, **kwargs:work(SimpleNamespace(job_id='j')) or 'j'))
             plans.report_start(1,'p')
         saved=next(call.kwargs['c'] for call in transaction.val.call_args_list if 'c' in call.kwargs)
         self.assertEqual((saved['doneTitles'],saved['restTitles']),(['강좌','과제'],[]))
