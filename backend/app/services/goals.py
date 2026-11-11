@@ -22,7 +22,9 @@ from app.learner_knowledge import VERSION as KNOWLEDGE_VERSION
 
 
 def _hash(inp: dict) -> str:
-    return hashlib.sha256(json.dumps([G.PROMPT_VERSION,KNOWLEDGE_VERSION,inp['profile']], ensure_ascii=False, sort_keys=True).encode('utf-8')).hexdigest()[:16]
+    # 평정이 없던 기존 후보는 입력이 동일하므로 다시 생성하지 않는다.
+    profile_signature = {'evaluations': [], **inp['profile']}
+    return hashlib.sha256(json.dumps([G.PROMPT_VERSION,KNOWLEDGE_VERSION,profile_signature], ensure_ascii=False, sort_keys=True).encode('utf-8')).hexdigest()[:16]
 
 
 def validate_mode(mode: str | None) -> None:
@@ -121,8 +123,11 @@ def _request(employee_id: int, trigger: str, avoid: list[str] | None, mode: str 
         if mode == 'mock':
             ctx.demo, ctx.fail_sim = True, {}
         elif mode in ('ollama', 'openai'):
-            # 관리자가 고른 모델에는 직원이 고른 추론 정도 대신 .env 기본값(OLLAMA_THINK · OPENAI_REASONING_EFFORT)을 쓴다
-            ctx.provider, ctx.demo, ctx.fail_sim, ctx.reasoning = mode, False, {}, {}
+            # 고정 모드에서는 작업 문맥에 담긴 관리자의 모델과 추론 단계를 함께 사용한다.
+            if not ctx.provider_managed:
+                ctx.provider = mode
+                ctx.reasoning = {}
+            ctx.demo, ctx.fail_sim = False, {}
         sim = rt.sim_once(ctx, 'goal', ph + '|' + '|'.join(avoid or []))
         try:
             out = G.run(ctx, dict(inp, avoid=avoid or []), sim=sim)

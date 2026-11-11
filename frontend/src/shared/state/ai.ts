@@ -6,7 +6,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { ApiError } from '@/api/client';
 import { canUseDemo } from '@/shared/lib/demoAccess';
 import { aiApi, demoApi, type ModelState, type ProviderInfo, type ThinkLevels } from '@/api/endpoints/account';
-import type { FailSim, ServerProvider, UserSettings } from '@/api/types/account';
+import type { FailSim, ProviderPolicy, ServerProvider, UserSettings } from '@/api/types/account';
 import type { StoredCause } from '@/api/types/common';
 import { signInSeq } from './session';
 
@@ -37,7 +37,7 @@ export interface Conn {
 }
 
 interface AiState {
-  status: { checked: boolean; server?: boolean; demoMode?: boolean; docLibs: Record<string, boolean>; providers: Record<string, ProviderInfo> };
+  status: { checked: boolean; server?: boolean; policy?: ProviderPolicy; demoMode?: boolean; docLibs: Record<string, boolean>; providers: Record<string, ProviderInfo> };
   settings: UserSettings;
   conn: Conn;
 }
@@ -50,14 +50,15 @@ export const useAi = create<AiState>(() => ({
 
 const g = () => useAi.getState();
 const prov = (p: string, s: AiState = g()): Partial<ProviderInfo> => s.status.providers[toSrv(p)] || {};
+const choiceOf = (s: AiState): UiProvider => toUi(s.status.policy && s.status.policy !== 'employee' ? s.status.policy : s.settings.aiProvider || 'ollama');
 const modeOf = (s: AiState): Mode => {
-  const choice = toUi(s.settings.aiProvider || 'ollama');
+  const choice = choiceOf(s);
   return s.settings.demoMock ? 'mock' : prov(choice, s).available ? choice : 'off';
 };
 
 export const ai = {
   demoAllowed: (): boolean => g().status.demoMode === true,
-  choice: (): UiProvider => toUi(g().settings.aiProvider || 'ollama'),
+  choice: (): UiProvider => choiceOf(g()),
   demoMock: (): boolean => !!g().settings.demoMock,
   available: (p: string): boolean => !!prov(p).available,
   unavailableWhy: (p: string): string => (!g().status.checked ? '확인 중…' : prov(p).reason || '설정을 확인해 주세요'),
@@ -97,7 +98,7 @@ export const unavailableWhyText = (): string => ai.unavailableWhy(ai.choice());
 /** 화면 구독용: 모드·고른 모델·연결 상태가 바뀌면 다시 그린다(값은 ai.* 로 읽는다) */
 export const useAiMode = (): { mode: Mode; choice: UiProvider; demo: boolean; checked: boolean; conn: Conn } =>
   useAi(
-    useShallow((s) => ({ mode: modeOf(s), choice: toUi(s.settings.aiProvider || 'ollama'), demo: !!s.settings.demoMock, checked: s.status.checked, conn: s.conn })),
+    useShallow((s) => ({ mode: modeOf(s), choice: choiceOf(s), demo: !!s.settings.demoMock, checked: s.status.checked, conn: s.conn })),
   );
 
 export const DOC_CHARS = 6000;
@@ -112,13 +113,19 @@ export function canClearHiddenDemoSettings({ status, settings }: AiState): boole
 let statusRequest = 0;
 export async function checkStatus(): Promise<void> {
   const request = ++statusRequest;
+  const session = signInSeq();
   useAi.setState((s) => ({ status: { ...s.status, demoMode: false } }));
   try {
     const j = await aiApi.providers();
-    if (request !== statusRequest) return;
-    useAi.setState({ status: { checked: true, server: true, demoMode: j.demoMode === true, docLibs: j.docLibs || {}, providers: Object.fromEntries(j.providers.map((p) => [p.id, p])) } });
+    if (request !== statusRequest || session !== signInSeq()) return;
+    useAi.setState((s) => ({
+      settings: { ...s.settings, aiProvider: j.current,
+        reasoning: (j.policy && j.policy !== 'employee') || j.policy !== s.status.policy ? j.employeeReasoning ?? s.settings.reasoning : s.settings.reasoning },
+      status: { checked: true, server: true, policy: j.policy ?? 'employee', demoMode: j.demoMode === true,
+        docLibs: j.docLibs || {}, providers: Object.fromEntries(j.providers.map((p) => [p.id, p])) },
+    }));
   } catch {
-    if (request !== statusRequest) return;
+    if (request !== statusRequest || session !== signInSeq()) return;
     useAi.setState((s) => ({ status: { ...s.status, checked: true, server: false, demoMode: false } }));
   }
 }
@@ -136,8 +143,14 @@ export function applySettings(s: Partial<UserSettings> | null | undefined): void
 }
 
 export async function setChoice(p: UiProvider): Promise<void> {
-  useAi.setState((s) => ({ settings: { ...s.settings, aiProvider: toSrv(p) } }));
-  await aiApi.setProvider(toSrv(p));
+  const seq = signInSeq();
+  try {
+    const saved = await aiApi.setProvider(toSrv(p));
+    if (seq === signInSeq()) useAi.setState((s) => ({ settings: { ...s.settings, aiProvider: saved.provider } }));
+  } catch (error) {
+    if (seq === signInSeq() && error instanceof ApiError && error.code === 'PROVIDER_MANAGED') await checkStatus();
+    throw error;
+  }
 }
 
 /* 추론 정도 저장은 하나씩 차례로 보낸다: 빠르게 바꾸면 앞 요청의 늦은 응답·실패가 마지막 선택을 덮지 않게
@@ -296,13 +309,14 @@ export function userTodo(kind?: string): string[] {
   if (kind === 'docbig') return ['15MB 이하로 줄여 다시 골라 주세요.', '기획서 없이 목표만으로 진행해도 돼요.'];
   if (/^doc/.test(kind || '')) return ['DOCX·PPTX·HWPX·PDF·TXT 중 하나로 저장해 다시 골라 주세요.', '기획서 없이 목표만으로 진행해도 돼요.'];
   const other = ai.choice() === 'api' ? 'ollama' : 'api';
+  const canSwitch = (!g().status.policy || g().status.policy === 'employee') && ai.available(other);
   if (kind === 'off')
     return ['서버 연결과 모델 설정을 확인해 주세요.', '자동 대체하지 않아요. 연결한 뒤 다시 시도해 주세요.'].concat(
-      ai.available(other) ? [`좌측 ‘AI 모델’에서 ${PROV[other]}를 골라 볼 수도 있어요.`] : [],
+      canSwitch ? [`좌측 ‘AI 모델’에서 ${PROV[other]}를 골라 볼 수도 있어요.`] : [],
     );
   if (kind === 'lost') return ['다시 시도하면 새로 만들어요.'];
   const t = [kind === 'format' ? '다시 시도하면 대부분 해결돼요.' : '잠시 뒤 다시 시도해 주세요.'];
-  if (kind !== 'server' && !ai.demoMock() && ai.available(other)) t.push(`좌측 ‘AI 모델’에서 ${PROV[other]}를 골라 볼 수도 있어요.`);
+  if (kind !== 'server' && !ai.demoMock() && canSwitch) t.push(`좌측 ‘AI 모델’에서 ${PROV[other]}를 골라 볼 수도 있어요.`);
   t.push('계속되면 담당자에게 알려 주세요.');
   return t;
 }

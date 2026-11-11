@@ -201,12 +201,6 @@ def _self_of(employee_id: int, t: db.Tx | None = None) -> tuple[dict, bool, date
     return src, x.get('edited_at') is not None, x.get('edited_at')
 
 
-def _evals(employee_id: int, t: db.Tx | None = None) -> list[dict]:
-    return [{'period': v['period'], 'title': v['title'] or '', 'grade': v['grade'] or '', 'score': v['score'] or '',
-             'consent': v['consent'] if v['consent'] is not None else v['consent_default'], 'consentDefault': v['consent_default']}
-            for v in (t.all if t is not None else db.all_)('SELECT * FROM app_ext.employee_evaluations WHERE employee_id = :e ORDER BY period DESC', e=employee_id)]
-
-
 def view(employee_id: int, rows: list[dict] | None = None, *, t: db.Tx | None = None) -> dict | None:
     """4차 화면 모양의 계정 정보(GP.me)"""
     rows = rows or (_rows(t) if t is not None else _rows())
@@ -230,7 +224,7 @@ def view(employee_id: int, rows: list[dict] | None = None, *, t: db.Tx | None = 
         'mySupervisor': _ref(sup) if sup else None,
         'profile': {k: src.get(k) for k in ('workDesc', 'expStatus', 'expSummary', 'devYears', 'inputStatus')} if has_profile else None,
         **{k: list(src.get(k) or []) for k in LISTS},
-        'evals': _evals(employee_id, t) if t is not None else _evals(employee_id), 'edited': bool(edited), 'editedAt': at.strftime('%Y-%m-%d') if at else None,
+        'evals': [], 'edited': bool(edited), 'editedAt': at.strftime('%Y-%m-%d') if at else None,
         'education': [f"{x['school_name']} {x['department_name'] or ''} ({EDU_LEVEL.get(x['education_level'], x['education_level'])})".replace('  ', ' ') for x in edu],
     }
 
@@ -312,12 +306,3 @@ def revert_self(employee_id: int) -> None:
             base = _work_baseline(row['baseline'], row.get('edited') or {}, _team_state(t, employee_id))
             _restore_team(t, employee_id, base)
         t.run('DELETE FROM app_ext.employee_self_inputs WHERE employee_id = :e', e=employee_id)
-
-
-def set_consent(employee_id: int, period: str, consent: bool) -> None:
-    with db.tx() as t:
-        row = t.one('SELECT consent_default FROM app_ext.employee_evaluations WHERE employee_id = :e AND period = :p', e=employee_id, p=period)
-        if not row:
-            raise ApiError(404, 'NOT_FOUND', '그 평정을 찾을 수 없어요')
-        t.run('UPDATE app_ext.employee_evaluations SET consent = :c, consent_changed_at = now() WHERE employee_id = :e AND period = :p',
-              c=None if consent == row['consent_default'] else consent, e=employee_id, p=period)

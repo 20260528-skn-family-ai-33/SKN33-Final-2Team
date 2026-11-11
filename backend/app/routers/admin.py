@@ -7,10 +7,11 @@ from __future__ import annotations
 
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import Response
 
-from .. import admin_io, db, llm, regfiles
+from .. import admin_io, db, llm, provider_keys, provider_policy, regfiles
+from ..config import S
 from ..auth import Account, require_admin
 from ..errors import ApiError, provider_label, unavailable_reason
 from . import validated_uuid
@@ -19,19 +20,61 @@ r = APIRouter(prefix='/api/v1/admin')
 MAX_FILE = 20_000_000
 
 
+@r.get('/ai-provider')
+def api_provider_policy(a: Account = Depends(require_admin)):
+    providers = {}
+    for p in ('openai', 'ollama'):
+        credential = provider_keys.read(S, p)
+        providers[p] = {'available': bool(credential.value) if p == 'openai' else bool(S.ollama_url),
+                        'model': llm.model_name(p), 'keyConfigured': bool(credential.value),
+                        'keySource': credential.source, 'hasDefaultKey': bool(S.openai_key if p == 'openai' else S.ollama_key)}
+    policy, level = provider_policy.selection()
+    providers['openai']['levels'] = list(S.openai_reasoning_levels)
+    return {'policy': policy, 'level': level, 'employeeSelectionAllowed': S.employee_ai_selection,
+            'providers': providers}
+
+
+@r.put('/ai-provider')
+def api_save_provider(body: dict, a: Account = Depends(require_admin)):
+    if 'policy' not in body or set(body) - {'policy', 'level'}:
+        raise ApiError(422, 'BAD_PROVIDER', '제공자와 추론 정도를 확인해 주세요')
+    current, level = provider_policy.selection()
+    provider_policy.save(body['policy'], body.get('level', level if current == body['policy'] else None))
+    return api_provider_policy(a)
+
+
+@r.put('/ai-provider/{provider}/key')
+async def api_save_provider_key(provider: provider_keys.Provider, request: Request, a: Account = Depends(require_admin)):
+    # 검증 오류 응답에 요청 본문이나 입력한 키가 포함되지 않도록 직접 검사한다.
+    try:
+        body = await request.json()
+    except ValueError:
+        body = None
+    value = body.get('key') if isinstance(body, dict) and set(body) == {'key'} else None
+    if not isinstance(value, str) or not 1 <= len(value) <= 4096 or not value.isascii() or not value.isprintable() or ' ' in value:
+        raise ApiError(422, 'BAD_PROVIDER_KEY', '공백 없이 올바른 API 키를 입력해 주세요')
+    provider_keys.save(S, provider, value)
+    return api_provider_policy(a)
+
+
+@r.delete('/ai-provider/{provider}/key')
+def api_reset_provider_key(provider: provider_keys.Provider, a: Account = Depends(require_admin)):
+    provider_keys.reset(S, provider)
+    return api_provider_policy(a)
+
+
 @r.get('/overview')
 def api_overview(a: Account = Depends(require_admin)):
     hr = db.one("""SELECT count(*) FILTER (WHERE coalesce(h.employment_status, '재직') <> '퇴직') AS active, count(*) FILTER (WHERE h.employment_status = '퇴직') AS retired,
             count(*) FILTER (WHERE e.is_department_head) AS heads, count(*) FILTER (WHERE e.employee_number IS NULL) AS no_number
         FROM public.employees e LEFT JOIN app_ext.employee_hr h ON h.employee_id = e.employee_id""")
     depts = db.val('SELECT count(*) FROM public.departments')
-    evals = db.val('SELECT count(*) FROM app_ext.employee_evaluations')
     transfers = db.all_("""SELECT t.changed_at, e.name, t.from_department_name, t.to_department_name, t.head_before, t.head_after FROM app_ext.employee_transfers t
                            JOIN public.employees e ON e.employee_id = t.employee_id ORDER BY t.changed_at DESC LIMIT 5""")
     goals = {x['status']: x['n'] for x in db.all_('SELECT status, count(*) AS n FROM app_ext.goal_suggestion_runs GROUP BY status')}
     edu =db.all_("""SELECT m.resource_type AS t, count(*) AS n, count(*) FILTER (WHERE jsonb_array_length(m.estimated_fields) > 0) AS est FROM app_ext.resource_meta m GROUP BY 1""")
     return {
-        'hr': {'active': hr['active'], 'retired': hr['retired'], 'heads': hr['heads'], 'noNumber': hr['no_number'], 'departments': depts, 'evaluations': evals,
+        'hr': {'active': hr['active'], 'retired': hr['retired'], 'heads': hr['heads'], 'noNumber': hr['no_number'], 'departments': depts,
                'transfers': [{'at': x['changed_at'].strftime('%Y-%m-%d %H:%M'), 'name': x['name'], 'from': x['from_department_name'], 'to': x['to_department_name'],
                               'headBefore': x['head_before'], 'headAfter': x['head_after']} for x in transfers]},
         'regulations': regfiles.overview(),
@@ -126,6 +169,14 @@ def api_goals_all(body: dict | None = None, a: Account = Depends(require_admin))
     b = body or {}
     mode = b.get('mode') if b.get('mode') in ('mock', 'ollama', 'openai') else None
     goals.validate_mode(mode)
+    policy, level = provider_policy.selection()
+    if (('expectedPolicy' in b and b['expectedPolicy'] != policy)
+            or ('expectedLevel' in b and b['expectedLevel'] != level)):
+        raise ApiError(409, 'PROVIDER_MANAGED', '모델 설정이 바뀌었어요. 현재 설정을 확인한 뒤 다시 시도해 주세요')
+    if policy != 'employee':
+        if mode and mode != policy:
+            raise ApiError(409, 'PROVIDER_MANAGED', '현재 관리자 설정을 확인한 뒤 다시 시도해 주세요')
+        mode = policy
     if mode in ('ollama', 'openai') and not llm.available(mode):
         raise ApiError(409, 'AI_UNAVAILABLE', f'{provider_label(mode)}를 지금 쓸 수 없어요', unavailable_reason(mode) or '.env 설정을 확인해 주세요', kind='config')
     ids = [x['employee_id'] for x in db.all_(_ACTIVE_SQL)]

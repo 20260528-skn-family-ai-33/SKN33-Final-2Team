@@ -1,6 +1,7 @@
 /* 관리자 화면 API (관리자 전용 계정) — 인적·교육: 한 건은 확인(token) → 저장, 여러 건은 파일 미리보기 → 반영
    · 규정: 고치지 않고 원문 PDF 올리기·내려받기만 */
 import { API_BASE, enc, fileForm, http } from '../client';
+import type { ProviderPolicy, ServerProvider } from '../types/account';
 import type {
   AdminOverview,
   AdminRows,
@@ -8,7 +9,6 @@ import type {
   EditRow,
   EditSaved,
   GoalEmployee,
-  GoalMode,
   RegulationDoc,
   RegulationUpload,
   UploadSummary,
@@ -17,7 +17,18 @@ import type {
 
 const qs = (o: Record<string, string | number>) => new URLSearchParams(Object.entries(o).map(([k, v]) => [k, String(v)])).toString();
 
+export interface AdminProviderSettings {
+  policy: ProviderPolicy;
+  level: string | null;
+  employeeSelectionAllowed: boolean;
+  providers: Record<ServerProvider, { model: string; levels?: string[]; available: boolean; keyConfigured: boolean; keySource: 'admin' | 'env' | 'none'; hasDefaultKey: boolean }>;
+}
+
 export const adminApi = {
+  providerSettings: () => http.get<AdminProviderSettings>('/admin/ai-provider'),
+  setProviderPolicy: (selection: {policy: ProviderPolicy; level: string | null}) => http.put<AdminProviderSettings>('/admin/ai-provider', selection),
+  setProviderKey: (p: ServerProvider, key: string) => http.put<AdminProviderSettings>(`/admin/ai-provider/${p}/key`, { key }),
+  resetProviderKey: (p: ServerProvider) => http.del<AdminProviderSettings>(`/admin/ai-provider/${p}/key`),
   overview: () => http.get<AdminOverview>('/admin/overview'),
   rows: (ds: string, sheet: string, q: { q?: string; limit?: number; offset?: number } = {}) =>
     http.get<AdminRows>(`/admin/datasets/${enc(ds)}/rows?${qs({ sheet, ...q })}`),
@@ -33,8 +44,8 @@ export const adminApi = {
   uploads: (ds = '') => http.get<UploadSummary[]>(`/admin/uploads?dataset=${enc(ds)}`),
   goalEmployees: () => http.get<GoalEmployee[]>('/admin/goal-suggestions/employees'),
   /** employeeIds 가 있으면 그 직원만, 없으면 재직 직원 모두 */
-  goalsAll: (mode: GoalMode, employeeIds?: number[]) =>
-    http.post<{ employees: number; started: number; defaults: number; mode: string }>('/admin/goal-suggestions/regenerate-all', employeeIds ? { mode, employeeIds } : { mode }),
+  goalsAll: (expectedPolicy: ProviderPolicy, expectedLevel: string | null, employeeIds?: number[]) =>
+    http.post<{ employees: number; started: number; defaults: number; mode: string }>('/admin/goal-suggestions/regenerate-all', { expectedPolicy, expectedLevel, employeeIds }),
   /** 지금 규정(도우미가 쓰는 버전)과 원문 PDF 가 서버에 있는지 */
   regulations: () => http.get<RegulationDoc[]>('/admin/regulations'),
   regulationUploads: () => http.get<RegulationUpload[]>('/admin/regulations/uploads'),

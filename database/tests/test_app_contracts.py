@@ -275,23 +275,18 @@ class AppContractTests(unittest.TestCase):
         self.assertEqual(self.db.one('SELECT * FROM public.employee_input_profiles WHERE employee_id=:e', e=self.ids['member']), before)
         self.assertIsNone(self.db.one('SELECT * FROM app_ext.employee_self_inputs WHERE employee_id=:e', e=self.ids['member']))
 
-    def test_consent_grant_withdrawal_and_invalid_body(self):
+    def test_retired_appraisals_are_hidden_and_preserved(self):
+        eid = self.ids['member']
         with self.db.tx() as t:
-            t.run("INSERT INTO app_ext.employee_evaluations(employee_id,period,consent_default) VALUES(:e,'fixture',false)", e=self.ids['member'])
+            t.run("INSERT INTO app_ext.employee_evaluations(employee_id,period,consent_default) VALUES(:e,'fixture',true)", e=eid)
         c = self.client('member')
-        path = '/api/v1/me/evaluations/fixture/consent'
-        self.assertEqual(c.put(path, json={'consent': True}).status_code, 200)
-        self.assertTrue(self.db.val("SELECT consent FROM app_ext.employee_evaluations WHERE employee_id=:e AND period='fixture'", e=self.ids['member']))
-        for invalid in ({}, {'consent': 'false'}, {'consent': None}, {'consent': 1}):
-            with self.subTest(body=invalid):
-                self.assertEqual(c.put(path, json=invalid).status_code, 422)
-        self.assertTrue(self.db.val("SELECT consent FROM app_ext.employee_evaluations WHERE employee_id=:e AND period='fixture'", e=self.ids['member']))
-        for _ in range(2):
-            self.assertEqual(c.put(path, json={'consent': False}).status_code, 200)
-        row = self.db.one("SELECT * FROM app_ext.employee_evaluations WHERE employee_id=:e AND period='fixture'", e=self.ids['member'])
-        self.assertIsNone(row['consent'])  # Inherit false default, not an erased evaluation.
-        self.assertIsNotNone(row['consent_changed_at'])
-        self.assertEqual(self.client('peer').put(path, json={'consent': True}).status_code, 404)
+        profile = c.get('/api/v1/me/profile').json()
+        self.assertEqual(profile['evaluations'], [])
+        self.assertEqual(profile['view']['evals'], [])
+        self.assertEqual(c.put('/api/v1/me/evaluations/fixture/consent', json={'consent': False}).status_code, 404)
+        row = self.db.one("SELECT consent,consent_default FROM app_ext.employee_evaluations WHERE employee_id=:e AND period='fixture'", e=eid)
+        self.assertIsNone(row['consent'])
+        self.assertTrue(row['consent_default'])
 
     def test_database_work_description_reaches_model_self_override_and_revert(self):
         from app.agents.goals import goal_input
@@ -541,22 +536,6 @@ class AppContractTests(unittest.TestCase):
             self.assertEqual(self._wait_goal(eid)['status'],'ready')
             self.assertEqual(generate.call_count,3)
 
-    def test_goal_preload_follows_website_evaluation_consent_changes(self):
-        eid,out=self._goal_setup()
-        with self.db.tx() as t:
-            t.run("INSERT INTO app_ext.employee_evaluations(employee_id,period,grade,consent_default) VALUES(:e,'2026','A',false)",e=eid)
-        with patch.object(self.goals,'request',self.actual_goal_request),patch.object(self.goals.G,'run',return_value=out) as generate:
-            c=self.client('member')
-            self.assertEqual(c.post('/api/v1/me/goal-suggestions/ensure').status_code,200)
-            self.assertEqual(self._wait_goal(eid)['status'],'ready')
-            self.assertEqual(c.put('/api/v1/me/evaluations/2026/consent',json={'consent':False}).status_code,200)
-            self.assertEqual(generate.call_count,1)
-            self.assertEqual(c.put('/api/v1/me/evaluations/2026/consent',json={'consent':True}).status_code,200)
-            self.assertEqual(self._wait_goal(eid)['status'],'ready')
-            self.assertEqual(generate.call_count,2)
-            self.assertEqual(c.put('/api/v1/me/evaluations/2026/consent',json={'consent':True}).status_code,200)
-            self.assertEqual(generate.call_count,2)
-
     def test_department_rename_preloads_affected_members_after_admin_save(self):
         from app.admin_io import base,hr
         eid,out=self._goal_setup()
@@ -567,7 +546,7 @@ class AppContractTests(unittest.TestCase):
             self.client('member').post('/api/v1/me/goal-suggestions/ensure')
             self.assertEqual(self._wait_goal(eid)['status'],'ready')
             with patch.object(hr,'_inst',return_value=self.inst):
-                cur={sheet:hr.current(sheet) for sheet in ('부서','직원','평정')}
+                cur={sheet:hr.current(sheet) for sheet in ('부서','직원')}
                 with self.db.tx() as t:result=hr.apply(t,{'부서':[row]},cur,{})
             self.assertEqual(set(result['goal_ids']),{self.ids[key] for key in ('head','member','peer','child_head','child_member')})
             self.assertEqual(generate.call_count,1)

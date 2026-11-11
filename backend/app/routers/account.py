@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import JSONResponse
 
-from .. import db, llm, regulation_embeddings
+from .. import db, llm, provider_policy, regulation_embeddings
 from ..agents import runtime as rt
 from ..auth import COOKIE, Account, end_session, hash_password, login, require_account, require_employee, start_session, verify_password
 from ..config import S, level_ok
@@ -15,12 +15,13 @@ from . import job_response
 r = APIRouter(prefix='/api/v1')
 
 
-def _settings(employee_id: int) -> dict:
+def _settings(employee_id: int, selection: tuple[str, str | None] | None = None) -> dict:
+    policy, level = selection or provider_policy.selection()
     s = db.one('SELECT ai_provider, demo_mock, fail_sim, reasoning FROM app_ext.user_settings WHERE employee_id = :e', e=employee_id) or {}
     # 시연을 끈 배포에서는 DB에 남아 있는 시연 옵션도 화면에 적용하지 않는다.
-    return {'aiProvider': s.get('ai_provider') or 'ollama', 'demoMock': S.demo_mode and bool(s.get('demo_mock')),
+    return {'aiProvider': provider_policy.resolve(policy, s.get('ai_provider')), 'demoMock': S.demo_mode and bool(s.get('demo_mock')),
             'failSim': (s.get('fail_sim') or {}) if S.demo_mode else {},
-            'reasoning': s.get('reasoning') or {}}
+            'reasoning': (s.get('reasoning') or {}) if policy == 'employee' else ({policy: level} if level else {})}
 
 
 def _me(a: Account) -> dict:
@@ -111,16 +112,6 @@ def api_self_revert(a: Account = Depends(require_employee)):
     return dict(profile.spec(v), view=v)
 
 
-@r.put('/me/evaluations/{period}/consent')
-def api_consent(period: str, body: dict, a: Account = Depends(require_employee)):
-    consent = body.get('consent')
-    if type(consent) is not bool:
-        raise ApiError(422, 'CONSENT_REQUIRED', '평정 활용 동의 여부를 true 또는 false로 보내 주세요')
-    profile.set_consent(a.id, period, consent)
-    goals.request(a.id, 'consent', only_if_stale=True)
-    return {'period': period, 'consent': consent}
-
-
 @r.get('/me/goal-suggestions')
 def api_goals(a: Account = Depends(require_employee)):
     return goals.get(a.id)
@@ -147,8 +138,10 @@ def api_goals_ensure(a: Account = Depends(require_employee)):
 # ── AI 모델 (API-10~12) ──
 @r.get('/ai/providers')
 def api_providers(a: Account = Depends(require_account)):
-    cur = _settings(a.id)['aiProvider'] if a.type == 'employee' else 'ollama'
-    return {'current': cur, 'demoMode': S.demo_mode, 'providers': [
+    policy, level = provider_policy.selection()
+    settings = _settings(a.id, (policy, level)) if a.type == 'employee' else {}
+    return {'current': settings.get('aiProvider') or provider_policy.resolve(policy, None),
+            'policy': policy, 'employeeReasoning': settings.get('reasoning', {}), 'demoMode': S.demo_mode, 'providers': [
         {'id': 'ollama', 'label': 'RunPod-Ollama', 'available': llm.available('ollama'), 'reason': unavailable_reason('ollama'), 'target': S.ollama_target if S.ollama_url else '',
          'models': dict({r: llm.model_name('ollama', r) for r in ('default', 'roadmap', 'regulation', 'vision')}, embed=regulation_embeddings.model()),
          'timeout': S.ollama_timeout,
@@ -172,6 +165,7 @@ def _has(mod: str) -> bool:
 
 @r.put('/me/ai-provider')
 def api_set_provider(body: dict, a: Account = Depends(require_employee)):
+    provider_policy.require_employee_selection()
     p = body.get('provider')
     if p not in ('ollama', 'openai'):
         raise ApiError(400, 'BAD_PROVIDER', 'RunPod-Ollama 또는 OpenAI API 중에서 골라 주세요')
@@ -186,6 +180,7 @@ def api_set_reasoning(body: dict, a: Account = Depends(require_employee)):
     """모드별 추론 정도. level 이 null 이면 .env 기본값을 따른다. RunPod-Ollama 는 진단·로드맵 모델에만 쓰고
     규정 에이전트 모델은 늘 끈다(생각을 끄고 학습 · 고를 수 없음). OpenAI 는 .env 의 OPENAI_REASONING_LEVELS 안에서만 받는다.
     RunPod-Ollama 단계는 모델마다 달라 이름 모양만 본다(모델이 모르는 이름이면 Ollama 가 모델 기본값을 쓴다)"""
+    provider_policy.require_employee_selection()
     p, level = body.get('provider'), body.get('level')
     if p not in ('ollama', 'openai'):
         raise ApiError(400, 'BAD_PROVIDER', 'RunPod-Ollama 또는 OpenAI API 중에서 골라 주세요')
@@ -206,6 +201,10 @@ def api_set_reasoning(body: dict, a: Account = Depends(require_employee)):
 @r.get('/ai/status')
 def api_status(provider: str = 'ollama', a: Account = Depends(require_account)):
     """연결 확인(API-12 · 토큰을 쓰지 않음). 화면은 쉬운 말만, 원인·조치·원문은 운영자용"""
+    if provider not in ('ollama', 'openai'):
+        raise ApiError(400, 'BAD_PROVIDER', '사용할 AI 제공자를 선택해 주세요')
+    if a.type == 'employee' and provider_policy.current() not in ('employee', provider):
+        raise ApiError(409, 'PROVIDER_MANAGED', '관리자가 지정한 모델의 연결만 확인할 수 있어요')
     try:
         return llm.ping(provider)
     except llm.LlmError as e:

@@ -136,7 +136,7 @@ function SaveButton({ label }: { label: string }) {
 
 function confirmEdit(ed: EditState, rows: RowView[], del: boolean): void {
   const newEmp = rows.some((x) => x.sheet === '직원' && x.action === 'add');
-  const regen = ed.ds === 'hr' && !newEmp && rows.some((x) => x.sheet === '평정' || (x.sheet === '직원' && x.action === 'update' && !(x.tags || []).includes('퇴직')));
+  const regen = ed.ds === 'hr' && !newEmp && rows.some((x) => x.sheet === '직원' && x.action === 'update' && !(x.tags || []).includes('퇴직'));
   const title = del ? DEL_ASK[ed.info.deleteLabel] || '삭제할까요?' : ed.mode === 'add' ? '이대로 추가할까요?' : '이대로 저장할까요?';
   const delLabel = del ? ed.info.deleteLabel : null;
   setChoice('editGoal', 'employee');

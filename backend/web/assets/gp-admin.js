@@ -9,7 +9,7 @@
   const S = () => GP.S;
   const ADM = API.admin;
   const DS = {
-    hr: { title: '인적 데이터', icon: 'users', lead: '부서·직원·근무성적평정. 인사이동은 직원의 ‘부서 코드’를, 부서장 권한은 ‘부서장’을 고쳐요. 직원은 지우지 않고 퇴직 처리해요.', sheets: ['직원', '부서', '평정'] },
+    hr: { title: '인적 데이터', icon: 'users', lead: '부서와 직원 정보를 관리해요. 인사이동은 직원의 ‘부서 코드’를, 부서장 권한은 ‘부서장’을 고쳐요. 직원은 지우지 않고 퇴직 처리해요.', sheets: ['직원', '부서'] },
     regulations: { title: '규정 데이터', icon: 'scale', lead: '사내 생활 도우미와 지원 조건 확인이 근거로 쓰는 규정과 조항(RAG 검색 단위). 조항을 고치면 그 규정은 새 버전으로 저장되고 이전 버전은 남아요.', sheets: ['규정', '조항'] },
     education: { title: '교육 데이터', icon: 'book', lead: '로드맵 추천에 쓰는 강좌·도서·자격증. 학습 형식·시간·단계·비용은 팀 DB에 없어 규칙으로 채운 ‘추정’ 값이 있고, 고치면 추정 표시가 빠져요.', sheets: ['강좌', '도서', '자격증'] }
   };
@@ -52,7 +52,7 @@
     return page({
       eyebrow: '관리자', title: '데이터 관리', lead: '인적·규정·교육 데이터를 화면에서 한 건씩 고치거나, 여러 건은 엑셀·CSV로 내려받아 고친 뒤 다시 올려요. 어느 쪽이든 같은 규칙으로 검사하고, 오류가 있으면 저장하지 않아요.',
       body: `<div class="adm-grid">
-        ${card('hr', `<div class="adm-num">${num('재직', o.hr.active)}${num('퇴직', o.hr.retired)}${num('부서', o.hr.departments)}${num('부서장', o.hr.heads)}${num('평정', o.hr.evaluations)}</div>
+        ${card('hr', `<div class="adm-num">${num('재직', o.hr.active)}${num('퇴직', o.hr.retired)}${num('부서', o.hr.departments)}${num('부서장', o.hr.heads)}</div>
           ${o.hr.noNumber ? `<p class="small muted" style="margin:0">사번이 없는 팀 테스트 계정 ${o.hr.noNumber}명은 엑셀로 다루지 않아요.</p>` : ''}
           ${o.hr.transfers.length ? `<p class="small" style="margin:8px 0 0"><b>최근 인사이동·권한 변경</b></p><ul class="plain-list small">${o.hr.transfers.map(t => `<li>${esc(t.at)} · ${esc(t.name)} · ${esc(t.from || '없음')} → ${esc(t.to || '없음')}${t.headBefore !== t.headAfter ? ` · ${t.headAfter ? '부서장 지정' : '부서장 해제'}` : ''}</li>`).join('')}</ul>` : ''}`)}
         ${card('regulations', `<div class="adm-num">${num('검색하는 조항', o.regulations.chunks)}${o.regulations.sets.map(s => num(s.group, `${s.count}건`)).join('')}</div>
@@ -316,7 +316,7 @@
   };
   function confirmEdit(ed, rows, del) {
     const newEmp = rows.some(x => x.sheet === '직원' && x.action === 'add');
-    const regen = ed.ds === 'hr' && !newEmp && rows.some(x => x.sheet === '평정' || (x.sheet === '직원' && x.action === 'update' && !(x.tags || []).includes('퇴직')));
+    const regen = ed.ds === 'hr' && !newEmp && rows.some(x => x.sheet === '직원' && x.action === 'update' && !(x.tags || []).includes('퇴직'));
     const title = del ? DEL_ASK[ed.info.deleteLabel] || '삭제할까요?' : ed.mode === 'add' ? '이대로 추가할까요?' : '이대로 저장할까요?';
     const goal = regen ? `<div class="stack adm-goal"><span class="small muted">저장한 뒤 이 직원의 목표 후보를 다시 만들 때</span>
         <label class="radio"><input type="radio" name="admEditGoal" value="employee" checked><span>그 직원이 고른 AI 모드로 만들기 <span class="small muted">· 실제 모델을 한 번 불러요(OpenAI API는 비용이 들어요) · 모드가 설정되지 않았으면 실패로 남아요</span></span></label>

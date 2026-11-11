@@ -93,7 +93,8 @@ def _result(found: dict[str, list[base.Row]], notes: list[str]) -> dict:
 
 def preview(ds: str, admin_id: int, file_name: str, raw: bytes, sheet_hint: str | None) -> dict:
     mod = get(ds)
-    found, notes = base.read_upload(file_name, raw, mod.SHEETS, sheet_hint)
+    found, notes = base.read_upload(file_name, raw, mod.SHEETS, sheet_hint,
+                                    retired_csv_headers=getattr(mod, 'RETIRED_CSV_HEADERS', ()))
     _compute(mod, found)
     out = _result(found, notes)
     sha = hashlib.sha256(raw).hexdigest()

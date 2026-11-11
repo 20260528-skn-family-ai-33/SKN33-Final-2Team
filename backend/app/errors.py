@@ -10,6 +10,7 @@ import re
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
+from . import provider_keys
 from .config import S
 
 
@@ -59,7 +60,7 @@ CAUSES = [
     (r'요청이 너무 커요', 'docbig', '파일이 너무 커요 (15MB까지)'),
     (r'비전 모델 설정이 없', 'visioncfg', '이미지를 읽는 비전 모델이 없어요(RunPod-Ollama 팀 모델은 이미지를 읽지 않음 · OpenAI는 .env의 OPENAI_VISION_MODEL)'),
     (r'Ollama 설정이 없|OLLAMA_BASE_URL', 'config', '.env에 Ollama 주소(OLLAMA_BASE_URL)가 없어요'),
-    (r'OPENAI_API_KEY', 'config', '.env에 OpenAI 키(OPENAI_API_KEY)가 없어요'),
+    (r'OPENAI_API_KEY|OpenAI API 키가 등록되지', 'config', 'OpenAI API 키가 등록되지 않았어요'),
     (r'RunPod 프록시 524', 'timeout', 'RunPod 프록시의 응답 시간 제한(약 100초)을 넘었어요'),
     # Pod 앞의 nginx 가 키를 확인하는 구성(RunPod Pod 연결 절차) · 401 = 키 없음·틀림
     (r'Ollama 40[13]|RunPod 프록시 HTTP 40[13]', 'auth', 'Ollama 키(OLLAMA_API_KEY)가 없거나 Pod의 키와 달라요'),
@@ -91,7 +92,7 @@ HINT = {
     'classifier': {'any': 'backend/models의 모델·토크나이저·classifier-manifest.json과 백엔드 로그를 확인해 주세요. 모델 교체 시 검증한 manifest도 갱신해야 해요'},
     'employee_group': {'any': '인사 담당 부서에 직원 구분 등록 여부를 확인해 주세요'},
     'off': {'ollama': '.env에 OLLAMA_BASE_URL을 넣고 서버를 다시 실행해 주세요. 가데이터로 보려면 시연 도구에서 직접 켜야 해요(자동 대체 없음)',
-            'any': '.env에 OPENAI_API_KEY를 넣고 서버를 다시 실행해 주세요. 가데이터로 보려면 시연 도구에서 직접 켜야 해요(자동 대체 없음)'},
+            'any': '관리자 화면에서 OpenAI API 키를 등록하거나 서버의 OPENAI_API_KEY를 설정해 주세요'},
     'lost': {'any': '다시 시도하면 새 작업으로 만들어요'},
     'server': {'any': '서버(목업_실행.cmd)가 켜져 있는지 확인해 주세요'},
     'config': {'any': '.env를 고친 뒤 서버를 다시 실행해 주세요'},
@@ -101,8 +102,7 @@ HINT = {
                         '.env에 원본 모델 이름을 넣었다면 Pod의 ollama list 이름과 같은지 확인해 주세요',
               'any': '.env의 OPENAI_MODEL을 확인해 주세요'},
     'memory': {'any': '더 큰 GPU의 Pod나 더 작게 양자화한 모델이 필요해요. 동시에 처리하는 요청이 줄면 될 수도 있어요'},
-    'auth': {'ollama': '.env의 OLLAMA_API_KEY에 Pod의 키(/workspace/ollama_key.txt)를 그대로 넣고 백엔드를 다시 만들어 주세요(docker compose up -d --no-deps --force-recreate backend)',
-             'any': '.env의 OPENAI_API_KEY를 확인해 주세요'},
+    'auth': {'any': '관리자 화면에서 해당 모델에 적용 중인 API 키를 확인해 주세요'},
     'limit': {'any': '잠시 뒤 다시 시도해 주세요'},
     'format': {'any': '다시 시도하면 대부분 해결돼요'},
     'docfmt': {'any': 'DOCX·PPTX·HWPX·PDF·TXT·MD 중 하나로 저장해 다시 고르면 돼요'},
@@ -159,4 +159,4 @@ def provider_label(p: str) -> str:
 def unavailable_reason(p: str) -> str:
     if p == 'ollama':
         return '.env에 OLLAMA_BASE_URL이 없어요' if not S.ollama_url else ''
-    return '.env에 OPENAI_API_KEY가 없어요' if p == 'openai' and not S.openai_key else ''
+    return 'OpenAI API 키가 등록되지 않았어요' if p == 'openai' and not provider_keys.read(S, 'openai').value else ''

@@ -32,12 +32,19 @@ class GoalCandidateContractTests(unittest.TestCase):
         self.assertEqual(model.call_args.args[2]['profile'], self.inp['profile'])
         self.assertEqual(model.call_args.args[2]['availableBasis'], ['직급·부서', '직무', '보유 자격'])
 
-    def test_identifiers_are_excluded_and_only_consented_evaluations_are_input(self):
+    def test_identifiers_are_excluded_and_all_evaluations_are_excluded(self):
         person = dict(self.person, evals=[{'period': '2025', 'grade': 'A', 'consent': False}, {'period': '2026', 'grade': 'B', 'consent': True}])
         inp = goals.goal_input(person)['profile']
         self.assertNotIn('name', inp)
         self.assertNotIn('code', inp)
-        self.assertEqual([row['period'] for row in inp['evaluations']], ['2026'])
+        self.assertNotIn('evaluations', inp)
+
+    def test_legacy_cache_for_a_profile_without_appraisals_is_reused(self):
+        from app.services import goals as store
+        legacy = dict(self.inp, profile=dict(self.inp['profile'], evaluations=[]))
+        self.assertEqual(store._hash(legacy), store._hash(self.inp))
+        legacy['profile']['evaluations'] = [{'period': '2026', 'result': 'A'}]
+        self.assertNotEqual(store._hash(legacy), store._hash(self.inp))
 
     def test_model_receives_one_complete_profile_without_derived_duplicates(self):
         from copy import deepcopy
@@ -53,7 +60,7 @@ class GoalCandidateContractTests(unittest.TestCase):
         self.assertEqual(payload['profile'], before['profile'])
         self.assertEqual(payload['profile']['techStack'], ['Python', 'SQL'])
         self.assertEqual(payload['profile']['learning'], ['API 교육'])
-        self.assertEqual(payload['profile']['evaluations'], [{'period': '2026', 'result': 'B, 40/50'}])
+        self.assertNotIn('evaluations', payload['profile'])
         self.assertEqual(self.inp, before)
         self.assertEqual(model.call_args.args[1], goals.G_SYS)
         self.assertEqual(set(result), {'candidates', 'note'})
