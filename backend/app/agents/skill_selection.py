@@ -79,10 +79,11 @@ def select_skills(
     rows = _skill_rows(raw)
     if not isinstance(rows, list):
         raise SelectionError('스킬 목록 형식이 올바르지 않습니다.')
-    if not 1 <= len(rows) <= MAX_SKILLS:
-        raise SelectionError(f'핵심 스킬은 1~{MAX_SKILLS}개여야 합니다. 프로젝트와 DB 태그를 확인해 주세요.')
+    if not rows:
+        raise SelectionError('핵심 스킬을 찾지 못했습니다. 프로젝트와 DB 태그를 확인해 주세요.')
+    # 모델이 상한보다 많이 내도 오류로 막지 않고 중요도 순 앞 3개만 제시한다.
     selected, seen = [], set()
-    for row in rows:
+    for row in rows[:MAX_SKILLS]:
         if not isinstance(row, dict):
             raise SelectionError('스킬 항목 형식이 올바르지 않습니다.')
         name = row.get('name')

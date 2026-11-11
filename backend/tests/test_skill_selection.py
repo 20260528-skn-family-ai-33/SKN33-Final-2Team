@@ -50,10 +50,15 @@ class SkillSelectionTests(unittest.TestCase):
                 self.assertEqual(result, {'skills': [self.row(self.tags[0])]})
                 self.assertIn('미제공 시 goal 기준', system)
 
-    def test_zero_or_more_than_three_is_rejected_without_silent_truncation(self):
-        for count in (0, 4, 5):
-            with self.subTest(count=count), self.assertRaises(SelectionError):
-                self.select([self.row(tag) for tag in self.tags[:count]])
+    def test_zero_is_rejected(self):
+        with self.assertRaises(SelectionError):
+            self.select([])
+
+    def test_four_or_five_suggestions_keep_only_first_three_in_order(self):
+        for count in (4, 5):
+            with self.subTest(count=count):
+                rows = [self.row(tag) for tag in self.tags[:count]]
+                self.assertEqual(self.select(rows)['skills'], rows[:3])
 
     def test_unknown_and_duplicate_tag_is_rejected(self):
         for rows in ([self.row('임의 태그')], [self.row(self.tags[0])] * 2):
