@@ -8,7 +8,7 @@ import { ChecksPage } from '@/features/assessment/ChecksPage';
 import { GanttAll } from '@/features/home/Gantt';
 import { mergeRes } from '@/shared/state/catalog';
 import { useWs } from '@/shared/state/workspace';
-import { ActRow } from './parts';
+import { ActRow, postStart } from './parts';
 import { RoadmapActivityList } from './RoadmapLearning';
 import { RoadmapList } from './RoadmapPages';
 
@@ -153,6 +153,15 @@ describe('마친 로드맵의 완료·조기 종료 표시', () => {
     expect(completedHeadingIdx).toBeLessThan(incompleteHeadingIdx);
     expect(html.indexOf('최근 완료 로드맵', completedHeadingIdx)).toBeLessThan(html.indexOf('이전 완료 로드맵', completedHeadingIdx));
     expect(html.indexOf('최근 진행 중 로드맵', incompleteHeadingIdx)).toBeLessThan(html.indexOf('이전 조기 종료 로드맵', incompleteHeadingIdx));
+  });
+
+  it('보고서 생성 중(post.running)일 때 postStart를 호출하면 사후 점검 화면으로 이동한다', () => {
+    const runningPlan = { ...record([course, task], { course: { status: 'done' } }, 'active'), id: 'p-run' };
+    runningPlan.post.running = true;
+    useWs.setState({ plans: { [runningPlan.id]: runningPlan }, reports: [] });
+    const navigated: string[] = [];
+    postStart(((to: string) => { navigated.push(to); }) as never, runningPlan.id);
+    expect(navigated).toEqual(['/roadmaps/p-run/post']);
   });
 });
 

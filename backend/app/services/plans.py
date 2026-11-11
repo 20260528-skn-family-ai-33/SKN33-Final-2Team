@@ -161,7 +161,8 @@ def _post(row: dict, plan: dict) -> dict:
     pc = db.one('SELECT goal_self, attachment, running, fail, job_id, deep FROM app_ext.post_checks WHERE roadmap_id = :r', r=row['roadmap_id']) or {}
     from .post_quiz import public_assessment
     post_survey=(pc.get('deep') or {}).get('v2Quiz')
-    public_survey=public_assessment({'v2':{'survey':post_survey}}, reveal=True)['v2']['survey'] if post_survey else None
+    reveal=bool(pc.get('running')) or STATUS.get(row.get('status'))=='done'
+    public_survey=public_assessment({'v2':{'survey':post_survey}}, reveal=reveal)['v2']['survey'] if post_survey else None
     return {'quizSurvey': public_survey, 'quizAnswers': (pc.get('deep') or {}).get('v2Answers') or {}, 'answers': ans, 'goalSelf': str(pc['goal_self']) if pc.get('goal_self') else '', 'file': pc.get('attachment'), 'running': bool(pc.get('running')),
             'fail': pc.get('fail'), 'jobId': str(pc['job_id']) if pc.get('job_id') and pc.get('running') else None, 'deep': _post_deep(plan, pc.get('deep'))}
 
@@ -913,9 +914,12 @@ def save_post(employee_id: int, roadmap_id: str, body: dict) -> dict:
     labels = dict(D['answerOpts'])
     from .post_quiz import validate as validate_quiz
     quiz_answers=None
+    pc_row=db.one('SELECT running, deep FROM app_ext.post_checks WHERE roadmap_id = :r',r=row['roadmap_id']) or {}
+    if pc_row.get('running'):
+        raise ApiError(409,'REPORT_BUSY','보고서가 이미 작성 중이에요.')
     if 'quizAnswers' in body:
         from .post_quiz import with_survey,questions
-        stored=(db.one('SELECT deep FROM app_ext.post_checks WHERE roadmap_id = :r',r=row['roadmap_id']) or {}).get('deep') or {}
+        stored=pc_row.get('deep') or {}
         if questions(row['content']) and not stored.get('v2Quiz'):raise ApiError(409,'POST_QUIZ_REQUIRED','사후 퀴즈를 먼저 생성해 주세요.')
         quiz_answers=validate_quiz(with_survey(row['content'],stored['v2Quiz']) if stored.get('v2Quiz') else row['content'],body['quizAnswers'])
     with db.tx() as t:

@@ -228,7 +228,12 @@ export function openPostAnswers(pid: string): void {
     '진행 중'인 활동이 남아 있으면 한 번 확인한다(이미 답하기 시작했으면 묻지 않음) */
 export function postStart(go: ReturnType<typeof useGo>, pid: string): void {
   const R = ws().plans[pid];
-  if (!R || R.status !== 'active' || R.post.running) return;
+  if (!R || R.status !== 'active') return;
+  if (R.post.running) {
+    closeSheet();
+    go(paths.post(R.id));
+    return;
+  }
   if (R.plan.assess?.v2 && !R.post.quizSurvey) void ensurePostQuiz(R.id).catch(() => {});
   const progress = count(R.plan, R.progress);
   const left = progress.t - progress.done;

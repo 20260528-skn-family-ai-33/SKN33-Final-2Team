@@ -125,6 +125,7 @@ export async function makeReport(go: ReturnType<typeof useGo>, pid: string): Pro
         s.plans[pid].post.jobId = j.jobId;
       }
     });
+    void pullPlan(pid);
     void waitReport(go, pid, j.jobId);
   } catch (err) {
     updateWs((s) => void (s.plans[pid].post.running = false));
