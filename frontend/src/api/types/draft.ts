@@ -205,6 +205,8 @@ export interface GenRow {
   tries?: number;
   out?: OptionDef;
   err?: StoredCause;
+  /** 이 안의 작성을 요청한 서버 시각(밀리초). 다시 시도하면 새로 찍힌다 */
+  startedAt?: number;
   [k: string]: unknown;
 }
 
