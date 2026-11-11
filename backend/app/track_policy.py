@@ -4,6 +4,8 @@ from __future__ import annotations
 VERSION = '20261111-skill-cap-3-v8'
 # 선정 스킬 상한(모든 코스). 이전에 4~5개로 저장된 목록은 사용자 순서의 앞 3개만 쓴다.
 MAX_SKILLS = 3
+# 이전 상한. 이미 저장된 점검의 남은 퀴즈를 이어 만들 때만 허용한다(기존 문항·응답 보존).
+LEGACY_MAX_SKILLS = 5
 FAST_SKILLS = 3
 FAST_MIN_OUTLINE_UNITS = 6
 FAST_MIN_FOCUS = 1 / 3

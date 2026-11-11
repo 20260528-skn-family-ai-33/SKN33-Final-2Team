@@ -64,7 +64,8 @@ def _text(value: Any, label: str) -> str:
 
 def generate_survey(project: dict[str, Any], selection: dict[str, Any], profile: dict[str, Any],
                     generate: Callable[[str, dict[str, Any]], dict[str, Any]], *,
-                    require_measurement: bool = False, phase: str | None = None) -> dict[str, Any]:
+                    require_measurement: bool = False, phase: str | None = None,
+                    max_skills: int = MAX_SKILLS) -> dict[str, Any]:
     if not isinstance(project, dict) or not isinstance(selection, dict) or not isinstance(profile, dict):
         raise SurveyError('프로젝트·스킬·프로필 입력 형식을 확인해 주세요.')
     goal = _text(project.get('goal'), '목표')
@@ -74,8 +75,8 @@ def generate_survey(project: dict[str, Any], selection: dict[str, Any], profile:
     summary = summary.strip() or None if isinstance(summary, str) else None
     desired = _text(project.get('desiredCompetencies'), '키우고 싶은 역량')
     skills = selection.get('skills')
-    if not isinstance(skills, list) or not 1 <= len(skills) <= MAX_SKILLS:
-        raise SurveyError(f'선정 스킬은 1~{MAX_SKILLS}개여야 합니다.')
+    if not isinstance(skills, list) or not 1 <= len(skills) <= max_skills:
+        raise SurveyError(f'선정 스킬은 1~{max_skills}개여야 합니다.')
     names = [_text(row.get('name') if isinstance(row, dict) else None, '스킬') for row in skills]
     if len(set(names)) != len(names):
         raise SurveyError('선정 스킬이 중복되었습니다.')
