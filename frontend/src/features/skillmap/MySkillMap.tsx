@@ -80,7 +80,7 @@ export function MySkillMap() {
       wheelZoom
       build={(data, pid) => {
         const { marks, unmatched } = earnedSkills(data, records, reports, resources);
-        const owned = new Set((me?.tech || []).map((name) => name.trim()));
+        const owned = new Set((me?.tech || []).map((entry) => entry.split(' / ', 1)[0].trim()));
         for (const skill of data.skills) {
           if (owned.has(skill.name.trim())) {
             marks.set(skill.id, { level: 'gold', plans: marks.get(skill.id)?.plans || [] });

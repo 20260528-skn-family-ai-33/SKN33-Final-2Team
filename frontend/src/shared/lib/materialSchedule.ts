@@ -79,6 +79,13 @@ export function applyMaterialSchedule(input: PlanContent): PlanContent {
   for (const estimate of Object.values(estimates)) estimate.totalWeeks = plan.weeks;
   report.durationEstimates = estimates;
   plan.def.materialSchedule = Object.entries(estimates).map(([skill, row]) => ({skill, weeks: row.weeks!, startWeek: row.startWeek, endWeek: row.endWeek, addedWeeks: row.addedWeeks, totalWeeks: plan.weeks}));
+  const taskWeeks = new Map<string, number>();
+  let elapsed = 0;
+  for (const name of active) {
+    const estimate = estimates[name];
+    if (!courseIds(choices[name]).length) taskWeeks.set(name, Math.min(elapsed + 1, Math.max(1, plan.weeks)));
+    elapsed += estimate.addedWeeks ?? 0;
+  }
   const seen = new Set<string>();
   const seenOther = new Set<string>();
   let materialHours = 0, taskHours = 0, otherMaterialHours = 0;
@@ -87,7 +94,10 @@ export function applyMaterialSchedule(input: PlanContent): PlanContent {
     const resource = courses.get(rid);
     const book = books.has(rid);
     const slot = resource || estimates[name];
-    if (slot) {
+    const taskWeek = rid ? undefined : taskWeeks.get(name);
+    if (taskWeek !== undefined) {
+      activity.wFrom = activity.wTo = taskWeek;
+    } else if (slot) {
       activity.wFrom = slot.startWeek || Math.max(1, plan.weeks);
       activity.wTo = slot.endWeek || activity.wFrom;
     }

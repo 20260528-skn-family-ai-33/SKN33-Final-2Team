@@ -164,6 +164,12 @@ def apply_plan_schedule(plan: dict) -> dict:
     report['durationEstimates'] = schedule['estimates']
     option['materialSchedule'] = schedule_rows(schedule['estimates'])
     plan['weeks'] = schedule['weeks']
+    task_weeks = {}
+    elapsed = 0
+    for name, estimate in schedule['estimates'].items():
+        if not estimate['courses']:
+            task_weeks[name] = min(elapsed + 1, max(1, plan['weeks']))
+        elapsed += estimate['addedWeeks']
     seen_courses = set()
     seen_other = set()
     material_hours = Decimal(0)
@@ -183,7 +189,9 @@ def apply_plan_schedule(plan: dict) -> dict:
         resource_slot = schedule['courses'].get(rid)
         slot = resource_slot
         slot = slot or schedule['estimates'].get(name)
-        if slot:
+        if not rid and name in task_weeks:
+            activity['wFrom'] = activity['wTo'] = task_weeks[name]
+        elif slot:
             activity['wFrom'] = slot['startWeek'] or max(1, plan['weeks'])
             activity['wTo'] = slot['endWeek'] or activity['wFrom']
             if resource_slot:
