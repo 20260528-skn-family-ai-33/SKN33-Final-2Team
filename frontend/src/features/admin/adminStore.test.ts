@@ -30,14 +30,13 @@ const emp = rows('직원', [col('code', '사번', { key: true }), col('name', '�
 const row = { code: '20220001', name: '조은호', task: 'RAG; 문서 검색', dept_name: '업무시스템팀' };
 
 describe('관리자 목표 후보 모드', () => {
-  it('초기화 후 일괄 생성은 Ollama, 인사 저장·반영은 직원 선택으로 시작한다', () => {
-    setChoice('goalsAll', 'mock');
+  it('초기화 후 인사 저장·반영은 직원 선택으로 시작한다', () => {
     setChoice('applyGoal', 'mock');
     dataReset();
-    expect(adm().choice).toEqual({ goalsAll: 'ollama', editGoal: 'employee', applyGoal: 'employee' });
+    expect(adm().choice).toEqual({ editGoal: 'employee', applyGoal: 'employee' });
   });
 
-  it.each(['goalsAll', 'editGoal', 'applyGoal'] as const)('서버 시연이 꺼지면 %s의 기존 mock을 실제 모델로 바꾸지 않고 재선택을 요구한다', (choice) => {
+  it.each(['editGoal', 'applyGoal'] as const)('서버 시연이 꺼지면 %s의 기존 mock을 실제 모델로 바꾸지 않고 재선택을 요구한다', (choice) => {
     setChoice(choice, 'mock');
     expect(() => requireDemoGoalAllowed(adm().choice[choice], false)).toThrow(ApiError);
     try { requireDemoGoalAllowed(adm().choice[choice], false); }

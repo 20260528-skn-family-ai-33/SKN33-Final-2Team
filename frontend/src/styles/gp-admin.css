@@ -5,7 +5,7 @@ body.admin .view .card + .card { margin-top: 12px; }
 .me.adm .avatar { background: var(--ink-2); color: #fff; }
 
 .adm-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
-.adm-grid .card { margin: 0; }
+body.admin .view .adm-grid > .card { margin: 0; }
 .adm-num { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 6px 0 10px; }
 .adm-num div { display: flex; flex-direction: column; }
 .adm-num small { font-size: 12px; color: var(--ink-3); }

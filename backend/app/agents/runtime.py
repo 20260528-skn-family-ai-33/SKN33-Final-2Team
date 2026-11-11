@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from .. import db, llm
+from .. import db, llm, provider_policy
 from ..config import S
 from ..errors import AgentError
 
@@ -50,6 +50,8 @@ class Ctx:
     by: str = ''  # 호출을 시작한 쪽: 비면 직원 본인, '관리자'면 관리자 화면에서 시작(에이전트 동작 보기 표시용)
     reasoning: dict = field(default_factory=dict)  # 직원이 고른 모드별 추론 정도 {ollama|openai: 단계}. 없는 모드는 .env 기본값
 
+    provider_managed: bool = False
+
     @property
     def mode(self) -> str:
         return 'mock' if self.demo else self.provider if llm.available(self.provider) else 'off'
@@ -67,7 +69,10 @@ def context(employee_id: int, me: dict | None = None) -> Ctx:
     # 시연 API를 차단한 뒤에도 저장된 옵션이 실제 모델 호출을 바꾸지 않게 한다.
     demo = S.demo_mode and bool(s.get('demo_mock'))
     fail_sim = (s.get('fail_sim') or {}) if S.demo_mode else {}
-    return Ctx(employee_id, s.get('ai_provider') or 'ollama', demo, fail_sim, me or {}, reasoning=s.get('reasoning') or {})
+    policy, level = provider_policy.selection()
+    reasoning = (s.get('reasoning') or {}) if policy == 'employee' else ({policy: level} if level else {})
+    return Ctx(employee_id, provider_policy.resolve(policy, s.get('ai_provider')), demo, fail_sim, me or {},
+               reasoning=reasoning, provider_managed=policy != 'employee')
 
 
 def reset_tries(employee_id: int) -> None:

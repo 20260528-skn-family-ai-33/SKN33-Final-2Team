@@ -290,7 +290,8 @@ def _table(sheet: Sheet, header: list, data: list[list], notes: list[str]) -> li
     return out
 
 
-def read_upload(name: str, raw: bytes, sheets: list[Sheet], sheet_hint: str | None) -> tuple[dict[str, list[Row]], list[str]]:
+def read_upload(name: str, raw: bytes, sheets: list[Sheet], sheet_hint: str | None, *,
+                retired_csv_headers: tuple[str, ...] = ()) -> tuple[dict[str, list[Row]], list[str]]:
     """엑셀(여러 시트) 또는 CSV(시트 하나) → 시트별 행"""
     notes: list[str] = []
     found: dict[str, list[Row]] = {}
@@ -328,6 +329,8 @@ def read_upload(name: str, raw: bytes, sheets: list[Sheet], sheet_hint: str | No
         header = lines[0]
         heads = {_norm_head(h) for h in header}
         sh = next((s for s in sheets if s.name == sheet_hint), None) if sheet_hint else None
+        if retired_csv_headers and (heads.intersection(_norm_head(h) for h in retired_csv_headers) or (sheet_hint and not sh)):
+            raise ApiError(422, 'NO_SHEET', '지원하지 않는 시트의 CSV예요', '현재 양식을 내려받아 사용해 주세요')
         if not sh:
             # 머리글이 가장 많이 맞는 시트
             score = lambda s: len(heads & {_norm_head(c.header) for c in s.cols})  # noqa: E731

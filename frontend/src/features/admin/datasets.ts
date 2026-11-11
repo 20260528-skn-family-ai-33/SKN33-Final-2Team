@@ -2,7 +2,7 @@
 import type { DatasetId, RowAction, UploadStatus } from '@/api/types/admin';
 
 export const DS: Record<DatasetId, { title: string; icon: string; lead: string; sheets: string[] }> = {
-  hr: { title: '인적 데이터', icon: 'users', lead: '부서·직원·근무성적평정. 인사이동은 직원의 ‘부서 코드’를, 부서장 권한은 ‘부서장’을 고쳐요. 직원은 지우지 않고 퇴직 처리해요.', sheets: ['직원', '부서', '평정'] },
+  hr: { title: '인적 데이터', icon: 'users', lead: '부서와 직원 정보를 관리해요. 인사이동은 직원의 ‘부서 코드’를, 부서장 권한은 ‘부서장’을 고쳐요. 직원은 지우지 않고 퇴직 처리해요.', sheets: ['직원', '부서'] },
   education:{ title: '교육 데이터', icon: 'book', lead: '로드맵 추천에 쓰는 강좌·도서·자격증. 학습 형식·시간·단계·비용은 팀 DB에 없어 규칙으로 채운 ‘추정’ 값이 있고, 고치면 추정 표시가 빠져요.', sheets: ['강좌', '도서', '자격증'] },
 };
 export const isDataset = (x: string | undefined): x is DatasetId => !!x && x in DS;

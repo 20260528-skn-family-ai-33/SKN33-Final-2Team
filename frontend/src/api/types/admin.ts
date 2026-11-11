@@ -29,7 +29,6 @@ export interface AdminOverview {
     heads: number;
     noNumber: number;
     departments: number;
-    evaluations: number;
     transfers: { at: string; name: string; from: string | null; to: string | null; headBefore: boolean; headAfter: boolean }[];
   };
   /** 지금 규정 수 · 원문 PDF 가 서버에 있는 규정 수 · 관리자가 올린 PDF 수와 마지막으로 올린 때 */

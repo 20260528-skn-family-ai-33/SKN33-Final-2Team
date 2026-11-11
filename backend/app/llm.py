@@ -12,6 +12,7 @@ import urllib.error
 import urllib.request
 from urllib.parse import quote
 
+from . import provider_keys
 from .config import OLLAMA_REGULATION_THINK, S
 
 
@@ -21,7 +22,9 @@ class LlmError(Exception):
 
 def available(provider: str) -> bool:
     # RunPod-Ollama 모델은 비워 두면 팀 모델(config.OLLAMA_TEAM_*)이라 주소만 있으면 쓸 수 있다
-    return bool(S.ollama_url) if provider == 'ollama' else bool(S.openai_key) if provider == 'openai' else False
+    if provider == 'ollama':
+        return bool(S.ollama_url)
+    return provider == 'openai' and bool(provider_keys.read(S, 'openai').value)
 
 
 def _http(url: str, payload: dict | None, headers: dict, timeout: int):
@@ -31,9 +34,10 @@ def _http(url: str, payload: dict | None, headers: dict, timeout: int):
 
 
 def openai(path: str, payload: dict | None, timeout: int = 90) -> dict:
-    if not S.openai_key:
-        raise LlmError('.env 에 OPENAI_API_KEY 가 없어요')
-    headers = {'Authorization': f'Bearer {S.openai_key}'}
+    key = provider_keys.read(S, 'openai').value
+    if not key:
+        raise LlmError('OpenAI API 키가 등록되지 않았어요')
+    headers = {'Authorization': f'Bearer {key}'}
     if payload is not None:
         headers['Content-Type'] = 'application/json'
     try:
@@ -44,7 +48,10 @@ def openai(path: str, payload: dict | None, timeout: int = 90) -> dict:
             msg = json.loads(e.read().decode('utf-8')).get('error', {}).get('message', '')
         except Exception:  # noqa: BLE001 - 응답 본문이 JSON이 아닐 수 있음
             msg = ''
-        raise LlmError(f'OpenAI {e.code}: {msg or e.reason}') from e
+        if e.code in (401, 403):
+            msg = 'API 키 인증 또는 접근 권한을 확인해 주세요'
+        detail = str(msg or e.reason).replace(key, '[redacted]')
+        raise LlmError(f'OpenAI {e.code}: {detail}') from e
     except (socket.timeout, TimeoutError) as e:
         raise LlmError(f'OpenAI 시간 초과: {timeout}초 안에 응답 없음') from e
     except urllib.error.URLError as e:
@@ -58,8 +65,9 @@ def ollama(path: str, payload: dict | None, timeout: int | None = None) -> dict:
         raise LlmError('Ollama 설정이 없어요 (.env 의 OLLAMA_BASE_URL)')
     timeout = timeout or S.ollama_timeout
     headers = {}
-    if S.ollama_key:
-        headers['Authorization'] = f'Bearer {S.ollama_key}'
+    key = provider_keys.read(S, 'ollama').value
+    if key:
+        headers['Authorization'] = f'Bearer {key}'
     if payload is not None:
         headers['Content-Type'] = 'application/json'
     try:
@@ -75,7 +83,8 @@ def ollama(path: str, payload: dict | None, timeout: int | None = None) -> dict:
             if e.code == 524:
                 raise LlmError('RunPod 프록시 524: 응답 시간 제한(약 100초)을 넘었어요') from e
             raise LlmError(f'RunPod 프록시 HTTP {e.code}: Ollama 응답이 아니에요 (Pod 꺼짐·시작 중 또는 Ollama 미실행)') from e
-        raise LlmError(f'Ollama {e.code}: {msg}') from e
+        detail = str(msg).replace(key, '[redacted]') if key else msg
+        raise LlmError(f'Ollama {e.code}: {detail}') from e
     except (socket.timeout, TimeoutError) as e:
         raise LlmError(f'Ollama 시간 초과: {timeout}초 안에 응답 없음') from e
     except urllib.error.URLError as e:

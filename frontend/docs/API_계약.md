@@ -1,5 +1,13 @@
 # API 계약 (화면이 백엔드에 기대하는 것)
 
+## 관리자 LLM 선택 (#120)
+
+관리자 설정 응답의 `policyStatus`는 정상 시 `active`, 직원별 선택을 끄고 모델을 지정하지 않아 Ollama가 적용된 경우 `default_ollama`다. 설정 파일 형식이 잘못되면 관리자 조회는 `200`과 `{policy: null, level: null, policyStatus: "invalid", ...}`를 반환해 화면에서 새 설정을 저장할 수 있다. 이때 새 모델 실행과 목표 후보 일괄 재생성은 `503 BAD_PROVIDER_POLICY`로 중단된다.
+
+관리자 데이터 관리 화면은 `GET /api/v1/admin/ai-provider`로 현재 정책, 직원별 선택 허용 여부, 서버에 등록한 모델 이름·키 등록 여부·설정 가능 여부를 조회한다. 저장은 `PUT /api/v1/admin/ai-provider`에 `{"policy":"openai"}`, `{"policy":"ollama"}` 또는 베타의 `{"policy":"employee"}`를 보낸다. 고정 모델을 저장할 때 `level`에 지원하는 추론 단계나 `null`(서버 기본값)을 함께 보낸다. 직원별 선택은 단계를 지정할 수 없다. 직원·부서장으로 관리자 API를 사용하면 403, 환경 설정이 빠진 제공자를 저장하면 409를 반환한다. 기본 키는 서버 .env에서 읽는다. 관리자는 `PUT /admin/ai-provider/{provider}/key`에 `{"key":"새 키"}`를 보내 등록하고, `DELETE`로 해제한다. 응답에는 키 원문 없이 `keySource`(env/admin/none), `hasDefaultKey`, `keyConfigured`가 포함된다. 연결 확인은 기존 `GET /api/v1/ai/status?provider=...`를 쓴다.
+
+관리자가 제공자를 고정하면 직원·부서장에게는 해당 모델을 표시하고 제공자·추론 설정 변경 요청은 409를 반환한다. 직원별 선택으로 돌아가면 저장된 개인 선택을 다시 사용한다. 직원 화면은 로그인·새로고침·창 복귀·모델 정보 열기 때 유효한 정책을 읽는다.
+
 화면(`frontend/`)이 실제로 부르는 API와 그 약속이에요. 기준은 **`frontend/src/api/`의 코드**이고, 이 문서는 그 요약이에요. 계약을 바꾸면 `api/endpoints/*`·`api/types/*`와 이 문서를 함께 고쳐요.
 
 - 응답 모양은 참고용 백엔드(`backend/` = 5차 FastAPI)에서 확인했어요.
@@ -60,7 +68,7 @@
 | --- | --- |
 | `POST /auth/login` · `POST /auth/logout` · `GET /me` | 로그인·로그아웃·새로 고침 때 계정 |
 | `GET /me/workspace` | 로그인 뒤 내 기록 전체(작성 문서·로드맵·보고서) |
-| `GET /me/profile` · `PUT`/`DELETE /me/profile/self` · `PUT /me/evaluations/{period}/consent` | 내 정보(동의는 `{period, consent}`를 돌려줌) |
+| `GET /me/profile` · `PUT`/`DELETE /me/profile/self` | 내 정보 |
 | `GET /me/goal-suggestions` · `POST /me/goal-suggestions/ensure` · `POST /me/goal-suggestions/regenerate` | 저장된 후보 조회 · 누락/변경 확인 · 명시적 다시 만들기 |
 | `GET /ai/providers` · `PUT /me/ai-provider` · `GET /ai/status?provider=` · `GET /ai/log` | 좌측 AI 모델 고르기·연결 상태·에이전트 동작 보기(시연·디버그 전용 · 직원·관리자 계정 모두 · 누가 호출했든 모든 계정의 최근 호출을 `employee`(누구의 일)·`by`(관리자 화면에서 시작하면 '관리자')와 함께 줌 · 운영에서는 끔) |
 | `PUT /me/reasoning` | 좌측 AI 모델에서 모델별 추론 정도 고르기(직원 계정만) |
@@ -88,15 +96,15 @@
 - OpenAI: `GET /ai/providers`의 openai 항목 `reasoning: {levels, default, modelDefault}`. `levels`는 `.env`의 `OPENAI_REASONING_LEVELS`이고 비면 기본 모델 gpt-6-luna의 코드 값(`none`~`xhigh`)이다(다른 모델이면 빈 목록 = 고르지 못함). `default`는 `.env`의 `OPENAI_REASONING_EFFORT`(비면 `null` = 보내지 않음), `modelDefault`는 보내지 않을 때 모델이 쓰는 값(gpt-6-luna `medium` · 모르는 모델이면 `null`)이고 화면 '기본값 · 보통' 표시에만 쓴다.
 - RunPod-Ollama: 진단·로드맵 모델에만 고르고, 모델마다 달라 `GET /ai/providers`의 `reasoning.levels`는 `null`이다(`default`는 `.env` 기본값). `GET /ai/status?provider=ollama`에서 진단·로드맵 모델(`role: default`)의 `models[].think: {levels, default}`(Ollama `/api/show` `thinking.values` · 켜고 끄기는 `off`·`on`)로 온다. 확인하지 못하면 `null`, 고를 단계가 없으면 빈 목록이다. 규정 모델 줄의 `think`는 늘 `null`이다.
 
-직원이 고른 값은 `GET /me`·`PUT /me/demo-settings` 응답의 `reasoning`으로 온다. 서버는 고른 값 → `.env` 기본값 순으로(고른 값이 지금 모델이 받는 단계가 아니면 — 모델을 바꾼 뒤 남은 옛 선택 등 — `.env` 기본값 · 단계를 확인하지 못하면 고른 값 그대로) Ollama에는 `think`(on/off는 true/false, 나머지는 단계 이름), OpenAI에는 `reasoning_effort`로 보내고, 둘 다 없으면 보내지 않아 모델 기본값을 따른다. **RunPod-Ollama 규정 에이전트(사내 생활 도우미) 호출은 생각을 끄고 학습한 모델이라 고른 값·`.env`와 관계없이 늘 `think: false`다.** 이미지 읽기 모델에는 직원 값을 쓰지 않는다. 관리자가 모델을 골라 목표 후보를 다시 만들 때는 직원 값 대신 `.env` 기본값을 쓴다.
+직원이 고른 값은 `GET /me`·`PUT /me/demo-settings` 응답의 `reasoning`으로 온다. 서버는 고른 값 → `.env` 기본값 순으로(고른 값이 지금 모델이 받는 단계가 아니면 — 모델을 바꾼 뒤 남은 옛 선택 등 — `.env` 기본값 · 단계를 확인하지 못하면 고른 값 그대로) Ollama에는 `think`(on/off는 true/false, 나머지는 단계 이름), OpenAI에는 `reasoning_effort`로 보내고, 둘 다 없으면 보내지 않아 모델 기본값을 따른다. **RunPod-Ollama 규정 에이전트(사내 생활 도우미) 호출은 생각을 끄고 학습한 모델이라 고른 값·`.env`와 관계없이 늘 `think: false`다.** 이미지 읽기 모델에는 직원 값을 쓰지 않는다. 관리자 고정 모델의 목표 후보도 관리자 추론 단계를 사용하며, 미지정 시 서버 기본값을 따른다.
 
-평정 동의 요청은 `{ "consent": true }` 또는 `{ "consent": false }`만 받는다. 누락·NULL·문자열·숫자는 `422 / CONSENT_REQUIRED`이며 기존 동의값을 보존한다. 개인 입력의 `devYears`가 숫자로 바뀌지 않거나 0~50년 범위를 벗어나면 `422 / DEV_YEARS_RANGE`를 반환하고 기존 입력을 보존한다. #15의 격리 DB·실제 인증 API 검사로 확인했다.
+근무성적평정은 내 정보와 목표 추천에서 제외한다. 호환용 응답 배열 `evaluations`와 `view.evals`는 비어 있다. 개인 입력의 `devYears`가 숫자로 바뀌지 않거나 0~50년 범위를 벗어나면 `422 / DEV_YEARS_RANGE`를 반환하고 기존 입력을 보존한다. #15의 격리 DB·실제 인증 API 검사로 확인했다.
 
 업무 설명(`view.profile.workDesc`·`self.profile.workDesc`)은 `employees.planned_project_description`에서 읽고 같은 열에 저장한다. 빈 값은 NULL이며 최대 500자(`422 / WORK_DESC_LENGTH`)다. 프로젝트는 기존 `employee_input_profiles.project_experience`의 줄바꿈 목록을 사용한다. 둘 다 선택이므로 프로젝트만 입력해도 저장·맞춤 추천이 가능하다. 새 테이블/열은 추가하지 않는다. 새 저장은 `edited.workDesc`를 만들지 않고 처음 값과 변경 해시만 보존한다.
 
 무변경 저장은 원래 입력 프로필 행과 갱신 시점을 보존한다. 업무 설명만 고쳐도 빈 입력 프로필을 만들지 않는다. 되돌리기는 본인이 고친 설명을 처음 값으로 복원하되 기술만 고쳤거나 이후 관리자가 갱신한 설명은 덮지 않는다. 구판 `edited.workDesc`는 명시적 저장/이관 전까지 읽기 호환을 유지한다. 선택 이관 SQL `backend/db/migrate_self_work_descriptions.sql`은 팀 열과 충돌하면 전체 롤백하며 구판 사본에 없던 처음 설명을 추정하지 않는다. 부서장 응답에는 본인 입력을 보내지 않는다.
 
-`POST /auth/login`과 `GET /me`는 목표 생성 요청이나 추천 입력 해시 검사를 하지 않는다. 본인 입력 저장/되돌리기·평정 동의·관리자 수정/업로드의 **저장 성공 뒤 추천 입력 해시가 바뀐 직원만** 백그라운드로 갱신한다. 부서명·상위 부서 변경은 해당/직속 하위 부서의 직원, 보유 자격명 변경은 연결된 직원도 포함한다. 무변경 저장과 저장 실패는 재생성하지 않는다. 목표 화면의 `ensure`는 생성 기록·후보가 모두 없는 계정만 처음 준비하며 기존 후보·실패 상태·설정용 mock 후보를 자동 재생성하지 않는다. 생성 중 정보가 바뀌면 옛 결과는 저장하지 않고 지정 모델로 최신 입력을 준비한다. 실패하면 기존 후보를 보존하고 수동으로 재시도한다. `regenerate`는 명시적 다시 만들기이며 SQL 직접 수정 후에도 사용한다. 배포 전에 사전 생성 도구로 준비할 수 있다.
+`POST /auth/login`과 `GET /me`는 목표 생성 요청이나 추천 입력 해시 검사를 하지 않는다. 본인 입력 저장/되돌리기·관리자 수정/업로드의 **저장 성공 뒤 추천 입력 해시가 바뀐 직원만** 백그라운드로 갱신한다. 부서명·상위 부서 변경은 해당/직속 하위 부서의 직원, 보유 자격명 변경은 연결된 직원도 포함한다. 무변경 저장과 저장 실패는 재생성하지 않는다. 목표 화면의 `ensure`는 생성 기록·후보가 모두 없는 계정만 처음 준비하며 기존 후보·실패 상태·설정용 mock 후보를 자동 재생성하지 않는다. 생성 중 정보가 바뀌면 옛 결과는 저장하지 않고 지정 모델로 최신 입력을 준비한다. 실패하면 기존 후보를 보존하고 수동으로 재시도한다. `regenerate`는 명시적 다시 만들기이며 SQL 직접 수정 후에도 사용한다. 배포 전에 사전 생성 도구로 준비할 수 있다.
 
 목표 추천은 본인 입력의 프로젝트를 사용하며, 진단 문항·진단 결과와 로드맵 전달에는 `profile.projectExperience`(최대 5개·각 300자)를 포함한다. 이는 경험 참고이며 업로드한 현재 기획서의 `projectSummary`나 숙련도 증빙으로 대체하지 않는다. 로드맵 전달 내용 화면에도 업무 설명과 프로젝트 경험을 표시한다.
 
@@ -149,7 +157,7 @@
 
 ### 사내 생활 도우미 — `assistant.ts`
 
-챗봇은 로그인한 직원의 계정별 AI 설정을 따릅니다. 직원 ID는 작업 소유권과 호출 기록에 사용합니다. 모델에는 빈 사용자 상황을 전달하고, 규정 원문의 적용 대상과 질문·앞 대화에 적힌 조건을 사용합니다. 브라우저 대화는 직원별로 분리합니다.
+챗봇은 관리자가 지정한 제공자를 사용합니다. 베타의 직원별 선택에서는 로그인한 직원의 AI 설정을 따릅니다. 직원 ID는 작업 소유권과 호출 기록에 사용합니다. 모델에는 빈 사용자 상황을 전달하고, 규정 원문의 적용 대상과 질문·앞 대화에 적힌 조건을 사용합니다. 브라우저 대화는 직원별로 분리합니다.
 
 수자원공사 정보로 분류되면 `knowledge.documents`·`knowledge.chunks`의 같은 범주·실제 자료만 벡터 검색해 답변 모델에 전달해요. 회사 답변은 `kind=general`, `source=work`이고 `summary`에 출처가 덧붙어요. 선택 필드 `answer.knowledgeSources[]`는 `{chunkId, documentId, documentTitle, sourceUrl, location, asOf, sourceLimits, isVirtual, textSha256, sourceFileSha256, textTruncated}`이며, 실제 인용한 검색 결과만 들어가요. `basis`는 규정 조항 전용으로 유지해요. 회사 자료에 맞는 근거가 없으면 `knowledgeSources=[]`와 확인 불가 안내예요. 다른 범주·가상 자료·없는 인용 ID·근거 없는 숫자는 허용하지 않아요.
 
@@ -222,7 +230,7 @@
 | `GET /admin/datasets/{ds}/export?format=&sheet=` · `.../template?...` | 엑셀·CSV 내려받기(링크로 염) |
 | `POST /admin/datasets/{ds}/preview`(파일) · `GET /admin/uploads/{id}` · `POST .../apply` · `DELETE /admin/uploads/{id}` · `GET /admin/uploads?dataset=` | 파일 미리보기 · 다시 보기 · 반영 · 취소 · 이력 |
 | `GET /admin/goal-suggestions/employees` | 목표 후보를 다시 만들 직원 고르기(재직 직원 · 지금 후보 상태와 만든 모드) |
-| `POST /admin/goal-suggestions/regenerate-all` | 목표 후보 다시 만들기. 본문 `{ mode, employeeIds? }` — `mode`: `mock`(가데이터) · `ollama` · `openai`(관리자가 고른 모델 · 직원 설정은 그대로) · `null`(각 직원이 고른 AI 모드). `employeeIds`가 있으면 그 직원만(재직 직원만 받음 · 없으면 400 `NO_EMPLOYEES`). 고른 모델을 지금 쓸 수 없으면 409 `AI_UNAVAILABLE` |
+| `POST /admin/goal-suggestions/regenerate-all` | 목표 후보 다시 만들기. 화면은 `{expectedPolicy, expectedLevel, employeeIds?}`를 보낸다. 고정 모델은 해당 제공자, 직원별 선택은 직원의 설정을 사용한다. 확인한 정책이 바뀌면 409. `employeeIds`가 있으면 그 직원만(재직 직원만 받음 · 없으면 400 `NO_EMPLOYEES`). 고른 모델을 지금 쓸 수 없으면 409 `AI_UNAVAILABLE` |
 | `GET /admin/regulations` | 규정 데이터 '지금 규정': 도우미가 쓰는 버전의 규정 목록(`id`·`name`·`group`·`version`·`effective`·`fileName`·`size`·`available`). 규정이 많은 직원 구분부터 |
 | `GET /admin/regulations/{id}/pdf` | 지금 규정 원문 PDF 내려받기(링크로 염 · 서버에 원문이 없으면 404 `NO_PDF`) |
 | `POST /admin/regulations/uploads`(파일 `file` + `memo`) · `GET /admin/regulations/uploads` | 새 규정 PDF 올리기(PDF만 · 20MB · 메모 500자 · 201) · 올린 PDF 목록(처리 상태 없음) |

@@ -44,6 +44,23 @@ describe('서버 시연 허용 상태', () => {
   });
 });
 
+it('관리자 지정을 해제하면 다시 로그인하지 않아도 직원의 제공자와 추론 설정을 복원한다', async () => {
+  useOllama({ default: 'team-model', roadmap: 'team-model', embed: '', vision: '' });
+  const providers = vi.spyOn(aiApi, 'providers');
+  try {
+    providers.mockResolvedValueOnce({ current: 'openai', policy: 'openai', employeeReasoning: {}, providers: [], docLibs: {} });
+    await checkStatus();
+    applySettings({ aiProvider: 'ollama' });
+    expect(ai.choice()).toBe('api');
+    providers.mockResolvedValueOnce({ current: 'ollama', policy: 'employee', employeeReasoning: { ollama: 'low' }, providers: [], docLibs: {} });
+    await checkStatus();
+    expect(ai.choice()).toBe('ollama');
+    expect(ai.reasoning('ollama')).toBe('low');
+  } finally {
+    providers.mockRestore();
+  }
+});
+
 describe('역할별 모델 이름', () => {
   it('규정 역할은 규정 모델을, 진단·로드맵은 각자의 모델을 쓴다', () => {
     useOllama({ default: 'ft-27b', roadmap: 'ft-27b', regulation: 'ft-4b', embed: 'text-embedding-3-small', vision: '' });
