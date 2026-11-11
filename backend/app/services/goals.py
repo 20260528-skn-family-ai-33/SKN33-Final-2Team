@@ -11,8 +11,9 @@ from __future__ import annotations
 from contextlib import nullcontext
 import hashlib
 import json
+from typing import TypedDict
 
-from .. import db, jobs
+from .. import db, jobs, llm, provider_policy
 from ..agents import goals as G
 from ..agents import runtime as rt
 from ..config import S
@@ -78,8 +79,46 @@ def _run_state(t: db.Tx, employee_id: int, **v) -> None:
                   finished_at = EXCLUDED.finished_at""", e=employee_id, **vals)
 
 
+class BulkModel(TypedDict):
+    provider: str
+    model: str
+    level: str | None
+    default_level: str | None
+
+
+def _default_level(provider: str) -> str | None:
+    return {'openai': S.openai_reasoning, 'ollama': S.ollama_think}.get(provider)
+
+
+def bulk_model(employee: dict, mode: str | None, level: str | None) -> BulkModel:
+    if mode is None:
+        provider = provider_policy.resolve('employee', employee.get('ai_provider'))
+        level = (employee.get('reasoning') or {}).get(provider)
+        if S.demo_mode and employee.get('demo_mock'):
+            provider, level = 'mock', None
+    else:
+        provider = mode
+    return BulkModel(provider=provider, model=llm.model_name(provider), level=level,
+                     default_level=_default_level(provider) if level is None else None)
+
+
+def _apply_bulk_model(ctx: rt.Ctx, approved: BulkModel, mode: str | None) -> None:
+    provider, level = approved['provider'], approved['level']
+    validate_mode(provider)
+    if provider not in ('mock', 'openai', 'ollama') or approved['model'] != llm.model_name(provider):
+        raise ApiError(409, 'BULK_MODEL_CHANGED', '승인한 모델을 사용할 수 없어요. 모델을 확인하고 다시 요청해 주세요.')
+    if level is None and approved['default_level'] != _default_level(provider):
+        raise ApiError(409, 'BULK_MODEL_CHANGED', '서버의 기본 추론 단계가 변경됐어요. 확인 후 다시 요청해 주세요.')
+    ctx.demo = provider == 'mock'
+    if not ctx.demo:
+        ctx.provider = provider
+        ctx.reasoning = {provider: level} if level else {}
+    if mode is not None:
+        ctx.fail_sim = {}
+
+
 def request(employee_id: int, trigger: str, avoid: list[str] | None = None, mode: str | None = None,
-            *, only_if_stale: bool = False) -> str | None:
+            *, only_if_stale: bool = False, approved_model: BulkModel | None = None) -> str | None:
     """같은 직원의 동시 요청은 작업을 공유한다. 같은 입력의 실패는 수동으로만 재시도한다."""
     validate_mode(mode)
     with db.tx() as t:
@@ -97,10 +136,11 @@ def request(employee_id: int, trigger: str, avoid: list[str] | None = None, mode
             seeded_mock = run.get('trigger') == 'setup' and run.get('source') == 'mock'
             if same and (run.get('status') == 'failed' or (run.get('status') in ('ready', 'default') and count == 3 and not seeded_mock)):
                 return None
-        return _request(employee_id, trigger, avoid, mode, t=t)
+        return _request(employee_id, trigger, avoid, mode, t=t, approved_model=approved_model)
 
 
-def _request(employee_id: int, trigger: str, avoid: list[str] | None, mode: str | None, *, t: db.Tx | None = None) -> str | None:
+def _request(employee_id: int, trigger: str, avoid: list[str] | None, mode: str | None, *,
+             t: db.Tx | None = None, approved_model: BulkModel | None = None) -> str | None:
     """미리 만들기·다시 만들기 작업을 시작한다. 사내/본인 입력 근거가 전혀 없을 때만 기본 후보를 저장한다.
     mode 'mock' 은 관리자가 고른 '시연용 가데이터로 만들기', 'ollama'·'openai' 는 관리자가 고른 모델(직원이 고른 AI 모드 대신 ·
     직원 설정은 바꾸지 않음 · 실패 시연 없음). 없으면 그 직원이 고른 모드"""
@@ -117,27 +157,32 @@ def _request(employee_id: int, trigger: str, avoid: list[str] | None, mode: str 
         return None
 
     def work(job: jobs.JobCtx):
-        ctx = rt.context(employee_id, me)
-        if trigger.startswith('admin'):   # admin-all · admin-pick · admin-upload
-            ctx.by = '관리자'
-        if mode == 'mock':
-            ctx.demo, ctx.fail_sim = True, {}
-        elif mode in ('ollama', 'openai'):
-            # 고정 모드에서는 작업 문맥에 담긴 관리자의 모델과 추론 단계를 함께 사용한다.
-            if not ctx.provider_managed:
-                ctx.provider = mode
-                ctx.reasoning = {}
-            ctx.demo, ctx.fail_sim = False, {}
-        sim = rt.sim_once(ctx, 'goal', ph + '|' + '|'.join(avoid or []))
         try:
+            ctx = rt.context(employee_id, me)
+            if trigger.startswith('admin'):
+                ctx.by = '관리자'
+            if approved_model is not None:
+                _apply_bulk_model(ctx, approved_model, mode)
+            elif trigger in ('admin-all', 'admin-pick'):
+                # 이전 버전의 중단 작업에는 관리자가 확인한 추론 단계가 없다.
+                raise ApiError(409, 'BULK_MODEL_UNKNOWN', '기존 일괄 작업의 모델 설정을 확인할 수 없어요. 다시 요청해 주세요.')
+            elif mode == 'mock':
+                ctx.demo, ctx.fail_sim = True, {}
+            elif mode in ('ollama', 'openai'):
+                if not ctx.provider_managed:
+                    ctx.provider, ctx.reasoning = mode, {}
+                ctx.demo, ctx.fail_sim = False, {}
+            sim = rt.sim_once(ctx, 'goal', ph + '|' + '|'.join(avoid or []))
             out = G.run(ctx, dict(inp, avoid=avoid or []), sim=sim)
-        except rt.AgentError as e:
+        except (rt.AgentError, ApiError) as e:
             with db.tx() as t:
                 latest = t.one('SELECT job_id FROM app_ext.goal_suggestion_runs WHERE employee_id=:e FOR UPDATE', e=employee_id) or {}
                 if str(latest.get('job_id')) == job.job_id:
-                    _run_state(t, employee_id, status='failed', used=inp['used'], profile_hash=ph, trigger=trigger, error=e.info, job_id=job.job_id)
-            if _hash(G.goal_input(profile.view(employee_id))) != ph:
-                request(employee_id, 'admin-profile-changed' if trigger.startswith('admin') else 'profile-changed', mode=mode, only_if_stale=True)
+                    _run_state(t, employee_id, status='failed', used=inp['used'], profile_hash=ph, trigger=trigger,
+                               error=jobs.error_info(e), job_id=job.job_id)
+            if isinstance(e, rt.AgentError) and _hash(G.goal_input(profile.view(employee_id))) != ph:
+                request(employee_id, 'admin-profile-changed' if trigger.startswith('admin') else 'profile-changed',
+                        mode=mode, only_if_stale=True, approved_model=approved_model)
             raise
         changed = None
         with db.tx() as t:
@@ -155,14 +200,16 @@ def _request(employee_id: int, trigger: str, avoid: list[str] | None, mode: str 
         if changed:
             # 같은 실패 입력을 재시도하는 것이 아니라 저장 중 바뀐 새 입력을 준비한다.
             return {'discarded': True, 'nextJobId': request(employee_id,
-                    'admin-profile-changed' if trigger.startswith('admin') else 'profile-changed', mode=mode, only_if_stale=True)}
+                    'admin-profile-changed' if trigger.startswith('admin') else 'profile-changed', mode=mode,
+                    only_if_stale=True, approved_model=approved_model)}
         return {'candidates': out['candidates']}
 
     def mark(jid: str) -> None:
         with (nullcontext(t) if t is not None else db.tx()) as state_tx:
             _run_state(state_tx, employee_id, status='running', used=inp['used'], profile_hash=ph, trigger=trigger, job_id=jid)
 
-    work._resume = {'operation':'goals.request','kwargs':{'employee_id':employee_id,'trigger':trigger,'avoid':avoid,'mode':mode}}
+    work._resume = {'operation': 'goals.request', 'kwargs': {
+        'employee_id': employee_id, 'trigger': trigger, 'avoid': avoid, 'mode': mode, 'approved_model': approved_model}}
     return jobs.start('goal-suggestions', employee_id, str(employee_id), work, before_start=mark, transaction=t)
 
 

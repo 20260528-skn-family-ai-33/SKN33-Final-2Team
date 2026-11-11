@@ -149,10 +149,12 @@ def api_uploads(dataset: str = '', a: Account = Depends(require_admin)):
 
 
 _ACTIVE_SQL = """SELECT e.employee_id, e.name, e.employee_number, coalesce(d.name, e.department) AS dept, e.grade,
-                         g.status AS goal_status, g.source AS goal_source, g.finished_at
+                         g.status AS goal_status, g.source AS goal_source, g.finished_at,
+                         s.ai_provider, s.reasoning, s.demo_mock
                   FROM public.employees e LEFT JOIN app_ext.employee_hr h ON h.employee_id = e.employee_id
                   LEFT JOIN public.departments d ON d.department_id = e.department_id
                   LEFT JOIN app_ext.goal_suggestion_runs g ON g.employee_id = e.employee_id
+                  LEFT JOIN app_ext.user_settings s ON s.employee_id = e.employee_id
                   WHERE coalesce(h.employment_status, '재직') <> '퇴직' ORDER BY e.employee_id"""
 
 
@@ -182,22 +184,24 @@ def api_goals_all(body: dict | None = None, a: Account = Depends(require_admin))
         mode = policy
     if mode in ('ollama', 'openai') and not llm.available(mode):
         raise ApiError(409, 'AI_UNAVAILABLE', f'{provider_label(mode)}를 지금 쓸 수 없어요', unavailable_reason(mode) or '.env 설정을 확인해 주세요', kind='config')
-    ids = [x['employee_id'] for x in db.all_(_ACTIVE_SQL)]
+    employees = db.all_(_ACTIVE_SQL)
     pick = b.get('employeeIds')
     if pick is not None:
         if not isinstance(pick, list):
             raise ApiError(400, 'BAD_EMPLOYEES', 'employeeIds 는 직원 번호 목록이어야 해요')
         want = {int(x) for x in pick if str(x).isdigit()}
-        ids = [i for i in ids if i in want]
-        if not ids:
+        employees = [row for row in employees if row['employee_id'] in want]
+        if not employees:
             raise ApiError(400, 'NO_EMPLOYEES', '고른 직원 중 재직 중인 직원이 없어요', '목록에서 직원을 다시 골라 주세요')
     started, saved = 0, 0
-    for eid in ids:
-        if goals.request(eid, 'admin-pick' if pick is not None else 'admin-all', mode=mode):
+    trigger = 'admin-pick' if pick is not None else 'admin-all'
+    for row in employees:
+        approved = goals.bulk_model(row, mode, level)
+        if goals.request(row['employee_id'], trigger, mode=mode, approved_model=approved):
             started += 1
         else:
             saved += 1
-    return {'employees': len(ids), 'started': started, 'defaults': saved, 'mode': mode or 'employee'}
+    return {'employees': len(employees), 'started': started, 'defaults': saved, 'mode': mode or 'employee'}
 
 
 # ── 규정 원문 PDF: 지금 규정 내려받기 · 새 규정 PDF 올리기 (규정 내용은 고치지 않음) ──

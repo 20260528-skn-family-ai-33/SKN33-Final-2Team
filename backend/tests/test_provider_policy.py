@@ -17,6 +17,7 @@ from app import auth, errors, llm, provider_keys, provider_policy
 from app.agents import runtime
 from app.errors import ApiError, api_error_handler
 from app.routers import account, admin
+from app.services import goals
 
 
 class ProviderPolicyTests(unittest.TestCase):
@@ -31,7 +32,7 @@ class ProviderPolicyTests(unittest.TestCase):
         self.settings = replace(llm.S, var_dir=Path(self.directory), employee_ai_selection=True,
                                 openai_key='example-openai', ollama_key='example-ollama',
                                 ollama_url='http://localhost', ollama_think=None, demo_mode=False)
-        for module in (provider_policy, llm, account, runtime, admin, errors):
+        for module in (provider_policy, llm, account, runtime, admin, errors, goals):
             self.enterContext(patch.object(module, 'S', self.settings))
         self.identity = self.enterContext(patch.object(auth, 'account_of', return_value=auth.Account('admin', 1, 'test')))
         self.enterContext(patch.object(runtime.db, 'one', return_value={'ai_provider': 'ollama'}))
@@ -126,7 +127,9 @@ class ProviderPolicyTests(unittest.TestCase):
                 self.save(policy)
                 result = self.client.post(path, json={'expectedPolicy': policy, 'employeeIds': [7]})
                 self.assertEqual(result.json()['mode'], policy)
-                start.assert_called_once_with(7, 'admin-pick', mode=None if policy == 'employee' else policy)
+                self.assertEqual(start.call_args.args, (7, 'admin-pick'))
+                self.assertEqual(start.call_args.kwargs['approved_model']['provider'],
+                                 'ollama' if policy == 'employee' else policy)
                 start.reset_mock()
             self.assertEqual(self.client.post(path, json={'expectedPolicy': 'ollama'}).status_code, 409)
             start.assert_not_called()
@@ -144,6 +147,48 @@ class ProviderPolicyTests(unittest.TestCase):
             self.save('employee')
             restored = employee_settings()
             self.assertEqual((restored['current'], restored['employeeReasoning']), ('ollama', {'ollama': 'low'}))
+
+    def test_queued_and_recovered_bulk_use_the_selection_at_confirmation(self):
+        from types import SimpleNamespace
+        from app.services import job_recovery
+
+        employees = [{'employee_id': n, 'ai_provider': 'openai', 'reasoning': {'openai': 'high'}} for n in range(1, 10)]
+        route = '/api/v1/admin/goal-suggestions/regenerate-all'
+        queued = []
+
+        def enqueue(kind, employee, ref, work, **kwargs):
+            queued.append(work)
+            return 'job'
+
+        def call_model(ctx, *args, **kwargs):
+            runtime.llm_json(ctx, 'Return JSON', {})
+            return {'candidates': []}
+
+        with (patch.object(goals.db, 'tx') as tx, patch.object(admin.db, 'all_', return_value=employees),
+              patch.object(goals.profile, 'view', return_value={'job': 'engineer'}),
+              patch.object(goals.jobs, 'start', side_effect=enqueue), patch.object(goals.G, 'run', side_effect=call_model),
+              patch.object(llm, 'think_levels', return_value={'levels': ['on', 'off']}),
+              patch.object(llm, 'chat', return_value={'content': '{"ok":true}'}) as chat):
+            tx.return_value.__enter__.return_value.one.return_value = {}
+            for policy, level, expected, effort in [('ollama', 'on', 'ollama', 'on'), ('openai', 'high', 'openai', 'high'),
+                                                     ('employee', None, 'openai', 'high')]:
+                with self.subTest(policy=policy):
+                    queued.clear()
+                    res = self.client.put('/api/v1/admin/ai-provider', json={'policy': policy, 'level': level})
+                    self.assertEqual(res.status_code, 200)
+                    res = self.client.post(route, json={'expectedPolicy': policy, 'expectedLevel': level})
+                    self.assertEqual(res.json()['started'], len(employees))
+                    changed = ('openai', 'low') if policy != 'employee' else ('ollama', 'off')
+                    res = self.client.put('/api/v1/admin/ai-provider', json={'policy': changed[0], 'level': changed[1]})
+                    self.assertEqual(res.status_code, 200)
+                    descriptor = json.loads(json.dumps(queued[-1]._resume))
+                    job_recovery.invoke(descriptor, employees[-1]['employee_id'])
+                    chat.reset_mock()
+                    for work in queued:
+                        work(SimpleNamespace(job_id='job'))
+                    self.assertEqual(len(chat.call_args_list), 10)
+                    for call in chat.call_args_list:
+                        self.assertEqual((call.args[0], call.kwargs['reasoning']), (expected, effort))
 
     def test_bulk_override_cannot_bypass_managed_mode(self):
         self.save('ollama')
@@ -169,7 +214,7 @@ class ProviderPolicyTests(unittest.TestCase):
             self.assertEqual(result.status_code, 409)
             rows.assert_not_called()
         with patch.object(goals.profile, 'view', return_value={'job': 'engineer'}), patch.object(goals.jobs, 'start') as start:
-            goals._request(7, 'admin-pick', None, 'openai')
+            goals._request(7, 'admin-pick', None, 'openai', approved_model=goals.bulk_model({}, 'openai', 'high'))
             worker = start.call_args.args[3]
             with patch.object(goals.G, 'run', return_value={'candidates': []}) as generate, patch.object(goals.db, 'tx'):
                 worker(SimpleNamespace(job_id='test-job'))

@@ -77,7 +77,9 @@ class DemoGoalGuardTests(unittest.TestCase):
             response = self.client.post('/api/v1/admin/goal-suggestions/regenerate-all', json={'mode': 'mock'})
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.json()['mode'], 'mock')
-            request.assert_called_once_with(7, 'admin-all', mode='mock')
+            self.assertEqual(request.call_args.args, (7, 'admin-all'))
+            self.assertEqual(request.call_args.kwargs['mode'], 'mock')
+            self.assertEqual(request.call_args.kwargs['approved_model']['provider'], 'mock')
 
     def test_allowed_modes_are_not_rewritten(self):
         for enabled in (False, True):
@@ -90,7 +92,7 @@ class DemoGoalGuardTests(unittest.TestCase):
                     active_transaction = transaction.return_value.__enter__.return_value
                     active_transaction.one.return_value = {}
                     self.assertEqual(goals.request(1, 'manual', mode=mode), 'job')
-                    request.assert_called_once_with(1, 'manual', None, mode, t=active_transaction)
+                    request.assert_called_once_with(1, 'manual', None, mode, t=active_transaction, approved_model=None)
 
     def test_enabled_seed_retains_existing_empty_database_behavior(self):
         with patch.object(goals, 'S', replace(goals.S, demo_mode=True)), \

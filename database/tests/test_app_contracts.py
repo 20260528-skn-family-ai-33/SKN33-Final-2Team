@@ -275,6 +275,47 @@ class AppContractTests(unittest.TestCase):
         self.assertEqual(self.db.one('SELECT * FROM public.employee_input_profiles WHERE employee_id=:e', e=self.ids['member']), before)
         self.assertIsNone(self.db.one('SELECT * FROM app_ext.employee_self_inputs WHERE employee_id=:e', e=self.ids['member']))
 
+    def test_corrupt_policy_marks_queued_goal_failed_in_admin_overview(self):
+        from dataclasses import replace
+        from tempfile import TemporaryDirectory
+        from fastapi import FastAPI
+        from app import auth, errors, jobs, provider_policy
+        from app.routers import admin
+
+        api = FastAPI()
+        api.include_router(admin.r)
+        api.add_exception_handler(errors.ApiError, errors.api_error_handler)
+        api.dependency_overrides[auth.require_admin] = lambda: auth.Account('admin', 1, 'test')
+        client = self.enterContext(self.TestClient(api))
+        var_dir = Path(self.enterContext(TemporaryDirectory()))
+        eid = self.ids['member']
+        with self.db.tx() as t:
+            candidates = self.goals.G.defaults()
+            self.goals._save(t, eid, candidates)
+        baseline = client.get('/api/v1/admin/overview').json()['goals']
+        with (patch.object(provider_policy, 'S', replace(provider_policy.S, var_dir=var_dir, employee_ai_selection=True)),
+              patch.object(self.goals, 'request', self.actual_goal_request),
+              patch.object(jobs.POOL, 'submit') as submit, patch.object(self.goals.G, 'run') as model):
+            result = client.post('/api/v1/admin/goal-suggestions/regenerate-all',
+                                 json={'expectedPolicy': 'employee', 'employeeIds': [eid]})
+            self.assertEqual(result.status_code, 200, result.text)
+            self.assertEqual(result.json()['started'], 1)
+            before = client.get('/api/v1/admin/overview').json()['goals']
+            self.assertEqual(before['running'], baseline.get('running', 0) + 1)
+            (var_dir / 'ai-provider').write_text('unknown')
+            submit.call_args.args[0]()  # 등록 후 파일 손상. 직원의 후보 조회 없이 관리자 개요부터 읽는다.
+            after = client.get('/api/v1/admin/overview').json()['goals']
+            self.assertEqual(after.get('running', 0), baseline.get('running', 0))
+            self.assertEqual(after['failed'], baseline.get('failed', 0) + 1)
+            model.assert_not_called()
+        row = self.db.one("""SELECT g.status, g.error, j.status AS job_status, j.error AS job_error
+            FROM app_ext.goal_suggestion_runs g JOIN app_ext.jobs j USING (job_id) WHERE g.employee_id=:e""", e=eid)
+        self.assertEqual((row['status'], row['job_status']), ('failed', 'failed'))
+        self.assertEqual(row['error']['code'], 'BAD_PROVIDER_POLICY')
+        self.assertEqual(row['error'], row['job_error'])
+        kept = self.db.all_('SELECT prompt_text FROM public.employee_recommended_prompts WHERE employee_id=:e ORDER BY display_order', e=eid)
+        self.assertEqual([r['prompt_text'] for r in kept], [c['goal'] for c in candidates])
+
     def test_retired_appraisals_are_hidden_and_preserved(self):
         eid = self.ids['member']
         with self.db.tx() as t:

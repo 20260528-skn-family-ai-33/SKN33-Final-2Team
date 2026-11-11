@@ -99,6 +99,8 @@ def preview(ds: str, admin_id: int, file_name: str, raw: bytes, sheet_hint: str 
     out = _result(found, notes)
     sha = hashlib.sha256(raw).hexdigest()
     plan = {'states': [r.state() for rs in found.values() for r in rs], 'signature': base.signature(found), 'fileHash': sha, 'view': out['rows']}
+    if ds == 'hr' and file_name.lower().endswith('.csv'):
+        plan['hrCsvHeadersChecked'] = True
     uid = str(db.val("""INSERT INTO app_ext.admin_uploads(admin_id, dataset, file_name, status, summary, plan) VALUES(:a, :d, :f, 'previewed', :s, :p) RETURNING upload_id""",
                      a=admin_id, d=ds, f=file_name[:200], s=db.J({k: out[k] for k in ('summary', 'notes', 'errorRows', 'changeRows', 'canApply')}), p=db.J(plan)))
     # 원본 파일은 서버 폴더에 남긴다(규정 새 버전의 원본 파일 기록 · 배포 때는 파일 저장소)
@@ -126,6 +128,8 @@ def apply(upload_id: str, admin_id: int, goal_mode: str | None = None) -> dict:
     mod = get(up['dataset'])
     plan = up['plan']
     ext = up['file_name'].rsplit('.', 1)[-1].lower()[:5]
+    if up['dataset'] == 'hr' and ext == 'csv' and not plan.get('hrCsvHeadersChecked'):
+        raise ApiError(409, 'STALE_PREVIEW', '인적 CSV 양식 검사가 변경됐어요. 파일을 다시 올려 미리보기를 확인해 주세요.')
     ctx = {'admin_id': admin_id, 'upload_id': upload_id, 'file_name': up['file_name'], 'file_hash': plan['fileHash'],
            'storage_key': f'var/uploads/admin/{upload_id}.{ext}', 'goal_mode': goal_mode}
     with db.tx() as t:
