@@ -15,7 +15,7 @@ import { useState } from 'react';
 import { monthDay, planStart, startsLater, weekNow } from './ganttCalc';
 import { useClockRefresh } from '@/shared/state/demoClock';
 import { useMe } from '@/shared/state/session';
-import { toast } from '@/shared/state/ui';
+import { closeSheet, openSheet, toast } from '@/shared/state/ui';
 import { draftActive, recs, updateWs, useWs, ws } from '@/shared/state/workspace';
 import { Icon } from '@/shared/ui/Icon';
 import { useCatalog } from '@/shared/state/catalog';
@@ -44,11 +44,27 @@ function DraftBox() {
     updateWs((s) => void (s.lastNew = null));
     toast('작성 중인 로드맵을 지웠어요');
   };
+  /* 지우면 되돌릴 수 없어 한 번 확인한다(#224) */
+  const askDiscard = () =>
+    openSheet({
+      title: '작성 중인 로드맵을 지울까요?',
+      body: () => <p style={{ margin: 0 }}>지금까지 적은 목표·세부 사항과 역량 테스트 응답, 만들어 둔 로드맵 안이 모두 사라지고 되돌릴 수 없어요.</p>,
+      foot: () => (
+        <>
+          <button className="btn line" onClick={closeSheet}>
+            취소
+          </button>
+          <button className="btn pri" onClick={() => { closeSheet(); void discard(); }}>
+            지우기
+          </button>
+        </>
+      ),
+    });
   return (
     <div className="card">
       <div className="sec-h">
         <h2 className="st">작성 중인 새 로드맵</h2>
-        <button className="link quiet" onClick={() => void discard()}>
+        <button className="link quiet" onClick={askDiscard}>
           지우기
         </button>
       </div>
@@ -71,7 +87,7 @@ function PostCta({ R }: { R: PlanRecord }) {
   const c = count(R.plan, R.progress);
   return (
     <div className="actions">
-      <button className="btn line home-show-all" onClick={() => postStart(go, R.id)}>
+      <button className={c.done === c.t ? 'btn pri sm' : 'btn line home-show-all'} onClick={() => postStart(go, R.id)}>
         {c.done === c.t ? '사후 점검 시작' : '사후 점검·조기 종료'}
       </button>
     </div>
@@ -144,10 +160,10 @@ function StageCard({ R }: { R: PlanRecord }) {
           {hasMore && <button type="button" className="btn line home-show-all" aria-expanded={expanded} onClick={() => setExpanded(value => !value)}>{expanded ? '접기' : '모두 보기'}</button>}
         </span>
       </div>
-      {!groups.size && !visibleShared.length && <p className="small muted">{later ? `${startText}부터 시작해요.` : '이번 주차에 예정된 활동이 없어요.'} 모두 보기에서 전체 활동을 확인할 수 있어요.</p>}
+      {!groups.size && !visibleShared.length && <p className="small muted">{later ? `${startText}부터 시작해요.` : '이번 주차에 예정된 활동이 없어요.'}{hasMore ? ' ‘모두 보기’에서 전체 활동을 확인할 수 있어요.' : ''}</p>}
       <div className="home-skill-groups">
         {visibleShared.map(course => <section className="home-skill-group" key={`shared:${course.id}`}>
-          <h3>{course.skills.join(' and ')}</h3>
+          <h3>{course.skills.join(' · ')}</h3>
           <div className="home-material-group" data-kind="강좌">
             <h4>강좌<span>{course.activities.length}개</span></h4>
             <ul className="acts">{course.activities.map(activity => <ActRow key={activity.id} a={activity} R={R} />)}</ul>
@@ -164,6 +180,18 @@ function StageCard({ R }: { R: PlanRecord }) {
     </div>
   );
 }
+
+/** 첫 화면의 단계 안내. 단계 이름은 작성 화면의 단계 표시줄(STEPS)을 그대로 쓴다(#74 · #224) */
+const STEP_HINT: Record<StepKey, string> = {
+  goal: '기획서는 선택',
+  details: '비워 두면 AI가 제안',
+  check: '적은 내용 훑어보기',
+  quiz: '설문과 짧은 퀴즈',
+  result: '답과 해설 확인',
+  options: '세 코스 중 하나',
+  materials: '',
+  review: '산출물 과제 정하기',
+};
 
 function PastLink() {
   const go = useGo();
@@ -224,26 +252,20 @@ export function HomePage() {
       <>
         <p className="eyebrow">안녕하세요, {hello} 님</p>
         <h1 className="t lg">어떤 역량을 키우고 싶나요?</h1>
-        <p className="lead">목표와 학습 여건을 적고 짧은 점검에 답하면, 관점이 다른 로드맵 3안을 만들어 드려요.</p>
+        <p className="lead">목표와 학습 여건을 적고 역량 테스트에 답하면, 방식이 다른 로드맵 3안을 만들어 드려요.</p>
         <div className="actions">
           <button className="btn pri" onClick={() => go(paths.newGoal)}>
             새 로드맵 작성
           </button>
         </div>
         <PastLink />
-        <div className="pstrip five" style={{ marginTop: 40 }}>
-          {[
-            ['목표 적기', '기획서는 선택'],
-            ['세부 사항', '비워 두면 알아서'],
-            ['역량 테스트', '1~5점 척도'],
-            ['3안 비교', '관점별 작성'],
-            ['확정', '고친 뒤'],
-          ].map(([a, b], i) => (
-            <div key={a}>
+        <div className="pstrip steps" style={{ marginTop: 40 }}>
+          {STEPS.map(([key, label], i) => (
+            <div key={key}>
               <b>
-                {i + 1}. {a}
+                {i + 1}. {label}
               </b>
-              {b}
+              {STEP_HINT[key]}
             </div>
           ))}
         </div>
@@ -255,9 +277,13 @@ export function HomePage() {
     <>
       <p className="eyebrow">안녕하세요, {hello} 님</p>
       <h1 className="t">진행 중인 로드맵 {act.length}개</h1>
-      <p className="lead">전체 일정을 먼저 보여 드리고, 로드맵마다 이번 주차 활동을 보여 드려요.</p>
-      <GanttAll list={graphPlans} onMove={moveGraph} />
-      {act.map((R) => (
+      <p className="lead">
+        로드맵마다 이번 주차에 할 일을 먼저 보여 드리고, 아래에 전체 일정을 보여 드려요.{' '}
+        <button type="button" className="link" onClick={() => document.getElementById('home-gantt')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+          전체 일정으로 가기
+        </button>
+      </p>
+      {graphPlans.map((R) => (
         <section className="hp" key={R.id}>
           <div className="hp-h">
             <h2 className="hp-t">{R.plan.displayTitle || R.plan.goal}</h2>
@@ -274,6 +300,9 @@ export function HomePage() {
           <StageCard R={R} />
         </section>
       ))}
+      <div className="sec home-gantt" id="home-gantt">
+        <GanttAll list={graphPlans} onMove={moveGraph} />
+      </div>
       {drafting ? (
         <div className="sec">
           <DraftBox />
