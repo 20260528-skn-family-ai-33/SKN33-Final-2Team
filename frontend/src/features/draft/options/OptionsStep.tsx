@@ -13,7 +13,7 @@ import { usePrepareMaterials, ResourceSelection, type ResourceSelectionHandle, t
 import { completeMaterialSelection } from '../materials/materialTransition';
 import { OptionSummary } from './OptionSummary';
 import { comparisonEvidence } from './comparisonEvidence';
-import { trackName } from '@/shared/constants/data';
+import { trackName, trackTrait } from '@/shared/constants/data';
 /* 6. 로드맵·자료 선택 (#224): ① 코스 카드(A1·A2·A3 순서 고정)에서 하나를 고르고 ② 그 코스의 강좌·도서를 정한다.
    마음에 들지 않는 코스는 바라는 점을 적어 그 코스만 다시 만들고(API-32 · 버전으로 쌓임), ‹ › 로 버전을 넘겨 본다 */
 import { useCallback, useEffect, useId, useReducer, useRef, useState } from 'react';
@@ -384,7 +384,7 @@ export function OptionsStep() {
         onClick={event => { if (!(event.target as HTMLElement).closest('button,a,input,summary')) selectCourse(p.opt); }}>
         <div className="opt-course-top">
           <h3>{name}</h3>
-          <span className={`tag${on ? ' acc' : ''}`}>{(D.perspectives[p.opt]?.focus || '').split('. ')[0]}</span>
+          <span className={`tag${on ? ' acc' : ''}`}>{trackTrait(p.opt)}</span>
         </div>
         <p className="opt-tagline">{planDescription(p.tagline)}</p>
         <dl className="opt-facts">
@@ -444,7 +444,6 @@ export function OptionsStep() {
             <span className="step-num">1</span>
             <div>
               <h2>코스 고르기</h2>
-              <p>앞에서 고른 스킬과 순서는 그대로예요 · {materialNames.join(' → ')}</p>
             </div>
           </header>
           <div className="opt-courses" role="radiogroup" aria-label="로드맵 코스">

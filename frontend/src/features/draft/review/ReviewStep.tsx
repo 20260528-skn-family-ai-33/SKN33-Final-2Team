@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { DeliverableSelection, type DeliverableSelectionHandle } from './DeliverableSelection';
-import { D, trackName } from '@/shared/constants/data';
+import { trackName, trackTrait } from '@/shared/constants/data';
 /* 7. 검토·산출물 선택·확정 (5차 scr['new-review'] · P.confirm · #224)
    요약 → 주차별 일정 → 스킬별 산출물 과제 → 확정하면 일어나는 일 → 아래 고정 요약 줄.
    확정(API-35): 새 로드맵 기록. 시작 방식은 작성 탭에 들어올 때 고른 값을 쓴다(../startModeSheet) */
@@ -81,7 +81,7 @@ export function ReviewStep() {
   const option = opt ? g?.options[opt] : undefined;
   const courseName = opt ? trackName(opt, option?.name || pl?.name) : '';
   const version = g?.hist && opt && (g.hist[opt] || []).length > 1 ? ((g.cur || {})[opt] || 0) + 1 : null;
-  const focus = (D.perspectives[opt]?.focus || '').split('. ')[0];
+  const focus = trackTrait(opt);
   const name = reviewPlan?.displayTitle || pl?.displayTitle || option?.displayTitle || '';
   /* 시작 시점: '끝나고 시작'만 서버가 진행 중인 로드맵이 끝난 다음 주로 미룬다(시작 방식 창과 같은 계산) */
   const today = today0();
