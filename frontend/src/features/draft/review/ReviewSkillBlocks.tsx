@@ -78,7 +78,6 @@ export function ReviewSkillBlocks({ materials, acts, busy, readOnly = false, onS
       kind === 'course' && resource.difficulty ? courseDifficulty(resource) : null,
       kind === 'book' ? '일정에 넣지 않아요' : activity ? activityTime(activity).text : null,
     ].filter(Boolean).join(' · ');
-    const memo = activities.map(a => progress?.[a.id]?.memo).find(Boolean);
     return <div className="rv-mini" key={resource.id} id={activity ? activityAnchor(activity.id) : undefined} tabIndex={activity ? -1 : undefined}>
       {/* '도서 · 강좌' 목록은 활동마다 이 위치로 이동하므로, 한 줄로 합친 나머지 활동의 위치도 남긴다 */}
       {activities.slice(1).map(a => <span key={a.id} id={activityAnchor(a.id)} tabIndex={-1} className="rv-anchor" />)}
@@ -88,7 +87,10 @@ export function ReviewSkillBlocks({ materials, acts, busy, readOnly = false, onS
       <span className="rv-mini-tx">
         <b><span className="tag">{kind === 'course' ? '강좌' : '도서'}</span>{open ? <button type="button" className="rv-title-btn" aria-label={`${resource.title} 실행 기록 열기`} onClick={open}>{resource.title}</button> : resource.title}</b>
         <small>{meta}</small>
-        {memo ? <small>메모 · {memo}</small> : null}
+        {/* 메모·첨부는 스킬(활동)마다 따로 저장된다. 공통 자료는 스킬별로 메모를 보여 주고 각 기록을 열 수 있게 한다 */}
+        {activities.map(a => progress?.[a.id]?.memo ? <small key={a.id}>{activities.length > 1 ? `스킬 ${number(a.skill)} 메모` : '메모'} · {progress[a.id].memo}</small> : null)}
+        {activities.length > 1 && onOpenResource && !busy ? <small className="rv-records">스킬별 기록{activities.map(a =>
+          <button type="button" className="rv-link" key={a.id} aria-label={`${resource.title} · ${a.skill} 실행 기록 열기`} onClick={() => onOpenResource(a.skill, resource.id)}>{number(a.skill)}</button>)}</small> : null}
       </span>
       {resource.url ? <a className="rv-link" href={resource.url} target="_blank" rel="noreferrer" aria-label={`${resource.title} ${resource.provider === '사내교육' ? '사내교육 안내' : '원본'} 보기 (새 창)`}>{resource.provider === '사내교육' ? '안내 보기' : '원본 보기'} ↗</a> : null}
     </div>;

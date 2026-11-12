@@ -118,3 +118,4 @@ details.rv-skill.is-current-week { border-color: var(--accent-line); background:
 .rv-anchor { position: absolute; width: 0; height: 0; outline: 0; }
 .rv-mini { position: relative; }
 .rv-mini:has(.rv-anchor:focus) { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+.rv-records { display: flex; align-items: baseline; gap: 10px; }

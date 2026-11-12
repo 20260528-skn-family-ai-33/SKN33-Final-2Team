@@ -131,7 +131,7 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
       {shared.map(course=>{
         const done=course.activities.every(activity=>st(R.progress,activity.id)==='done');
         const skillLabel=`${course.skills.join(' · ')} 공통`;
-        const show=()=>openSheet({title:course.title,sub:skillLabel,body:()=> <ul className="acts"><ActRow a={course.activities[0]} R={R}/></ul>});
+        const show=()=>openSheet({title:course.title,sub:skillLabel,body:()=> <div>{course.activities.map(activity=><section key={activity.id}><h3>{activity.skill}</h3><ul className="acts"><ActRow a={activity} R={R}/></ul></section>)}</div>});
         return <Row key={`shared:${course.id}`} lv={1} ins={up}
           label={<button className="gt-a" aria-label={`${course.title} · ${skillLabel} · 관련 스킬 기록 열기`} onClick={show}><span className="gt-name">{course.title}<small>{skillLabel}</small></span>{done?<Icon name="check" cls="gt-ok"/>:null}</button>}
           bar={<button type="button" className={`gt-bar act gt-materials-open${done?' done':''}`} aria-label={`${course.title} · ${skillLabel} · ${course.from}~${course.to}주차`} onClick={show} style={gtPos(off+7*(course.from-1),off+7*course.to,T)}>{done?<Icon name="check"/>:null}</button>}
