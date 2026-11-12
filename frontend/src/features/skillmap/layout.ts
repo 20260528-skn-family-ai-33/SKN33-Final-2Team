@@ -250,3 +250,51 @@ export function place(data: SkillMapData, tw: Measure): Layout {
   }
   return { nodes, byId };
 }
+
+type NodeBox = Pick<SmNode, 'x' | 'y' | 'r' | 'bw' | 'bh'>;
+/** 이름 칸을 피한 선이 이 길이보다 짧아지면 피하지 않는다(길이 0 이면 화살촉 방향이 정해지지 않는다).
+    짧은 선의 화살촉 뒷부분은 시작 점 밑으로 들어가 가려지고 앞부분만 보인다 */
+const MIN_EDGE = 4;
+/** 점 둘레에서 이만큼 안에 이름 칸이 걸리면 피한다. 굵은 화살표의 화살촉 길이(선 끝에서 뒤로 약 11.5)를 덮는 값 */
+const NEAR = 12;
+
+/** 점 가운데에서 (ux, uy) 방향으로 나아가는 선이 점 아래 이름 칸(스킬 이름 줄·분류 줄)에 들어가고 나오는 거리. 지나지 않으면 null */
+export function labelSpan(n: NodeBox, ux: number, uy: number): { tin: number; tout: number } | null {
+  // 점 가운데 기준 이름 칸: 첫 줄 글자 위(글자 둘레 칠 포함)부터 분류 줄 아래까지, 너비는 place 의 bw(글자 너비 + 양옆 3)
+  const box: [number, number, number][] = [
+    [-n.bw / 2, n.bw / 2, ux],
+    [n.r + 3, n.bh - n.r, uy],
+  ];
+  let tin = 0;
+  let tout = Infinity;
+  for (const [lo, hi, d] of box) {
+    if (Math.abs(d) < 1e-9) {
+      if (lo > 0 || hi < 0) return null;
+      continue;
+    }
+    tin = Math.max(tin, Math.min(lo / d, hi / d));
+    tout = Math.min(tout, Math.max(lo / d, hi / d));
+  }
+  return tin <= tout ? { tin, tout } : null;
+}
+
+/** 선수 관계 화살표의 양 끝. 점 둘레에서 시작해 점 둘레에서 끝나되,
+    점 바로 옆에서 그 점의 이름 칸을 지나가면 칸 바깥에서 끊는다 → 선이 이름을 가로지르지 않고 화살촉이 이름 뒤에 숨지 않는다.
+    점과 점이 너무 가까워 피할 자리가 없으면 원래대로 둔다(이름은 테마의 글자 둘레 칠이 선을 가린다) */
+export function edgeEnds(A: NodeBox, B: NodeBox): { x1: number; y1: number; x2: number; y2: number } {
+  const vx = B.x - A.x;
+  const vy = B.y - A.y;
+  const d = Math.hypot(vx, vy) || 1;
+  const ux = vx / d;
+  const uy = vy / d;
+  // 끝 점에서 5 를 남기는 것은 화살촉이 선 끝보다 조금 더 나가기 때문
+  const s0 = A.r + 2;
+  const e0 = B.r + 5;
+  const from = labelSpan(A, ux, uy);
+  const to = labelSpan(B, -ux, -uy);
+  const s1 = from && from.tin < s0 + NEAR ? Math.max(s0, from.tout + 2) : s0;
+  const e1 = to && to.tin < e0 + NEAR ? Math.max(e0, to.tout + 5) : e0;
+  // 둘 다 피할 자리가 없으면 화살촉이 있는 끝 쪽 이름부터 피한다
+  const [s, e] = ([[s1, e1], [s0, e1], [s1, e0]] as const).find(([a, b]) => d - a - b >= MIN_EDGE) ?? [s0, e0];
+  return { x1: A.x + ux * s, y1: A.y + uy * s, x2: B.x - ux * e, y2: B.y - uy * e };
+}

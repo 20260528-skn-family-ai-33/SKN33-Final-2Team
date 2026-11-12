@@ -12,7 +12,7 @@ import { Note } from '@/shared/ui/parts';
 import { ApiError } from '@/api/client';
 import { matchingCertificates } from '@/features/roadmap/roadmapLearningData';
 import { useMe } from '@/shared/state/session';
-import { actWeek, canvasMeasure, coverOf, place, relOf, weeksOf, type Cover, type Layout } from './layout';
+import { actWeek, canvasMeasure, coverOf, edgeEnds, place, relOf, weeksOf, type Cover, type Layout } from './layout';
 
 let layoutCache: { d: SkillMapData; m: Layout } | null = null;
 let bigPref: boolean | null = null;
@@ -193,21 +193,17 @@ function Svg({ data, view, picked, onPick, big, zoom }: { data: SkillMapData; vi
           const A = m.byId[a];
           const B = m.byId[bb];
           if (!A || !B) return null;
-          const vx = B.x - A.x;
-          const vy = B.y - A.y;
-          const d = Math.hypot(vx, vy) || 1;
-          const ux = vx / d;
-          const uy = vy / d;
+          const p = edgeEnds(A, B);
           const edge = view.edge(a, bb);
           return (
             <line
               key={i}
               className={`sm-e${edge ? ` ${edge}` : ''}`}
               markerEnd={`url(#sm-${edge ? 'on' : 'g'})`}
-              x1={(A.x + ux * (A.r + 2)).toFixed(1)}
-              y1={(A.y + uy * (A.r + 2)).toFixed(1)}
-              x2={(B.x - ux * (B.r + 5)).toFixed(1)}
-              y2={(B.y - uy * (B.r + 5)).toFixed(1)}
+              x1={p.x1.toFixed(1)}
+              y1={p.y1.toFixed(1)}
+              x2={p.x2.toFixed(1)}
+              y2={p.y2.toFixed(1)}
             />
           );
         })}
