@@ -354,6 +354,29 @@ def _context_query(q: str, history: list, *, classify: bool = False) -> str:
 
 
 # ==============================================================================
+# ⭐ [입력 전처리 및 개인정보 격리 헬퍼] (후속 대화 5턴 제한 및 documents_only 개인정보 제거)
+# ==============================================================================
+
+def isolate_input(question: str, history: list | None, me: dict, context: dict | None = None,
+                  *, documents_only: bool = False) -> dict:
+    """1~8단계 파이프라인 진입 전 입력 전처리:
+    1. 후속 질문(이어 묻기): 최근 최대 5턴(FOLLOW_HISTORY_LIMIT)의 대화 기록 유지.
+    2. 개인정보 완벽 격리: 문서 전용 모드(documents_only=True)에서는 LLM 전송 및 로그 노출 방지를 위해
+       me에서 직원 구분(empGroup)만 남기고 context는 완전히 비운다.
+    """
+    clean_me = {'empGroup': (me or {}).get('empGroup')} if documents_only else (me or {})
+    clean_context = {} if documents_only else (context or {})
+    clean_history = (history or [])[-FOLLOW_HISTORY_LIMIT:]
+    return {
+        'question': question,
+        'history': clean_history,
+        'context': clean_context,
+        'me': clean_me,
+        'documents_only': documents_only,
+    }
+
+
+# ==============================================================================
 # ⭐ [공통 응답 헬퍼 함수] (근거 없음·제공 거절 등 파이프라인에서 사용)
 # ==============================================================================
 
@@ -384,7 +407,8 @@ def classify_question_roberta(question: str, history: list | None = None, me: di
     """⭐ [1단계 - RoBERTa로 질문 분류]
     1. 사용자 정보(me 또는 emp_group)에서 사용자의 직군을 확인한다.
        - 사용자 정보에 직군이 없으면 즉시 에러(AgentError)를 발생시켜 인사 담당자 문의를 안내한다.
-    2. 질문(question) 안에 특정 직군 명칭이 언급되어 있으면 해당 직군을 우선 사용하고, 없으면 사용자 직군을 사용한다.
+    2. 질문(question) 안에 특정 직군 명칭이 언급되어 있으면 해당 직군을 우선 사용한다.
+       - 후속 질문인 경우 앞 대화에서 다룬 직군을 계승하고, 없으면 사용자 직군을 사용한다.
     3. 직군과 대화 맥락을 결합하여 RoBERTa로 질문 유형을 1차 분류한다.
     """
     history = history or []
@@ -396,6 +420,15 @@ def classify_question_roberta(question: str, history: list | None = None, me: di
         raise AgentError('로그인한 직원의 직원 구분을 확인할 수 없어요')
 
     detected_group = next((g for g in group_list if g in question), None)
+    # 현재 질문에 직군이 없고 앞 대화(후속 질문)가 있다면, 앞선 질문들의 직군을 계승
+    if not detected_group and history:
+        for prev in reversed(history[-5:]):
+            prev_q = prev.get('q', '') if isinstance(prev, dict) else ''
+            prev_detected = next((g for g in group_list if g in prev_q), None)
+            if prev_detected:
+                detected_group = prev_detected
+                break
+
     effective_group = detected_group if detected_group else user_group
 
     me_obj = {'empGroup': effective_group}
@@ -760,27 +793,15 @@ def scope_answer(a: dict, me: dict) -> dict:
                ref=list(a.get('basis') or [])[:3], retrieved=a.get('retrieved') or [])
 
 
-def prepare_assistant_input(question: str, history: list | None, me: dict, context: dict | None = None,
-                            *, documents_only: bool = False) -> dict:
-    """사용자 질문, 앞 대화 내용, 사용자 정보를 검증하고 묶는다."""
-    return {
-        'question': question,
-        'history': history or [],
-        'context': context or {},
-        'me': me or {},
-        'documents_only': documents_only,
-    }
-
-
 def answer(ctx: rt.Ctx, question: str, history: list, context: dict, sim: str | None = None,
            *, documents_only: bool = False) -> dict:
     """history는 답을 받은 질문·답 [{q, a}]이다. 이어 묻기에는 최대 5턴을 사용한다."""
     me = ctx.me if ctx.me else {}
-    inp = prepare_assistant_input(question, history, me, context, documents_only=documents_only)
-    task = f"사내 생활 질문 분류·답변{f' (앞 대화 {len(history)}턴 포함)' if history else ''}"
+    inp = isolate_input(question, history, me, context, documents_only=documents_only)
+    task = f"사내 생활 질문 분류·답변{f' (앞 대화 {len(inp[\"history\"])}턴 포함)' if inp['history'] else ''}"
     mock = _mock_documents if documents_only else _mock
     a = rt.run(ctx, '규정 에이전트', task, inp, mock, lambda i: _api(ctx, i), role='regulation', sim=sim, mock_delay=0.38,
-               log_input={'question': question, 'context': context, 'history': history or []})
+               log_input={'question': question, 'context': inp['context'], 'history': inp['history']})
     if inp.get('_classification'):
         ctx.meta['classification'] = inp['_classification']
     if documents_only:
@@ -843,3 +864,7 @@ def classify_with_context(question: str, history: list, me: dict) -> dict:
 def _regulation_answer(ctx: rt.Ctx, inp: dict) -> dict:
     ids = retrieve_regulation_slots(ctx, inp)
     return format_regulation_response(ctx, inp, ids, generate_regulation_summary(ctx, inp, ids)) if ids else _no_evidence('regulation')
+
+
+# 레거시 호환용 별칭
+prepare_assistant_input = isolate_input
