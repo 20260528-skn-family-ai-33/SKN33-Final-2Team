@@ -411,7 +411,7 @@ def classify_question_roberta(question: str, history: list | None = None, me: di
 
 
 def classify_label_with_llm(ctx: rt.Ctx, question: str, history: list | None = None) -> str | None:
-    """⭐ [2단계 - RoBERTa 예측 정확도가 80% 미만일 때 LLM을 호출하여 라벨을 다시 분류한다]"""
+    """⭐ [2-1단계 - RoBERTa 예측 정확도가 80% 미만일 때 LLM을 호출하여 라벨을 다시 분류한다]"""
     if ctx.mode not in ('ollama', 'openai'):
         return None
     system = """너는 사내 질문의 유형을 정확하게 분류하는 AI 분류기다.
@@ -438,7 +438,7 @@ def classify_label_with_llm(ctx: rt.Ctx, question: str, history: list | None = N
 def verify_or_reclassify_label_with_llm(ctx: rt.Ctx, question: str, label: str,
                                        confidence: float | None = None,
                                        history: list | None = None) -> str:
-    """⭐ [2-1단계 - RoBERTa 예측정확도 80% 이하 시 LLM 2차 재분류]
+    """⭐ [2-2단계 - RoBERTa 예측정확도 80% 이하 시 LLM 2차 재분류]
     1. RoBERTa 확신도가 80%(0.80) 이상이면 1단계 분류 라벨을 그대로 확정한다.
     2. 확신도가 80% 미만이거나 애매한 경우, LLM이 질문을 다시 읽고 2차 재분류를 수행한다.
     """
