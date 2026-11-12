@@ -548,6 +548,8 @@ a.me { color: inherit; text-decoration: none; cursor: pointer; transition: borde
 a.me:hover { border-color: var(--line-2); }
 a.me.on { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft2); }
 a.me .grow { min-width: 0; }
+/* 사람 아이콘은 칸 크기의 비율로 잡는다: 테마·화면 폭마다 칸이 28~34px 로 달라도 넘치지 않는다 */
+a.me .avatar svg.i { width: 52%; height: 52%; }
 a.me .me-go { width: 16px; height: 16px; flex: none; color: var(--ink-4); }
 .me-sup { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 5px; font-size: 11px; font-weight: 650; line-height: 1.5; background: var(--accent-soft2); color: var(--accent-ink); vertical-align: 1px; }
 .nav-sup { margin-top: 14px; }
