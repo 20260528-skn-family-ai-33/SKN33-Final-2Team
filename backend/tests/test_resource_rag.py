@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import Mock,patch
-from app.services.resource_rag import retrieve,query_text,validate_vectors,cached_vectors,search_vectors,DIMENSIONS,MODEL,VERSION
+from app.services.resource_rag import retrieve,validate_vectors,cached_vectors,search_vectors,DIMENSIONS,MODEL,VERSION
 from app.agents.resource_recommendations import RecommendationError
 
 VECTOR=[1.0]+[0.0]*(DIMENSIONS-1)
@@ -20,9 +20,13 @@ class ResourceRagTests(unittest.TestCase):
   self.assertEqual({r['id'] for r in pools[0]['courses']},{'20','21','22','23','24'})
   self.assertFalse(search.call_args.args[4]);self.assertTrue(all(r['cost']==0 for r in pools[0]['courses']))
   self.assertEqual(meta['version'],VERSION)
- def test_project_skill_and_course_all_reach_embedding_input(self):
-  text=query_text(self.project,self.selection['skills'][0],{'id':'A2','scope':'단기 실습'})
-  for expected in ['프로젝트 요약','분석 역량','실무 적용','A2','단기 실습']:self.assertIn(expected,text)
+ def test_unscoped_book_search_keeps_learner_context(self):
+  embed=Mock(side_effect=self.embed)
+  item={'book_b':{'id':'book_b','type':'book','usable':True,'skills':['자료 분석']}}
+  retrieve(dict(self.project,learnerKnowledge={'known':['SQL']}),self.selection,item,embed=embed,
+           search=lambda *args:[{'resource_id':'b','similarity':.7}])
+  text,=embed.call_args.args[0]
+  for expected in ['프로젝트 요약','실무 적용','SQL']:self.assertIn(expected,text)
  def test_all_skill_queries_batched_once(self):
   selection={'skills':[{'name':'자료 분석'},{'name':'T'}]};items=dict(self.items,t={'id':'t','type':'course','usable':True,'skills':['T'],'cost':0})
   embed=Mock(side_effect=self.embed)

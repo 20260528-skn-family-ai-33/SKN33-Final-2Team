@@ -428,15 +428,7 @@ class CrashResourceScopeTests(unittest.TestCase):
         self.assertTrue(info['scopeEvidence']['Python'])
         self.assertTrue(resource_evidence.suitable(info, 'Python'))
 
-    def test_free_challenge_and_legacy_crash_keep_full_scope(self):
+    def test_skill_without_core_keeps_full_scope(self):
         skill = {'name': WEB, 'application': 'FastAPI와 Django REST API 구현'}
-        for track in ('A1', 'A2', 'A3'):
-            with self.subTest(track=track):
-                query = json.loads(resource_rag.query_text(self.project, skill, {'id': track, 'scope': 'Django 구현'}))
-                self.assertEqual(query['projectGoal'], self.project['goal'])
-                self.assertEqual(query['projectSummary'], self.project['projectSummary'])
-                self.assertEqual(query['application'], skill['application'])
-                self.assertEqual(query['course']['scope'], 'Django 구현')
-                self.assertNotIn('coreCriteria', query)
         profiles = resource_evidence.facts(self.short, self.project, {'skills': [skill]})['suitability']
         self.assertEqual(profiles[WEB]['missingStack'], ['django'])

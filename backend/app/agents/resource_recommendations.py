@@ -139,6 +139,7 @@ def _recover_cross_skill_courses(by_name, payload, references, eligibility, gene
 
 def _empty_skill(name: str) -> dict:
     return {'name': name, 'courses': [], 'books': [], 'modelCourseCandidates': [], 'selectedCourse': None, 'selectedBooks': [],
+            'modelBookCounts': {'candidates': 0, 'recommended': 0},
             'courseDiagnostic': _no_candidates('강좌'), 'bookDiagnostic': _no_candidates('도서')}
 
 
@@ -287,13 +288,20 @@ def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
         pools = filtered
     if is_crash:
         pools = crash_courses.share_candidates(pools, project, selection, items, cache=crash_cache)
-    pools, common_books = book_candidates.common_pool(pools, items, selection=plan_selection)
+    book_selection = (book_candidates.shared_selection(project, plan_selection) if track in ('A1', 'A2', 'A3')
+                      else plan_selection)
+    book_order = [skill['name'] for skill in book_selection['skills']]
+    by_name = {pool['name']: pool for pool in pools}
+    book_pools, common_books = book_candidates.common_pool([by_name[name] for name in book_order],
+                                                          items, selection=book_selection)
+    by_name = {pool['name']: pool for pool in book_pools}
+    pools = [by_name[pool['name']] for pool in pools]
     if not any(pool['courses'] or pool['books'] for pool in pools):
         return {'skills': [dict(_empty_skill(pool['name']), **(
             {'courseDiagnostic': rejected_diagnostics[pool['name']]} if pool['name'] in rejected_diagnostics else {}))
             for pool in pools]}
     names = [pool['name'] for pool in pools]
-    book_catalog = book_candidates.model_catalog(common_books, items, names)
+    book_catalog = book_candidates.model_catalog(common_books, items, book_order)
     book_refs = {book['id']: f'B{index}' for index, book in enumerate(common_books, 1)}
     # 같은 강좌는 여러 스킬에서 한 키를 공유한다. 별칭을 서로 다른 자료로 고르는 혼동을 막는다.
     course_refs = {}
@@ -451,6 +459,7 @@ def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
     if is_crash:
         _finalize_crash(result, pools, selection, project, crash_cache)
     for output, pool in zip(result, pools, strict=True):
+        output['modelBookCounts'] = {'candidates': len(pool['books']), 'recommended': len(output['books'])}
         selected = {row['id'] for row in output['courses']}
         output['modelCourseCandidates'] = [
             {'id': row['id'], 'title': row['title'], 'provider': row.get('provider'), 'recommended': row['id'] in selected}
@@ -481,7 +490,7 @@ def validate_choices(recommendations: dict, choices: dict) -> None:
 
 
 def recommend_from_catalog(ctx: Any, pre: dict, course: dict | None = None, *,
-                           completed: frozenset[str] = frozenset()) -> dict:
+                           completed: frozenset[str] = frozenset(), book_search=None) -> dict:
     from app import catalog
     from app.agents import runtime
     if not ctx.live:
@@ -494,7 +503,7 @@ def recommend_from_catalog(ctx: Any, pre: dict, course: dict | None = None, *,
     project=dict(pre['project'],learnerKnowledge=from_profile(pre.get('profile')),hrContext=hr_context(pre.get('profile')))
     project['selectedCourse'] = deepcopy(course)
     selection = dict(pre['selection'], commonApplications=pre.get('_commonApplications') or {})
-    pools, retrieval = retrieve(project, selection, items, course)
+    pools, retrieval = retrieve(project, selection, items, course, book_search=book_search)
     result = recommend_resources(project, selection, items,
         runtime.model(ctx, '자료 추천', '스킬별 학습 자료 추천', role='resources'), course=course, retrieved_pools=pools)
     result['retrieval'] = retrieval

@@ -96,6 +96,7 @@ class RecommendationTests(unittest.TestCase):
         self.assertEqual(result['skills'][0]['selectedBooks'],[])
         self.assertIsNone(result['skills'][0]['selectedCourse'])
         model.assert_not_called()
+        self.assertEqual(result['skills'][0]['modelBookCounts'], {'candidates': 0, 'recommended': 0})
     def test_fewer_than_three_resources_not_padded(self):
         raw=self.raw();raw['skills'][0]['books']=raw['skills'][0]['books'][:1]
         result=self.recommend(raw)
@@ -107,6 +108,7 @@ class RecommendationTests(unittest.TestCase):
         output = self.recommend(raw)['skills'][0]
         self.assertEqual(output['bookDiagnostic'], scope)
         self.assertEqual((output['books'], output['selectedBooks']), ([], []))
+        self.assertEqual(output['modelBookCounts'], {'candidates': 4, 'recommended': 0})
         self.assertEqual(output['courseDiagnostic']['reason'], 'insufficient_evidence')
         del raw['skills'][0]['bookDiagnostic']
         self.assertEqual(self.recommend(raw)['skills'][0]['bookDiagnostic']['reason'], 'insufficient_evidence')

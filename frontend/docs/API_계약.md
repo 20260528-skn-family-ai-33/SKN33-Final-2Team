@@ -42,6 +42,8 @@
 
 조회·생성 응답의 `recommendations.skills[]`에 스킬별 강좌와 도서가 들어간다. 최종 추천 도서는 스킬당 0~3권이며, 0권이면 `books`와 `selectedBooks`가 빈 배열이다. 자료 선택 화면은 저장된 `choices`를 우선한다.
 
+데모 모드는 스킬별로 모델에 제시한 후보와 그중 추천에 포함된 수를 표시한다. 강좌는 생성 당시 `modelCourseCandidates[]`의 전체 수와 `recommended: true` 수를 사용한다. 도서는 `modelBookCounts: {candidates, recommended}`를 사용한다. 예를 들어 공통 목록 30권 중 그 스킬에 제시한 책이 8권이고 2권을 추천했다면 `{candidates: 8, recommended: 2}`다. 사용자 선택을 바꿔도 이 수치는 유지된다. 후보가 없으면 0/0이고, 이전 기록에 해당 필드가 없으면 수치를 표시하지 않는다.
+
 강좌 카드의 선택 필드 `unverifiedTargetTopics: string[]`는 서버가 실제 적용 단원·소개에서 확인하지 못한 세부 목표 범위다. 모든 코스의 자료 카드에서 표시하며 생략·빈 배열이면 안내하지 않는다. 모델이 작성한 값은 사용하지 않는다.
 
 `recommendations.outdated: boolean`은 응답 시 저장된 `retrieval.version`을 현재 코스별 규칙 버전과 비교한 값이다. 버전이 없거나 다르면 이전 기준 안내를 표시한다. 저장 JSON과 기존 선택은 유지하며 자동 재추천하지 않는다. 계획 비교 화면의 ‘해당 계획 다시 생성’으로 새 계획의 자료를 추천받을 수 있다.

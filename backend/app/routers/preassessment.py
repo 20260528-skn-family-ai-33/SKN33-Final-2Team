@@ -4,6 +4,7 @@ from __future__ import annotations
 from app.services.generation_job import queued_generation
 
 from copy import deepcopy
+from functools import partial
 import hashlib
 from app.services.generation_lock import generation_guard
 from uuid import UUID
@@ -15,7 +16,7 @@ from app import db
 from app.auth import Account, require_employee
 from app.agents import runtime
 from app.errors import ApiError
-from app.services import profile
+from app.services import draft_book_search, profile
 from app.services.course_recommendations import completed_course_ids
 from app.services.drafts import doc_summary
 from app.agents.skill_selection import SelectionError, select_from_catalog
@@ -249,7 +250,8 @@ def generate_recommendations(project_id: UUID, a: Account = Depends(require_empl
             if pre.get('recommendations'):
                 return recommendation_view(pre)
         ctx = runtime.context(a.id)
-        result = recommend_from_catalog(ctx, pre, selected_course, completed=completed)
+        book_search = partial(draft_book_search.search, a.id, str(project_id), pre['generationId']) if course else None
+        result = recommend_from_catalog(ctx, pre, selected_course, completed=completed, book_search=book_search)
         with db.tx() as t:
             t.one("SELECT project_id FROM public.projects WHERE project_id=CAST(:p AS uuid) AND employee_id=:e AND status='DRAFTING' FOR UPDATE",p=str(project_id),e=a.id)
             latest_completed = completed_course_ids(t, a.id)

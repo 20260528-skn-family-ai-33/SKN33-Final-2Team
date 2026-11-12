@@ -3,7 +3,9 @@ import { hrs } from '@/shared/lib/format';
 import { courseDifficulty } from '@/shared/lib/courseDifficulty';
 import { materialVersionKey } from './materialVersion';
 import { useConsoleAction } from '@/features/demo/consoleActions';
-import { loadRecommendations, recommendationUrl, requestMaterials as request, type Resource, type Result } from './materialRequests';
+import { browserDemoEnabled, useBrowserOptions } from '@/shared/lib/browserOptions';
+import { useAi } from '@/shared/state/ai';
+import { loadRecommendations, recommendationUrl, requestMaterials as request, type ModelCandidateCounts, type Resource, type Result } from './materialRequests';
 import { MaterialReason } from './MaterialReason';
 import { ResourcePreviewButton } from './ResourcePreview';
 import { OutdatedRecommendations, UnverifiedTargets } from './ResourceNotices';
@@ -55,6 +57,13 @@ function ResourceCard({ resource, kind, checked, disabled, preload = false, onCh
   </article>;
 
 }
+function ModelCandidateRatio({ counts }: { counts?: ModelCandidateCounts }) {
+  if (!counts) return <small className="material-model-count">후보 기록 없음</small>;
+  const { recommended, candidates } = counts;
+  return <small className="material-model-count" title={`이 스킬에 제시한 후보 ${candidates}개 중 AI가 ${recommended}개를 추천했어요.`}>
+    AI 추천 ({recommended}/{candidates}) · 제외 {candidates - recommended}
+  </small>;
+}
 export type ResourceSelectionHandle = { save: () => Promise<boolean>; saveForVersion: () => Promise<boolean> };
 export type MaterialTotals = { weeks: number | null; amount: number; unknown: boolean; version: string; weeklyHours: number };
 export function ResultStep() {
@@ -78,6 +87,9 @@ export function ResourceSelection({ ref, onChoicesChanged, locked, courseId, onT
 function ResultSelection({ editorRef, onChoicesChanged, locked = false, courseId, onTotals, onPrepared, skillFilter, sectionOpen, onSectionToggle, stacked = false }: { stacked?: boolean; editorRef?: Ref<ResourceSelectionHandle>; onChoicesChanged?: () => void; locked?: boolean; courseId?:string; onTotals?:(course:string,totals:MaterialTotals)=>void; onPrepared?:(course:string,state:'ready'|'pending'|'failed',version:string)=>void; skillFilter?:string; sectionOpen?:{books:boolean;courses:boolean}; onSectionToggle?:(kind:'books'|'courses',open:boolean)=>void }) {
   const id = useWs(s => s.draftId);
   const draft = useWs(s => s.draft);
+  const browserDemo = useBrowserOptions(s => browserDemoEnabled(s.options));
+  const serverDemo = useAi(s => s.status.demoMode);
+  const showModelCounts = browserDemo && serverDemo === true;
   const course = courseId || draft.chosen;
   const version = materialVersionKey(draft.gen?.options[course || '']);
   const generation = useWs(s => s.draft.v2Assessment?.generationId);
@@ -198,14 +210,19 @@ function ResultSelection({ editorRef, onChoicesChanged, locked = false, courseId
         const excluded = selected.enabled === false;
         const weeks = currentWeeks(selected, estimates[skill.name]);
         const courses = skill.courses.filter(resource => course !== 'A1' || resource.cost === 0);
+        const candidates = skill.modelCourseCandidates;
         const hasLegacyBookCandidates = result.recommendations?.retrieval?.matches?.some(match => match.skill === skill.name && match.resourceId.startsWith('book_'));
         return <section className={`card v2-skill${excluded ? ' v2-skill-excluded' : ''}`} key={skill.name} data-skill={skill.name} role={skillFilter||stacked?'region':'tabpanel'} id={`${tabsId}-panel-${skillIndex}`} aria-labelledby={skillFilter||stacked?undefined:`${tabsId}-tab-${skillIndex}`} aria-label={skillFilter||stacked?skill.name:undefined} hidden={!stacked&&skill.name!==shownSkill}>
           {!skillFilter&&<div className="v2-skill-heading">{stacked&&<span className="v2-skill-order">{String(skillIndex+1).padStart(2,'0')}</span>}<h2>{skill.name}</h2><span className="small muted">{excluded ? '미선택' : weeks === null ? '주차 계산 중' : durationLabel(estimates[skill.name])}</span></div>}
-          <details className="material-kind material-kind-books" open={sectionOpen?.books??true} onToggle={event=>{if(sectionOpen&&event.currentTarget.open!==sectionOpen.books)onSectionToggle?.('books',event.currentTarget.open);}}><summary><span>도서</span><small>선택 {selected.books.length} / 최대 3권</small><span className="material-kind-chevron" aria-hidden="true">⌄</span></summary>
+          <details className="material-kind material-kind-books" open={sectionOpen?.books??true} onToggle={event=>{if(sectionOpen&&event.currentTarget.open!==sectionOpen.books)onSectionToggle?.('books',event.currentTarget.open);}}><summary><span>도서</span>
+            {showModelCounts && <ModelCandidateRatio counts={skill.modelBookCounts} />}
+            <small>선택 {selected.books.length} / 최대 3권</small><span className="material-kind-chevron" aria-hidden="true">⌄</span></summary>
           {skill.books.length > 0 && <div className="v2-resource-grid">{skill.books.map(resource => <ResourceCard key={resource.id} resource={resource} kind="book" checked={selected.books.includes(resource.id)} disabled={locked || busy || excluded || (!selected.books.includes(resource.id) && selected.books.length >= 3)} onChange={() => selectBook(skill.name, resource.id)} />)}</div>}
           <MaterialReason kind="도서" diagnostic={skill.bookDiagnostic} hasOptions={skill.books.length > 0}
             fallback={hasLegacyBookCandidates ? '도서 후보는 있지만 이번 추천에서는 선정되지 않았어요.' : '이 스킬에 추천할 도서가 없어요.'} />
-          </details><details className="material-kind material-kind-courses" open={sectionOpen?.courses??true} onToggle={event=>{if(sectionOpen&&event.currentTarget.open!==sectionOpen.courses)onSectionToggle?.('courses',event.currentTarget.open);}}><summary><span>강좌</span><small>{selected.course?'1개 선택됨':'1개 선택'}</small><span className="material-kind-chevron" aria-hidden="true">⌄</span></summary>
+          </details><details className="material-kind material-kind-courses" open={sectionOpen?.courses??true} onToggle={event=>{if(sectionOpen&&event.currentTarget.open!==sectionOpen.courses)onSectionToggle?.('courses',event.currentTarget.open);}}><summary><span>강좌</span>
+            {showModelCounts && <ModelCandidateRatio counts={candidates && { candidates: candidates.length, recommended: candidates.filter(c => c.recommended).length }} />}
+            <small>{selected.course?'1개 선택됨':'1개 선택'}</small><span className="material-kind-chevron" aria-hidden="true">⌄</span></summary>
           {courses.length > 0 && <div className="v2-resource-grid">{courses.map(resource => <ResourceCard key={resource.id} resource={resource} kind="course" preload={skill.name === shownSkill && sectionOpen?.courses !== false} checked={selected.course === resource.id} disabled={locked || busy || excluded} onChange={() => { onChoicesChanged?.(); setChoices(old => ({ ...old, [skill.name]: { ...selected, course: resource.id } })); }} />)}</div>}
           <MaterialReason kind="강좌" diagnostic={skill.courseDiagnostic} hasOptions={courses.length > 0} fallback="프로젝트에 맞는 강좌를 찾지 못했어요." />
           </details>
@@ -215,6 +232,8 @@ function ResultSelection({ editorRef, onChoicesChanged, locked = false, courseId
       .v2-skill-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
       .v2-skill-summary>div,.v2-skill-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
       .v2-skills-board{display:grid;gap:16px;margin-top:20px}
+      .material-kind>summary:has(.material-model-count){flex-wrap:wrap}
+      .material-kind>summary>.material-model-count{font-weight:600;color:var(--ink);white-space:nowrap}
       .v2-skills-board>.v2-skill{min-width:0;margin:0;padding:20px}.v2-skill-heading{display:flex;justify-content:space-between;gap:12px}
       .material-reason{margin:8px 0 0;overflow-wrap:anywhere}
       .v2-skill-heading h2{font-size:17px;margin:0 0 8px;overflow-wrap:anywhere}
