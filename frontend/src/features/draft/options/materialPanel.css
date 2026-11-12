@@ -7,4 +7,25 @@
 .full-width-materials .material-course-column>header{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:8px;padding:12px}.full-width-materials .material-course-column>header h3{font-size:13px;line-height:1.5;white-space:nowrap}.full-width-materials .material-course-column>header>span{min-width:0;justify-self:stretch;text-align:right;white-space:nowrap;font-size:12px;line-height:1.5;letter-spacing:-.2px;overflow:hidden;text-overflow:ellipsis}
 
 .material-kind{margin:0 0 16px;min-width:0}.material-kind>summary{display:flex;align-items:center;gap:8px;padding:10px 0;margin-bottom:10px;border-bottom:2px solid var(--line-2);font-size:12px;font-weight:700;cursor:pointer;list-style:none}.material-kind>summary::-webkit-details-marker{display:none}.material-kind>summary>small{font-size:12px;color:var(--ink-3);font-weight:400}.material-kind-chevron{margin-left:auto;transform:rotate(-90deg);font-size:16px;line-height:1}.material-kind[open]>summary>.material-kind-chevron{transform:rotate(0)}.material-kind:not([open])>summary{margin-bottom:0}.material-kind>.small{padding:12px;background:var(--surface-2);border-radius:8px;font-size:12px;line-height:1.6}
-@media(min-width:901px){.full-width-materials .material-course-column{display:grid;grid-template-rows:subgrid;grid-row:span 3;row-gap:0;align-items:start}.full-width-materials .material-course-column>.course-material-editor{display:contents}.full-width-materials .material-course-column .v2-skills-board{display:contents}.full-width-materials .material-course-column .v2-skill:not([hidden]){display:contents}.full-width-materials .material-course-column .material-kind-books{grid-row:2;padding:0 12px}.full-width-materials .material-course-column .material-kind-courses{grid-row:3;padding:0 12px}.full-width-materials .material-course-column>.course-material-editor>.loading{grid-row:2 / span 2;padding:16px;font-size:12px}.material-course-comparison{column-gap:14px;row-gap:0}}
+@media (min-width: 901px) {
+  .material-course-comparison { column-gap: 14px; row-gap: 0; }
+  .full-width-materials .material-course-column {
+    display: grid;
+    grid-template-rows: subgrid;
+    grid-row: span 4;
+    row-gap: 0;
+    align-items: start;
+  }
+  .full-width-materials .material-course-column > header { grid-row: 1; }
+  .full-width-materials .material-course-column > .course-material-editor,
+  .full-width-materials .material-course-column .v2-skills-board,
+  .full-width-materials .material-course-column .v2-skill:not([hidden]) { display: contents; }
+  .full-width-materials .course-material-editor > .material-reason { grid-row: 2; margin: 8px 12px; }
+  .full-width-materials .material-course-column .material-kind-books { grid-row: 3; padding: 0 12px; }
+  .full-width-materials .material-course-column .material-kind-courses { grid-row: 4; padding: 0 12px; }
+  .full-width-materials .material-course-column > .course-material-editor > .loading {
+    grid-row: 2 / span 2;
+    padding: 16px;
+    font-size: 12px;
+  }
+}
