@@ -1,5 +1,5 @@
 /* 화면 테마 tm590 · templatemo 590 Topic Listing
-   원본: https://templatemo.com/tm-590-topic-listing — 무료 · 상업/비상업 사용 허용. 로그인 사진(office.jpg)도 템플릿에 들어 있던 것.
+   원본: https://templatemo.com/tm-590-topic-listing — 무료 · 상업/비상업 사용 허용.
    전부 :root[data-skin="tm590"] 안에 적어 이 테마를 고른 때만 적용된다.
 
    템플릿에서 가져온 것
@@ -222,15 +222,13 @@
   .v2-survey section, .v2-survey fieldset { border-radius: 20px; }
   .v2-survey button { border-radius: 100px; }
 
-  /* ── 로그인: 그라데이션 화면 + 사진에 그라데이션을 덮은 소개(템플릿 overlay 블록) ── */
+  /* ── 로그인: 그라데이션 화면 + 그라데이션 소개 상자
+     소개 상자에 깔던 인물 사진(office.jpg)은 흰 글자 뒤로 사람 윤곽이 비쳐 뺐다(#218) ── */
   body.auth .app { min-height: 100vh; }
   body.auth .main { min-height: 100vh; display: flex; align-items: center; background: var(--tm-grad); }
   body.auth .view { width: 100%; }
   .login-card { border: 0; box-shadow: 0 20px 50px rgba(11, 31, 42, .18); }
-  .login-side {
-    background: linear-gradient(15deg, rgba(19, 84, 122, .88) 0%, rgba(128, 208, 199, .82) 100%), url('./office.jpg') center / cover;
-    box-shadow: 0 20px 50px rgba(11, 31, 42, .18);
-  }
+  .login-side { background: var(--tm-grad); box-shadow: 0 20px 50px rgba(11, 31, 42, .18); }
   .login-side::after { display: none; }
   .login-side h2 { font-family: var(--tm-title); font-weight: 700; }
   .login-side .pill { font-family: var(--tm-title); }
