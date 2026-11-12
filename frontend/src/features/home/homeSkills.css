@@ -1,3 +1,6 @@
 .home-skill-groups{display:grid;gap:14px}.home-skill-group{padding:14px;border:1px solid var(--line,#e0e5e2);border-radius:12px}.home-skill-group>h3{font-size:15px;margin:0 0 12px}.home-material-group{padding:10px 12px;border-radius:8px;background:#f4f7f5;margin-top:8px}.home-material-group[data-kind="도서"]{background:#faf6ef}.home-material-group>h4{font-size:12px;margin:0 0 8px;display:flex;align-items:center;gap:6px}.home-material-group>h4 span{font-size:11px;font-weight:400;color:var(--muted,#66756d)}.home-material-group .acts{gap:8px}.home-material-group .act-row{background:var(--paper,#fff);border-radius:8px;padding:10px}
 
-.home-show-all.btn{min-height:0;height:26px;padding:3px 9px;font-size:11px;line-height:18px;border-radius:6px}
+.home-show-all.btn{min-height:0;height:30px;padding:4px 10px;font-size:12.5px;line-height:20px;border-radius:6px}
+
+/* 첫 화면 단계 안내: 작성 단계 수만큼 한 줄에(좁으면 두 칸씩) */
+.pstrip.steps{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}

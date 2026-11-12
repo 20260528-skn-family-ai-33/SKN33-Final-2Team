@@ -1,0 +1,8 @@
+/* 5단계 결과 요약(#224). 색은 테마 변수에서만 가져온다 */
+.result-summary h2 { margin: 0; font-size: 17px; }
+.result-summary-lead { margin: 6px 0 0; font-size: 14px; color: var(--ink-2); }
+.result-summary-lead b { color: var(--ink); }
+.result-summary ul { list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 16px 0 0; padding: 0; }
+.result-summary li { min-width: 0; display: grid; gap: 4px; padding: 14px 16px; border: 1px solid var(--line); border-top: 3px solid var(--accent); border-radius: var(--r-md); background: var(--surface-2); }
+.result-summary li b { font-size: 14.5px; color: var(--ink); overflow-wrap: anywhere; }
+.result-summary li span { font-size: 13px; color: var(--ink-2); }

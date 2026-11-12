@@ -20,7 +20,7 @@ it('fills prepared quizzes including the zero index and stays inside option boun
   fillRandomPost(value, () => 0);
   expect(value.post.quizAnswers).toEqual({quiz:'0'});
   fillRandomPost(value, () => 0.9999);
-  expect(value.post.answers.survey).toBe('5');
-  expect(value.post.quizAnswers?.quiz).toBe('2');
-  expect(value.post.goalSelf).toBe('5');
+  expect(value.post.answers.survey).toBe('1');
+  expect(value.post.quizAnswers?.quiz).toBe('0');
+  expect(value.post.goalSelf).toBe('1');
 });

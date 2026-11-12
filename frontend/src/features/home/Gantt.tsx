@@ -38,10 +38,15 @@ function useTip() {
     const onDown = (e: PointerEvent) => {
       if (e.pointerType === 'mouse') hide();
     };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') hide();
+    };
     document.addEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey);
     window.addEventListener('scroll', hide, true);
     return () => {
       document.removeEventListener('pointerdown', onDown);
+      document.removeEventListener('keydown', onKey);
       window.removeEventListener('scroll', hide, true);
     };
   }, []);
@@ -94,7 +99,8 @@ function Row({ lv, ins, label, bar, tip }: { lv: number; ins: string[]; label: R
   return (
     <div className={`gt-row lv${lv}`} data-in={ins.join(' ')} hidden={ins.some((k) => gtFold.has(k))} data-tv={tip.v} data-tt={tip.t} data-tm={tip.m}>
       <div className="gt-l">{label}</div>
-      <div className="gt-tl">{bar}</div>
+      {/* 막대는 일정 구간(gt-span) 안에서만 자리를 잡는다. 화면이 넓어 날짜 칸을 더 그려도 막대 길이는 그대로다 */}
+      <div className="gt-tl"><div className="gt-span">{bar}</div></div>
     </div>
   );
 }
@@ -333,79 +339,74 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
   );
 }
 
-/** 하루 단위 칸이 보이는 배율을 처음 화면이자 '원래 크기'로 쓴다. */
-const DEFAULT_ZOOM = 1.5;
+/** 하루 칸의 폭은 화면 폭과 상관없이 같게 둔다. 화면이 넓으면 칸을 늘리지 않고 일정 뒤의 날짜를 더 보여 주고,
+    일정이 화면보다 길면 옆으로 민다(#224). 주 단위는 일정 전체를 한눈에 보는 용도라 화면에 맞춰 늘린다 */
+const DAY_WIDTH = 40;
+const WEEK_MIN = 34;
 
 /** 머리 줄(칸 이름 두 줄) + 세로 칸 선·이번 주 칸 + 줄들 + 범례 */
-function Card({ title, link, heads, cols, days, rows, note, cls }: { title: ReactNode; link: ReactNode; heads: [string, string]; cols: GtCol[]; days?: GtCol[]; rows: ReactNode; note: string; cls?: string }) {
+function Card({ title, link, heads, cols, total, days, rows, note, cls }: { title: ReactNode; link: ReactNode; heads: [string, string]; cols: GtCol[]; /** 일정 전체 일 수 */ total: number; /** 첫날부터 n일의 하루 단위 칸 */ days?: (n: number) => GtCol[]; rows: ReactNode; note: string; cls?: string }) {
   const tip = useTip();
   const scroll = useRef<HTMLDivElement>(null);
-  const [zoom, setZoom] = useState(DEFAULT_ZOOM);
-  const daily = !!days && Math.round(zoom * 100) >= 150;
-  const visibleCols = daily ? days! : cols;
-  const [timelineSize, setTimelineSize] = useState({ available: 0, base: cols.length * 34 });
+  /* 처음에는 하루 단위로 보여 준다. 배율(%) 조절은 없애고 일·주 단위만 바꾼다 */
+  const [unit, setUnit] = useState<'day' | 'week'>(days ? 'day' : 'week');
+  const daily = !!days && unit === 'day';
+  const [available, setAvailable] = useState(0);
   useEffect(() => {
     const element = scroll.current;
     if (!element) return;
     const measure = () => {
       const label = element.querySelector<HTMLElement>('.gt-h .gt-l');
-      const available = Math.max(0, element.clientWidth - (label?.offsetWidth || 236));
-      setTimelineSize({ available, base: Math.max(available, cols.length * 34) });
+      setAvailable(Math.max(0, element.clientWidth - (label?.offsetWidth || 236)));
     };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(element);
     return () => observer.disconnect();
-  }, [cols.length]);
+  }, []);
+  /* 하루 단위: 화면에 들어가는 만큼 날짜 칸을 더 그린다(막대는 일정 구간 안에만) */
+  const dayCount = Math.max(total, Math.floor(available / DAY_WIDTH));
+  const visibleCols = daily ? days!(dayCount) : cols;
+  const span = daily ? total / dayCount : 1;
+  const width = daily ? Math.max(available, dayCount * DAY_WIDTH) : Math.max(available, cols.length * WEEK_MIN);
+  const scrolls = width > available + 1;
+  /* 주 단위는 하루 단위로 일정이 한 화면에 안 들어올 때만 쓸모가 있어, 그때만 전환 버튼을 보여 준다 */
+  const dayOverflows = !!days && total * DAY_WIDTH > available + 1;
   const [dragging, setDragging] = useState(false);
   const drag = useRef<{ pointer: number; x: number; left: number; moved: boolean } | null>(null);
   const suppressClick = useRef(false);
-  const changeZoom = (value: number) => { tip.hide(); setZoom(Math.max(.45, Math.min(1.5, value))); };
-  useEffect(() => {
-    const element = scroll.current;
-    if (!element) return;
-    const onWheel = (event: WheelEvent) => {
-      if (!event.ctrlKey) return;
-      event.preventDefault();
-      tip.hide();
-      setZoom(value => Math.max(.45, Math.min(1.5, value + (event.deltaY < 0 ? .1 : -.1))));
-    };
-    element.addEventListener('wheel', onWheel, { passive: false });
-    return () => element.removeEventListener('wheel', onWheel);
-  }, [tip.hide]);
-  const fit = () => {
-    const element = scroll.current;
-    if (!element) return;
-    changeZoom(Math.min(1, timelineSize.available / timelineSize.base));
-    element.scrollLeft = 0;
-  };
+  const changeUnit = (next: 'day' | 'week') => { tip.hide(); setUnit(next); };
   /* 일정이 칸보다 넓어 옆으로 밀리면 이번 주 칸이 이름 칸 바로 옆(한 칸 띄움)에 오게 맞춘다.
      시연 기준 날짜를 옮기면 지금 표시 중인 칸(주·일 단위)을 다시 따라간다. 시연이 아니면 첫 표시 때만 맞춘다.
      첫 측정 뒤에 일정표 폭이 넓어질 수 있어 측정이 끝나면 한 번 더 맞춘다 */
   const demoDay = useDemoDay();
-  const measured = timelineSize.available > 0;
-  useEffect(() => {
+  const measured = available > 0;
+  const toToday = () => {
     const sc = scroll.current;
     const on = sc?.querySelector<HTMLElement>('.gt-h .on');
     if (!sc || !on || sc.scrollWidth <= sc.clientWidth) return;
     const l = sc.querySelector<HTMLElement>('.gt-h .gt-l');
     sc.scrollLeft += on.getBoundingClientRect().left - sc.getBoundingClientRect().left - (l?.offsetWidth || 0) - on.offsetWidth;
-  }, [demoDay, measured]);
+  };
+  // 단위를 바꾸면 칸 폭이 달라지므로 다시 맞춘다
+  useEffect(toToday, [demoDay, measured, unit]);
   return (
     <div className="card gt-card">
       <div className="sec-h">
         <h2 className="st">{title}</h2>
-        <div className="gt-view-controls" aria-label="일정표 보기 조절">
-          <button type="button" onClick={() => changeZoom(zoom - .1)} disabled={zoom <= .45} aria-label="일정표 축소">−</button>
-          <span aria-live="polite">{Math.round(zoom * 100)}%</span>
-          <button type="button" onClick={() => changeZoom(zoom + .1)} disabled={zoom >= 1.5} aria-label="일정표 확대">+</button>
-          <button type="button" onClick={fit}>전체 맞춤</button>
-          <button type="button" onClick={() => changeZoom(DEFAULT_ZOOM)} disabled={zoom === DEFAULT_ZOOM}>원래 크기</button>
+        <div className="gt-view-controls" role="group" aria-label="일정표 보기 조절">
+          {dayOverflows || (days && !daily) ? <span className="gt-unit" role="group" aria-label="칸 단위">
+            <button type="button" aria-pressed={daily} onClick={() => changeUnit('day')}>일 단위</button>
+            <button type="button" aria-pressed={!daily} onClick={() => changeUnit('week')}>주 단위</button>
+          </span> : null}
+          {/* 옆으로 넘칠 때만 쓸모가 있어 그때만 보여 준다 */}
+          {scrolls ? <button type="button" onClick={() => { tip.hide(); toToday(); }}>{daily ? '오늘로' : '이번 주로'}</button> : null}
           {link}
         </div>
       </div>
-      <div className={`gt-scroll gt-pan${dragging ? ' is-dragging' : ''}`} ref={scroll} onScroll={event => event.currentTarget.style.setProperty('--gt-scroll-left', `${Math.max(0, event.currentTarget.scrollLeft)}px`)} tabIndex={0} aria-label="일정표 · 좌우 드래그로 이동, Ctrl과 마우스 휠로 확대·축소"
-        onPointerOver={event => { if (!drag.current?.moved) tip.show(event); }} onFocus={tip.show}
+      <div className={`gt-scroll gt-pan${dragging ? ' is-dragging' : ''}`} ref={scroll} onScroll={event => event.currentTarget.style.setProperty('--gt-scroll-left', `${Math.max(0, event.currentTarget.scrollLeft)}px`)} tabIndex={0} role="region" aria-label="일정표 · 넘치면 좌우로 끌어서 이동"
+        onPointerOver={event => { if (!drag.current?.moved) tip.show(event); }} onPointerLeave={tip.hide} onFocus={tip.show}
+        onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) tip.hide(); }}
         onPointerDown={event => {
           if (event.pointerType !== 'mouse' || event.button !== 0) return;
           suppressClick.current = false;
@@ -425,7 +426,7 @@ function Card({ title, link, heads, cols, days, rows, note, cls }: { title: Reac
         onLostPointerCapture={() => { drag.current = null; setDragging(false); }}
         onClickCapture={event => { if (suppressClick.current) { event.preventDefault(); event.stopPropagation(); suppressClick.current = false; } }}>
 
-        <div className={`gt${cls ? ` ${cls}` : ''}`} style={{ ['--n' as string]: visibleCols.length, minWidth: `calc(var(--gl) + ${daily ? Math.max(timelineSize.base * zoom, visibleCols.length * 26) : timelineSize.base * zoom}px)` }}>
+        <div className={`gt${cls ? ` ${cls}` : ''}`} style={{ ['--n' as string]: visibleCols.length, ['--gt-span' as string]: span, minWidth: `calc(var(--gl) + ${width}px)` }}>
           <div className="gt-h">
             <div className="gt-l">
               <span>{daily ? '일 단위' : heads[0]}</span>
@@ -454,17 +455,21 @@ function Card({ title, link, heads, cols, days, rows, note, cls }: { title: Reac
       <div className="gt-key">
         <span>
           <i className="k-done" />
-          완료
+          완료한 활동
         </span>
         <span>
           <i className="k-left" />
           남은 활동
         </span>
         <span>
+          <i className="k-sum"><i /></i>
+          스킬·로드맵 진행(채운 만큼 완료)
+        </span>
+        <span>
           <i className="k-now" />
           {daily ? '오늘' : '이번 주'}
         </span>
-        <span className="gt-note">{note}</span>
+        <span className="gt-note">{note} 도서는 일정표에 넣지 않아요.</span>
       </div>
       {tip.el}
     </div>
@@ -498,9 +503,10 @@ export function GanttOne({ R }: { R: PlanRecord }) {
       }
       heads={['주차', '시작일']}
       cols={colsOne(R)}
-      days={dailyCols(base, 7 * n)}
+      total={7 * n}
+      days={(count) => dailyCols(base, count)}
       rows={<Stages R={R} off={0} T={7 * n} up={[]} onToggle={toggle} />}
-      note={`1주차는 시작일(${md(base)})부터 ${md(addDays(base, 6))}까지예요. 150%보다 줄이면 주 단위로 보여요.`}
+      note={`1주차는 시작일(${md(base)})부터 ${md(addDays(base, 6))}까지예요.`}
     />
   );
 }
@@ -524,7 +530,7 @@ export function GanttAll({ list, onMove }: { list: PlanRecord[]; onMove?: (id: s
           ins={[]}
           label={
             <>
-              <Tg k={R.id} name={pl.goal} onToggle={() => toggle(R.id)} />
+              <Tg k={R.id} name={pl.displayTitle || pl.goal} onToggle={() => toggle(R.id)} />
               <button className="gt-r" onClick={() => go(paths.roadmap(R.id))}>
                 <span className="gt-name">{pl.displayTitle || pl.goal}</span>
                 <small>
@@ -532,8 +538,8 @@ export function GanttAll({ list, onMove }: { list: PlanRecord[]; onMove?: (id: s
                 </small>
               </button>
               {onMove && list.length > 1 && <>
-                <button type="button" className="gt-move" aria-label={`${pl.goal} 위로`} disabled={i === 0} onClick={() => onMove(R.id, -1)}>↑</button>
-                <button type="button" className="gt-move" aria-label={`${pl.goal} 아래로`} disabled={i === list.length - 1} onClick={() => onMove(R.id, 1)}>↓</button>
+                <button type="button" className="gt-move" aria-label={`${pl.displayTitle || pl.goal} 위로`} disabled={i === 0} onClick={() => onMove(R.id, -1)}>↑</button>
+                <button type="button" className="gt-move" aria-label={`${pl.displayTitle || pl.goal} 아래로`} disabled={i === list.length - 1} onClick={() => onMove(R.id, 1)}>↓</button>
               </>}
             </>
           }
@@ -542,13 +548,13 @@ export function GanttAll({ list, onMove }: { list: PlanRecord[]; onMove?: (id: s
               <i style={{ width: `${c.t ? (c.done / c.t) * 100 : 0}%` }} />
             </span>
           }
-          tip={{ v: `${md(starts[i])}~${md(addDays(starts[i], 7 * w - 1))} · ${at}`, t: pl.goal, m: `${trackName(pl.opt, pl.name)} · v${pl.version} · 활동 ${c.t}개 중 ${c.done}개 완료` }}
+          tip={{ v: `${md(starts[i])}~${md(addDays(starts[i], 7 * w - 1))} · ${at}`, t: pl.displayTitle || pl.goal, m: `${trackName(pl.opt, pl.name)} · 버전 ${pl.version} · 활동 ${c.t}개 중 ${c.done}개 완료` }}
         />
         <Stages R={R} off={off} T={T} up={[R.id]} onToggle={toggle} />
       </div>
     );
   });
   return (
-    <Card title="전체 일정" link={null} heads={['', '주 시작일']} cols={cols} days={dailyCols(axis, T)} rows={rows} note="로드맵 시작일부터 7일을 1주로 세요. 150%보다 줄이면 주 단위로 보여요." cls="all" />
+    <Card title="전체 일정" link={null} heads={['', '주 시작일']} cols={cols} total={T} days={(count) => dailyCols(axis, count)} rows={rows} note="로드맵 시작일부터 7일을 1주로 세요." cls="all" />
   );
 }

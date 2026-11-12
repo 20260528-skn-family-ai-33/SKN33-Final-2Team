@@ -636,6 +636,25 @@ DROP TABLE app_ext.report_tasks;
 COMMIT;
 ```
 
+### 처음 접속 튜토리얼 팝업용 열 (#236, 2026-11-12)
+
+처음 접속한 계정에게 튜토리얼을 볼지 묻는 팝업을 한 번만 띄우기 위한 열만 미리 둔다. 팝업·튜토리얼과 이 열을 읽고 쓰는 API는 아직 없다.
+
+- 저장: `app_ext.user_settings.tutorial_answered_at`(timestamptz). 팝업에 답한 시각이며 진행·건너뛰기를 구분하지 않는다.
+- 판정: 값이 `NULL`이거나 설정 행이 없으면 아직 답하지 않은 계정이다. 기존 계정의 값은 채우지 않으므로 기존 계정도 답하기 전까지는 대상이다.
+
+**DB 적용(이 열을 읽는 앱을 올리기 전에 DB마다 한 번):** 저장소 루트에서 실행한다. 다시 실행해도 결과는 같다. 지금 앱은 이 열을 읽지 않아 적용 전후 모두 그대로 동작한다.
+
+```bash
+docker compose exec -T db sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < backend/db/migrate_tutorial_prompt.sql
+```
+
+**복구:** 답한 기록이 지워진다.
+
+```sql
+ALTER TABLE app_ext.user_settings DROP COLUMN IF EXISTS tutorial_answered_at;
+```
+
 ### LLM 도서 후보 최소 확보 (#76)
 
 세 코스 모두 스킬별 벡터 검색 최대 30권을 검토하고, 공통 도서 입력은 중복을 제거한 최대 30권으로 유지한다. `book_candidates.common_pool`은 스킬의 application·targetOutcome·완료 기준과 제목·소개를 대조해 순위를 보완한 뒤, 각 스킬의 후보 3권을 먼저 확보하고 나머지를 교차 배분한다. 실제로 태그가 연결된 공유 도서만 다른 스킬의 후보로 사용할 수 있고, 사용 불가 자료·태그 불일치·중복 ISBN은 최소 수량에 포함하지 않는다.

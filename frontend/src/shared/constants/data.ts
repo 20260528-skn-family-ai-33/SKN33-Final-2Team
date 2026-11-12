@@ -521,3 +521,7 @@ export const D: GpData = {
 
 /** 내부 관점 ID를 사용자 표시 이름으로 변환한다. 기존 저장 데이터에도 적용. */
 export const trackName = (id: string, fallback = ""): string => D.perspectives[id]?.name || fallback;
+/** 코스 성격 한 줄(코스 카드·검토 화면). 서버의 코스 기준(roadmap_generation POLICIES · track_policy 의 Challenge 심화 기준)에 맞춘다.
+    perspectives.focus 는 예전 정의(Challenge = 업무 적용)라 쓰지 않는다 */
+const TRACK_TRAIT: Record<string, string> = { A1: "무료 강좌 중심", A2: "짧게 핵심만", A3: "심화 학습" };
+export const trackTrait = (id: string): string => TRACK_TRAIT[id] || "";

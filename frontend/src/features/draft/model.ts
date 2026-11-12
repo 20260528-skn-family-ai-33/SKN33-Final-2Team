@@ -11,17 +11,19 @@ export type StepKey = 'goal' | 'details' | 'check' | 'quiz' | 'result' | 'option
 
 export const STEPS: [StepKey, string, string][] = [
   ['goal', '목표·기획서', paths.newGoal],
-  ['details', '세부사항·스킬 선택', paths.newDetails],
+  ['details', '세부 사항·스킬', paths.newDetails],
   ['check', '입력 내용 확인', paths.newDetailsCheck],
   ['quiz', '역량 테스트', paths.newQuiz],
   ['result', '테스트 결과', paths.newResult],
   ['options', '로드맵·자료 선택', paths.newOptions],
-  ['review', '검토·산출물 선택·확정', paths.newReview],
+  ['review', '검토·확정', paths.newReview],
 ];
 
 /** 단계 표시에 따로 없는 하위 화면은 속한 단계로 보여 준다 */
 export const SUB: Record<string, StepKey> = { [paths.newResultEdit]: 'result', [paths.newGen]: 'options' };
 export const stepOfPath = (p: string): StepKey | undefined => STEPS.find((x) => x[2] === p)?.[0] || SUB[p];
+/** 버튼('다음: …')과 탭 제목이 단계 표시줄과 같은 이름을 쓰게 한다 */
+export const stepLabel = (k: StepKey): string => STEPS.find((x) => x[0] === k)?.[1] || '';
 
 /** 결과 화면의 다음 버튼과 단계 표시줄·이어 쓰기가 같은 경로로 들어간다. */
 export function roadmapEntry({ draft, draftId, educationGuideShownFor }: WsState): string {

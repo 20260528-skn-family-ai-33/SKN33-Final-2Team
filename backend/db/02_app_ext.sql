@@ -90,6 +90,9 @@ CREATE TABLE IF NOT EXISTS app_ext.user_settings (
 -- 모드별 추론 정도(좌측 'AI 모델'에서 고름 · #28): {"ollama": "xhigh", "openai": "low"}. RunPod-Ollama 는 진단·로드맵 모델에만 쓰고
 -- 규정 에이전트 모델은 늘 끈다. 모드가 없으면 .env 기본값(OLLAMA_THINK · OPENAI_REASONING_EFFORT)을 따른다
 ALTER TABLE app_ext.user_settings ADD COLUMN IF NOT EXISTS reasoning jsonb NOT NULL DEFAULT '{}'::jsonb;
+-- 처음 접속한 계정에게 튜토리얼을 볼지 묻는 팝업에 답한 시각(진행·건너뛰기 모두). NULL 이거나 행이 없으면 아직 답하지 않은 계정이라 팝업을 띄운다.
+-- 기존 DB에는 migrate_tutorial_prompt.sql 로 넣는다
+ALTER TABLE app_ext.user_settings ADD COLUMN IF NOT EXISTS tutorial_answered_at timestamptz;
 
 -- ── 목표 후보(FR-05) 보조 ──
 -- 후보 문장은 ERD public.employee_recommended_prompts(display_order 1~3)에 둔다. 추천 이유·근거 항목은 그 표에 열이 없어 여기에

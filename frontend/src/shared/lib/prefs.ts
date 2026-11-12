@@ -17,7 +17,7 @@ export function prefText(k: keyof Prefs, p: Prefs): string {
     const c = certOf(p);
     return c ? `${c.name} · 4단계에 준비 활동을 넣어요` : '계획 없음';
   }
-  if (k === 'hours') return +v > 0 ? `주 ${v}시간` : '알아서 (로드맵 계획 에이전트가 정해요)';
+  if (k === 'hours') return +v > 0 ? `주 ${v}시간` : '알아서 (AI가 정해요)';
   if (k === 'weeks') return +v > 0 ? `${v}주 안에` : '알아서 (정해진 기간 없음)';
   if (k === 'budget') return blank(v) ? '알아서' : +v > 0 ? won(+v) : '0원 (무료 자료만)';
   if (k === 'etc') return String(v || '').trim() || '없음';

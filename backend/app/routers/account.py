@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from .. import db, llm, provider_policy, regulation_embeddings
 from ..agents import runtime as rt
 from ..auth import COOKIE, Account, end_session, hash_password, login, require_account, require_employee, start_session, verify_password
+from ..browser_console import demo_enabled, options as browser_options
 from ..config import OLLAMA_THINK, S, level_ok
 from ..errors import ApiError, provider_label, unavailable_reason
 from ..services import demo, goals, profile
@@ -15,12 +16,17 @@ from . import job_response
 r = APIRouter(prefix='/api/v1')
 
 
+@r.get('/console/capabilities')
+def console_capabilities():
+    return {'picker': S.beta_account_picker, 'demo': S.demo_mode}
+
+
 def _settings(employee_id: int, selection: tuple[str, str | None] | None = None) -> dict:
     policy, level = selection or provider_policy.selection()
     s = db.one('SELECT ai_provider, demo_mock, fail_sim, reasoning FROM app_ext.user_settings WHERE employee_id = :e', e=employee_id) or {}
     # 시연을 끈 배포에서는 DB에 남아 있는 시연 옵션도 화면에 적용하지 않는다.
-    return {'aiProvider': provider_policy.resolve(policy, s.get('ai_provider')), 'demoMock': S.demo_mode and bool(s.get('demo_mock')),
-            'failSim': (s.get('fail_sim') or {}) if S.demo_mode else {},
+    return {'aiProvider': provider_policy.resolve(policy, s.get('ai_provider')), 'demoMock': demo_enabled(S.demo_mode) and bool(s.get('demo_mock')),
+            'failSim': (s.get('fail_sim') or {}) if demo_enabled(S.demo_mode) else {},
             'reasoning': (s.get('reasoning') or {}) if policy == 'employee' else ({policy: level} if level else {})}
 
 
@@ -46,12 +52,12 @@ def api_logout(request: Request):
 
 
 def require_demo_mode() -> None:
-    if not S.demo_mode:
+    if not demo_enabled(S.demo_mode):
         raise ApiError(404, 'NOT_FOUND', '요청한 기능을 찾을 수 없어요')
 
 
 def require_beta_account_picker() -> None:
-    if not S.beta_account_picker:
+    if not S.beta_account_picker or browser_options.get().picker_off:
         raise ApiError(404, 'NOT_FOUND', '요청한 기능을 찾을 수 없어요')
 
 
@@ -141,8 +147,8 @@ def api_providers(a: Account = Depends(require_account)):
     policy, level = provider_policy.selection()
     settings = _settings(a.id, (policy, level)) if a.type == 'employee' else {}
     return {'current': settings.get('aiProvider') or provider_policy.resolve(policy, None),
-            'policy': policy, 'employeeReasoning': settings.get('reasoning', {}), 'demoMode': S.demo_mode, 'providers': [
-        {'id': 'ollama', 'label': 'RunPod-Ollama', 'available': llm.available('ollama'), 'reason': unavailable_reason('ollama'), 'target': S.ollama_target if S.ollama_url else '',
+            'policy': policy, 'employeeReasoning': settings.get('reasoning', {}), 'demoMode': demo_enabled(S.demo_mode), 'providers': [
+        {'id': 'ollama', 'label': 'RunPod-Ollama', 'available': llm.available('ollama'), 'reason': unavailable_reason('ollama'), 'target': 'runpod' if browser_options.get().ollama_url else S.ollama_target if S.ollama_url else '',
          'models': dict({r: llm.model_name('ollama', r) for r in ('default', 'roadmap', 'regulation', 'vision')}, embed=regulation_embeddings.model()),
          'timeout': S.ollama_timeout,
          # 추론 정도: 모든 역할을 늘 끄고 부르므로 고를 단계가 없다(빈 목록 → 화면에 고르는 칸을 두지 않음)

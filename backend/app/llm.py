@@ -13,7 +13,7 @@ import urllib.error
 import urllib.request
 from urllib.parse import quote
 
-from . import provider_keys
+from . import browser_console, provider_keys
 from .config import S
 
 
@@ -24,13 +24,20 @@ class LlmError(Exception):
 def available(provider: str) -> bool:
     # RunPod-Ollama 모델은 비워 두면 팀 모델(config.OLLAMA_TEAM_*)이라 주소만 있으면 쓸 수 있다
     if provider == 'ollama':
-        return bool(S.ollama_url)
+        return bool(browser_console.options.get().ollama_url or S.ollama_url)
     return provider == 'openai' and bool(provider_keys.read(S, 'openai').value)
 
 
-def _http(url: str, payload: dict | None, headers: dict, timeout: int):
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def _http(url: str, payload: dict | None, headers: dict, timeout: int, *, allow_redirects: bool = True):
     req = urllib.request.Request(url, data=None if payload is None else json.dumps(payload).encode('utf-8'),
                                  method='GET' if payload is None else 'POST', headers=headers)
+    if not allow_redirects:
+        return urllib.request.build_opener(_NoRedirect()).open(req, timeout=timeout)
     return urllib.request.urlopen(req, timeout=timeout)
 
 
@@ -62,17 +69,22 @@ def openai(path: str, payload: dict | None, timeout: int = 90) -> dict:
 
 
 def ollama(path: str, payload: dict | None, timeout: int | None = None) -> dict:
-    if not S.ollama_url:
+    settings = browser_console.options.get()
+    base_url = settings.ollama_url or S.ollama_url
+    if not base_url:
         raise LlmError('Ollama 설정이 없어요 (.env 의 OLLAMA_BASE_URL)')
-    timeout = timeout or S.ollama_timeout
+    timeout = timeout or (browser_console.options.get().timeout if path == 'api/chat' else None) or S.ollama_timeout
     headers = {}
-    key = provider_keys.read(S, 'ollama').value
+    key = settings.ollama_key
+    if key is None and not settings.ollama_url:
+        key = provider_keys.read(S, 'ollama').value
     if key:
         headers['Authorization'] = f'Bearer {key}'
     if payload is not None:
         headers['Content-Type'] = 'application/json'
     try:
-        with _http(f'{S.ollama_url}/{path}', payload, headers, timeout) as res:
+        transport = {'allow_redirects': False} if settings.ollama_url or settings.ollama_key else {}
+        with _http(f'{base_url}/{path}', payload, headers, timeout, **transport) as res:
             body = res.read().decode('utf-8', 'replace')
     except urllib.error.HTTPError as e:
         raw = e.read().decode('utf-8', 'replace')
@@ -128,6 +140,14 @@ def chat(provider: str, messages: list, role: str = 'default', json_mode: bool =
     reasoning: 직원·관리자가 고른 OpenAI 추론 정도(단계 이름). 없으면 .env 기본값(OPENAI_REASONING_EFFORT),
     그것도 비면 보내지 않아 모델 기본값을 따른다. 이미지 읽기 모델은 화면에서 고르지 않아 직원 값을 쓰지 않는다.
     RunPod-Ollama 는 역할과 고른 값에 관계없이 늘 추론 없이 부른다(config.OLLAMA_THINK · think: false)"""
+    limits = browser_console.options.get()
+    if limits.input_tokens is not None:
+        from .catalog_budget import FRAMING_RESERVE, tokens
+        if any(message.get('images') for message in messages):
+            raise LlmError('이미지 입력은 토큰을 계산할 수 없어요. inputTokens default 명령으로 복원해 주세요.')
+        count = FRAMING_RESERVE + sum(tokens(message.get('content') or '') + tokens(message.get('role') or '') for message in messages)
+        if count > limits.input_tokens:
+            raise LlmError(f'모델 입력이 브라우저 한도를 넘었어요 ({count} / {limits.input_tokens} 토큰).')
     mine = None if role == 'vision' else reasoning
     if provider == 'ollama':
         if role == 'vision' and not S.ollama_vision:
@@ -142,6 +162,8 @@ def chat(provider: str, messages: list, role: str = 'default', json_mode: bool =
             from .catalog_budget import OUTPUT_RESERVE, DEFAULT_CONTEXT
             payload.setdefault('options', {})['num_predict'] = OUTPUT_RESERVE
             payload['options'].setdefault('num_ctx', DEFAULT_CONTEXT)
+        if limits.output_tokens is not None:
+            payload.setdefault('options', {})['num_predict'] = limits.output_tokens
         if role == 'regulation':
             # 챗봇 파인튜닝 모델의 GPU/VRAM 선택은 Ollama 서버에 맡긴다.
             # -1은 자동 선택이며 모델에 남은 CPU 강제(num_gpu=0)도 덮어쓴다.
@@ -186,7 +208,9 @@ def chat(provider: str, messages: list, role: str = 'default', json_mode: bool =
         payload['reasoning_effort'] = level
     # 상세 계획을 쓰는 로드맵만 더 기다린다. 사용자 추론 선택과 다른 기능의 제한은 유지한다.
     timeout = S.openai_roadmap_timeout if role == 'roadmap' else 90
-    res = openai('chat/completions', payload, timeout=timeout)
+    if limits.output_tokens is not None:
+        payload['max_completion_tokens'] = limits.output_tokens
+    res = openai('chat/completions', payload, timeout=limits.timeout or timeout)
     return {'content': res['choices'][0]['message'].get('content') or '', 'model': res.get('model', model), 'provider': 'openai', 'loadMs': 0, 'totalMs': 0}
 
 
@@ -209,6 +233,6 @@ def ping(provider: str) -> dict:
     roles = [('default', S.ollama_model)]
     if S.ollama_model_regulation != S.ollama_model:
         roles.append(('regulation', S.ollama_model_regulation))
-    return {'ok': True, 'provider': 'ollama', 'target': S.ollama_target, 'version': version,
+    return {'ok': True, 'provider': 'ollama', 'target': 'runpod' if browser_console.options.get().ollama_url else S.ollama_target, 'version': version,
             'models': [{'role': r, 'name': n, 'installed': hit(n, have), 'loaded': hit(n, loaded)} for r, n in roles],
             'ms': round((time.perf_counter() - t0) * 1000)}

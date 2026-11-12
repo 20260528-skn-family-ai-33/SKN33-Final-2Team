@@ -138,7 +138,7 @@ def _recover_cross_skill_courses(by_name, payload, references, eligibility, gene
 
 
 def _empty_skill(name: str) -> dict:
-    return {'name': name, 'courses': [], 'books': [], 'selectedCourse': None, 'selectedBooks': [],
+    return {'name': name, 'courses': [], 'books': [], 'modelCourseCandidates': [], 'selectedCourse': None, 'selectedBooks': [],
             'courseDiagnostic': _no_candidates('강좌'), 'bookDiagnostic': _no_candidates('도서')}
 
 
@@ -450,6 +450,12 @@ def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
         result.append(output)
     if is_crash:
         _finalize_crash(result, pools, selection, project, crash_cache)
+    for output, pool in zip(result, pools, strict=True):
+        selected = {row['id'] for row in output['courses']}
+        output['modelCourseCandidates'] = [
+            {'id': row['id'], 'title': row['title'], 'provider': row.get('provider'), 'recommended': row['id'] in selected}
+            for row in pool['courses']
+        ]
     return {'skills': result}
 
 
