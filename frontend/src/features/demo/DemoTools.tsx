@@ -1,6 +1,6 @@
 /* 시연 도구 (5차 gp-core.js modeBox·jump·reset·agent-log) — 로그인한 계정에 만든 시연 기록을 교체한다.
    '에이전트 동작 보기'는 시연·디버그 전용이라 누가 호출했든 모든 계정의 호출을 보여 준다(직원·관리자 화면 공통 · 2026-10-26).
-   브라우저의 tools 설정(기본 VITE_DEMO_TOOLS)과 서버 시연 허용을 함께 확인한다. 서버 조회 실패·구버전 응답은 숨긴다. */
+   브라우저의 demo 설정(기본 VITE_DEMO_TOOLS)과 서버 시연 허용을 함께 확인한다. 서버 조회 실패·구버전 응답은 숨긴다. */
 import { useState } from 'react';
 import { legacyToPath, paths } from '@/app/paths';
 import { demoApi } from '@/api/endpoints/account';

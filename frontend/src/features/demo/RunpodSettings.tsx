@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { storeOptions, useBrowserOptions } from '@/shared/lib/browserOptions';
+import { browserDemoEnabled, storeOptions, useBrowserOptions } from '@/shared/lib/browserOptions';
 
 export function RunpodSettings({ focus, onDone }: { focus: 'url' | 'key'; onDone: (message: string) => void }) {
   const [url, setUrl] = useState(() => useBrowserOptions.getState().options.ollamaUrl || '');
@@ -34,7 +34,7 @@ export function RunpodSettings({ focus, onDone }: { focus: 'url' | 'key'; onDone
       });
       const data = await response.json();
       if (controller.signal.aborted) return;
-      if (!response.ok || !data.demo || useBrowserOptions.getState().options.demo === false) {
+      if (!response.ok || !data.demo || !browserDemoEnabled(useBrowserOptions.getState().options)) {
         setError(data.error?.message || '시연 모드를 확인해 주세요.');
         return;
       }

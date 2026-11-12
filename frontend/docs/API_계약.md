@@ -86,7 +86,7 @@
 
 `GP5_DEMO_MODE=off`이면 위 시연 전용 3개 API와 `GET /ai/log`·`GET /ai/log/{id}`는 인증·조회 전에 `404 / NOT_FOUND`를 반환합니다. 직원·관리자 모두 같은 제한을 받습니다. `GET /me`와 실행 컨텍스트는 off에서 저장된 `demo_mock`·`fail_sim`을 무시하고 `demoMock: false`, `failSim: {}`를 사용하며 DB 원본·선택한 AI 제공자·추론값은 유지합니다.
 
-`GET /ai/providers`에는 서버 시연 허용 여부인 최상위 `demoMode: boolean`이 추가됩니다. 예를 들어 `{ "current": "ollama", "demoMode": false, "providers": [...], "docLibs": {...} }`이면 화면은 시연 도구와 관리자 가데이터 선택지를 숨깁니다. 값이 없거나 조회가 실패해도 표시하지 않습니다. 서버 `GP5_DEMO_MODE`와 프런트 `VITE_DEMO_TOOLS`는 미설정·빈 값·공백·알 수 없는 값이면 off이며, 앞뒤 공백과 대소문자를 정리한 on만 허용합니다. 서버는 빈 환경변수도 파일 설정보다 우선합니다. 두 설정이 모두 on일 때만 시연 도구가 표시됩니다. 직원의 미설정 AI 기본값은 `ollama`이며 OpenAI 키 설정만으로 선택이 바뀌지 않습니다.
+`GET /ai/providers`에는 서버 시연 허용 여부인 최상위 `demoMode: boolean`이 추가됩니다. 예를 들어 `{ "current": "ollama", "demoMode": false, "providers": [...], "docLibs": {...} }`이면 화면은 시연 도구와 관리자 가데이터 선택지를 숨깁니다. 값이 없거나 조회가 실패해도 표시하지 않습니다. 서버 `GP5_DEMO_MODE`와 프런트 `VITE_DEMO_TOOLS`는 미설정·빈 값·공백·알 수 없는 값이면 off이며, 앞뒤 공백과 대소문자를 정리한 on만 허용합니다. 서버는 빈 환경변수도 파일 설정보다 우선합니다. 브라우저는 `VITE_DEMO_TOOLS`를 시연 모드의 초기값으로 사용하며 콘솔의 `demo on/off`로 변경할 수 있습니다. 서버가 허용하고 브라우저 시연 모드가 켜져야 시연 도구와 개인 모델 설정이 활성화됩니다. 직원의 미설정 AI 기본값은 `ollama`이며 OpenAI 키 설정만으로 선택이 바뀌지 않습니다.
 
 시연 설정 저장은 서버가 성공 응답을 보낸 뒤에만 화면에 반영합니다. 가데이터·실패 시연 저장은 같은 큐에서 요청하고, 실패 시 기존값을 유지합니다. 이전 로그인 회차의 응답은 버리며 시연 응답으로 제공자·추론값을 덮지 않습니다.
 

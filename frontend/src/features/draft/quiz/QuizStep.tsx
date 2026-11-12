@@ -1,4 +1,5 @@
 import { useConsoleAction } from '@/features/demo/consoleActions';
+import { FillAnswersButton } from '@/features/demo/FillAnswersButton';
 import { loadSurvey, request, SurveyRequestError, type Stored } from './surveyRequest';
 import { prepareRoadmaps } from '../prepareRoadmaps';
 import { sameJ } from '@/shared/lib/format';
@@ -85,7 +86,7 @@ export function QuizStep() {
   },[id,owner,inputKey,requestKey,survey]);
   useConsoleAction('fill', '답안채우기', '설문·퀴즈의 빈 응답을 무작위로 채웁니다.', !!survey && !survey.completed && !saving,
     () => `빈 응답 ${surveyRef.current?.randomize() ?? 0}개를 채웠습니다.`);
-  return <><Stepper cur="quiz" busy={saving} /><Page title="역량 테스트"
+  return <><Stepper cur="quiz" busy={saving} /><Page title="역량 테스트" titleAction={<FillAnswersButton />}
     lead="프로젝트와 함께 키우고 싶은 역량, 현재 업무 배경에 맞춘 설문과 퀴즈를 확인해요. 모든 응답을 마치면 다음 단계로 이어집니다.">
     {error ? <div className="card"><p role="alert">{error}</p><div className="actions">
       <button className="btn line" onClick={() => go(paths.newDetailsCheck)}>입력 내용 확인</button>

@@ -16,6 +16,7 @@ import { ai, cause, errText } from '@/shared/state/ai';
 import { setAt } from '@/shared/state/bind';
 import { updateWs, ws } from '@/shared/state/workspace';
 import { useConsoleAction } from '@/features/demo/consoleActions';
+import { FillAnswersButton } from '@/features/demo/FillAnswersButton';
 import { Icon } from '@/shared/ui/Icon';
 import { AgentRow, FailPage, Note, OpsBox, Page, runSub, via } from '@/shared/ui/parts';
 import { Skeleton } from '@/shared/ui/Skeleton';
@@ -188,6 +189,7 @@ function Post({ R }: { R: PlanRecord }) {
     <Page
       back={paths.checks}
       title="사후 점검"
+      titleAction={<FillAnswersButton />}
       lead="설문은 사전과 같은 문항이고, 퀴즈는 같은 스킬·개념의 새 문제예요. 지금 기준으로 답해 주세요. 설문은 1~5점, 퀴즈는 보기 중 하나를 선택해요."
       foot={
         reportId ? (

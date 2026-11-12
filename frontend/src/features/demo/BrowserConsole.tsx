@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { http } from '@/api/client';
 import { accountApi } from '@/api/endpoints/account';
 import { useLocation } from 'react-router';
-import { limits, storeOptions, useBrowserOptions, type BrowserOptions } from '@/shared/lib/browserOptions';
+import { activeRunpodSettings, browserDemoEnabled, limits, storeOptions, useBrowserOptions, type BrowserOptions } from '@/shared/lib/browserOptions';
 import { canUseDemo } from '@/shared/lib/demoAccess';
 import { ai, applySettings, checkStatus, resetConn, useAi } from '@/shared/state/ai';
 import { loadDemoAccounts, signInSeq, useSession } from '@/shared/state/session';
@@ -13,7 +13,7 @@ import './browserConsole.css';
 
 const toggleText = (value: boolean) => value ? '켜짐' : '꺼짐';
 const normalize = (text: string) => text.trim().toLowerCase().replace(/\s+/g, ' ');
-const toggleNames = { picker: '직원선택', demo: '시연', tools: '도구' } as const;
+const toggleNames = { picker: '직원선택', demo: '시연' } as const;
 type Command = ConsoleAction & { needsNumber?: boolean };
 const numeric = [
   { name: 'timeout', alias: '대기시간', field: 'timeout', unit: '초' },
@@ -44,14 +44,17 @@ export function BrowserConsole() {
         useSession.setState({ demo: null });
         if (!useSession.getState().account) void loadDemoAccounts(true);
       }
-      if (options.tools !== prev.options.tools) useAi.setState(s => ({ status: { ...s.status } }));
-      const runpodChanged = options.ollamaUrl !== prev.options.ollamaUrl || options.ollamaKey !== prev.options.ollamaKey;
+      const demoEnabled = browserDemoEnabled(options);
+      const demoChanged = demoEnabled !== browserDemoEnabled(prev.options);
+      const previousPod = activeRunpodSettings(prev.options);
+      const currentPod = activeRunpodSettings(options);
+      const runpodChanged = currentPod.ollamaUrl !== previousPod.ollamaUrl || currentPod.ollamaKey !== previousPod.ollamaKey;
       if (runpodChanged && ai.choice() === 'ollama') resetConn();
-      if (useSession.getState().account && (runpodChanged || options.demo !== prev.options.demo)) {
+      if (useSession.getState().account && (runpodChanged || demoChanged)) {
         void checkStatus({ reconnectRunpod: runpodChanged });
       }
-      if (options.demo === prev.options.demo || !useSession.getState().account) return;
-      if (options.demo === false) useAi.setState(s => ({ status: { ...s.status, demoMode: false }, settings: { ...s.settings, demoMock: false, failSim: {} } }));
+      if (!demoChanged || !useSession.getState().account) return;
+      if (!demoEnabled) useAi.setState(s => ({ status: { ...s.status, demoMode: false }, settings: { ...s.settings, demoMock: false, failSim: {} } }));
       const seq = signInSeq(), request = ++revision;
       void accountApi.me().then(acct => {
         if (seq === signInSeq() && request === revision && acct.accountType === 'employee') applySettings(acct);
@@ -86,8 +89,9 @@ function CommandDialog({ close }: { close: () => void }) {
       });
     return () => { active = false; element.close(); };
   }, []);
-  const demo = caps?.demo === true && options.demo !== false;
-  const prefix = normalize(query).replace(/^tokens (input|output)(?= |$)/, (_, direction: string) => direction + 'tokens');
+  const demo = canUseDemo(caps?.demo);
+  const prefix = normalize(query).replace(/^tools(?= |$)/, 'demo').replace(/^도구(켜기|끄기)$/, '시연$1')
+    .replace(/^tokens (input|output)(?= |$)/, (_, direction: string) => direction + 'tokens');
   const commands: Command[] = [];
   const add = (name: string, alias: string, description: string, run: ConsoleAction['run']) => commands.push({ name, alias, description, run });
   function change(label: string, field: keyof BrowserOptions, value: number | boolean | undefined, unit = '') {
@@ -98,11 +102,11 @@ function CommandDialog({ close }: { close: () => void }) {
     return `${label} · ${value === undefined ? '기본값' : toggleText(value)}`;
   }
   add('status', '설정보기', '현재 설정 보기 · 테스트 기능, 모델 제한, RunPod 연결', () => '');
-  for (const field of ['picker', 'demo', 'tools'] as const) {
-    const label = { picker: '로그인 직원 고르기', demo: '시연 기능', tools: '화면 시연 도구' }[field];
+  for (const field of ['picker', 'demo'] as const) {
+    const label = { picker: '로그인 직원 고르기', demo: '시연 도구와 개인 모델 설정' }[field];
     for (const enabled of [true, false]) {
       add(field + (enabled ? ' on' : ' off'), toggleNames[field] + (enabled ? '켜기' : '끄기'), `이 브라우저에서 ${label}를 ${enabled ? '켭니다' : '끕니다'}.`, () => {
-        if (enabled && !(field === 'tools' ? demo : caps?.[field])) return field === 'tools' ? '시연 도구를 켜려면 먼저 demo on을 실행하세요.' : '서버에서 이 기능을 허용해야 켤 수 있습니다.';
+        if (enabled && !caps?.[field]) return '서버에서 이 기능을 허용해야 켤 수 있습니다.';
         return change(label, field, enabled);
       });
     }
@@ -214,7 +218,7 @@ function CommandDialog({ close }: { close: () => void }) {
     </div>
     </>}
     {!editingRunpod && <div aria-live="polite">
-      {result?.command === 'status' ? <ConsoleStatus caps={caps} options={options} demo={demo} tools={canUseDemo(demo)} />
+      {result?.command === 'status' ? <ConsoleStatus caps={caps} options={options} demo={demo} />
         : result && <pre>{result.message}</pre>}
     </div>}
   </dialog>;
