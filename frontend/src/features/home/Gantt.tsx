@@ -130,12 +130,12 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
     <>
       {shared.map(course=>{
         const done=course.activities.every(activity=>st(R.progress,activity.id)==='done');
-        const skillLabel=course.skills.join(' and ');
-        const show=()=>openSheet({title:course.title,sub:`공통 강좌 · ${skillLabel}`,body:()=> <div>{course.activities.map(activity=><section key={activity.id}><h3>{activity.skill}</h3><ul className="acts"><ActRow a={activity} R={R}/></ul></section>)}</div>});
+        const skillLabel=`${course.skills.join(' · ')} 공통`;
+        const show=()=>openSheet({title:course.title,sub:skillLabel,body:()=> <div>{course.activities.map(activity=><section key={activity.id}><h3>{activity.skill}</h3><ul className="acts"><ActRow a={activity} R={R}/></ul></section>)}</div>});
         return <Row key={`shared:${course.id}`} lv={1} ins={up}
-          label={<button className="gt-a" aria-label={`${course.title} 공통 강좌 · ${skillLabel} · 관련 스킬 기록 열기`} onClick={show}><span className="gt-name">{course.title}<small>{skillLabel}</small></span>{done?<Icon name="check" cls="gt-ok"/>:null}</button>}
+          label={<button className="gt-a" aria-label={`${course.title} · ${skillLabel} · 관련 스킬 기록 열기`} onClick={show}><span className="gt-name">{course.title}<small>{skillLabel}</small></span>{done?<Icon name="check" cls="gt-ok"/>:null}</button>}
           bar={<button type="button" className={`gt-bar act gt-materials-open${done?' done':''}`} aria-label={`${course.title} · ${skillLabel} · ${course.from}~${course.to}주차`} onClick={show} style={gtPos(off+7*(course.from-1),off+7*course.to,T)}>{done?<Icon name="check"/>:null}</button>}
-          tip={{v:when(course.from,course.to),t:course.title,m:`${skillLabel}에 연결된 공통 강좌 · 배정 범위 표시`}}/>;
+          tip={{v:when(course.from,course.to),t:course.title,m:skillLabel}}/>;
       })}
       {(() => {
         interface SkillCluster {
@@ -163,7 +163,7 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
               key: `${R.id}:cluster:${clusterSkills.join('+')}`,
               skills: clusterSkills,
               numbers,
-              title: clusterSkills.join(' and '),
+              title: clusterSkills.join(' · '),
               noLabel,
               sharedCourse,
             });
@@ -183,7 +183,8 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
 
         return clusters.map(cluster => {
           const allActs = cluster.skills.flatMap(s => groups.get(s) || []);
-          const dn = allActs.filter(a => st(R.progress, a.id) === 'done').length;
+          // 묶음의 완료 수도 전체와 같은 기준으로 센다(공통 강좌는 하나 · 걸린 활동이 모두 끝나야 완료)
+          const { done: dn, t: total } = count({ ...pl, acts: allActs }, R.progress);
           let f: number, t: number;
           if (cluster.sharedCourse) {
             f = cluster.sharedCourse.from;
@@ -209,16 +210,16 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
                     <span className="gt-no">{cluster.noLabel}</span>
                     <span className="gt-name">{cluster.title}</span>
                     <span className="gt-sub">
-                      {dn}/{allActs.length}
+                      {dn}/{total}
                     </span>
                   </>
                 }
                 bar={
                   <span className="gt-bar sum" style={gtPos(off + 7 * (f - 1), rangeEnd, T)}>
-                    <i style={{ width: `${(dn / (allActs.length || 1)) * 100}%` }} />
+                    <i style={{ width: `${(dn / (total || 1)) * 100}%` }} />
                   </span>
                 }
-                tip={{ v: when(f, t), t: cluster.title, m: `활동 ${allActs.length}개 중 ${dn}개 완료` }}
+                tip={{ v: when(f, t), t: cluster.title, m: `활동 ${total}개 중 ${dn}개 완료` }}
               />
               {cluster.skills.map(name => {
                 const as = groups.get(name)!;
@@ -244,7 +245,7 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
 
                 return (
                   <Fragment key={`${cluster.key}:${name}`}>
-                    {materials.length > 0 && (
+                    {separateMaterials.length > 0 && (
                       <Row
                         lv={2}
                         ins={up.concat(cluster.key)}
@@ -292,7 +293,7 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
                       const activityFrom = a.wFrom || taskWeek;
                       const activityTo = taskWeek;
                       const done = st(R.progress, a.id) === 'done';
-                      const no = `${number}.${i + (materials.length ? 2 : 1)}`;
+                      const no = `${number}.${i + (separateMaterials.length ? 2 : 1)}`;
                       const w = when(activityFrom, activityTo);
                       const m = `${activityTime(a).text} · ${done ? '완료' : '진행 중'}`;
                       return (

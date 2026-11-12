@@ -139,6 +139,7 @@ async function recSave(): Promise<void> {
   }
   const ok = await saveProgress(t.pid, t.id, body);
   if (!ok) return;
+  // 공통 강좌(여러 스킬이 같이 쓰는 강좌)는 서버가 같은 요청에서 다른 스킬 활동의 상태도 함께 바꾼다(메모·첨부는 활동별로 유지)
   updateWs((s) => void (s.tmp = null));
   recFile = null;
   closeSheet();
