@@ -359,7 +359,7 @@ def _context_query(q: str, history: list, *, classify: bool = False) -> str:
 
 def isolate_input(question: str, history: list | None, me: dict, context: dict | None = None,
                   *, documents_only: bool = False) -> dict:
-    """1~8단계 파이프라인 진입 전 입력 전처리:
+    """1~5단계 파이프라인 진입 전 입력 전처리:
     1. 후속 질문(이어 묻기): 최근 최대 5턴(FOLLOW_HISTORY_LIMIT)의 대화 기록 유지.
     2. 개인정보 완벽 격리: 문서 전용 모드(documents_only=True)에서는 LLM 전송 및 로그 노출 방지를 위해
        me에서 직원 구분(empGroup)만 남기고 context는 완전히 비운다.
@@ -399,7 +399,7 @@ def _refused(topic: str) -> dict:
 
 
 # ==============================================================================
-# ⭐ [1단계 ~ 8단계 사내 질의응답 핵심 파이프라인 (규정·생활안내·회사정보)]
+# ⭐ [1단계 ~ 5단계 사내 질의응답 핵심 파이프라인 (사내 규정: 3-1, 4-1, 5-1 / 생활안내·수자원공사 정보: 3-2, 4-2, 5-2)]
 # ==============================================================================
 
 def classify_question_roberta(question: str, history: list | None = None, me: dict | None = None,
@@ -499,7 +499,7 @@ def verify_or_reclassify_label_with_llm(ctx: rt.Ctx, question: str, label: str,
 
 
 def retrieve_regulation_slots(ctx: rt.Ctx, inp: dict) -> list[str]:
-    """⭐ [3단계 - 사내 규정 RAG를 통해서 근거 가져오기 (조항 및 부모 슬롯 확보)]
+    """⭐ [3-1단계 - 사내 규정 RAG를 통해서 근거 가져오기 (조항 및 부모 슬롯 확보)]
     BGE-M3(벡터) + BM25(키워드) 하이브리드 검색으로 사내 규정 관련 조항을 찾고,
     명시적으로 요청한 조항(explicit_ref)을 검색 후보보다 먼저 최우선 확보하며,
     부모 조항(parent_context) 최대 2슬롯을 우선 확보하여 조항 ID(ids)를 선별한다. (이슈 #138 해결)
@@ -582,8 +582,8 @@ def retrieve_regulation_slots(ctx: rt.Ctx, inp: dict) -> list[str]:
 
 
 def generate_regulation_summary(ctx: rt.Ctx, inp: dict, ids: list[str]) -> dict:
-    """⭐ [4단계 - 사내 규정 근거를 통해서 LLM이 요약하기]
-    3단계(규정 RAG)에서 선별된 조항 원문을 바탕으로 LLM에게 요약 답변 생성을 요청한다.
+    """⭐ [4-1단계 - 사내 규정 근거를 통해서 LLM이 요약하기]
+    3-1단계(규정 RAG)에서 선별된 조항 원문을 바탕으로 LLM에게 요약 답변 생성을 요청한다.
     명시적으로 요청한 조항(requested)이 있으면 함께 전달한다.
     (비공개 개인정보·타인 인사정보나 제공 금지 요청은 LLM이 status='refused'로 판단하여 거절)
     """
@@ -602,7 +602,7 @@ def generate_regulation_summary(ctx: rt.Ctx, inp: dict, ids: list[str]) -> dict:
 
 
 def format_regulation_response(ctx: rt.Ctx, inp: dict, ids: list[str], result: dict) -> dict:
-    """⭐ [5단계 - 사내 규정 요약 결과 검증 및 최종 화면 출력]
+    """⭐ [5-1단계 - 사내 규정 요약 결과 검증 및 최종 화면 출력]
     규정 요약 결과의 상태(refused, not_found, found)를 분기하고, 숫자 환각 방지(nums_ok) 검증 후 최종 화면 응답(ans)을 출력한다.
     """
     q = inp['question']
@@ -628,9 +628,9 @@ def format_regulation_response(ctx: rt.Ctx, inp: dict, ids: list[str], result: d
 
 
 def retrieve_knowledge_slots(ctx: rt.Ctx, inp: dict, topic: str) -> tuple[list[dict], list[dict]]:
-    """⭐ [6단계 - 사내 생활안내 및 수자원공사 정보 RAG를 통해서 근거 가져오기]
-    사내 생활안내(식당 메뉴, 버스 노선 등) 및 수자원공사 정보(기관 소개, 주요 사업 등) 지식 문서를 검색하여
-    적절한 검색 결과(hits)와 지식 청크(sources)를 선별한다.
+    """⭐ [3-2단계 - 사내 생활안내 및 수자원공사 정보 RAG를 통해서 근거 가져오기]
+    사내 생활안내(식당 메뉴, 버스 노선 등) 및 수자원공사 정보(기관 소개, 주요 사업 등) 문서를 검색하여
+    적절한 검색 결과(hits)와 안내 청크(sources)를 선별한다.
     """
     q = inp['question']
     history = inp.get('_history') or []
@@ -653,8 +653,8 @@ def retrieve_knowledge_slots(ctx: rt.Ctx, inp: dict, topic: str) -> tuple[list[d
 
 
 def generate_knowledge_summary(ctx: rt.Ctx, inp: dict, topic: str, sources: list[dict]) -> dict:
-    """⭐ [7단계 - 사내 생활안내 및 수자원공사 정보 근거를 통해서 LLM이 요약하기]
-    6단계(지식 RAG)에서 검색된 지식 청크들을 바탕으로 LLM에게 요약 답변 생성을 요청한다.
+    """⭐ [4-2단계 - 사내 생활안내 및 수자원공사 정보 근거를 통해서 LLM이 요약하기]
+    3-2단계(생활안내·수자원공사 정보 RAG)에서 검색된 문서 청크들을 바탕으로 LLM에게 요약 답변 생성을 요청한다.
     """
     q = inp['question']
     history = inp.get('_history') or []
@@ -662,8 +662,8 @@ def generate_knowledge_summary(ctx: rt.Ctx, inp: dict, topic: str, sources: list
 
 
 def format_knowledge_response(ctx: rt.Ctx, inp: dict, topic: str, sources: list[dict], result: dict) -> dict:
-    """⭐ [8단계 - 사내 생활안내 및 수자원공사 정보 요약 결과 검증 및 최종 화면 출력]
-    지식 요약 결과의 상태를 분기하고, 숫자 환각 검증 및 출처 메타데이터(provenance)를 구성하여 최종 화면 응답(ans)을 출력한다.
+    """⭐ [5-2단계 - 사내 생활안내 및 수자원공사 정보 요약 결과 검증 및 최종 화면 출력]
+    생활안내·수자원공사 정보 요약 결과의 상태를 분기하고, 숫자 환각 검증 및 출처 메타데이터(provenance)를 구성하여 최종 화면 응답(ans)을 출력한다.
     """
     title = '회사 정보' if topic == 'company' else '사내 생활'
     source_type = 'work' if topic == 'company' else 'intranet'
@@ -704,14 +704,14 @@ def format_knowledge_response(ctx: rt.Ctx, inp: dict, topic: str, sources: list[
 
 
 # ==============================================================================
-# ⭐ [통합 파이프라인 조율 함수] (1단계 -> 2단계 -> 3/4/5단계 또는 6/7/8단계 순차 실행)
+# ⭐ [통합 파이프라인 조율 함수] (1단계 -> 2단계 -> 3/4/5단계 순차 실행)
 # ==============================================================================
 
 def answer_with_pipeline(ctx: rt.Ctx, inp: dict) -> dict:
-    """⭐ [통합 파이프라인] 1단계부터 8단계를 도메인별로 순서대로 실행한다.
-    - 규정 질문: [1단계 분류] -> [2단계 재분류] -> [3단계 규정 RAG] -> [4단계 규정 요약] -> [5단계 규정 최종 출력]
-    - 생활/회사: [1단계 분류] -> [2단계 재분류] -> [6단계 지식 RAG] -> [7단계 지식 요약] -> [8단계 지식 최종 출력]
-    - 범위 밖:   [1단계 분류] -> [2단계 재분류] -> 거절 화면 출력
+    """⭐ [통합 파이프라인] 1단계부터 5단계를 도메인별로 순서대로 실행한다.
+    - 사내 규정:              [1단계 분류] -> [2단계 재분류] -> [3-1단계 규정 RAG] -> [4-1단계 규정 요약] -> [5-1단계 규정 최종 출력]
+    - 생활안내·수자원공사 정보: [1단계 분류] -> [2단계 재분류] -> [3-2단계 생활·정보 RAG] -> [4-2단계 생활·정보 요약] -> [5-2단계 생활·정보 최종 출력]
+    - 범위 밖:                [1단계 분류] -> [2단계 재분류] -> 거절 화면 출력
     """
     q, hist = inp['question'], inp.get('history') or []
     me = inp.get('me') or {}
@@ -734,18 +734,18 @@ def answer_with_pipeline(ctx: rt.Ctx, inp: dict) -> dict:
     if effective_label == '범위 밖':
         return ans(kind='out', level='out')
 
-    # 2) 사내 규정 질문: [3단계 RAG] -> [4단계 요약] -> [5단계 최종 출력]
+    # 2) 사내 규정 질문: [3-1단계 RAG] -> [4-1단계 요약] -> [5-1단계 최종 출력]
     if effective_label == '사내 규정':
-        ids = retrieve_regulation_slots(ctx, inp)                              # [3단계] 사내 규정 RAG
-        summary_result = generate_regulation_summary(ctx, inp, ids)            # [4단계] 사내 규정 LLM 요약
-        return format_regulation_response(ctx, inp, ids, summary_result)       # [5단계] 사내 규정 요약 검증 및 최종 출력
+        ids = retrieve_regulation_slots(ctx, inp)                              # [3-1단계] 사내 규정 RAG
+        summary_result = generate_regulation_summary(ctx, inp, ids)            # [4-1단계] 사내 규정 LLM 요약
+        return format_regulation_response(ctx, inp, ids, summary_result)       # [5-1단계] 사내 규정 요약 검증 및 최종 출력
 
-    # 3) 수자원공사 정보 & 사내 생활안내 질문: [6단계 RAG] -> [7단계 요약] -> [8단계 최종 출력]
+    # 3) 사내 생활안내 & 수자원공사 정보 질문: [3-2단계 RAG] -> [4-2단계 요약] -> [5-2단계 최종 출력]
     topic = 'life' if effective_label == '사내 생활안내' else 'company'
-    hits, sources = retrieve_knowledge_slots(ctx, inp, topic)                  # [6단계] 지식 RAG
+    hits, sources = retrieve_knowledge_slots(ctx, inp, topic)                  # [3-2단계] 생활안내·수자원공사 정보 RAG
     inp['_knowledge_hits'] = hits
-    summary_result = generate_knowledge_summary(ctx, inp, topic, sources)        # [7단계] 지식 LLM 요약
-    return format_knowledge_response(ctx, inp, topic, sources, summary_result) # [8단계] 지식 요약 검증 및 최종 출력
+    summary_result = generate_knowledge_summary(ctx, inp, topic, sources)        # [4-2단계] 생활안내·수자원공사 정보 LLM 요약
+    return format_knowledge_response(ctx, inp, topic, sources, summary_result) # [5-2단계] 생활안내·수자원공사 정보 요약 검증 및 최종 출력
 
 
 
@@ -759,7 +759,7 @@ def answer(ctx: rt.Ctx, question: str, history: list, context: dict, sim: str | 
            *, documents_only: bool = False) -> dict:
     """⭐ [챗봇 최상위 호출 진입점] (FastAPI 라우터 work.py에서 answer() 호출)
     1. 입력 전처리(isolate_input): 문서 전용 모드 시 개인정보 격리 및 후속 대화 5턴 보존
-    2. rt.run(): 런타임 로깅 및 _api()를 통한 1~8단계 파이프라인 실행
+    2. rt.run(): 런타임 로깅 및 _api()를 통한 1~5단계 파이프라인 실행
     3. 결과 반환: 규정 적용 범위 확인(scope_answer) 및 최종 답변 반환
     """
     me = ctx.me if ctx.me else {}
