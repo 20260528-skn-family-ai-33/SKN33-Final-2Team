@@ -10,7 +10,7 @@ import { activityTime } from '@/shared/lib/resourceTime';
 import { trackName } from '@/shared/constants/data';
 /* 수정 요청 (10/14 · 5차 scr.revise · P.revForm·revCtl·revRow·goalRow·diffView)
    여러 항목을 함께 골라도 된다. 고른 항목과 요청 내용을 관점 에이전트가 함께 보고 수정안을 먼저 보여 준다. 확정하기 전까지 지금 로드맵은 그대로 */
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { newIdToPath, paths } from '@/app/paths';
 import type { PendingRevision, PlanContent, PlanRecord, RevForm } from '@/api/types/plan';
 import { CertPicker } from '@/features/draft/details/CertPicker';
@@ -433,6 +433,13 @@ function Revise({ R }: { R: PlanRecord }) {
     revisionId,
     skills: activeSkills,
   }));
+  const initializedRef = useRef<string | undefined>(pd ? revisionId : undefined);
+  useEffect(() => {
+    if (pd && revisionId && initializedRef.current !== revisionId) {
+      initializedRef.current = revisionId;
+      setPicks({ revisionId, skills: activeSkills });
+    }
+  }, [pd, revisionId, activeSkills]);
   usePlanWatch(R.id);
   const base = R.plan;
   const noForm = !R.rev || !R.rev.v;

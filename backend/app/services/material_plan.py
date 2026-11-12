@@ -84,12 +84,12 @@ def rebuild_revision(option, plan, handoff):
     if dropped and not course_changed:
         _drop_learning_skills(option, set(dropped))
     old_acts = plan['acts']
-    done_course_by_skill = {}
+    done_courses_by_skill: dict[str, list[dict]] = {}
     for a in old_acts:
         if a.get('done') and a.get('res') and a.get('skill'):
             res_meta = roadmap._res(a['res'])
             if res_meta and res_meta.get('type') == 'course':
-                done_course_by_skill[a['skill']] = a
+                done_courses_by_skill.setdefault(a['skill'], []).append(a)
     used = set()
     resources = {name: {} for name in names}
     kept = []
@@ -119,26 +119,35 @@ def rebuild_revision(option, plan, handoff):
         if resource:
             if resource.get('type') not in ('course', 'book', 'cert'):
                 raise llm.LlmError('스킬별 학습 자료는 강좌 또는 도서여야 합니다.')
-            # 스킬당 강좌는 1개만 허용: 이미 완료된 강좌가 있는 스킬이면 새 강좌를 추가하지 않고 완료된 강좌만 유지 (#226)
-            if resource.get('type') == 'course' and activity.get('skill') in done_course_by_skill:
-                done_act = done_course_by_skill[activity['skill']]
-                if activity.get('res') != done_act.get('res') and activity.get('key') != done_act.get('id'):
+            # 스킬에 이미 완료된 강좌가 있는 경우: 기존 완료 강좌들은 모두 유지하고, 새 강좌 추가만 방지 (#226, #235)
+            if resource.get('type') == 'course' and activity.get('skill') in done_courses_by_skill:
+                skill_done_courses = done_courses_by_skill[activity['skill']]
+                is_existing_done = any(
+                    activity.get('res') == d.get('res') or activity.get('key') == d.get('id')
+                    for d in skill_done_courses
+                )
+                if not is_existing_done:
                     continue
             if resource.get('type') in ('course', 'book') and activity['stage'] >= handoff.get('startStage', plan['start']):
                 resources[activity['skill']][resource['id']] = deepcopy(resource)
         kept.append(activity)
 
-    # 스킬당 완료된 강좌(done course)가 있는 경우 완료된 강좌만 단독 유지하여 강좌 증식 방지 (#226)
-    course_seen = set()
+    # 스킬당 완료된 강좌(done course)가 있는 경우 완료된 강좌들을 보존하고 새 강좌 증식 방지 (#226, #235)
+    done_course_seen_ids = set()
     deduped_kept = []
     for activity in kept:
         resource = roadmap._res(activity.get('res')) if activity.get('res') else None
         skill = activity.get('skill')
-        if resource and resource.get('type') == 'course' and skill and skill in done_course_by_skill:
-            done_act = done_course_by_skill[skill]
-            if activity.get('key') == done_act.get('id') or activity.get('res') == done_act.get('res'):
-                if skill not in course_seen:
-                    course_seen.add(skill)
+        if resource and resource.get('type') == 'course' and skill and skill in done_courses_by_skill:
+            skill_done_courses = done_courses_by_skill[skill]
+            matching_done = [
+                d for d in skill_done_courses
+                if activity.get('key') == d.get('id') or activity.get('res') == d.get('res')
+            ]
+            if matching_done:
+                done_id = matching_done[0]['id']
+                if done_id not in done_course_seen_ids:
+                    done_course_seen_ids.add(done_id)
                     deduped_kept.append(activity)
             continue
         deduped_kept.append(activity)
