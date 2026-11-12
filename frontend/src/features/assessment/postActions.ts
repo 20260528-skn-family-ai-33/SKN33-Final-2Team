@@ -72,7 +72,7 @@ onBound((_s, path, evt) => {
 
 /* 보고서 작성(API-50): 서버 작업. 끝나면 보고서 목록을 다시 읽고 사후 점검 화면이면 완료 상태를 남긴다 */
 const repWait = new Set<string>();
-export async function waitReport(_go: ReturnType<typeof useGo>, pid: string, jobId: string): Promise<void> {
+export async function waitReport(go: ReturnType<typeof useGo>, pid: string, jobId: string): Promise<void> {
   if (repWait.has(jobId)) return;
   repWait.add(jobId);
   let out: { reportId?: string } | null = null;
@@ -83,7 +83,7 @@ export async function waitReport(_go: ReturnType<typeof useGo>, pid: string, job
   }
   repWait.delete(jobId);
   if (!me()) return;
-  const here = () => window.location.pathname === paths.post(pid);
+  const here = () => typeof window !== 'undefined' && window.location.pathname === paths.post(pid);
   if (out && out.reportId) {
     const reportId = out.reportId;
     if (here()) updateWs((s) => { if (s.plans[pid]) { s.plans[pid].post.running = false; s.plans[pid].post.reportId = reportId; } });
@@ -91,11 +91,17 @@ export async function waitReport(_go: ReturnType<typeof useGo>, pid: string, job
       if (!await reloadWorkspace()) return;
     } catch (error) {
       failToast(error, '보고서는 저장됐어요. 보고서 화면에서 다시 불러와 주세요.');
-      if (here()) updateWs((s) => { if (s.plans[pid]) { s.plans[pid].post.running = false; s.plans[pid].post.reportId = reportId; } });
+      if (here()) {
+        updateWs((s) => { if (s.plans[pid]) { s.plans[pid].post.running = false; s.plans[pid].post.reportId = reportId; } });
+        go(paths.report(reportId));
+      }
       return;
     }
-    if (here()) updateWs((s) => { if (s.plans[pid]) s.plans[pid].post.reportId = reportId; });
-    else {
+    if (here()) {
+      updateWs((s) => { if (s.plans[pid]) s.plans[pid].post.reportId = reportId; });
+      toast('결과 보고서 작성이 완료되었어요');
+      go(paths.report(reportId));
+    } else {
       updateWs((s) => { if (s.plans[pid]?.post.reportId) s.plans[pid].post.reportId = null; });
       toast('결과 보고서가 나왔어요 · 점검·보고서에서 볼 수 있어요');
     }
@@ -108,8 +114,21 @@ export async function waitReport(_go: ReturnType<typeof useGo>, pid: string, job
         return;
       }
       const repId = planReports(ws(), updated)[0]?.id;
-      if (repId && here()) updateWs((s) => { if (s.plans[pid]) s.plans[pid].post.reportId = repId; });
-      else if (repId) toast('결과 보고서가 나왔어요 · 점검·보고서에서 볼 수 있어요');
+      if (repId && here()) {
+        updateWs((s) => { if (s.plans[pid]) s.plans[pid].post.reportId = repId; });
+        toast('결과 보고서 작성이 완료되었어요');
+        go(paths.report(repId));
+      } else if (repId) {
+        toast('결과 보고서가 나왔어요 · 점검·보고서에서 볼 수 있어요');
+      } else if (here()) {
+        toast('결과 보고서 저장이 완료되었어요');
+        go(paths.roadmap(pid));
+      }
+    } else if (!updated && here()) {
+      updateWs((s) => {
+        if (s.plans[pid]) s.plans[pid].post.running = false;
+      });
+      toast('네트워크 상태를 확인한 후 다시 시도해 주세요.');
     }
   }
 }
@@ -118,6 +137,14 @@ export async function makeReport(go: ReturnType<typeof useGo>, pid: string): Pro
   const R = ws().plans[pid];
   if (!R || R.post.running) return;
   clearTimeout(postT);
+  const mine = ws().plans[pid]?.post;
+  const keep = mine
+    ? {
+        answers: { ...mine.answers },
+        quizAnswers: { ...mine.quizAnswers },
+        goalSelf: mine.goalSelf,
+      }
+    : null;
   updateWs((s) => {
     s.plans[pid].post.running = true;
     s.plans[pid].post.reportId = null;
@@ -141,8 +168,15 @@ export async function makeReport(go: ReturnType<typeof useGo>, pid: string): Pro
     });
     void waitReport(go, pid, j.jobId);
   } catch (err) {
-    updateWs((s) => void (s.plans[pid].post.running = false));
+    updateWs((s) => {
+      if (s.plans[pid]) s.plans[pid].post.running = false;
+    });
     failToast(err, '결과 보고서를 만들지 못했어요');
     await pullPlan(pid);
+    if (keep && ws().plans[pid]) {
+      updateWs((s) => {
+        Object.assign(s.plans[pid].post, keep);
+      });
+    }
   }
 }
