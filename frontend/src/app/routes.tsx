@@ -52,7 +52,7 @@ export const router = createBrowserRouter([
       r(paths.newQuiz, <DraftScreen step="quiz"><QuizStep /></DraftScreen>, { nav: 'new', title: '역량 테스트', width: 'wide' }),
       r(paths.newResult, <DraftScreen step="result"><ResultStep /></DraftScreen>, { nav: 'new', title: '점검 결과', width: 'wide' }),
       r(paths.newResultEdit, <DraftScreen step="result" extra={editGate}><ResultEdit /></DraftScreen>, { nav: 'new', title: '점검 결과 수정', width: 'wide' }),
-      r(paths.newGen, <DraftScreen extra={genGate} step="goal" remember={false}><GenerationStep /></DraftScreen>, { nav: 'new', title: '로드맵 3안 작성', width: 'wide', hideAssistant: true }),
+      r(paths.newGen, <DraftScreen extra={genGate} step="goal" remember={false}><GenerationStep /></DraftScreen>, { nav: 'new', title: '로드맵 3안 작성', width: 'wide generation' }),
       r(paths.newOptions, <DraftScreen extra={optionsGate} step="goal"><OptionsStep /></DraftScreen>, { nav: 'new', title: '로드맵 선택', width: 'xwide' }),
       r(paths.newMaterials, <Navigate to={paths.newOptions} replace />, { nav: 'new', title: '로드맵 선택', width: 'wide' }),
       r(paths.newReview, <DraftScreen step="review"><ReviewStep /></DraftScreen>, { nav: 'new', title: '검토·확정', width: 'wide' }),

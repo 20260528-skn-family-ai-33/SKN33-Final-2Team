@@ -15,7 +15,6 @@ import { AppVersion } from '@/shared/ui/AppVersion';
 import { AiBox, Sidebar } from './Sidebar';
 
 export interface ScreenHandle {
-  hideAssistant?: boolean;
   nav?: string;
   title?: string;
   width?: string;
@@ -171,7 +170,7 @@ export function AppShell() {
           </div>
         </main>
       </div>
-      {booted && acct?.accountType === 'employee' && !h.hideAssistant ? <AssistantHost /> : null}
+      {booted && acct?.accountType === 'employee' ? <AssistantHost /> : null}
       {booted && acct && !admin ? <DraftNavGuard /> : null}
       {booted && acct && !admin ? <StartModeNavGuard /> : null}
       <SheetHost />
