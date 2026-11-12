@@ -66,7 +66,6 @@ function MyInfo({ data, picked, marks, onClose }: { data: SkillMapData; picked: 
 }
 
 export function MySkillMap() {
-  const me = useMe();
   const plans = useWs((s) => s.plans);
   const reports = useWs((s) => s.reports);
   const resources = useCatalog((s) => s.res);
@@ -79,13 +78,8 @@ export function MySkillMap() {
       viewKey="mine"
       wheelZoom
       build={(data, pid) => {
+        // 뱃지는 학습 기록(활동 완료·사후 퀴즈)으로만 준다. 내 정보의 보유 스킬은 자기 신고라 골드로 치지 않는다(#213)
         const { marks, unmatched } = earnedSkills(data, records, reports, resources);
-        const owned = new Set((me?.tech || []).map((entry) => entry.split(' / ', 1)[0].trim()));
-        for (const skill of data.skills) {
-          if (owned.has(skill.name.trim())) {
-            marks.set(skill.id, { level: 'gold', plans: marks.get(skill.id)?.plans || [] });
-          }
-        }
         const draft = data.prerequisiteSource !== 'db';
         const medals = [...marks.values()].map(medalOf);
         const countOf = (medal: string) => medals.filter((m) => m === medal).length;
@@ -102,7 +96,7 @@ export function MySkillMap() {
             <>
               <span>
                 <i className="k-gold" />
-                골드 · 보유 스킬 또는 사후 퀴즈 모두 정답
+                골드 · 사후 퀴즈 모두 정답
               </span>
               <span>
                 <i className="k-silver" />
@@ -142,7 +136,7 @@ export function MySkillMap() {
                 <summary style={{ color: 'var(--ink-3)', fontSize: 13 }}><span aria-hidden="true">•</span>참고사항</summary>
                 <Note>
                   브론즈는 그 스킬의 활동(도서 제외)을 모두 완료로 기록했을 때, 실버와 골드는 결과 보고서 학습 점검의 사후 퀴즈에서 그 스킬 문항의 3분의 2 이상 또는 전부를 맞힌 적이 있을
-                  때 표시해요. 내 정보에 등록한 보유 스킬도 골드로 표시해요. 꼬리표의 숫자는 그 스킬을 배운 로드맵 수예요(한 번이면 표시하지 않아요). 내가 기록한 학습 이력이에요. 역량 판정이나 인사평가에 쓰지 않아요.
+                  때 표시해요. 꼬리표의 숫자는 그 스킬을 배운 로드맵 수예요(한 번이면 표시하지 않아요). 내가 기록한 학습 이력이에요. 역량 판정이나 인사평가에 쓰지 않아요.
                 </Note>
                 {draft ? (
                   <Note>선수 관계 {data.prerequisites.length}개는 팀 DB에 아직 없어 임시 초안(가정)으로 그렸어요. 팀 검토 전에는 참고로만 봐 주세요.</Note>
