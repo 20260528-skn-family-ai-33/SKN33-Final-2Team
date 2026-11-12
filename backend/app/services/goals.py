@@ -16,7 +16,7 @@ from typing import TypedDict
 from .. import db, jobs, llm, provider_policy
 from ..agents import goals as G
 from ..agents import runtime as rt
-from ..config import S
+from ..config import OLLAMA_THINK, S
 from ..errors import ApiError, cause
 from . import profile
 from app.learner_knowledge import VERSION as KNOWLEDGE_VERSION
@@ -87,7 +87,7 @@ class BulkModel(TypedDict):
 
 
 def _default_level(provider: str) -> str | None:
-    return {'openai': S.openai_reasoning, 'ollama': S.ollama_think}.get(provider)
+    return {'openai': S.openai_reasoning, 'ollama': OLLAMA_THINK}.get(provider)
 
 
 def bulk_model(employee: dict, mode: str | None, level: str | None) -> BulkModel:
@@ -98,6 +98,8 @@ def bulk_model(employee: dict, mode: str | None, level: str | None) -> BulkModel
             provider, level = 'mock', None
     else:
         provider = mode
+    if provider == 'ollama':
+        level = None  # RunPod-Ollama 는 늘 추론 없이 부른다: 예전에 저장된 직원·관리자 단계를 보여 주지 않는다
     return BulkModel(provider=provider, model=llm.model_name(provider), level=level,
                      default_level=_default_level(provider) if level is None else None)
 
