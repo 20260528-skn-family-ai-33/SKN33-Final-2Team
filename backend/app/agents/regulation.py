@@ -405,8 +405,10 @@ def _refused(topic: str) -> dict:
 def classify_question_roberta(question: str, history: list | None = None, me: dict | None = None,
                              emp_group: str | None = None) -> dict:
     """⭐ [1단계 - RoBERTa로 질문 분류]
-    1. 사용자 정보(me 또는 emp_group)에서 사용자의 직군을 확인한다.
-       - 사용자 정보에 직군이 없으면 즉시 에러(AgentError)를 발생시켜 인사 담당자 문의를 안내한다.
+    1. 사용자 정보(me 또는 emp_group)에서 사용자의 직군을 공통 필수 정보로 확인한다.
+       - 실제 모델 모드의 규정·회사 정보·생활안내·범위 밖 질문 모두 분류 전에 확인한다.
+       - 직군이 없거나 빈 문자열·공백이면 즉시 AgentError를 발생시켜 인사 담당 부서 문의를 안내한다.
+         질문이나 이전 대화의 직군으로 로그인한 직원의 누락 정보를 대신하지 않는다.
     2. 질문(question) 안에 특정 직군 명칭이 언급되어 있으면 해당 직군을 우선 사용한다.
     3. 질문에 직군이 없더라도 앞 대화와 실제로 이어지는 후속 질문(_follow_history)이라면,
        이어지는 대화 범위 내에서 다룬 직군을 계승한다. 새 주제로 전환되었으면 로그인한 직원의 직군을 사용한다.
@@ -459,7 +461,9 @@ def classify_question_roberta(question: str, history: list | None = None, me: di
 
 
 def classify_label_with_llm(ctx: rt.Ctx, question: str, history: list | None = None) -> str | None:
-    """⭐ [2-2단계 - RoBERTa 예측 정확도가 80% 미만일 때 LLM을 호출하여 라벨을 다시 분류한다]"""
+    """⭐ [2단계 보조 함수 - LLM으로 라벨을 재분류하고 허용된 라벨인지 검증한다]
+    재분류 필요 여부는 verify_or_reclassify_label_with_llm에서 판단한다.
+    """
     if ctx.mode not in ('ollama', 'openai'):
         return None
     system = """너는 사내 질문의 유형을 정확하게 분류하는 AI 분류기다.
@@ -483,9 +487,9 @@ def classify_label_with_llm(ctx: rt.Ctx, question: str, history: list | None = N
 def verify_or_reclassify_label_with_llm(ctx: rt.Ctx, question: str, label: str,
                                        confidence: float | None = None,
                                        history: list | None = None) -> str:
-    """⭐ [2-1단계 - RoBERTa 예측정확도 80% 이하 시 LLM 2차 재분류]
+    """⭐ [2단계 - RoBERTa 확신도에 따라 라벨 확정 또는 LLM 재분류]
     1. RoBERTa 확신도가 80%(0.80) 이상이면 1단계 분류 라벨을 그대로 확정한다.
-    2. 확신도가 80% 미만이거나 애매한 경우, LLM이 질문을 다시 읽고 2차 재분류를 수행한다.
+    2. 확신도가 80% 미만이거나 없으면 classify_label_with_llm을 호출해 재분류한다.
     """
     if confidence is not None and confidence >= 0.8:
         return label
@@ -727,7 +731,7 @@ def answer_with_pipeline(ctx: rt.Ctx, inp: dict) -> dict:
     if classified.get('detectedFromQuestion') and classified.get('group'):
         inp['me'] = dict(me, empGroup=classified['group'])
 
-    # [2단계] RoBERTa 예측정확도가 80% 미만 시 LLM 2차 재분류
+    # [2단계] RoBERTa 확신도가 80% 미만이거나 없으면 LLM 재분류
     effective_label = verify_or_reclassify_label_with_llm(ctx, q, label, confidence, follow_history)
 
     # 1) 범위 밖 질문: 즉시 정중히 거절
