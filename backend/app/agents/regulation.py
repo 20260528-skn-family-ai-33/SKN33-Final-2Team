@@ -717,13 +717,14 @@ def answer(ctx: rt.Ctx, question: str, history: list, context: dict, sim: str | 
     me = ctx.me if ctx.me else {}
     inp = prepare_assistant_input(question, history, me, context, documents_only=documents_only)
     task = f"사내 생활 질문 분류·답변{f' (앞 대화 {len(history)}턴 포함)' if history else ''}"
-    # 1~5단계 파이프라인 단독 실행 검증: 레거시 mock 대신 _api 직접 실행
-    mock = None
+    mock = _mock_documents if documents_only else _mock
     a = rt.run(ctx, '규정 에이전트', task, inp, mock, lambda i: _api(ctx, i), role='regulation', sim=sim, mock_delay=0.38,
                log_input={'question': question, 'context': context, 'history': history or []})
     if inp.get('_classification'):
         ctx.meta['classification'] = inp['_classification']
-    return a
+    if documents_only:
+        return a
+    return scope_answer(a, me) if a['kind'] == 'regulation' and a.get('evidenceStatus') != 'refused' and not regstore.set_for(me.get('empGroup')) else a
 
 
 def education_guide(t: db.Tx, group: str | None) -> dict:
