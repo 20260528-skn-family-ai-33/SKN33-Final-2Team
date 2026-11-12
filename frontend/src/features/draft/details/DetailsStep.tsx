@@ -17,39 +17,43 @@ import { ai, ping, useAi } from '@/shared/state/ai';
 import { updateWs, useWs } from '@/shared/state/workspace';
 import { ConnBox } from '@/shared/ui/conn';
 import { Icon } from '@/shared/ui/Icon';
-import { Note, Page } from '@/shared/ui/parts';
+import { Page } from '@/shared/ui/parts';
+import { DownstreamNotice } from '../DownstreamNotice';
+import { stepLabel } from '../model';
 import { StaleNote } from '../stale';
+import '../stepLayout.css';
 import { Stepper } from '../Stepper';
 import { DetailsForm } from './DetailsForm';
 
 export function DetailsStep() {
   const go = useGo();
   const draft = useWs(s => s.draft);
-  const hasQuiz = !!draft.v2Assessment?.completed;
+  const ready = canContinueSkills(draft);
   return (
     <>
       <Stepper cur="details" />
       <Page
         title="학습 여건과 학습할 스킬을 정해 주세요"
-        lead="학습 여건은 비워 두면 알아서 정해요. 학습할 스킬은 하나 이상 선택해 주세요."
+        lead="학습 여건은 비워 두면 AI가 알아서 정해요. 학습할 스킬은 하나 이상 선택해 주세요."
         foot={
           <>
             <button className="btn line" onClick={() => go(paths.newGoal)}>
               <Icon name="left" />
               이전
             </button>
-            <button className="btn pri" disabled={!canContinueSkills(draft)} onClick={() => { go(paths.newDetailsCheck); }}>
-              다음: 입력 내용 확인
+            {!ready ? <p className="actions-why" role="status">학습할 스킬 제안이 끝나고 하나 이상 선택하면 다음으로 넘어갈 수 있어요.</p> : null}
+            <button className="btn pri" disabled={!ready} onClick={() => { go(paths.newDetailsCheck); }}>
+              다음: {stepLabel('check')}
             </button>
           </>
         }
       >
+        <DownstreamNotice />
         <div className="card">
           <DetailsForm path="draft.prefs" learningConditionsOnly />
         </div>
         <InputSkills />
         <StaleNote kind="gen" />
-        {hasQuiz ? <Note>점검 완료 응답은 고정돼요. 목표·세부사항·스킬을 변경하면 새 점검을 진행해요.</Note> : null}
       </Page>
     </>
   );
@@ -109,9 +113,7 @@ export function DetailsCheck() {
     <>
       <Stepper cur="check" busy={summaryBusy || editingSummary} />
       <Page
-        eyebrow="세부 사항 확인"
-        title="학습 목표·프로젝트 요약과 선택한 스킬을 확인해 주세요"
-        lead="입력한 학습 목표·프로젝트 요약과 선택한 스킬을 확인해 주세요."
+        title="입력한 내용을 확인해 주세요"
         foot={
           <>
             <button className="btn line" disabled={summaryBusy || editingSummary} onClick={() => go(paths.newDetails)}>
@@ -126,11 +128,12 @@ export function DetailsCheck() {
                 go(paths.newQuiz);
               }}
             >
-              다음: 역량 테스트
+              다음: {stepLabel('quiz')}
             </button>
           </>
         }
       >
+        <DownstreamNotice />
         <div className="card input-confirm-box">
         <section className="card check-goal" aria-labelledby="checkGoalTitle"><h2 id="checkGoalTitle">학습 목표</h2><p>{d.goal}</p></section>
         <details className="card check-goal check-project">

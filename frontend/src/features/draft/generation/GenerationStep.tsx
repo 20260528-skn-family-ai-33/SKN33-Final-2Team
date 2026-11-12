@@ -17,6 +17,7 @@ import { draftCall, syncGenCur } from '../draftSync';
 import { startEdit, genStart } from '../result/ResultStep';
 import { Stepper } from '../Stepper';
 import { useDraftWatch } from '../useDraftWatch';
+import { stepLabel } from '../model';
 import { EducationGuide } from './EducationGuide';
 import { genStartedAt } from './genStartedAt';
 
@@ -26,7 +27,7 @@ export function HandoffView({ h }: { h: Handoff }) {
     <details className="card flat handoff" id="hoView" open={hoOpen} onToggle={(e) => (hoOpen = (e.target as HTMLDetailsElement).open)}>
       <summary>
         <Icon name="right" />
-        진단 에이전트가 넘긴 내용 보기
+        3안을 만들 때 쓰는 내용 보기
       </summary>
       <dl className="kv">
         <dt>목표</dt>
@@ -97,8 +98,8 @@ function GenRowView({ d, id }: { d: DraftDoc; id: string }) {
   const r = curGen(d);
   const row = r ? r.rows[id] : { st: 'run', tries: 1 };
   const name = rowName(id);
-  if (!row || row.st === 'run') return <AgentRow st="run" name={name} sub="진단 결과를 토대로 계획 생성 중" />;
-  if (row.st === 'ok') return <AgentRow st="ok" name={name} sub="준비가 완료되었습니다." tag="작성 완료" tagCls="acc" />;
+  if (!row || row.st === 'run') return <AgentRow st="run" name={name} sub="역량 테스트 결과를 바탕으로 만드는 중" />;
+  if (row.st === 'ok') return <AgentRow st="ok" name={name} sub="준비됐어요." tag="작성 완료" tagCls="acc" />;
   const c = cause(row.err || {});
   return (
     <AgentRow
@@ -138,7 +139,7 @@ function GenProgress({ d, done }: { d: DraftDoc; done: boolean }) {
       <div className="gen-progress-bar" style={{ gridTemplateColumns: `repeat(${sts.length}, minmax(0, 1fr))` }} role="progressbar" aria-label="로드맵 3안 작성 진행" aria-valuemin={0} aria-valuemax={sts.length} aria-valuenow={ok}>
         {D.optionOrder.map((id, i) => <span key={id} className={`gen-seg ${sts[i] === 'ok' ? 'ok' : 'run'}`} title={`${rowName(id)} · ${sts[i] === 'ok' ? '작성 완료' : '작성 중'}`} />)}
       </div>
-      {!done && <p className="small muted">세 안을 모두 쓰면 ‘로드맵 계획 미리보기’에서 나란히 비교할 수 있어요.</p>}
+      {!done && <p className="small muted">세 코스가 모두 준비되면 다음 단계에서 나란히 비교할 수 있어요.</p>}
     </div>
   );
 }
@@ -191,7 +192,7 @@ export function GenerationStep() {
           desc={
             g.ok
               ? `${names}을 쓰지 못했어요. 작성된 안만 가지고 다음 단계로 넘어가거나, 실패한 안만 다시 시도할 수 있어요.`
-              : '관점별 하위 에이전트가 로드맵 안을 쓰지 못했어요. 실패한 안을 다시 시도하거나, 조건을 고쳐 다시 만들어 주세요.'
+              : '로드맵 안을 만들지 못했어요. 실패한 안을 다시 시도하거나, 조건을 고쳐 다시 만들어 주세요.'
           }
           cause={`${failed.map((id, i) => `${D.perspectives[id].name} — ${errs[i].user || userText(errs[i].kind)}`).join(' · ')}. ${todoOf(errs)}`}
           body={
@@ -203,7 +204,8 @@ export function GenerationStep() {
           ops={<OpsBox items={failed.map((id, i) => [rowName(id), errs[i]])} />}
           foot={
             <>
-              <button className="btn line" onClick={() => startEdit(go)}>
+              {/* 자료를 따로 고르는 흐름에는 고칠 진단 결과(diag)가 없어, 조건을 적는 2단계로 보낸다(#224) */}
+              <button className="btn line" onClick={() => (d.diag ? startEdit(go) : go(paths.newDetails))}>
                 <Icon name="left" />
                 조건 수정하고 다시 만들기
               </button>
@@ -235,13 +237,13 @@ export function GenerationStep() {
     <>
       <Stepper cur="options" />
       <Page
-        title={done ? '로드맵 3안을 다 썼어요' : '로드맵 계획 에이전트가 3안을 쓰고 있어요'}
+        title={done ? '로드맵 3안이 준비됐어요' : '로드맵 3안을 만들고 있어요'}
         lead={
           done
-            ? '‘로드맵 계획 미리보기’를 눌러 비교해 보세요.'
+            ? `‘다음: ${stepLabel('options')}’을 눌러 세 코스를 비교해 보세요.`
             : ai.mode() === 'ollama'
-              ? '관점별 하위 에이전트 셋이 진단 에이전트가 넘긴 같은 내용으로 동시에 요청해요. AI 서버 사정에 따라 차례대로 처리돼 시간이 더 걸릴 수 있어요. 화면을 떠나도 서버가 이어서 써요.'
-              : '관점별 하위 에이전트 셋이 진단 에이전트가 넘긴 같은 내용으로 동시에 작성해요. 화면을 떠나도 서버가 이어서 써요.'
+              ? '방식이 다른 세 코스를 함께 요청했어요. AI 서버 사정에 따라 차례대로 처리돼 시간이 더 걸릴 수 있어요. 다른 화면에 다녀와도 계속 만들어요.'
+              : '방식이 다른 세 코스를 동시에 만들고 있어요. 보통 1~2분 걸리고, 다른 화면에 다녀와도 계속 만들어요.'
         }
         foot={
           <>
@@ -250,7 +252,7 @@ export function GenerationStep() {
               이전
             </button>
             <button className="btn pri" disabled={!done} onClick={() => go(paths.newOptions)}>
-              로드맵 계획 미리보기
+              다음: {stepLabel('options')}
             </button>
           </>
         }

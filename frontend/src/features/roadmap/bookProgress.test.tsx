@@ -78,7 +78,9 @@ describe('홈 일정표의 도서', () => {
   it('도서 줄·도서만 있는 스킬을 빼고 완료 수도 도서 없이 센다', () => {
     const html = inRouter(<GanttAll list={[record([course, book, bookOnly], { course: { status: 'done' }, book: { status: 'done' } })]} />);
     expect(html).toContain('강좌 1개');
-    expect(html).not.toContain('도서');
+    // 범례의 "도서는 일정표에 넣지 않아요" 안내(#224)만 남고, 줄·막대에는 도서가 없어야 한다
+    expect(html).toContain('도서는 일정표에 넣지 않아요.');
+    expect(html.replace('도서는 일정표에 넣지 않아요.', '')).not.toContain('도서');
     expect(html).not.toContain('독서');
     expect(html).toContain('활동 1개 중 1개 완료');
   });

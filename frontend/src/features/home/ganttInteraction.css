@@ -1,4 +1,4 @@
-.gt-view-controls{display:flex;align-items:center;gap:5px;margin-left:auto;flex-wrap:wrap}.gt-view-controls>button{height:26px;min-height:0;padding:3px 8px;border:1px solid var(--line-2,#d4ded9);border-radius:6px;background:var(--surface,#fff);font-size:11px;line-height:18px;color:inherit;cursor:pointer}.gt-view-controls>button:disabled{opacity:.45;cursor:default}.gt-view-controls>span{min-width:34px;text-align:center;font-size:11px;font-variant-numeric:tabular-nums}.gt-scroll.gt-pan{cursor:grab;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}.gt-pan .gt-l,.gt-pan button{cursor:grab}.gt-pan.is-dragging,.gt-pan.is-dragging *{cursor:grabbing!important;user-select:none}.gt-pan:focus-visible{outline:2px solid var(--accent,#16816d);outline-offset:3px}.gt-pan .gt-h{position:sticky;top:0;z-index:4;background:var(--surface,#fff)}
+.gt-view-controls{display:flex;align-items:center;gap:5px;margin-left:auto;flex-wrap:wrap}.gt-view-controls button{height:30px;min-height:0;padding:4px 10px;border:1px solid var(--line-2,#d4ded9);border-radius:6px;background:var(--surface,#fff);font-size:12.5px;line-height:20px;color:inherit;cursor:pointer}.gt-view-controls button:disabled{opacity:.45;cursor:default}.gt-view-controls>span{min-width:34px;text-align:center;font-size:11px;font-variant-numeric:tabular-nums}.gt-scroll.gt-pan{cursor:grab;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}.gt-pan .gt-l{cursor:grab}.gt-pan button:not(:disabled){cursor:pointer}.gt-pan.is-dragging,.gt-pan.is-dragging *{cursor:grabbing!important;user-select:none}.gt-pan:focus-visible{outline:2px solid var(--accent,#16816d);outline-offset:3px}.gt-pan .gt-h{position:sticky;top:0;z-index:4;background:var(--surface,#fff)}
 
 .gt-task-submit{padding:0;border:1px solid var(--accent,#16816d);cursor:pointer}.gt-task-submit:focus-visible{outline:2px solid var(--accent,#16816d);outline-offset:2px}
 
@@ -17,3 +17,18 @@
 .gt-pan .gt-row>.gt-tl,.gt-pan .gt-h>.gt-tl,.gt-pan .gt-grid,.gt-pan .gt-week-boundaries{clip-path:inset(0 0 0 var(--gt-scroll-left,0px))}
 
 .gt-shared-note{position:absolute;left:8px;top:8px;font-size:10px;color:var(--ink-3,#68776f)}
+
+/* 일·주 단위 전환(#224): 눌린 쪽을 테마 강조색으로 */
+.gt-unit{display:inline-flex}
+.gt-unit button:first-child{border-radius:6px 0 0 6px}
+.gt-unit button:last-child{border-radius:0 6px 6px 0;margin-left:-1px}
+.gt-unit button[aria-pressed=true]{position:relative;border-color:var(--accent);background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
+/* 눌러서 기록을 여는 막대는 올렸을 때 표시가 난다 */
+.gt-pan button.gt-bar.act:hover{box-shadow:inset 0 0 0 1.5px var(--accent-ink)}
+/* 오늘(이번 주) 칸은 남은 활동 막대와 헷갈리지 않게 옅은 바탕 + 양옆 선으로 표시한다 */
+.gt-grid i.on{box-shadow:inset 1.5px 0 0 var(--accent-line),inset -1.5px 0 0 var(--accent-line)}
+.gt-key .k-now{width:12px;height:14px;border-radius:0;background:var(--accent-soft);box-shadow:inset 1.5px 0 0 var(--accent-line),inset -1.5px 0 0 var(--accent-line)}
+.gt-key .k-sum{display:block;height:8px;border-radius:3px;background:var(--line-2);overflow:hidden}
+.gt-key .k-sum>i{display:block;width:55%;height:100%;border-radius:0;background:var(--accent)}
+/* 막대가 놓이는 일정 구간: 날짜 칸을 더 그렸을 때는 그만큼 좁아진다 */
+.gt-row .gt-span{position:absolute;inset:0 auto 0 0;width:calc(var(--gt-span,1) * 100%)}

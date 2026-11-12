@@ -8,13 +8,13 @@ export function Stepper({ cur, busy = false }: { cur: StepKey; busy?: boolean })
   const go = useGo();
   const s = useWs();
   return (
-    <nav className="stepper" aria-label="새 로드맵 작성 단계">
+    <nav className={`stepper${busy ? ' is-busy' : ''}`} aria-label="새 로드맵 작성 단계">
       <ol>
         {STEPS.map(([k, l, r], i) => {
           const st = k === cur ? 'cur' : stepDone(s, k) ? 'done' : !blockedTo(s, k) ? 'open' : 'lock';
           return (
             <li className={st} key={k}>
-              <button disabled={busy || st === 'lock'} aria-current={k === cur ? 'step' : undefined} onClick={() => go(r)}>
+              <button disabled={busy || st === 'lock'} aria-current={k === cur ? 'step' : undefined} title={st === 'lock' ? '앞 단계를 먼저 마쳐 주세요' : undefined} onClick={() => go(r)}>
                 <span className="sn">{st === 'done' ? <Icon name="check" /> : i + 1}</span>
                 <span className="sl">{l}</span>
               </button>
