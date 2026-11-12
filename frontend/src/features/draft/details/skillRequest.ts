@@ -1,3 +1,4 @@
+import { browserHeaders } from '@/shared/lib/browserOptions';
 import { waitJob } from '@/api/jobs';
 import type { DraftDoc, SelectedSkill } from '@/api/types/draft';
 import { ws } from '@/shared/state/workspace';
@@ -15,7 +16,7 @@ export async function loadSkills(owner: string|null, signature: string): Promise
   const id=await ensureDraft(); if(!current())throw new Error('입력이 변경됐어요.');
   const key=JSON.stringify([owner,id,signature]); const pending=flights.get(key); if(pending)return pending;
   const work=(async()=>{
-    const response=await fetch(`/api/v2/drafts/${id}/skills`,{method:'POST',credentials:'same-origin',headers:{Prefer:'respond-async'}});
+    const response=await fetch(`/api/v2/drafts/${id}/skills`,{method:'POST',credentials:'same-origin',mode:'same-origin',headers:{...browserHeaders(),Prefer:'respond-async'}});
     let body=await response.json().catch(()=>null);
     if(!response.ok)throw new Error(body?.error?.message || (response.status===404?'현재 백엔드에 스킬 추천 API가 반영되지 않았어요. 백엔드 업데이트가 필요합니다.':`스킬 추천 요청에 실패했어요(HTTP ${response.status}).`));
     if(response.status===202)body=await waitJob<{skills:SelectedSkill[]}>(body.jobId);

@@ -232,9 +232,14 @@ function setConn(state: Conn['state'], extra: Partial<Conn>): void {
   useAi.setState({ conn: { state, provider: ai.mode(), at: Date.now(), ms: 0, loadMs: 0, error: '', raw: '', kind: '', models: prev.models || null, ...extra } });
 }
 
-export const resetConn = (): void => useAi.setState({ conn: { state: 'idle', provider: '', at: 0 } });
+let connectionRevision = 0;
+export function resetConn(): void {
+  connectionRevision++;
+  useAi.setState({ conn: { state: 'idle', provider: '', at: 0 } });
+}
 
 export async function ping(): Promise<void> {
+  const revision = connectionRevision;
   const p = ai.mode();
   const c = g().conn;
   if (!ai.live() || (c.state === 'checking' && c.provider === p)) return;
@@ -242,10 +247,10 @@ export async function ping(): Promise<void> {
   const t0 = performance.now();
   try {
     const j = await aiApi.status(toSrv(p));
-    if (ai.mode() !== p) return;
+    if (ai.mode() !== p || revision !== connectionRevision) return;
     setConn('ok', { provider: p, ms: Math.round(performance.now() - t0), via: 'ping', models: j.models || null, version: j.version || '' });
   } catch (err) {
-    if (ai.mode() !== p) return;
+    if (ai.mode() !== p || revision !== connectionRevision) return;
     const k = cause(err);
     setConn('error', { provider: p, error: k.text, raw: k.raw, kind: k.kind, hint: k.hint, via: 'ping' });
   }

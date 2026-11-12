@@ -18,8 +18,8 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
-from . import catalog, jobs
-from .config import ROOT
+from . import browser_console, catalog, jobs
+from .config import ROOT, S
 from .errors import ApiError, api_error_handler
 from .routers import account, notifications, team, work, preassessment
 from .version import read_project_version
@@ -62,6 +62,21 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title='GrowPath 5차 목업 API', version=read_project_version(), lifespan=lifespan, docs_url='/api/docs', openapi_url='/api/openapi.json')
+
+
+@app.middleware('http')
+async def browser_preferences(request: Request, call_next):
+    try:
+        settings = browser_console.from_headers(request.headers, S.demo_mode)
+    except ValueError as error:
+        return JSONResponse({'error': {'code': 'INVALID_CONSOLE_OPTION', 'message': str(error)}}, status_code=422)
+    token = browser_console.options.set(settings)
+    try:
+        return await call_next(request)
+    finally:
+        browser_console.options.reset(token)
+
+
 app.add_exception_handler(ApiError, api_error_handler)
 app.include_router(account.r)
 app.include_router(work.r)

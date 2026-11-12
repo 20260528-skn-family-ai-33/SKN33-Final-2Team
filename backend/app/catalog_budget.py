@@ -9,6 +9,7 @@ from pathlib import Path
 
 from . import catalog_candidates as candidates
 from .config import ROOT, env
+from .browser_console import options
 
 TOKENIZER_REVISION = '1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0'
 TOKENIZER_SHA256 = '0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3'
@@ -87,7 +88,8 @@ def pack(selection: candidates.Selection, system: str = '', payload: dict | None
     OpenAI에서도 같은 입력 비용 정책을 사용하지만 Qwen 계산값이 OpenAI의 과금 토큰 수는 아니다.
     요청 본문과 시스템 지시는 자르지 않는다. 필수 자료가 안 들어가면 명시적으로 실패한다.
     """
-    limit = min(INPUT_TOKENS, (context_limit or DEFAULT_CONTEXT) - OUTPUT_RESERVE - CONTEXT_RESERVE)
+    limits = options.get()
+    limit = min(limits.input_tokens or INPUT_TOKENS, (context_limit or DEFAULT_CONTEXT) - (limits.output_tokens or OUTPUT_RESERVE) - CONTEXT_RESERVE)
     base = deepcopy(payload or {})
     base.update(catalog=[], catalogSkillMap={f'S{i + 1}': s for i, s in enumerate(selection.skills)},
                 catalogPolicy=GUIDE, catalogExcluded=selection.excluded,

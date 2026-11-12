@@ -68,6 +68,7 @@
 | --- | --- |
 | `POST /auth/login` · `POST /auth/logout` · `GET /me` | 로그인·로그아웃·새로 고침 때 계정 |
 | `GET /me/workspace` | 로그인 뒤 내 기록 전체(작성 문서·로드맵·보고서) |
+| `GET /console/capabilities` | 로그인 전에도 확인 가능한 서버 허용 여부 `{ "picker": true, "demo": false }` |
 | `GET /me/profile` · `PUT`/`DELETE /me/profile/self` | 내 정보 |
 | `GET /me/goal-suggestions` · `POST /me/goal-suggestions/ensure` · `POST /me/goal-suggestions/regenerate` | 저장된 후보 조회 · 누락/변경 확인 · 명시적 다시 만들기 |
 | `GET /ai/providers` · `PUT /me/ai-provider` · `GET /ai/status?provider=` · `GET /ai/log` · `GET /ai/log/{id}` | 좌측 AI 모델 고르기·연결 상태·에이전트 동작 보기(시연·디버그 전용 · 직원·관리자 계정 모두 · 누가 호출했든 모든 계정의 최근 호출을 `employee`(누구의 일)·`by`(관리자 화면에서 시작하면 '관리자')와 함께 줌 · 운영에서는 끔). 목록은 요약과 `callCount`(모델 호출 수)만, `/ai/log/{id}`는 그 기록의 에이전트 입력·출력과 모델 호출마다 보낸 메시지·응답 원문(`calls`)을 자르지 않고 줌(이미지는 개수만). 오래돼 밀려난 기록은 `404 LOG_NOT_FOUND` |
@@ -80,6 +81,8 @@
 단계 이동으로 만든 초안은 조회 응답의 `draft.demoSeeded`가 `true`입니다. 서버가 저장한 출처만 사용하며 확정 후에도 시연 초기화 대상입니다. 이 초안은 `together`와 `after`로 확정할 수 있고 부서장에게 확정 알림을 보내지 않습니다. `{"startMode":"archive"}`는 `409 DEMO_ARCHIVE_FORBIDDEN`으로 거절해 기존 로드맵과 수정안을 보존합니다. 시연 도구가 켜져 있어도 직원이 직접 생성한 초안에는 일반 확정 규칙이 적용됩니다.
 
 `GP5_BETA_ACCOUNT_PICKER`는 시연 모드와 독립적입니다. 베타 예시는 on이며, 미설정 또는 off이면 `GET /demo/accounts`는 DB 조회 전에 `404 / NOT_FOUND`를 반환하고 화면에서 직원 선택을 숨깁니다. 베타 종료 시 off로 변경하고 백엔드를 다시 생성한 뒤 화면을 새로고침합니다. on일 때도 비밀번호를 반환하지 않으며 직원 선택은 사번만 채웁니다. 직접 입력 로그인은 어느 설정에서도 유지합니다.
+
+브라우저 콘솔은 API 요청의 `X-GrowPath-Picker: off`, `X-GrowPath-Demo: off`로 해당 기능을 끕니다. 시연이 허용된 환경에서는 `X-GrowPath-Timeout`(1~900초), `X-GrowPath-Input`(1~131072토큰), `X-GrowPath-Output`(1~32768토큰)을 모델 호출과 해당 요청이 시작한 작업에 적용합니다. 범위 밖의 값은 `422 / INVALID_CONSOLE_OPTION`입니다. 시연 모드에서는 `X-GrowPath-Ollama-Url`과 `X-GrowPath-Ollama-Key`로 같은 요청의 Ollama 주소와 Bearer 키를 지정합니다. 주소를 지정하고 키를 생략하면 해당 Pod에는 인증 없이 연결합니다. 두 헤더를 모두 생략하면 서버 주소와 키를 사용합니다.
 
 `GP5_DEMO_MODE=off`이면 위 시연 전용 3개 API와 `GET /ai/log`·`GET /ai/log/{id}`는 인증·조회 전에 `404 / NOT_FOUND`를 반환합니다. 직원·관리자 모두 같은 제한을 받습니다. `GET /me`와 실행 컨텍스트는 off에서 저장된 `demo_mock`·`fail_sim`을 무시하고 `demoMock: false`, `failSim: {}`를 사용하며 DB 원본·선택한 AI 제공자·추론값은 유지합니다.
 

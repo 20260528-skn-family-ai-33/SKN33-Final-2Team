@@ -1,0 +1,182 @@
+import { useEffect, useRef, useState } from 'react';
+import { http } from '@/api/client';
+import { accountApi } from '@/api/endpoints/account';
+import { useLocation } from 'react-router';
+import { limits, storeOptions, useBrowserOptions, type BrowserOptions } from '@/shared/lib/browserOptions';
+import { canUseDemo } from '@/shared/lib/demoAccess';
+import { applySettings, checkStatus, resetConn, useAi } from '@/shared/state/ai';
+import { loadDemoAccounts, signInSeq, useSession } from '@/shared/state/session';
+import { useConsoleActions, type ConsoleAction } from './consoleActions';
+import { RunpodSettings } from './RunpodSettings';
+import './browserConsole.css';
+
+type Capabilities = { picker: boolean; demo: boolean };
+const toggleText = (value: boolean) => value ? '켜짐' : '꺼짐';
+const normalize = (text: string) => text.trim().toLowerCase().replace(/\s+/g, ' ');
+const toggleNames = { picker: '직원선택', demo: '시연', tools: '도구' } as const;
+const numeric = [
+  { name: 'timeout', alias: '대기시간', field: 'timeout', unit: '초', sample: 180 },
+  { name: 'inputTokens', alias: '입력토큰', field: 'input', unit: '입력 토큰', sample: 8192 },
+  { name: 'outputTokens', alias: '출력토큰', field: 'output', unit: '출력 토큰', sample: 2048 },
+] as const;
+
+export function BrowserConsole() {
+  const [openedAt, setOpenedAt] = useState<string>();
+  const account = useSession(s => s.account);
+  const location = useLocation();
+  const scope = location.key + ':' + (account?.accountType ?? 'guest');
+  useEffect(() => {
+    const keydown = (event: KeyboardEvent) => {
+      if (event.ctrlKey && event.altKey && !event.metaKey && !event.shiftKey && event.code === 'KeyK') {
+        event.preventDefault();
+        if (!event.repeat) setOpenedAt(old => old === scope ? undefined : scope);
+      }
+    };
+    window.addEventListener('keydown', keydown);
+    return () => window.removeEventListener('keydown', keydown);
+  }, [scope]);
+
+  useEffect(() => {
+    let revision = 0;
+    return useBrowserOptions.subscribe(({ options }, prev) => {
+      if (options.picker !== prev.options.picker) {
+        useSession.setState({ demo: null });
+        if (!useSession.getState().account) void loadDemoAccounts(true);
+      }
+      if (options.tools !== prev.options.tools) useAi.setState(s => ({ status: { ...s.status } }));
+      if (options.ollamaUrl !== prev.options.ollamaUrl || options.ollamaKey !== prev.options.ollamaKey) {
+        resetConn();
+        if (options.demo === prev.options.demo && useSession.getState().account) void checkStatus();
+      }
+      if (options.demo === prev.options.demo || !useSession.getState().account) return;
+      if (options.demo === false) useAi.setState(s => ({ status: { ...s.status, demoMode: false }, settings: { ...s.settings, demoMock: false, failSim: {} } }));
+      const seq = signInSeq(), request = ++revision;
+      void checkStatus();
+      void accountApi.me().then(acct => {
+        if (seq === signInSeq() && request === revision && acct.accountType === 'employee') applySettings(acct);
+      }).catch(() => { /* 서버 응답을 받지 못하면 현재 적용된 설정으로 표시한다. */ });
+    });
+  }, []);
+  return openedAt === scope ? <CommandDialog close={() => setOpenedAt(undefined)} /> : null;
+}
+
+function CommandDialog({ close }: { close: () => void }) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [query, setQuery] = useState('');
+  const [editingRunpod, setEditingRunpod] = useState<'url' | 'key'>();
+  const commandInput = useRef<HTMLInputElement>(null);
+  const [selected, setSelected] = useState<string>();
+  const [result, setResult] = useState('');
+  const running = useRef(false);
+  const [caps, setCaps] = useState<Capabilities>();
+  const options = useBrowserOptions(s => s.options);
+  const screenActions = useConsoleActions(s => s.actions);
+  const employee = useSession(s => s.account?.accountType === 'employee');
+  useEffect(() => {
+    const element = dialog.current!;
+    element.showModal();
+    let active = true;
+    void http.get<Capabilities>('/console/capabilities').then(value => { if (active) setCaps(value); })
+      .catch(() => { if (active) setResult('서버의 콘솔 허용 상태를 확인하지 못했습니다.'); });
+    return () => { active = false; element.close(); };
+  }, []);
+  const demo = caps?.demo === true && options.demo !== false;
+  const prefix = normalize(query).replace(/^tokens (input|output)(?= |$)/, (_, direction: string) => direction + 'tokens');
+  const commands: ConsoleAction[] = [];
+  const add = (name: string, alias: string, description: string, run: ConsoleAction['run']) => commands.push({ name, alias, description, run });
+  function change(label: string, field: keyof BrowserOptions, value: number | boolean | undefined) {
+    const next = { ...useBrowserOptions.getState().options, [field]: value };
+    if (value === undefined) delete next[field];
+    storeOptions(next);
+    return `${label} · ${value === undefined ? '기본값' : typeof value === 'boolean' ? toggleText(value) : value}`;
+  }
+  add('status', '설정보기', '서버 허용 여부와 이 브라우저에서 적용할 값을 봅니다.', () => {
+    const state = (value?: boolean) => value === undefined ? '확인 중' : toggleText(value);
+    const source = (key: keyof BrowserOptions) => options[key] === undefined ? '기본값' : '브라우저 설정';
+    return [`직원 선택 · 서버 ${state(caps?.picker)} / 현재 ${state(caps && caps.picker && options.picker !== false)} (${source('picker')})`,
+      `시연 모드 · 서버 ${state(caps?.demo)} / 현재 ${state(caps && demo)} (${source('demo')})`,
+      `시연 도구 · ${state(caps && canUseDemo(demo))} (${source('tools')})`,
+      `OLLAMA_BASE_URL · ${options.ollamaUrl || '서버 기본값'}`,
+      `OLLAMA_API_KEY · ${options.ollamaKey ? '브라우저 키 설정됨' : options.ollamaUrl ? '개인 주소에 키 미설정' : '서버 기본값'}`,
+      ...numeric.map(({ name, field, unit }) => `${name} · ${options[field] === undefined ? '서버 기본값' : options[field] + ' ' + unit + (demo ? '' : ' (시연 꺼짐)')}`)].join('\n');
+  });
+  for (const field of ['picker', 'demo', 'tools'] as const) {
+    const label = { picker: '로그인 직원 고르기', demo: '시연 기능', tools: '화면 시연 도구' }[field];
+    for (const enabled of [true, false]) {
+      add(field + (enabled ? ' on' : ' off'), toggleNames[field] + (enabled ? '켜기' : '끄기'), `이 브라우저에서 ${label}를 ${enabled ? '켭니다' : '끕니다'}.`, () => {
+        if (enabled && !(field === 'tools' ? demo : caps?.[field])) return field === 'tools' ? '시연 도구를 켜려면 먼저 demo on을 실행하세요.' : '서버에서 이 기능을 허용해야 켤 수 있습니다.';
+        return change(label, field, enabled);
+      });
+    }
+  }
+  for (const { name, alias, field, unit, sample } of numeric) {
+    const base = [normalize(name) + ' ', alias].find(key => prefix.startsWith(key));
+    const suffix = base ? prefix.slice(base.length) : '';
+    const digits = /^\d+$/.test(suffix) ? suffix : String(sample);
+    const number = Number(digits);
+    add(name + ' ' + digits, alias + digits, `명령 뒤에 한 칸 띄우고 원하는 숫자를 입력하세요 (1~${limits[field]} · ${unit}).`, () => {
+      if (!demo || !employee) return '시연이 허용된 직원 계정에서 설정할 수 있습니다.';
+      if (!Number.isSafeInteger(number) || number < 1 || number > limits[field]) return `1~${limits[field]} 사이의 정수를 입력하세요.`;
+      return change(name, field, number);
+    });
+    add(name + ' default', alias + '복원', '이 항목의 서버 기본값을 복원합니다.', () => change(name, field, undefined));
+  }
+  if (employee && demo) {
+    for (const field of ['url', 'key'] as const) {
+      add(field === 'url' ? 'runpod url' : 'runpod key', field === 'url' ? '런팟주소' : '런팟키', field === 'url' ? 'OLLAMA_BASE_URL을 입력합니다.' : 'OLLAMA_API_KEY를 가려진 입력란에서 설정합니다.', () => {
+        setEditingRunpod(field);
+        return '';
+      });
+    }
+    commands.push(...screenActions);
+  }
+  add('runpod default', '런팟복원', 'RunPod 주소와 키를 서버 기본값으로 복원합니다.', () => {
+    const next = { ...useBrowserOptions.getState().options };
+    delete next.ollamaUrl;
+    delete next.ollamaKey;
+    storeOptions(next);
+    return 'RunPod 기본값을 복원했습니다.';
+  });
+  add('reset', '전체초기화', '이 브라우저에 저장한 콘솔 설정을 모두 지웁니다.', () => { storeOptions({}); return '브라우저 기본값을 복원했습니다.'; });
+  add('help', '도움말', '사용할 수 있는 명령과 설명을 봅니다.', () => commands.map(c => c.name + '  ' + c.description).join('\n'));
+  const matches = commands.filter(c => normalize(c.name).startsWith(prefix) || c.alias.startsWith(prefix));
+  const current = matches.find(c => c.name === selected) ?? matches.find(c => normalize(c.name) === prefix || c.alias === prefix) ?? (prefix ? matches[0] : undefined);
+  async function execute(command: ConsoleAction) {
+    if (running.current) return;
+    running.current = true;
+    try { const output = await command.run(); setResult(`${command.name} · ${command.description}\n${output}`); setQuery(''); setSelected(undefined); }
+    catch (error) { setResult(error instanceof Error ? error.message : '명령 실행에 실패했습니다.'); }
+    finally { running.current = false; }
+  }
+  return <dialog ref={dialog} className="browser-console" aria-label="테스트 콘솔" onCancel={close}>
+    <header><strong>테스트 콘솔</strong><button type="button" aria-label="닫기" onClick={close}>×</button></header>
+    {editingRunpod ? <RunpodSettings focus={editingRunpod} onDone={message => {
+      setEditingRunpod(undefined);
+      setResult(message);
+      requestAnimationFrame(() => commandInput.current?.focus());
+    }} /> : <>
+    <input ref={commandInput} autoFocus aria-label="명령어" role="combobox" aria-expanded={true} aria-controls="console-options"
+      aria-activedescendant={current ? 'console-option-' + matches.indexOf(current) : undefined}
+      placeholder="예: timeout 180, inputTokens 8192" value={query} onChange={e => { setQuery(e.target.value); setSelected(undefined); }}
+      onKeyDown={e => {
+        if (e.nativeEvent.isComposing && e.key !== 'Tab') return;
+        if ((e.key === 'Tab' && !e.shiftKey || e.key === 'Enter') && current) {
+          e.preventDefault(); if (!e.repeat) void execute(current);
+        } else if (matches.length && ['ArrowUp', 'ArrowDown'].includes(e.key)) {
+          e.preventDefault();
+          const index = current ? matches.indexOf(current) : e.key === 'ArrowDown' ? -1 : 0;
+          const next = (index + (e.key === 'ArrowDown' ? 1 : -1) + matches.length) % matches.length;
+          setSelected(matches[next].name);
+          document.getElementById('console-option-' + next)?.scrollIntoView({ block: 'nearest' });
+        }
+      }} />
+    <small>↑ ↓ 선택 · Tab 또는 Enter 실행 · Esc 닫기</small>
+    <div role="listbox" id="console-options" aria-label="자동완성">
+      {matches.map((c, i) => <button key={c.name} id={'console-option-' + i} type="button" role="option"
+        tabIndex={-1} aria-selected={c === current} onMouseDown={e => e.preventDefault()} onClick={() => void execute(c)}><code>{c.name}</code><span>{c.description}</span></button>)}
+      {!matches.length && <span>일치하는 명령이 없습니다.</span>}
+    </div>
+    </>}
+    {!editingRunpod && result && <pre aria-live="polite">{result}</pre>}
+  </dialog>;
+}

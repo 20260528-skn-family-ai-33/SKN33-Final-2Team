@@ -23,6 +23,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from .. import db, llm, provider_policy
+from ..browser_console import demo_enabled
 from ..config import S
 from ..errors import AgentError
 
@@ -77,8 +78,8 @@ def context(employee_id: int, me: dict | None = None) -> Ctx:
         from ..services import profile
         me = profile.view(employee_id)
     # 시연 API를 차단한 뒤에도 저장된 옵션이 실제 모델 호출을 바꾸지 않게 한다.
-    demo = S.demo_mode and bool(s.get('demo_mock'))
-    fail_sim = (s.get('fail_sim') or {}) if S.demo_mode else {}
+    demo = demo_enabled(S.demo_mode) and bool(s.get('demo_mock'))
+    fail_sim = (s.get('fail_sim') or {}) if demo_enabled(S.demo_mode) else {}
     policy, level = provider_policy.selection()
     reasoning = (s.get('reasoning') or {}) if policy == 'employee' else ({policy: level} if level else {})
     return Ctx(employee_id, provider_policy.resolve(policy, s.get('ai_provider')), demo, fail_sim, me or {},

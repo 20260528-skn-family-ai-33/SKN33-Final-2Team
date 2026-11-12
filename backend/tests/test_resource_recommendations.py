@@ -67,6 +67,17 @@ class RecommendationTests(unittest.TestCase):
                 self.assertEqual(result['skills'][0]['courses'],[])
                 self.assertEqual(result['skills'][0]['books'],[])
 
+    def test_candidate_snapshot_matches_initial_model_input(self):
+        for i in range(4, 8):
+            self.items[f'course{i}'] = dict(self.items['course0'], id=f'course{i}', title=f'자료 {i}', cost=i)
+        model = Mock(return_value=self.raw())
+        row = recommend_resources(self.project, self.selection, self.items, model)['skills'][0]
+        prompt_courses = model.call_args_list[0].args[1]['skills'][0]['courses']
+        candidates = row['modelCourseCandidates']
+        self.assertEqual(len(candidates), 6)
+        self.assertEqual([c['title'] for c in candidates], [c['title'] for c in prompt_courses])
+        self.assertEqual([c['id'] for c in candidates if c['recommended']], [c['id'] for c in row['courses']])
+
     def test_top_recommendation_and_one_book_default(self):
         row=self.recommend()['skills'][0]
         self.assertEqual(row['selectedCourse'],'course0')

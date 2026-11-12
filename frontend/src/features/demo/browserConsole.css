@@ -1,0 +1,14 @@
+.browser-console { width: min(38rem, 92vw); max-height: 85dvh; padding: 1.2rem; overflow: auto; color: var(--ink); background: var(--surface, white); border: 1px solid var(--line); border-radius: 12px; }
+.browser-console::backdrop { background: rgb(0 0 0 / 40%); }
+.browser-console header, .browser-console [role=option] { display: flex; gap: 1rem; align-items: center; justify-content: space-between; }
+.browser-console input { width: 100%; margin-block: .7rem .3rem; padding: .65rem; }
+.browser-console [role=listbox] { max-height: 30dvh; overflow: auto; margin-top: .6rem; }
+.browser-console button { cursor: pointer; color: inherit; background: transparent; border: 0; }
+.browser-console [role=option] { width: 100%; padding: .6rem; text-align: left; }
+.browser-console [role=option] span { font-size: .85rem; }
+.browser-console [aria-selected=true], .browser-console [role=option]:hover { background: var(--surface-2, #eee); }
+.browser-console fieldset { margin: .8rem 0; padding: 1rem; border: 1px solid var(--line); }
+.browser-console label { display: block; margin-bottom: .5rem; }
+.browser-console footer { display: flex; gap: .5rem; margin-top: .8rem; }
+.browser-console footer button { border: 1px solid var(--line); border-radius: .4rem; padding: .35rem .8rem; }
+.browser-console pre { white-space: pre-wrap; overflow-wrap: anywhere; margin-bottom: 0; }
