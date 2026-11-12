@@ -382,15 +382,19 @@ def _refused(topic: str) -> dict:
 def classify_question_roberta(question: str, history: list | None = None, me: dict | None = None,
                              emp_group: str | None = None) -> dict:
     """⭐ [1단계 - RoBERTa로 질문 분류]
-    1. 사용자 정보(me 또는 emp_group)에서 사용자의 기본 직군을 가져온다. (없으면 '일반직' 자동 보장)
-    2. 질문(question) 안에 특정 직군 명칭이 언급되어 있는지 확인한다.
-       - 질문에 직군이 있으면: 질문에 적힌 직군을 사용 (예: "실무직 연차 휴가는?" -> '실무직')
-       - 질문에 직군이 없으면: 사용자의 기본 직군을 사용 (예: "연차 휴가는?" -> 사용자 직군 '일반직')
+    1. 사용자 정보(me 또는 emp_group)에서 사용자의 직군을 확인한다.
+       - 사용자 정보에 직군이 없으면 즉시 에러(AgentError)를 발생시켜 인사 담당자 문의를 안내한다.
+    2. 질문(question) 안에 특정 직군 명칭이 언급되어 있으면 해당 직군을 우선 사용하고, 없으면 사용자 직군을 사용한다.
     3. 직군과 대화 맥락을 결합하여 RoBERTa로 질문 유형을 1차 분류한다.
     """
     history = history or []
     group_list = ['일반직', '실무직', '운영직']
-    user_group = emp_group or (me.get('empGroup') if isinstance(me, dict) else me) or '일반직'
+
+    raw_group = emp_group or (me.get('empGroup') if isinstance(me, dict) else me)
+    user_group = str(raw_group).strip() if raw_group and str(raw_group).strip() else None
+    if not user_group:
+        raise AgentError('로그인한 직원의 직원 구분을 확인할 수 없어요')
+
     detected_group = next((g for g in group_list if g in question), None)
     effective_group = detected_group if detected_group else user_group
 
@@ -424,15 +428,12 @@ def classify_label_with_llm(ctx: rt.Ctx, question: str, history: list | None = N
         반드시 아래 JSON 형식으로만 응답하라:
         {"label": "사내 규정" | "사내 생활안내" | "수자원공사 정보" | "범위 밖"}"""
     payload = {'question': question}
-    try:
-        res = rt.llm_json(ctx, system, payload, role='regulation', history=_hist_msgs(history or []),
-                          temperature=0 if ctx.mode == 'ollama' else None)
-        label = res.get('label')
-        if label in ('사내 규정', '사내 생활안내', '수자원공사 정보', '범위 밖'):
-            return label
-    except Exception:
-        pass
-    return None
+    res = rt.llm_json(ctx, system, payload, role='regulation', history=_hist_msgs(history or []),
+                      temperature=0 if ctx.mode == 'ollama' else None)
+    label = res.get('label')
+    if label in ('사내 규정', '사내 생활안내', '수자원공사 정보', '범위 밖'):
+        return label
+    raise llm.LlmError(f'재분류 라벨 형식 오류: 유효하지 않은 라벨({label})입니다')
 
 
 def verify_or_reclassify_label_with_llm(ctx: rt.Ctx, question: str, label: str,
@@ -679,7 +680,7 @@ def answer_with_pipeline(ctx: rt.Ctx, inp: dict) -> dict:
 
     inp['_history'] = follow_history
     inp['_classification'] = {k: v for k, v in classified.items() if k not in ('follow_history', 'group', 'detectedFromQuestion')}
-    if classified.get('group'):
+    if classified.get('detectedFromQuestion') and classified.get('group'):
         inp['me'] = dict(me, empGroup=classified['group'])
 
     # [2단계] RoBERTa 예측정확도가 80% 미만 시 LLM 2차 재분류
