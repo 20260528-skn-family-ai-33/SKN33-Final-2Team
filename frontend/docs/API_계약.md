@@ -4,7 +4,7 @@
 
 관리자 설정 응답의 `policyStatus`는 정상 시 `active`, 직원별 선택을 끄고 모델을 지정하지 않아 Ollama가 적용된 경우 `default_ollama`다. 설정 파일 형식이 잘못되면 관리자 조회는 `200`과 `{policy: null, level: null, policyStatus: "invalid", ...}`를 반환해 화면에서 새 설정을 저장할 수 있다. 이때 새 모델 실행과 목표 후보 일괄 재생성은 `503 BAD_PROVIDER_POLICY`로 중단된다.
 
-관리자 데이터 관리 화면은 `GET /api/v1/admin/ai-provider`로 현재 정책, 직원별 선택 허용 여부, 서버에 등록한 모델 이름·키 등록 여부·설정 가능 여부를 조회한다. 저장은 `PUT /api/v1/admin/ai-provider`에 `{"policy":"openai"}`, `{"policy":"ollama"}` 또는 베타의 `{"policy":"employee"}`를 보낸다. 고정 모델을 저장할 때 `level`에 지원하는 추론 단계나 `null`(서버 기본값)을 함께 보낸다. 직원별 선택은 단계를 지정할 수 없다. 직원·부서장으로 관리자 API를 사용하면 403, 환경 설정이 빠진 제공자를 저장하면 409를 반환한다. 기본 키는 서버 .env에서 읽는다. 관리자는 `PUT /admin/ai-provider/{provider}/key`에 `{"key":"새 키"}`를 보내 등록하고, `DELETE`로 해제한다. 응답에는 키 원문 없이 `keySource`(env/admin/none), `hasDefaultKey`, `keyConfigured`가 포함된다. 연결 확인은 기존 `GET /api/v1/ai/status?provider=...`를 쓴다.
+관리자 데이터 관리 화면은 `GET /api/v1/admin/ai-provider`로 현재 정책, 직원별 선택 허용 여부, 서버에 등록한 모델 이름·키 등록 여부·설정 가능 여부를 조회한다. 저장은 `PUT /api/v1/admin/ai-provider`에 `{"policy":"openai"}`, `{"policy":"ollama"}` 또는 베타의 `{"policy":"employee"}`를 보낸다. 고정 모델을 저장할 때 `level`에 지원하는 추론 단계나 `null`(서버 기본값)을 함께 보낸다. 직원별 선택과 `ollama`는 단계를 지정할 수 없다(`ollama`에 단계를 보내면 `422 / BAD_REASONING` · RunPod-Ollama는 늘 추론 없이 부름 · #229). 직원·부서장으로 관리자 API를 사용하면 403, 환경 설정이 빠진 제공자를 저장하면 409를 반환한다. 기본 키는 서버 .env에서 읽는다. 관리자는 `PUT /admin/ai-provider/{provider}/key`에 `{"key":"새 키"}`를 보내 등록하고, `DELETE`로 해제한다. 응답에는 키 원문 없이 `keySource`(env/admin/none), `hasDefaultKey`, `keyConfigured`가 포함된다. 연결 확인은 기존 `GET /api/v1/ai/status?provider=...`를 쓴다.
 
 관리자가 제공자를 고정하면 직원·부서장에게는 해당 모델을 표시하고 제공자·추론 설정 변경 요청은 409를 반환한다. 직원별 선택으로 돌아가면 저장된 개인 선택을 다시 사용한다. 직원 화면은 로그인·새로고침·창 복귀·모델 정보 열기 때 유효한 정책을 읽는다.
 
@@ -72,7 +72,7 @@
 | `GET /me/profile` · `PUT`/`DELETE /me/profile/self` | 내 정보 |
 | `GET /me/goal-suggestions` · `POST /me/goal-suggestions/ensure` · `POST /me/goal-suggestions/regenerate` | 저장된 후보 조회 · 누락/변경 확인 · 명시적 다시 만들기 |
 | `GET /ai/providers` · `PUT /me/ai-provider` · `GET /ai/status?provider=` · `GET /ai/log` · `GET /ai/log/{id}` | 좌측 AI 모델 고르기·연결 상태·에이전트 동작 보기(시연·디버그 전용 · 직원·관리자 계정 모두 · 누가 호출했든 모든 계정의 최근 호출을 `employee`(누구의 일)·`by`(관리자 화면에서 시작하면 '관리자')와 함께 줌 · 운영에서는 끔). 목록은 요약과 `callCount`(모델 호출 수)만, `/ai/log/{id}`는 그 기록의 에이전트 입력·출력과 모델 호출마다 보낸 메시지·응답 원문(`calls`)을 자르지 않고 줌(이미지는 개수만). 오래돼 밀려난 기록은 `404 LOG_NOT_FOUND` |
-| `PUT /me/reasoning` | 좌측 AI 모델에서 모델별 추론 정도 고르기(직원 계정만) |
+| `PUT /me/reasoning` | AI 모델 창에서 OpenAI 추론 정도 고르기(직원 계정만 · RunPod-Ollama는 `level: null`만 받음) |
 | `GET /demo/accounts` | 베타 로그인 직원 선택. `GP5_BETA_ACCOUNT_PICKER=on`일 때만 인증 없이 DB 직원 목록·관리자 로그인 아이디 제공. 비밀번호는 제외 |
 | `PUT /me/demo-settings` · `POST /demo/reset` · `POST /demo/jump` | 시연 전용(가데이터·실패 시연·단계 이동·초기화) |
 
@@ -92,14 +92,14 @@
 
 서버 ON·프런트 OFF에서 직원이 AI 모델 메뉴의 해제를 누르면 기존 `PUT /me/demo-settings`에 `demoMock: false`와 지원하는 모든 `failSim` 항목의 `false`를 한 번에 보냅니다. 버튼은 적용 중인 시연 설정이 있을 때만 표시합니다.
 
-`GET /ai/providers`의 `providers[].models`는 `{default, roadmap, regulation, embed, vision}`이에요. `default`는 진단 에이전트, `roadmap`은 로드맵 에이전트, `regulation`은 규정 에이전트(사내 생활 도우미 답변), `vision`은 기획서 이미지 읽기 모델이에요. `regulation`이 없는 옛 응답이면 화면은 `default`를 써요. `GET /ai/status?provider=ollama`의 `models[]`는 `{role, name, installed, loaded, think}`이고(`think`는 아래 추론 정도 · 진단·로드맵 모델만), `default` 다음에는 `default`와 이름이 다른 `roadmap`·`regulation`만 들어가요(같은 이름이면 Ollama에 한 번만 올라가서) (#33).
+`GET /ai/providers`의 `providers[].models`는 `{default, roadmap, regulation, embed, vision}`이에요. `default`는 진단 에이전트, `roadmap`은 로드맵 에이전트, `regulation`은 규정 에이전트(사내 생활 도우미 답변), `vision`은 기획서 이미지 읽기 모델이에요. `regulation`이 없는 옛 응답이면 화면은 `default`를 써요. `GET /ai/status?provider=ollama`의 `models[]`는 `{role, name, installed, loaded}`이고(예전의 `think` 필드는 #229에서 없앴다), `default` 다음에는 `default`와 이름이 다른 `roadmap`·`regulation`만 들어가요(같은 이름이면 Ollama에 한 번만 올라가서) (#33).
 
-추론 정도 요청은 `{ "provider": "ollama" | "openai", "level": "<단계 이름>" | null }`이고 그 모드의 값만 바꿔(다른 모드 값은 그대로 · 동시에 저장해도 사라지지 않음) 모드별로 저장한 전체 `{reasoning: {ollama?, openai?}}`를 돌려준다. 화면은 저장을 하나씩 차례로 보내고 마지막 선택의 응답만 화면에 맞춘다. `null`은 그 모드를 서버 기본값으로 되돌린다. 단계 이름은 소문자·숫자·`_`·`-` 20자 이내만 받고 `true`·`false` 같은 값은 받지 않는다(`422 / BAD_REASONING`). OpenAI는 서버의 단계 목록 밖이면 같은 오류다. 고를 수 있는 단계는 이렇게 온다.
+추론 정도 요청은 `{ "provider": "ollama" | "openai", "level": "<단계 이름>" | null }`이고 그 모드의 값만 바꿔(다른 모드 값은 그대로 · 동시에 저장해도 사라지지 않음) 모드별로 저장한 전체 `{reasoning: {ollama?, openai?}}`를 돌려준다. 화면은 저장을 하나씩 차례로 보내고 마지막 선택의 응답만 화면에 맞춘다. `null`은 그 모드를 서버 기본값으로 되돌린다. 단계 이름은 소문자·숫자·`_`·`-` 20자 이내만 받고 `true`·`false` 같은 값은 받지 않는다(`422 / BAD_REASONING`). OpenAI는 서버의 단계 목록 밖이면 같은 오류다. **`ollama`는 `level: null`만 받고, 단계 이름을 보내면 `422 / BAD_REASONING`(RunPod-Ollama는 추론 없이만 답함)이다.** 고를 수 있는 단계는 이렇게 온다.
 
 - OpenAI: `GET /ai/providers`의 openai 항목 `reasoning: {levels, default, modelDefault}`. `levels`는 `.env`의 `OPENAI_REASONING_LEVELS`이고 비면 기본 모델 gpt-6-luna의 코드 값(`none`~`xhigh`)이다(다른 모델이면 빈 목록 = 고르지 못함). `default`는 `.env`의 `OPENAI_REASONING_EFFORT`(비면 `null` = 보내지 않음), `modelDefault`는 보내지 않을 때 모델이 쓰는 값(gpt-6-luna `medium` · 모르는 모델이면 `null`)이고 화면 '기본값 · 보통' 표시에만 쓴다.
-- RunPod-Ollama: 진단·로드맵 모델에만 고르고, 모델마다 달라 `GET /ai/providers`의 `reasoning.levels`는 `null`이다(`default`는 `.env` 기본값). `GET /ai/status?provider=ollama`에서 진단·로드맵 모델(`role: default`)의 `models[].think: {levels, default}`(Ollama `/api/show` `thinking.values` · 켜고 끄기는 `off`·`on`)로 온다. 확인하지 못하면 `null`, 고를 단계가 없으면 빈 목록이다. 규정 모델 줄의 `think`는 늘 `null`이다.
+- RunPod-Ollama: 고를 단계가 없다. `GET /ai/providers`의 ollama 항목은 `reasoning: {levels: [], default: "off"}`이고, 화면은 드롭다운 없이 '추론 없음'만 보인다(#229).
 
-직원이 고른 값은 `GET /me`·`PUT /me/demo-settings` 응답의 `reasoning`으로 온다. 서버는 고른 값 → `.env` 기본값 순으로(고른 값이 지금 모델이 받는 단계가 아니면 — 모델을 바꾼 뒤 남은 옛 선택 등 — `.env` 기본값 · 단계를 확인하지 못하면 고른 값 그대로) Ollama에는 `think`(on/off는 true/false, 나머지는 단계 이름), OpenAI에는 `reasoning_effort`로 보내고, 둘 다 없으면 보내지 않아 모델 기본값을 따른다. **RunPod-Ollama 규정 에이전트(사내 생활 도우미) 호출은 생각을 끄고 학습한 모델이라 고른 값·`.env`와 관계없이 늘 `think: false`다.** 이미지 읽기 모델에는 직원 값을 쓰지 않는다. 관리자 고정 모델의 목표 후보도 관리자 추론 단계를 사용하며, 미지정 시 서버 기본값을 따른다.
+직원이 고른 값은 `GET /me`·`PUT /me/demo-settings` 응답의 `reasoning`으로 온다. OpenAI는 고른 값 → `.env` 기본값 순으로 `reasoning_effort`에 보내고, 둘 다 없으면 보내지 않아 모델 기본값을 따른다. **RunPod-Ollama는 진단·로드맵·규정·이미지 읽기 모든 호출에 고른 값·`.env`와 관계없이 늘 `think: false`를 보낸다(#229).** 예전에 저장된 `reasoning.ollama` 값이나 관리자 정책 파일의 `ollama` 단계는 읽지 않는다. 이미지 읽기 모델에는 직원 값을 쓰지 않는다. 관리자 고정 모델의 목표 후보도 관리자 추론 단계를 사용하며(RunPod-Ollama는 단계 없음 · 기본 `off`), 미지정 시 서버 기본값을 따른다.
 
 근무성적평정은 내 정보와 목표 추천에서 제외한다. 호환용 응답 배열 `evaluations`와 `view.evals`는 비어 있다. 개인 입력의 `devYears`가 숫자로 바뀌지 않거나 0~50년 범위를 벗어나면 `422 / DEV_YEARS_RANGE`를 반환하고 기존 입력을 보존한다. #15의 격리 DB·실제 인증 API 검사로 확인했다.
 

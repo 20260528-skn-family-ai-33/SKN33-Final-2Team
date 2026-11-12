@@ -14,7 +14,7 @@ import urllib.request
 from urllib.parse import quote
 
 from . import browser_console, provider_keys
-from .config import OLLAMA_REGULATION_THINK, S
+from .config import S
 
 
 class LlmError(Exception):
@@ -134,37 +134,12 @@ def _with_images(messages: list, provider: str) -> list:
     return out
 
 
-def _think(level: str) -> bool | str:
-    """단계 이름 → Ollama think 값. on/off 는 켜고 끄기만 되는 모델(qwen 등)의 true/false, 나머지는 모델이 정한 단계 이름 그대로"""
-    return {'on': True, 'off': False}.get(level, level)
-
-
-def _level_name(v) -> str:
-    return 'on' if v is True else 'off' if v is False else str(v)
-
-
-# 모델 이름 → /api/show 로 확인한 추론 정도 단계(연결 확인·호출 때 채움). 화면에 보인 단계와 같은 기준으로 직원 값을 거른다
-_think_cache: dict[str, list[str]] = {}
-
-
-def _ollama_takes(model: str, level: str) -> bool:
-    """그 모델이 이 단계를 받는지. 화면은 모델이 받는 단계만 보여 주므로, 모델을 바꾼 뒤 남은 옛 선택(예: high)은
-    서버 기본값으로 돌린다(PR #40 리뷰). 단계를 확인하지 못하면(연결 확인 실패) 고른 값을 그대로 보낸다"""
-    if browser_console.options.get().ollama_url:
-        info = think_levels(model)
-        return info is None or level in info['levels']
-    if model not in _think_cache:
-        think_levels(model)
-    levels = _think_cache.get(model)
-    return levels is None or level in levels
-
-
 def chat(provider: str, messages: list, role: str = 'default', json_mode: bool = True, reasoning: str | None = None,
          temperature: float | None = None, response_schema: dict | None = None) -> dict:
     """한 번의 대화 호출 → {content, model, provider, loadMs, totalMs}.
-    reasoning: 직원이 화면에서 고른 추론 정도(단계 이름). 없으면 .env 기본값(OLLAMA_THINK / OPENAI_REASONING_EFFORT),
+    reasoning: 직원·관리자가 고른 OpenAI 추론 정도(단계 이름). 없으면 .env 기본값(OPENAI_REASONING_EFFORT),
     그것도 비면 보내지 않아 모델 기본값을 따른다. 이미지 읽기 모델은 화면에서 고르지 않아 직원 값을 쓰지 않는다.
-    RunPod-Ollama 규정 에이전트는 생각을 끄고 학습한 모델이라 직원 값·.env 와 관계없이 늘 끈다(OLLAMA_REGULATION_THINK)"""
+    RunPod-Ollama 는 역할과 고른 값에 관계없이 늘 추론 없이 부른다(config.OLLAMA_THINK · think: false)"""
     limits = browser_console.options.get()
     if limits.input_tokens is not None:
         from .catalog_budget import FRAMING_RESERVE, tokens
@@ -197,12 +172,8 @@ def chat(provider: str, messages: list, role: str = 'default', json_mode: bool =
             payload.setdefault('options', {})['temperature'] = temperature
         if S.ollama_keep_alive:
             payload['keep_alive'] = S.ollama_keep_alive
-        if role == 'regulation':
-            level = OLLAMA_REGULATION_THINK
-        else:
-            level = (mine if mine and _ollama_takes(model, mine) else None) or S.ollama_think
-        if level:
-            payload['think'] = _think(level)
+        # 추론 없음 고정: think 를 빼면 qwen 계열은 모델 기본값(켬)으로 돌아가므로 늘 false 를 명시해 보낸다
+        payload['think'] = False
         res = ollama('api/chat', payload)
         msg = res.get('message') or {}
         content = (msg.get('content') or '').strip()
@@ -216,13 +187,6 @@ def chat(provider: str, messages: list, role: str = 'default', json_mode: bool =
                     content = m.group(0)
                 except ValueError:
                     pass
-        # 그래도 content 가 비어 있고 think 가 켜져 있었다면 생각(thinking)을 끄고 1회 자동 재시도
-        # (fine-tuned 모델이 reasoning 설정으로 인해 content 를 비우는 현상 방지)
-        if not content and payload.get('think') not in (None, False):
-            retry_payload = dict(payload, think=False)
-            res = ollama('api/chat', retry_payload)
-            msg = res.get('message') or {}
-            content = (msg.get('content') or '').strip()
         ms = lambda ns: round((ns or 0) / 1e6)  # noqa: E731 - Ollama 시간 값은 나노초
         return {'content': content, 'model': res.get('model', model), 'provider': 'ollama',
                 'loadMs': ms(res.get('load_duration')), 'totalMs': ms(res.get('total_duration'))}
@@ -250,28 +214,8 @@ def chat(provider: str, messages: list, role: str = 'default', json_mode: bool =
     return {'content': res['choices'][0]['message'].get('content') or '', 'model': res.get('model', model), 'provider': 'openai', 'loadMs': 0, 'totalMs': 0}
 
 
-def think_levels(name: str) -> dict | None:
-    """Ollama 모델이 고를 수 있는 추론 정도 {levels, default} (/api/show 의 thinking.values · 토큰을 쓰지 않음).
-    thinking 이 없는 옛 Ollama 는 capabilities 의 'thinking' 만 보고 켜고 끄기로 본다. 고를 단계가 없으면 levels 가 빈 목록,
-    확인하지 못하면 None(화면은 '연결을 확인하면 고를 수 있어요')"""
-    try:
-        res = ollama('api/show', {'model': name}, timeout=15)
-    except LlmError:
-        return None
-    t = res.get('thinking') or {}
-    if t.get('values'):
-        levels = [_level_name(v) for v in t['values']]
-        default = None if t.get('default') is None else _level_name(t['default'])
-    else:
-        levels, default = (['off', 'on'] if 'thinking' in (res.get('capabilities') or []) else []), None
-    levels = levels if len(levels) > 1 else []
-    if not browser_console.options.get().ollama_url:
-        _think_cache[name] = levels
-    return {'levels': levels, 'default': default}
-
-
 def ping(provider: str) -> dict:
-    """연결 확인 (토큰을 쓰지 않음). Ollama: 버전 → 설치 모델 → GPU에 올라간 모델 → 모델별 추론 정도 단계"""
+    """연결 확인 (토큰을 쓰지 않음). Ollama: 버전 → 설치 모델 → GPU에 올라간 모델"""
     t0 = time.perf_counter()
     if provider == 'openai':
         res = openai(f"models/{quote(S.openai_model, safe='')}", None, timeout=15)
@@ -290,7 +234,5 @@ def ping(provider: str) -> dict:
     if S.ollama_model_regulation != S.ollama_model:
         roles.append(('regulation', S.ollama_model_regulation))
     return {'ok': True, 'provider': 'ollama', 'target': 'runpod' if browser_console.options.get().ollama_url else S.ollama_target, 'version': version,
-            # 추론 정도는 진단·로드맵 모델만 고른다(규정 모델은 늘 끔) → 그 모델의 단계만 묻는다
-            'models': [{'role': r, 'name': n, 'installed': hit(n, have), 'loaded': hit(n, loaded),
-                        'think': think_levels(n) if r == 'default' and hit(n, have) else None} for r, n in roles],
+            'models': [{'role': r, 'name': n, 'installed': hit(n, have), 'loaded': hit(n, loaded)} for r, n in roles],
             'ms': round((time.perf_counter() - t0) * 1000)}

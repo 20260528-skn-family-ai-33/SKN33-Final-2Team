@@ -24,7 +24,8 @@ def _read_selection() -> tuple[str, str | None, str]:
         raise ApiError(503, 'BAD_PROVIDER_POLICY', '저장된 추론 정도를 확인해 주세요')
     if mode == 'employee' and not S.employee_ai_selection:
         return 'ollama', None, 'default_ollama'
-    if mode == 'openai' and level not in S.openai_reasoning_levels:
+    # RunPod-Ollama 는 늘 추론 없이 부르므로 예전에 저장한 단계는 읽지 않는다(파일은 다음 저장 때 고쳐진다)
+    if mode == 'ollama' or (mode == 'openai' and level not in S.openai_reasoning_levels):
         level = None
     return mode, level, 'active'
 
@@ -62,13 +63,9 @@ def save(mode: str, level: str | None = None) -> None:
     if level is not None:
         if not isinstance(level, str) or not level_ok(level) or mode == 'employee':
             raise ApiError(422, 'BAD_REASONING', '고정 모델의 추론 단계를 선택해 주세요')
-        levels = S.openai_reasoning_levels
         if mode == 'ollama':
-            info = llm.think_levels(llm.model_name('ollama'))
-            if info is None:
-                raise ApiError(409, 'AI_UNAVAILABLE', 'Ollama의 추론 단계를 확인하지 못했어요. 연결을 확인해 주세요')
-            levels = info['levels']
-        if level not in levels:
+            raise ApiError(422, 'BAD_REASONING', 'RunPod-Ollama 는 추론 없이만 답해요. 추론 단계를 비워 저장해 주세요')
+        if level not in S.openai_reasoning_levels:
             raise ApiError(422, 'BAD_REASONING', '선택한 모델이 지원하는 추론 단계가 아니에요')
     S.var_dir.mkdir(parents=True, exist_ok=True)
     with NamedTemporaryFile(dir=S.var_dir, delete=False, mode='w', encoding='utf-8') as tmp:

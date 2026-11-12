@@ -55,30 +55,26 @@ export function AiBox() {
       .catch((err) => failToast(err));
   };
   /** 고른 모드 바로 아래의 추론 정도. 단계는 모델마다 달라 그 모델이 받는 것만 보여 준다.
-   *  RunPod-Ollama 는 진단·로드맵 모델에만 쓰고, 규정 에이전트는 생각을 끄고 학습한 모델이라 늘 끈다(고를 수 없음) */
+   *  RunPod-Ollama 는 모든 생성을 추론 없이 부르므로 고르는 칸 없이 그 사실만 적는다 */
   const effort = (p: UiProvider) => {
     if (choice !== p || !ai.available(p)) return null;
+    if (p === 'ollama') return <div className="aim-effort"><small className="aim-effort-n">추론 없음</small></div>;
     const levels = ai.reasoningLevels(p);
-    if (levels && !levels.length) return null;
+    if (!levels.length) return null;
     const def = ai.reasoningDefault(p);
     const mine = ai.reasoning(p);
     const id = `aim-effort-${p}`;
     return (
       <div className="aim-effort">
         <label htmlFor={id}>추론 정도</label>
-        {levels ? (
-          <select id={id} value={mine && levels.includes(mine) ? mine : ''} onChange={(e) => pickLevel(p, e.target.value || null)}>
-            <option value="">기본값 · {def ? levelLabel(def) : '모델 기본'}</option>
-            {levels.map((l) => (
-              <option key={l} value={l}>
-                {levelLabel(l)}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <small>연결을 확인하면 고를 수 있어요</small>
-        )}
-        {p === 'ollama' ? <small className="aim-effort-n">진단·로드맵에 적용 · 규정 에이전트는 늘 추론 없이 답해요</small> : null}
+        <select id={id} value={mine && levels.includes(mine) ? mine : ''} onChange={(e) => pickLevel(p, e.target.value || null)}>
+          <option value="">기본값 · {def ? levelLabel(def) : '모델 기본'}</option>
+          {levels.map((l) => (
+            <option key={l} value={l}>
+              {levelLabel(l)}
+            </option>
+          ))}
+        </select>
       </div>
     );
   };
@@ -95,7 +91,7 @@ export function AiBox() {
     <div className="aim" role={policy && policy !== 'employee' ? 'group' : 'radiogroup'} aria-label="AI 모델">
       <span className="lbl">AI 모델</span>
       {policy && policy !== 'employee' ? (
-        <p>관리자 지정 · {PROV[policy]} · {policy === 'openai' ? ai.openaiModel() : ai.ollamaInfo().model} · 추론 {levelLabel(ai.reasoning(policy === 'openai' ? 'api' : 'ollama') || '기본값')}</p>
+        <p>관리자 지정 · {PROV[policy]} · {policy === 'openai' ? ai.openaiModel() : ai.ollamaInfo().model} · 추론 {policy === 'openai' ? levelLabel(ai.reasoning('api') || '기본값') : '없음'}</p>
       ) : <>
         {opt('ollama', 'RunPod-Ollama', '로컬 LLM·sLLM')}
         {effort('ollama')}

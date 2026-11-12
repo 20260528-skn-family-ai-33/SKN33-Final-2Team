@@ -101,6 +101,7 @@ class BrowserConsoleTests(unittest.TestCase):
                 config.ollama_model = 'model'
                 llm.chat('ollama', messages)
                 self.assertEqual(http.call_args.args[1]['options']['num_predict'], 2048)
+                self.assertIs(http.call_args.args[1]['think'], False)
                 self.assertEqual(http.call_args.args[3], 180)
             console.options.reset(token)
             llm.chat('openai', messages)
