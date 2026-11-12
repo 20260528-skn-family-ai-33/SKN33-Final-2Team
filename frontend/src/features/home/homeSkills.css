@@ -4,4 +4,3 @@
 
 /* 첫 화면 단계 안내: 작성 단계 수만큼 한 줄에(좁으면 두 칸씩) */
 .pstrip.steps{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
-.home-gantt{scroll-margin-top:96px}

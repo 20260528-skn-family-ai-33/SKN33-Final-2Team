@@ -277,12 +277,8 @@ export function HomePage() {
     <>
       <p className="eyebrow">안녕하세요, {hello} 님</p>
       <h1 className="t">진행 중인 로드맵 {act.length}개</h1>
-      <p className="lead">
-        로드맵마다 이번 주차에 할 일을 먼저 보여 드리고, 아래에 전체 일정을 보여 드려요.{' '}
-        <button type="button" className="link" onClick={() => document.getElementById('home-gantt')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
-          전체 일정으로 가기
-        </button>
-      </p>
+      <p className="lead">전체 일정을 먼저 보여 드리고, 로드맵마다 이번 주차에 할 일을 보여 드려요.</p>
+      <GanttAll list={graphPlans} onMove={moveGraph} />
       {graphPlans.map((R) => (
         <section className="hp" key={R.id}>
           <div className="hp-h">
@@ -300,9 +296,6 @@ export function HomePage() {
           <StageCard R={R} />
         </section>
       ))}
-      <div className="sec home-gantt" id="home-gantt">
-        <GanttAll list={graphPlans} onMove={moveGraph} />
-      </div>
       {drafting ? (
         <div className="sec">
           <DraftBox />
