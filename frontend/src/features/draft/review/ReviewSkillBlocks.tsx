@@ -4,9 +4,9 @@ import { Stt } from '@/shared/ui/parts';
 import { activityTime } from '@/shared/lib/resourceTime';
 import { hrs } from '@/shared/lib/format';
 import './reviewSkills.css';
+import './reviewStep.css';
 import { ResourceImage } from '@/shared/ui/ResourceImage';
 import { TaskDescription } from '@/shared/ui/TaskDescription';
-import { Skeleton } from '@/shared/ui/Skeleton';
 import { activityAnchor } from '@/features/roadmap/roadmapLearningData';
 import { durationLabel, type DurationEstimate } from '../result/skillOrder';
 import { courseDifficulty } from '@/shared/lib/courseDifficulty';
@@ -40,42 +40,87 @@ export function ReviewTaskCopy({ task, memo }: { task: Act; memo?: string }) {
   </span><TaskDescription text={task.how} />{memo && <span className="small muted">메모 · {memo}</span>}</span>;
 }
 
-export function ReviewSkillBlocks({ materials, acts, selectedIds, busy, onToggle, onPropose, confirmed = false, readOnly = false, onSubmit, onOpenResource, progress, skillAction, skillFooter, currentSkillNames = [], proposeDisabled = false, alternatives, onPick, generatingSkill, generating = false }: { readOnly?: boolean; proposeDisabled?: boolean; generating?: boolean; generatingSkill?: string | null; alternatives?: Record<string, { proposalId: string; task: Act }[]>; onPick?: (skill: string, proposalId: string) => void; materials: ReviewMaterials; acts: Act[]; selectedIds: string[]; busy: boolean; onToggle?: (id: string) => void; onPropose?: (skill: string) => void; confirmed?: boolean; onSubmit?: (skill: string) => void; onOpenResource?: (skill: string, resourceId: string) => void; progress?: PlanRecord['progress']; skillAction?: (skill: string) => ReactNode; skillFooter?: (skill: string) => ReactNode; currentSkillNames?: string[] }) {
+/** 확정한 로드맵의 스킬 블록(내 로드맵 · 부서장 보기). 작성 7단계(ReviewTaskBlocks)와 같은 구성으로 보여 준다(#224 후속):
+    배울 자료(눌러서 실행 기록) · 이 스킬을 마치면 · 산출물 과제(상태와 제출). 작성 단계의 선택·제안 기능은 ReviewTaskBlocks 가 맡는다 */
+export function ReviewSkillBlocks({ materials, acts, busy, readOnly = false, onSubmit, onOpenResource, progress, skillAction, skillFooter, currentSkillNames = [] }: {
+  materials: ReviewMaterials; acts: Act[];
+  /** 이전 호출부와 맞추기 위해 받기만 한다(확정 뒤에는 모든 활동이 선택된 상태다) */
+  selectedIds?: string[]; confirmed?: boolean;
+  /** 진행 중이 아니면(읽기 전용) 실행 기록을 열지 않는다 */
+  busy: boolean; readOnly?: boolean;
+  onSubmit?: (skill: string) => void; onOpenResource?: (skill: string, resourceId: string) => void;
+  progress?: PlanRecord['progress']; skillAction?: (skill: string) => ReactNode; skillFooter?: (skill: string) => ReactNode; currentSkillNames?: string[];
+}) {
   const skills = materials.recommendations?.skills || [];
   const names = (materials.skillOrder || skills.map(s => s.name)).filter(name => materials.choices[name]?.enabled !== false);
-  return <div className="review-skill-blocks">{names.map((name, index) => {
+  const done = (id: string) => progress?.[id]?.status === 'done';
+  return <div className="rv-skills">{names.map((name, index) => {
     const skill = skills.find(s => s.name === name); if (!skill) return null;
     const choice = materials.choices[name];
     const rows = [...skill.courses.filter(r => r.id === choice?.course || choice?.courses?.includes(r.id)), ...skill.books.filter(r => choice?.books.includes(r.id))];
     const outcomes = materials.skillDetails?.find(s => s.name === name)?.competencySummary || [];
     const tasks = acts.filter(a => a.skill === name && !a.res);
-    const latest = alternatives?.[name]?.filter(item => !tasks.some(task => task.id === item.task.id)).slice(-1) || [];
-    return <details open className={`card review-skill-block${currentSkillNames.includes(name) ? ' is-current-week' : ''}`} key={name}>
-      <summary><span className="review-skill-number">{index + 1}</span><h2>{name}</h2>{materials.durationEstimates?.[name]?.weeks != null && <span className="tag">{durationLabel(materials.durationEstimates[name])}</span>}{skillAction?.(name)}<span className="review-skill-toggle-more">펼치기</span><span className="review-skill-toggle-less">접기</span></summary>
-      <div className="review-combined-learning"><div className="review-resource-rows">
-        {rows.length ? rows.map(resource => {
-          const kind = skill.books.includes(resource) ? '도서' : '강좌';
-          const activity = acts.find(a => a.skill === name && a.res === resource.id);
-          return <ReviewResourceCard key={resource.id} resource={resource} kind={kind} activity={activity} anchor={confirmed}
-            progress={progress} onOpenResource={confirmed && onOpenResource && !busy ? () => onOpenResource(name, resource.id) : undefined} />;
-        }) : <p className="small muted">선택한 외부 자료가 없어요.</p>}
-      </div><div className="review-outcomes review-combined-outcomes"><h3>다음 활동을 얻을 수 있는 역량</h3>
-        {outcomes.length ? <ul>{outcomes.map((line, i) => <li key={i}>{line}</li>)}</ul> : generating ? <Skeleton kind="lines" /> : <p className="small muted">선택한 자료를 함께 학습했을 때의 역량 요약이 아직 없어요.</p>}
-      </div></div>
-      <div className="review-tasks">
-        <div><h3>산출물</h3>{tasks.length ? tasks.map(act => <label className="review-task" key={act.id}>{progress && <Stt done={progress[act.id]?.status === 'done'} />}
-          {!confirmed && <input type="checkbox" checked={selectedIds.includes(act.id)} disabled={busy} onChange={() => onToggle?.(act.id)} />}
-          <ReviewTaskCopy task={act} memo={progress?.[act.id]?.memo} />
-        </label>) : generating || generatingSkill === name ? <Skeleton kind="cards" count={1} /> : <p className="small muted">산출물을 제안받으면 이 스킬의 과제가 표시돼요.</p>}</div>
-        {!readOnly && <div className="review-submit"><button type="button" className="btn line" aria-busy={generatingSkill === name} disabled={busy || (!confirmed && proposeDisabled) || (confirmed && (!tasks.length || !onSubmit))} onClick={() => confirmed ? onSubmit?.(name) : onPropose?.(name)}>{generatingSkill === name ? <><span className="review-proposal-spinner" aria-hidden="true" /><span role="status">제안 생성 중…</span></> : confirmed ? '과제물 제출' : tasks.length ? '과제 다시 제안받기' : '과제 제안받기'}</button></div>}
+    const estimate = materials.durationEstimates?.[name];
+    const current = currentSkillNames.includes(name);
+    return <details open className={`rv-skill review-skill-block${current ? ' is-current-week' : ''}`} key={name}>
+      <summary>
+        <span className="rv-skill-n">{String(index + 1).padStart(2, '0')}</span>
+        <h3>{name}</h3>
+        {current ? <span className="tag acc">이번 주</span> : null}
+        {estimate?.weeks != null ? <span className="tag line">{durationLabel(estimate)}</span> : null}
+        {skillAction?.(name)}
+        <span className="review-skill-toggle-more">펼치기</span><span className="review-skill-toggle-less">접기</span>
+      </summary>
+      <div className="rv-learn">
+        <div>
+          <h4>배울 자료</h4>
+          {rows.length ? rows.map(resource => {
+            const kind = skill.books.includes(resource) ? 'book' : 'course';
+            const activity = acts.find(a => a.skill === name && a.res === resource.id);
+            const open = onOpenResource && !busy ? () => onOpenResource(name, resource.id) : undefined;
+            const meta = [
+              resource.provider || '출처 미확인',
+              resource.cost == null ? '가격 확인 필요' : resource.cost === 0 ? '무료' : `${resource.cost.toLocaleString('ko-KR')}원`,
+              kind === 'course' && resource.difficulty ? courseDifficulty(resource) : null,
+              kind === 'book' ? '일정에 넣지 않아요' : activity ? activityTime(activity).text : null,
+            ].filter(Boolean).join(' · ');
+            return <div className="rv-mini" key={resource.id} id={activity ? activityAnchor(activity.id) : undefined} tabIndex={activity ? -1 : undefined}>
+              {progress && activity && kind === 'course' ? <Stt done={done(activity.id)} /> : null}
+              <ResourceImage className="rv-thumb" image={resource.image} type={kind} alt="" />
+              <span className="rv-mini-tx">
+                <b><span className="tag">{kind === 'course' ? '강좌' : '도서'}</span>{open ? <button type="button" className="rv-title-btn" aria-label={`${resource.title} 실행 기록 열기`} onClick={open}>{resource.title}</button> : resource.title}</b>
+                <small>{meta}</small>
+                {activity && progress?.[activity.id]?.memo ? <small>메모 · {progress[activity.id].memo}</small> : null}
+              </span>
+              {resource.url ? <a className="rv-link" href={resource.url} target="_blank" rel="noreferrer" aria-label={`${resource.title} ${resource.provider === '사내교육' ? '사내교육 안내' : '원본'} 보기 (새 창)`}>{resource.provider === '사내교육' ? '안내 보기' : '원본 보기'} ↗</a> : null}
+            </div>;
+          }) : <p className="rv-muted">선택한 외부 자료가 없어요.</p>}
+        </div>
+        <div>
+          <h4>이 스킬을 마치면</h4>
+          {outcomes.length ? <ul className="rv-outcomes">{outcomes.map((line, i) => <li key={i}>{line}</li>)}</ul>
+            : <p className="rv-muted">얻게 될 역량 요약이 아직 없어요.</p>}
+        </div>
       </div>
-      {!confirmed && latest.length > 0 && <div className="review-task-alternatives" aria-label={`${name} 산출물 선택`}>
-        <h3>새로운 제안</h3>
-        {latest.map(({ proposalId, task }) => <label className="review-task-choice" key={task.id}>
-          <input type="checkbox" checked={selectedIds.includes(task.id)} disabled={busy} onChange={() => selectedIds.includes(task.id) ? onToggle?.(task.id) : onPick?.(name, proposalId)} />
-          <span><span className="review-task-title"><b>{task.title}</b><span className="small muted">예상 {hrs(task.hours)} · 자료 학습 기간에서 제외</span></span><TaskDescription text={task.how} /></span>
-        </label>)}
-      </div>}
+      {tasks.length ? <div className="rv-tasks">
+        <div className="rv-tasks-head">
+          <h4>산출물 과제</h4>
+          <span />
+          {!readOnly ? <button type="button" className="btn sm line" disabled={busy || !onSubmit} onClick={() => onSubmit?.(name)}>과제물 제출</button> : null}
+        </div>
+        <div className="rv-task-grid">
+          {tasks.map(task => <div className={`rv-task is-static${done(task.id) ? ' is-on' : ''}`} key={task.id} id={activityAnchor(task.id)} tabIndex={-1}>
+            {progress ? <Stt done={done(task.id)} /> : null}
+            <span className="rv-task-tx">
+              <span className="rv-task-kicker">{progress ? done(task.id) ? '제출 완료' : '아직 제출 전' : '산출물 과제'}</span>
+              <b>{task.title}</b>
+              <TaskDescription text={task.how} />
+              {progress?.[task.id]?.memo ? <span className="rv-muted">메모 · {progress[task.id].memo}</span> : null}
+            </span>
+            <em>약 {hrs(task.hours)}</em>
+          </div>)}
+        </div>
+      </div> : null}
       {skillFooter?.(name)}
     </details>;
   })}</div>;

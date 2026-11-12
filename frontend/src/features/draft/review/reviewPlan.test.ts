@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { reviewPlan, reviewTaskDisplay, type ReviewProposal } from './reviewPlan';
-import { ReviewSkillBlocks, type ReviewMaterials } from './ReviewSkillBlocks';
+import type { ReviewMaterials } from './ReviewSkillBlocks';
+import { ReviewTaskBlocks } from './ReviewTaskBlocks';
+
+// 작성 7단계의 스킬 블록(ReviewTaskBlocks)으로 그린다. 확정 뒤 화면용 ReviewSkillBlocks 는 선택·제안 기능이 없다
+const noop = () => {};
+const blocks = { options: {}, onToggle: noop, onPick: noop, onPropose: noop, onChangeMaterials: noop };
 import { Stats } from '@/shared/ui/parts';
 
 function fixture() {
@@ -25,9 +30,9 @@ describe('검토 선택과 확정 계획의 시간 기준', () => {
     const result = reviewPlan(proposal, [proposal], {}, materials, handoff, 'SQL');
     expect(result.plan).toMatchObject({weeks: 3, materialHours: 13.5, taskHours: 8, totalH: 21.5, cost: 1000, costUnknown: true});
     expect(result.acts.find(act => act.res === 'book')).toMatchObject({hours: 10, catalogHours: 10});
-    const card = renderToStaticMarkup(createElement(ReviewSkillBlocks, {materials, acts: result.acts, selectedIds: proposal.selectedIds, busy: false}));
+    const card = renderToStaticMarkup(createElement(ReviewTaskBlocks, {...blocks, materials, acts: result.acts, selectedIds: proposal.selectedIds, busy: false}));
     const stats = renderToStaticMarkup(createElement(Stats, {pl: result.plan}));
-    expect(card).toContain('일정 산정 제외'); expect(card).not.toContain('계획 10시간');
+    expect(card).toContain('일정에 넣지 않아요'); expect(card).not.toContain('계획 10시간');
     expect(stats).toContain('강좌 시간 기준 · 13시간 30분'); expect(stats).not.toContain('과제 별도'); expect(proposal).toEqual(original);
   });
   it('과제를 해제하면 합계에서만 제외하고 카드에는 재선택할 활동을 남긴다', () => {
@@ -84,10 +89,10 @@ describe('검토 계산 대기·오류 중 과제 표시', () => {
     const acts = reviewTaskDisplay(proposal, [proposal], {});
     expect(acts.map(act => act.id)).toEqual(['t']);
     for (const busy of [false, true]) {
-      const html = renderToStaticMarkup(createElement(ReviewSkillBlocks, {materials, acts, selectedIds: proposal.selectedIds, busy, proposeDisabled: true}));
+      const html = renderToStaticMarkup(createElement(ReviewTaskBlocks, {...blocks, materials, acts, selectedIds: proposal.selectedIds, busy, proposeDisabled: true}));
       expect(html).toContain('Task'); expect(html).toContain('checked');
       expect(html).not.toContain('산출물을 제안받으면'); expect(html).not.toContain('계획 10시간');
-      expect(html).toMatch(/<button[^>]*disabled[^>]*>과제 다시 제안받기/);
+      expect(html).toMatch(/<button[^>]*disabled[^>]*>(?:(?!<\/button>).)*다른 과제 제안받기/);
       if (!busy) expect(html).not.toMatch(/<input[^>]*disabled/);
     }
   });

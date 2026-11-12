@@ -11,6 +11,7 @@ import { st, trackedActs } from '@/shared/lib/plan';
 import { useCatalog } from '@/shared/state/catalog';
 import { useClockRefresh } from '@/shared/state/demoClock';
 import { Stats } from '@/shared/ui/parts';
+import { PlanSummary } from '@/features/roadmap/PlanSummary';
 
 export function MemberRoadView({ R, skillAction, skillFooter }: { R: PlanRecord; skillAction?: (skill: string) => ReactNode; skillFooter?: (skill: string) => ReactNode }) {
   const resources = useCatalog((state) => state.res);
@@ -27,7 +28,7 @@ export function MemberRoadView({ R, skillAction, skillFooter }: { R: PlanRecord;
       : [];
   return (
     <>
-      <Stats pl={pl} periodLabel={learning ? '자료 학습 예상 기간' : '기간'} />
+      {learning ? <PlanSummary R={R} /> : <Stats pl={pl} periodLabel="기간" />}
       <RoadmapResources R={R} owned={[]} />
       {learning ? (
         <ReviewSkillBlocks

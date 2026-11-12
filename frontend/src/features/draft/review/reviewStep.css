@@ -92,3 +92,18 @@
 .rv-stats dd span .rv-skel-sub { width: 150px; max-width: 100%; height: 11px; margin: 4px 0; }
 .rv-weeks-skel .skel-wrap { margin-top: 0; gap: 14px; }
 .rv-skills .skel-wrap { margin-top: 0; }
+
+/* 확정한 로드맵의 스킬 블록(ReviewSkillBlocks): 작성 7단계와 같은 모양에 접기·상태 표시를 더한다 */
+details.rv-skill > summary { display: flex; align-items: center; gap: 10px; list-style: none; cursor: pointer; }
+details.rv-skill > summary::-webkit-details-marker { display: none; }
+details.rv-skill > summary h3 { flex: 1; min-width: 0; margin: 0; font-size: 17px; overflow-wrap: anywhere; }
+details.rv-skill[open] > summary { padding-bottom: 14px; margin-bottom: 16px; border-bottom: 1px solid var(--line); }
+details.rv-skill.is-current-week { border-color: var(--accent-line); background: var(--accent-soft); box-shadow: inset 4px 0 0 var(--accent); }
+.rv-mini:focus-visible, .rv-task:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+.rv-title-btn { padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.rv-title-btn:hover { text-decoration: underline; }
+.rv-title-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.rv-task.is-static { cursor: default; }
+.rv-mini-tx small + small { color: var(--ink-2); }
+.rv-stats.is-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); margin-top: 0; padding-top: 0; border-top: 0; }
+@media (max-width: 900px) { .rv-stats.is-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
