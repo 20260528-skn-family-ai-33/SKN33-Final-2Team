@@ -16,24 +16,21 @@ MSGS = [{'role': 'user', 'content': 'hi'}]
 
 
 class OllamaThinkTest(unittest.TestCase):
-    """팀 모델 단계는 실제 Pod 기록(backend/RunPod_Ollama_연결_절차.md · 2026-10-29): 27b false·low·medium·xhigh, 4b false·true"""
+    """RunPod-Ollama 는 모든 생성을 추론 없이 부른다: 역할·직원/관리자 단계·.env 와 관계없이 think: false"""
 
     def setUp(self):
-        self.values = {'growpath-27b': [False, 'low', 'medium', 'xhigh'], 'growpath-regulation-4b': [False, True]}
-        self.sent, self.shows, self.show_fails = [], 0, False
+        self.sent, self.shows = [], 0
 
         def fake(path, payload, timeout=None):
             if path == 'api/show':
                 self.shows += 1
-                if self.show_fails:
-                    raise llm.LlmError('Ollama 연결 실패: 시험')
-                return {'thinking': {'values': self.values[payload['model']]}}
+                return {'thinking': {'values': [False, 'low', 'medium', 'xhigh']}}
             self.sent.append(payload)
             return {'message': {'content': '{}'}, 'model': payload['model']}
 
         settings = dataclasses.replace(llm.S, ollama_url='http://x', ollama_model='growpath-27b', ollama_model_regulation='growpath-regulation-4b',
-                                       ollama_vision='qwen3.8:27b', ollama_think='off')
-        for p in (patch.object(llm, 'ollama', fake), patch.object(llm, 'S', settings), patch.dict(llm._think_cache, clear=True)):
+                                       ollama_vision='qwen3.8:27b')
+        for p in (patch.object(llm, 'ollama', fake), patch.object(llm, 'S', settings)):
             p.start()
             self.addCleanup(p.stop)
 
@@ -41,33 +38,31 @@ class OllamaThinkTest(unittest.TestCase):
         llm.chat('ollama', MSGS, role=role, reasoning=reasoning)
         return self.sent[-1].get('think', '(없음)')
 
-    def test_level_the_model_takes_is_sent(self):
-        self.assertEqual(self.think('xhigh'), 'xhigh')
-        self.assertIs(self.think('off'), False)
+    def test_every_role_and_choice_sends_think_false(self):
+        # 보내지 않으면(None) qwen 계열은 모델 기본값(켬)을 쓰므로 False 가 실제로 실려야 한다
+        for role in ('default', 'roadmap', 'resources', 'regulation', 'vision'):
+            for reasoning in (None, 'off', 'on', 'low', 'xhigh', 'high'):
+                with self.subTest(role=role, reasoning=reasoning):
+                    self.assertIs(self.think(reasoning, role=role), False)
+        self.assertEqual(self.shows, 0)  # 단계를 고르지 않으므로 모델 단계(/api/show)도 묻지 않는다
 
-    def test_level_the_model_does_not_take_falls_back_to_env_default(self):
-        # 모델을 바꾼 뒤 남은 옛 선택: 화면이 '기본값 · 끔'으로 보이므로 실제 요청도 .env 기본값이어야 한다
-        self.assertIs(self.think('high'), False)
-        self.assertIs(self.think('on'), False)
-        with patch.object(llm, 'S', dataclasses.replace(llm.S, ollama_think=None)):
-            self.assertEqual(self.think('high'), '(없음)')
+    def test_env_no_longer_turns_thinking_on(self):
+        with patch.dict(os.environ, {'OLLAMA_THINK': 'on'}), patch.dict(config._FILE, {}, clear=True):
+            settings = config.load()
+        self.assertFalse(hasattr(settings, 'ollama_think'))
+        with patch.object(llm, 'S', dataclasses.replace(settings, ollama_url='http://x')):
+            self.assertIs(self.think(), False)
 
-    def test_levels_are_asked_once_per_model(self):
-        self.think('low')
-        self.think('medium')
-        self.assertEqual(self.shows, 1)
+    def test_ping_does_not_ask_reasoning_levels(self):
+        def fake(path, payload, timeout=None):
+            self.shows += path == 'api/show'
+            return {'api/version': {'version': '0.40'}, 'api/tags': {'models': [{'name': 'growpath-27b'}]},
+                    'api/ps': {'models': []}}.get(path, {})
 
-    def test_unknown_levels_keep_the_choice(self):
-        self.show_fails = True
-        self.assertEqual(self.think('high'), 'high')
-
-    def test_regulation_model_is_always_off(self):
-        with patch.object(llm, 'S', dataclasses.replace(llm.S, ollama_think='on')):
-            self.assertIs(self.think('xhigh', role='regulation'), False)
-            self.assertIs(self.think(None, role='regulation'), False)
-
-    def test_vision_model_ignores_the_choice(self):
-        self.assertIs(self.think('xhigh', role='vision'), False)
+        with patch.object(llm, 'ollama', fake):
+            res = llm.ping('ollama')
+        self.assertEqual(self.shows, 0)
+        self.assertTrue(all('think' not in m for m in res['models']))
 
     def test_only_chatbot_model_requests_automatic_gpu_selection(self):
         for role in ('default', 'roadmap', 'regulation', 'vision'):
@@ -90,22 +85,18 @@ class OllamaThinkTest(unittest.TestCase):
                 self.assertIn('num_predict', self.sent[-1]['options'])
                 self.assertIn('num_ctx', self.sent[-1]['options'])
 
-    def test_empty_content_with_think_retries_with_think_false(self):
+    def test_json_left_only_in_thinking_is_recovered_without_retry(self):
         calls = []
+
         def fake_chat(path, payload, timeout=None):
-            if path == 'api/show':
-                return {'thinking': {'values': [False, 'low', 'medium', 'xhigh']}}
             calls.append(payload)
-            if payload.get('think') == 'medium':
-                return {'message': {'content': '', 'thinking': '생각중...'}, 'model': payload['model']}
-            return {'message': {'content': '{"recovered": true}'}, 'model': payload['model']}
+            return {'message': {'content': '', 'thinking': '정리하면 {"recovered": true}'}, 'model': payload['model']}
 
         with patch.object(llm, 'ollama', fake_chat):
             res = llm.chat('ollama', MSGS, reasoning='medium')
-            self.assertEqual(res['content'], '{"recovered": true}')
-            self.assertEqual(len(calls), 2)
-            self.assertEqual(calls[0]['think'], 'medium')
-            self.assertIs(calls[1]['think'], False)
+        self.assertEqual(res['content'], '{"recovered": true}')
+        self.assertEqual(len(calls), 1)
+        self.assertIs(calls[0]['think'], False)
 
 
 class OpenAiReasoningTest(unittest.TestCase):
@@ -175,7 +166,7 @@ class OpenAiTimeoutTest(unittest.TestCase):
 class SettingsTest(unittest.TestCase):
     def load(self, **env):
         base = {'OPENAI_MODEL': '', 'OPENAI_REASONING_LEVELS': '', 'OPENAI_REASONING_EFFORT': '',
-                'OPENAI_ROADMAP_TIMEOUT': '', 'OLLAMA_THINK': 'off'}
+                'OPENAI_ROADMAP_TIMEOUT': ''}
         with patch.dict(os.environ, dict(base, **env)), patch.dict(config._FILE, {}, clear=True):
             return config.load()
 
@@ -190,7 +181,7 @@ class SettingsTest(unittest.TestCase):
         self.assertEqual(self.load(OPENAI_MODEL='gpt-4o', OPENAI_REASONING_LEVELS='low,high').openai_reasoning_levels, ('low', 'high'))
 
     def test_bad_values_stop_startup(self):
-        for env in ({'OPENAI_REASONING_EFFORT': 'max'}, {'OLLAMA_THINK': 'false'}, {'OLLAMA_THINK': 'High Effort'}):
+        for env in ({'OPENAI_REASONING_EFFORT': 'max'}, {'OPENAI_REASONING_EFFORT': 'false'}, {'OPENAI_REASONING_EFFORT': 'High Effort'}):
             with self.subTest(env=env), self.assertRaises(ValueError):
                 self.load(**env)
 

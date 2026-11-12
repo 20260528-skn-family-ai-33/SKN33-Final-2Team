@@ -39,9 +39,10 @@
 | `app/routers/admin.py`, `app/services/goals.py` | 관리자 목표 후보 다시 만들기에 모델 고르기(`mode`: `ollama`·`openai` 추가 · 이번 작업에만 쓰고 직원이 고른 AI 모드는 바꾸지 않음)와 직원 고르기(`employeeIds` · 새 `GET /admin/goal-suggestions/employees`) 추가 | 관리자가 모델을 정해 일괄로, 또는 몇 명만 골라 다시 만들 수 있게(2026-10-26 사용자 요청) · 원본은 가데이터 / 각 직원의 모드 두 가지로 재직 직원 전체만 |
 | `app/errors.py` | Ollama 401·403을 '키 문제(auth)'로 분류하고 `OLLAMA_API_KEY` 넣는 법을 조치로 안내(원본은 '잠시 뒤 다시 시도') | Pod 앞 nginx가 키를 확인하는 구성(RunPod Pod 연결 절차는 [RunPod_Ollama_연결_절차.md](RunPod_Ollama_연결_절차.md))에서 원인이 바로 보이게 (2026-10-26) |
 | `app/config.py`, `app/llm.py`, `app/errors.py` | RunPod-Ollama 기본 모델을 팀 모델로 둠(`app/config.py`의 `OLLAMA_TEAM_*`): 진단·로드맵 `growpath-27b`, 규정 에이전트 `growpath-regulation-4b`, 비전 없음. `.env`의 `OLLAMA_MODEL`·`OLLAMA_MODEL_REGULATION`·`OLLAMA_VISION_MODEL`은 비워 두면 기본값이고 원본 Qwen과 비교할 때만 적음. `OLLAMA_MODEL_ROADMAP`은 없앰(로드맵은 `OLLAMA_MODEL`과 같은 모델). `OLLAMA_BASE_URL`만 있으면 RunPod-Ollama 모드를 쓸 수 있음 | 팀 결정(2026-10-29 · #33): RunPod-Ollama는 팀이 파인튜닝한 두 모델을 기본으로 씀(이름은 Pod에서 만드는 별칭 · [RunPod_Ollama_연결_절차.md](RunPod_Ollama_연결_절차.md) 2-4). 원본(5차)은 `OLLAMA_MODEL` 기본 `qwen3.5:9b`, 그전(2026-10-26)에는 기본값 없이 `.env`로만 정했음 |
-| `app/config.py`, `app/llm.py` | Ollama 생각(thinking) 모드를 `.env`의 `OLLAMA_THINK`(on/off)로 정함. 비우면 원본처럼 `think`를 보내지 않음 | 생각 모드가 기본으로 켜진 모델(qwen3.8:27b)은 답 앞에 생각을 길게 써서 느림 · 끌 수 있게 (2026-10-26) |
+| `app/config.py`, `app/llm.py` | Ollama 생각(thinking) 모드를 `.env`의 `OLLAMA_THINK`(on/off)로 정함. 비우면 원본처럼 `think`를 보내지 않음. **2026-11-12부터는 이 설정을 없애고 모든 역할에 늘 `think: false`를 보냄**(`config.OLLAMA_THINK = 'off'` · 아래 추론 정도 행 참고) | 생각 모드가 기본으로 켜진 모델(qwen3.8:27b)은 답 앞에 생각을 길게 써서 느림 · 끌 수 있게 (2026-10-26) |
 | `app/llm.py`, `app/agents/regulation.py`, `app/routers/account.py`, `tools/mock_ollama.py`·`mock_ollama.env` | 규정 에이전트(사내 생활 도우미 답변)가 `regulation` 역할로 규정 모델(기본 `growpath-regulation-4b`)을 부름. 연결 확인(`GET /ai/status`)이 그 모델의 설치·GPU 적재 여부도 보고, `GET /ai/providers`의 `models`에 `regulation`을 더함. 모의 Ollama 모델 이름을 팀 모델 이름으로 바꾸고 `no-regulation-model` 시나리오를 추가(`no-roadmap-model`은 로드맵이 진단과 같은 모델이 돼 없앰) | 팀 논의(2026-10-29 · #33): 진단·로드맵은 팀원이 파인튜닝한 27b, 규정 에이전트는 팀원이 파인튜닝한 4b를 한 Pod에 함께 올려 씀. 원본은 로드맵만 모델을 따로 정할 수 있었음 |
 | `db/02_app_ext.sql`, `app/config.py`, `app/routers/account.py`, `app/agents/runtime.py`, `app/llm.py`, `app/services/goals.py`, `app/errors.py`, `tools/mock_ollama.py` | 직원이 좌측 'AI 모델'에서 모드별 **추론 정도**를 고름(#28): `app_ext.user_settings.reasoning`(jsonb `{ollama, openai}` · 없는 모드는 `.env` 기본값)·`PUT /me/reasoning` 추가, `GET /me`에 `reasoning`. RunPod-Ollama는 진단·로드맵 모델에만 쓰고, 연결 확인(`/ai/status`) 때 그 모델의 `/api/show` `thinking.values`로 고를 단계를 알아내 `models[].think`로 줌 · `think`(on/off는 true/false, 나머지는 단계 이름)로 보냄. **규정 에이전트 모델은 직원 값·`.env`와 관계없이 늘 `think: false`**(`config.OLLAMA_REGULATION_THINK`). OpenAI는 받는 단계 안에서 골라 `reasoning_effort`로 보냄: 기본 모델 gpt-6-luna는 코드의 확인한 단계(none~xhigh)·모델 기본값(medium · 화면 '기본값 · 보통'), 다른 모델은 `.env`의 `OPENAI_REASONING_LEVELS`(기본값 `OPENAI_REASONING_EFFORT` · `GET /ai/providers`의 `reasoning`의 `levels`·`default`·`modelDefault` · `OPENAI_MODEL`이 아닌 비전 모델에는 보내지 않음). 고른 값이 지금 모델이 받는 단계가 아니면(모델을 바꾼 뒤 남은 옛 선택) `.env` 기본값을 보냄(모델별 단계는 `/api/show` 결과를 기억해 둠). 저장은 그 모드의 키만 한 SQL 문으로 바꿈(동시 저장에도 다른 모드 값 유지). 이미지 읽기 모델에는 직원 값을 쓰지 않음. `OLLAMA_THINK`는 진단·로드맵 모델 기본값이 되고 단계 이름도 받음(true·false 같은 값은 예전처럼 시작할 때 멈춤). 관리자 고정 모델의 목표 후보에는 관리자 추론 단계(미지정 시 `.env`)를 적용함. 생각 모드·`reasoning_effort`를 받지 않는다는 오류에 원인 문구를 붙임. 모의 Ollama에 모델별 `/api/show`(`--think` · 기본은 실제 Pod 값)·`--host` 추가 | 모델마다 받는 단계가 다르고(팀 27b: 끔·low·medium·xhigh — RunPod 연결 절차의 실제 Pod 기록 · gpt-6-luna Chat Completions: none~xhigh, 모델 문서의 max는 400) `.env`를 고치고 서버를 다시 켜지 않아도 화면에서 바꿔 보게. 규정 에이전트 모델(4b)은 생각을 끄고 학습해 추론 없이가 기본이고 사용자가 바꾸면 안 됨 (2026-10-28·29 사용자 요청·결정) |
+| `app/config.py`, `app/llm.py`, `app/provider_policy.py`, `app/routers/account.py`, `app/services/goals.py` | **RunPod-Ollama는 모든 생성을 추론 없이**: `llm.chat`이 역할(진단·로드맵·규정·이미지)과 직원·관리자 단계, `.env`에 관계없이 늘 `think: false`를 보냄. `.env`의 `OLLAMA_THINK` 읽기, 연결 확인의 `/api/show` 단계 조회(`models[].think`), 추론을 켰을 때의 빈 답 재시도를 없앰. `PUT /me/reasoning`·관리자 고정 설정은 RunPod-Ollama 단계를 422로 거절하고, 예전에 저장된 RunPod-Ollama 단계는 읽지 않음. `GET /ai/providers`의 RunPod-Ollama `reasoning`은 `{levels: [], default: 'off'}` · 화면은 추론 정도 드롭다운 대신 '추론 없음'만 보여 줌 | `OLLAMA_THINK`가 비면 `think`를 보내지 않아 qwen3.8 27b가 모델 기본값(켬)으로 추론했고, 저장된 직원 단계도 그대로 전송됐음. 모드를 고르면 늘 추론 없이 생성하도록 (2026-11-12 사용자 요청) |
 | `app/regfiles.py`(새 파일), `app/routers/admin.py`, `app/admin_io/`(`regulations.py` 지움), `app/regstore.py`(설명), `app/config.py`, `db/02_app_ext.sql`, `docker-compose.yml` | 관리자의 규정 관리를 **원문 PDF 올리기·내려받기**로 바꿈. 규정·조항 엑셀/CSV·한 건 고치기(`/admin/datasets/regulations/*`)와 규정 색인 만들기(`POST /admin/regulations/index`)를 없애고, 지금 규정 목록(`GET /admin/regulations`)·원문 PDF 내려받기(`GET /admin/regulations/{id}/pdf`)·새 규정 PDF 올리기(`POST /admin/regulations/uploads`, 파일+메모)·올린 PDF 목록/내려받기·잘못 올린 PDF 삭제(`DELETE /admin/regulations/uploads/{id}` · 파일과 기록을 함께 지움)를 추가. 지금 규정 원문은 팀 규정 묶음의 `source/`(`GP5_REGULATION_FILES_DIR` · compose 는 `team_db/regulations` 를 읽기 전용으로 붙임), 올린 PDF는 `var/uploads/regulations/` 와 `app_ext.regulation_uploads`(처리 상태 없음). 개요 응답의 `regulations` 를 PDF 개수로 바꾸고 `providers` 를 맨 위로 옮김. 옛 화면(`web/`)의 규정 데이터 메뉴는 이제 동작하지 않음 | 사용자 결정(2026-10-26): 규정은 벡터 DB를 거친 RAG에 쓰여 관리자가 고치지 않고, 시스템 관리자(서비스 운영팀)가 올라온 PDF를 내려받아 임베딩·벡터 DB를 갱신(MVP 방식). 조항 표는 원문과 맞춰 보기 어려워 원문 PDF로 보게 함 |
 
 나머지는 5차 원본의 `app`·`tools`·`db`·`web`과 같아요(2026-10-26 비교).
@@ -633,6 +634,25 @@ ALTER TABLE app_ext.notifications DROP COLUMN task_id;
 ALTER TABLE app_ext.notifications ADD CONSTRAINT notifications_kind_check CHECK (kind IN ('roadmap', 'report', 'job', 'comment'));
 DROP TABLE app_ext.report_tasks;
 COMMIT;
+```
+
+### 처음 접속 튜토리얼 팝업용 열 (#236, 2026-11-12)
+
+처음 접속한 계정에게 튜토리얼을 볼지 묻는 팝업을 한 번만 띄우기 위한 열만 미리 둔다. 팝업·튜토리얼과 이 열을 읽고 쓰는 API는 아직 없다.
+
+- 저장: `app_ext.user_settings.tutorial_answered_at`(timestamptz). 팝업에 답한 시각이며 진행·건너뛰기를 구분하지 않는다.
+- 판정: 값이 `NULL`이거나 설정 행이 없으면 아직 답하지 않은 계정이다. 기존 계정의 값은 채우지 않으므로 기존 계정도 답하기 전까지는 대상이다.
+
+**DB 적용(이 열을 읽는 앱을 올리기 전에 DB마다 한 번):** 저장소 루트에서 실행한다. 다시 실행해도 결과는 같다. 지금 앱은 이 열을 읽지 않아 적용 전후 모두 그대로 동작한다.
+
+```bash
+docker compose exec -T db sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < backend/db/migrate_tutorial_prompt.sql
+```
+
+**복구:** 답한 기록이 지워진다.
+
+```sql
+ALTER TABLE app_ext.user_settings DROP COLUMN IF EXISTS tutorial_answered_at;
 ```
 
 ### LLM 도서 후보 최소 확보 (#76)

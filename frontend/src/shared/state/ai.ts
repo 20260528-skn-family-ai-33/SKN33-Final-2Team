@@ -5,7 +5,7 @@ import { create } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
 import { ApiError } from '@/api/client';
 import { canUseDemo } from '@/shared/lib/demoAccess';
-import { aiApi, demoApi, type ModelState, type ProviderInfo, type ThinkLevels } from '@/api/endpoints/account';
+import { aiApi, demoApi, type ModelState, type ProviderInfo } from '@/api/endpoints/account';
 import type { FailSim, ProviderPolicy, ServerProvider, UserSettings } from '@/api/types/account';
 import type { StoredCause } from '@/api/types/common';
 import { signInSeq } from './session';
@@ -72,22 +72,19 @@ export const ai = {
   },
   ollamaInfo: () => ({ model: prov('ollama').models?.default || '' }),
   openaiModel: (): string => prov('api').models?.default || '',
-  /** 고를 수 있는 추론 정도 단계. OpenAI 는 서버 설정(.env), RunPod-Ollama 는 연결 확인 때 진단·로드맵 모델이 알려 준 단계
-   *  (규정 에이전트 모델은 늘 꺼서 고르지 않음). null 이면 아직 모름(연결 확인 전·실패), 빈 목록이면 이 모델은 고를 단계가 없음 */
-  reasoningLevels: (p: UiProvider): string[] | null => (p === 'api' ? prov('api').reasoning?.levels || [] : (ollamaThink()?.levels ?? null)),
-  /** 고르지 않았을 때 쓰는 값: 서버 기본값(.env) → 모델 기본값(Ollama 는 연결 확인, OpenAI 는 서버가 아는 기본 모델 값). null 이면 모름 */
+  /** 고를 수 있는 추론 정도 단계. OpenAI 는 서버 설정(.env) · 빈 목록이면 고를 단계가 없음.
+   *  RunPod-Ollama 는 모든 생성을 추론 없이 부르므로 늘 빈 목록(고르는 칸을 두지 않음) */
+  reasoningLevels: (p: UiProvider): string[] => (p === 'api' ? prov('api').reasoning?.levels || [] : []),
+  /** 고르지 않았을 때 쓰는 값: 서버 기본값(.env) → OpenAI 는 서버가 아는 기본 모델 값. RunPod-Ollama 는 늘 'off'. null 이면 모름 */
   reasoningDefault: (p: UiProvider): string | null =>
-    prov(p).reasoning?.default ?? (p === 'ollama' ? ollamaThink()?.default : prov('api').reasoning?.modelDefault) ?? null,
-  /** 직원이 고른 단계. null 이면 기본값을 따름 */
-  reasoning: (p: UiProvider): string | null => g().settings.reasoning[toSrv(p)] ?? null,
+    p === 'ollama' ? OLLAMA_THINK : prov(p).reasoning?.default ?? prov('api').reasoning?.modelDefault ?? null,
+  /** 직원·관리자가 고른 단계. null 이면 기본값을 따름. RunPod-Ollama 는 예전에 저장된 값이 있어도 늘 'off' */
+  reasoning: (p: UiProvider): string | null => (p === 'ollama' ? OLLAMA_THINK : g().settings.reasoning[toSrv(p)] ?? null),
   failSim: (): FailSim => ({ ...Object.fromEntries(SIM_KINDS.map((k) => [k, false])), ...(g().settings.failSim || {}) }),
 };
 
-/** RunPod-Ollama 진단·로드맵 모델의 추론 정도 단계(마지막 연결 확인 결과) */
-function ollamaThink(): ThinkLevels | null {
-  const c = g().conn;
-  return (c.provider === 'ollama' && c.models?.find((m) => m.role === 'default')?.think) || null;
-}
+/** RunPod-Ollama 의 추론 정도: 서버(config.OLLAMA_THINK)가 모든 호출에 think: false 를 보내는 고정값 */
+export const OLLAMA_THINK = 'off';
 
 const LEVEL_LABEL: Record<string, string> = { off: '끔', on: '켬', none: '없음', minimal: '최소', low: '낮음', medium: '보통', high: '높음', xhigh: '매우 높음', max: '최대' };
 /** 단계 이름 → 화면 글자. 모르는 이름(모델이 정한 이름)은 그대로 */
@@ -111,7 +108,7 @@ export function canClearHiddenDemoSettings({ status, settings }: AiState): boole
 }
 
 let statusRequest = 0;
-export async function checkStatus(): Promise<void> {
+export async function checkStatus({ reconnectRunpod = false } = {}): Promise<void> {
   const request = ++statusRequest;
   const session = signInSeq();
   useAi.setState((s) => ({ status: { ...s.status, demoMode: false } }));
@@ -124,6 +121,7 @@ export async function checkStatus(): Promise<void> {
       status: { checked: true, server: true, policy: j.policy ?? 'employee', demoMode: j.demoMode === true,
         docLibs: j.docLibs || {}, providers: Object.fromEntries(j.providers.map((p) => [p.id, p])) },
     }));
+    if (reconnectRunpod && ai.mode() === 'ollama') await ping();
   } catch {
     if (request !== statusRequest || session !== signInSeq()) return;
     useAi.setState((s) => ({ status: { ...s.status, checked: true, server: false, demoMode: false } }));
@@ -232,9 +230,14 @@ function setConn(state: Conn['state'], extra: Partial<Conn>): void {
   useAi.setState({ conn: { state, provider: ai.mode(), at: Date.now(), ms: 0, loadMs: 0, error: '', raw: '', kind: '', models: prev.models || null, ...extra } });
 }
 
-export const resetConn = (): void => useAi.setState({ conn: { state: 'idle', provider: '', at: 0 } });
+let connectionRevision = 0;
+export function resetConn(): void {
+  connectionRevision++;
+  useAi.setState({ conn: { state: 'idle', provider: '', at: 0 } });
+}
 
 export async function ping(): Promise<void> {
+  const revision = connectionRevision;
   const p = ai.mode();
   const c = g().conn;
   if (!ai.live() || (c.state === 'checking' && c.provider === p)) return;
@@ -242,10 +245,10 @@ export async function ping(): Promise<void> {
   const t0 = performance.now();
   try {
     const j = await aiApi.status(toSrv(p));
-    if (ai.mode() !== p) return;
+    if (ai.mode() !== p || revision !== connectionRevision) return;
     setConn('ok', { provider: p, ms: Math.round(performance.now() - t0), via: 'ping', models: j.models || null, version: j.version || '' });
   } catch (err) {
-    if (ai.mode() !== p) return;
+    if (ai.mode() !== p || revision !== connectionRevision) return;
     const k = cause(err);
     setConn('error', { provider: p, error: k.text, raw: k.raw, kind: k.kind, hint: k.hint, via: 'ping' });
   }

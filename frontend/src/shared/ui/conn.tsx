@@ -73,8 +73,8 @@ export function ConnView() {
       </span>
     );
   const c = connFor('default', conn);
-  const st = c.state === 'idle' ? 'checking' : c.state;
-  const lbl = ({ ok: '연결됨', cold: '모델 준비 중', error: '연결 안 됨', checking: '연결 확인 중…' } as Record<string, string>)[st];
+  const st = c.state;
+  const lbl = { idle: '연결 확인 전', ok: '연결됨', cold: '모델 준비 중', error: '연결 안 됨', checking: '연결 확인 중…' }[st];
   return (
     <>
       <span className={`conn ${st}`}>

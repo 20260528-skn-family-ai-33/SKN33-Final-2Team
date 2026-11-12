@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Navigate, Outlet, useMatches } from 'react-router';
 import { paths } from '@/app/paths';
 import { AdminSide } from '@/features/admin/AdminSide';
+import { BrowserConsole } from '@/features/demo/BrowserConsole';
 import { AssistantHost } from '@/features/assistant/AssistantHost';
 import { DraftNavGuard } from '@/features/draft/stale';
 import { StartModeNavGuard } from '@/features/draft/startModeSheet';
@@ -173,6 +174,7 @@ export function AppShell() {
       {booted && acct?.accountType === 'employee' ? <AssistantHost /> : null}
       {booted && acct && !admin ? <DraftNavGuard /> : null}
       {booted && acct && !admin ? <StartModeNavGuard /> : null}
+      <BrowserConsole />
       <SheetHost />
       <ToastHost />
     </>

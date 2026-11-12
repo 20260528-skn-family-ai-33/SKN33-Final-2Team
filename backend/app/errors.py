@@ -10,7 +10,7 @@ import re
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from . import provider_keys
+from . import browser_console, provider_keys
 from .config import S
 
 
@@ -158,5 +158,5 @@ def provider_label(p: str) -> str:
 
 def unavailable_reason(p: str) -> str:
     if p == 'ollama':
-        return '.env에 OLLAMA_BASE_URL이 없어요' if not S.ollama_url else ''
+        return '.env에 OLLAMA_BASE_URL이 없어요' if not (browser_console.options.get().ollama_url or S.ollama_url) else ''
     return 'OpenAI API 키가 등록되지 않았어요' if p == 'openai' and not provider_keys.read(S, 'openai').value else ''

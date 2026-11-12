@@ -1,3 +1,4 @@
+import { browserHeaders } from '@/shared/lib/browserOptions';
 import { waitJob } from '@/api/jobs';
 import type { BookDiagnostic, CourseDiagnostic, MaterialResource } from '@/api/types/draft';
 import { flush } from '../draftSync';
@@ -5,6 +6,7 @@ import type { Choices, DurationEstimate } from './skillOrder';
 
 export type Resource = Pick<MaterialResource, 'id' | 'title' | 'unverifiedTargetTopics' | 'difficulty' | 'difficultyEstimated' | 'difficultyBasis' | 'difficultySource'> & { provider?: string; image?: string; url?: string; cost: number | null; hours?: number | null; timeStatus?: string; estimated?: string[]; why: string; knowledge: string; aiRecommended: boolean };
 type Skill = {
+  modelCourseCandidates?: { id: string; title: string; provider?: string | null; recommended: boolean }[];
   name: string; courses: Resource[]; books: Resource[]; selectedCourse: string | null; selectedBooks: string[];
   courseDiagnostic?: CourseDiagnostic;
   bookDiagnostic?: BookDiagnostic;
@@ -16,7 +18,7 @@ export function recommendationUrl(id: string, course?: string | null, suffix = '
 }
 
 export async function requestMaterials(path: string, init?: RequestInit): Promise<Result> {
-  const response = await fetch(path, { ...init, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', ...init?.headers } });
+  const response = await fetch(path, { ...init, credentials: 'same-origin', mode: 'same-origin', headers: { ...browserHeaders(), 'Content-Type': 'application/json', ...init?.headers } });
   let body = await response.json().catch(() => null);
   if (response.status === 202 && body?.jobId) body = await waitJob<Result>(body.jobId);
   if (!response.ok) throw new Error(body?.error?.message ?? '추천 자료를 읽지 못했어요.');

@@ -7,7 +7,8 @@ from fastapi.responses import JSONResponse
 from .. import db, llm, provider_policy, regulation_embeddings
 from ..agents import runtime as rt
 from ..auth import COOKIE, Account, end_session, hash_password, login, require_account, require_employee, start_session, verify_password
-from ..config import S, level_ok
+from ..browser_console import demo_enabled, options as browser_options
+from ..config import OLLAMA_THINK, S, level_ok
 from ..errors import ApiError, provider_label, unavailable_reason
 from ..services import demo, goals, profile
 from . import job_response
@@ -15,12 +16,17 @@ from . import job_response
 r = APIRouter(prefix='/api/v1')
 
 
+@r.get('/console/capabilities')
+def console_capabilities():
+    return {'picker': S.beta_account_picker, 'demo': S.demo_mode}
+
+
 def _settings(employee_id: int, selection: tuple[str, str | None] | None = None) -> dict:
     policy, level = selection or provider_policy.selection()
     s = db.one('SELECT ai_provider, demo_mock, fail_sim, reasoning FROM app_ext.user_settings WHERE employee_id = :e', e=employee_id) or {}
     # 시연을 끈 배포에서는 DB에 남아 있는 시연 옵션도 화면에 적용하지 않는다.
-    return {'aiProvider': provider_policy.resolve(policy, s.get('ai_provider')), 'demoMock': S.demo_mode and bool(s.get('demo_mock')),
-            'failSim': (s.get('fail_sim') or {}) if S.demo_mode else {},
+    return {'aiProvider': provider_policy.resolve(policy, s.get('ai_provider')), 'demoMock': demo_enabled(S.demo_mode) and bool(s.get('demo_mock')),
+            'failSim': (s.get('fail_sim') or {}) if demo_enabled(S.demo_mode) else {},
             'reasoning': (s.get('reasoning') or {}) if policy == 'employee' else ({policy: level} if level else {})}
 
 
@@ -46,12 +52,12 @@ def api_logout(request: Request):
 
 
 def require_demo_mode() -> None:
-    if not S.demo_mode:
+    if not demo_enabled(S.demo_mode):
         raise ApiError(404, 'NOT_FOUND', '요청한 기능을 찾을 수 없어요')
 
 
 def require_beta_account_picker() -> None:
-    if not S.beta_account_picker:
+    if not S.beta_account_picker or browser_options.get().picker_off:
         raise ApiError(404, 'NOT_FOUND', '요청한 기능을 찾을 수 없어요')
 
 
@@ -141,13 +147,12 @@ def api_providers(a: Account = Depends(require_account)):
     policy, level = provider_policy.selection()
     settings = _settings(a.id, (policy, level)) if a.type == 'employee' else {}
     return {'current': settings.get('aiProvider') or provider_policy.resolve(policy, None),
-            'policy': policy, 'employeeReasoning': settings.get('reasoning', {}), 'demoMode': S.demo_mode, 'providers': [
-        {'id': 'ollama', 'label': 'RunPod-Ollama', 'available': llm.available('ollama'), 'reason': unavailable_reason('ollama'), 'target': S.ollama_target if S.ollama_url else '',
+            'policy': policy, 'employeeReasoning': settings.get('reasoning', {}), 'demoMode': demo_enabled(S.demo_mode), 'providers': [
+        {'id': 'ollama', 'label': 'RunPod-Ollama', 'available': llm.available('ollama'), 'reason': unavailable_reason('ollama'), 'target': 'runpod' if browser_options.get().ollama_url else S.ollama_target if S.ollama_url else '',
          'models': dict({r: llm.model_name('ollama', r) for r in ('default', 'roadmap', 'regulation', 'vision')}, embed=regulation_embeddings.model()),
          'timeout': S.ollama_timeout,
-         # 추론 정도(진단·로드맵 모델 · 규정 모델은 늘 끔): default 는 .env 기본값(비면 null = 모델 기본값).
-         # Ollama 단계는 모델마다 달라 연결 확인(/ai/status)의 진단·로드맵 모델 models[].think 로 준다
-         'reasoning': {'levels': None, 'default': S.ollama_think}},
+         # 추론 정도: 모든 역할을 늘 끄고 부르므로 고를 단계가 없다(빈 목록 → 화면에 고르는 칸을 두지 않음)
+         'reasoning': {'levels': [], 'default': OLLAMA_THINK}},
         {'id': 'openai', 'label': 'OpenAI API', 'available': llm.available('openai'), 'reason': unavailable_reason('openai'),
          'models': {'default': S.openai_model, 'roadmap': S.openai_model, 'regulation': S.openai_model, 'embed': regulation_embeddings.model(), 'vision': S.openai_vision},
          # modelDefault: 보내지 않을 때 모델이 쓰는 값(기본 모델 gpt-6-luna 만 코드에 있음 · 화면 '기본값 · 보통' 표시용)
@@ -177,15 +182,16 @@ def api_set_provider(body: dict, a: Account = Depends(require_employee)):
 
 @r.put('/me/reasoning')
 def api_set_reasoning(body: dict, a: Account = Depends(require_employee)):
-    """모드별 추론 정도. level 이 null 이면 .env 기본값을 따른다. RunPod-Ollama 는 진단·로드맵 모델에만 쓰고
-    규정 에이전트 모델은 늘 끈다(생각을 끄고 학습 · 고를 수 없음). OpenAI 는 .env 의 OPENAI_REASONING_LEVELS 안에서만 받는다.
-    RunPod-Ollama 단계는 모델마다 달라 이름 모양만 본다(모델이 모르는 이름이면 Ollama 가 모델 기본값을 쓴다)"""
+    """모드별 추론 정도. level 이 null 이면 .env 기본값을 따른다. OpenAI 는 .env 의 OPENAI_REASONING_LEVELS 안에서만 받는다.
+    RunPod-Ollama 는 늘 추론 없이 부르므로 null(저장된 옛 선택 지우기)만 받는다"""
     provider_policy.require_employee_selection()
     p, level = body.get('provider'), body.get('level')
     if p not in ('ollama', 'openai'):
         raise ApiError(400, 'BAD_PROVIDER', 'RunPod-Ollama 또는 OpenAI API 중에서 골라 주세요')
     if 'level' not in body or not (level is None or (isinstance(level, str) and level_ok(level))):
         raise ApiError(422, 'BAD_REASONING', '추론 정도는 단계 이름 또는 null(서버 기본값)로 보내 주세요')
+    if p == 'ollama' and level is not None:
+        raise ApiError(422, 'BAD_REASONING', 'RunPod-Ollama 는 추론 없이만 답해요', '추론 정도는 OpenAI API 모드에서만 고를 수 있어요')
     if p == 'openai' and level is not None and level not in S.openai_reasoning_levels:
         raise ApiError(422, 'BAD_REASONING', 'OpenAI 모델이 받는 추론 정도가 아니에요', '.env 의 OPENAI_REASONING_LEVELS 에 있는 단계만 고를 수 있어요')
     # 그 모드의 키만 한 문장으로 바꾼다: 읽고 고쳐 통째로 쓰면 두 모드를 동시에 저장할 때 한쪽이 사라진다(PR #40 리뷰)

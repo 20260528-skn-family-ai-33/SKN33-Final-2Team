@@ -229,7 +229,7 @@ Windows·macOS·Linux 모두 Docker Engine/Desktop과 Compose v2가 필요합니
 
 `off`에서는 DB에 저장된 직원별 가데이터(`demo_mock`)·실패 시연(`fail_sim`) 설정도 내 정보 응답과 모델 실행에서 무시합니다. 선택한 AI 제공자와 추론 정도는 유지하며, 모델을 사용할 수 없으면 가데이터로 대신하지 않고 오류를 반환합니다. DB의 시연 설정은 삭제하지 않으므로 서버를 `on`으로 다시 실행하면 저장된 값이 다시 적용됩니다.
 
-Compose는 루트 `.env`의 `VITE_DEMO_TOOLS`를 프런트 빌드 인자로 전달하며 기본값은 `off`입니다. 로컬 시연을 유지하려면 `GP5_DEMO_MODE=on`과 `VITE_DEMO_TOOLS=on`을 함께 명시하세요. 프런트 설정이 on이고 서버가 `/ai/providers`의 `demoMode: true`를 반환할 때만 시연 도구·관리자 가데이터 선택지를 표시합니다. 프런트 단독 개발은 `frontend/.env.local`, 단독 Docker 빌드는 `--build-arg VITE_DEMO_TOOLS=on`으로 시연을 선택합니다.
+Compose는 루트 `.env`의 `VITE_DEMO_TOOLS`를 프런트 빌드 인자로 전달하며 기본값은 `off`입니다. 로컬 시연을 유지하려면 `GP5_DEMO_MODE=on`과 `VITE_DEMO_TOOLS=on`을 함께 명시하세요. 이 브라우저의 통합 시연 모드(`demo on/off`, 초기값 `VITE_DEMO_TOOLS`)이 on이고 서버가 `/ai/providers`의 `demoMode: true`를 반환할 때만 시연 도구·관리자 가데이터 선택지를 표시합니다. 브라우저별 재설정은 [테스트 콘솔 사용법](frontend/README.md#브라우저-테스트-콘솔)을 따릅니다. 프런트 단독 개발은 `frontend/.env.local`, 단독 Docker 빌드는 `--build-arg VITE_DEMO_TOOLS=on`으로 시연을 선택합니다.
 
 서버만 on이고 프런트가 off인 경우, 이전에 가데이터나 실패 시연을 켜 둔 직원은 상단 **AI 모델 → 가데이터·실패 시연 해제**에서 두 설정을 한 번에 끌 수 있습니다. 본인 설정에 저장되므로 재로그인 후에도 적용되고, 선택한 모델과 추론 정도는 유지됩니다. 시연 도구에서 설정을 다시 켜려면 서버와 프런트 모두 on이어야 합니다.
 
@@ -272,7 +272,7 @@ docker compose up -d --no-deps --force-recreate backend frontend
 | --- | --- |
 | `OLLAMA_BASE_URL` · `OLLAMA_API_KEY` | RunPod-Ollama 서버 주소와 인증키입니다. |
 | `OLLAMA_MODEL` · `OLLAMA_MODEL_REGULATION` | 비워 두면 각각 `growpath-27b`(진단·로드맵), `growpath-regulation-4b`(규정)를 사용합니다. Pod에서 준비한 Ollama 모델 이름을 사용합니다. |
-| `OLLAMA_THINK` | 예시값은 `off`입니다. 27B는 사용자 선택이 우선하며, 이 값을 비우면 모델 기본값을 따릅니다. 규정 4B의 Ollama 호출은 이 설정과 관계없이 생각 모드를 끕니다. |
+| `OLLAMA_THINK` | 더 읽지 않습니다. RunPod-Ollama는 27B·규정 4B의 모든 호출에 `think: false`를 보내 추론 없이 생성하고, 화면에서도 추론 정도를 고르지 않습니다. |
 | `OPENAI_API_KEY` | OpenAI 답변 생성용입니다. 임베딩에는 쓰지 않습니다. |
 | `OPENAI_MODEL` | OpenAI 생성 모드에서 사용할 모델입니다. 서버 설정으로 지정합니다. |
 | `ASSISTANT_SEARCH_MODE` | 세 범주의 BGE 검색은 기본 `hybrid`(BM25+pgvector+RRF)입니다. `vector`는 기존 벡터 단독 복구용입니다. |

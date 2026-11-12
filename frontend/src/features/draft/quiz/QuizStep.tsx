@@ -1,3 +1,5 @@
+import { useConsoleAction } from '@/features/demo/consoleActions';
+import { FillAnswersButton } from '@/features/demo/FillAnswersButton';
 import { loadSurvey, request, SurveyRequestError, type Stored } from './surveyRequest';
 import { prepareRoadmaps } from '../prepareRoadmaps';
 import { sameJ } from '@/shared/lib/format';
@@ -12,7 +14,6 @@ import { surveyState } from './surveyState';
 import { inputSignature, invalidateDraft } from '../invalidation';
 import { answerMemoryKey, pendingAnswers, rememberAnswers } from './assessment/answerMemory';
 import { Stepper } from '../Stepper';
-import { useTestTools } from '@/shared/lib/testTools';
 import { SurveyFlow, type SurveyFlowHandle } from './assessment/SurveyFlow';
 
 export function QuizStep() {
@@ -22,8 +23,6 @@ export function QuizStep() {
   const id = useWs(s => s.draftId);
   const inputKey = useWs(s => inputSignature(s.draft));
   const go = useGo();
-  /* 무작위 선택은 시험용이라 개발 서버와 시연 도구를 켠 빌드에서만 보인다(#74 · #224) */
-  const testTools = useTestTools();
   const [loaded, setLoaded] = useState<{ key: string; survey: Stored | null; error: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -85,9 +84,9 @@ export function QuizStep() {
     timer = setTimeout(poll, 1000);
     return () => { active = false; clearTimeout(timer); };
   },[id,owner,inputKey,requestKey,survey]);
-  return <><Stepper cur="quiz" busy={saving} /><Page title={<span style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>역량 테스트
-    {testTools ? <button type="button" className="btn line" style={{ fontSize: 12.5, padding: '5px 10px', minHeight: 0 }} disabled={!survey || survey.completed} onClick={() => surveyRef.current?.randomize()}>시험용 · 무작위 선택</button> : null}
-  </span>}
+  useConsoleAction('fill', '답안채우기', '설문·퀴즈의 빈 응답을 무작위로 채웁니다.', !!survey && !survey.completed && !saving,
+    () => `빈 응답 ${surveyRef.current?.randomize() ?? 0}개를 채웠습니다.`);
+  return <><Stepper cur="quiz" busy={saving} /><Page title="역량 테스트" titleAction={<FillAnswersButton />}
     lead="프로젝트와 키우고 싶은 역량, 지금 하는 업무에 맞춘 설문과 퀴즈예요.">
     {error ? <div className="card"><p role="alert">{error}</p><div className="actions">
       <button className="btn line" onClick={() => go(paths.newDetailsCheck)}>입력 내용 확인</button>

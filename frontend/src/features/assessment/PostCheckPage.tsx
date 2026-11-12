@@ -15,7 +15,8 @@ import { count } from '@/shared/lib/plan';
 import { ai, cause, errText } from '@/shared/state/ai';
 import { setAt } from '@/shared/state/bind';
 import { updateWs, ws } from '@/shared/state/workspace';
-import { toast } from '@/shared/state/ui';
+import { useConsoleAction } from '@/features/demo/consoleActions';
+import { FillAnswersButton } from '@/features/demo/FillAnswersButton';
 import { Icon } from '@/shared/ui/Icon';
 import { AgentRow, FailPage, Note, OpsBox, Page, runSub, via } from '@/shared/ui/parts';
 import { Skeleton } from '@/shared/ui/Skeleton';
@@ -23,7 +24,6 @@ import { deepOpen, ensurePostQuiz, makeReport, savePost, waitReport } from './po
 import { QuizBody } from './quizParts';
 import { PostQuiz } from './PostQuiz';
 import { fillRandomPost } from './postRandom';
-import { useTestTools } from '@/shared/lib/testTools';
 
 const POST_DEEP_AGENT = '진단 에이전트 · 사후 심화 질문 생성';
 const pdAsk = new Set<string>();
@@ -124,8 +124,11 @@ function Post({ R }: { R: PlanRecord }) {
   const submitted = !!R.post.submitted;
   const locked = running || !!reportId;
   const quizLocked = locked || submitted;
-  /* 무작위 선택은 시험용이라 개발 서버와 시연 도구를 켠 빌드에서만 보인다(#74 · #224) */
-  const testTools = useTestTools();
+  useConsoleAction('fill', '답안채우기', '사후 점검의 빈 응답을 채우고 초안을 저장합니다.', !quizLocked && !R.post.fail, async () => {
+    updateWs(state => { fillRandomPost(state.plans[R.id]); });
+    if (!await savePost(R.id)) throw new Error('사후 점검 초안을 저장하지 못했습니다.');
+    return quizPending ? '초안을 저장했습니다. 퀴즈가 준비되면 다시 채울 수 있습니다.' : '사후 점검 초안을 저장했습니다.';
+  });
   const curPhase = locked && hasQuiz ? 'quizzes' : phase;
   const jobId = R.post.jobId;
   useEffect(() => () => {
@@ -185,13 +188,8 @@ function Post({ R }: { R: PlanRecord }) {
   return (
     <Page
       back={paths.checks}
-      title={<span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>사후 점검{testTools ? <button type="button" className="btn line" style={{ height: 30, minHeight: 0, padding: '4px 10px', fontSize: 12.5 }} disabled={quizLocked} onClick={() => {
-        updateWs(state => {
-          fillRandomPost(state.plans[R.id]);
-        });
-        if (quizPending) toast('설문과 목표 달성 응답을 선택했어요. 퀴즈가 준비되면 무작위 선택을 한 번 더 눌러 주세요.');
-        void savePost(R.id);
-      }}>시험용 · 무작위 선택</button> : null}</span>}
+      title="사후 점검"
+      titleAction={<FillAnswersButton />}
       lead="설문은 사전과 같은 문항이고, 퀴즈는 같은 스킬·개념의 새 문제예요. 지금 기준으로 답해 주세요. 설문은 1~5점, 퀴즈는 보기 중 하나를 선택해요."
       foot={
         reportId ? (
