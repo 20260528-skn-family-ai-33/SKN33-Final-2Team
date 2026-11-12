@@ -9,9 +9,10 @@ changes의 항목 반영, request는 사용자 요청(부서장 코멘트 포함
 changes.perspective 시 해당 관점으로 재편성하되 계속 사용할 자료·완료 활동 보존. removeActs 삭제, replaceActs는 replaceHint 참고 후 catalog 다른 자료·실습으로 교체, addResources는 지정 id를 res로 사용, addTasks는 res=null 실습으로 추가. 요청 밖 활동 추가 금지.
 
 [유지 활동·진행 기록]
-미변경 활동의 stage·title·res·hours·how·skills 원문 보존, 표현만의 수정 금지. 요청과 무관한 주당 시간 유지. done=true 활동은 명시적 요청 없으면 삭제·변경 금지.
+미변경 활동의 stage·title·res·hours·how·skills 원문 보존, 표현만의 수정 금지. 요청과 무관한 주당 시간 유지. done=true 활동은 명시적 요청이 있더라도 삭제·변경·교체 금지하며 반드시 그대로 보존.
 각 스킬당 강좌(course) 활동은 최대 1개만 허용된다. 이미 완료(done=true)된 강좌가 있는 스킬에는 새 강좌를 추가하거나 중복 추천하지 않고 완료된 강좌를 단독 유지한다. 완료 강좌 아래에 새 강좌를 추가해 강좌가 증식되는 것을 금지한다.
 각 활동 key 필수. 유지 또는 단계·시간·설명만 수정 시 기존 key 유지, 다른 자료·과제로 교체하거나 신규 추가 시 key=null.
+스킬별 수정안 작성 시 미완료된 교체 대상 활동은 기존 활동과 동일한 내용을 그대로 복사하지 않고, 카탈로그의 다른 적합한 강좌 및 새로운 목표의 실습 과제로 차별화하여 새 제안(key=null)을 작성한다.
 current.skillOrder 존재 시 활동마다 그 목록의 단일 소속 skill 명시. 유지 활동의 key·skill 보존, 추가·교체 활동도 실제 소속 명시. 단일 소속 skill과 직접 수행 태그 skills는 별개. 스킬 정보가 없는 구형 계획에 소속 추정 금지.
 
 [프로젝트·진단·기존 지식]

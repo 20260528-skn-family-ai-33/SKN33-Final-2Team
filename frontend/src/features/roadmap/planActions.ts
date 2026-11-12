@@ -376,11 +376,43 @@ export function confirmReviseComment(
     return;
   }
 
+  if (undoneActs.length === 0) {
+    openSheet({
+      title: skill ? `${skill} 수정 요청 불가` : '수정 요청 불가',
+      body: () =>
+        h('div', null, [
+          h(
+            'p',
+            { key: 'p1' },
+            skill
+              ? `${skill} 스킬의 강좌와 산출물이 모두 완료되어 새로 수정할 대상이 없습니다.`
+              : '해당 활동이 모두 완료되어 새로 수정할 대상이 없습니다.',
+          ),
+          h(
+            'p',
+            { key: 'p2', className: 'small muted' },
+            '완료된 항목이 포함된 스킬은 계획과 진행 기록이 안전하게 보존됩니다.',
+          ),
+        ]),
+      foot: () =>
+        h('div', { className: 'actions' }, [
+          h(
+            'button',
+            {
+              key: 'ok',
+              type: 'button',
+              className: 'btn pri',
+              onClick: closeSheet,
+            },
+            '확인',
+          ),
+        ]),
+    });
+    return;
+  }
+
   const doneTitles = doneActs.map((a) => a.title).join(', ');
-  const undoneTitles =
-    undoneActs.length > 0
-      ? undoneActs.map((a) => a.title).join(', ')
-      : '미완료 항목';
+  const undoneTitles = undoneActs.map((a) => a.title).join(', ');
 
   openSheet({
     title: skill ? `${skill} 코멘트 수정 요청` : '코멘트 수정 요청 확인',

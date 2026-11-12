@@ -84,21 +84,20 @@ export async function waitReport(go: ReturnType<typeof useGo>, pid: string, jobI
   repWait.delete(jobId);
   if (!me()) return;
   const here = () => typeof window !== 'undefined' && window.location.pathname === paths.post(pid);
-  const onPostPage = here();
   if (out && out.reportId) {
     const reportId = out.reportId;
     try {
       if (!await reloadWorkspace()) return;
     } catch (error) {
       failToast(error, '보고서는 저장됐어요. 보고서 화면에서 다시 불러와 주세요.');
-      if (onPostPage) {
+      if (here()) {
         updateWs((s) => { if (s.plans[pid]) { s.plans[pid].post.running = false; s.plans[pid].post.reportId = reportId; } });
         toast('결과 보고서 작성이 완료되었어요');
         go(paths.report(reportId));
       }
       return;
     }
-    if (onPostPage) {
+    if (here()) {
       updateWs((s) => { if (s.plans[pid]) { s.plans[pid].post.running = false; s.plans[pid].post.reportId = reportId; } });
       toast('결과 보고서 작성이 완료되었어요');
       go(paths.report(reportId));
@@ -120,19 +119,19 @@ export async function waitReport(go: ReturnType<typeof useGo>, pid: string, jobI
         return;
       }
       const repId = planReports(ws(), updated)[0]?.id;
-      if (repId && onPostPage) {
+      if (repId && here()) {
         updateWs((s) => { if (s.plans[pid]) { s.plans[pid].post.running = false; s.plans[pid].post.reportId = repId; } });
         toast('결과 보고서 작성이 완료되었어요');
         go(paths.report(repId));
       } else if (repId) {
         updateWs((s) => { if (s.plans[pid]) s.plans[pid].post.running = false; });
         toast('결과 보고서가 나왔어요 · 점검·보고서에서 볼 수 있어요');
-      } else if (onPostPage) {
+      } else if (here()) {
         updateWs((s) => { if (s.plans[pid]) s.plans[pid].post.running = false; });
         toast('결과 보고서 저장이 완료되었어요');
         go(paths.roadmap(pid));
       }
-    } else if (!updated && onPostPage) {
+    } else if (!updated && here()) {
       updateWs((s) => {
         if (s.plans[pid]) s.plans[pid].post.running = false;
       });

@@ -569,6 +569,18 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
             req = f'{skill}의 강좌는 이미 완료되었습니다. 완료된 강좌는 새 강좌를 추가하지 말고 그대로 유지하고, 미완료 산출물만 새로 작성해 주세요.\n{req}'
         elif 'task' not in targets and 'course' in targets:
             req = f'{skill}의 산출물은 이미 완료되었습니다. 완료된 산출물은 그대로 유지하고, 미완료 강좌만 새로 추천해 주세요.\n{req}'
+    if not skill and (base.get('def') or {}).get('learningReport'):
+        # 일반 수정 요청(전체 수정안): 완료된 활동/도서는 보존하고, 미완료된 각 스킬의 강좌·산출물을 새 제안으로 교체 (#226)
+        undone_changeable = [
+            a for a in base['acts']
+            if a['id'] not in done and not (RM._res(a.get('res')) or {}).get('type') == 'book'
+        ]
+        if undone_changeable and not ch['c'].get('replaceActs'):
+            ch['c']['replaceActs'] = [{'key': a['id'], 'title': a['title']} for a in undone_changeable]
+            ch['c']['replaceHint'] = '완료된 활동과 도서는 원본 그대로 유지하고, 미완료된 각 스킬의 강좌는 카탈로그의 다른 강좌로 교체하며 산출물은 새로운 실습 목표와 과제로 반드시 새로 작성해 주세요. 현재 계획과 동일한 내용을 반환하지 마세요.'
+            req = (req + '\n완료된 활동과 도서는 유지하고, 미완료된 각 스킬의 강좌는 다른 추천 강좌로, 산출물은 새 과제로 차별화하여 새 제안을 작성해 주세요.').strip()
+    if not skill and rev.get('fromComment'):
+        req = (req + '\n완료된 활동(done: true)과 진행 기록은 안전하게 보존되어야 하므로 어떠한 경우에도 삭제·변경·교체하지 마세요.').strip()
     if (base.get('def') or {}).get('learningReport') and (skill or not rev.get('fromComment')):
         req = (req + '\n도서 유지. 새 산출물 설명 형식: 만들 것:, 필수 항목:, 제출물:, 평가 기준:. 각 항목 내용 필수.').strip()
     if retry:
@@ -606,6 +618,17 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
             for index, activity in enumerate(d['acts']):
                 if 'task' in targets and activity['id'] == targets['task']['id']:
                     activity['id'] = f"{base['opt'].lower()}-v{base['version'] + 1}-task-{index + 1}"
+        if done:
+            # 완료 활동 보존 강제: done에 속한 활동은 base['acts'] 원본 속성 그대로 보존 (#235)
+            base_done_acts = {a['id']: a for a in base['acts'] if a['id'] in done}
+            existing_d_done_ids = set()
+            for index, activity in enumerate(d['acts']):
+                if activity['id'] in base_done_acts:
+                    d['acts'][index] = copy.deepcopy(base_done_acts[activity['id']])
+                    existing_d_done_ids.add(activity['id'])
+            for done_id, orig_act in base_done_acts.items():
+                if done_id not in existing_d_done_ids:
+                    d['acts'].append(copy.deepcopy(orig_act))
         to = RM.build_plan(d, {'start': ch['start'], 'hours': base['hours'] if skill else prefs_h['weeklyHours'] or d.get('weeklyHours') or base['hours'] or D['autoHours'], 'format': prefs_h['formatKey'], 'patch': {}}, base['goal'])
         if retry:
             pending = retry['result']
@@ -728,15 +751,22 @@ def accept_revision(employee_id: int, roadmap_id: str, revision_id: str, selecte
             if (not source or source['fit'] == '__deleted__' or source['status'] == 'applied'
                     or not stamp or source['updated_at'].isoformat() != stamp):
                 raise ApiError(409, 'COMMENT_UNAVAILABLE', '코멘트가 변경됐어요. 수정안을 다시 요청해 주세요.')
+        done_ids = {item['activity_id'] for item in t.all(
+            "SELECT activity_id FROM app_ext.activity_progress WHERE roadmap_id = :r AND status = 'done'",
+            r=row['roadmap_id'])}
         if scoped:
             current = t.val('SELECT content FROM public.roadmaps WHERE roadmap_id = :r', r=row['roadmap_id'])
             if current != pd['from']:
                 raise ApiError(409, 'REVISION_CHANGED', '로드맵이 변경됐어요. 수정안을 다시 요청해 주세요.')
-            done_ids = {item['activity_id'] for item in t.all(
-                "SELECT activity_id FROM app_ext.activity_progress WHERE roadmap_id = :r AND status = 'done'",
-                r=row['roadmap_id'])}
             if done_ids.intersection(scoped['targets']):
                 raise ApiError(409, 'REVISION_CHANGED', '완료한 활동이 있어요. 수정안을 다시 요청해 주세요.')
+        elif pd.get('fromComment'):
+            # 범용 코멘트 수정안 확정 시에도 완료 활동 보존 검증 (#235)
+            cur_done_acts = {a['id']: a for a in cur['acts'] if a['id'] in done_ids}
+            to_acts = {a['id']: a for a in plan['acts']}
+            for aid, old_a in cur_done_acts.items():
+                if aid not in to_acts or any(to_acts[aid].get(k) != old_a.get(k) for k in ('res', 'title', 'how')):
+                    raise ApiError(409, 'REVISION_CHANGED', '완료한 활동은 바꿀 수 없어요. 기존 계획을 유지해 주세요.')
         evidence = baseline.get('selectionEvidence') if isinstance(baseline, dict) else None
         if not isinstance(evidence, dict):
             evidence = cur.get('selectionEvidence')
