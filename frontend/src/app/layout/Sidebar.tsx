@@ -137,7 +137,9 @@ export function Sidebar({ active }: { active: string }) {
           go(paths.me);
         }}
       >
-        <span className="avatar">{me.name.slice(1)}</span>
+        <span className="avatar">
+          <Icon name="user" />
+        </span>
         <div className="grow">
           <b>
             {me.name}

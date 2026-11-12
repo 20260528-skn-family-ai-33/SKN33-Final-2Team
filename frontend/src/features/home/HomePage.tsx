@@ -165,8 +165,9 @@ function StageCard({ R }: { R: PlanRecord }) {
         {visibleShared.map(course => <section className="home-skill-group" key={`shared:${course.id}`}>
           <h3>{course.skills.join(' · ')}</h3>
           <div className="home-material-group" data-kind="강좌">
-            <h4>강좌<span>{course.activities.length}개</span></h4>
-            <ul className="acts">{course.activities.map(activity => <ActRow key={activity.id} a={activity} R={R} />)}</ul>
+            <h4>강좌<span>1개 · 공통</span></h4>
+            {/* 같은 강좌라 한 줄만 보여 준다. 기록을 저장하면 다른 스킬의 활동에도 같이 저장된다 */}
+            <ul className="acts"><ActRow a={course.activities[0]} R={R} /></ul>
           </div>
         </section>)}
         {[...groups].map(([skill, categories]) => <section className="home-skill-group" key={skill}>

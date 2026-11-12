@@ -30,6 +30,6 @@
 .roadmap-learning-group>summary{cursor:pointer;list-style:none}.roadmap-learning-group>summary::-webkit-details-marker{display:none}
 .learning-toggle-more,.learning-toggle-less{font-size:11px;color:var(--muted)}.learning-toggle-less{display:none}.roadmap-learning-group[open] .learning-toggle-more{display:none}.roadmap-learning-group[open] .learning-toggle-less{display:inline}.roadmap-learning-group:not([open])>summary{margin-bottom:0}
 
-.review-skill-block.is-current-week,.roadmap-learning-group.is-current-week{background:#f1f9f3;border-color:#c8e4d0}
-.roadmap-learning-anchor.is-current-week{background:#e7f5eb}.roadmap-learning-anchor.is-current-week .act-row{background:transparent}
-.review-skill-block.is-current-week,.roadmap-learning-group.is-current-week{box-shadow:inset 4px 0 0 #4d9b70}
+.roadmap-learning-group.is-current-week{background:var(--accent-soft);border-color:var(--accent-line)}
+.roadmap-learning-anchor.is-current-week{background:var(--accent-soft2)}.roadmap-learning-anchor.is-current-week .act-row{background:transparent}
+.roadmap-learning-group.is-current-week{box-shadow:inset 4px 0 0 var(--accent)}

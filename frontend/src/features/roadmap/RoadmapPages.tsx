@@ -3,7 +3,8 @@ import { failToast } from '@/shared/lib/fail';
 import { CmItem, prepareCommentRevision } from './comments';
 import { ReviewSkillBlocks, type ReviewMaterials } from '@/features/draft/review/ReviewSkillBlocks';
 import { openRecord } from './RecordSheet';
-import { trackName } from '@/shared/constants/data';
+import { trackName, trackTrait } from '@/shared/constants/data';
+import { PlanSummary } from './PlanSummary';
 /* 내 로드맵: 목록(진행 중 · 지난 로드맵) → 로드맵 하나 · 확정 완료 화면 (5차 scr.roadmap · scr.confirmed) */
 import { Navigate, useParams } from 'react-router';
 import type { PlanRecord } from '@/api/types/plan';
@@ -337,7 +338,7 @@ function RoadView({ R }: { R: PlanRecord }) {
   return (
     <Page
       back={paths.roadmaps}
-      eyebrow={trackName(pl.opt, pl.name)}
+      eyebrow={[trackName(pl.opt, pl.name), trackTrait(pl.opt)].filter(Boolean).join(' · ')}
       title={pl.displayTitle || pl.goal}
       lead={pl.goal}
       foot={foot}
@@ -352,7 +353,7 @@ function RoadView({ R }: { R: PlanRecord }) {
           {R.status === 'done' ? '마친 로드맵이에요. 기록은 읽기만 할 수 있어요.' : '보관한 로드맵이에요. 기록은 읽기만 할 수 있고, ‘다시 진행하기’를 누르면 이어서 기록할 수 있어요.'}
         </Note>
       )}
-      <Stats pl={pl} periodLabel={pl.def.learningReport ? '자료 학습 예상 기간' : '기간'} />
+      {pl.def.learningReport ? <PlanSummary R={R} /> : <Stats pl={pl} periodLabel="기간" />}
       <RoadmapResources R={R} />
       {pl.def.learningReport ? <ReviewSkillBlocks confirmed materials={pl.def.learningReport as ReviewMaterials}
         acts={pl.acts.filter((act): act is typeof act & { skill: string; how: string; hours: number } => !!act.skill).map(act => ({ ...act, how: act.how || '' }))}

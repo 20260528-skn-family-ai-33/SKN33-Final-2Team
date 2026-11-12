@@ -92,3 +92,30 @@
 .rv-stats dd span .rv-skel-sub { width: 150px; max-width: 100%; height: 11px; margin: 4px 0; }
 .rv-weeks-skel .skel-wrap { margin-top: 0; gap: 14px; }
 .rv-skills .skel-wrap { margin-top: 0; }
+
+/* 확정한 로드맵의 스킬 블록(ReviewSkillBlocks): 작성 7단계와 같은 모양에 접기·상태 표시를 더한다 */
+details.rv-skill > summary { display: flex; align-items: center; gap: 10px; list-style: none; cursor: pointer; }
+details.rv-skill > summary::-webkit-details-marker { display: none; }
+details.rv-skill > summary h3 { flex: 1; min-width: 0; margin: 0; font-size: 17px; overflow-wrap: anywhere; }
+details.rv-skill[open] > summary { padding-bottom: 14px; margin-bottom: 16px; border-bottom: 1px solid var(--line); }
+details.rv-skill.is-current-week { border-color: var(--accent-line); background: var(--accent-soft); box-shadow: inset 4px 0 0 var(--accent); }
+.rv-mini:focus-visible, .rv-task:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+.rv-title-btn { padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.rv-title-btn:hover { text-decoration: underline; }
+.rv-title-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.rv-task.is-static { cursor: default; }
+.rv-mini-tx small + small { color: var(--ink-2); }
+.rv-stats.is-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); margin-top: 0; padding-top: 0; border-top: 0; }
+@media (max-width: 900px) { .rv-stats.is-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* 여러 스킬이 함께 쓰는 자료: 그 스킬들 위에 한 번만 보여 준다 */
+.rv-shared { padding: 16px 20px; border: 1px solid var(--accent-line); border-radius: var(--r-lg); background: var(--surface); }
+.rv-shared > header { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.rv-shared > header h3 { margin: 0; font-size: 15px; }
+.rv-shared-ref { display: flex; align-items: baseline; gap: 8px; margin: 0 0 6px; font-size: 13.5px; line-height: 1.5; color: var(--ink-2); overflow-wrap: anywhere; }
+.rv-shared-ref .tag { flex-shrink: 0; }
+.rv-stt-gap { flex: none; width: 22px; }
+.rv-anchor { position: absolute; width: 0; height: 0; outline: 0; }
+.rv-mini { position: relative; }
+.rv-mini:has(.rv-anchor:focus) { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+.rv-records { display: flex; align-items: baseline; gap: 10px; }
