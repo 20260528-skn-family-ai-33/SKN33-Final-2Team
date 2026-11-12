@@ -2,7 +2,7 @@ import { useImperativeHandle, useState, type Ref } from 'react';
 import { complete, type Answers, type Phase, type Survey } from './flow';
 import './style.css';
 
-export type SurveyFlowHandle = { randomize: () => void };
+export type SurveyFlowHandle = { randomize: () => number };
 type Props = { onRetry?: () => void; ref?: Ref<SurveyFlowHandle>; survey: Survey; initialAnswers?: Answers; initialCompleted?: boolean; review?: boolean; initialPhase?: Phase; onProgress?: (answers: Answers, phase: Phase) => void; onContinue?: () => void;
   onSave: (answers: Answers, finished: boolean) => Promise<void> };
 const scale = ['전혀 아니다', '아니다', '보통이다', '그렇다', '매우 그렇다'];
@@ -14,15 +14,17 @@ export function SurveyFlow({ onRetry, ref, survey, initialAnswers = {}, initialC
   const [saving, setSaving] = useState(false);
   const [finished, setFinished] = useState(initialCompleted);
   useImperativeHandle(ref, () => ({ randomize: () => {
-    if (saving || finished) return;
-    const random: Answers = {};
+    if (saving || finished) return 0;
+    const random: Answers = { ...answers };
     for (const group of survey.groups) {
-      for (const q of group.surveys) random[q.id] = Math.floor(Math.random() * 5) + 1;
+      for (const q of group.surveys) if (!Object.hasOwn(random, q.id)) random[q.id] = Math.floor(Math.random() * 5) + 1;
       for (const q of group.quizzes) {
-        if (q.options?.length) random[q.id] = Math.floor(Math.random() * q.options.length);
+        if (q.options?.length && !Object.hasOwn(random, q.id)) random[q.id] = Math.floor(Math.random() * q.options.length);
       }
     }
-    setAnswers(random); onProgress?.(random, phase); setError('');
+    const count = Object.keys(random).length - Object.keys(answers).length;
+    if (count) { setAnswers(random); onProgress?.(random, phase); setError(''); }
+    return count;
   } }));
   const questions = survey.groups.flatMap(g => g[phase]);
   const answered = questions.filter(q => Object.hasOwn(answers, q.id)).length;

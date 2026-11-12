@@ -86,10 +86,15 @@ def start(kind: str, employee_id: int | None, ref: str, fn: Callable[[JobCtx], A
         if changed and employee_id is not None and not unchanged_revision and not (error or {}).get('stopped'):
             _notify_finished(kind, employee_id, ref, status, descriptor if isinstance(descriptor, dict) else None, jid)
 
+    from .browser_console import options
+    browser_settings = options.get()
+
     def work() -> None:
+        token = options.set(browser_settings)
         try:
             perform()
         finally:
+            options.reset(token)
             if owner is not None:
                 owner.__exit__(None, None, None)
 

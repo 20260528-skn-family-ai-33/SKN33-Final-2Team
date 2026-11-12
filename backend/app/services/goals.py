@@ -16,6 +16,7 @@ from typing import TypedDict
 from .. import db, jobs, llm, provider_policy
 from ..agents import goals as G
 from ..agents import runtime as rt
+from ..browser_console import demo_enabled
 from ..config import OLLAMA_THINK, S
 from ..errors import ApiError, cause
 from . import profile
@@ -30,7 +31,7 @@ def _hash(inp: dict) -> str:
 
 def validate_mode(mode: str | None) -> None:
     """가데이터를 명시한 요청은 저장·작업 등록 전에 검사한다."""
-    if mode == 'mock' and not S.demo_mode:
+    if mode == 'mock' and not demo_enabled(S.demo_mode):
         raise ApiError(409, 'DEMO_DISABLED', '시연 모드가 꺼져 있어 가데이터로 만들 수 없어요',
                        '사용할 AI 모드를 직접 선택해 주세요', kind='config')
 
@@ -94,7 +95,7 @@ def bulk_model(employee: dict, mode: str | None, level: str | None) -> BulkModel
     if mode is None:
         provider = provider_policy.resolve('employee', employee.get('ai_provider'))
         level = (employee.get('reasoning') or {}).get(provider)
-        if S.demo_mode and employee.get('demo_mock'):
+        if demo_enabled(S.demo_mode) and employee.get('demo_mock'):
             provider, level = 'mock', None
     else:
         provider = mode

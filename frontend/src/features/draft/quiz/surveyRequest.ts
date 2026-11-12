@@ -1,3 +1,4 @@
+import { browserHeaders } from '@/shared/lib/browserOptions';
 import { waitJob } from '@/api/jobs';
 import { ensureDraft } from '../draftSync';
 import type { Answers, Survey } from './assessment/flow';
@@ -8,7 +9,7 @@ export class SurveyRequestError extends Error {
   constructor(message: string, readonly code: string) { super(message); }
 }
 export async function request(path: string, init?: RequestInit): Promise<Stored | null> {
-  const response = await fetch(path, { ...init, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', ...(init?.method === 'POST' ? { Prefer: 'respond-async' } : {}), ...init?.headers } });
+  const response = await fetch(path, { ...init, credentials: 'same-origin', mode: 'same-origin', headers: { ...browserHeaders(), 'Content-Type': 'application/json', ...(init?.method === 'POST' ? { Prefer: 'respond-async' } : {}), ...init?.headers } });
   let body = await response.json().catch(() => null);
   if (response.status === 202 && body?.jobId) {
     const job = waitJob<{ survey: Stored }>(body.jobId);

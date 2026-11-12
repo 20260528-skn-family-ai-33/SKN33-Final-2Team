@@ -2,6 +2,7 @@
    화면 컴포넌트는 fetch 를 직접 쓰지 않고 endpoints/ 의 함수만 쓴다. 백엔드를 바꿀 때 고칠 곳을 이 폴더로 모으기 위해서다.
    - 오류는 서버 형식 {error: {code, message, hint, retryable, kind, cause, raw}} 를 ApiError 로 바꿔 던진다
    - 오래 걸리는 작업은 'Prefer: respond-async' 로 보내 202 {jobId} 를 받는다(jobs.ts 의 waitJob 으로 끝날 때까지 기다림) */
+import { browserHeaders } from '@/shared/lib/browserOptions';
 import type { ApiErrorPayload } from './types/common';
 
 export const API_BASE = '/api/v1';
@@ -32,7 +33,7 @@ export interface RequestOptions {
 type Body = FormData | object | undefined;
 
 export async function request<T>(method: string, path: string, body?: Body, opts: RequestOptions = {}): Promise<T> {
-  const headers: Record<string, string> = {};
+  const headers = browserHeaders();
   let data: BodyInit | undefined;
   if (body instanceof FormData) data = body;
   else if (body !== undefined) {
@@ -42,7 +43,7 @@ export async function request<T>(method: string, path: string, body?: Body, opts
   if (opts.async) headers.Prefer = 'respond-async';
   let r: Response;
   try {
-    r = await fetch(API_BASE + path, { method, headers, body: data, credentials: 'same-origin', cache: 'no-store', signal: opts.signal });
+    r = await fetch(API_BASE + path, { method, headers, body: data, credentials: 'same-origin', mode: 'same-origin', cache: 'no-store', signal: opts.signal });
   } catch (e) {
     if (e instanceof DOMException && e.name === 'AbortError') throw e;
     throw new ApiError(0, {

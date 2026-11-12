@@ -2,6 +2,7 @@ import { MaterialBasis } from '@/shared/ui/MaterialBasis';
 import { hrs } from '@/shared/lib/format';
 import { courseDifficulty } from '@/shared/lib/courseDifficulty';
 import { materialVersionKey } from './materialVersion';
+import { useConsoleAction } from '@/features/demo/consoleActions';
 import { loadRecommendations, recommendationUrl, requestMaterials as request, type Resource, type Result } from './materialRequests';
 import { MaterialReason } from './MaterialReason';
 import { ResourcePreviewButton } from './ResourcePreview';
@@ -171,6 +172,15 @@ function ResultSelection({ editorRef, onChoicesChanged, locked = false, courseId
   }
   const materialNames=displayOrder(order,choices).filter(name=>result?.recommendations?.skills.some(skill=>skill.name===name));
   const shownSkill=skillFilter || (materialNames.includes(activeSkill)?activeSkill:materialNames[0]);
+  const courseSuffix = course || '';
+  useConsoleAction(courseSuffix ? 'courses ' + courseSuffix.toUpperCase() : 'courses', '강좌후보' + courseSuffix.toLowerCase(),
+    `${course || '선택 코스'} · ${shownSkill || '스킬'}의 모델 전달 강좌를 봅니다.`,
+    !!result?.recommendations && !!shownSkill, () => {
+      const candidates = result?.recommendations?.skills.find(s => s.name === shownSkill)?.modelCourseCandidates;
+      if (!candidates) return '당시 후보 기록 없음';
+      return [`${course} · ${shownSkill} | 모델에 전달 ${candidates.length}개 · 최종 추천 포함 ${candidates.filter(c => c.recommended).length}개`,
+        ...candidates.slice(0, 6).map((c, i) => `${i + 1}. ${c.title} · ${c.provider || '제공처 미상'} · ${c.recommended ? '추천 포함' : '미포함'}`)].join('\n');
+    }, course === draft.chosen);
   const content = <>
     <div className="v2-skill-summary"><h2>도서·강좌 선택</h2>
       <div><b aria-live="polite">자료 학습 예상 기간 {total === null ? `주차 산정 필요${missingCount ? ` (${missingCount}개)` : ''}` : `${total}주`}</b>
