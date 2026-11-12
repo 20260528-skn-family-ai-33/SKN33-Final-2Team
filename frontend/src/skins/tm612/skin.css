@@ -267,10 +267,17 @@
   .gt-scroll::-webkit-scrollbar-thumb { background: #4A4A4A; border-color: var(--surface); }
   .sm-wrap { background: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, .08) 1px, transparent 0) 0 0 / 22px 22px var(--surface-2); }
   .sm-e { stroke: #4A4A4A; }
-  /* 아직 배우지 않은 스킬: 원래의 흐림(.38)은 어두운 바탕에서 글자가 안 읽혀 덜 흐리게 */
-  .sm-n.off { opacity: .62; }
+  /* 아직 배우지 않은 스킬: 원래의 흐림(.38)은 어두운 바탕에서 글자가 안 읽힌다.
+     점 묶음 전체를 반투명하게 하면 아래 이름 둘레 칠도 비쳐 밑을 지나는 화살표가 글자 사이로 보이므로,
+     흐림은 점에만 두고 이름은 색만 낮춘다(바탕 대비 이름 약 5.7:1 · 분류 약 4.2:1) */
+  .sm-n.off { opacity: 1; }
+  .sm-n.off:not(.pick) .dot { opacity: .62; }
+  .sm-n.off:not(.pick) text { fill: var(--ink-4); }
+  .sm-n.off:not(.pick) text.cat { fill: #787878; }
   .sm-n .dot { fill: var(--surface); stroke: #5A5A5A; }
-  .sm-n text { stroke: rgba(13, 13, 13, .92); }
+  /* 스킬 이름 둘레를 지도 바탕색으로 넓게 칠해(기본의 paint-order: stroke) 밑을 지나는 화살표를 글자 둘레에서 가린다.
+     이 테마는 지나온 길 화살표도 이름도 흰색이라, 둘레가 얇으면 화살표가 글자에 붙어 읽히지 않는다 */
+  .sm-n text { stroke: var(--surface-2); stroke-width: 6px; }
   /* 내 스킬 지도(누적): 이 테마의 화살표 색 규칙이 기본 규칙보다 우선하므로 지나온 길 색을 다시 적는다 */
   .sm-e.trail { stroke: var(--accent); }
 
@@ -285,7 +292,8 @@
   .scale label:has(input:checked), .lik label:has(input:checked), .stepper li.cur .sn, .deep-tg[aria-pressed="true"] .box { background-color: var(--accent); }
   .dq-opt:has(input:checked) { background-color: var(--accent-soft2); }
   .drop:hover, .gs-it:hover { background-color: var(--accent-soft); }
-  .sm-n .tag text { fill: var(--tm-on-accent); }
+  /* 꼬리표('3회')는 흰 바탕에 검은 글자라 둘레를 칠하지 않는다(위 이름 둘레 규칙이 기본의 stroke: none 보다 우선해 글자가 뭉개졌다) */
+  .sm-n .tag text { fill: var(--tm-on-accent); stroke: none; }
 
   /* 어두운 상자·창 공통 */
   .choice, .chip, .scale label, .lik label, .dq-opt { border-color: var(--line-2); }
