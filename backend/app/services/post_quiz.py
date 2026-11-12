@@ -116,7 +116,15 @@ def ensure_generated(employee_id,plan_id):
         if old.get('v2Quiz'):return old['v2Quiz']
         ctx=rt.context(employee_id)
         if not ctx.live:raise ApiError(409,'LIVE_REQUIRED','사후 퀴즈 생성에는 연결된 모델이 필요해요.')
-        survey=generate(row['content'],rt.model(ctx,'진단 에이전트','사후 퀴즈 문항 생성'))
+        try:
+            survey=generate(row['content'],rt.model(ctx,'진단 에이전트','사후 퀴즈 문항 생성',role='quiz'))
+        except Exception:
+            if ctx.provider == 'openai' and (ctx.reasoning.get('openai') in ('high', 'xhigh') or ctx.reasoning.get('openai') is None):
+                from dataclasses import replace
+                fallback_ctx = replace(ctx, reasoning={**ctx.reasoning, 'openai': 'medium'})
+                survey=generate(row['content'],rt.model(fallback_ctx,'진단 에이전트','사후 퀴즈 문항 생성',role='quiz'))
+            else:
+                raise
         with db.tx() as t:
             t.run("INSERT INTO app_ext.post_checks(roadmap_id,deep) VALUES(:r,:d) ON CONFLICT(roadmap_id) DO UPDATE SET deep=coalesce(app_ext.post_checks.deep,'{}'::jsonb) || EXCLUDED.deep,updated_at=now()",r=row['roadmap_id'],d=db.J({'v2Quiz':survey,'v2Answers':{}}))
         return survey

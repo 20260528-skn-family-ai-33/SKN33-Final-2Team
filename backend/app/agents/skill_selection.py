@@ -18,6 +18,7 @@ availableSkills의 DB 태그 이름과 정확히 일치하는 스킬만 중요�
 
 [기존 지식·업무 맥락]
 learnerKnowledge.technologies는 이미 알고 사용하는 기술. 설치·문법 입문·기초 따라하기의 기본 재추천 금지, 새로운 개념·심화·실제 적용·검증의 부족 부분만 추천.
+기존 보유 스킬이나 학습 경험(learnerKnowledge.technologies)이 있더라도 프로젝트 목표 달성에 필요한 핵심 스킬이면 목록에서 임의로 제외하거나 탈락시키지 않는다. 해당 스킬은 기존 기술 경험을 바탕으로 새로운 응용·심화 수행 역량으로 편성한다.
 넓은 기술 경험의 세부 응용 숙련 확대 해석 금지. 예: Python 경험만으로 비동기·모델 서빙 숙련 추정 금지. 같은 넓은 스킬 태그가 필요하면 application과 과제는 기존 기술을 활용한 새로운 수행 역량으로 한정.
 learnerKnowledge.certifications의 동일 자격 재취득·시험 준비 추천 금지. 자격 보유의 관련 기술 전체 숙련 증명 간주 금지.
 목표에서 명시적 복습·재학습 요청 시에만 해당 기초 재학습 허용. 경력·직급·부서·학력만으로 기술 보유 추정 금지.
@@ -82,6 +83,7 @@ def select_skills(
     if not rows:
         raise SelectionError('핵심 스킬을 찾지 못했습니다. 프로젝트와 DB 태그를 확인해 주세요.')
     # 모델이 상한보다 많이 내도 오류로 막지 않고 중요도 순 앞 3개만 제시한다.
+    known_techs = [str(t).strip().casefold() for t in (payload.get('learnerKnowledge') or {}).get('technologies') or [] if str(t).strip()]
     selected, seen = [], set()
     for row in rows[:MAX_SKILLS]:
         if not isinstance(row, dict):
@@ -96,7 +98,11 @@ def select_skills(
         if any(not isinstance(row.get(k), str) or not row[k].strip() for k in ('reason', 'application')):
             raise SelectionError('선정 이유와 프로젝트 사용 부분이 필요합니다.')
         seen.add(name)
-        selected.append(dict(name=name, reason=row['reason'].strip(), application=row['application'].strip()))
+        is_learned = name.casefold() in known_techs or _normalized_tag(name) in known_techs
+        item = dict(name=name, reason=row['reason'].strip(), application=row['application'].strip())
+        if is_learned:
+            item['learned'] = True
+        selected.append(item)
     return {'skills': selected}
 
 

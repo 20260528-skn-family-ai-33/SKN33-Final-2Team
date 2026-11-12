@@ -84,6 +84,12 @@ def rebuild_revision(option, plan, handoff):
     if dropped and not course_changed:
         _drop_learning_skills(option, set(dropped))
     old_acts = plan['acts']
+    done_course_by_skill = {}
+    for a in old_acts:
+        if a.get('done') and a.get('res') and a.get('skill'):
+            res_meta = roadmap._res(a['res'])
+            if res_meta and res_meta.get('type') == 'course':
+                done_course_by_skill[a['skill']] = a
     used = set()
     resources = {name: {} for name in names}
     kept = []
@@ -113,10 +119,30 @@ def rebuild_revision(option, plan, handoff):
         if resource:
             if resource.get('type') not in ('course', 'book', 'cert'):
                 raise llm.LlmError('스킬별 학습 자료는 강좌 또는 도서여야 합니다.')
+            # 스킬당 강좌는 1개만 허용: 이미 완료된 강좌가 있는 스킬이면 새 강좌를 추가하지 않고 완료된 강좌만 유지 (#226)
+            if resource.get('type') == 'course' and activity.get('skill') in done_course_by_skill:
+                done_act = done_course_by_skill[activity['skill']]
+                if activity.get('res') != done_act.get('res') and activity.get('key') != done_act.get('id'):
+                    continue
             if resource.get('type') in ('course', 'book') and activity['stage'] >= handoff.get('startStage', plan['start']):
                 resources[activity['skill']][resource['id']] = deepcopy(resource)
         kept.append(activity)
-    option['acts'] = kept
+
+    # 스킬당 완료된 강좌(done course)가 있는 경우 완료된 강좌만 단독 유지하여 강좌 증식 방지 (#226)
+    course_seen = set()
+    deduped_kept = []
+    for activity in kept:
+        resource = roadmap._res(activity.get('res')) if activity.get('res') else None
+        skill = activity.get('skill')
+        if resource and resource.get('type') == 'course' and skill and skill in done_course_by_skill:
+            done_act = done_course_by_skill[skill]
+            if activity.get('key') == done_act.get('id') or activity.get('res') == done_act.get('res'):
+                if skill not in course_seen:
+                    course_seen.add(skill)
+                    deduped_kept.append(activity)
+            continue
+        deduped_kept.append(activity)
+    option['acts'] = deduped_kept
     weekly = (handoff.get('prefs') or {}).get('weeklyHours') or option.get('weeklyHours') or plan['hours']
     rec, choices = [], {}
     for name in names:

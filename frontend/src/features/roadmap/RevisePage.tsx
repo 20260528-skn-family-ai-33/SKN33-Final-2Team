@@ -32,7 +32,7 @@ import { ResPicker } from '@/shared/ui/ResPicker';
 import { Skeleton } from '@/shared/ui/Skeleton';
 import { CommentView, commentReq, CmTag } from './comments';
 import { cmBy, PlanGate } from './parts';
-import { acceptRevision, dropRevision, freshRev, pullPlan, REV_ITEMS, revise, revItemOk, revKey, revOk, usePlanWatch } from './planActions';
+import { acceptRevision, confirmReviseComment, confirmReviseSkillsExclusion, confirmSkillRevisionSingle, dropRevision, freshRev, pullPlan, REV_ITEMS, revise, revItemOk, revKey, revOk, usePlanWatch } from './planActions';
 
 
 /** 수정안 비교 (5차 P.diffView) */
@@ -343,16 +343,25 @@ function RevForm({ R }: { R: PlanRecord }) {
   );
 }
 
-function SkillRevisionChoices({ pd, selected, onPick, retrying, onRetry }: {
+function SkillRevisionChoices({ pd, selected, onPick, retrying, onRetry, progress }: {
   pd: PendingRevision; selected: string[]; onPick: (skill: string, recommended: boolean) => void;
-  retrying: string | null; onRetry: (skill: string) => void;
+  retrying: string | null; onRetry: (skill: string) => void; progress?: PlanRecord['progress'];
 }) {
-  const names = commentSkillNames(pd.from);
+  const allNames = commentSkillNames(pd.from);
+  // 이미 완료된 강좌나 산출물이 있는 스킬은 수정안 선택 탭 및 고르는 버튼 자체를 제외 (#226)
+  const isSkillDone = (name: string) =>
+    pd.from.acts.some(
+      (a) =>
+        a.skill === name &&
+        !isBookActivity(a) &&
+        st(progress, a.id) === 'done',
+    );
+  const names = allNames.filter((name) => !isSkillDone(name));
   const [active, setActive] = useState('');
   const id = useId();
   const resources = useCatalog(state => state.res);
   const skill = names.includes(active) ? active : names[0];
-  if (!skill) return null;
+  if (!skill) return <p className="small muted">모든 스킬에 완료된 활동이 있어 수정할 스킬이 없어요.</p>;
   return <div className="stack">
     {names.length > 1 && <MaterialSkillTabs names={names} active={skill} onChange={setActive} id={id} panelId={id + '-panel'} />}
     <div id={id + '-panel'} role={names.length > 1 ? 'tabpanel' : undefined} aria-label={skill} className="stack">
@@ -406,16 +415,37 @@ function SkillRevisionChoices({ pd, selected, onPick, retrying, onRetry }: {
 function Revise({ R }: { R: PlanRecord }) {
   const go = useGo();
   const [retrying, setRetrying] = useState<string | null>(null);
-  const [picks, setPicks] = useState<{ revisionId?: string; skills: string[] }>({ skills: [] });
+  const pd = R.pending;
+  const revisionId = R.revision?.id;
+  const allSkills = pd ? commentSkillNames(pd.from) : [];
+  const activeSkills = pd
+    ? allSkills.filter(
+        (name) =>
+          !pd.from.acts.some(
+            (a) =>
+              a.skill === name &&
+              !isBookActivity(a) &&
+              st(R.progress, a.id) === 'done',
+          ),
+      )
+    : [];
+  const [picks, setPicks] = useState<{ revisionId?: string; skills: string[] }>(() => ({
+    revisionId,
+    skills: activeSkills,
+  }));
   usePlanWatch(R.id);
   const base = R.plan;
   const noForm = !R.rev || !R.rev.v;
   useEffect(() => {
-    if (noForm) updateWs((s) => void (s.plans[R.id].rev = freshRev(s.plans[R.id])));
+    if (noForm) {
+      updateWs((s) => {
+        const init = (s.plans[R.id].revision?.request as RevForm | undefined) || freshRev(s.plans[R.id]);
+        s.plans[R.id].rev = init;
+      });
+    }
   }, [noForm, R.id]);
   if (!R.rev || !R.rev.v) return null;
   const r = R.rev;
-  const pd = R.pending;
   const busy = !!r.running;
   const pid = r.on.pid && r.v.pid !== base.opt ? r.v.pid : base.opt;
   const agent = `${D.perspectives[pid].name}`;
@@ -423,8 +453,7 @@ function Revise({ R }: { R: PlanRecord }) {
   /* 요청 내용을 채운 뒤 부서장이 코멘트를 고쳤으면(10/23 코멘트 수정) 알리고, 고친 내용으로 다시 채울 수 있게 한다 */
   const skillComment = cm?.skill;
   const mixed = !r.fromComment && !!base.def.learningReport;
-  const revisionId = R.revision?.id;
-  const selectedSkills = picks.revisionId === revisionId ? picks.skills : [];
+  const selectedSkills = picks.revisionId === revisionId ? picks.skills : activeSkills;
   const confirmRevision = () => {
     if (!pd) return;
     if (mixed) {
@@ -507,7 +536,7 @@ function Revise({ R }: { R: PlanRecord }) {
         }
         ops={<OpsBox items={[['', fail]]} />}
         foot={
-          <button className="btn pri" disabled={!ok} onClick={() => void revise(R.id)}>
+          <button className="btn pri" disabled={!ok} onClick={() => (skillComment || r.fromComment ? confirmReviseComment(R, skillComment || undefined, () => void revise(R.id)) : confirmReviseSkillsExclusion(R, () => void revise(R.id)))}>
             <Icon name="retry" />
             {skillComment ? '재요청하기' : '다시 시도하기'}
           </button>
@@ -528,7 +557,13 @@ function Revise({ R }: { R: PlanRecord }) {
             const rows = plan.acts.filter(activity => activity.skill === skillComment && !unchanged.has(activity.id));
             return <section className={`card${index ? ' rv-recommendation-new' : ''}`} key={title}>
               <div className="sec-h"><h3 className="st">{title}</h3><span className={`tag ${index ? 'acc' : 'line'}`}>{index ? '새 제안' : '현재 계획'}</span></div>
-              <div className="stack">{rows.map(activity => {
+              <div className="stack">
+                {plan.acts.filter(activity => activity.skill === skillComment && activity.res && st(R.progress, activity.id) === 'done').map(activity => (
+                  <p className="small muted" key={'done-' + activity.id}>
+                    <span className="tag ok">강좌 완료</span> {activity.title} (기존 유지)
+                  </p>
+                ))}
+                {rows.map(activity => {
                 const item = { ...activity, skill: skillComment, how: activity.how || '' };
                 if (!activity.res) return <div className="review-task" key={activity.id}><ReviewTaskCopy task={item} /></div>;
                 const report = plan.def.learningReport as ReviewMaterials | undefined;
@@ -539,7 +574,7 @@ function Revise({ R }: { R: PlanRecord }) {
               })}</div>
             </section>;
           })}
-        </div> : mixed ? <SkillRevisionChoices pd={pd} selected={selectedSkills} retrying={retrying} onRetry={skill => void retrySkill(skill)} onPick={(skill, recommended) =>
+        </div> : mixed ? <SkillRevisionChoices pd={pd} selected={selectedSkills} retrying={retrying} progress={R.progress} onRetry={skill => confirmSkillRevisionSingle(R, skill, () => void retrySkill(skill))} onPick={(skill, recommended) =>
           setPicks({ revisionId, skills: recommended ? [...new Set([...selectedSkills, skill])] : selectedSkills.filter(name => name !== skill) })
         } /> : <DiffView pd={pd} />}
       </>
@@ -601,7 +636,7 @@ function Revise({ R }: { R: PlanRecord }) {
       {!skillComment && !mixed && <RevForm R={R} />}
       {fail && !busy ? null : (
         <div className="actions rv-act">
-          <button className={`btn ${pd ? 'line' : 'pri'}`} disabled={!ok || !!retrying} onClick={() => void revise(R.id)}>
+          <button className={`btn ${pd ? 'line' : 'pri'}`} disabled={!ok || !!retrying} onClick={() => (skillComment || r.fromComment ? confirmReviseComment(R, skillComment || undefined, () => void revise(R.id)) : confirmReviseSkillsExclusion(R, () => void revise(R.id)))}>
             {busy ? '수정안을 만드는 중…' : mixed ? '전체 재요청' : skillComment ? '재요청하기' : pd ? '수정안 다시 만들기' : '수정안 만들기'}
           </button>
         </div>

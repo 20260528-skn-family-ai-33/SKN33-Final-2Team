@@ -138,12 +138,6 @@ function Post({ R }: { R: PlanRecord }) {
       });
     }
   }, [R.id]);
-  /* 작성 완료된 보고서가 있으면 상세 화면으로 이동 */
-  useEffect(() => {
-    if (reportId && !running && window.location.pathname === paths.post(R.id)) {
-      go(paths.report(reportId));
-    }
-  }, [reportId, running, go, R.id]);
   /* 새로 고침·재접속: 쓰던 보고서는 서버 작업을 이어서 기다린다(새 작업을 만들지 않음 · 10/20) */
   useEffect(() => {
     if (running && jobId) void waitReport(go, R.id, jobId);

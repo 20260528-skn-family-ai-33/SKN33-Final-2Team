@@ -89,9 +89,15 @@ def finish_option(pid: str, raw: dict, source: str, off_domain: bool = False, ke
         wh = float(raw.get('weeklyHours'))
     except (TypeError, ValueError):
         wh = 0
+    DEFAULT_PROS = {
+        'A1': ['강좌비 0원의 경제적인 무료 학습', '공식 문서와 검증된 공개 자료 중심 학습'],
+        'A2': ['핵심 최소 기능(MVP) 빠른 집중 구현', '불필요한 범위를 줄여 학습 시간 단축'],
+        'A3': ['실무 심층 구현 및 설계 대안 비교', '정밀한 품질·성능 측정과 프로덕션 수준 검증'],
+    }
     display_title = ' '.join(str(raw.get('displayTitle') or '').split())[:30]
+    pros = lst(raw.get('pros')) or DEFAULT_PROS.get(pid, [])
     option = {'displayTitle': display_title, 'id': pid, 'name': per['name'], 'short': per['short'], 'tagline': str(raw.get('tagline') or per['focus'])[:60], 'reason': str(raw.get('reason') or ''),
-            'pros': lst(raw.get('pros')), 'cons': lst(raw.get('cons')), 'scope': str(raw.get('scope') or ''), 'acts': acts,
+            'pros': pros, 'cons': lst(raw.get('cons')), 'scope': str(raw.get('scope') or ''), 'acts': acts,
             'weeklyHours': round(wh * 2) / 2 if 0.5 <= wh <= 40 else None, 'source': source, 'offDomain': bool(off_domain)}
     if preserve_learning_skills:
         option.update({field: copy.deepcopy(raw[field]) for field in LEARNING_SKILL_FIELDS if field in raw})
@@ -691,6 +697,7 @@ REV_SYS = """너는 GrowPath '로드맵 계획 에이전트'의 관점별 하위
 - 바꾸지 않는 활동은 current의 stage·title·res·hours·how·skills·skill을 글자 그대로 쓴다. 표현만 다듬지 않는다. 요청과 관계없는 주당 시간도 그대로 둔다.
 - 활동마다 key를 쓴다. current의 활동을 그대로 두거나 단계·시간·설명만 고친 활동은 그 활동의 key를 그대로 쓴다(진행 기록이 key로 이어진다). 다른 자료·다른 과제로 바꾸거나 새로 넣은 활동은 key를 null로 둔다.
 - 완료한 활동(done: true)은 요청이 없으면 빼거나 바꾸지 않는다. 요청에 없는 활동을 새로 더하지 않는다.
+- 스킬당 강좌(course) 활동은 정확히 1개만 허용된다. 이미 완료(done: true)된 강좌가 있는 스킬에는 새 강좌를 추가하거나 중복 추천하지 않고 완료된 강좌만 유지한다. 완료된 강좌 아래에 새로운 강좌를 추가해 강좌가 2개 이상으로 증식되지 않도록 한다.
 - changes.perspective가 있으면 너의 관점으로 로드맵을 새로 쓴다. current는 참고만 하고, 계속 쓸 자료와 완료한 활동은 그대로 둔다.
 - removeActs의 활동은 뺀다. replaceActs의 활동은 catalog의 다른 자료나 다른 실습 과제로 바꾼다(replaceHint 참고). addResources는 catalog id를 그대로 res로 넣고, addTasks는 실습 과제(res null)로 넣는다.
 - handoff.prefs의 주당 시간(weeklyHours)·예산(budgetWon)·학습 방식(format)·자격(certRes)을 지킨다. 기간(deadlineWeeks)은 참고 조건이며 모든 코스에 기간 상한을 적용하지 않는다. 실제 자료 기준의 기간을 계산한다. weeklyHours가 null이면 관점과 기간에 맞게 정해 weeklyHours에 쓴다. certRes가 있으면 그 자격 자료를 4단계에 넣고, 없으면 자격 준비 활동은 뺀다.

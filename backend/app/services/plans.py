@@ -469,9 +469,15 @@ def _skill_comment_option(out: dict, base: dict, targets: dict, skill: str, hand
     courses = [a for a in proposals if a.get('res') and a['res'] not in old_ids
                and (RM._res(a['res']) or {}).get('type') == 'course']
     tasks = [a for a in proposals if not a.get('res') and (a['title'], a.get('how') or '') not in old_tasks]
-    if len(courses) != 1 or len(tasks) != 1:
-        raise ApiError(422, 'SKILL_REVISION_INVALID', '이 스킬의 새 강좌와 산출물을 하나씩 확인하지 못했어요. 다시 요청해 주세요.')
-    replacement = {targets['course']['id']: courses[0], targets['task']['id']: tasks[0]}
+    replacement = {}
+    if 'course' in targets:
+        if not courses:
+            raise ApiError(422, 'SKILL_REVISION_INVALID', '이 스킬의 새 강좌를 확인하지 못했어요. 다시 요청해 주세요.')
+        replacement[targets['course']['id']] = courses[0]
+    if 'task' in targets:
+        if not tasks:
+            raise ApiError(422, 'SKILL_REVISION_INVALID', '이 스킬의 새 산출물을 확인하지 못했어요. 다시 요청해 주세요.')
+        replacement[targets['task']['id']] = tasks[0]
     option = copy.deepcopy(base['def'])
     option.pop('support', None)
     option.pop('supportFail', None)
@@ -548,12 +554,21 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
                 targets.setdefault('task', activity)
             elif (RM._res(resource) or {}).get('type') == 'course':
                 targets.setdefault('course', activity)
-        if len(targets) != 2:
-            raise ApiError(422, 'SKILL_REVISION_TARGET', '이 스킬에 교체 가능한 미완료 강좌와 산출물이 각각 필요해요.')
+        if len(targets) == 0:
+            raise ApiError(422, 'SKILL_REVISION_TARGET', '이 스킬의 활동이 모두 완료되어 수정할 대상이 없어요.')
         ch['c']['replaceActs'] = [{'key': a['id'], 'title': a['title']} for a in targets.values()]
-        ch['c']['replaceHint'] = f'{skill}의 지정 강좌 1개와 산출물 1개 교체. 강좌는 실제 카탈로그의 다른 강좌. 그 외 활동 유지.'
+        needed_parts = []
+        if 'course' in targets:
+            needed_parts.append('강좌 1개')
+        if 'task' in targets:
+            needed_parts.append('산출물 1개')
+        ch['c']['replaceHint'] = f"{skill}의 {'와 '.join(needed_parts)} 교체. 그 외 활동 유지."
         feedback = ' / '.join(comment.get(key) or '' for key in ('fit', 'fitText', 'level', 'levelText', 'free')).strip(' /')
         req = f'{skill} 담당 부서장 의견: {feedback}\n{req}'.strip()
+        if 'course' not in targets and 'task' in targets:
+            req = f'{skill}의 강좌는 이미 완료되었습니다. 완료된 강좌는 새 강좌를 추가하지 말고 그대로 유지하고, 미완료 산출물만 새로 작성해 주세요.\n{req}'
+        elif 'task' not in targets and 'course' in targets:
+            req = f'{skill}의 산출물은 이미 완료되었습니다. 완료된 산출물은 그대로 유지하고, 미완료 강좌만 새로 추천해 주세요.\n{req}'
     if (base.get('def') or {}).get('learningReport') and (skill or not rev.get('fromComment')):
         req = (req + '\n도서 유지. 새 산출물 설명 형식: 만들 것:, 필수 항목:, 제출물:, 평가 기준:. 각 항목 내용 필수.').strip()
     if retry:
@@ -589,7 +604,7 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
         if skill:
             # 교체된 산출물에는 이전 완료 기록을 연결하지 않는다.
             for index, activity in enumerate(d['acts']):
-                if activity['id'] == targets['task']['id']:
+                if 'task' in targets and activity['id'] == targets['task']['id']:
                     activity['id'] = f"{base['opt'].lower()}-v{base['version'] + 1}-task-{index + 1}"
         to = RM.build_plan(d, {'start': ch['start'], 'hours': base['hours'] if skill else prefs_h['weeklyHours'] or d.get('weeklyHours') or base['hours'] or D['autoHours'], 'format': prefs_h['formatKey'], 'patch': {}}, base['goal'])
         if retry:

@@ -60,7 +60,7 @@ export function InputSkills(){
           onDragEnd={()=>{setDragging(null);setDropTarget(null);}}
           onDrop={event=>{event.preventDefault();if(dragging&&!busy)move(dragging,row.name);setDragging(null);setDropTarget(null);}}>
           <span className="input-skill-grip" aria-hidden="true">⠿</span><span className="input-skill-number" aria-hidden="true">{index+1}</span>
-          <div className="input-skill-copy"><h3>{row.name}</h3><p>{row.application}</p>{row.reason&&<details className="input-skill-reason"><summary>선정 이유</summary><p>{row.reason}</p></details>}</div>
+          <div className="input-skill-copy"><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><h3>{row.name}</h3>{row.learned && <span className="tag acc" style={{ fontSize: '0.75rem', padding: '2px 6px' }}>학습 완료</span>}</div><p>{row.application}</p>{row.reason&&<details className="input-skill-reason"><summary>선정 이유</summary><p>{row.reason}</p></details>}</div>
           <div className="input-skill-actions" role="group" aria-label={`${row.name} 순서와 포함 여부`}>
             <div className="input-skill-arrows"><button type="button" disabled={busy||index===0} aria-label={`${row.name} 위로`} onClick={()=>move(row.name,selected[index-1].name)}>↑</button><button type="button" disabled={busy||index===selected.length-1} aria-label={`${row.name} 아래로`} onClick={()=>move(row.name,selected[index+1].name)}>↓</button></div>
             <button type="button" className="input-skill-exclude" aria-label={`${row.name} 제외`} disabled={busy||selected.length===1} onClick={()=>save(selected.filter(item=>item.name!==row.name))}>제외</button>

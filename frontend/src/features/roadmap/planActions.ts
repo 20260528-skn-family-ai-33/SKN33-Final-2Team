@@ -1,15 +1,16 @@
 /* 확정한 로드맵 서버 동기화·동작 (5차 gp-parts.js takePlan·pullPlan·saveProgress·revise·acceptRevision·dropRevision, gp-app.js 보관·다시 진행) */
-import { useEffect } from 'react';
+import { createElement as h, useEffect } from 'react';
 import { plansApi } from '@/api/endpoints/plans';
 import type { PlanRecord, PlanResponse, RevForm } from '@/api/types/plan';
 import { paths } from '@/app/paths';
 import type { useGo } from '@/shared/hooks/useGo';
 import { failToast } from '@/shared/lib/fail';
 import { clone } from '@/shared/lib/format';
+import { isBookActivity, st } from '@/shared/lib/plan';
 import { cause } from '@/shared/state/ai';
 import { mergeReg, mergeRes } from '@/shared/state/catalog';
 import { me } from '@/shared/state/session';
-import { toast } from '@/shared/state/ui';
+import { closeSheet, openSheet, toast } from '@/shared/state/ui';
 import { putRec, updateWs, useWs, ws } from '@/shared/state/workspace';
 
 type Go = ReturnType<typeof useGo>;
@@ -213,20 +214,255 @@ export async function dropRevision(go: Go, pid: string): Promise<void> {
   toast('현재 상태를 유지했어요.');
 }
 
+/** 일반 수정 요청: 강좌 또는 산출물 중 하나라도 완료된 스킬은 수정안에서 제외하고 안내 (#226) */
+export function confirmReviseSkillsExclusion(
+  R: PlanRecord,
+  onConfirm: (excludedSkills: string[], remainingSkills: string[]) => void,
+): void {
+  const acts = R.plan.acts.filter((a) => !isBookActivity(a) && a.skill);
+  const skillMap = new Map<string, { done: boolean; acts: typeof acts }>();
+  for (const a of acts) {
+    if (!a.skill) continue;
+    if (!skillMap.has(a.skill)) {
+      skillMap.set(a.skill, { done: false, acts: [] });
+    }
+    const info = skillMap.get(a.skill)!;
+    info.acts.push(a);
+    if (st(R.progress, a.id) === 'done') {
+      info.done = true;
+    }
+  }
+  const allSkills = Array.from(skillMap.keys());
+  const doneSkills = allSkills.filter((s) => skillMap.get(s)?.done);
+  const remainingSkills = allSkills.filter((s) => !skillMap.get(s)?.done);
+
+  if (doneSkills.length === 0) {
+    onConfirm([], allSkills);
+    return;
+  }
+
+  openSheet({
+    title: '수정 대상 스킬 안내',
+    body: () =>
+      h('div', null, [
+        h(
+          'p',
+          { key: 'p1' },
+          `${doneSkills.join(', ')} 스킬은 이미 완료된 강좌 또는 산출물이 있어 수정안에서 제외됩니다.`,
+        ),
+        remainingSkills.length > 0
+          ? h('p', { key: 'p2' }, [
+              '나머지 스킬(',
+              h('b', { key: 'b' }, remainingSkills.join(', ')),
+              ')만 수정안을 생성할까요?',
+            ])
+          : h(
+              'p',
+              { key: 'p2', className: 'muted' },
+              '모든 스킬에 완료된 강좌 또는 산출물이 있어 새로 수정할 대상이 없습니다.',
+            ),
+        h(
+          'p',
+          { key: 'p3', className: 'small muted' },
+          '완료된 강좌 및 산출물은 안전하게 보존되며 진행 기록이 유지됩니다.',
+        ),
+      ]),
+    foot: () =>
+      h(
+        'div',
+        { className: 'actions' },
+        remainingSkills.length > 0
+          ? [
+              h(
+                'button',
+                {
+                  key: 'ok',
+                  type: 'button',
+                  className: 'btn pri',
+                  onClick: () => {
+                    closeSheet();
+                    onConfirm(doneSkills, remainingSkills);
+                  },
+                },
+                '나머지 스킬 수정안 생성',
+              ),
+              h(
+                'button',
+                {
+                  key: 'cancel',
+                  type: 'button',
+                  className: 'btn line',
+                  onClick: closeSheet,
+                },
+                '취소',
+              ),
+            ]
+          : [
+              h(
+                'button',
+                {
+                  key: 'close',
+                  type: 'button',
+                  className: 'btn pri',
+                  onClick: closeSheet,
+                },
+                '확인',
+              ),
+            ],
+      ),
+  });
+}
+
+/** 단일 스킬 수정 요청: 해당 스킬에 완료된 강좌나 산출물이 있으면 제외 안내 (#226) */
+export function confirmSkillRevisionSingle(
+  R: PlanRecord,
+  skill: string,
+  onConfirm: () => void,
+): void {
+  const acts = R.plan.acts.filter(
+    (a) => !isBookActivity(a) && a.skill === skill,
+  );
+  const hasDone = acts.some((a) => st(R.progress, a.id) === 'done');
+
+  if (hasDone) {
+    openSheet({
+      title: `${skill} 수정 요청 불가`,
+      body: () =>
+        h('div', null, [
+          h(
+            'p',
+            { key: 'p1' },
+            `${skill} 스킬은 이미 완료된 강좌 또는 산출물이 있어 수정안에서 제외됩니다.`,
+          ),
+          h(
+            'p',
+            { key: 'p2', className: 'small muted' },
+            '완료된 항목이 포함된 스킬은 계획과 진행 기록이 보존됩니다.',
+          ),
+        ]),
+      foot: () =>
+        h('div', { className: 'actions' }, [
+          h(
+            'button',
+            {
+              key: 'ok',
+              type: 'button',
+              className: 'btn pri',
+              onClick: closeSheet,
+            },
+            '확인',
+          ),
+        ]),
+    });
+    return;
+  }
+  onConfirm();
+}
+
+/** 코멘트로 인한 수정: 강좌와 산출물 중 완료된 게 있으면 미완료 부분만 새로 작성할지 확인 (#226) */
+export function confirmReviseComment(
+  R: PlanRecord,
+  skill: string | undefined,
+  onConfirm: () => void,
+): void {
+  const acts = R.plan.acts.filter(
+    (a) => !isBookActivity(a) && (!skill || a.skill === skill),
+  );
+  const doneActs = acts.filter((a) => st(R.progress, a.id) === 'done');
+  const undoneActs = acts.filter((a) => st(R.progress, a.id) !== 'done');
+
+  if (doneActs.length === 0) {
+    onConfirm();
+    return;
+  }
+
+  const doneTitles = doneActs.map((a) => a.title).join(', ');
+  const undoneTitles =
+    undoneActs.length > 0
+      ? undoneActs.map((a) => a.title).join(', ')
+      : '미완료 항목';
+
+  openSheet({
+    title: skill ? `${skill} 코멘트 수정 요청` : '코멘트 수정 요청 확인',
+    body: () =>
+      h('div', null, [
+        h('p', { key: 'p1' }, `${doneTitles}은(는) 이미 완료되었습니다.`),
+        h('p', { key: 'p2' }, [
+          h('b', { key: 'b' }, undoneTitles),
+          '만 새로 작성해 드릴까요?',
+        ]),
+        h(
+          'p',
+          { key: 'p3', className: 'small muted' },
+          '완료된 강좌 및 산출물은 안전하게 보존되며 진행 기록이 유지됩니다.',
+        ),
+      ]),
+    foot: () =>
+      h('div', { className: 'actions' }, [
+        h(
+          'button',
+          {
+            key: 'ok',
+            type: 'button',
+            className: 'btn pri',
+            onClick: () => {
+              closeSheet();
+              onConfirm();
+            },
+          },
+          '새로 작성',
+        ),
+        h(
+          'button',
+          {
+            key: 'cancel',
+            type: 'button',
+            className: 'btn line',
+            onClick: closeSheet,
+          },
+          '취소',
+        ),
+      ]),
+  });
+}
+
+/** 하위 호환용 alias */
+export const confirmReviseUndoneOnly = confirmReviseComment;
+
 /** 수정 요청 시작: 쓰던 양식이 없으면 새로 만든다 */
 export function startRevise(go: Go, pid: string): void {
   const R = ws().plans[pid];
   if (!R || R.status !== 'active') return;
   const integrated = !!R.plan.def.learningReport;
-  const resume = R.revision?.status === 'running' || (integrated && !!R.pending && !R.rev?.fromComment);
-  if (!resume)
-    updateWs((s) => {
-      s.plans[pid].rev = freshRev(s.plans[pid], integrated
-        ? '기존 목표와 스킬 순서, 학습 여건을 유지하고 스킬별로 개선할 강좌와 산출물을 제안해 주세요. 도서와 완료한 활동은 유지해 주세요. 새 산출물 설명은 만들 것:, 필수 항목:, 제출물:, 평가 기준: 순서로 각 항목을 작성해 주세요.' : '');
-      s.plans[pid].pending = null;
+  const resume =
+    R.revision?.status === 'running' ||
+    (integrated && !!R.pending && !R.rev?.fromComment);
+
+  const proceed = (doneSkills: string[] = [], remainingSkills: string[] = []) => {
+    if (!resume)
+      updateWs((s) => {
+        let note = integrated
+          ? '기존 목표와 스킬 순서, 학습 여건을 유지하고 스킬별로 개선할 강좌와 산출물을 제안해 주세요. 도서와 완료한 활동은 유지해 주세요.'
+          : '';
+        if (doneSkills.length > 0) {
+          note += ` 이미 완료된 활동이 있는 스킬(${doneSkills.join(', ')})은 그대로 유지하고, 나머지 스킬(${remainingSkills.join(', ')})만 수정안을 작성해 주세요.`;
+        }
+        note +=
+          ' 이미 완료된 강좌가 있는 스킬은 새 강좌를 추가하지 마세요. 새 산출물 설명은 만들 것:, 필수 항목:, 제출물:, 평가 기준: 순서로 각 항목을 작성해 주세요.';
+        s.plans[pid].rev = freshRev(s.plans[pid], note);
+        s.plans[pid].pending = null;
+      });
+    go(paths.revise(pid));
+    if (integrated && !resume) void revise(pid);
+  };
+
+  if (!resume) {
+    confirmReviseSkillsExclusion(R, (doneSkills, remainingSkills) => {
+      proceed(doneSkills, remainingSkills);
     });
-  go(paths.revise(pid));
-  if (integrated && !resume) void revise(pid);
+  } else {
+    proceed();
+  }
 }
 
 /* 보관(API-41): 진행을 멈추고 지난 로드맵으로 옮긴다. 기록은 그대로이고 언제든 다시 진행할 수 있다(API-42) */

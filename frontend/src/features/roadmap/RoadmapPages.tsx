@@ -22,7 +22,7 @@ import { newComments, planReports, recs, updateWs, useWs } from '@/shared/state/
 import { Icon } from '@/shared/ui/Icon';
 import { Note, Page, Stats } from '@/shared/ui/parts';
 import { Alerts, NoPlan, openPreAnswers, openVersions, PlanGate, postStart } from './parts';
-import { archivePlan, resumePlan, revise, startRevise } from './planActions';
+import { archivePlan, confirmReviseComment, resumePlan, revise, startRevise } from './planActions';
 import { useState } from 'react';
 import { won } from '@/shared/lib/format';
 
@@ -326,10 +326,12 @@ function RoadView({ R }: { R: PlanRecord }) {
       onClick={event => {
         event.preventDefault();
         event.stopPropagation();
-        if (prepareCommentRevision(R.id, comment)) {
-          go(paths.revise(R.id));
-          void revise(R.id);
-        }
+        confirmReviseComment(R, skill, () => {
+          if (prepareCommentRevision(R.id, comment)) {
+            go(paths.revise(R.id));
+            void revise(R.id);
+          }
+        });
       }}>수정 요청</button>;
   };
   return (
