@@ -96,7 +96,7 @@ export function ProviderSettings() {
           {choices.map(option => <option key={option} value={option}>{levelLabel(option)} ({option})</option>)}
           {!validLevel && <option disabled value={level}>{levelLabel(level)} · 현재 모델에서 사용 불가</option>}
         </select></label>}
-        {selected === 'ollama' && <p className="small muted">추론 없음 · RunPod-Ollama는 모든 답변을 추론 없이 만들어요.</p>}
+        {selected === 'ollama' && <p className="small muted">추론 없음</p>}
         {selected && selected !== 'employee' && <ProviderKey key={selected} provider={selected} settings={data.providers[selected]} />}
         <div className="actions">
           {selected && selected !== 'employee' && <button className="btn line sm" disabled={save.isPending || check.isPending || !data.providers[selected].available}

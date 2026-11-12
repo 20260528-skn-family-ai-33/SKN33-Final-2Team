@@ -58,7 +58,7 @@ export function AiBox() {
    *  RunPod-Ollama 는 모든 생성을 추론 없이 부르므로 고르는 칸 없이 그 사실만 적는다 */
   const effort = (p: UiProvider) => {
     if (choice !== p || !ai.available(p)) return null;
-    if (p === 'ollama') return <div className="aim-effort"><small className="aim-effort-n">추론 없음 · 모든 답변을 추론 없이 만들어요</small></div>;
+    if (p === 'ollama') return <div className="aim-effort"><small className="aim-effort-n">추론 없음</small></div>;
     const levels = ai.reasoningLevels(p);
     if (!levels.length) return null;
     const def = ai.reasoningDefault(p);
