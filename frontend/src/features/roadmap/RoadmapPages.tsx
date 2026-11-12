@@ -442,11 +442,11 @@ function Confirmed({ R }: { R: PlanRecord }) {
             <div className="row top">
               <Icon name="spark" />
               <span>
-                해당 로드맵은{' '}
+                이 로드맵은{' '}
                 <b>
                   {trackName(pl.selection.perspective, pl.selection.name)}
-                </b>
-                을(를) 토대로 계획되었습니다.
+                </b>{' '}
+                방식으로 만들었어요.
               </span>
             </div>
           ) : null}

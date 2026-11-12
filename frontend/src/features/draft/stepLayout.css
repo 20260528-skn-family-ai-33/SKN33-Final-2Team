@@ -24,3 +24,6 @@
   .step-bar-btns { width: 100%; }
   .step-bar-btns .btn.pri { flex: 1; min-width: 0; }
 }
+
+/* 다음 버튼이 꺼져 있을 때 그 이유(버튼 줄 위에 한 줄) */
+.actions-why { flex-basis: 100%; margin: 0; font-size: 13.5px; color: var(--ink-3); }

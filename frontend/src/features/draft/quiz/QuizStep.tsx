@@ -12,6 +12,7 @@ import { surveyState } from './surveyState';
 import { inputSignature, invalidateDraft } from '../invalidation';
 import { answerMemoryKey, pendingAnswers, rememberAnswers } from './assessment/answerMemory';
 import { Stepper } from '../Stepper';
+import { useTestTools } from '@/shared/lib/testTools';
 import { SurveyFlow, type SurveyFlowHandle } from './assessment/SurveyFlow';
 
 export function QuizStep() {
@@ -21,6 +22,8 @@ export function QuizStep() {
   const id = useWs(s => s.draftId);
   const inputKey = useWs(s => inputSignature(s.draft));
   const go = useGo();
+  /* 무작위 선택은 시험용이라 개발 서버와 시연 도구를 켠 빌드에서만 보인다(#74 · #224) */
+  const testTools = useTestTools();
   const [loaded, setLoaded] = useState<{ key: string; survey: Stored | null; error: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -83,9 +86,9 @@ export function QuizStep() {
     return () => { active = false; clearTimeout(timer); };
   },[id,owner,inputKey,requestKey,survey]);
   return <><Stepper cur="quiz" busy={saving} /><Page title={<span style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>역량 테스트
-    <button type="button" className="btn line" style={{ fontSize: 12, padding: '5px 10px', minHeight: 0 }} disabled={!survey || survey.completed} onClick={() => surveyRef.current?.randomize()}>test용으로 삭제예정 · 무작위 선택</button>
+    {testTools ? <button type="button" className="btn line" style={{ fontSize: 12.5, padding: '5px 10px', minHeight: 0 }} disabled={!survey || survey.completed} onClick={() => surveyRef.current?.randomize()}>시험용 · 무작위 선택</button> : null}
   </span>}
-    lead="프로젝트와 함께 키우고 싶은 역량, 현재 업무 배경에 맞춘 설문과 퀴즈를 확인해요. 모든 응답을 마치면 다음 단계로 이어집니다.">
+    lead="프로젝트와 키우고 싶은 역량, 지금 하는 업무에 맞춘 설문과 퀴즈예요. 결과는 로드맵 3안을 내 수준에 맞추는 데 써요.">
     {error ? <div className="card"><p role="alert">{error}</p><div className="actions">
       <button className="btn line" onClick={() => go(paths.newDetailsCheck)}>입력 내용 확인</button>
       <button className="btn pri" onClick={() => setAttempt(n => n + 1)}>다시 시도하기</button></div></div>

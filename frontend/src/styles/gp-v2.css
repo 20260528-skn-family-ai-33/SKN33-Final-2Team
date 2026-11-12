@@ -18,7 +18,9 @@
 .stepper li { flex: 1; position: relative; }
 .stepper button { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; min-width: 92px; padding: 6px 4px; border: 0; border-radius: 10px; background: none; font-size: 12.5px; color: var(--ink-3); }
 .stepper button:hover:not(:disabled) { background: rgba(0, 0, 0, .04); }
-.stepper button:disabled { cursor: default; opacity: .45; }
+/* 잠긴 단계는 번호만 흐리게 하고 이름은 읽히게 둔다. 저장 중(is-busy)에 잠깐 눌리지 않는 것은 흐리게 하지 않는다(#224) */
+.stepper button:disabled { cursor: default; }
+.stepper li.lock .sn { border-style: dashed; opacity: .55; }
 .stepper .sn { position: relative; z-index: 1; width: 28px; height: 28px; display: grid; place-items: center; border: 1.5px solid var(--line-2); border-radius: 50%; background: #fff; font-size: 12.5px; font-weight: 700; color: var(--ink-3); }
 .stepper .sn svg { width: 14px; height: 14px; stroke-width: 3; }
 .stepper li.done .sn { background: var(--accent-soft2); border-color: var(--accent-line); color: var(--accent-ink); }

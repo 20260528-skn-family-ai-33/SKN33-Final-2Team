@@ -7,3 +7,9 @@
 .v2-survey-review .quiz-result-number{display:inline-flex;align-items:center;vertical-align:middle;white-space:nowrap;padding:3px 9px;margin:0 6px 3px 0;border:1px solid var(--line-2);border-radius:7px;background:var(--surface-2);font-size:12px;line-height:1.5;font-weight:700}.v2-survey-review .quiz-result-number.correct{color:#23743a;background:#eaf6ed;border-color:#83b58e}.v2-survey-review .quiz-result-number.wrong{color:#b4232a;background:#fff0f1;border-color:#d99296}
 
 .v2-survey-review .scale label.selected{color:var(--accent-ink);background:var(--accent-soft);border-color:var(--accent)}
+
+/* 빠뜨린 문항 표시와 완료 전 안내(#224) */
+.v2-survey fieldset.is-missing{border-color:var(--danger,#C2362F);box-shadow:0 0 0 2px color-mix(in srgb,var(--danger,#C2362F) 22%,transparent);scroll-margin:120px}
+.v2-survey .missing-tag{display:inline-block;margin-left:8px;padding:1px 7px;border-radius:6px;background:color-mix(in srgb,var(--danger,#C2362F) 12%,transparent);color:var(--danger,#C2362F);font-size:12px;font-weight:600}
+.v2-survey .finish-note{margin:16px 0 8px;text-align:right;font-size:13px}
+.v2-survey-review .answer-label{font-size:12px}

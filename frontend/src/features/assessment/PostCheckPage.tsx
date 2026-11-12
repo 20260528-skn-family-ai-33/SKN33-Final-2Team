@@ -23,6 +23,7 @@ import { deepOpen, ensurePostQuiz, makeReport, savePost, waitReport } from './po
 import { QuizBody } from './quizParts';
 import { PostQuiz } from './PostQuiz';
 import { fillRandomPost } from './postRandom';
+import { useTestTools } from '@/shared/lib/testTools';
 
 const POST_DEEP_AGENT = '진단 에이전트 · 사후 심화 질문 생성';
 const pdAsk = new Set<string>();
@@ -123,6 +124,8 @@ function Post({ R }: { R: PlanRecord }) {
   const submitted = !!R.post.submitted;
   const locked = running || !!reportId;
   const quizLocked = locked || submitted;
+  /* 무작위 선택은 시험용이라 개발 서버와 시연 도구를 켠 빌드에서만 보인다(#74 · #224) */
+  const testTools = useTestTools();
   const curPhase = locked && hasQuiz ? 'quizzes' : phase;
   const jobId = R.post.jobId;
   useEffect(() => () => {
@@ -182,13 +185,13 @@ function Post({ R }: { R: PlanRecord }) {
   return (
     <Page
       back={paths.checks}
-      title={<span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>사후 점검<button type="button" className="btn line" style={{ height: 26, minHeight: 0, padding: '3px 9px', fontSize: 11 }} disabled={quizLocked} onClick={() => {
+      title={<span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>사후 점검{testTools ? <button type="button" className="btn line" style={{ height: 30, minHeight: 0, padding: '4px 10px', fontSize: 12.5 }} disabled={quizLocked} onClick={() => {
         updateWs(state => {
           fillRandomPost(state.plans[R.id]);
         });
         if (quizPending) toast('설문과 목표 달성 응답을 선택했어요. 퀴즈가 준비되면 무작위 선택을 한 번 더 눌러 주세요.');
         void savePost(R.id);
-      }}>test용으로 삭제예정 · 무작위 선택</button></span>}
+      }}>시험용 · 무작위 선택</button> : null}</span>}
       lead="설문은 사전과 같은 문항이고, 퀴즈는 같은 스킬·개념의 새 문제예요. 지금 기준으로 답해 주세요. 설문은 1~5점, 퀴즈는 보기 중 하나를 선택해요."
       foot={
         reportId ? (

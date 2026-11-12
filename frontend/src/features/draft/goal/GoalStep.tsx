@@ -18,7 +18,9 @@ import { AgentRow, Note, OpsBox, Page, runSub } from '@/shared/ui/parts';
 import { Skeleton } from '@/shared/ui/Skeleton';
 import { draftCall, pullDraft } from '../draftSync';
 import { clearProject, docDoneText, uploadProject } from './projectDoc';
-import { docBusy, goalOk } from '../model';
+import { DownstreamNotice } from '../DownstreamNotice';
+import { docBusy, goalOk, stepLabel } from '../model';
+import '../stepLayout.css';
 import { StaleNote } from '../stale';
 import { Stepper } from '../Stepper';
 import { useDraftWatch } from '../useDraftWatch';
@@ -335,13 +337,17 @@ export function GoalStep() {
       <Stepper cur="goal" busy={busy} />
       <Page
         title="어떤 역량을 키우고 싶나요?"
-        lead="목표와, 적용할 프로젝트 기획서가 있으면 함께 알려 주세요. 기획서는 진단 에이전트가 읽고 요약해요. 학습 여건은 다음 단계에서 적어 주세요(모두 선택)."
+        lead="목표와, 적용할 프로젝트 기획서가 있으면 함께 알려 주세요. 기획서는 AI가 읽고 요약해요. 학습 여건은 다음 단계에서 적어요."
         foot={
-          <button className="btn pri" disabled={!ok} onClick={proceed}>
-            다음: 세부 사항
-          </button>
+          <>
+            {!ok ? <p className="actions-why" role="status">{busy ? '기획서를 읽고 있어요. 다 읽으면 다음으로 넘어갈 수 있어요.' : '목표를 4자 이상 적거나 목표 후보를 골라 주세요.'}</p> : null}
+            <button className="btn pri" disabled={!ok} onClick={proceed}>
+              다음: {stepLabel('details')}
+            </button>
+          </>
         }
       >
+        <DownstreamNotice />
         <div className="card">
           <div className="field">
             <label>키우고 싶은 역량</label>
