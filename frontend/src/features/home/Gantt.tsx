@@ -99,7 +99,8 @@ function Row({ lv, ins, label, bar, tip }: { lv: number; ins: string[]; label: R
   return (
     <div className={`gt-row lv${lv}`} data-in={ins.join(' ')} hidden={ins.some((k) => gtFold.has(k))} data-tv={tip.v} data-tt={tip.t} data-tm={tip.m}>
       <div className="gt-l">{label}</div>
-      <div className="gt-tl">{bar}</div>
+      {/* 막대는 일정 구간(gt-span) 안에서만 자리를 잡는다. 화면이 넓어 날짜 칸을 더 그려도 막대 길이는 그대로다 */}
+      <div className="gt-tl"><div className="gt-span">{bar}</div></div>
     </div>
   );
 }
@@ -338,18 +339,18 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
   );
 }
 
-/** 칸 하나의 최소 폭. 일정이 짧으면 칸을 늘려 한 화면에 채우고, 길면 이 폭을 지키며 옆으로 민다(#224) */
-const DAY_MIN = 26;
+/** 하루 칸의 폭은 화면 폭과 상관없이 같게 둔다. 화면이 넓으면 칸을 늘리지 않고 일정 뒤의 날짜를 더 보여 주고,
+    일정이 화면보다 길면 옆으로 민다(#224). 주 단위는 일정 전체를 한눈에 보는 용도라 화면에 맞춰 늘린다 */
+const DAY_WIDTH = 40;
 const WEEK_MIN = 34;
 
 /** 머리 줄(칸 이름 두 줄) + 세로 칸 선·이번 주 칸 + 줄들 + 범례 */
-function Card({ title, link, heads, cols, days, rows, note, cls }: { title: ReactNode; link: ReactNode; heads: [string, string]; cols: GtCol[]; days?: GtCol[]; rows: ReactNode; note: string; cls?: string }) {
+function Card({ title, link, heads, cols, total, days, rows, note, cls }: { title: ReactNode; link: ReactNode; heads: [string, string]; cols: GtCol[]; /** 일정 전체 일 수 */ total: number; /** 첫날부터 n일의 하루 단위 칸 */ days?: (n: number) => GtCol[]; rows: ReactNode; note: string; cls?: string }) {
   const tip = useTip();
   const scroll = useRef<HTMLDivElement>(null);
   /* 처음에는 하루 단위로 보여 준다. 배율(%) 조절은 없애고 일·주 단위만 바꾼다 */
   const [unit, setUnit] = useState<'day' | 'week'>(days ? 'day' : 'week');
   const daily = !!days && unit === 'day';
-  const visibleCols = daily ? days! : cols;
   const [available, setAvailable] = useState(0);
   useEffect(() => {
     const element = scroll.current;
@@ -363,8 +364,14 @@ function Card({ title, link, heads, cols, days, rows, note, cls }: { title: Reac
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
-  const width = Math.max(available, visibleCols.length * (daily ? DAY_MIN : WEEK_MIN));
+  /* 하루 단위: 화면에 들어가는 만큼 날짜 칸을 더 그린다(막대는 일정 구간 안에만) */
+  const dayCount = Math.max(total, Math.floor(available / DAY_WIDTH));
+  const visibleCols = daily ? days!(dayCount) : cols;
+  const span = daily ? total / dayCount : 1;
+  const width = daily ? Math.max(available, dayCount * DAY_WIDTH) : Math.max(available, cols.length * WEEK_MIN);
   const scrolls = width > available + 1;
+  /* 주 단위는 하루 단위로 일정이 한 화면에 안 들어올 때만 쓸모가 있어, 그때만 전환 버튼을 보여 준다 */
+  const dayOverflows = !!days && total * DAY_WIDTH > available + 1;
   const [dragging, setDragging] = useState(false);
   const drag = useRef<{ pointer: number; x: number; left: number; moved: boolean } | null>(null);
   const suppressClick = useRef(false);
@@ -388,7 +395,7 @@ function Card({ title, link, heads, cols, days, rows, note, cls }: { title: Reac
       <div className="sec-h">
         <h2 className="st">{title}</h2>
         <div className="gt-view-controls" role="group" aria-label="일정표 보기 조절">
-          {days ? <span className="gt-unit" role="group" aria-label="칸 단위">
+          {dayOverflows || (days && !daily) ? <span className="gt-unit" role="group" aria-label="칸 단위">
             <button type="button" aria-pressed={daily} onClick={() => changeUnit('day')}>일 단위</button>
             <button type="button" aria-pressed={!daily} onClick={() => changeUnit('week')}>주 단위</button>
           </span> : null}
@@ -418,7 +425,7 @@ function Card({ title, link, heads, cols, days, rows, note, cls }: { title: Reac
         onLostPointerCapture={() => { drag.current = null; setDragging(false); }}
         onClickCapture={event => { if (suppressClick.current) { event.preventDefault(); event.stopPropagation(); suppressClick.current = false; } }}>
 
-        <div className={`gt${cls ? ` ${cls}` : ''}`} style={{ ['--n' as string]: visibleCols.length, minWidth: `calc(var(--gl) + ${width}px)` }}>
+        <div className={`gt${cls ? ` ${cls}` : ''}`} style={{ ['--n' as string]: visibleCols.length, ['--gt-span' as string]: span, minWidth: `calc(var(--gl) + ${width}px)` }}>
           <div className="gt-h">
             <div className="gt-l">
               <span>{daily ? '일 단위' : heads[0]}</span>
@@ -495,7 +502,8 @@ export function GanttOne({ R }: { R: PlanRecord }) {
       }
       heads={['주차', '시작일']}
       cols={colsOne(R)}
-      days={dailyCols(base, 7 * n)}
+      total={7 * n}
+      days={(count) => dailyCols(base, count)}
       rows={<Stages R={R} off={0} T={7 * n} up={[]} onToggle={toggle} />}
       note={`1주차는 시작일(${md(base)})부터 ${md(addDays(base, 6))}까지예요.`}
     />
@@ -546,6 +554,6 @@ export function GanttAll({ list, onMove }: { list: PlanRecord[]; onMove?: (id: s
     );
   });
   return (
-    <Card title="전체 일정" link={null} heads={['', '주 시작일']} cols={cols} days={dailyCols(axis, T)} rows={rows} note="로드맵 시작일부터 7일을 1주로 세요." cls="all" />
+    <Card title="전체 일정" link={null} heads={['', '주 시작일']} cols={cols} total={T} days={(count) => dailyCols(axis, count)} rows={rows} note="로드맵 시작일부터 7일을 1주로 세요." cls="all" />
   );
 }
