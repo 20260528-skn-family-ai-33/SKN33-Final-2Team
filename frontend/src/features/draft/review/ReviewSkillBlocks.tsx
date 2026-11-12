@@ -80,6 +80,8 @@ export function ReviewSkillBlocks({ materials, acts, busy, readOnly = false, onS
     ].filter(Boolean).join(' · ');
     const memo = activities.map(a => progress?.[a.id]?.memo).find(Boolean);
     return <div className="rv-mini" key={resource.id} id={activity ? activityAnchor(activity.id) : undefined} tabIndex={activity ? -1 : undefined}>
+      {/* '도서 · 강좌' 목록은 활동마다 이 위치로 이동하므로, 한 줄로 합친 나머지 활동의 위치도 남긴다 */}
+      {activities.slice(1).map(a => <span key={a.id} id={activityAnchor(a.id)} tabIndex={-1} className="rv-anchor" />)}
       {/* 완료 표시가 없는 줄(도서)도 같은 자리를 비워 표지와 글이 한 줄로 맞게 한다 */}
       {progress ? activity && kind === 'course' ? <Stt done={activities.every(a => done(a.id))} /> : <span className="rv-stt-gap" aria-hidden="true" /> : null}
       <ResourceImage className="rv-thumb" image={resource.image} type={kind} alt="" />
