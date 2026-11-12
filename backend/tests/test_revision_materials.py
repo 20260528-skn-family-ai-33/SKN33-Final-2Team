@@ -96,3 +96,30 @@ class RevisionMaterialsTests(TestCase):
             self.option['id']=course
             out=self.rebuild()
             self.assertEqual(out['materialSchedule'][0]['weeks'],2)
+
+    def test_revision_llm_error_converts_to_api_error_without_name_error(self):
+        from app.services import plans
+        from app.errors import ApiError
+
+        # 1) _skill_comment_option 에서 LlmError 발생 시 SKILL_REVISION_INVALID 422 반환
+        with patch('app.services.material_plan.rebuild_revision', side_effect=llm.LlmError('스킬 소속 불명확')):
+            out = {'acts': [
+                {'skill': 'SQL', 'res': 'c2', 'title': 'Added', 'how': ''},
+                {'skill': 'SQL', 'res': None, 'title': 'New Task', 'how': 'New How'}
+            ]}
+            targets = {'course': {'id': 'old-course'}, 'task': {'id': 'old-task'}}
+            with self.assertRaises(ApiError) as ctx:
+                plans._skill_comment_option(out, self.old, targets, 'SQL', self.handoff)
+            self.assertEqual(ctx.exception.status, 422)
+            self.assertEqual(ctx.exception.code, 'SKILL_REVISION_INVALID')
+
+        # 2) _mix_revision_skills 에서 LlmError 발생 시 REVISION_SKILLS_INVALID 422 반환
+        proposal = deepcopy(self.old)
+        proposal['acts'] = [
+            {'id': 'new-task', 'skill': 'SQL', 'stage': 2, 'title': 'New Task', 'res': None, 'hours': 40, 'how': ''}
+        ]
+        with patch('app.services.material_plan.rebuild_revision', side_effect=llm.LlmError('자료 오류')):
+            with self.assertRaises(ApiError) as ctx:
+                plans._mix_revision_skills(self.old, proposal, self.handoff, ['SQL'], set())
+            self.assertEqual(ctx.exception.status, 422)
+            self.assertEqual(ctx.exception.code, 'REVISION_SKILLS_INVALID')

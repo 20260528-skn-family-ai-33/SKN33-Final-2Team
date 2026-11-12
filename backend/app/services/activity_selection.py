@@ -121,8 +121,35 @@ def propose(saved, draft, generate, source, *, previous=None):
     if previous:
         payload['previousProposals']=[{'acts':record['option']['acts']} for record in previous]
     raw=generate(system,payload)
+    if isinstance(raw, dict) and 'acts' not in raw and 'answer' in raw:
+        if isinstance(raw['answer'], dict):
+            raw = raw['answer']
+        elif isinstance(raw['answer'], str):
+            try:
+                raw = json.loads(raw['answer'])
+            except Exception:
+                pass
     acts=raw.get('acts') if isinstance(raw,dict) else None
     if not isinstance(acts,list) or not acts: raise ApiError(422,'ACTIVITIES_INVALID','활동 제안을 확인하지 못했어요.')
+    # 모델 응답 정규화: 파인튜닝 모델이 skills 목록이나 res 키만으로 활동을 제안한 경우 복구
+    for act in acts:
+        if not isinstance(act, dict):
+            continue
+        if not act.get('skill'):
+            if isinstance(act.get('skills'), list):
+                match = next((s for s in act['skills'] if s in active), None)
+                if match:
+                    act['skill'] = match
+            if not act.get('skill') and act.get('res'):
+                match = next((s for s in active if act['res'] in choices[s]['books'] or choices[s]['course'] == act['res']), None)
+                if match:
+                    act['skill'] = match
+            if not act.get('skill') and len(active) == 1:
+                act['skill'] = active[0]
+        if not str(act.get('how') or '').strip():
+            act['how'] = str(act.get('description') or act.get('content') or act.get('detail') or '').strip()
+        if not str(act.get('title') or '').strip() and act.get('name'):
+            act['title'] = str(act.get('name')).strip()
     summaries=validate_summaries(raw.get('skillSummaries'),active)
     used=set(); covered=set(); task_skills=set()
     for act in acts:

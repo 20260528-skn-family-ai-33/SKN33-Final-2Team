@@ -176,7 +176,21 @@ export function prepRec(R: PlanRecord, rev: RevForm | null | undefined): PlanRec
     };
   }
   if (R.pending && R.rev == null && rv && rv.request) R.rev = { ...({ on: {}, v: {}, note: '' } as unknown as RevForm), ...(rv.request as unknown as RevForm) };
-  R.post = R.post || { answers: {}, goalSelf: '', file: null };
+  const p = R.post || ({} as Partial<PlanRecord['post']>);
+  R.post = {
+    ...p,
+    quizSurvey: p.quizSurvey ?? null,
+    quizAnswers: p.quizAnswers || {},
+    submitted: !!p.submitted,
+    answers: p.answers || {},
+    goalSelf: p.goalSelf || '',
+    file: p.file ?? null,
+    running: !!p.running,
+    reportId: p.reportId ?? null,
+    fail: p.fail ?? null,
+    jobId: p.jobId ?? null,
+    deep: p.deep ?? null,
+  };
   return R;
 }
 

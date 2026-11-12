@@ -164,3 +164,20 @@ class ActivityTests(unittest.TestCase):
     self.assertEqual(result['key'],key)
     self.assertEqual(result['selectedIds'],['0','1'])
    self.assertEqual((saved,draft),before)
+
+ def test_roadmap_style_acts_schema_normalized(self):
+  # 파인튜닝 모델이 산출물 과제에 skills(리스트)를 넣고, 자료 활동에 skill 키를 생략한 경우
+  acts = [
+   {'stage': 2, 'title': '학습', 'res': 'c', 'hours': 2, 'how': '학습 설명'},
+   {'stage': 3, 'title': '적용', 'res': None, 'hours': 2, 'how': '구현 설명', 'skills': ['S']}
+  ]
+  p = self.propose(acts)
+  self.assertEqual(len(p['option']['acts']), 2)
+  self.assertEqual(p['option']['acts'][0]['skill'], 'S')
+  self.assertEqual(p['option']['acts'][1]['skill'], 'S')
+
+ def test_wrapped_answer_envelope_supported(self):
+  with patch('app.services.activity_selection.catalog.items', return_value={'c': {'id': 'c', 'title': '자료', 'cost': 0}}), \
+       patch('app.services.activity_selection.RM.finish_option', side_effect=lambda pid, raw, source: {**raw, 'acts': [dict(a, id=str(i)) for i, a in enumerate(raw['acts'])]}):
+   p = propose(self.saved, self.draft, lambda *_: {'answer': {'acts': self.acts, 'skillSummaries': {'S': ['이해', '적용', '검증']}}, 'type': 'agent'}, 'test')
+  self.assertEqual(p['selectedIds'], ['0', '1'])

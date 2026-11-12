@@ -2,7 +2,7 @@
    응답은 고칠 때마다 서버에 저장한다(API-49). 저장이 실패하면 보고서를 만들지 않는다 — 서버에 남은 예전 응답으로 보고서가 나오지 않게(PR #23 리뷰 2026-10-27) */
 import { plansApi } from '@/api/endpoints/plans';
 import { waitJob } from '@/api/jobs';
-import type { PostDeep } from '@/api/types/plan';
+import type { PostAssessmentInput, PostDeep } from '@/api/types/plan';
 import { paths } from '@/app/paths';
 import { reloadWorkspace } from '@/features/draft/draftSync';
 import { pullPlan, takePlan } from '@/features/roadmap/planActions';
@@ -21,7 +21,7 @@ export function ensurePostQuiz(pid: string): Promise<void> {
   const pending = quizFlights.get(pid); if (pending) return pending;
   const apply = (result: Awaited<ReturnType<typeof plansApi.postQuiz>>) => {
     const mine = ws().plans[pid]?.post;
-    const keep = mine ? { answers: { ...mine.answers }, quizAnswers: { ...mine.quizAnswers }, goalSelf: mine.goalSelf } : null;
+    const keep = mine ? { answers: { ...mine.answers }, quizAnswers: { ...mine.quizAnswers }, goalSelf: mine.goalSelf, ...(mine.submitted ? { submitted: true } : {}), ...(mine.running ? { running: true } : {}), ...(mine.reportId ? { reportId: mine.reportId } : {}), ...(mine.jobId ? { jobId: mine.jobId } : {}) } : null;
     takePlan(result);
     if (keep && ws().plans[pid]) updateWs(s => { Object.assign(s.plans[pid].post, keep); });
   };
@@ -36,12 +36,12 @@ export function ensurePostQuiz(pid: string): Promise<void> {
 let postQ: Promise<boolean> = Promise.resolve(true);
 
 /** 사후 점검 응답 저장. 성공하면 true, 실패하면 알림을 띄우고 false(화면 입력은 그대로 두어 다시 시도할 수 있다) */
-export function savePost(pid: string, extra?: Record<string, unknown> | null): Promise<boolean> {
+export function savePost(pid: string, extra?: Partial<PostAssessmentInput> | null): Promise<boolean> {
   postQ = postQ.then(async () => {
     const cur = ws().plans[pid];
     if (!cur) return false;
     const dp = cur.post.deep;
-    const body = { ...(cur.post.quizSurvey ? { quizAnswers: cur.post.quizAnswers || {} } : {}), answers: cur.post.answers, goalSelf: cur.post.goalSelf, ...(deepOpen(dp) ? { deepMcq: dp!.mcq || {}, deepEssay: dp!.essay || {} } : {}), ...(extra || {}) };
+    const body: PostAssessmentInput = { ...(cur.post.quizSurvey ? { quizAnswers: cur.post.quizAnswers || {} } : {}), answers: cur.post.answers, goalSelf: cur.post.goalSelf, ...(deepOpen(dp) ? { deepMcq: dp!.mcq || {}, deepEssay: dp!.essay || {} } : {}), ...(extra || {}) };
     try {
       const res = await plansApi.savePost(pid, body);
       /* 보내는 사이 서술형을 더 썼으면 서버 응답이 덮지 않게 화면의 심화 답을 그대로 둔다
@@ -133,7 +133,7 @@ export async function makeReport(go: ReturnType<typeof useGo>, pid: string): Pro
     const j = await plansApi.makeReport(pid);
     updateWs((s) => {
       if (s.plans[pid]) {
-        s.plans[pid].post.submitted = true;
+        s.plans[pid].post.submitted = j.submitted ?? true;
         s.plans[pid].post.running = true;
         s.plans[pid].post.jobId = j.jobId;
         if (j.quizSurvey) s.plans[pid].post.quizSurvey = j.quizSurvey;

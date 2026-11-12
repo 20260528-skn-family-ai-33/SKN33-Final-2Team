@@ -83,6 +83,30 @@ class OllamaThinkTest(unittest.TestCase):
             llm.chat('ollama', MSGS, role='regulation', temperature=0)
             self.assertEqual(self.sent[-1]['options'], {'num_gpu': -1, 'num_ctx': 16384, 'temperature': 0})
 
+    def test_roadmap_and_resources_set_num_predict_and_context(self):
+        for role in ('roadmap', 'resources'):
+            with self.subTest(role=role):
+                llm.chat('ollama', MSGS, role=role)
+                self.assertIn('num_predict', self.sent[-1]['options'])
+                self.assertIn('num_ctx', self.sent[-1]['options'])
+
+    def test_empty_content_with_think_retries_with_think_false(self):
+        calls = []
+        def fake_chat(path, payload, timeout=None):
+            if path == 'api/show':
+                return {'thinking': {'values': [False, 'low', 'medium', 'xhigh']}}
+            calls.append(payload)
+            if payload.get('think') == 'medium':
+                return {'message': {'content': '', 'thinking': '생각중...'}, 'model': payload['model']}
+            return {'message': {'content': '{"recovered": true}'}, 'model': payload['model']}
+
+        with patch.object(llm, 'ollama', fake_chat):
+            res = llm.chat('ollama', MSGS, reasoning='medium')
+            self.assertEqual(res['content'], '{"recovered": true}')
+            self.assertEqual(len(calls), 2)
+            self.assertEqual(calls[0]['think'], 'medium')
+            self.assertIs(calls[1]['think'], False)
+
 
 class OpenAiReasoningTest(unittest.TestCase):
     def setUp(self):

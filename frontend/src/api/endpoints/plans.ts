@@ -2,7 +2,7 @@ import { waitJob } from '../jobs';
 /* 내 로드맵·진행·수정안·코멘트·사후 점검·보고서 (API-36~52) */
 import { enc, fileForm, http } from '../client';
 import type { JobStarted } from '../types/common';
-import type { PlanRecord, PlanResponse, Report } from '../types/plan';
+import type { PlanResponse, PostAssessmentInput, Report, ReportJobStarted } from '../types/plan';
 
 const a = { async: true } as const;
 
@@ -17,8 +17,8 @@ export const plansApi = {
   acceptRevision: (rid: string, selectedSkills?: string[]) => http.post<PlanResponse>(`/revisions/${enc(rid)}/accept`, selectedSkills ? { selectedSkills } : {}),
   dropRevision: (rid: string) => http.del<null>(`/revisions/${enc(rid)}`),
   commentRead: (id: string, cid: string) => http.post<PlanResponse>(`/plans/${enc(id)}/comments/${enc(cid)}/read`),
-  savePost: (id: string, body: Record<string, unknown>) => http.put<PlanResponse>(`/plans/${enc(id)}/post-assessment`, body),
-  makeReport: (id: string) => http.post<JobStarted & { quizSurvey?: PlanRecord['post']['quizSurvey'] }>(`/plans/${enc(id)}/reports`, {}, a),
+  savePost: (id: string, body: PostAssessmentInput) => http.put<PlanResponse>(`/plans/${enc(id)}/post-assessment`, body),
+  makeReport: (id: string) => http.post<ReportJobStarted>(`/plans/${enc(id)}/reports`, {}, a),
   /** 설계서 밖 추가(10/23) · 사후 심화 질문 만들기 */
   postQuiz: async (id: string) => {
     const job = await http.post<JobStarted>(`/plans/${enc(id)}/post-quiz`, {}, a);

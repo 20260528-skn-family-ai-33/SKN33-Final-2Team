@@ -210,17 +210,44 @@ def run(ctx: Ctx, agent: str, task: str, inp, mock_fn, live_fn, role: str = 'def
     return out
 
 
+def _unwrap_envelope(data: Any) -> Any:
+    """파인튜닝·에이전트 모델이 {"answer": ...}, {"data": ...}, {"result": ...} 등의 외피 키(또는 type, role 등
+    메타데이터와 함께)로 실제 응답을 감싸 반환한 경우 내부 JSON 객체를 꺼낸다. 문자열화된 JSON도 파싱한다."""
+    if isinstance(data, dict):
+        keys = [k for k in data.keys() if k not in ('type', 'role', 'agent', 'model', 'status_code', 'success')]
+        if len(keys) == 1 and keys[0] in ('answer', 'data', 'result', 'response', 'output'):
+            val = data[keys[0]]
+            if isinstance(val, dict):
+                return _unwrap_envelope(val)
+            if isinstance(val, str):
+                s = val.strip()
+                if (s.startswith('{') and s.endswith('}')) or (s.startswith('[') and s.endswith(']')):
+                    try:
+                        inner = json.loads(s)
+                        return _unwrap_envelope(inner)
+                    except Exception:
+                        pass
+    return data
+
+
 def parse_json(t: str) -> dict:
+    res = None
     try:
-        return json.loads(t)
+        res = json.loads(t)
     except (ValueError, TypeError):
         m = re.search(r'\{[\s\S]*\}', str(t or ''))
         if m:
             try:
-                return json.loads(m.group(0))
+                res = json.loads(m.group(0))
             except ValueError:
                 pass
-        raise llm.LlmError('모델 응답이 JSON 형식이 아니에요')
+    if res is not None:
+        unwrapped = _unwrap_envelope(res)
+        if isinstance(unwrapped, dict):
+            return unwrapped
+        if isinstance(res, dict):
+            return res
+    raise llm.LlmError('모델 응답이 JSON 형식이 아니에요')
 
 
 def llm_json(ctx: Ctx, system: str, inp, role: str = 'default', images: list | None = None, history: list | None = None,

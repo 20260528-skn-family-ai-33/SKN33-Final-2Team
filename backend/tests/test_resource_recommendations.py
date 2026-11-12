@@ -191,6 +191,54 @@ class RecommendationTests(unittest.TestCase):
         raw=self.raw();raw['skills'][0]['courses'][0]={'key':'S1-B1','why':'이유','knowledge':'지식'}
         with self.assertRaises(RecommendationError):self.recommend(raw)
 
+    def test_wrapped_answer_envelope_and_positional_name_recovery(self):
+        # 1) {"answer": {"skills": [...]}, "type": "agent"}
+        wrapped_dict = {'answer': self.raw(), 'type': 'agent'}
+        res1 = self.recommend(wrapped_dict)
+        self.assertEqual(res1['skills'][0]['name'], '분석')
+
+        # 2) {"answer": "{\"skills\": [...]}"}
+        import json
+        wrapped_str = {'answer': json.dumps(self.raw())}
+        res2 = self.recommend(wrapped_str)
+        self.assertEqual(res2['skills'][0]['name'], '분석')
+
+        # 3) 파인튜닝 모델이 행의 name 을 누락한 경우 pools 에서 복구
+        no_name = copy.deepcopy(self.raw())
+        no_name['skills'][0].pop('name', None)
+        res3 = self.recommend(no_name)
+        self.assertEqual(res3['skills'][0]['name'], '분석')
+
+    def test_multi_row_positional_name_recovery_when_all_names_omitted(self):
+        # 3개 스킬 선정 환경에서 모델이 모든 행의 name 을 누락한 경우 위치 복구 검증
+        project = {'goal': '수질 데이터 분석', 'projectSummary': None, 'desiredCompetencies': '전처리'}
+        selection = {'skills': [
+            {'name': '분석', 'application': '분석 구현'},
+            {'name': '시각화', 'application': '차트 구현'},
+            {'name': '머신러닝', 'application': '모델링'},
+        ]}
+        items = {
+            'course0': {'id': 'course0', 'title': '강좌 0', 'type': 'course', 'usable': True, 'skills': ['분석', '시각화', '머신러닝'], 'cost': 0, 'content': '분석 내용'},
+            'book0': {'id': 'book0', 'title': '도서 0', 'type': 'book', 'usable': True, 'skills': ['분석', '시각화', '머신러닝'], 'cost': 0, 'content': '도서 내용'},
+        }
+        # 모델 출력이 3개 행 모두 name 을 생략한 경우 (모든 행이 올바른 순서의 스킬명으로 복구되어야 함)
+        raw_multi = {'skills': [
+            {'courses': [{'id': 'course0', 'why': '분석 자료', 'knowledge': '분석 지식'}], 'books': []},
+            {'courses': [{'id': 'course0', 'why': '시각화 자료', 'knowledge': '시각화 지식'}], 'books': []},
+            {'courses': [{'id': 'course0', 'why': '머신러닝 자료', 'knowledge': '머신러닝 지식'}], 'books': []},
+        ]}
+        res = recommend_resources(project, selection, items, lambda *_: raw_multi)
+        self.assertEqual([s['name'] for s in res['skills']], ['분석', '시각화', '머신러닝'])
+
+        # 부분 누락(1개만 name 있고 나머지는 누락)인 경우 모호하므로 거부되는지 검증
+        partial_missing = {'skills': [
+            {'name': '분석', 'courses': [{'id': 'course0', 'why': '분석 자료', 'knowledge': '분석 지식'}], 'books': []},
+            {'courses': [{'id': 'course0', 'why': '시각화 자료', 'knowledge': '시각화 지식'}], 'books': []},
+            {'courses': [{'id': 'course0', 'why': '머신러닝 자료', 'knowledge': '머신러닝 지식'}], 'books': []},
+        ]}
+        with self.assertRaises(RecommendationError):
+            recommend_resources(project, selection, items, lambda *_: partial_missing)
+
 
 class PeriodCandidateTests(unittest.TestCase):
     def test_all_courses_keep_long_and_short_candidates_without_mutating_hours(self):

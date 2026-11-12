@@ -113,6 +113,24 @@ export interface PostCheck {
   deep?: PostDeep | null;
 }
 
+export interface PostAssessmentInput {
+  quizAnswers?: Record<string, string | number>;
+  answers?: Record<string, string | number>;
+  goalSelf?: string | number;
+  file?: PostCheck['file'];
+  clearFail?: boolean;
+  deepMcq?: Record<string, string>;
+  deepEssay?: Record<string, string>;
+  [k: string]: unknown;
+}
+
+export interface ReportJobStarted {
+  jobId: string;
+  status: 'running' | string;
+  submitted?: boolean;
+  quizSurvey?: PostCheck['quizSurvey'];
+}
+
 /** 수정안(받은 쪽 계획과 바뀌는 쪽 계획) */
 export interface PendingRevision {
   key?: string;
