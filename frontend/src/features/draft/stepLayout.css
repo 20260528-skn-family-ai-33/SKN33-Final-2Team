@@ -1,0 +1,26 @@
+/* 작성 단계 공통 배치(#224): 번호가 붙은 구획 머리와, 화면 아래에 붙어 있는 요약·이동 줄. 색은 테마 변수에서만 가져온다 */
+.step-sec { margin-top: 36px; }
+.step-sec-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
+.step-sec-head h2 { margin: 0; font-size: 19px; line-height: 1.5; }
+.step-sec-head p { margin: 2px 0 0; font-size: 14px; color: var(--ink-3); }
+.step-sec-right { margin-left: auto; align-self: center; flex-shrink: 0; }
+/* 강조색 위 글자는 바탕색으로: 밝은 테마는 흰색, 어두운 테마(강조색이 흰색)는 어두운 색이 된다 */
+.step-num { flex-shrink: 0; display: grid; place-items: center; width: 28px; height: 28px; margin-top: 1px; border-radius: 50%; background: var(--accent); color: var(--surface); font-size: 14px; font-weight: 700; }
+
+
+/* 아래 고정 요약 줄 */
+.step-bar { position: sticky; bottom: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-top: 28px; padding: 12px 20px; border: 1px solid var(--line-2); border-bottom: 0; border-radius: var(--r-lg) var(--r-lg) 0 0; background: var(--surface); box-shadow: 0 -8px 24px rgba(24, 24, 20, .08); }
+.step-bar-sum { display: flex; align-items: center; flex-wrap: wrap; min-height: 24px; font-size: 14px; color: var(--ink-2); }
+.step-bar-sum b { font-size: 15px; color: var(--ink); }
+.step-bar-sum b + span::before, .step-bar-sum span + span::before { content: '·'; margin: 0 8px; color: var(--ink-4); }
+.step-bar-wait { color: var(--ink-3); }
+.step-bar-btns { display: flex; gap: 10px; margin-left: auto; }
+.step-bar-btns .btn.pri { min-width: 240px; }
+.step-bar-btns .btn svg { width: 16px; height: 16px; }
+
+
+@media (max-width: 900px) {
+  .step-sec-head { flex-wrap: wrap; }
+  .step-bar-btns { width: 100%; }
+  .step-bar-btns .btn.pri { flex: 1; min-width: 0; }
+}

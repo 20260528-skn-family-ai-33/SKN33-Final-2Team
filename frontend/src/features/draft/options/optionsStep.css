@@ -1,12 +1,4 @@
 /* 6단계 로드맵·자료 선택(#224): ① 코스 카드 → ② 고른 코스의 자료 → 아래 고정 요약 줄. 색은 테마 변수에서만 가져온다 */
-.opt-sec { margin-top: 36px; }
-.opt-sec-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
-.opt-sec-head h2 { margin: 0; font-size: 19px; line-height: 1.5; }
-.opt-sec-head p { margin: 2px 0 0; font-size: 14px; color: var(--ink-3); }
-.opt-sec-right { margin-left: auto; align-self: center; flex-shrink: 0; }
-/* 강조색 위 글자는 바탕색으로: 밝은 테마는 흰색, 어두운 테마(강조색이 흰색)는 어두운 색이 된다 */
-.opt-num { flex-shrink: 0; display: grid; place-items: center; width: 28px; height: 28px; margin-top: 1px; border-radius: 50%; background: var(--accent); color: var(--surface); font-size: 14px; font-weight: 700; }
-
 /* ① 코스 카드 */
 .opt-courses { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: stretch; }
 .opt-course { display: flex; flex-direction: column; min-width: 0; padding: 20px; border: 1.5px solid var(--line); border-radius: var(--r-lg); background: var(--surface); cursor: pointer; }
@@ -65,23 +57,10 @@
 .opt-materials .material-reason { font-size: 13px; line-height: 1.6; }
 .opt-materials .course-material-editor > .loading { padding: 20px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); }
 
-/* 아래 고정 요약 줄 */
-.opt-bar { position: sticky; bottom: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-top: 28px; padding: 12px 20px; border: 1px solid var(--line-2); border-bottom: 0; border-radius: var(--r-lg) var(--r-lg) 0 0; background: var(--surface); box-shadow: 0 -8px 24px rgba(24, 24, 20, .08); }
-.opt-bar-sum { display: flex; align-items: center; flex-wrap: wrap; min-height: 24px; font-size: 14px; color: var(--ink-2); }
-.opt-bar-sum b { font-size: 15px; color: var(--ink); }
-.opt-bar-sum b + span::before, .opt-bar-sum span + span::before { content: '·'; margin: 0 8px; color: var(--ink-4); }
-.opt-bar-wait { color: var(--ink-3); }
-.opt-bar-btns { display: flex; gap: 10px; margin-left: auto; }
-.opt-bar-btns .btn.pri { min-width: 240px; }
-.opt-bar-btns .btn svg { width: 16px; height: 16px; }
-
 @media (max-width: 900px) {
   .opt-courses { grid-template-columns: minmax(0, 1fr); }
   .opt-tagline { min-height: 0; }
   .opt-materials .v2-skills-board > .v2-skill:not([hidden]) { grid-template-columns: minmax(0, 1fr); }
   .opt-materials .material-kind { grid-row: auto; grid-column: 1; }
   .opt-materials .material-kind-books { margin-top: 16px; }
-  .opt-sec-head { flex-wrap: wrap; }
-  .opt-bar-btns { width: 100%; }
-  .opt-bar-btns .btn.pri { flex: 1; min-width: 0; }
 }

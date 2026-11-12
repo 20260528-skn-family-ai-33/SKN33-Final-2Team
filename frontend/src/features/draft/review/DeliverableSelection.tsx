@@ -1,5 +1,6 @@
 import { reviewRequest as request } from './reviewRequest';
-import { ReviewSkillBlocks, type ReviewMaterials } from './ReviewSkillBlocks';
+import type { ReviewMaterials } from './ReviewSkillBlocks';
+import { ReviewTaskBlocks } from './ReviewTaskBlocks';
 import { useEffect, useImperativeHandle, useMemo, useState, type Ref } from 'react';
 import type { DraftResponse } from '@/api/types/draft';
 import { useWs, ws } from '@/shared/state/workspace';
@@ -44,12 +45,14 @@ async function initializeReview(id: string, course: string, scope: string): Prom
 export type DeliverableSelectionHandle = { save: () => Promise<boolean> };
 type SelectionProps = {
   ref?: Ref<DeliverableSelectionHandle>; onReadyChange: (ready: boolean) => void; onBusyChange: (busy: boolean) => void; onPlanChange: (state: ReviewPlanState) => void;
+  /** 자료를 바꾸러 6단계로 돌아가기 */
+  onChangeMaterials: () => void;
 };
 export function DeliverableSelection(props: SelectionProps) {
   const scope = useWs(reviewScope);
   return <ScopedDeliverableSelection key={scope} {...props} scope={scope} />;
 }
-function ScopedDeliverableSelection({ ref, onReadyChange, onBusyChange, onPlanChange, scope }: SelectionProps & { scope: string }) {
+function ScopedDeliverableSelection({ ref, onReadyChange, onBusyChange, onPlanChange, onChangeMaterials, scope }: SelectionProps & { scope: string }) {
   const current = () => reviewScope(ws()) === scope;
   const id = useWs(s => s.draftId);
   const course = useWs(s => s.draft.chosen);
@@ -170,12 +173,23 @@ function ScopedDeliverableSelection({ ref, onReadyChange, onBusyChange, onPlanCh
     if (task && !proposal?.selectedIds.includes(actId)) { pick(task.skill, chosen); return; }
     setVersions(old => old.map(row => row.id === chosen ? { ...row, selectedIds: row.selectedIds.includes(actId) ? row.selectedIds.filter(value => value !== actId) : [...row.selectedIds, actId] } : row));
   }
-  return <section className="sec" aria-label="산출물 제안">
-    <h2>산출물 제안</h2>
-    <p className="small muted">선택한 강좌·도서를 바탕으로 스킬별 산출물을 제안받아요. 기본으로 모두 선택되며 필요 없는 항목만 제외할 수 있어요.</p>
-    {(loading || busy) && <p className="review-generation-status" role="status"><span className="review-proposal-spinner" aria-hidden="true" />{loading ? '최종 검토 결과 생성 중… 선택한 자료를 바탕으로 역량과 산출물을 준비하고 있어요.' : '해당 스킬의 과제를 다시 제안하고 있어요.'}</p>}
-    {(error || preview.error) && <div><p className="err" role="alert">{error || preview.error}</p><button type="button" className="btn line small" disabled={busy || loading} onClick={() => { reviewTasks.forget(scope); setLoading(true); setError(''); setAttempt(n => n + 1); }}>다시 불러오기</button></div>}
-    {materials && <ReviewSkillBlocks materials={{ ...materials, durationEstimates: preview.value?.plan.def.learningReport?.durationEstimates || materials.durationEstimates, skillDetails: (materials.skillOrder || materials.recommendations?.skills.map(s => s.name) || []).map(name => ({ name, application: '', competencySummary: proposal?.skillSummaries?.[name] || summaries?.[name] || materials.skillDetails?.find(s => s.name === name)?.competencySummary })) }} acts={preview.value?.acts || reviewTaskDisplay(proposal, versions, skillPicks, handoff?.startStage)} alternatives={alternatives} onPick={pick} selectedIds={proposal?.selectedIds || []} busy={busy || loading} proposeDisabled={!!preview.error || !!error} generating={loading || (busy && !generatingSkill && !proposal)} generatingSkill={generatingSkill} onToggle={toggle} onPropose={name => void propose(proposal ? name : undefined)} />}
-
+  const skillsWithTasks = Object.keys(alternatives);
+  const chosenCount = skillsWithTasks.filter(skill => alternatives[skill].some(item => proposal?.selectedIds.includes(item.task.id))).length;
+  return <section className="step-sec" aria-label="산출물 과제 고르기">
+    <header className="step-sec-head">
+      <span className="step-num">2</span>
+      <div>
+        <h2>산출물 과제 고르기</h2>
+        <p>스킬마다 배운 것을 확인할 과제가 하나씩 선택돼 있어요. 빼거나 다른 과제를 제안받을 수 있어요.</p>
+      </div>
+      {skillsWithTasks.length ? <span className="tag acc step-sec-right">{skillsWithTasks.length}개 중 {chosenCount}개 선택</span> : null}
+    </header>
+    {loading ? <p className="rv-status" role="status"><span className="sp" aria-hidden="true" />선택한 자료를 바탕으로 역량 요약과 산출물 과제를 준비하고 있어요. 30초에서 1분쯤 걸려요.</p>
+      : generatingSkill ? <p className="rv-status" role="status"><span className="sp" aria-hidden="true" />새 과제를 제안받고 있어요. 지금 과제는 그대로 남아요.</p> : null}
+    {(error || preview.error) && <div className="rv-error"><p className="err" role="alert">{error || preview.error}</p><button type="button" className="btn line sm" disabled={busy || loading} onClick={() => { reviewTasks.forget(scope); setLoading(true); setError(''); setAttempt(n => n + 1); }}>다시 불러오기</button></div>}
+    {materials && <ReviewTaskBlocks materials={{ ...materials, durationEstimates: preview.value?.plan.def.learningReport?.durationEstimates || materials.durationEstimates, skillDetails: (materials.skillOrder || materials.recommendations?.skills.map(s => s.name) || []).map(name => ({ name, application: '', competencySummary: proposal?.skillSummaries?.[name] || summaries?.[name] || materials.skillDetails?.find(s => s.name === name)?.competencySummary })) }}
+      acts={preview.value?.acts || reviewTaskDisplay(proposal, versions, skillPicks, handoff?.startStage)} options={alternatives} onPick={pick} selectedIds={proposal?.selectedIds || []}
+      busy={busy || loading} proposeDisabled={!!preview.error || !!error} generating={loading || (busy && !generatingSkill && !proposal)} generatingSkill={generatingSkill}
+      onToggle={toggle} onPropose={name => void propose(proposal ? name : undefined)} onChangeMaterials={onChangeMaterials} />}
   </section>;
 }

@@ -5,6 +5,7 @@ import { invalidateDraft, invalidateMaterialChoices } from '../invalidation';
 import { materialPreparation, canRevealMaterials, initialMaterialPreparation, type MaterialStatus } from './materialPreparation';
 import './courseSkills.css';
 import './materialPanel.css';
+import '../stepLayout.css';
 import './optionsStep.css';
 import { MaterialSkillTabs } from '../result/MaterialSkillTabs';
 import { materialVersionKey } from '../result/materialVersion';
@@ -438,9 +439,9 @@ export function OptionsStep() {
         lead="같은 스킬을 서로 다른 방식으로 짰어요. 코스를 하나 고르면, 그 코스에서 들을 강좌와 도서를 확인할 수 있어요."
       >
         {d.selectionNotice&&<Note>{d.selectionNotice}</Note>}
-        <section className="opt-sec" aria-label="코스 고르기">
-          <header className="opt-sec-head">
-            <span className="opt-num">1</span>
+        <section className="step-sec" aria-label="코스 고르기">
+          <header className="step-sec-head">
+            <span className="step-num">1</span>
             <div>
               <h2>코스 고르기</h2>
               <p>앞에서 고른 스킬과 순서는 그대로예요 · {materialNames.join(' → ')}</p>
@@ -454,9 +455,9 @@ export function OptionsStep() {
           </div>
           <p className="opt-basis">기간은 고른 강좌의 시간과 주당 학습 시간으로 계산해요. 도서는 기간에 넣지 않아요.</p>
         </section>
-        <section className="opt-sec" aria-label="학습 자료 고르기">
-          <header className="opt-sec-head">
-            <span className="opt-num">2</span>
+        <section className="step-sec" aria-label="학습 자료 고르기">
+          <header className="step-sec-head">
+            <span className="step-num">2</span>
             <div>
               <h2>{compare ? '코스별 학습 자료 비교' : chosen ? `${trackName(chosen.opt, chosen.name)}의 학습 자료` : '학습 자료 고르기'}</h2>
               <p>{compare ? '세 코스의 추천 자료를 스킬별로 나란히 보여 드려요. 다음 단계에는 고른 코스의 자료만 반영돼요.'
@@ -464,7 +465,7 @@ export function OptionsStep() {
                 : '코스를 고르면 그 코스의 강좌·도서가 여기에 나와요.'}</p>
             </div>
             {chosen && ps.length > 1 ? (
-              <button type="button" className="btn sm line opt-sec-right" aria-expanded={compare} aria-controls="roadmap-material-comparison" disabled={selecting} onClick={() => setCompare(value => !value)}>
+              <button type="button" className="btn sm line step-sec-right" aria-expanded={compare} aria-controls="roadmap-material-comparison" disabled={selecting} onClick={() => setCompare(value => !value)}>
                 {compare ? '고른 코스만 보기' : '다른 코스 자료와 비교'}
               </button>
             ) : null}
@@ -485,14 +486,14 @@ export function OptionsStep() {
           </section>
         </section>
         {off ? <Note>저장된 예시 로드맵과 입력한 목표의 주제가 달라요. 목표에 맞는 안을 받으려면 AI 모델 설정을 확인한 뒤 다시 생성해 주세요.</Note> : null}
-        <div className="opt-bar">
-          <div className="opt-bar-sum" aria-live="polite">
+        <div className="step-bar">
+          <div className="step-bar-sum" aria-live="polite">
             {chosen ? <b>{trackName(chosen.opt, chosen.name)}</b> : null}
-            {block ? <span className="opt-bar-wait">{block}</span>
+            {block ? <span className="step-bar-wait">{block}</span>
               : chosenTotals && chosen ? <><span>자료 학습 {chosenTotals.weeks == null ? '기간 계산 중…' : `${chosenTotals.weeks}주`}</span><span>주 {chosen.hours}시간</span><span>강좌 {amountText(chosenTotals)}</span></>
               : null}
           </div>
-          <div className="opt-bar-btns">
+          <div className="step-bar-btns">
             <button type="button" className="btn line" disabled={selecting} onClick={() => go(paths.newResult)}>
               <Icon name="left" />
               이전
