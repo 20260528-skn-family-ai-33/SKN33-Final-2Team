@@ -107,3 +107,11 @@ details.rv-skill.is-current-week { border-color: var(--accent-line); background:
 .rv-mini-tx small + small { color: var(--ink-2); }
 .rv-stats.is-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); margin-top: 0; padding-top: 0; border-top: 0; }
 @media (max-width: 900px) { .rv-stats.is-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* 여러 스킬이 함께 쓰는 자료: 그 스킬들 위에 한 번만 보여 준다 */
+.rv-shared { padding: 16px 20px; border: 1px solid var(--accent-line); border-radius: var(--r-lg); background: var(--surface); }
+.rv-shared > header { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.rv-shared > header h3 { margin: 0; font-size: 15px; }
+.rv-shared-ref { display: flex; align-items: baseline; gap: 8px; margin: 0 0 6px; font-size: 13.5px; line-height: 1.5; color: var(--ink-2); overflow-wrap: anywhere; }
+.rv-shared-ref .tag { flex-shrink: 0; }
+.rv-stt-gap { flex: none; width: 22px; }

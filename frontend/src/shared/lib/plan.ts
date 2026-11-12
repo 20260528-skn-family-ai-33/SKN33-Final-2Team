@@ -96,9 +96,21 @@ export const st = (progress: Record<string, Progress> | undefined, id: string): 
 export const isBookResource = (r: Pick<Resource, 'type' | 'kind'> | null | undefined): boolean => r?.type === 'book' || r?.kind === '도서';
 export const isBookActivity = (a: Pick<Activity, 'res'>): boolean => isBookResource(resOf(a.res));
 export const trackedActs = <T extends Pick<Activity, 'res'>>(acts: T[]): T[] => acts.filter((a) => !isBookActivity(a));
+/** 같은 자료를 쓰는 활동들(여러 스킬이 함께 듣는 공통 강좌). 자료가 없는 과제는 자기 자신뿐이다 */
+export const sameResourceActs = <T extends Pick<Activity, 'id' | 'res'>>(acts: T[], id: string): T[] => {
+  const act = acts.find((a) => a.id === id);
+  if (!act) return [];
+  return act.res ? acts.filter((a) => a.res === act.res) : [act];
+};
+/** 완료 수. 공통 강좌는 스킬마다 활동이 따로 저장돼 있어도 하나로 세고, 걸린 활동이 모두 끝나야 완료로 본다(함께 완료 · #242 후속) */
 export const count = (pl: PlanContent, progress?: Record<string, Progress>) => {
-  const acts = trackedActs(pl.acts);
-  return { t: acts.length, done: acts.filter((a) => st(progress, a.id) === 'done').length };
+  const groups = new Map<string, Activity[]>();
+  for (const a of trackedActs(pl.acts)) {
+    const key = a.res ? `res:${a.res}` : `act:${a.id}`;
+    groups.set(key, [...(groups.get(key) || []), a]);
+  }
+  const list = [...groups.values()];
+  return { t: list.length, done: list.filter((group) => group.every((a) => st(progress, a.id) === 'done')).length };
 };
 /** 계획한 활동을 모두 마쳤는지. 도서만 있으면 남은 활동이 없어 마친 것으로 본다(보고서의 조기 종료 판정과 같은 기준) */
 export const isPlanComplete = (pl: PlanContent, progress?: Record<string, Progress>): boolean => {

@@ -9,7 +9,7 @@ import type { Resource } from '@/api/types/catalog';
 import { paths } from '@/app/paths';
 import { useGo } from '@/shared/hooks/useGo';
 import { failToast } from '@/shared/lib/fail';
-import { isBookResource, st, stageName } from '@/shared/lib/plan';
+import { isBookResource, st, stageName, sameResourceActs } from '@/shared/lib/plan';
 import { setAt, useAt } from '@/shared/state/bind';
 import { resOf } from '@/shared/state/catalog';
 import { me } from '@/shared/state/session';
@@ -139,6 +139,12 @@ async function recSave(): Promise<void> {
   }
   const ok = await saveProgress(t.pid, t.id, body);
   if (!ok) return;
+  /* 함께 완료: 공통 강좌는 스킬마다 활동이 따로 있어, 나머지 활동에도 같은 상태·메모를 저장한다.
+     하나라도 실패하면 saveProgress 가 알리고 서버 상태를 다시 읽으므로 창을 닫지 않고 다시 저장하게 둔다 */
+  const siblings = sameResourceActs(ws().plans[t.pid]?.plan.acts || [], t.id).filter((a) => a.id !== t.id);
+  for (const a of siblings) {
+    if (!(await saveProgress(t.pid, a.id, { status: t.status, memo: t.memo || '' }))) return;
+  }
   updateWs((s) => void (s.tmp = null));
   recFile = null;
   closeSheet();
