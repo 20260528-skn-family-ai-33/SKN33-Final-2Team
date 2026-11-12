@@ -399,7 +399,8 @@ function Card({ title, link, heads, cols, total, days, rows, note, cls }: { titl
             <button type="button" aria-pressed={daily} onClick={() => changeUnit('day')}>일 단위</button>
             <button type="button" aria-pressed={!daily} onClick={() => changeUnit('week')}>주 단위</button>
           </span> : null}
-          <button type="button" onClick={() => { tip.hide(); toToday(); }} disabled={!scrolls} title={scrolls ? undefined : '일정이 한 화면에 다 보여요'}>{daily ? '오늘로' : '이번 주로'}</button>
+          {/* 옆으로 넘칠 때만 쓸모가 있어 그때만 보여 준다 */}
+          {scrolls ? <button type="button" onClick={() => { tip.hide(); toToday(); }}>{daily ? '오늘로' : '이번 주로'}</button> : null}
           {link}
         </div>
       </div>
