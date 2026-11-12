@@ -281,7 +281,8 @@ details.handoff + .agents { margin-top: 14px; }
   .grid2 { grid-template-columns: 1fr; }
   .pstrip.five { grid-template-columns: repeat(2, 1fr); }
   .fab { right: 16px; bottom: 16px; width: 46px; height: 46px; }
-  .regp { right: 8px; bottom: 8px; width: calc(100vw - 16px); height: calc(100vh - var(--rib-h) - 16px); }
+  /* 좁은 화면에서는 가운데 창(.ov · .sheet)과 같은 여백과 흐린 뒤 배경으로 띄워 새 화면이 아니라 떠 있는 창으로 보이게 한다 */
+  .regp { right: 12px; bottom: 12px; width: calc(100vw - 24px); height: calc(100vh - var(--rib-h) - 40px); box-shadow: var(--shadow-pop), 0 0 0 100vmax rgba(22, 22, 20, .32); }
   .ribbon .mode { display: none; }
 }
 
