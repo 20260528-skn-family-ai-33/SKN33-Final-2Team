@@ -408,8 +408,9 @@ def classify_question_roberta(question: str, history: list | None = None, me: di
     1. 사용자 정보(me 또는 emp_group)에서 사용자의 직군을 확인한다.
        - 사용자 정보에 직군이 없으면 즉시 에러(AgentError)를 발생시켜 인사 담당자 문의를 안내한다.
     2. 질문(question) 안에 특정 직군 명칭이 언급되어 있으면 해당 직군을 우선 사용한다.
-       - 후속 질문인 경우 앞 대화에서 다룬 직군을 계승하고, 없으면 사용자 직군을 사용한다.
-    3. 직군과 대화 맥락을 결합하여 RoBERTa로 질문 유형을 1차 분류한다.
+    3. 질문에 직군이 없더라도 앞 대화와 실제로 이어지는 후속 질문(_follow_history)이라면,
+       이어지는 대화 범위 내에서 다룬 직군을 계승한다. 새 주제로 전환되었으면 로그인한 직원의 직군을 사용한다.
+    4. 직군과 대화 맥락을 결합하여 RoBERTa로 질문 유형을 1차 분류한다.
     """
     history = history or []
     group_list = ['일반직', '실무직', '운영직']
@@ -419,20 +420,30 @@ def classify_question_roberta(question: str, history: list | None = None, me: di
     if not user_group:
         raise AgentError('로그인한 직원의 직원 구분을 확인할 수 없어요')
 
-    detected_group = next((g for g in group_list if g in question), None)
-    # 현재 질문에 직군이 없고 앞 대화(후속 질문)가 있다면, 앞선 질문들의 직군을 계승
-    if not detected_group and history:
-        for prev in reversed(history[-5:]):
+    # 1) 현재 질문 자체에 명시된 직군 감지
+    question_group = next((g for g in group_list if g in question), None)
+
+    # 2) 실제로 이어지는 후속 대화인지 먼저 판별 (_follow_history)
+    base_group_for_follow = question_group or user_group
+    follow_history = _follow_history(question, history, {'empGroup': base_group_for_follow})
+
+    # 3) 직군 결정:
+    #    - 현재 질문에 직군이 직접 명시된 경우: 해당 직군 사용
+    #    - 현재 질문에 직군이 없지만 '실제로 이어지는 대화(follow_history)'인 경우: 후속 대화 범위 내 직군 계승
+    #    - 새 주제로 전환되었거나 후속 대화가 아닌 경우: 로그인한 직원의 본래 직군(user_group) 유지!
+    inherited_group = None
+    if not question_group and follow_history:
+        for prev in reversed(follow_history):
             prev_q = prev.get('q', '') if isinstance(prev, dict) else ''
             prev_detected = next((g for g in group_list if g in prev_q), None)
             if prev_detected:
-                detected_group = prev_detected
+                inherited_group = prev_detected
                 break
 
-    effective_group = detected_group if detected_group else user_group
+    effective_group = question_group or inherited_group or user_group
+    # 질문 자체에 직군이 명시되었거나, 실제 후속 대화에서 직군이 계승된 경우에만 덮어쓰기 허용
+    detected_from_question = bool(question_group or inherited_group)
 
-    me_obj = {'empGroup': effective_group}
-    follow_history = _follow_history(question, history, me_obj)
     context_query = _context_query(question, follow_history, classify=True)
     result = question_classifier.classify(context_query)
 
@@ -443,7 +454,7 @@ def classify_question_roberta(question: str, history: list | None = None, me: di
         'usedHistory': bool(follow_history),
         'follow_history': follow_history,
         'group': effective_group,
-        'detectedFromQuestion': bool(detected_group),
+        'detectedFromQuestion': detected_from_question,
     }
 
 
@@ -737,65 +748,20 @@ def answer_with_pipeline(ctx: rt.Ctx, inp: dict) -> dict:
     return format_knowledge_response(ctx, inp, topic, sources, summary_result) # [8단계] 지식 요약 검증 및 최종 출력
 
 
-# ==============================================================================
-# ⭐ [_api 실행 진입점] (answer_with_pipeline 바로 아래에 위치)
-# ==============================================================================
 
-def _api(ctx: rt.Ctx, inp: dict) -> dict:
-    """에이전트 런타임(rt.run)이 호출하는 진입점: 통합 파이프라인을 실행한다."""
-    return answer_with_pipeline(ctx, inp)
 
 
 # ==============================================================================
-# ⭐ [외부 / 레거시 호환용 헬퍼 함수]
+# ⭐ [최상위 챗봇 호출 진입점 (Entry Point)] (FastAPI work.py 연동)
 # ==============================================================================
-
-def _empty_evidence_answer(ctx: rt.Ctx, topic: str, inp: dict, note: str = '', retrieved: list | None = None,
-                           history: list | None = None) -> dict:
-    # 검색 자료가 없어도 제공 금지 요청과 단순 근거 부족은 구분해야 한다.
-    if history is None:
-        history = _hist_msgs(inp.get('_history') or [])
-    result = grounded_answer.generate(ctx, topic, inp['question'], [], inp['context'],
-                                     history=history)
-    return _refused(topic) if result['status'] == 'refused' else _no_evidence(topic, retrieved, note)
-
-
-# ==============================================================================
-# ⭐ [사내 생활안내 / 수자원공사 정보 래퍼] (외부 호환용)
-# ==============================================================================
-
-def _life_answer(ctx: rt.Ctx, inp: dict) -> dict:
-    return _knowledge_answer(ctx, inp, 'life')
-
-
-def _company_answer(ctx: rt.Ctx, inp: dict) -> dict:
-    return _knowledge_answer(ctx, inp, 'company')
-
-
-def _knowledge_answer(ctx: rt.Ctx, inp: dict, topic: str) -> dict:
-    hits, sources = retrieve_knowledge_slots(ctx, inp, topic)
-    if not hits:
-        return _empty_evidence_answer(ctx, topic, inp)
-    inp['_knowledge_hits'] = hits
-    summary_result = generate_knowledge_summary(ctx, inp, topic, sources)
-    return format_knowledge_response(ctx, inp, topic, sources, summary_result)
-
-
-# ==============================================================================
-# ⭐ [최상위 챗봇 호출 진입점] (FastAPI 라우터 work.py에서 answer() 호출)
-# ==============================================================================
-
-def scope_answer(a: dict, me: dict) -> dict:
-    grp = me.get('empGroup') or '직원 구분이 확인되지 않은 직원'
-    has = '·'.join(g for g in regstore.groups())
-    return ans(kind='regulation', level='scope', topic='regulation', evidenceStatus='not_found', summary=f"등록된 규정은 {has} 대상이라, {grp}인 {me.get('name') or '사용자'} 님에게 적용되는 규정이 아직 없어요.",
-               apply=f'{grp}의 인사·복무·교육훈련 기준은 {grp} 대상 규정을 따르는데, 아직 GrowPath에 등록되지 않아 답할 수 없어요. 인사 담당 부서(인재경영실 · 가상)에 확인해 주세요.',
-               ref=list(a.get('basis') or [])[:3], retrieved=a.get('retrieved') or [])
-
 
 def answer(ctx: rt.Ctx, question: str, history: list, context: dict, sim: str | None = None,
            *, documents_only: bool = False) -> dict:
-    """history는 답을 받은 질문·답 [{q, a}]이다. 이어 묻기에는 최대 5턴을 사용한다."""
+    """⭐ [챗봇 최상위 호출 진입점] (FastAPI 라우터 work.py에서 answer() 호출)
+    1. 입력 전처리(isolate_input): 문서 전용 모드 시 개인정보 격리 및 후속 대화 5턴 보존
+    2. rt.run(): 런타임 로깅 및 _api()를 통한 1~8단계 파이프라인 실행
+    3. 결과 반환: 규정 적용 범위 확인(scope_answer) 및 최종 답변 반환
+    """
     me = ctx.me if ctx.me else {}
     inp = isolate_input(question, history, me, context, documents_only=documents_only)
     task = f"사내 생활 질문 분류·답변{f' (앞 대화 {len(inp[\"history\"])}턴 포함)' if inp['history'] else ''}"
@@ -807,6 +773,50 @@ def answer(ctx: rt.Ctx, question: str, history: list, context: dict, sim: str | 
     if documents_only:
         return a
     return scope_answer(a, me) if a['kind'] == 'regulation' and a.get('evidenceStatus') != 'refused' and not regstore.set_for(me.get('empGroup')) else a
+
+
+def _api(ctx: rt.Ctx, inp: dict) -> dict:
+    """에이전트 런타임(rt.run)이 호출하는 진입점: 통합 파이프라인(answer_with_pipeline)을 실행한다."""
+    return answer_with_pipeline(ctx, inp)
+
+
+def scope_answer(a: dict, me: dict) -> dict:
+    grp = me.get('empGroup') or '직원 구분이 확인되지 않은 직원'
+    has = '·'.join(g for g in regstore.groups())
+    return ans(kind='regulation', level='scope', topic='regulation', evidenceStatus='not_found', summary=f"등록된 규정은 {has} 대상이라, {grp}인 {me.get('name') or '사용자'} 님에게 적용되는 규정이 아직 없어요.",
+               apply=f'{grp}의 인사·복무·교육훈련 기준은 {grp} 대상 규정을 따르는데, 아직 GrowPath에 등록되지 않아 답할 수 없어요. 인사 담당 부서(인재경영실 · 가상)에 확인해 주세요.',
+               ref=list(a.get('basis') or [])[:3], retrieved=a.get('retrieved') or [])
+
+
+# ==============================================================================
+# ⭐ [외부 호출 및 단위 테스트 호환용 래퍼 함수들]
+# ==============================================================================
+
+def _knowledge_answer(ctx: rt.Ctx, inp: dict, topic: str) -> dict:
+    hits, sources = retrieve_knowledge_slots(ctx, inp, topic)
+    if not hits:
+        return _empty_evidence_answer(ctx, topic, inp)
+    inp['_knowledge_hits'] = hits
+    summary_result = generate_knowledge_summary(ctx, inp, topic, sources)
+    return format_knowledge_response(ctx, inp, topic, sources, summary_result)
+
+
+def _life_answer(ctx: rt.Ctx, inp: dict) -> dict:
+    return _knowledge_answer(ctx, inp, 'life')
+
+
+def _company_answer(ctx: rt.Ctx, inp: dict) -> dict:
+    return _knowledge_answer(ctx, inp, 'company')
+
+
+def _empty_evidence_answer(ctx: rt.Ctx, topic: str, inp: dict, note: str = '', retrieved: list | None = None,
+                           history: list | None = None) -> dict:
+    # 검색 자료가 없어도 제공 금지 요청과 단순 근거 부족은 구분해야 한다.
+    if history is None:
+        history = _hist_msgs(inp.get('_history') or [])
+    result = grounded_answer.generate(ctx, topic, inp['question'], [], inp['context'],
+                                     history=history)
+    return _refused(topic) if result['status'] == 'refused' else _no_evidence(topic, retrieved, note)
 
 
 # ==============================================================================

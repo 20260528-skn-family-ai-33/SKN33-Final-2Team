@@ -317,6 +317,20 @@ class RegulationFollowUpTest(unittest.TestCase):
         with self.assertRaisesRegex(LlmError, '출처'):
             self.ask('그럼 제9조는?', source_ids=['edu-7'])
 
+    def test_new_topic_does_not_inherit_group_from_previous_question(self):
+        history = [{'q': '실무직 교육비 지원 기준은?', 'a': {'summary': '실무직 기준 안내', 'basis': ['edu-7']}}]
+        classified = reg.classify_question_roberta('다른 질문인데 연차휴가는 며칠인가요?', history, me={'empGroup': '일반직'})
+        self.assertEqual(classified['group'], '일반직')
+        self.assertFalse(classified['detectedFromQuestion'])
+        self.assertEqual(classified['follow_history'], [])
+
+    def test_follow_up_inherits_group_from_previous_question(self):
+        history = [{'q': '실무직 교육비 지원 기준은?', 'a': {'summary': '실무직 기준 안내', 'basis': ['edu-7']}}]
+        classified = reg.classify_question_roberta('그럼 지원 한도는 얼마야?', history, me={'empGroup': '일반직'})
+        self.assertEqual(classified['group'], '실무직')
+        self.assertTrue(classified['detectedFromQuestion'])
+        self.assertEqual(len(classified['follow_history']), 1)
+
 
 if __name__ == '__main__':
     unittest.main()
