@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import re
 import socket
 import time
 import urllib.error
@@ -159,7 +160,7 @@ def chat(provider: str, messages: list, role: str = 'default', json_mode: bool =
             payload['format'] = response_schema if response_schema is not None else 'json'
         if S.ollama_num_ctx:
             payload['options'] = {'num_ctx': S.ollama_num_ctx}
-        if role == 'roadmap':
+        if role in ('roadmap', 'resources'):
             from .catalog_budget import OUTPUT_RESERVE, DEFAULT_CONTEXT
             payload.setdefault('options', {})['num_predict'] = OUTPUT_RESERVE
             payload['options'].setdefault('num_ctx', DEFAULT_CONTEXT)
@@ -178,8 +179,27 @@ def chat(provider: str, messages: list, role: str = 'default', json_mode: bool =
         if level:
             payload['think'] = _think(level)
         res = ollama('api/chat', payload)
+        msg = res.get('message') or {}
+        content = (msg.get('content') or '').strip()
+        # 생각(thinking) 모드에서 모델이 content 를 비우고 thinking 에만 JSON 을 남긴 경우 복구
+        if not content and msg.get('thinking'):
+            t_text = msg['thinking'].strip()
+            m = re.search(r'\{[\s\S]*\}', t_text)
+            if m:
+                try:
+                    json.loads(m.group(0))
+                    content = m.group(0)
+                except ValueError:
+                    pass
+        # 그래도 content 가 비어 있고 think 가 켜져 있었다면 생각(thinking)을 끄고 1회 자동 재시도
+        # (fine-tuned 모델이 reasoning 설정으로 인해 content 를 비우는 현상 방지)
+        if not content and payload.get('think') not in (None, False):
+            retry_payload = dict(payload, think=False)
+            res = ollama('api/chat', retry_payload)
+            msg = res.get('message') or {}
+            content = (msg.get('content') or '').strip()
         ms = lambda ns: round((ns or 0) / 1e6)  # noqa: E731 - Ollama 시간 값은 나노초
-        return {'content': (res.get('message') or {}).get('content') or '', 'model': res.get('model', model), 'provider': 'ollama',
+        return {'content': content, 'model': res.get('model', model), 'provider': 'ollama',
                 'loadMs': ms(res.get('load_duration')), 'totalMs': ms(res.get('total_duration'))}
     if role == 'vision' and not S.openai_vision:
         raise LlmError('OpenAI 비전 모델 설정이 없어요 (.env 의 OPENAI_VISION_MODEL)')

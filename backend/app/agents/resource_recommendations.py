@@ -2,6 +2,7 @@
 from __future__ import annotations
 from collections.abc import Callable
 from copy import deepcopy
+import json
 import logging
 import math
 import re
@@ -357,12 +358,27 @@ def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
     if isinstance(goal, str) and isinstance(desired, str) and goal.strip() == desired.strip():
         payload['project'].pop('desiredCompetencies')
     raw = generate(instructions(course), payload)
+    if isinstance(raw, dict) and 'skills' not in raw and 'answer' in raw:
+        if isinstance(raw['answer'], dict):
+            raw = raw['answer']
+        elif isinstance(raw['answer'], str):
+            try:
+                raw = json.loads(raw['answer'])
+            except Exception:
+                pass
     rows = raw.get('skills') if isinstance(raw, dict) else None
     if not isinstance(rows, list) or len(rows) != len(pools):
         raise RecommendationError('스킬별 추천 결과 수가 일치하지 않습니다.')
+    pool_names = [p['name'] for p in pools]
+    for i, row in enumerate(rows):
+        if isinstance(row, dict):
+            if 'name' not in row and 'skill' in row and row['skill'] in pool_names:
+                row['name'] = row['skill']
+            elif 'name' not in row and i < len(pools) and all('name' not in r for r in rows):
+                row['name'] = pools[i]['name']
     by_name = {}
     for row in rows:
-        if not isinstance(row, dict) or row.get('name') not in [p['name'] for p in pools] or row['name'] in by_name:
+        if not isinstance(row, dict) or row.get('name') not in pool_names or row['name'] in by_name:
             raise RecommendationError('추천 스킬이 입력과 다르거나 중복되었습니다.')
         by_name[row['name']] = row
     _recover_cross_skill_courses(by_name, payload, references, course_eligibility, generate)

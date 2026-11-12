@@ -131,8 +131,8 @@
 | `POST /plans/{id}/archive` · `.../resume` | 보관·다시 진행 |
 | `POST /plans/{id}/revisions` · `POST /revisions/{rid}/accept` · `DELETE /revisions/{rid}` | 수정 요청(작업) · 수정안 확정 · 버리기 |
 | `POST /plans/{id}/comments/{cid}/read` | 부서장 코멘트 읽음 |
-| `PUT /plans/{id}/post-assessment` · `POST .../post-assessment/deep` | 사후 점검 저장 · 심화 질문 사후 문제(작업 · 설계서 밖 추가 10/23) |
-| `POST /plans/{id}/reports` · `GET /reports?planId=` · `POST /reports/{rid}/confirm` | 보고서 만들기(작업) · 목록 · 확인 |
+| `PUT /plans/{id}/post-assessment` · `POST .../post-assessment/deep` | 사후 점검 저장(`{quizAnswers?, answers?, goalSelf?, file?, clearFail?, deepMcq?, deepEssay?}` → `{plan, res, reg}`) · 심화 질문 사후 문제(작업 · 설계서 밖 추가 10/23). 사후 퀴즈 정답·해설은 제출 전에는 숨기고, 보고서 작성을 시작(`post.submitted=true`)하거나 완료한 뒤에만 공개해요. 제출 뒤에는 퀴즈 답안을 바꿀 수 없어요(409 `POST_LOCKED` · 작성 중 저장은 409 `REPORT_BUSY`) |
+| `POST /plans/{id}/reports` · `GET /reports?planId=` · `POST /reports/{rid}/confirm` | 보고서 만들기(비동기 202 `{jobId, status: 'running', submitted: true, quizSurvey?}`) · 목록 · 확인 |
 
 보고서(`Report`)의 `opt`는 코스 ID(A1~A3)예요. 화면은 `trackName(opt)`로 Free·Crash·Challenge Course 이름을 보여 줘요. 이전 보고서에 저장된 Track 이름(Free·Fast·Challenge Track)은 서버가 코스 ID로 바꿔 보내요. 보고서 목록, `GET /me/workspace`, 부서장의 직원 기록 응답에 모두 적용돼요(#78).
 
@@ -214,11 +214,11 @@
 
 | 요청 | 쓰는 곳 |
 | --- | --- |
-| `GET /notifications` | 상단 띠 알림 버튼·목록(30초마다·화면 이동·창 열 때)과 새 알림 하단 플로팅(#96). `{items: AppNotification[] (읽지 않은 알림 최근 50건), unread}` — `unread`는 목록 길이와 관계없이 전체 수. 읽은 알림은 목록에 없음(#96 · 서버 기록은 남음) |
+| `GET /notifications` | 사이드바 하단 알림 버튼·목록(30초마다·화면 이동·창 열 때)과 새 알림 하단 플로팅(#96, #190). `{items: AppNotification[] (최근 24시간 이내 알림 최대 50건 · 읽지 않은 알림 우선), unread}` — `unread`는 목록 길이와 관계없이 최근 24시간 내 읽지 않은 전체 수. 읽은 알림도 24시간 동안 목록에 남음(#190) |
 | `POST /notifications/{id}/read` · `POST /notifications/read-all` | 한 건 읽음(내 알림이 아니면 404) · 모두 읽음. 둘 다 바뀐 목록을 그대로 돌려줌 |
 | `POST /notifications/read-target` `{kind: 'roadmap'\|'report', id}` | 부서장이 직원의 로드맵·보고서 화면을 열 때(#96). 그 대상의 내 알림을 모두 읽음으로 바꾸고 바뀐 목록과 `changed`(바뀐 수)를 돌려줌. 잘못된 종류 400 · 형식이 틀린 id 404 · 읽을 알림이 없으면 `changed: 0` |
 
-`AppNotification`은 `{id, kind: 'roadmap'|'report'|'job'|'comment'|'task'|'task_result', audience: 'self'|'head'|'member', employee: {id, name}, planId, planTitle, track, reportId, draftId, commentId, taskId, jobKind, jobStatus: 'done'|'failed'|null, createdAt, read}`예요(읽은 알림은 목록에서 빠지므로 목록의 `read`는 `false`). `employee`는 알림을 일으킨 사람이고(코멘트 알림이면 보낸 부서장), `planId`는 로드맵 확정 전 작업(`options`·`regenerate`·`materials`)만 `null`이에요. 문구와 이동할 주소는 화면이 정해요(`features/notifications/notificationView.ts`): 본인은 `/roadmaps/{planId}`·`/reports/{reportId}`, 부서장은 `/team/{employee.id}/plans/{planId}`·`/team/{employee.id}/reports/{reportId}`, 코멘트는 `/roadmaps/{planId}/comments`, 작업은 `/new/options`·`/new/materials`·`/roadmaps/{planId}/revise`·`/roadmaps/{planId}/post`. 본인·직원 알림이 가리키는 화면을 이미 보고 있으면 화면이 바로 읽음으로 바꿔요. 확인 전 보고서를 다시 만들면 이전 보고서 알림은 지워지고 새 보고서 알림만 남아요. 부서장 알림은 그 직원이 지금도 같은 부서일 때만 보여요.
+`AppNotification`은 `{id, kind: 'roadmap'|'report'|'job'|'comment'|'task'|'task_result', audience: 'self'|'head'|'member', employee: {id, name}, planId, planTitle, track, reportId, draftId, commentId, taskId, jobKind, jobStatus: 'done'|'failed'|null, createdAt, read}`예요(읽은 알림도 24시간 동안 목록에 남으며 `read`는 `boolean`). `employee`는 알림을 일으킨 사람이고(코멘트 알림이면 보낸 부서장), `planId`는 로드맵 확정 전 작업(`options`·`regenerate`·`materials`)만 `null`이에요. 문구와 이동할 주소는 화면이 정해요(`features/notifications/notificationView.ts`): 본인은 `/roadmaps/{planId}`·`/reports/{reportId}`, 부서장은 `/team/{employee.id}/plans/{planId}`·`/team/{employee.id}/reports/{reportId}`, 코멘트는 `/roadmaps/{planId}/comments`, 작업은 `/new/options`·`/new/materials`·`/roadmaps/{planId}/revise`·`/roadmaps/{planId}/post`. 본인·직원 알림이 가리키는 화면을 이미 보고 있으면 화면이 바로 읽음으로 바꿔요. 확인 전 보고서를 다시 만들면 이전 보고서 알림은 지워지고 새 보고서 알림만 남아요. 부서장 알림은 그 직원이 지금도 같은 부서일 때만 보여요.
 
 ### 관리자 — `admin.ts` (5차 목업에서 추가 · 2026-10-21 사용자 결정 · 설계서 반영 여부는 사람 확인 필요)
 

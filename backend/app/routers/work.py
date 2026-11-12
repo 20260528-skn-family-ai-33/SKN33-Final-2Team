@@ -353,8 +353,10 @@ def api_report(plan_id: str, request: Request, a: Account = Depends(require_empl
     res = job_response(request, jid, a.id)
     if isinstance(res, JSONResponse) and jid:
         quiz_survey = PL.revealed_post_quiz(a.id, plan_id)
+        body = {'jobId': jid, 'status': 'running', 'submitted': True}
         if quiz_survey:
-            return JSONResponse({'jobId': jid, 'status': 'running', 'quizSurvey': quiz_survey}, status_code=202)
+            body['quizSurvey'] = quiz_survey
+        return JSONResponse(body, status_code=202)
     return res
 
 

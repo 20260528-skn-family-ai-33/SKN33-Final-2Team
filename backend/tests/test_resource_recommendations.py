@@ -191,6 +191,24 @@ class RecommendationTests(unittest.TestCase):
         raw=self.raw();raw['skills'][0]['courses'][0]={'key':'S1-B1','why':'이유','knowledge':'지식'}
         with self.assertRaises(RecommendationError):self.recommend(raw)
 
+    def test_wrapped_answer_envelope_and_positional_name_recovery(self):
+        # 1) {"answer": {"skills": [...]}, "type": "agent"}
+        wrapped_dict = {'answer': self.raw(), 'type': 'agent'}
+        res1 = self.recommend(wrapped_dict)
+        self.assertEqual(res1['skills'][0]['name'], '분석')
+
+        # 2) {"answer": "{\"skills\": [...]}"}
+        import json
+        wrapped_str = {'answer': json.dumps(self.raw())}
+        res2 = self.recommend(wrapped_str)
+        self.assertEqual(res2['skills'][0]['name'], '분석')
+
+        # 3) 파인튜닝 모델이 행의 name 을 누락한 경우 pools 에서 복구
+        no_name = copy.deepcopy(self.raw())
+        no_name['skills'][0].pop('name', None)
+        res3 = self.recommend(no_name)
+        self.assertEqual(res3['skills'][0]['name'], '분석')
+
 
 class PeriodCandidateTests(unittest.TestCase):
     def test_all_courses_keep_long_and_short_candidates_without_mutating_hours(self):

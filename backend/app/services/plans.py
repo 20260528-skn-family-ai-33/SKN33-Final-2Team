@@ -257,7 +257,7 @@ def record(row: dict, for_mgr: bool = False) -> dict:
             v.pop('handoff', None)
             if v.get('assess'):
                 v['assess'] = {'questions': [], 'answers': {}, 'domain': v['assess'].get('domain')}
-        rec['post'] = {'answers': {}, 'goalSelf': '', 'file': None}
+        rec['post'] = {'quizSurvey': None, 'quizAnswers': {}, 'submitted': False, 'answers': {}, 'goalSelf': '', 'file': None, 'running': False, 'fail': None, 'jobId': None, 'deep': None}
         return rec
     rec['post'] = _post(row, plan)
     rv = _revision(rid)
@@ -461,7 +461,6 @@ def _rev_changes(r: dict, pl: dict) -> dict:
 
 
 def _skill_comment_option(out: dict, base: dict, targets: dict, skill: str, handoff: dict) -> dict:
-    from app.llm import LlmError
     from .material_plan import rebuild_revision
     old_ids = {a.get('res') for a in base['acts'] if a.get('skill') == skill}
     old_tasks = {(a['title'], a.get('how') or '') for a in base['acts'] if a.get('skill') == skill and not a.get('res')}
@@ -624,7 +623,6 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
 
 
 def _mix_revision_skills(current: dict, proposal: dict, handoff: dict, selected: list[str], done: set[str]) -> dict:
-    from app.llm import LlmError
     from .material_plan import rebuild_revision
     old_report = (current.get('def') or {}).get('learningReport') or {}
     new_report = (proposal.get('def') or {}).get('learningReport') or {}
