@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SKIN, formatChoice, parseChoice, pickChoice } from './pick';
 
-const ids = ['tm464', 'tm590'];
+const ids = ['tm464', 'tm590', 'tm612'];
 const plain = (skin: string) => ({ skin, side: false, narrow: false });
 
 describe('pickChoice', () => {
@@ -12,17 +12,20 @@ describe('pickChoice', () => {
     expect(pickChoice('tm999', 'tm590', ids)).toEqual(plain('tm590'));
     expect(pickChoice('tm999:side:narrow', 'tm590', ids)).toEqual(plain('tm590'));
   });
-  it('아무것도 없으면 기본 테마(464) · 상단 메뉴 · 넓은 본문 폭', () => {
-    expect(DEFAULT_SKIN).toBe('tm464');
-    expect(pickChoice(null, null, ids)).toEqual(plain('tm464'));
-    expect(pickChoice('', '', ids)).toEqual(plain('tm464'));
+  it('아무것도 없으면 기본 테마(612) · 상단 메뉴 · 넓은 본문 폭', () => {
+    expect(DEFAULT_SKIN).toBe('tm612');
+    expect(pickChoice(null, null, ids)).toEqual(plain('tm612'));
+    expect(pickChoice('', '', ids)).toEqual(plain('tm612'));
+  });
+  it('예전 기본 테마(464)를 기억한 브라우저는 그대로 464', () => {
+    expect(pickChoice(null, 'tm464', ids)).toEqual(plain('tm464'));
   });
   it('기억한 테마 폴더를 지웠으면 기본 테마', () => {
-    expect(pickChoice(null, 'tm999', ids)).toEqual(plain('tm464'));
+    expect(pickChoice(null, 'tm999', ids)).toEqual(plain('tm612'));
   });
   it('예전의 원래 화면(base)은 주소 · 기억 모두 기본 테마로', () => {
-    expect(pickChoice('base', null, ids)).toEqual(plain('tm464'));
-    expect(pickChoice(null, 'base:side:narrow', ids)).toEqual(plain('tm464'));
+    expect(pickChoice('base', null, ids)).toEqual(plain('tm612'));
+    expect(pickChoice(null, 'base:side:narrow', ids)).toEqual(plain('tm612'));
     expect(pickChoice('base', 'tm590:side', ids)).toEqual({ skin: 'tm590', side: true, narrow: false });
   });
   it('기본 테마 폴더도 없으면 남은 테마 중 첫 번째', () => {
