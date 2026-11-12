@@ -5,7 +5,9 @@ from copy import deepcopy
 from functools import lru_cache
 import json
 import math
+from threading import Lock
 from time import perf_counter
+from weakref import WeakValueDictionary
 from app import db
 from app import regulation_embeddings as embeddings
 from app.agents.resource_recommendations import RecommendationError, candidate_pools
@@ -13,7 +15,7 @@ from app.services import book_candidates, course_focus, resource_evidence
 
 MODEL = embeddings.BGE_MODEL
 DIMENSIONS = embeddings.BGE_DIMENSIONS
-VERSION = 'resource-pgvector-rag/v35-audit-min-three'
+VERSION = 'resource-pgvector-rag/v36-shared-books'
 PER_KIND = 6
 COURSE_REVIEW = 20
 FIELDS = ('id','title','provider','cost','hours','estimated','image','url','skills','content','curriculum')
@@ -24,10 +26,15 @@ def version_for(course=None):
     return VERSION + '/' + CRASH_VERSION if is_crash(course) else VERSION
 
 
-def query_text(project: dict, skill: dict, course: dict | None) -> str:
-    if course and course.get('id') == 'A2' and (core := resource_evidence.crash_core_scope(skill)):
-        # 스킬 이름에도 FastAPI/Django처럼 여러 기술이 들어갈 수 있다. 태그는 후보 필터에서 사용한다.
-        return json.dumps({**core, 'course': {'id': 'A2'}}, ensure_ascii=False, sort_keys=True)
+def skill_query(project: dict, name: str, application: str | None) -> str:
+    return json.dumps({'goal': project.get('goal'), 'skill': name,
+                       **({'application': application} if application else {}),
+                       'desiredCompetencies': project.get('desiredCompetencies'),
+                       'projectSummary': project.get('projectSummary')}, ensure_ascii=False, sort_keys=True)
+
+
+def _unscoped_book_query(project: dict, skill: dict) -> str:
+    """코스 선택 전 공통 추천은 기존 학습자 맥락을 사용한다."""
     return json.dumps({
         'learnerKnowledge':project.get('learnerKnowledge') or {},
         'learningDirection':'이미 사용하는 기술의 입문 반복보다 프로젝트에 필요한 새 개념·심화·적용 중심',
@@ -35,8 +42,7 @@ def query_text(project: dict, skill: dict, course: dict | None) -> str:
         'projectSummary': str(project.get('projectSummary') or '')[:2500],
         'desiredCompetencies': str(project.get('desiredCompetencies') or '')[:500],
         'skill': skill['name'], 'application': str(skill.get('application') or '')[:600],
-        **({'targetOutcome':str(skill.get('targetOutcome') or '')[:500],'completionCriteria':skill.get('completionCriteria') or []} if course and course.get('id')=='A3' else {}),
-        'course': {key: str((course or {}).get(key) or '')[:500] for key in ('id','name','reason','scope')},
+        'course': {key: '' for key in ('id','name','reason','scope')},
     }, ensure_ascii=False, sort_keys=True)
 
 
@@ -56,10 +62,23 @@ def cached_vectors(texts: tuple[str,...]):
     return tuple(tuple(vector) for vector in validate_vectors(embeddings.embed(list(texts)),len(texts)))
 
 
-def search_vectors(resource_type, ids, vector, limit, free_only):
+_query_locks = WeakValueDictionary()
+_query_locks_guard = Lock()
+
+
+def _shared_vectors(texts):
+    # 동시 요청이 같은 캐시 미스에서 임베딩을 여러 번 시작하는 일을 막는다.
+    with _query_locks_guard:
+        lock = _query_locks.setdefault(texts, Lock())
+    with lock:
+        return cached_vectors(texts)
+
+
+def search_vectors(resource_type, ids, vector, limit, free_only, *, read=None):
     # 스킬·종류·사용 가능 여부는 ids에 반영하고, 최신 0원 조건도 LIMIT 이전에 적용한다.
     if not ids:return []
-    return db.all_("""SELECT e.resource_id, m.cost_won AS current_cost,
+    read = read or db.all_
+    return read("""SELECT e.resource_id, m.cost_won AS current_cost,
             1-(e.embedding <=> CAST(:query AS vector)) AS similarity
         FROM public.learning_resource_embeddings e
         JOIN growpath_bge_meta.inputs p ON p.kind=e.resource_type AND p.source_id=e.resource_id
@@ -75,7 +94,7 @@ def search_vectors(resource_type, ids, vector, limit, free_only):
         revision=embeddings.PROVENANCE['model_revision'],limit=limit,free_only=free_only)
 
 
-def retrieve(project, selection, items, course=None, *, embed=None, search=None):
+def retrieve(project, selection, items, course=None, *, embed=None, search=None, book_search=None):
     started=perf_counter()
     free_only=bool(course and course.get('id')=='A1')
     track = (course or {}).get('id')
@@ -89,18 +108,14 @@ def retrieve(project, selection, items, course=None, *, embed=None, search=None)
                       'maxUniqueBooks':book_candidates.LIMIT,'matches':[],'elapsedMs':round((perf_counter()-started)*1000)}
     queries = {}
     for i in active:
+        name = all_pools[i]['name']
+        common = skill_query(project, name, (selection.get('commonApplications') or {}).get(name))
         if all_pools[i]['courses']:
-            spec = shared['skills'][i]
-            common_application = (selection.get('commonApplications') or {}).get(spec['name'])
-            queries[i, 'courses'] = json.dumps({'goal': project.get('goal'), 'skill': spec['name'],
-                                                **({'application': common_application} if common_application else {}),
-                                                'desiredCompetencies': project.get('desiredCompetencies'),
-                                                'projectSummary': project.get('projectSummary')},
-                                               ensure_ascii=False, sort_keys=True)
+            queries[i, 'courses'] = common
         if all_pools[i]['books']:
-            queries[i, 'books'] = query_text(project, selection['skills'][i], course)
-    texts = tuple(dict.fromkeys(queries.values()))
-    vectors = dict(zip(texts, validate_vectors((embed or cached_vectors)(texts), len(texts)), strict=True))
+            queries[i, 'books'] = common if track else _unscoped_book_query(project, selection['skills'][i])
+    texts = tuple(sorted(set(queries.values())))
+    vectors = dict(zip(texts, validate_vectors((embed or _shared_vectors)(texts), len(texts)), strict=True))
     search = search or search_vectors
     matches = []
     from app.services import crash_courses
@@ -121,7 +136,10 @@ def retrieve(project, selection, items, course=None, *, embed=None, search=None)
             scoped_course = track in ('A1', 'A2', 'A3')
             review_limit = (COURSE_REVIEW if key == 'courses' else book_candidates.REVIEW_LIMIT) if scoped_course else PER_KIND
             limit = len(allowed) if scoped_course and key == 'courses' else review_limit
-            rows = search(kind, list(allowed), vector, limit, False)
+            if key == 'books' and scoped_course and book_search is not None:
+                rows = book_search(pools[index]['name'], queries[index, key], list(allowed), vector, limit)
+            else:
+                rows = search(kind, list(allowed), vector, limit, False)
             if not rows:
                 raise RecommendationError('조건에 맞는 자료의 검색 벡터를 찾지 못했어요. 등록된 임베딩 상태를 확인해 주세요.')
             if scoped_course and key == 'courses':

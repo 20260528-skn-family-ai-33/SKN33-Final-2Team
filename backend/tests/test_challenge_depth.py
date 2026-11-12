@@ -1,11 +1,10 @@
-import unittest,json
+import unittest
 from copy import deepcopy
 from unittest.mock import patch
 from app import track_policy
 from app.agents.resource_recommendations import recommend_resources
 from app.services import activity_selection as activities,course_skills
 from app.services.course_recommendations import scope_view
-from app.services.resource_rag import query_text
 
 class ChallengeDepthTests(unittest.TestCase):
  def target(self):
@@ -15,13 +14,10 @@ class ChallengeDepthTests(unittest.TestCase):
    self.assertIn('Challenge 심화 기준',track_policy.challenge_guidance('A3',stage))
    self.assertEqual(track_policy.challenge_guidance('A1',stage),'')
    self.assertEqual(track_policy.challenge_guidance('A2',stage),'')
- def test_targets_survive_selection_scope_and_are_used_for_retrieval(self):
+ def test_targets_survive_selection_scope(self):
   rows=course_skills.validate_recommendations([self.target()],{'SQL'},'A3')
   scoped=scope_view({'generationId':'g'},'A3',{'learningSkills':rows})
   self.assertEqual(scoped['selection']['skills'][0],self.target())
-  query=json.loads(query_text({'goal':'검색'},scoped['selection']['skills'][0],{'id':'A3'}))
-  self.assertEqual(query['targetOutcome'],self.target()['targetOutcome'])
-  self.assertEqual(query['completionCriteria'],self.target()['completionCriteria'])
  def test_resources_receive_targets_and_db_evidence_rule(self):
   course={'id':'A3','learningSkills':[self.target()]}
   items={'c':{'id':'c','type':'course','usable':True,'skills':['SQL'],'title':'SQL 비교 실습','cost':0,'difficulty':'ADVANCED','curriculum':{'items':[{'title':'SQL 쿼리 대안과 실행 계획 비교'}]},'content':'SQL 쿼리 대안과 실행 계획 비교'}}

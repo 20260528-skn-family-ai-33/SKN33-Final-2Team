@@ -2,7 +2,6 @@
 from contextlib import nullcontext
 from copy import deepcopy
 from types import SimpleNamespace
-import json
 import unittest
 from unittest.mock import Mock, patch
 
@@ -10,7 +9,7 @@ from app import db
 from app.agents import roadmap, runtime
 from app.errors import ApiError
 from app.routers import preassessment
-from app.services import course_skills, drafts, resource_evidence, resource_rag
+from app.services import course_skills, drafts, resource_evidence
 import test_revision_course_targets as revision_cases
 from test_recommendation_suitability import WEB, course
 
@@ -112,13 +111,10 @@ class CrashRequiredTechnologiesTests(unittest.TestCase):
             self.assertEqual(caught.exception.code, 'SKILLS_INVALID')
             self.assertNotIn('learningSkills', option)
 
-    def test_validated_required_core_reaches_search_and_actual_suitability(self):
+    def test_validated_required_core_reaches_actual_suitability(self):
         result, _ = self.option(target('Django'))
         skill = result['learningSkills'][0]
         project, selection = {'goal': 'Django 사용 필수'}, {'skills': [skill]}
-        query = json.loads(resource_rag.query_text(project, skill, result))
-        self.assertIn('Django', query['coreOutcome'])
-        self.assertNotIn('followUpScope', query)
         good = course('django', ['Django REST API 구현 실습'], skills=[WEB])
         wrong = course('fastapi', ['FastAPI REST API 구현 실습'], skills=[WEB])
         good_info = resource_evidence.facts(good, project, selection)
@@ -127,12 +123,10 @@ class CrashRequiredTechnologiesTests(unittest.TestCase):
         self.assertFalse(resource_evidence.suitable(wrong_info, WEB))
         self.assertEqual(wrong_info['suitability'][WEB]['missingStack'], ['django'])
 
-    def test_optional_comparison_stays_out_of_search_and_suitability(self):
+    def test_optional_comparison_stays_out_of_required_stack(self):
         result, _ = self.option(target(), goal='FastAPI 구현 후 Django 비교')
         skill = result['learningSkills'][0]
         project = {'goal': 'FastAPI 구현 후 Django 비교'}
-        query = resource_rag.query_text(project, skill, result)
-        self.assertNotIn('django', query.casefold())
         row = course('fastapi', ['FastAPI REST API 구현 실습'], skills=[WEB])
         info = resource_evidence.facts(row, project, {'skills': [skill]})
         self.assertTrue(resource_evidence.suitable(info, WEB))

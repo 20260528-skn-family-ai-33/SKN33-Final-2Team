@@ -9,6 +9,16 @@ MIN_PER_SKILL = 3
 DESCRIPTION_CHARS = 180
 
 
+def shared_selection(project: dict, selection: dict) -> dict:
+    """공통 선정 순서·적용 목표만 도서 순위에 사용한다. 코스 목표는 최종 추천에 전달한다."""
+    names = {row['name'] for row in selection['skills']}
+    applications = selection.get('commonApplications') or {}
+    chosen = [row['name'] if isinstance(row, dict) else row for row in project.get('selectedSkills') or []]
+    order = dict.fromkeys([*chosen, *applications, *sorted(names)])
+    return {'skills': [{'name': name, 'application': applications.get(name) or project.get('goal') or ''}
+                       for name in order if name in names]}
+
+
 def _rank(rows: list[dict], skill: dict) -> list[dict]:
     # 넓은 태그의 벡터 점수만으로 비동기 같은 구체적인 학습 대상이 밀리지 않게 한다.
     # 관련 표현의 반복 횟수는 가점하지 않고 동점에서는 검색 순위를 유지한다.

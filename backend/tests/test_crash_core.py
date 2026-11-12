@@ -15,7 +15,6 @@ from app.services import activity_selection as activities, course_skills, crash_
 from app.services.activity_instructions import instructions as task_instructions
 from app.services.course_recommendations import scope_view
 from app.services.learning_outcomes import instructions as summary_instructions
-from app.services.resource_rag import query_text
 
 ETL = 'ETL & 데이터 파이프라인'
 
@@ -112,16 +111,12 @@ class CrashCoreTests(unittest.TestCase):
         with self.assertRaises(roadmap.llm.LlmError):
             run(old, {'name': ETL, 'application': '증분 모델'})
 
-    def test_core_criteria_reach_resource_search_and_tasks_without_follow_up_scope(self):
+    def test_core_criteria_reach_tasks(self):
         rows = course_skills.validate_recommendations([target()], {ETL}, 'A2', require_depth=True)
         saved = {'generationId': 'g', 'project': {'selectedSkills': [ETL]},
                  'selection': {'skills': [{'name': ETL, 'application': target()['application']}]}}
         skill = scope_view(saved, 'A2', {'learningSkills': rows})['selection']['skills'][0]
         self.assertEqual(skill, target())
-        query = json.loads(query_text({'goal': 'dbt'}, skill, {'id': 'A2'}))
-        self.assertEqual(query['coreCriteria'], target()['coreCriteria'])
-        self.assertNotIn('followUpScope', query)
-        self.assertNotIn('coreCriteria', json.loads(query_text({'goal': 'dbt'}, skill, {'id': 'A1'})))
         task_saved = {'generationId': 'g', 'project': {'goal': 'dbt'}, 'recommendations': {'id': 'r'},
                       'selection': {'skills': [skill]}, 'skillOrder': [ETL],
                       'resourceChoices': {ETL: {'course': None, 'books': []}}}
