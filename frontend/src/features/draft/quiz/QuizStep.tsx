@@ -88,7 +88,7 @@ export function QuizStep() {
   return <><Stepper cur="quiz" busy={saving} /><Page title={<span style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>역량 테스트
     {testTools ? <button type="button" className="btn line" style={{ fontSize: 12.5, padding: '5px 10px', minHeight: 0 }} disabled={!survey || survey.completed} onClick={() => surveyRef.current?.randomize()}>시험용 · 무작위 선택</button> : null}
   </span>}
-    lead="프로젝트와 키우고 싶은 역량, 지금 하는 업무에 맞춘 설문과 퀴즈예요. 결과는 로드맵 3안을 내 수준에 맞추는 데 써요.">
+    lead="프로젝트와 키우고 싶은 역량, 지금 하는 업무에 맞춘 설문과 퀴즈예요.">
     {error ? <div className="card"><p role="alert">{error}</p><div className="actions">
       <button className="btn line" onClick={() => go(paths.newDetailsCheck)}>입력 내용 확인</button>
       <button className="btn pri" onClick={() => setAttempt(n => n + 1)}>다시 시도하기</button></div></div>

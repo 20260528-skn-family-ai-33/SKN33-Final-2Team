@@ -25,10 +25,7 @@ function ResultSummary({ survey }: { survey: Stored }) {
   return (
     <section className="card result-summary" aria-label="역량 테스트 결과 요약">
       <h2>한눈에 보기</h2>
-      <p className="result-summary-lead">
-        {summary.quizTotal ? <>퀴즈 <b>{summary.quizTotal}문항 중 {summary.quizCorrect}문항</b>을 맞혔어요. </> : null}
-        이 결과를 바탕으로 로드맵 3안을 만들어요.
-      </p>
+      {summary.quizTotal ? <p className="result-summary-lead">퀴즈 <b>{summary.quizTotal}문항 중 {summary.quizCorrect}문항</b>을 맞혔어요.</p> : null}
       <ul>
         {summary.skills.map(row => (
           <li key={row.skill}>

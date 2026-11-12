@@ -103,8 +103,7 @@ export function ReviewStep() {
     <>
       <Stepper cur="review" busy={submitting} />
       <Page eyebrow={[courseName, focus, version ? `버전 ${version}` : ''].filter(Boolean).join(' · ')}
-        title="이대로 시작할까요?"
-        lead="확정 전 마지막 확인이에요. 스킬마다 만들 산출물 과제를 정하면 끝나요.">
+        title="이대로 시작할까요?">
         <section className="card rv-summary" aria-label="로드맵 요약">
           {name ? <><span className="rv-label">로드맵 이름</span><h2>{name}</h2></> : null}
           <p className="rv-goal">{pl?.goal || goal}</p>
@@ -116,7 +115,7 @@ export function ReviewStep() {
             </div>
             <div>
               <dt>주당 학습</dt>
-              <dd><b>{reviewPlan ? `${reviewPlan.hours}시간` : waiting}</b><span>{reviewPlan ? '세부 사항에서 정한 학습 시간 기준' : ' '}</span></dd>
+              <dd><b>{reviewPlan ? `${reviewPlan.hours}시간` : waiting}</b><span>{' '}</span></dd>
             </div>
             <div>
               <dt>총 학습 시간</dt>
@@ -126,7 +125,7 @@ export function ReviewStep() {
             <div>
               <dt>예상 비용</dt>
               <dd><b>{reviewPlan ? costText(reviewPlan.cost, reviewPlan.costUnknown) : waiting}</b>
-                <span>{reviewPlan ? reviewPlan.costUnknown ? '일부 자료는 가격 확인 필요' : '선택한 강좌·도서 기준' : ' '}</span></dd>
+                <span>{reviewPlan?.costUnknown ? '일부 자료는 가격 확인 필요' : ' '}</span></dd>
             </div>
           </dl>
         </section>
@@ -136,7 +135,6 @@ export function ReviewStep() {
             <span className="step-num">1</span>
             <div>
               <h2>주차별 일정</h2>
-              <p>{later ? `${monthDay(start)}에 1주차가 시작돼요. 날짜는 그날 기준이에요.` : '확정한 날부터 1주차예요. 날짜는 오늘 확정했을 때 기준이에요.'}</p>
             </div>
           </header>
           {rows.length ? (
@@ -166,9 +164,9 @@ export function ReviewStep() {
           <h2>확정하면</h2>
           <ul>
             <li><Icon name="play" /><span><b>{later ? `${monthDay(start)}부터 시작해요.` : `오늘(${md(today)})부터 1주차가 시작돼요.`}</b>
-              {later ? ' 진행 중인 로드맵이 끝난 다음 주로 잡았어요.' : startMode === 'archive' ? ' 진행 중이던 로드맵은 보관되고, 내 로드맵에서 다시 진행할 수 있어요.' : ' 홈의 전체 일정과 이번 주 활동에 바로 나타나요.'}</span></li>
-            <li><Icon name="users" /><span><b>나와 부서장만 볼 수 있어요.</b> 확정한 로드맵, 진행 상태, 결과 보고서가 모두 그래요.</span></li>
-            <li><Icon name="edit" /><span><b>확정 뒤에도 바꿀 수 있어요.</b> 내 로드맵에서 수정 요청을 보내면 돼요.</span></li>
+              {later ? ' 진행 중인 로드맵이 끝난 다음 주예요.' : startMode === 'archive' ? ' 진행 중이던 로드맵은 보관돼요.' : ''}</span></li>
+            <li><Icon name="users" /><span><b>나와 부서장만 볼 수 있어요.</b></span></li>
+            <li><Icon name="edit" /><span><b>확정 뒤에도 내 로드맵에서 수정 요청을 보낼 수 있어요.</b></span></li>
           </ul>
         </section>
 

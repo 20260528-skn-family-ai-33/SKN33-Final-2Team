@@ -422,7 +422,7 @@ export function OptionsStep() {
           <h3>{trackName(id, D.perspectives[id].name)}</h3>
           <span className="tag warn">생성되지 않음</span>
         </div>
-        <p className="opt-tagline">이 코스는 만들지 못했어요. 이 코스만 다시 받을 수 있고, 만들어진 코스는 그대로 유지돼요.</p>
+        <p className="opt-tagline">이 코스는 만들지 못했어요.</p>
         <div className="opt-course-foot">
           <button type="button" className="btn sm line" disabled={running} onClick={() => void draftCall('계획을 재생성하지 못했어요', draftId => draftsApi.optionRetry(draftId, id), { soft: true })}>
             {running ? <><span className="sp" aria-hidden="true" /> 생성 중</> : <><Icon name="retry" /> 이 코스 다시 받기</>}
@@ -436,7 +436,6 @@ export function OptionsStep() {
       <Stepper cur="options" busy={selecting} />
       <Page
         title={ps.length === 1 ? '작성된 로드맵과 학습 자료를 확인해 주세요' : '로드맵을 고르고 학습 자료를 정해 주세요'}
-        lead="같은 스킬을 서로 다른 방식으로 짰어요. 코스를 하나 고르면, 그 코스에서 들을 강좌와 도서를 확인할 수 있어요."
       >
         {d.selectionNotice&&<Note>{d.selectionNotice}</Note>}
         <section className="step-sec" aria-label="코스 고르기">
@@ -452,16 +451,13 @@ export function OptionsStep() {
               return p ? courseCard(p) : missingCard(id);
             })}
           </div>
-          <p className="opt-basis">기간은 고른 강좌의 시간과 주당 학습 시간으로 계산해요. 도서는 기간에 넣지 않아요.</p>
         </section>
         <section className="step-sec" aria-label="학습 자료 고르기">
           <header className="step-sec-head">
             <span className="step-num">2</span>
             <div>
               <h2>{compare ? '코스별 학습 자료 비교' : chosen ? `${trackName(chosen.opt, chosen.name)}의 학습 자료` : '학습 자료 고르기'}</h2>
-              <p>{compare ? '세 코스의 추천 자료를 스킬별로 나란히 보여 드려요. 다음 단계에는 고른 코스의 자료만 반영돼요.'
-                : chosen ? 'AI 추천이 미리 선택돼 있어요. 그대로 진행해도 되고, 바꾸고 싶은 것만 바꾸면 돼요.'
-                : '코스를 고르면 그 코스의 강좌·도서가 여기에 나와요.'}</p>
+              {compare ? <p>다음 단계에는 고른 코스의 자료만 반영돼요.</p> : null}
             </div>
             {chosen && ps.length > 1 ? (
               <button type="button" className="btn sm line step-sec-right" aria-expanded={compare} aria-controls="roadmap-material-comparison" disabled={selecting} onClick={() => setCompare(value => !value)}>

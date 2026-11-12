@@ -33,7 +33,6 @@
 .opt-course-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
 .opt-course-foot .btn svg { width: 15px; height: 15px; }
 .opt-course-foot .btn .sp { width: 12px; height: 12px; }
-.opt-basis { margin: 10px 0 0; font-size: 12.5px; color: var(--ink-3); }
 
 /* ② 고른 코스의 자료: 스킬을 순서대로 펼치고, 강좌와 도서를 나란히 둔다 */
 .opt-empty { padding: 28px; border: 1.5px dashed var(--line-2); border-radius: var(--r-lg); text-align: center; font-size: 14px; color: var(--ink-3); }

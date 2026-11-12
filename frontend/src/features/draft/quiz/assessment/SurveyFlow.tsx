@@ -95,7 +95,7 @@ export function SurveyFlow({ onRetry, ref, survey, initialAnswers = {}, initialC
         </section>)}
       </>}
     {error && <p role="alert" className="error">{error}</p>}
-    {!review&&phase==='quizzes'&&!quizPending&&!quizFailed&&<p className="muted finish-note">완료하면 답을 바꿀 수 없어요. 정답과 해설은 다음 화면에서 바로 볼 수 있어요.</p>}
+    {!review&&phase==='quizzes'&&!quizPending&&!quizFailed&&<p className="muted finish-note">완료하면 답을 바꿀 수 없어요.</p>}
     {!review&&<footer>{phase === 'quizzes' && <button disabled={saving} onClick={() => navigate('surveys')}>이전: 설문</button>}
       <button className="primary" disabled={saving || quizPending || quizFailed} onClick={() => void next()}>
         {saving ? '저장 중…' : phase === 'surveys' ? '다음: 퀴즈' : '역량 테스트 완료'}

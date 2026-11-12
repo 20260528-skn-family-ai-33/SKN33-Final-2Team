@@ -95,7 +95,7 @@ export function ReviewTaskBlocks({ materials, acts, options, selectedIds, busy, 
             <div className="rv-tasks">
               <div className="rv-tasks-head">
                 <h4>산출물 과제</h4>
-                <span>{multi ? '제안받은 과제 중 하나를 골라 주세요' : '배운 것을 확인하려고 직접 만들어 보는 결과물이에요'}</span>
+                <span>{multi ? '제안받은 과제 중 하나를 골라 주세요' : ''}</span>
                 <button type="button" className="btn sm line" aria-busy={proposing} disabled={busy || proposeDisabled} onClick={() => onPropose(name)}>
                   {proposing ? <><span className="sp" aria-hidden="true" /><span role="status">제안받는 중…</span></> : <><Icon name="retry" /> {list.length ? '다른 과제 제안받기' : '과제 제안받기'}</>}
                 </button>
@@ -121,12 +121,10 @@ export function ReviewTaskBlocks({ materials, acts, options, selectedIds, busy, 
                 </div>
               ) : generating || proposing ? <Skeleton kind="cards" count={1} />
                 : <p className="rv-muted">아직 제안된 과제가 없어요. ‘과제 제안받기’를 눌러 주세요.</p>}
-              {list.length ? (
+              {list.length && (multi || !chosen) ? (
                 <p className="rv-task-foot">
-                  {chosen ? <>
-                    {multi ? '고르지 않은 제안은 확정할 때 반영되지 않아요.' : '필요 없으면 선택을 풀어 과제 없이 진행할 수 있어요.'}
-                    {multi ? <button type="button" className="rv-link" disabled={busy} onClick={() => onToggle(chosen.task.id)}>이 스킬은 과제 없이 진행하기</button> : null}
-                  </> : '이 스킬은 과제 없이 진행해요. 과제를 고르면 다시 넣을 수 있어요.'}
+                  {chosen ? <button type="button" className="rv-link" disabled={busy} onClick={() => onToggle(chosen.task.id)}>이 스킬은 과제 없이 진행하기</button>
+                    : '이 스킬은 과제 없이 진행해요.'}
                 </p>
               ) : null}
             </div>

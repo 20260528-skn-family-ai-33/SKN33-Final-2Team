@@ -66,7 +66,6 @@ export function ResultStep() {
   useDraftWatch();
   useEffect(()=>{if(d.v2Assessment?.completed)void prepareRoadmaps().catch(e=>setError(e instanceof Error?e.message:'로드맵 준비에 실패했어요.'));},[id,generation,d.v2Assessment?.completed]);
   return <><Stepper cur="result" busy={busy} /><Page title="역량 테스트 결과를 확인해 주세요"
-    lead="스킬별 결과를 먼저 보고, 아래에서 설문 응답과 퀴즈 정답·해설을 확인할 수 있어요."
     foot={<><button className="btn line" disabled={busy} onClick={() => go(paths.newQuiz)}>이전: 역량 테스트</button>
       <button className="btn pri" disabled={busy} onClick={() => { setBusy(true); void genStart(go).finally(() => setBusy(false)); }}>다음: {stepLabel('options')}</button></>}>
       <AssessmentResults />

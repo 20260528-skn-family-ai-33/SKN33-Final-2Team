@@ -114,7 +114,6 @@ export function DetailsCheck() {
       <Stepper cur="check" busy={summaryBusy || editingSummary} />
       <Page
         title="입력한 내용을 확인해 주세요"
-        lead="학습 목표·프로젝트 요약·학습 여건·스킬이 맞는지 확인해 주세요. 고칠 곳이 있으면 ‘수정’을 눌러 주세요."
         foot={
           <>
             <button className="btn line" disabled={summaryBusy || editingSummary} onClick={() => go(paths.newDetails)}>
