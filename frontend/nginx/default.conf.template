@@ -8,7 +8,19 @@ server {
     # 관리자 엑셀·CSV(20MB까지)와 첨부 파일 올리기
     client_max_body_size 25m;
 
+    # 화면 파일(HTML·JS·CSS·SVG)을 gzip 으로 줄여 보낸다. 사진(jpg·png·webp)은 이미 압축된 형식이라 대상에서 뺀다
+    gzip on;
+    gzip_comp_level 5;
+    gzip_min_length 1024;
+    gzip_types text/css application/javascript image/svg+xml;
+    # 캐시가 압축본과 원본을 따로 보관하게 Vary: Accept-Encoding 을 붙인다
+    gzip_vary on;
+    # CloudFront 같은 프록시를 거친 요청(Via 헤더)은 기본값(off)에서 압축이 빠지므로 켠다
+    gzip_proxied any;
+
     location /api/ {
+        # API 응답은 압축하지 않는다(이번 범위는 화면 파일. 응답 본문 압축은 따로 검토한다)
+        gzip off;
         proxy_pass ${API_UPSTREAM};
         proxy_http_version 1.1;
         proxy_set_header Host $host;
