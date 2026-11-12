@@ -221,7 +221,6 @@ def _mock_documents(inp: dict) -> dict:
 
 
 def _prev_reg(prev: dict | None) -> str | None:
-    """앞 답변의 첫 근거 조항이 속한 규정(이어 묻기에서 규정 이름 없이 '그럼 제3조는?'이라고 물을 때)"""
     b = ((prev or {}).get('a') or {}).get('basis') or []
     a = regstore.article(b[0]) if b else None
     return a['reg'] if a else None
@@ -232,7 +231,6 @@ def _clean(t: str) -> str:
 
 
 def _ref_answer(ref: dict, me: dict) -> dict:
-    """직접 물은 조·항·호를 원문 그대로 보여 주는 답(가데이터 모드)"""
     reg = ref['reg']
     if not ref['ids']:
         return ans(kind='regulation', level='none', summary=f"{ref['note']}. 등록된 규정에 없는 조항이라 답하지 않아요.")
@@ -281,13 +279,13 @@ def _mock(inp: dict) -> dict:
     name = f"「{reg.get('name', '')}」 {a['no']}({a['title']})" if a['title'] else f"「{reg.get('name', '')}」 {a['no']}"
     if '준용' in a['text'] and refs:
         return ans(kind='regulation', level='missing', summary=f'{name}는 「{refs[0]}」을 따르도록 정하고 있어요. 그 원문이 아직 등록되지 않아 자세한 기준은 확인할 수 없어요.',
-                   apply=f"{group or ''} 대상으로 등록된 규정에서 찾은 조항이에요.", more=[f'「{refs[0]}」 원문 확인'], basis=[h['id'] for h in hits], missing=refs, retrieved=[h['id'] for h in hits])
+                    apply=f"{group or ''} 대상으로 등록된 규정에서 찾은 조항이에요.", more=[f'「{refs[0]}」 원문 확인'], basis=[h['id'] for h in hits], missing=refs, retrieved=[h['id'] for h in hits])
     first = re.sub(r'\s+', ' ', re.sub(r'<[^>]*>|\[[^\]]*\]', '', a['text'])).strip()
     m = re.match(r'^.*?다\.', first)
     os_ = ' 국외근무 직원 대상 규정이라 국내에서 근무하면 적용되지 않아요.' if reg.get('overseas') else ''
     return ans(kind='regulation', level='ok', summary=f"{name}: {(m.group(0) if m else first)[:170]}",
-               apply=f"{me.get('name') or '사용자'} 님은 {group or ''}이라 「{reg.get('name', '')}」 조항으로 답했어요.{os_} 자세한 내용은 아래 ‘규정 근거 보기’에서 원문을 확인하세요.",
-               more=['내 상황에 그대로 적용되는지는 담당 부서에 확인해 주세요.'], basis=[h['id'] for h in hits], retrieved=[h['id'] for h in hits])
+                apply=f"{me.get('name') or '사용자'} 님은 {group or ''}이라 「{reg.get('name', '')}」 조항으로 답했어요.{os_} 자세한 내용은 아래 ‘규정 근거 보기’에서 원문을 확인하세요.",
+                more=['내 상황에 그대로 적용되는지는 담당 부서에 확인해 주세요.'], basis=[h['id'] for h in hits], retrieved=[h['id'] for h in hits])
 
 
 def _mock_follow(q: str, prev: dict, me: dict) -> dict:
@@ -305,8 +303,8 @@ def _mock_follow(q: str, prev: dict, me: dict) -> dict:
     if a.get('missing'):
         ms = '·'.join(miss_label(m) for m in a['missing'])
         return ans(kind='regulation', level='missing', summary=f'{head} ‘{q}’도 지금 등록된 자료로는 확인할 수 없어요.',
-                   apply=f"앞 답변의 근거{f'({nos})' if nos else ''}는 {ms}에 기준을 넘기고 있는데, 그 내용이 등록되지 않았어요. 원문에 없는 기한·절차를 짐작해서 답하지 않을게요.",
-                   more=[f'담당 부서에 물어볼 질문: {q}'], basis=list(a.get('basis') or []), missing=list(a['missing']))
+                    apply=f"앞 답변의 근거{f'({nos})' if nos else ''}는 {ms}에 기준을 넘기고 있는데, 그 내용이 등록되지 않았어요. 원문에 없는 기한·절차를 짐작해서 답하지 않을게요.",
+                    more=[f'담당 부서에 물어볼 질문: {q}'], basis=list(a.get('basis') or []), missing=list(a['missing']))
     return ans(kind='regulation', level='none')
 
 
@@ -355,15 +353,255 @@ def _context_query(q: str, history: list, *, classify: bool = False) -> str:
     return f'현재 질문: {q}\n앞 대화:\n{context}'
 
 
-def _api(ctx: rt.Ctx, inp: dict) -> dict:
+# ==============================================================================
+# ⭐ [1단계 ~ 5단계 규정 질의응답 핵심 파이프라인]
+# ==============================================================================
+
+def classify_question_roberta(question: str, history: list | None = None, me: dict | None = None,
+                             emp_group: str | None = None) -> dict:
+    """⭐ [1단계 - RoBERTa로 질문 분류]
+    1. 사용자 정보(me 또는 emp_group)에서 사용자의 기본 직군을 가져온다. (없으면 '일반직' 자동 보장)
+    2. 질문(question) 안에 특정 직군 명칭이 언급되어 있는지 확인한다.
+       - 질문에 직군이 있으면: 질문에 적힌 직군을 사용 (예: "실무직 연차 휴가는?" -> '실무직')
+       - 질문에 직군이 없으면: 사용자의 기본 직군을 사용 (예: "연차 휴가는?" -> 사용자 직군 '일반직')
+    3. 직군과 대화 맥락을 결합하여 RoBERTa로 질문 유형을 1차 분류한다.
+    """
+    history = history or []
+    group_list = ['일반직', '실무직', '운영직']
+    user_group = emp_group or (me.get('empGroup') if isinstance(me, dict) else me) or '일반직'
+    detected_group = next((g for g in group_list if g in question), None)
+    effective_group = detected_group if detected_group else user_group
+
+    me_obj = {'empGroup': effective_group}
+    follow_history = _follow_history(question, history, me_obj)
+    context_query = _context_query(question, follow_history, classify=True)
+    result = question_classifier.classify(context_query)
+
+    return {
+        'label': result['label'],
+        'confidence': result.get('confidence'),
+        'model': result.get('model'),
+        'usedHistory': bool(follow_history),
+        'follow_history': follow_history,
+        'group': effective_group,
+        'detectedFromQuestion': bool(detected_group),
+    }
+
+
+def classify_label_with_llm(ctx: rt.Ctx, question: str, history: list | None = None) -> str | None:
+    """RoBERTa 예측 정확도가 80% 미만일 때 LLM을 호출하여 라벨을 다시 분류한다."""
+    if ctx.mode not in ('ollama', 'openai'):
+        return None
+    system = """너는 사내 질문의 유형을 정확하게 분류하는 AI 분류기다.
+        사용자의 질문과 이전 대화를 읽고, 다음 4가지 라벨 중 가장 적절한 하나만 JSON으로 응답하라:
+        1. '사내 규정': 취업규칙, 인사, 복무, 휴가, 출장, 교육비 지원, 승진, 징계, 퇴직 등 회사 사규·규정 관련 질문
+        2. '사내 생활안내': 구내식당 메뉴 및 운영시간, 통근버스 노선 및 시간표, 사내 복지시설, 회의실 예약 등 사내 생활편의 관련 질문
+        3. '수자원공사 정보': K-water 회사 소개, 설립 목적, 주요 사업(수자원, 수도, 댐 등), 기관 정보 관련 질문
+        4. '범위 밖': 사내 업무 및 생활과 무관한 일반 질문 (주식, 날씨, 연예인, 스포츠, 잡담 등)
+
+        반드시 아래 JSON 형식으로만 응답하라:
+        {"label": "사내 규정" | "사내 생활안내" | "수자원공사 정보" | "범위 밖"}"""
+    payload = {'question': question}
+    try:
+        res = rt.llm_json(ctx, system, payload, role='regulation', history=_hist_msgs(history or []),
+                          temperature=0 if ctx.mode == 'ollama' else None)
+        label = res.get('label')
+        if label in ('사내 규정', '사내 생활안내', '수자원공사 정보', '범위 밖'):
+            return label
+    except Exception:
+        pass
+    return None
+
+
+def verify_or_reclassify_label_with_llm(ctx: rt.Ctx, question: str, label: str,
+                                       confidence: float | None = None,
+                                       history: list | None = None) -> str:
+    """⭐ [2단계 - RoBERTa 예측정확도 80% 이하 시 LLM 2차 재분류]
+    1. RoBERTa 확신도가 80%(0.80) 이상이면 1단계 분류 라벨을 그대로 확정한다.
+    2. 확신도가 80% 미만이거나 애매한 경우, LLM이 질문을 다시 읽고 2차 재분류를 수행한다.
+    """
+    if confidence is not None and confidence >= 0.8:
+        return label
+
+    if ctx.mode in ('ollama', 'openai'):
+        llm_label = classify_label_with_llm(ctx, question, history)
+        if llm_label:
+            return llm_label
+
+    return label
+
+
+def retrieve_regulation_slots(ctx: rt.Ctx, inp: dict) -> list[str]:
+    """⭐ [3단계 - RAG를 통해서 근거 가져오기 (조항 및 부모 슬롯 확보)]
+    BGE-M3(벡터) + BM25(키워드) 하이브리드 검색으로 관련 조항을 찾고,
+    부모 조항(parent_context) 최대 2슬롯을 우선 확보하여 7개 조항 ID(ids)를 선별한다. (이슈 #138 해결)
+    """
+    q, me, hist = inp['question'], inp['me'], inp.get('history') or []
+    group = me.get('empGroup') or '일반직'
+    follow_history = inp.get('_history') or []
+    documents_only = inp.get('documents_only')
+
+    prev = follow_history[-1] if follow_history else None
+
+    # 1) BGE-M3 + BM25 하이브리드 검색 실행
+    alone = regstore.search(q, 5, group, ctx.mode)
+    joined = regstore.search(_context_query(q, follow_history), 5, group, ctx.mode) if prev else []
+    mix = []
+    for index in range(max(len(alone), len(joined))):
+        if index < len(joined):
+            mix.append(joined[index]['id'])
+        if index < len(alone):
+            mix.append(alone[index]['id'])
+
+    # 이전 대화의 근거 조항들
+    previous_ids = list((prev or {}).get('a', {}).get('basis') or [])
+    if documents_only:
+        previous_ids = [aid for aid in previous_ids if (source := regstore.article(aid)) and source.get('group') == group]
+
+    # 중복 제거된 검색 후보 조항 리스트
+    core_candidates = [v for v in rt.uniq(previous_ids + mix) if regstore.article(v)]
+    if not core_candidates:
+        return []
+
+    # ⭐ [이슈 #138 핵심 해결: 7개 슬롯 예산 최적 배분]
+    # (1) 핵심 검색 조항을 먼저 최대 4개까지만 담아서 부모 조항을 위한 자리(최소 3슬롯)를 예약!
+    selected_ids = list(core_candidates[:4])
+
+    # (2) 부모 문맥(parent_context) 최대 2개 슬롯 우선 확보! (조건, 예외, 상위 항 보존)
+    if documents_only and ctx.mode in ('ollama', 'openai') and hybrid_search.enabled():
+        parent_ids = regstore.parent_context(selected_ids, group, q, limit=2)
+        selected_ids = rt.uniq(selected_ids + parent_ids)
+
+    # (3) 참조 조항(referenced_paragraphs) 최대 2개 슬롯 보충
+    if documents_only:
+        ref_para_ids = regstore.referenced_paragraphs(selected_ids, limit=min(2, 7 - len(selected_ids)))
+        selected_ids = rt.uniq(selected_ids + ref_para_ids)
+
+    # (4) 7개 슬롯 중 아직 자리가 남았다면 나머지 검색 후보(mix)로 알뜰하게 채움!
+    for cand in core_candidates:
+        if len(selected_ids) >= 7:
+            break
+        if cand not in selected_ids:
+            selected_ids.append(cand)
+
+    ids = selected_ids[:7]
+    return ids
+
+
+def generate_regulation_summary(ctx: rt.Ctx, inp: dict, ids: list[str]) -> dict:
+    """⭐ [4단계 - 근거를 통해서 LLM이 요약하기]
+    3단계(RAG)에서 선별된 7개 조항 원문을 바탕으로 LLM에게 요약 답변 생성을 요청한다.
+    (비공개 개인정보·타인 인사정보나 제공 금지 요청은 LLM이 status='refused'로 판단하여 거절)
+    """
+    q = inp['question']
+    follow_history = inp.get('_history') or []
+    history = _hist_msgs(follow_history)
+    sources = [_art_in(regstore.article(value)) for value in ids]
+
+    # LLM에게 조항 원문들을 주입하여 요약 답변 생성
+    result = grounded_answer.generate(ctx, 'regulation', q, sources, inp['context'], history=history)
+    return result
+
+
+def format_and_output_response(ctx: rt.Ctx, inp: dict, ids: list[str], result: dict) -> dict:
+    """⭐ [5단계 - 요약 결과 검증 및 최종 화면 출력]
+    LLM의 결과 상태(refused, not_found)를 분기하고, 숫자 환각 방지 검증을 거쳐 최종 화면 응답(ans)을 출력한다.
+    """
+    q = inp['question']
+
+    # 1) 제공 금지(refused) 또는 근거 없음(not_found) 상태 처리
+    if result['status'] == 'refused':
+        return _refused('regulation')
+    if result['status'] == 'not_found':
+        return _no_evidence('regulation', ids)
+
+    basis, summary = result['sourceIds'], result['summary']
+    if not hr_stated(q, basis):
+        return _no_evidence('regulation', ids)
+
+    # 2) 숫자 환각 방지 검증 (원문에 없는 숫자 사용 차단)
+    if not nums_ok(summary, basis, ctx_nums(inp['context'])):
+        raise llm.LlmError('답변 형식 오류: 규정 답변의 숫자가 인용 조항에 없어요')
+
+    # 3) 최종 출력 객체 생성 및 반환
+    final_response = ans(kind='regulation', topic='regulation', evidenceStatus=result['status'],
+                         level='ok' if result['status'] == 'found' else 'unclear', summary=summary,
+                         basis=basis, retrieved=ids)
+    return final_response
+
+
+# ==============================================================================
+# ⭐ [통합 파이프라인 조율 함수] (1단계 -> 2단계 -> 3단계 -> 4단계 -> 5단계 순차 실행)
+# ==============================================================================
+
+def answer_with_pipeline(ctx: rt.Ctx, inp: dict) -> dict:
+    """⭐ [통합 파이프라인] 1단계부터 5단계를 위에서 아래로 순서대로 실행한다."""
     q, hist = inp['question'], inp.get('history') or []
-    history = _follow_history(q, hist, inp['me'])
-    inp['_history'] = history
-    classification = question_classifier.classify(_context_query(q, history, classify=True))
-    inp['_classification'] = dict(classification, usedHistory=bool(history))
-    if classification['label'] == '범위 밖':
+    me = inp.get('me') or {}
+
+    # [1단계] RoBERTa 질문 1차 분류
+    classified = classify_question_roberta(q, hist, me=me)
+    label = classified['label']
+    confidence = classified.get('confidence')
+    follow_history = classified['follow_history']
+
+    inp['_history'] = follow_history
+    inp['_classification'] = {k: v for k, v in classified.items() if k not in ('follow_history', 'group', 'detectedFromQuestion')}
+    if classified.get('group'):
+        inp['me'] = dict(me, empGroup=classified['group'])
+
+    # [2단계] RoBERTa 예측정확도가 80% 이하면 LLM이 다시 분류
+    effective_label = verify_or_reclassify_label_with_llm(ctx, q, label, confidence, follow_history)
+
+    # 도메인별 분기
+    if effective_label == '범위 밖':
         return ans(kind='out', level='out')
-    return _api_answer(ctx, inp, classification['label'])
+    elif effective_label == '수자원공사 정보':
+        return _company_answer(ctx, inp)
+    elif effective_label == '사내 생활안내':
+        return _life_answer(ctx, inp)
+
+    # ── [사내 규정 처리 3 -> 4 -> 5단계] ──
+    # [3단계] RAG를 통해서 근거를 가져온다.
+    ids = retrieve_regulation_slots(ctx, inp)
+    if not ids:
+        return _no_evidence('regulation')
+
+    # [4단계] 근거를 통해서 LLM이 요약을 한다.
+    summary_result = generate_regulation_summary(ctx, inp, ids)
+
+    # [5단계] 요약하는 거 검증하고 최종 출력한다.
+    return format_and_output_response(ctx, inp, ids, summary_result)
+
+
+# ==============================================================================
+# ⭐ [_api 실행 진입점] (answer_with_pipeline 바로 아래에 위치)
+# ==============================================================================
+
+def _api(ctx: rt.Ctx, inp: dict) -> dict:
+    """에이전트 런타임(rt.run)이 호출하는 진입점: 통합 파이프라인을 실행한다."""
+    return answer_with_pipeline(ctx, inp)
+
+
+def answer_with_rag_and_llm(ctx: rt.Ctx, inp: dict, label: str, confidence: float | None = None) -> dict:
+    return answer_with_pipeline(ctx, inp)
+
+
+def generate_regulation_output(ctx: rt.Ctx, inp: dict, ids: list[str]) -> dict:
+    summary_result = generate_regulation_summary(ctx, inp, ids)
+    return format_and_output_response(ctx, inp, ids, summary_result)
+
+
+def retrieve_and_answer(ctx: rt.Ctx, inp: dict, label: str, confidence: float | None = None) -> dict:
+    return answer_with_pipeline(ctx, inp)
+
+
+def _api_answer(ctx: rt.Ctx, inp: dict, label: str, confidence: float | None = None) -> dict:
+    return answer_with_pipeline(ctx, inp)
+
+
+def classify_with_context(question: str, history: list, me: dict) -> dict:
+    return classify_question_roberta(question, history, me)
 
 
 def _no_evidence(topic: str, retrieved: list | None = None, note: str = '') -> dict:
@@ -448,67 +686,9 @@ def _knowledge_answer(ctx: rt.Ctx, inp: dict, topic: str) -> dict:
                summary=summary, knowledgeSources=provenance)
 
 
-def _api_answer(ctx: rt.Ctx, inp: dict, label: str) -> dict:
-    if label == '수자원공사 정보':
-        return _company_answer(ctx, inp)
-    if label == '사내 생활안내':
-        return _life_answer(ctx, inp)
-    if label != '사내 규정':
-        raise llm.LlmError('답변 형식 오류: 알 수 없는 질문 분류 결과예요')
-    q, me, hist = inp['question'], inp['me'], inp.get('history') or []
-    group = me.get('empGroup')
-    follow_history = inp.get('_history') or []
-    documents_only = inp.get('documents_only')
-    if documents_only and not (group or '').strip():
-        raise AgentError('로그인한 직원의 직원 구분을 확인할 수 없어요')
-    ref = regstore.explicit_ref(q, group)
-    # 규정 이름이 없는 조항 질문은 일반 이어 묻기 판별과 별도로 직전 규정을 참조한다.
-    if ref is None and hist and regstore.REF_ART.search(q):
-        default_reg = _prev_reg(hist[-1])
-        if default_reg:
-            ref = regstore.explicit_ref(q, group, default_reg)
-            if ref is not None and not follow_history:
-                follow_history = [hist[-1]]
-    prev = follow_history[-1] if follow_history else None
-    history = _hist_msgs(follow_history)
-    alone = regstore.search(q, 5, group, ctx.mode)
-    joined = regstore.search(_context_query(q, follow_history), 5, group, ctx.mode) if prev else []
-    mix = []
-    for index in range(max(len(alone), len(joined))):
-        if index < len(joined):
-            mix.append(joined[index]['id'])
-        if index < len(alone):
-            mix.append(alone[index]['id'])
-    ref_ids = (ref or {}).get('ids') or []
-    previous_ids = list((prev or {}).get('a', {}).get('basis') or [])
-    if documents_only:
-        # 브라우저에서 전달한 이전 근거는 현재 직원 구분에서 다시 확인한다.
-        previous_ids = [aid for aid in previous_ids if (source := regstore.article(aid)) and source.get('group') == group]
-    ids = [value for value in rt.uniq(ref_ids + previous_ids + mix) if regstore.article(value)][:max(7, len(ref_ids))]
-    if ref and not ref_ids:
-        note = f"{ref['note']}. 규정명과 조 번호를 확인하거나 담당 부서에 문의해 주세요."
-        return _empty_evidence_answer(ctx, 'regulation', inp, note, ids, history=history)
-    if not ids:
-        return _empty_evidence_answer(ctx, 'regulation', inp, history=history)
-    if documents_only:
-        ids += regstore.referenced_paragraphs(ids, limit=min(3, 7 - len(ids)))
-        if ctx.mode in ('ollama', 'openai') and hybrid_search.enabled():
-            ids += regstore.parent_context(ids, group, q, limit=min(2, 7 - len(ids)))
-    requested = {'where': ref['where'], 'focus': ref['focus'], 'note': ref['note']} if ref else None
-    result = grounded_answer.generate(ctx, 'regulation', q, [_art_in(regstore.article(value)) for value in ids],
-                                     inp['context'], history=history, requested=requested)
-    if result['status'] == 'refused':
-        return _refused('regulation')
-    if result['status'] == 'not_found':
-        return _no_evidence('regulation', ids)
-    basis, summary = result['sourceIds'], result['summary']
-    if not hr_stated(q, basis):
-        return _no_evidence('regulation', ids)
-    if not nums_ok(summary, basis, ctx_nums(inp['context'])):
-        raise llm.LlmError('답변 형식 오류: 규정 답변의 숫자가 인용 조항에 없어요')
-    return ans(kind='regulation', topic='regulation', evidenceStatus=result['status'],
-               level='ok' if result['status'] == 'found' else 'unclear', summary=summary,
-               basis=basis, retrieved=ids)
+def _regulation_answer(ctx: rt.Ctx, inp: dict) -> dict:
+    ids = retrieve_regulation_slots(ctx, inp)
+    return format_and_output_response(ctx, inp, ids, generate_regulation_summary(ctx, inp, ids)) if ids else _no_evidence('regulation')
 
 
 def scope_answer(a: dict, me: dict) -> dict:
@@ -519,22 +699,31 @@ def scope_answer(a: dict, me: dict) -> dict:
                ref=list(a.get('basis') or [])[:3], retrieved=a.get('retrieved') or [])
 
 
+def prepare_assistant_input(question: str, history: list | None, me: dict, context: dict | None = None,
+                            *, documents_only: bool = False) -> dict:
+    """사용자 질문, 앞 대화 내용, 사용자 정보를 검증하고 묶는다."""
+    return {
+        'question': question,
+        'history': history or [],
+        'context': context or {},
+        'me': me or {},
+        'documents_only': documents_only,
+    }
+
+
 def answer(ctx: rt.Ctx, question: str, history: list, context: dict, sim: str | None = None,
            *, documents_only: bool = False) -> dict:
     """history는 답을 받은 질문·답 [{q, a}]이다. 이어 묻기에는 최대 5턴을 사용한다."""
-    me = {'empGroup': ctx.me.get('empGroup')} if documents_only else ctx.me
-    context = {} if documents_only else context
-    inp = {'question': question, 'history': history or [], 'context': context, 'me': me,
-           'documents_only': documents_only}
+    me = ctx.me if ctx.me else {}
+    inp = prepare_assistant_input(question, history, me, context, documents_only=documents_only)
     task = f"사내 생활 질문 분류·답변{f' (앞 대화 {len(history)}턴 포함)' if history else ''}"
-    mock = _mock_documents if documents_only else _mock
+    # 1~5단계 파이프라인 단독 실행 검증: 레거시 mock 대신 _api 직접 실행
+    mock = None
     a = rt.run(ctx, '규정 에이전트', task, inp, mock, lambda i: _api(ctx, i), role='regulation', sim=sim, mock_delay=0.38,
                log_input={'question': question, 'context': context, 'history': history or []})
     if inp.get('_classification'):
         ctx.meta['classification'] = inp['_classification']
-    if documents_only:
-        return a
-    return scope_answer(a, me) if a['kind'] == 'regulation' and a.get('evidenceStatus') != 'refused' and not regstore.set_for(me.get('empGroup')) else a
+    return a
 
 
 def education_guide(t: db.Tx, group: str | None) -> dict:
