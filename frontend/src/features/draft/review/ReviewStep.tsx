@@ -12,6 +12,7 @@ import { hrs } from '@/shared/lib/format';
 import { recs, useWs } from '@/shared/state/workspace';
 import { Icon } from '@/shared/ui/Icon';
 import { Page, Stats } from '@/shared/ui/parts';
+import { Skeleton } from '@/shared/ui/Skeleton';
 import { StagesView } from '@/shared/ui/StagesView';
 import { confirmReview } from './confirmReview';
 import { Stepper } from '../Stepper';
@@ -42,6 +43,7 @@ export function ReviewStep() {
   const goal = useWs((s) => s.draft.goal);
   const startMode = useWs((s) => s.draft.startMode);
   const plans = useWs((s) => s.plans);
+  const selectedSkills = useWs((s) => s.draft.selectedSkills?.length || 0);
   useDraftWatch();
   async function submit() {
     if (busy || submitting || (assessment && !ready)) return;
@@ -92,7 +94,10 @@ export function ReviewStep() {
   const rows = reviewPlan ? reviewSchedule(reviewPlan) : [];
   const taskCount = reviewPlan ? reviewPlan.acts.filter(act => !act.res).length : 0;
   const costText = (cost: number, unknown: boolean) => cost === 0 ? (unknown ? '가격 확인 필요' : '무료') : `${cost.toLocaleString('ko-KR')}원${unknown ? '+' : ''}`;
-  const waiting = reviewError ? '계산하지 못했어요' : '계산 중…';
+  /* 계산을 기다리는 동안에는 값 자리에 뼈대를 그린다(높이는 값이 들어왔을 때와 같다). 실패하면 글로 알린다 */
+  const waiting = reviewError ? '계산하지 못했어요' : <span className="skel rv-skel-num" aria-hidden="true" />;
+  const waitingSub = reviewError ? ' ' : <span className="skel rv-skel-sub" aria-hidden="true" />;
+  const skillCount = Math.min(3, Math.max(1, selectedSkills || 2));
   /* 확정할 수 없는 이유는 버튼 옆에 미리 적는다 */
   const block = reviewError ? '검토 내용을 불러오지 못했어요. 아래에서 다시 불러와 주세요'
     : submitting ? '확정하고 있어요'
@@ -111,7 +116,7 @@ export function ReviewStep() {
             <div>
               <dt>기간</dt>
               <dd><b>{weeks != null ? `${weeks}주` : waiting}</b>
-                <span>{weeks == null ? ' ' : later ? `${monthDay(start)}부터 · 진행 중인 로드맵이 끝난 다음 주` : `오늘 확정하면 ${md(start)} ~ ${md(addDays(start, weeks * 7 - 1))}`}</span></dd>
+                <span>{weeks == null ? waitingSub : later ? `${monthDay(start)}부터 · 진행 중인 로드맵이 끝난 다음 주` : `오늘 확정하면 ${md(start)} ~ ${md(addDays(start, weeks * 7 - 1))}`}</span></dd>
             </div>
             <div>
               <dt>주당 학습</dt>
@@ -120,7 +125,7 @@ export function ReviewStep() {
             <div>
               <dt>총 학습 시간</dt>
               <dd><b>{reviewPlan ? `약 ${hrs(reviewPlan.totalH)}` : waiting}</b>
-                <span>{reviewPlan ? `강좌 ${hrs(reviewPlan.materialHours ?? 0)} + 과제 ${hrs(reviewPlan.taskHours ?? 0)}${reviewPlan.totalHUnknown ? ' · 시간 미확인 자료 있음' : ''}` : ' '}</span></dd>
+                <span>{reviewPlan ? `강좌 ${hrs(reviewPlan.materialHours ?? 0)} + 과제 ${hrs(reviewPlan.taskHours ?? 0)}${reviewPlan.totalHUnknown ? ' · 시간 미확인 자료 있음' : ''}` : waitingSub}</span></dd>
             </div>
             <div>
               <dt>예상 비용</dt>
@@ -155,7 +160,8 @@ export function ReviewStep() {
                 </li>
               ))}
             </ol>
-          ) : <div className="rv-weeks-wait" role="status">{reviewError ? '일정을 계산하지 못했어요.' : '일정을 계산하고 있어요…'}</div>}
+          ) : reviewError ? <div className="rv-weeks-wait" role="status">일정을 계산하지 못했어요.</div>
+            : <div className="rv-weeks-skel" role="status" aria-label="일정을 계산하고 있어요"><Skeleton kind="columns" count={skillCount} /></div>}
         </section>
 
         <DeliverableSelection ref={deliverables} onReadyChange={setReady} onBusyChange={setBusy} onPlanChange={setReview} onChangeMaterials={() => go(paths.newOptions)} />
