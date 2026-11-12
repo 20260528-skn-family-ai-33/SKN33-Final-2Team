@@ -15,6 +15,7 @@ import uuid
 from datetime import date, timedelta
 
 from .. import catalog, course_time, db, jobs
+from ..llm import LlmError
 from ..agents import deepcheck as DC
 from ..agents import diag as DG
 from ..agents import roadmap as RM
