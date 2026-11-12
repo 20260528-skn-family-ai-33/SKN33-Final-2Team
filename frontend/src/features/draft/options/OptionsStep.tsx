@@ -1,11 +1,11 @@
 import { currentMaterialTotals } from './materialTotals';
-import { optionSummary, planDescription } from '@/shared/lib/planDescription';
-import { MaterialBasis } from '@/shared/ui/MaterialBasis';
+import { planDescription } from '@/shared/lib/planDescription';
 import { activityTime } from '@/shared/lib/resourceTime';
 import { invalidateDraft, invalidateMaterialChoices } from '../invalidation';
 import { materialPreparation, canRevealMaterials, initialMaterialPreparation, type MaterialStatus } from './materialPreparation';
 import './courseSkills.css';
 import './materialPanel.css';
+import './optionsStep.css';
 import { MaterialSkillTabs } from '../result/MaterialSkillTabs';
 import { materialVersionKey } from '../result/materialVersion';
 import { usePrepareMaterials, ResourceSelection, type ResourceSelectionHandle, type MaterialTotals } from '../result/ResultStep';
@@ -13,8 +13,8 @@ import { completeMaterialSelection } from '../materials/materialTransition';
 import { OptionSummary } from './OptionSummary';
 import { comparisonEvidence } from './comparisonEvidence';
 import { trackName } from '@/shared/constants/data';
-/* 5. 3안 비교표 (10/14 · 5차 scr['new-options']): 열 순서는 A1·A2·A3 고정.
-   마음에 들지 않는 안은 요청을 적어 그 안만 다시 만들고(API-32 · 버전으로 쌓임), ‹ › 로 버전을 넘겨 본다 */
+/* 6. 로드맵·자료 선택 (#224): ① 코스 카드(A1·A2·A3 순서 고정)에서 하나를 고르고 ② 그 코스의 강좌·도서를 정한다.
+   마음에 들지 않는 코스는 바라는 점을 적어 그 코스만 다시 만들고(API-32 · 버전으로 쌓임), ‹ › 로 버전을 넘겨 본다 */
 import { useCallback, useEffect, useId, useReducer, useRef, useState } from 'react';
 import { draftsApi } from '@/api/endpoints/drafts';
 import type { DraftDoc, OptionDef, RegenRequest } from '@/api/types/draft';
@@ -34,6 +34,7 @@ import { Icon } from '@/shared/ui/Icon';
 import { ActThumb, Note, OpsBox, Page } from '@/shared/ui/parts';
 import { Skeleton } from '@/shared/ui/Skeleton';
 import { syncGenCur, DraftSaveError, draftCall, flush, takeDraft } from '../draftSync';
+import { STEPS } from '../model';
 import { Stepper } from '../Stepper';
 import { useDraftWatch } from '../useDraftWatch';
 
@@ -57,10 +58,6 @@ export async function choose(go: ReturnType<typeof useGo>, id: string, save:()=>
   } catch (err) {
     if (!(err instanceof DraftSaveError)) failToast(err, '안을 고르지 못했어요');
   }
-}
-
-function regeneratePlan(pid: string) {
-  return draftCall('해당 계획을 다시 생성하지 못했어요', id => draftsApi.regenerate(id, pid, null), { soft: true });
 }
 
 async function ver(pid: string, dir: number, save?:()=>Promise<boolean>): Promise<void> {
@@ -88,9 +85,10 @@ async function ver(pid: string, dir: number, save?:()=>Promise<boolean>): Promis
   }
 }
 
-/* 다시 만들기 요청 창: 바라는 점(문장) + 빠른 칩 + 활동별 그대로/빼기/바꾸기. 아무것도 고르지 않으면 활동 구성이 다른 안을 새로 쓴다 */
+/* 다시 만들기 요청 창: 바라는 점(문장) + 빠른 칩 + 활동별 그대로/빼기/바꾸기. 아무것도 고르지 않으면 활동 구성이 다른 안을 새로 쓴다.
+   자료를 따로 고르는 흐름(v2Assessment)에서는 6단계에 활동을 보여 주지 않으므로 활동 목록을 뺀다 */
 const QUICK = ['더 짧게', '실습 늘리기', '비용 줄이기', '영상 위주', '문서 위주', '업무 과제 늘리기'];
-function RegenBody({ pl }: { pl: PlanContent }) {
+function RegenBody({ pl, showActs }: { pl: PlanContent; showActs: boolean }) {
   const q = useWs((s) => s.regenReq);
   if (!q) return null;
   return (
@@ -117,7 +115,7 @@ function RegenBody({ pl }: { pl: PlanContent }) {
           })}
         </div>
       </div>
-      <div className="field">
+      {showActs ? <div className="field">
         <label>
           빼거나 바꿀 활동 <span className="muted small">선택</span>
         </label>
@@ -146,18 +144,24 @@ function RegenBody({ pl }: { pl: PlanContent }) {
             </div>
           ))}
         </div>
-      </div>
+      </div> : null}
       <p className="small muted" style={{ margin: 0 }}>
-        아무것도 고르지 않으면 같은 관점으로 활동 구성이 다른 안을 새로 써요. 다시 만든 안은 새 버전으로 쌓이고 ‹ › 로 이전 버전과 넘겨 볼 수 있어요.
+        아무것도 고르지 않으면 같은 방식으로 구성이 다른 안을 새로 써요. 다시 만든 안은 새 버전으로 쌓이고 ‹ › 로 이전 버전과 넘겨 볼 수 있어요.{showActs ? '' : ' 이 코스의 학습 자료 추천도 새로 준비해요.'}
       </p>
     </div>
   );
 }
 
+/** 요청 창을 연 화면이 넘긴 실행기: 고른 자료를 먼저 저장한 뒤에만 다시 만들기를 시작하게 한다 */
+type RegenRunner = (run: () => Promise<void>) => Promise<void>;
+let regenRunner: RegenRunner | null = null;
+
 async function regenGo(): Promise<void> {
   const q = ws().regenReq;
   const g = ws().draft.gen;
   if (!q || !g) return;
+  const runner = regenRunner;
+  regenRunner = null;
   closeSheet();
   const o = g.options[q.pid];
   /** 고른 활동(빼기·바꾸기)을 서버가 아는 {key, title} 로. 지금 안에 없는 활동은 뺀다 */
@@ -170,26 +174,32 @@ async function regenGo(): Promise<void> {
       });
   const req: RegenRequest = { wish: String(q.note || '').trim(), quick: q.chips.slice(), removeActs: refs('remove'), replaceActs: refs('replace') };
   const has = req.wish || req.quick.length || req.removeActs.length || req.replaceActs.length;
-  updateWs((s) => {
-    s.regenReq = null;
-    const gg = s.draft.gen;
-    if (gg) gg.regenRun = { ...(gg.regenRun || {}), [q.pid]: { req } };
-  });
-  await draftCall(`${D.perspectives[q.pid].name}을 다시 만들지 못했어요`, (id) => draftsApi.regenerate(id, q.pid, has ? req : null), { soft: true });
+  updateWs((s) => void (s.regenReq = null));
+  const run = async () => {
+    updateWs((s) => {
+      const gg = s.draft.gen;
+      if (gg) gg.regenRun = { ...(gg.regenRun || {}), [q.pid]: { req } };
+    });
+    await draftCall(`${D.perspectives[q.pid].name}을 다시 만들지 못했어요`, (id) => draftsApi.regenerate(id, q.pid, has ? req : null), { soft: true });
+  };
+  if (runner) await runner(run);
+  else await run();
 }
 
-export function openRegenSheet(pid: string): void {
+export function openRegenSheet(pid: string, runner?: RegenRunner): void {
   const d = ws().draft;
   const g = d.gen;
   if (!g || !g.options[pid] || regenBusy(d, pid)) return;
   syncGenCur();
   const o = ws().draft.gen!.options[pid];
   const pl = buildPlan(o, paramsOf(d, o), d.goal);
+  const showActs = !d.v2Assessment;
+  regenRunner = runner || null;
   updateWs((s) => void (s.regenReq = { pid, note: '', chips: [], acts: {} }));
   openSheet({
     title: `${D.perspectives[pid].name} 다시 만들기`,
     wide: true,
-    body: () => <RegenBody pl={pl} />,
+    body: () => <RegenBody pl={pl} showActs={showActs} />,
     foot: () => (
       <>
         <button className="btn line" onClick={closeSheet}>
@@ -219,9 +229,9 @@ function useRegenToast(): void {
 
 export function OptionsStep() {
   usePrepareMaterials();
-  const [summariesOpen, setSummariesOpen] = useState(false);
   const [selecting,setSelecting]=useState(false);
-  const [materialsOpen,setMaterialsOpen]=useState(true);
+  /* 기본은 고른 코스의 자료만 보여 주고, 원할 때만 세 코스를 나란히 본다(#224) */
+  const [compare,setCompare]=useState(false);
   const [preparation,reportPreparation]=useReducer(materialPreparation,initialMaterialPreparation);
   const materialPrepared=Object.fromEntries(Object.entries(preparation.courses).map(([course,value])=>[`${course}:${value.version}`,value.status]));
   const generationStatus=useWs(s=>JSON.stringify({unavailable:s.draft.gen?.missing||[],generating:[...Object.entries(s.draft.genRun?.rows||{}).filter(([,row])=>row?.st==='run').map(([course])=>course),...Object.keys(s.draft.gen?.regenRun||{})]}));
@@ -251,10 +261,7 @@ export function OptionsStep() {
   const toggleMaterialSection=useCallback((kind:'books'|'courses',open:boolean)=>setMaterialSections(old=>old[kind]===open?old:{...old,[kind]:open}),[]);
   const materialTabsId=useId();
   const materialPanel=useRef<HTMLElement|null>(null);
-  function openMaterials(){
-    setMaterialsOpen(true);
-    requestAnimationFrame(()=>materialPanel.current?.scrollIntoView({behavior:'smooth',block:'start'}));
-  }
+  const showMaterials=()=>requestAnimationFrame(()=>materialPanel.current?.scrollIntoView({behavior:'smooth',block:'start'}));
   const editors=useRef<Record<string,ResourceSelectionHandle|null>>({});
   const [totals,setTotals]=useState<Record<string,MaterialTotals>>({});
   const receiveTotals=useCallback((course:string,value:MaterialTotals)=>setTotals(old=>old[course]?.weeks===value.weeks&&old[course]?.amount===value.amount&&old[course]?.unknown===value.unknown&&old[course]?.version===value.version&&old[course]?.weeklyHours===value.weeklyHours?old:{...old,[course]:value}),[]);
@@ -264,14 +271,19 @@ export function OptionsStep() {
     try{await ver(course,direction,()=>editors.current[course]?.saveForVersion()||Promise.resolve(true));}
     finally{setSelecting(false);}
   }
-  async function regenerateWithMaterials(course:string){
+  /** 고른 자료를 먼저 저장하고, 그사이 초안·버전이 바뀌지 않았을 때만 다시 만들기를 시작한다 */
+  async function saveThenRegenerate(course:string,run:()=>Promise<void>){
     if(selecting)return;
     setSelecting(true);
     const owner=ws().owner,id=ws().draftId,version=materialVersionKey(ws().draft.gen?.options[course]);
     try{
-      if(editors.current[course]&&!await editors.current[course]!.saveForVersion()){toast('자료 선택을 저장하지 못해 재생성을 시작하지 않았어요.');return;}
-      if(ws().owner===owner&&ws().draftId===id&&materialVersionKey(ws().draft.gen?.options[course])===version)await regeneratePlan(course);
+      if(editors.current[course]&&!await editors.current[course]!.saveForVersion()){toast('자료 선택을 저장하지 못해 다시 만들기를 시작하지 않았어요.');return;}
+      if(ws().owner===owner&&ws().draftId===id&&materialVersionKey(ws().draft.gen?.options[course])===version)await run();
     }finally{setSelecting(false);}
+  }
+  function askRegenerate(course:string){
+    if(selecting)return;
+    openRegenSheet(course,run=>saveThenRegenerate(course,run));
   }
   function selectCourse(course:string){
     if(selecting)return;
@@ -284,10 +296,15 @@ export function OptionsStep() {
   const status=JSON.parse(generationStatus) as {unavailable:string[];generating:string[]};
   const readyToReveal=canRevealMaterials(preparation.courses,availableVersions,status.unavailable,status.generating);
   const comparisonVisible=preparation.scope===comparisonScope&&(readyToReveal||preparation.revealed);
-  const currentTotals = (p: PlanContent) => currentMaterialTotals(totals[p.opt], materialVersionKey(p.def), p.hours, !regenBusy(d,p.opt) && materialPrepared[`${p.opt}:${materialVersionKey(p.def)}`] === 'ready');
+  const stateOf = (p: PlanContent) => materialPrepared[`${p.opt}:${materialVersionKey(p.def)}`];
+  const currentTotals = (p: PlanContent) => currentMaterialTotals(totals[p.opt], materialVersionKey(p.def), p.hours, !regenBusy(d,p.opt) && stateOf(p) === 'ready');
+  const amountText = (t: MaterialTotals) => t.amount === 0 ? (t.unknown ? '가격 미확인' : '무료') : `${t.amount.toLocaleString()}원${t.unknown ? ' + 가격 미확인' : ''}`;
+  /** 자료가 준비되기 전이나 주차를 계산하는 동안에는 계산값 대신 지금 상태를 적는다(사용자가 할 일이 있는 것처럼 보이지 않게).
+      계산에 실패하면 자료 영역이 이유와 다시 시도를 보여 준다 */
+  const waitText = (p: PlanContent) => regenBusy(d, p.opt) ? '다시 만드는 중' : stateOf(p) === 'failed' ? '준비 실패' : '계산 중…';
   const materialSummary = (p: PlanContent) => {
     const current = currentTotals(p);
-    return current ? `자료 학습 ${current.weeks === null ? '주차 산정 필요' : `예상 ${current.weeks}주`} · 강좌 총계 ${current.amount.toLocaleString()}원${current.unknown ? ' + 가격 미확인' : ''}` : '자료 준비 중…';
+    return current ? `자료 학습 ${current.weeks === null ? '주차 산정 필요' : `예상 ${current.weeks}주`} · 강좌 ${amountText(current)}` : '자료 준비 중…';
   };
   useCatalog((s) => s.res);
   useDraftWatch();
@@ -299,24 +316,32 @@ export function OptionsStep() {
   if (!g || !d.handoff) return null;
   const ps = optsOf(d);
   const cur = d.chosen;
+  const chosen = ps.find(p => p.opt === cur) || null;
+  const chosenTotals = chosen ? currentTotals(chosen) : undefined;
   const materialNames=Array.from(new Set((d.selectedSkills || ps.flatMap(plan=>plan.def.learningSkills || [])).map(skill=>skill.name)));
   const activeMaterialSkill=materialNames.includes(materialSkill)?materialSkill:materialNames[0];
-  const colCls = (p: PlanContent) => (regenBusy(d, p.opt) ? 'busy' : undefined);
   const off = ps.some((p) => p.def.offDomain);
-  const missing = g.missing || [];
-  const row = (k: string, f: (p: PlanContent, x: OptionDef) => React.ReactNode) => (
-    <tr>
-      <td className="k">{k}</td>
-      {D.optionOrder.map(id => {
-        const p = ps.find(plan => plan.opt === id);
-        return p ? (
-        <td key={p.opt} data-col={p.opt} className={colCls(p)} onClick={event => { if (!(event.target as HTMLElement).closest('button,a,input,summary')) selectCourse(p.opt); }} style={{ cursor: 'pointer' }}>
-          {f(p, p.def)}
-        </td>
-      ) : <td key={id} data-col={id} className="muted">—</td>; })}
-    </tr>
-  );
-  const Ver = ({ p }: { p: PlanContent }) => {
+  const reviewLabel = STEPS.find(step => step[0] === 'review')?.[1] || '검토';
+  /* 다음으로 갈 수 없는 이유는 버튼 옆에 미리 적는다 */
+  const block = !chosen ? '코스를 고르면 다음 단계로 갈 수 있어요'
+    : regenBusy(d, chosen.opt) ? '이 코스를 다시 만들고 있어요. 끝나면 진행할 수 있어요'
+    : stateOf(chosen) === 'failed' ? '이 코스의 자료를 준비하지 못했어요. 아래에서 다시 시도해 주세요'
+    : stateOf(chosen) !== 'ready' ? '이 코스의 자료를 준비하고 있어요'
+    : null;
+  function next() {
+    if (!cur) { toast('코스를 먼저 선택해 주세요.'); return; }
+    if (regenBusy(ws().draft, cur)) {
+      toast('그 코스를 다시 만드는 중이에요. 잠시 뒤에 진행해 주세요');
+      return;
+    }
+    const option=ws().draft.gen?.options[cur];
+    const state=materialPrepared[`${cur}:${materialVersionKey(option)}`];
+    if(state!=='ready'){showMaterials();toast(state==='failed'?'선택한 코스의 자료 추천에 실패했어요. 다시 시도한 뒤 진행해 주세요.':'선택한 코스의 자료를 준비하고 있어요. 완료 후 다시 눌러 주세요.');return;}
+    if(!editors.current[cur]){showMaterials();toast('선택한 코스의 자료를 불러오는 중이에요. 잠시 뒤 다시 눌러 주세요.');return;}
+    setSelecting(true);
+    void choose(go,cur,()=>editors.current[cur]?.save()||Promise.resolve(false)).finally(()=>setSelecting(false));
+  }
+  const versions = (p: PlanContent) => {
     const list = (g.hist || {})[p.opt];
     const i = (g.cur || {})[p.opt] || 0;
     const o = p.def;
@@ -324,7 +349,7 @@ export function OptionsStep() {
     return (
       <>
         {list && list.length > 1 ? (
-          <span className="vnav">
+          <span className="opt-vnav">
             <button type="button" disabled={i === 0 || busy} aria-label="이전 버전" onClick={() => void changeVersion(p.opt, -1)}>
               <Icon name="left" />
             </button>
@@ -337,121 +362,146 @@ export function OptionsStep() {
           </span>
         ) : null}
         {i > 0 ? (
-          <>
-            {o.revSummary ? <span className="small rev">바꾼 점: {planDescription(o.revSummary)}</span> : null}
-            {o.revRequest ? <span className="small muted rev">요청: {o.revRequest}</span> : null}
-            {(o.revNotes || []).length ? <span className="small muted rev">반영하지 못한 것: {(o.revNotes || []).map(planDescription).join(' ')}</span> : null}
-          </>
+          <div className="opt-rev">
+            {o.revSummary ? <p>바꾼 점: {planDescription(o.revSummary)}</p> : null}
+            {o.revRequest ? <p className="muted">요청: {o.revRequest}</p> : null}
+            {(o.revNotes || []).length ? <p className="muted">반영하지 못한 것: {(o.revNotes || []).map(planDescription).join(' ')}</p> : null}
+          </div>
         ) : null}
       </>
     );
   };
-  const head = (p: PlanContent) => {
-    const busy = selecting || regenBusy(d, p.opt);
+  const courseCard = (p: PlanContent) => {
+    const on = cur === p.opt;
+    const remaking = regenBusy(d, p.opt);
+    const busy = selecting || remaking;
     const err = regenErr(d, p.opt);
+    const t = currentTotals(p);
+    const name = trackName(p.opt, p.name);
     return (
-      <th key={p.opt} data-col={p.opt} className={colCls(p)} onClick={event => { if (!(event.target as HTMLElement).closest('button,a,input,label')) selectCourse(p.opt); }} style={{ cursor: 'pointer' }}>
-        <div className="course-title-row">
-          <label><input type="radio" name="pick" value={p.opt} checked={cur === p.opt} disabled={selecting} onChange={() => selectCourse(p.opt)} /><b>{trackName(p.opt, p.name)}</b></label>
-          <button type="button" className="course-regenerate" disabled={busy} onClick={() => void regenerateWithMaterials(p.opt)}>{busy ? '계획 생성 중…' : '해당 계획 다시 생성'}</button>
+      <article key={p.opt} className={`opt-course${on ? ' is-on' : ''}${remaking ? ' is-busy' : ''}`}
+        onClick={event => { if (!(event.target as HTMLElement).closest('button,a,input,summary')) selectCourse(p.opt); }}>
+        <div className="opt-course-top">
+          <h3>{name}</h3>
+          <span className={`tag${on ? ' acc' : ''}`}>{(D.perspectives[p.opt]?.focus || '').split('. ')[0]}</span>
         </div>
-        <small className="course-tagline">{planDescription(p.tagline)}</small>
-        <OptionSummary id={`course-summary-${p.opt}`} reason={p.def.reason} pros={p.def.pros} expanded={summariesOpen} />
-        <Ver p={p} />
+        <p className="opt-tagline">{planDescription(p.tagline)}</p>
+        <dl className="opt-facts">
+          <div><dt>자료 학습 기간</dt><dd>{t && t.weeks != null ? <><b>{t.weeks}</b>주</> : waitText(p)}</dd></div>
+          <div><dt>주당</dt><dd><b>{p.hours}</b>시간</dd></div>
+          <div><dt>강좌 비용</dt><dd>{t ? <b>{amountText(t)}</b> : waitText(p)}</dd></div>
+        </dl>
+        <OptionSummary id={`course-summary-${p.opt}`} reason={p.def.reason} pros={p.def.pros} expanded />
+        {versions(p)}
         {err && !busy ? (
           <>
-            <span className="small rev fail-t">
+            <p className="opt-fail">
               <Icon name="x" />
-              <span>다시 만들지 못했어요 · {err.user}. 이전 안을 그대로 뒀어요. 다시 시도하려면 제목 옆 ‘해당 계획 다시 생성’을 눌러 주세요.</span>
-            </span>
+              <span>다시 만들지 못했어요 · {err.user}. 이전 안을 그대로 뒀어요. 다시 시도하려면 ‘다르게 다시 만들기’를 눌러 주세요.</span>
+            </p>
             <OpsBox items={[['', err]]} cls="sm" />
           </>
         ) : null}
-      </th>
+        <div className="opt-course-foot">
+          <button type="button" role="radio" aria-checked={on} aria-label={`${name} 선택`} className={`btn sm ${on ? 'pri' : 'line'}`} disabled={selecting} onClick={() => selectCourse(p.opt)}>
+            {on ? <><Icon name="check" /> 선택한 코스</> : '이 코스 선택'}
+          </button>
+          <button type="button" className="btn sm ghost" disabled={busy} onClick={() => askRegenerate(p.opt)}>
+            {remaking ? <><span className="sp" aria-hidden="true" /> 다시 만드는 중…</> : <><Icon name="retry" /> 다르게 다시 만들기</>}
+          </button>
+        </div>
+      </article>
+    );
+  };
+  const missingCard = (id: string) => {
+    const running = d.genRun?.rows[id]?.st === 'run';
+    return (
+      <article key={id} className="opt-course is-missing">
+        <div className="opt-course-top">
+          <h3>{trackName(id, D.perspectives[id].name)}</h3>
+          <span className="tag warn">생성되지 않음</span>
+        </div>
+        <p className="opt-tagline">이 코스는 만들지 못했어요. 이 코스만 다시 받을 수 있고, 만들어진 코스는 그대로 유지돼요.</p>
+        <div className="opt-course-foot">
+          <button type="button" className="btn sm line" disabled={running} onClick={() => void draftCall('계획을 재생성하지 못했어요', draftId => draftsApi.optionRetry(draftId, id), { soft: true })}>
+            {running ? <><span className="sp" aria-hidden="true" /> 생성 중</> : <><Icon name="retry" /> 이 코스 다시 받기</>}
+          </button>
+        </div>
+      </article>
     );
   };
   return (
     <>
       <Stepper cur="options" busy={selecting} />
       <Page
-        title={ps.length === 3 ? '로드맵 제안' : ps.length === 1 ? '작성된 로드맵을 확인해 주세요' : `작성된 로드맵 ${ps.length}안을 비교하고 골라 주세요`}
-        lead="앞에서 선택한 스킬·순서는 유지합니다. 로드맵을 비교하며 강좌·도서를 고르고, 예상 기간·금액을 확인한 뒤 검토로 진행해 주세요."
-        foot={
-          <>
-            <button className="btn line" onClick={() => go(paths.newResult)}>
+        title={ps.length === 1 ? '작성된 로드맵과 학습 자료를 확인해 주세요' : '로드맵을 고르고 학습 자료를 정해 주세요'}
+        lead="같은 스킬을 서로 다른 방식으로 짰어요. 코스를 하나 고르면, 그 코스에서 들을 강좌와 도서를 확인할 수 있어요."
+      >
+        {d.selectionNotice&&<Note>{d.selectionNotice}</Note>}
+        <section className="opt-sec" aria-label="코스 고르기">
+          <header className="opt-sec-head">
+            <span className="opt-num">1</span>
+            <div>
+              <h2>코스 고르기</h2>
+              <p>앞에서 고른 스킬과 순서는 그대로예요 · {materialNames.join(' → ')}</p>
+            </div>
+          </header>
+          <div className="opt-courses" role="radiogroup" aria-label="로드맵 코스">
+            {D.optionOrder.map(id => {
+              const p = ps.find(plan => plan.opt === id);
+              return p ? courseCard(p) : missingCard(id);
+            })}
+          </div>
+          <p className="opt-basis">기간은 고른 강좌의 시간과 주당 학습 시간으로 계산해요. 도서는 기간에 넣지 않아요.</p>
+        </section>
+        <section className="opt-sec" aria-label="학습 자료 고르기">
+          <header className="opt-sec-head">
+            <span className="opt-num">2</span>
+            <div>
+              <h2>{compare ? '코스별 학습 자료 비교' : chosen ? `${trackName(chosen.opt, chosen.name)}의 학습 자료` : '학습 자료 고르기'}</h2>
+              <p>{compare ? '세 코스의 추천 자료를 스킬별로 나란히 보여 드려요. 다음 단계에는 고른 코스의 자료만 반영돼요.'
+                : chosen ? 'AI 추천이 미리 선택돼 있어요. 그대로 진행해도 되고, 바꾸고 싶은 것만 바꾸면 돼요.'
+                : '코스를 고르면 그 코스의 강좌·도서가 여기에 나와요.'}</p>
+            </div>
+            {chosen && ps.length > 1 ? (
+              <button type="button" className="btn sm line opt-sec-right" aria-expanded={compare} aria-controls="roadmap-material-comparison" disabled={selecting} onClick={() => setCompare(value => !value)}>
+                {compare ? '고른 코스만 보기' : '다른 코스 자료와 비교'}
+              </button>
+            ) : null}
+          </header>
+          {!chosen && !compare ? <div className="opt-empty">위에서 코스를 먼저 골라 주세요</div> : null}
+          {/* 세 코스의 자료 편집기는 늘 떠 있다(기간·금액 계산과 저장을 맡는다). 보기 방식만 바꾼다 */}
+          <section id="roadmap-material-comparison" ref={materialPanel} className={compare ? 'roadmap-material-panel full-width-materials' : 'opt-materials'} aria-label={compare ? '스킬별 학습 자료 비교' : '고른 코스의 학습 자료'}>
+            {compare && !comparisonVisible ? <><div className="loading" role="status"><span className="sp" aria-hidden="true" /><span>코스별 자료 제안을 준비하고 있어요. 1~2분쯤 걸릴 수 있어요.</span></div><Skeleton kind="columns" count={ps.length||3}/></> : null}
+            <div hidden={compare && !comparisonVisible}>
+              {compare ? <MaterialSkillTabs names={materialNames} active={activeMaterialSkill} onChange={setMaterialSkill} id={materialTabsId} panelId="material-comparison-panel"/> : null}
+              <div className={compare ? 'material-course-comparison' : 'opt-material-list'} role={compare ? 'tabpanel' : undefined} id="material-comparison-panel" aria-labelledby={compare ? `${materialTabsId}-tab-${materialNames.indexOf(activeMaterialSkill)}` : undefined}>
+                {ps.map(p=><section className={`material-course-column${cur===p.opt?' is-selected':''}`} key={p.opt} hidden={!compare&&cur!==p.opt} aria-label={`${trackName(p.opt,p.name)} 자료`}>
+                  <header><h3>{trackName(p.opt,p.name)}</h3>{regenBusy(d,p.opt)?<span role="status"><span className="sp" aria-hidden="true"/> 이 코스의 로드맵을 다시 만드는 중…</span>:stateOf(p)!=='ready'?<span role="status">{stateOf(p)==='failed'?'이 코스의 자료 준비 실패':'이 코스의 자료 준비 중…'}</span>:null}<span hidden={regenBusy(d,p.opt)||stateOf(p)!=='ready'} title={materialSummary(p)}>{materialSummary(p)}</span></header>
+                  <ResourceSelection key={`${p.opt}:${p.def.optionId||p.tagline}`} ref={value=>{editors.current[p.opt]=value;}} courseId={p.opt} stacked={!compare} skillFilter={compare?activeMaterialSkill:undefined} sectionOpen={compare?materialSections:undefined} onSectionToggle={toggleMaterialSection} locked={regenBusy(d,p.opt)||selecting} onTotals={receiveTotals} onPrepared={receivePrepared} onChoicesChanged={()=>updateWs(state=>invalidateMaterialChoices(state,p.opt))}/>
+                </section>)}
+              </div>
+            </div>
+          </section>
+        </section>
+        {off ? <Note>저장된 예시 로드맵과 입력한 목표의 주제가 달라요. 목표에 맞는 안을 받으려면 AI 모델 설정을 확인한 뒤 다시 생성해 주세요.</Note> : null}
+        <div className="opt-bar">
+          <div className="opt-bar-sum" aria-live="polite">
+            {chosen ? <b>{trackName(chosen.opt, chosen.name)}</b> : null}
+            {block ? <span className="opt-bar-wait">{block}</span>
+              : chosenTotals && chosen ? <><span>자료 학습 {chosenTotals.weeks == null ? '기간 계산 중…' : `${chosenTotals.weeks}주`}</span><span>주 {chosen.hours}시간</span><span>강좌 {amountText(chosenTotals)}</span></>
+              : null}
+          </div>
+          <div className="opt-bar-btns">
+            <button type="button" className="btn line" disabled={selecting} onClick={() => go(paths.newResult)}>
               <Icon name="left" />
               이전
             </button>
-            <button
-              className="btn pri"
-              disabled={selecting}
-              onClick={() => {
-                if (!cur) { toast('로드맵을 먼저 선택해 주세요.'); return; }
-                if (regenBusy(ws().draft, cur)) {
-                  toast('그 안을 다시 쓰는 중이에요. 잠시 뒤에 골라 주세요');
-                  return;
-                }
-                const option=ws().draft.gen?.options[cur];
-                const state=materialPrepared[`${cur}:${materialVersionKey(option)}`];
-                if(state!=='ready'){openMaterials();toast(state==='failed'?'선택한 코스의 자료 추천에 실패했어요. 다시 시도한 뒤 저장해 주세요.':'선택한 코스의 자료를 준비하고 있어요. 완료 후 다시 눌러 주세요.');return;}
-                if(!editors.current[cur]){openMaterials();toast('선택한 코스의 자료를 불러오는 중이에요. 잠시 뒤 다시 눌러 주세요.');return;}
-                setSelecting(true);
-                void choose(go,cur,()=>editors.current[cur]?.save()||Promise.resolve(false)).finally(()=>setSelecting(false));
-              }}
-            >
-              자료 저장 후 검토·산출물 선택
+            <button type="button" className="btn pri" disabled={selecting || !!block} onClick={next}>
+              다음: {reviewLabel}
             </button>
-          </>
-        }
-      >
-        <style>{`.v2-course-boundaries [data-col]{border-left:3px solid #f2f2f2}.v2-course-boundaries [data-col]:last-child{border-right:3px solid #f2f2f2}`}</style>
-        {d.selectionNotice&&<Note>{d.selectionNotice}</Note>}
-        <div className="tblwrap">
-          <table className="cmp v2-course-boundaries">
-            <thead>
-              <tr>
-                <th />
-                {D.optionOrder.map(id => {
-                  const p = ps.find(plan => plan.opt === id);
-                  if (p) return head(p);
-                  const running = d.genRun?.rows[id]?.st === 'run';
-                  return <th key={id} data-col={id}><div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                    <b>{trackName(id, D.perspectives[id].name)}</b><span style={{ color: 'var(--danger, #dc3545)', fontSize: 12 }}>생성되지 않음</span>
-                    <button className="link" disabled={running} onClick={() => void draftCall('계획을 재생성하지 못했어요', draftId => draftsApi.optionRetry(draftId, id), { soft: true })}>
-                      {running ? <><span className="sp" aria-hidden="true" /> 생성 중</> : '재생성'}
-                    </button></div></th>;
-                })}
-              </tr>
-              {ps.some(plan => optionSummary(plan.def.reason, plan.def.pros).expandable) &&<tr><th /><th colSpan={3} style={{ textAlign: 'center', padding: '2px 8px 7px', fontWeight: 400 }}><button type="button" className="course-more" aria-expanded={summariesOpen} aria-controls={ps.map(plan => `course-summary-${plan.opt}`).join(' ')} onClick={() => setSummariesOpen(open => !open)}>{summariesOpen ? '접기' : '더보기'}</button></th></tr>}
-            </thead>
-            <tbody>
-              {row('자료 학습 예상 기간', (p) => (
-                <><span className="numv">{currentTotals(p)?.weeks == null ? '산정 필요' : `${currentTotals(p)!.weeks}주`}</span> · 주 {p.hours}시간</>
-              ))}
-              {row('예상 금액',p=><span>{currentTotals(p)?`${currentTotals(p)!.amount.toLocaleString()}원${currentTotals(p)!.unknown?' + 가격 미확인':''}`:'자료 선택 후 계산'}<small className="muted"> · 선택 강좌 기준</small></span>)}
-              <tr><td className="k">학습 자료</td><td colSpan={3} className="material-expand-cell"><button type="button" className={`btn line small material-expand${materialsOpen?' is-open':''}`} aria-expanded={materialsOpen} aria-controls="roadmap-material-comparison" disabled={selecting} onClick={()=>materialsOpen?setMaterialsOpen(false):openMaterials()}><Icon name="book"/>{materialsOpen?'자료 비교 접기':'자료 비교하기'}</button></td></tr>
-            </tbody>
-          </table>
-          <MaterialBasis />
-        </div>
-        <section id="roadmap-material-comparison" ref={materialPanel} className="roadmap-material-panel full-width-materials" hidden={!materialsOpen} aria-label="스킬별 학습 자료 비교">
-          <header className="roadmap-material-header"><div><span>학습 자료</span><h2>스킬별 자료 비교</h2></div><button type="button" className="btn line small" disabled={selecting} onClick={()=>setMaterialsOpen(false)}>접기 <Icon name="x"/></button></header>
-          {!comparisonVisible && <div className="loading" role="status"><span className="sp" aria-hidden="true" /><span>코스별 자료 제안을 준비하고 있어요.</span></div>}
-          {!comparisonVisible&&<Skeleton kind="columns" count={ps.length||3}/>}
-          <div hidden={!comparisonVisible}>
-          <MaterialSkillTabs names={materialNames} active={activeMaterialSkill} onChange={setMaterialSkill} id={materialTabsId} panelId="material-comparison-panel"/>
-          <div className="material-course-comparison" role="tabpanel" id="material-comparison-panel" aria-labelledby={`${materialTabsId}-tab-${materialNames.indexOf(activeMaterialSkill)}`}>{ps.map(p=><section className={`material-course-column${cur===p.opt?' is-selected':''}`} key={p.opt} aria-label={`${trackName(p.opt,p.name)} 자료`}>
-            <header><h3>{trackName(p.opt,p.name)}</h3>{regenBusy(d,p.opt)?<span role="status"><span className="sp" aria-hidden="true"/> 이 코스의 로드맵을 다시 만드는 중…</span>:materialPrepared[`${p.opt}:${materialVersionKey(p.def)}`]!=='ready'?<span role="status">{materialPrepared[`${p.opt}:${materialVersionKey(p.def)}`]==='failed'?'이 코스의 자료 준비 실패':'이 코스의 자료 준비 중…'}</span>:null}<span hidden={regenBusy(d,p.opt)||materialPrepared[`${p.opt}:${materialVersionKey(p.def)}`]!=='ready'} title={materialSummary(p)}>{materialSummary(p)}</span></header>
-            <ResourceSelection key={`${p.opt}:${p.def.optionId||p.tagline}`} ref={value=>{editors.current[p.opt]=value;}} courseId={p.opt} skillFilter={activeMaterialSkill} sectionOpen={materialSections} onSectionToggle={toggleMaterialSection} locked={regenBusy(d,p.opt)||selecting} onTotals={receiveTotals} onPrepared={receivePrepared} onChoicesChanged={()=>updateWs(state=>invalidateMaterialChoices(state,p.opt))}/>
-          </section>)}</div>
           </div>
-        </section>
-        {missing.length ? (
-          <Note>
-            {missing.map((id) => `${D.perspectives[id].name}`).join(', ')}은 생성되지 않았어요. 코스 이름 옆 ‘재생성’으로 해당 코스만 다시 받을 수 있어요. 성공한 코스는 유지됩니다.
-          </Note>
-        ) : null}
-        {off ? <Note>저장된 예시 로드맵과 입력한 목표의 주제가 달라요. 목표에 맞는 안을 받으려면 AI 모델 설정을 확인한 뒤 다시 생성해 주세요.</Note> : null}
+        </div>
       </Page>
     </>
   );
