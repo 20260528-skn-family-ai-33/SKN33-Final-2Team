@@ -15,7 +15,7 @@ class RoadmapOutputLimitTests(TestCase):
 
     def test_ollama_roadmap_sets_prediction_cap_and_default_context(self):
         for configured,expected in ((0,20480),(16384,16384),(32768,32768)):
-            with self.subTest(configured=configured),patch.object(llm,'ollama',return_value={'message':{'content':'{}'}}) as call,patch.object(llm,'S',replace(llm.S,ollama_num_ctx=configured,ollama_think='off')):
+            with self.subTest(configured=configured),patch.object(llm,'ollama',return_value={'message':{'content':'{}'}}) as call,patch.object(llm,'S',replace(llm.S,ollama_num_ctx=configured)):
                 llm.chat('ollama',[{'role':'user','content':'mock'}],role='roadmap')
                 options=call.call_args.args[1]['options']
                 self.assertEqual(options['num_predict'],7000)

@@ -67,15 +67,14 @@ export function ProviderSettings() {
   const check = useMutation({ mutationFn: async (provider: ServerProvider) => {
     const result = await aiApi.status(provider);
     const missing = result.models?.filter((m) => !m.installed).map((m) => m.name);
-    return { think: result.models?.find(m => m.role === 'default')?.think,
-      message: missing?.length ? '설치가 필요한 모델 · ' + missing.join(', ') : PROV[provider] + ' 연결을 확인했어요.' };
-  }, onSuccess: result => setNotice(result.message) });
+    return missing?.length ? '설치가 필요한 모델 · ' + missing.join(', ') : PROV[provider] + ' 연결을 확인했어요.';
+  }, onSuccess: setNotice });
   const data = q.data;
   const selected = selection ?? data?.policy;
-  const savedLevel = selected === data?.policy ? data?.level || '' : '';
+  // 추론 단계는 OpenAI 만 고른다. RunPod-Ollama 는 서버가 모든 호출을 추론 없이 보낸다
+  const savedLevel = selected === 'openai' && selected === data?.policy ? data?.level || '' : '';
   const level = draftLevel ?? savedLevel;
-  const levels = selected === 'openai' ? data?.providers.openai.levels : check.data?.think?.levels;
-  const choices = !levels && savedLevel ? [savedLevel] : levels || [];
+  const choices = data?.providers.openai.levels || [];
   const validLevel = !level || choices.includes(level);
   return (
     <section className="card">
@@ -91,15 +90,13 @@ export function ProviderSettings() {
           {data.employeeSelectionAllowed && <option value="employee">{label('employee')}</option>}
           {(['openai', 'ollama'] as const).map((p) => <option key={p} value={p}>{label(p)} · {data.providers[p].model}</option>)}
         </select></label>
-        {selected && selected !== 'employee' && <>
-          <label>추론 정도 <select className="input" value={level} disabled={save.isPending || check.isPending || (!choices.length && !level)}
-            onChange={event => { setDraftLevel(event.target.value); setNotice(''); save.reset(); }}>
-            <option value="">서버 기본값</option>
-            {choices.map(option => <option key={option} value={option}>{levelLabel(option)} ({option})</option>)}
-            {!validLevel && <option disabled value={level}>{levelLabel(level)} · 현재 모델에서 사용 불가</option>}
-          </select></label>
-          {selected === 'ollama' && <p className="small muted">{!levels ? '연결 확인 후 추론 단계를 선택할 수 있어요. ' : ''}진단·로드맵에 적용되며 규정 에이전트는 추론을 끕니다.</p>}
-        </>}
+        {selected === 'openai' && <label>추론 정도 <select className="input" value={level} disabled={save.isPending || check.isPending || (!choices.length && !level)}
+          onChange={event => { setDraftLevel(event.target.value); setNotice(''); save.reset(); }}>
+          <option value="">서버 기본값</option>
+          {choices.map(option => <option key={option} value={option}>{levelLabel(option)} ({option})</option>)}
+          {!validLevel && <option disabled value={level}>{levelLabel(level)} · 현재 모델에서 사용 불가</option>}
+        </select></label>}
+        {selected === 'ollama' && <p className="small muted">추론 없음 · RunPod-Ollama는 모든 답변을 추론 없이 만들어요.</p>}
         {selected && selected !== 'employee' && <ProviderKey key={selected} provider={selected} settings={data.providers[selected]} />}
         <div className="actions">
           {selected && selected !== 'employee' && <button className="btn line sm" disabled={save.isPending || check.isPending || !data.providers[selected].available}

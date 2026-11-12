@@ -272,7 +272,7 @@ docker compose up -d --no-deps --force-recreate backend frontend
 | --- | --- |
 | `OLLAMA_BASE_URL` · `OLLAMA_API_KEY` | RunPod-Ollama 서버 주소와 인증키입니다. |
 | `OLLAMA_MODEL` · `OLLAMA_MODEL_REGULATION` | 비워 두면 각각 `growpath-27b`(진단·로드맵), `growpath-regulation-4b`(규정)를 사용합니다. Pod에서 준비한 Ollama 모델 이름을 사용합니다. |
-| `OLLAMA_THINK` | 예시값은 `off`입니다. 27B는 사용자 선택이 우선하며, 이 값을 비우면 모델 기본값을 따릅니다. 규정 4B의 Ollama 호출은 이 설정과 관계없이 생각 모드를 끕니다. |
+| `OLLAMA_THINK` | 더 읽지 않습니다. RunPod-Ollama는 27B·규정 4B의 모든 호출에 `think: false`를 보내 추론 없이 생성하고, 화면에서도 추론 정도를 고르지 않습니다. |
 | `OPENAI_API_KEY` | OpenAI 답변 생성용입니다. 임베딩에는 쓰지 않습니다. |
 | `OPENAI_MODEL` | OpenAI 생성 모드에서 사용할 모델입니다. 서버 설정으로 지정합니다. |
 | `ASSISTANT_SEARCH_MODE` | 세 범주의 BGE 검색은 기본 `hybrid`(BM25+pgvector+RRF)입니다. `vector`는 기존 벡터 단독 복구용입니다. |

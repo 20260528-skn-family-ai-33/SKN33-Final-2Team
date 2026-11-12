@@ -31,7 +31,7 @@ class ProviderPolicyTests(unittest.TestCase):
         self.directory = self.enterContext(TemporaryDirectory())
         self.settings = replace(llm.S, var_dir=Path(self.directory), employee_ai_selection=True,
                                 openai_key='example-openai', ollama_key='example-ollama',
-                                ollama_url='http://localhost', ollama_think=None, demo_mode=False)
+                                ollama_url='http://localhost', demo_mode=False)
         for module in (provider_policy, llm, account, runtime, admin, errors, goals):
             self.enterContext(patch.object(module, 'S', self.settings))
         self.identity = self.enterContext(patch.object(auth, 'account_of', return_value=auth.Account('admin', 1, 'test')))
@@ -167,10 +167,9 @@ class ProviderPolicyTests(unittest.TestCase):
         with (patch.object(goals.db, 'tx') as tx, patch.object(admin.db, 'all_', return_value=employees),
               patch.object(goals.profile, 'view', return_value={'job': 'engineer'}),
               patch.object(goals.jobs, 'start', side_effect=enqueue), patch.object(goals.G, 'run', side_effect=call_model),
-              patch.object(llm, 'think_levels', return_value={'levels': ['on', 'off']}),
               patch.object(llm, 'chat', return_value={'content': '{"ok":true}'}) as chat):
             tx.return_value.__enter__.return_value.one.return_value = {}
-            for policy, level, expected, effort in [('ollama', 'on', 'ollama', 'on'), ('openai', 'high', 'openai', 'high'),
+            for policy, level, expected, effort in [('ollama', None, 'ollama', None), ('openai', 'high', 'openai', 'high'),
                                                      ('employee', None, 'openai', 'high')]:
                 with self.subTest(policy=policy):
                     queued.clear()
@@ -178,7 +177,7 @@ class ProviderPolicyTests(unittest.TestCase):
                     self.assertEqual(res.status_code, 200)
                     res = self.client.post(route, json={'expectedPolicy': policy, 'expectedLevel': level})
                     self.assertEqual(res.json()['started'], len(employees))
-                    changed = ('openai', 'low') if policy != 'employee' else ('ollama', 'off')
+                    changed = ('openai', 'low') if policy != 'employee' else ('ollama', None)
                     res = self.client.put('/api/v1/admin/ai-provider', json={'policy': changed[0], 'level': changed[1]})
                     self.assertEqual(res.status_code, 200)
                     descriptor = json.loads(json.dumps(queued[-1]._resume))
@@ -219,13 +218,25 @@ class ProviderPolicyTests(unittest.TestCase):
             with patch.object(goals.G, 'run', return_value={'candidates': []}) as generate, patch.object(goals.db, 'tx'):
                 worker(SimpleNamespace(job_id='test-job'))
                 self.assertEqual(generate.call_args.args[0].reasoning, {'openai': 'high'})
-        with patch.object(llm, 'think_levels', return_value={'levels': ['off', 'on']}):
-            self.assertEqual(set_level('ollama', 'high').status_code, 422)
-            self.assertEqual(set_level('ollama', 'on').status_code, 200)
-        self.assertEqual(runtime.context(1, {}).reasoning, {'ollama': 'on'})
+        # RunPod-Ollama 는 추론 없이만 부르므로 단계를 고정할 수 없고, 예전에 저장된 단계도 읽지 않는다
+        for stale in ('high', 'on', 'off'):
+            with self.subTest(stale=stale):
+                self.assertEqual(set_level('ollama', stale).status_code, 422)
+        self.assertEqual(provider_policy.selection(), ('openai', 'high'))
         self.assertEqual(set_level('ollama', None).status_code, 200)
         self.assertEqual(runtime.context(1, {}).reasoning, {})
+        Path(self.directory, 'ai-provider').write_text('ollama\non\n')
+        self.assertEqual(provider_policy.selection(), ('ollama', None))
+        self.assertEqual(runtime.context(1, {}).reasoning, {})
+        self.assertEqual(self.client.get('/api/v1/admin/ai-provider').json()['level'], None)
+        self.assertEqual(goals.bulk_model({}, 'ollama', 'on')['level'], None)
         self.assertEqual(set_level('employee', None).status_code, 200)
+        self.assertEqual(goals.bulk_model({'ai_provider': 'ollama', 'reasoning': {'ollama': 'high'}}, None, None),
+                         {'provider': 'ollama', 'model': llm.model_name('ollama'), 'level': None, 'default_level': 'off'})
+        self.identity.return_value = auth.Account('employee', 1, 'test')
+        self.assertEqual(self.client.put('/api/v1/me/reasoning', json={'provider': 'ollama', 'level': 'on'}).status_code, 422)
+        ollama = next(p for p in self.client.get('/api/v1/ai/providers').json()['providers'] if p['id'] == 'ollama')
+        self.assertEqual(ollama['reasoning'], {'levels': [], 'default': 'off'})
 
     def test_post_beta_disables_personal_selection(self):
         endpoint = '/api/v1/admin/ai-provider'

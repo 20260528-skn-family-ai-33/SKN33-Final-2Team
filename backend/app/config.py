@@ -89,7 +89,6 @@ class Settings:
     ollama_timeout: int
     ollama_num_ctx: int
     ollama_keep_alive: str
-    ollama_think: str | None  # 추론 정도 기본값(on·off 또는 모델의 단계 이름). None 이면 think 를 보내지 않아 모델 기본값을 따른다
 
     @property
     def ollama_target(self) -> str:
@@ -101,8 +100,11 @@ class Settings:
 # 채팅 형식(renderer·parser)을 붙여 만든 이름이다(backend/RunPod_Ollama_연결_절차.md 2-4). .env 의 모델 줄은 원본 Qwen 과 비교할 때만 적는다
 OLLAMA_TEAM_MODEL = 'growpath-27b'  # 진단·로드맵 · hf.co/Ssum-mer/qwen3.8-27b-growpath-Q4
 OLLAMA_TEAM_REGULATION_MODEL = 'growpath-regulation-4b'  # 규정 에이전트 · hf.co/golddragon0926/qwen35-4b-diagnosis-agent
-# 규정 에이전트는 생각(추론)을 끄고 학습한 모델이라 늘 끄고 부른다. 화면(직원)·.env 의 추론 정도로 바꾸지 않는다(사용자 결정 2026-10-29 · #28)
-OLLAMA_REGULATION_THINK = 'off'
+# RunPod-Ollama 는 모든 생성(진단·로드맵·규정·이미지 읽기)을 추론 없이 부른다: llm.chat 이 요청마다 think: false 를 보내고,
+# 화면(직원·관리자)이나 .env 로 바꾸지 않는다. 규정 4b 는 생각을 끄고 학습했고(#28), 27b 도 추론을 켜면 답이 길어지고
+# content 를 비우는 일이 있어(#209) 끄기로 정했다(사용자 결정 2026-11-12). 이 이름은 그 고정값을 단계 이름으로 알려 줄 때 쓴다
+# (/ai/providers 의 기본값 · 관리자 일괄 작업의 기본 단계 확인)
+OLLAMA_THINK = 'off'
 
 # OpenAI 기본 모델(OPENAI_MODEL 코드 기본값)의 추론 정도. OpenAI 는 모델이 받는 단계·기본값을 알려 주는 API 가 없어 확인한 값을 둔다:
 # gpt-6-luna 는 Chat Completions 에서 none~xhigh(모델 문서의 max 는 400 · 2026-10-28 실제 호출 오류), 기본 medium(모델 문서)
@@ -177,8 +179,6 @@ def load() -> Settings:
         ollama_timeout=int(env('OLLAMA_TIMEOUT', '180') or 180),
         ollama_num_ctx=int(env('OLLAMA_NUM_CTX', '0') or 0),
         ollama_keep_alive=env('OLLAMA_KEEP_ALIVE'),
-        # 생각(thinking) 모드·추론 정도: off 면 생각 없이 바로 답한다(qwen3.8 등은 기본이 켜짐 · 응답이 길어져 느림)
-        ollama_think=_level('OLLAMA_THINK'),
     )
 
 

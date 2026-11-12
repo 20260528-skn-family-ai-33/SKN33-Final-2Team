@@ -3,7 +3,7 @@
    추론 정도: 모드별 고를 수 있는 단계·기본값 순서·저장과 실패 때 되돌리기 · 규정 에이전트 모델은 고르지 않음 (#28) */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/api/client';
-import { aiApi, type ProviderInfo, type ThinkLevels } from '@/api/endpoints/account';
+import { aiApi, type ProviderInfo } from '@/api/endpoints/account';
 import type { ReasoningPicks } from '@/api/types/account';
 import { ai, applySettings, cause, checkStatus, errText, levelLabel, setReasoning, useAi } from './ai';
 
@@ -52,10 +52,10 @@ it('관리자 지정을 해제하면 다시 로그인하지 않아도 직원의 
     await checkStatus();
     applySettings({ aiProvider: 'ollama' });
     expect(ai.choice()).toBe('api');
-    providers.mockResolvedValueOnce({ current: 'ollama', policy: 'employee', employeeReasoning: { ollama: 'low' }, providers: [], docLibs: {} });
+    providers.mockResolvedValueOnce({ current: 'ollama', policy: 'employee', employeeReasoning: { openai: 'low' }, providers: [], docLibs: {} });
     await checkStatus();
     expect(ai.choice()).toBe('ollama');
-    expect(ai.reasoning('ollama')).toBe('low');
+    expect(ai.reasoning('api')).toBe('low');
   } finally {
     providers.mockRestore();
   }
@@ -119,31 +119,20 @@ describe('추론 정도', () => {
     models: { default: 'm', roadmap: 'm', embed: '', vision: '' },
     reasoning,
   });
-  /** 실제 Pod 에서 본 팀 진단·로드맵 모델(27b)의 단계(RunPod 연결 절차 · 2026-10-29) */
-  const POD27: ThinkLevels = { levels: ['off', 'low', 'medium', 'xhigh'], default: null };
-  /** mine: 직원이 고른 값 · ollamaDefault/openai: 서버 설정(.env) · think: 연결 확인 때 받은 모델별 단계 */
+  /** mine: 직원이 고른 값 · ollama/openai: 서버가 알려 준 추론 정도 */
   const setup = (o: {
     mine?: ReasoningPicks;
-    ollamaDefault?: string | null;
+    ollama?: ProviderInfo['reasoning'];
     openai?: ProviderInfo['reasoning'];
-    think?: Partial<Record<'default' | 'regulation', ThinkLevels | null>>;
-    connOf?: string;
   }) =>
     useAi.setState({
       settings: { aiProvider: 'ollama', demoMock: false, failSim: {}, reasoning: o.mine || {} },
       status: {
         checked: true,
         docLibs: {},
-        providers: { ollama: info('ollama', { levels: null, default: o.ollamaDefault ?? null }), openai: info('openai', o.openai) },
+        providers: { ollama: info('ollama', o.ollama ?? { levels: [], default: 'off' }), openai: info('openai', o.openai) },
       },
-      conn: o.think
-        ? {
-            state: 'ok',
-            provider: o.connOf || 'ollama',
-            at: 1,
-            models: Object.entries(o.think).map(([role, think]) => ({ role, name: role, installed: true, loaded: true, think })),
-          }
-        : { state: 'idle', provider: '', at: 0 },
+      conn: { state: 'idle', provider: '', at: 0 },
     });
 
   afterEach(() => vi.restoreAllMocks());
@@ -155,27 +144,19 @@ describe('추론 정도', () => {
     expect(ai.reasoningLevels('api')).toEqual([]);
   });
 
-  it('RunPod-Ollama 는 진단·로드맵 모델이 알려 준 단계만 쓰고, 규정 모델 단계는 쓰지 않는다(규정 에이전트는 늘 끔)', () => {
-    setup({ think: { default: POD27, regulation: { levels: ['off', 'on'], default: null } } });
-    expect(ai.reasoningLevels('ollama')).toEqual(['off', 'low', 'medium', 'xhigh']);
-    setup({ think: { regulation: { levels: ['off', 'on'], default: null } } });
-    expect(ai.reasoningLevels('ollama')).toBeNull();
+  it('RunPod-Ollama 는 고를 단계가 없고 기본값·적용 값 모두 추론 없음(off)이다', () => {
+    // 예전 서버 응답(단계 null·기본값 없음)이나 예전에 저장한 직원 값이 있어도 화면은 늘 끔으로 본다
+    for (const o of [{}, { ollama: { levels: null, default: null } }, { mine: { ollama: 'xhigh' } }]) {
+      setup(o);
+      expect(ai.reasoningLevels('ollama')).toEqual([]);
+      expect(ai.reasoningDefault('ollama')).toBe('off');
+      expect(ai.reasoning('ollama')).toBe('off');
+    }
   });
 
-  it('연결 확인 전·실패이면 단계를 모른다(null)', () => {
-    setup({});
-    expect(ai.reasoningLevels('ollama')).toBeNull();
-    setup({ think: { default: POD27 }, connOf: 'api' });
-    expect(ai.reasoningLevels('ollama')).toBeNull();
-    setup({ think: { default: null } });
-    expect(ai.reasoningLevels('ollama')).toBeNull();
-  });
-
-  it('기본값은 서버 설정(.env)이 앞서고, 없으면 그 모델의 기본값', () => {
-    setup({ ollamaDefault: 'off', think: { default: { levels: ['off', 'on'], default: 'on' } } });
-    expect(ai.reasoningDefault('ollama')).toBe('off');
-    setup({ think: { default: { levels: ['off', 'on'], default: 'on' } } });
-    expect(ai.reasoningDefault('ollama')).toBe('on');
+  it('OpenAI 기본값은 서버 설정(.env)이 앞서고, 없으면 모름(null)', () => {
+    setup({ openai: { levels: ['low', 'medium'], default: 'low' } });
+    expect(ai.reasoningDefault('api')).toBe('low');
     setup({ openai: { levels: ['low', 'medium'], default: null } });
     expect(ai.reasoningDefault('api')).toBeNull();
   });
@@ -190,7 +171,8 @@ describe('추론 정도', () => {
   it('직원이 고른 값은 모드마다 따로 읽는다(화면 api = 서버 openai)', () => {
     setup({ mine: { openai: 'high' } });
     expect(ai.reasoning('api')).toBe('high');
-    expect(ai.reasoning('ollama')).toBeNull();
+    setup({});
+    expect(ai.reasoning('api')).toBeNull();
   });
 
   it('설정 응답에 추론 정도가 없으면 고른 값을 지우지 않는다', () => {
@@ -214,10 +196,10 @@ describe('추론 정도', () => {
   });
 
   it('저장에 실패하면 화면 값을 되돌린다', async () => {
-    setup({ mine: { ollama: 'off' } });
+    setup({ mine: { openai: 'off' } });
     vi.spyOn(aiApi, 'setReasoning').mockRejectedValue(new ApiError(422, { code: 'BAD_REASONING', message: '추론 정도가 아니에요' }));
-    await expect(setReasoning('ollama', 'xhigh')).rejects.toBeInstanceOf(ApiError);
-    expect(useAi.getState().settings.reasoning).toEqual({ ollama: 'off' });
+    await expect(setReasoning('api', 'xhigh')).rejects.toBeInstanceOf(ApiError);
+    expect(useAi.getState().settings.reasoning).toEqual({ openai: 'off' });
   });
 
   /** 저장 요청을 붙잡아 두고 순서를 정해 끝낸다(늦은 응답·실패 재현) */
@@ -233,47 +215,47 @@ describe('추론 정도', () => {
   it('빠르게 바꾸면 저장은 차례로 보내고, 앞 요청의 늦은 응답이 마지막 선택을 덮지 않는다', async () => {
     setup({});
     const calls = holdSaves();
-    const first = setReasoning('ollama', 'low');
-    const second = setReasoning('ollama', 'xhigh');
+    const first = setReasoning('api', 'low');
+    const second = setReasoning('api', 'xhigh');
     await tick();
     expect(calls.map((c) => c.level)).toEqual(['low']);
-    calls[0].done({ reasoning: { ollama: 'low' } });
+    calls[0].done({ reasoning: { openai: 'low' } });
     await first;
-    expect(ai.reasoning('ollama')).toBe('xhigh');
+    expect(ai.reasoning('api')).toBe('xhigh');
     await tick();
     expect(calls.map((c) => c.level)).toEqual(['low', 'xhigh']);
-    calls[1].done({ reasoning: { ollama: 'xhigh' } });
+    calls[1].done({ reasoning: { openai: 'xhigh' } });
     await second;
-    expect(ai.reasoning('ollama')).toBe('xhigh');
+    expect(ai.reasoning('api')).toBe('xhigh');
   });
 
   it('앞 요청이 실패해도 마지막 선택을 되돌리지 않는다', async () => {
-    setup({ mine: { ollama: 'off' } });
+    setup({ mine: { openai: 'off' } });
     const calls = holdSaves();
-    const first = setReasoning('ollama', 'low');
-    const second = setReasoning('ollama', 'xhigh');
+    const first = setReasoning('api', 'low');
+    const second = setReasoning('api', 'xhigh');
     await tick();
     calls[0].fail(new ApiError(500, { code: 'SERVER', message: '저장하지 못했어요' }));
     await expect(first).rejects.toBeInstanceOf(ApiError);
-    expect(ai.reasoning('ollama')).toBe('xhigh');
+    expect(ai.reasoning('api')).toBe('xhigh');
     await tick();
-    calls[1].done({ reasoning: { ollama: 'xhigh' } });
+    calls[1].done({ reasoning: { openai: 'xhigh' } });
     await second;
-    expect(ai.reasoning('ollama')).toBe('xhigh');
+    expect(ai.reasoning('api')).toBe('xhigh');
   });
 
   it('마지막 요청이 실패하면 서버에 마지막으로 저장된 값으로 돌린다', async () => {
-    setup({ mine: { ollama: 'off' } });
+    setup({ mine: { openai: 'off' } });
     const calls = holdSaves();
-    const first = setReasoning('ollama', 'low');
-    const second = setReasoning('ollama', 'xhigh');
+    const first = setReasoning('api', 'low');
+    const second = setReasoning('api', 'xhigh');
     await tick();
-    calls[0].done({ reasoning: { ollama: 'low' } });
+    calls[0].done({ reasoning: { openai: 'low' } });
     await first;
     await tick();
     calls[1].fail(new ApiError(500, { code: 'SERVER', message: '저장하지 못했어요' }));
     await expect(second).rejects.toBeInstanceOf(ApiError);
-    expect(useAi.getState().settings.reasoning).toEqual({ ollama: 'low' });
+    expect(useAi.getState().settings.reasoning).toEqual({ openai: 'low' });
   });
 
   it('단계 이름은 아는 것만 한글로, 모델이 정한 이름은 그대로 보인다', () => {
