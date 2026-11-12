@@ -112,7 +112,8 @@ export function ReviewSkillBlocks({ materials, acts, busy, readOnly = false, onS
           {tasks.map(task => <div className={`rv-task is-static${done(task.id) ? ' is-on' : ''}`} key={task.id} id={activityAnchor(task.id)} tabIndex={-1}>
             {progress ? <Stt done={done(task.id)} /> : null}
             <span className="rv-task-tx">
-              <span className="rv-task-kicker">{progress ? done(task.id) ? '제출 완료' : '아직 제출 전' : '산출물 과제'}</span>
+              <span className="rv-task-kicker">{/* 저장되는 것은 활동의 완료 여부뿐이라(첨부 없이 완료하거나 첨부하고 진행 중일 수 있다) 제출 여부로 적지 않는다 */}
+              {progress ? done(task.id) ? '산출물 과제 · 완료' : '산출물 과제 · 미완료' : '산출물 과제'}</span>
               <b>{task.title}</b>
               <TaskDescription text={task.how} />
               {progress?.[task.id]?.memo ? <span className="rv-muted">메모 · {progress[task.id].memo}</span> : null}
