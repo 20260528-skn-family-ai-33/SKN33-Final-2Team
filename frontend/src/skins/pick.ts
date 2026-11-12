@@ -4,7 +4,7 @@
    예전의 '원래 화면'(base)은 고르기에서 뺐다. 기억해 둔 base 나 ?skin=base 는 모르는 테마로 보고 기본 테마로 연다 */
 
 /** 기본 테마: templatemo 612 Parallax Starter · 상단 메뉴(2026-11-12 #211에서 464 Ultra Profile → 612).
-    처음 열 때 고른 값을 브라우저에 기억하므로(skins/index.ts), 예전 기본값(464)을 기억한 브라우저는 그대로 464로 열린다 */
+    열기만 한 브라우저는 고른 값을 기억하지 않으므로(choiceToRemember), 기본값을 바꾸면 직접 고르지 않은 브라우저는 다음에 열 때 따라간다 */
 export const DEFAULT_SKIN = 'tm612';
 
 export interface Choice {
@@ -33,4 +33,12 @@ export function pickChoice(query: string | null, saved: string | null, ids: read
   }
   // 기본 테마 폴더를 지웠으면 남은 테마 중 첫 번째
   return { skin: ids.includes(DEFAULT_SKIN) ? DEFAULT_SKIN : ids[0] ?? DEFAULT_SKIN, side: false, narrow: false };
+}
+
+/** 처음 열 때 기억할 값 — 주소의 ?skin= 으로 아는 테마를 연 때만 그 값을 돌려준다(새로 고치거나 주소 없이 다시 열어도 유지되게).
+    아무것도 고르지 않고 열기만 한 때는 null: 기억하지 않아야 기본 테마가 바뀌었을 때 따라간다. 테마 상자에서 고른 값은 setChoice 가 기억한다 */
+export function choiceToRemember(query: string | null, ids: readonly string[]): string | null {
+  if (!query) return null;
+  const c = parseChoice(query);
+  return ids.includes(c.skin) ? formatChoice(c) : null;
 }

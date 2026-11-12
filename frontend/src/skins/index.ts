@@ -15,9 +15,10 @@
    - 본문 폭도 두 가지: 넓은 본문 폭(기본 · gp.css) · 이전 본문 폭(<html data-width="narrow"> · width.css). 테마와 상관없이 고른다.
    - 테마 추가 = 폴더 추가, 빼기 = 폴더 삭제. 이 파일이 폴더를 알아서 찾는다.
    - 고를 때: 왼쪽 아래 '화면 테마' 상자(접힌 채 시작, 펼치면 테마 → 메뉴 위치 → 본문 폭 · 로그인 화면은 테마만), 또는 주소 뒤 ?skin=<id>[:side][:narrow]
-     (형식은 pick.ts). 고른 값은 이 브라우저에 기억한다.
+     (형식은 pick.ts). 상자에서 고른 값과 ?skin= 으로 연 값만 이 브라우저에 기억한다. 열기만 해서는 기억하지 않으므로
+     아무것도 고르지 않은 브라우저는 기본 테마가 바뀌면 따라간다(2026-11-12 #211).
    - 최종 결정 뒤에는 최신 main 에서 새 브랜치를 만들고 고른 폴더만 가져가 정식으로 적용한다. 이 고르기 장치(width.css 포함)는 가져가지 않는다. */
-import { type Choice, formatChoice, pickChoice } from './pick';
+import { type Choice, choiceToRemember, formatChoice, pickChoice } from './pick';
 import './width.css';
 import './reveal.css';
 import './reveal';
@@ -35,12 +36,16 @@ export interface Skin extends SkinMeta {
   id: string;
 }
 
-const KEY = 'growpath.skin';
+/* 기억하는 키. 2026-11-12 #211에서 예전 키(growpath.skin)를 바꿨다 — 예전에는 열기만 해도 고른 값을 저장해서, 예전 기본값(464)이
+   직접 고른 값과 구분 없이 남아 있었다. 키를 바꿔 모든 브라우저가 한 번은 기본 테마(612)로 열리게 하고, 예전 키는 지운다 */
+const KEY = 'growpath.skin.v2';
+const OLD_KEY = 'growpath.skin';
 const mods = import.meta.glob<{ default: SkinMeta }>('./*/index.ts', { eager: true });
 
 export const SKINS: Skin[] = Object.entries(mods)
   .map(([path, m]) => ({ ...m.default, id: path.split('/')[1] }))
   .sort((a, b) => a.id.localeCompare(b.id));
+const IDS = SKINS.map((s) => s.id);
 
 /* 저장소를 못 쓰는 브라우저(사생활 보호 모드 등)에서는 기억만 못 하고, 지금 화면에는 그대로 적용한다 */
 function load(): string | null {
@@ -57,8 +62,16 @@ function save(v: string): void {
     /* 위 설명대로 기억만 건너뜀 */
   }
 }
+function forgetOld(): void {
+  try {
+    localStorage.removeItem(OLD_KEY);
+  } catch {
+    /* 위 설명대로 건너뜀 */
+  }
+}
 
-let current: Choice = pickChoice(new URLSearchParams(window.location.search).get('skin'), load(), SKINS.map((s) => s.id));
+const query = new URLSearchParams(window.location.search).get('skin');
+let current: Choice = pickChoice(query, load(), IDS);
 
 function apply(c: Choice): void {
   const skin = SKINS.find((s) => s.id === c.skin);
@@ -101,4 +114,7 @@ export function setChoice(c: Choice): void {
 }
 
 apply(current);
-save(formatChoice(current));
+forgetOld();
+// 열기만 한 때는 기억하지 않는다(?skin= 으로 연 때만 · pick.ts choiceToRemember)
+const remember = choiceToRemember(query, IDS);
+if (remember) save(remember);

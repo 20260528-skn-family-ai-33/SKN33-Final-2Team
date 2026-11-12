@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SKIN, formatChoice, parseChoice, pickChoice } from './pick';
+import { choiceToRemember, DEFAULT_SKIN, formatChoice, parseChoice, pickChoice } from './pick';
 
 const ids = ['tm464', 'tm590', 'tm612'];
 const plain = (skin: string) => ({ skin, side: false, narrow: false });
@@ -17,7 +17,7 @@ describe('pickChoice', () => {
     expect(pickChoice(null, null, ids)).toEqual(plain('tm612'));
     expect(pickChoice('', '', ids)).toEqual(plain('tm612'));
   });
-  it('예전 기본 테마(464)를 기억한 브라우저는 그대로 464', () => {
+  it('직접 골라 기억한 테마는 기본 테마보다 먼저', () => {
     expect(pickChoice(null, 'tm464', ids)).toEqual(plain('tm464'));
   });
   it('기억한 테마 폴더를 지웠으면 기본 테마', () => {
@@ -50,5 +50,21 @@ describe('parseChoice · formatChoice', () => {
   });
   it('모르는 꼬리표는 버린다', () => {
     expect(parseChoice('tm464:wide')).toEqual(plain('tm464'));
+  });
+});
+
+describe('choiceToRemember', () => {
+  it('열기만 한 때(주소에 ?skin= 없음)는 기억하지 않는다 → 기본 테마가 바뀌면 따라간다', () => {
+    expect(choiceToRemember(null, ids)).toBeNull();
+    expect(choiceToRemember('', ids)).toBeNull();
+  });
+  it('주소의 테마를 모르면 기억하지 않는다', () => {
+    expect(choiceToRemember('tm999', ids)).toBeNull();
+    expect(choiceToRemember('base:side:narrow', ids)).toBeNull();
+  });
+  it('주소로 아는 테마를 열면 정리한 형식으로 기억한다', () => {
+    expect(choiceToRemember('tm590', ids)).toBe('tm590');
+    expect(choiceToRemember('tm464:narrow:side', ids)).toBe('tm464:side:narrow');
+    expect(choiceToRemember('tm464:wide', ids)).toBe('tm464');
   });
 });
