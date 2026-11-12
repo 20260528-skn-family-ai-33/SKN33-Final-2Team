@@ -370,11 +370,12 @@ def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
     if not isinstance(rows, list) or len(rows) != len(pools):
         raise RecommendationError('스킬별 추천 결과 수가 일치하지 않습니다.')
     pool_names = [p['name'] for p in pools]
+    all_names_missing = all(isinstance(r, dict) and 'name' not in r for r in rows)
     for i, row in enumerate(rows):
         if isinstance(row, dict):
             if 'name' not in row and 'skill' in row and row['skill'] in pool_names:
                 row['name'] = row['skill']
-            elif 'name' not in row and i < len(pools) and all('name' not in r for r in rows):
+            elif 'name' not in row and all_names_missing and i < len(pools):
                 row['name'] = pools[i]['name']
     by_name = {}
     for row in rows:
