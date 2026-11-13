@@ -15,7 +15,7 @@ from app.services import book_candidates, course_focus, resource_evidence
 
 MODEL = embeddings.BGE_MODEL
 DIMENSIONS = embeddings.BGE_DIMENSIONS
-VERSION = 'resource-pgvector-rag/v36-shared-books'
+VERSION = 'resource-pgvector-rag/v38-related-course-candidates'
 PER_KIND = 6
 COURSE_REVIEW = 20
 FIELDS = ('id','title','provider','cost','hours','estimated','image','url','skills','content','curriculum')
@@ -23,6 +23,8 @@ FIELDS = ('id','title','provider','cost','hours','estimated','image','url','skil
 
 def version_for(course=None):
     from app.services.crash_courses import is_crash, VERSION as CRASH_VERSION
+    if (course.get('id') if isinstance(course, dict) else course) == 'A3':
+        return VERSION + '/challenge-content-v1'
     return VERSION + '/' + CRASH_VERSION if is_crash(course) else VERSION
 
 
@@ -120,12 +122,17 @@ def retrieve(project, selection, items, course=None, *, embed=None, search=None,
     matches = []
     from app.services import crash_courses
     crash_cache = {}
-    def has_learning_evidence(rid, name, allow_audit_gap):
+    def course_info(rid):
         if rid not in crash_cache:
             crash_cache[rid] = resource_evidence.facts(items[rid], project, shared)
-        info = crash_cache[rid]
-        spec = next(skill for skill in shared['skills'] if skill['name'] == name)
-        return resource_evidence.course_applicable(info, spec, allow_audit_gap=allow_audit_gap)
+        return crash_cache[rid]
+
+    specs = {skill['name']: skill for skill in shared['skills']}
+    def has_learning_evidence(rid, name, allow_foundation):
+        return resource_evidence.course_applicable(course_info(rid), specs[name], allow_foundation=allow_foundation)
+
+    def related_basis(rid, name):
+        return resource_evidence.related_basis(course_info(rid), specs[name])
 
     for index in active:
         for key, kind, prefix in [('courses','courses',''), ('books','books','book_')]:
@@ -153,8 +160,13 @@ def retrieve(project, selection, items, course=None, *, embed=None, search=None,
                         raise RecommendationError('자료 검색 유사도가 올바르지 않아요.')
                 rows = [dict(row, current_cost=row.get('current_cost', allowed[row['resource_id']].get('cost'))) for row in rows]
                 spec = shared['skills'][index]
+                def challenge_rank(rid):
+                    return resource_evidence.course_rank_key(course_info(rid), project, spec, items[rid], True)
                 rows = course_focus.course_window(rows, items, spec['name'], resource_evidence.requested_topics(spec),
-                                                  track, review_limit, has_learning_evidence)
+                                                  track, review_limit, has_learning_evidence, related_basis=related_basis,
+                                                  challenge_rank=challenge_rank if track == 'A3' else None,
+                                                  allow_topic_foundation=bool(course_focus.foundation_rules(
+                                                      spec['name'], spec.get('stageApplication') or spec.get('application') or '')))
             seen=set()
             found = []
             for match in rows[:review_limit]:
@@ -174,6 +186,7 @@ def retrieve(project, selection, items, course=None, *, embed=None, search=None,
                         crash_cache[row['id']] = crash_courses.facts(items[row['id']], project, shared)
                 # 20개 검토 결과를 스킬별로 먼저 6개로 자르면 공통 단기 강좌를 잃을 수 있다.
                 found = crash_courses.rank(found, project, shared, shared['skills'][index], cache=crash_cache)
+                found = resource_evidence.select_course_candidates(found, crash_cache, shared['skills'][index], review_limit)
             elif key == 'courses' and scoped_course:
                 found = resource_evidence.rank_applicable(found, project, shared, shared['skills'][index], course,
                                                           limit=PER_KIND, sources=items, cache=crash_cache)

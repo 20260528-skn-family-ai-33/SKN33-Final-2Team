@@ -365,9 +365,10 @@ class CrashCourseTests(unittest.TestCase):
         self.assertFalse(plan['hoursConfirmed'])
         self.assertIsNone(plan['uniqueHours'])
 
-    def test_only_crash_recommendation_cache_version_changes(self):
+    def test_crash_and_challenge_scope_their_own_recommendation_cache_versions(self):
         self.assertEqual(rag.version_for('A1'), rag.VERSION)
-        self.assertEqual(rag.version_for('A3'), rag.VERSION)
+        self.assertNotEqual(rag.version_for('A3'), rag.VERSION)
+        self.assertNotEqual(rag.version_for({'id': 'A3'}), rag.version_for('A2'))
         self.assertEqual(rag.version_for(None), rag.VERSION)
         self.assertNotEqual(rag.version_for('A2'), rag.VERSION)
 

@@ -61,16 +61,18 @@ class CrashResourceScopeTests(unittest.TestCase):
         profiles = {row['title']: row['learningEvidence'] for row in payload['skills'][0]['courses']}
         self.assertEqual(profiles['short']['requiredStack'], ['fastapi'])
         self.assertEqual(profiles['short']['missingStack'], [])
-        self.assertNotIn('django', profiles)
+        self.assertEqual(profiles['django']['missingStack'], ['fastapi'])
+        self.assertEqual(payload['skills'][0]['courses'][-1]['candidateKind'], 'supplemental')
         self.assertEqual(payload['crashStudyPlan']['uniqueHours'], 2)
         self.assertEqual(result['skills'][0]['selectedCourse'], 'short')
         self.assertEqual(payload['project']['goal'], original[0]['goal'])
         self.assertEqual((self.project, self.selection, self.option), original)
 
     def test_unsuitable_model_only_choice_cannot_reference_a_filtered_course(self):
-        items = {row['id']: row for row in (self.short, self.long, self.django)}
+        unrelated = course('unrelated', ['수강 일정과 사용자 인터뷰'], skills=[WEB], hours=1)
+        items = {row['id']: row for row in (self.short, self.long, unrelated)}
         pools = [{'name': WEB, 'courses': list(items.values()), 'books': []}]
-        raw = {'skills': [{'name': WEB, 'courses': [{'id': 'django'}], 'books': []}]}
+        raw = {'skills': [{'name': WEB, 'courses': [{'id': 'unrelated'}], 'books': []}]}
         before = deepcopy((self.project, self.selection, pools))
         with self.assertRaises(RecommendationError):
             recommend_resources(self.project, self.selection, items, lambda *_: raw,
@@ -221,7 +223,7 @@ class CrashResourceScopeTests(unittest.TestCase):
                 self.assertEqual(profile['conflictingStack'], [runtime])
                 self.assertFalse(profile['suitable'])
 
-    def test_recommendation_rejects_excluded_technology_in_applied_evidence(self):
+    def test_other_framework_is_supplemental_and_never_evidence_for_django(self):
         self.project = {'goal': 'Django로 REST API 구현'}
         self.skill.update(coreOutcome='Django REST API 구현', coreCriteria=['응답 코드 확인'])
         self.django['hours'] = 5
@@ -233,7 +235,8 @@ class CrashResourceScopeTests(unittest.TestCase):
                                     for key, score in [('replacement', .95), ('partial-name', .9), ('django', .8)]])
         pools, _ = resource_rag.retrieve(self.project, self.selection, items, self.option,
                                          embed=embed, search=search)
-        self.assertEqual([row['id'] for row in pools[0]['courses']], ['django'])
+        self.assertEqual([(row['id'], row['candidateKind']) for row in pools[0]['courses']],
+                         [('django', 'direct'), ('replacement', 'supplemental')])
         # 이전 추천 캐시에 제외된 강좌가 남은 경우에도 최종 선택을 검사한다.
         pools = [{'name': WEB, 'courses': list(items.values()), 'books': []}]
         generate = Mock(return_value={'skills': [{'name': WEB, 'books': [],
@@ -242,8 +245,8 @@ class CrashResourceScopeTests(unittest.TestCase):
                                      retrieved_pools=pools)
         payload = generate.call_args.args[1]
         profiles = {row['title']: row['learningEvidence'] for row in payload['skills'][0]['courses']}
-        for key in ('replacement', 'partial-name'):
-            self.assertNotIn(key, profiles)
+        self.assertIn('django', profiles['replacement']['missingStack'])
+        self.assertNotIn('partial-name', profiles)
         self.assertEqual(payload['crashStudyPlan']['uniqueHours'], 5)
         self.assertEqual(result['skills'][0]['selectedCourse'], 'django')
         generate.return_value['skills'][0]['courses'] = [{'id': 'replacement'}, {'id': 'partial-name'}]

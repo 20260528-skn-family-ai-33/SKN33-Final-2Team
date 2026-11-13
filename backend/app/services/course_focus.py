@@ -74,6 +74,7 @@ _topics = (
     ('RESTful', r'요청|수정\s*api|오류\s*응답', r'웹\s*api|restful|rest\s*api', r'컨트롤러|엔드포인트|crud|요청\s*모델|http\s*상태|응답\s*처리|response handling'),
     ('Docker', r'dockerfile|도커파일', r'dockerfile|도커파일', r'레이어|layer|명령|이미지|\bcopy\b|\bfrom\b|캐시|컨텍스트'),
     ('멀티스레딩', r'잠금|경쟁|경합|동기화', r'스레드|쓰레드|threads?|pthread', r'잠금|동기화|경쟁|뮤텍스|\block\b|mutex|synchroniz'),
+    ('멀티스레딩', r'뮤텍스|mutex', r'뮤텍스|mutex', r'동기화|임계\s*(?:구역|영역)|상호\s*배제|잠금|synchroniz|critical.section|mutual exclusion'),
     ('멀티스레딩', r'공유|잠금|경쟁', r'멀티\s*(?:스레드|쓰레드)|pthread|multithread', r'read.write lock|spin lock|뮤텍스|동기화|임계\s*구역'),
     ('RESTful', r'오류\s*응답|요청\s*검증', r'\brest(?:ful)?\b|jax.?rs|웹\s*api|fastapi', r'오류\s*응답|응답\s*처리|response handling|유효성|validation|상태\s*코드'),
     ('클라우드 컴퓨팅', r'가용\s*영역', r'가용\s*영역|다중\s*영역|다중\s*az|multi.az|availability zone', r'영역.{0,12}(?:분산|배치|중단|장애|분배)|부하\s*분산|로드\s*밸런|failover|장애\s*조치'),
@@ -87,12 +88,17 @@ _grounding_metric = english_token('faithfulness|groundedness')
 
 # 사전점검의 해당 스킬 과업에서 찾을 수 있는 근거. 한 차시가 직접 다루는 작업을 구분한다.
 _tasks = (
-    (r'NLP|자연어', r'(?=.*(?:응답|답변|LLM|언어\s*모델))(?=.*(?:품질|근거성|거절|환각|정답|평가))',
+    (r'NLP|자연어', r'(?:응답|답변).{0,24}(?:품질|근거성|거절|환각|정답|평가)|(?:LLM|언어\s*모델)(?:의|을|를)?\s*(?:품질|근거성|환각|평가)|(?:평가|측정).{0,12}(?:응답|답변)\s*품질',
      ((rf'{_llm_subject}|{_translation_metric}|{_grounding_metric}',
        '(?:' + _llm_subject + r').{0,14}(?:평가|판정)|(?:정답|의미).{0,8}(?:비교|일치)|'
        + english_token(r'LLM[ ._-]as[ ._-]a[ ._-]judge') + '|' + _translation_metric),
-      (r'환각|근거|충실도|거절|무응답|' + _grounding_metric + '|' + english_token('RAGAS'),
-       _grounding_metric + r'|(?:환각|충실도|근거성|거절|무응답).{0,12}(?:측정|평가|판정|지표|검증|임곗값)'))),
+      (r'환각|근거|충실도|거절|무응답|인용\s*적중률|' + _grounding_metric + '|' + english_token('RAGAS'),
+       _grounding_metric + r'|(?:환각|충실도|근거성|거절|무응답).{0,12}(?:측정|평가|판정|지표|검증|임곗값)|(?:평가\s*지표|측정|계산).{0,24}인용\s*적중률|인용\s*적중률.{0,12}(?:측정|계산)'))),
+    (r'NLP|자연어', r'(?=.*(?:자연어|텍스트|문장|문서))(?=.*(?:분류기|분류\s*(?:방법|모델|실험)|(?:텍스트|문장|문서)\s*분류))',
+     ((r'토큰|토크나이|형태소|서브워드|임베딩|word2vec|TF.IDF',
+       r'토큰화|토크나이[저제]|형태소\s*분석|단어\s*임베딩|워드\s*임베딩|word2vec|TF.IDF'),
+      (r'텍스트|문서|문장|자연어|감성|감정',
+       r'(?:텍스트|문서|문장|감성|감정).{0,12}(?:분류|분석)|분류기.{0,10}(?:학습|평가)'))),
     (r'EDA|탐색적', r'(?=.*(?:예측|체크포인트|반복\s*측정|지연|latency))(?=.*(?:지표|구간|표본|집단|그룹|비교))',
      ((r'모델|예측|평가|성능', r'(?:모델|예측|성능|평가).{0,9}(?:성능\s*향상|평가\s*지표|성능\s*평가|평가\s*방법|평가와|평가하기|오차\s*분석)|분류\s*지표'),
       (r'그룹|구간|반복\s*측정|표본|분포|groupby|groupkfold', r'그룹별\s*(?:집계|비교|기준선)|구간별\s*(?:분포|비교|집계)|반복\s*측정|소표본|groupby|groupkfold'))),
@@ -120,13 +126,42 @@ def requested(name, context):
                  if skill.search(name) and trigger.search(context))
 
 
-def lesson_score(topics, title, unit):
+def lesson_score(topics, title, unit, section=''):
     """주제와 작업이 함께 확인된 차시를 찾는다. 제목의 주제만으로는 점수를 주지 않는다."""
     if re.match(r'^\s*(?:Q\s*[.:]|질문\s*[:：])', unit, re.I):
         return 0
-    count = sum(bool(action.search(unit) and (subject.search(unit) or subject.search(title)))
+    # 섹션은 주제만 보완한다. 하위 차시가 단순히 '실습', '소개'라고 쓰인 것은 작업 근거가 아니다.
+    if section and re.fullmatch(r'\s*(?:[\d.() -]*)(?:실습|연습|소개|요약|퀴즈|practice|exercise|lab)\s*[\d.() -]*', unit, re.I):
+        section = ''
+    count = sum(bool(action.search(unit) and (subject.search(unit) or subject.search(title) or subject.search(section)))
                 for subject, action in topics)
     return 0 if not count else 3 * count + bool(_practice.search(unit)) + bool(_lab.search(unit))
+
+
+# 직접 과업은 확인되지 않지만 필요한 구성 요소를 실제 차시에서 가르치는 경우.
+# 주제·작업을 서로 다른 차시에서 합치지 않고, 빠진 과업은 모델에 그대로 알린다.
+_foundations = tuple((re.compile(skill, re.I), re.compile(goal, re.I), re.compile(lesson, re.I), gap,
+                      re.compile(context, re.I) if context else None) for skill, goal, lesson, gap, context in (
+    ('네트워크 보안', r'방화벽|firewall', r'(?:방화벽|firewall).{0,24}(?:배포|구성|구현|관리|문제 해결)|(?:구성|배포).{0,18}(?:방화벽|firewall)', '요청한 방화벽 규칙 적용', None),
+    ('클라우드 컴퓨팅', r'가용\s*영역|로드\s*밸런|부하\s*분산', r'(?:aws|아마존|amazon).{0,24}(?:\bALB\b|application load balanc\w*)|(?:azure|애저).{0,24}(?:load balancer|부하\s*분산\s*장치)', '다중 가용 영역의 부하 분산 구성', None),
+    ('클라우드 IAM', r'역할|서비스\s*계정|최소\s*권한|rbac', r'(?:entra|iam|rbac|서비스\s*주체).{0,24}(?:역할|권한).{0,12}(?:구성|관리|분석|할당)', '요청 대상에 대한 역할·권한 적용', None),
+    ('멀티스레딩', r'뮤텍스|mutex', r'(?:스레드|쓰레드|threads?).{0,18}(?:동기화|synchroniz)|(?:임계\s*(?:영역|구역)|critical.section).{0,20}(?:상호\s*배제|mutual exclusion)', '뮤텍스를 이용한 공유 자원 보호', None),
+    ('자연어|NLP', r'(?:응답|답변).{0,24}(?:품질|근거성|정답|평가)', r'(?=.*(?:\bLLM\b|언어\s*모델))(?=.*품질)(?=.*(?:지표|측정))', '답변별 근거성·정답 일치 평가', None),
+    ('자연어|NLP', r'(?:응답|답변).{0,24}(?:품질|근거성|정답|평가)', r'데이터셋.{0,15}평가\s*(?:방법|지표)', '생성 답변의 평가 기준 적용', r'자연어\s*처리|\bNLP\b|언어\s*모델'),
+))
+
+
+@lru_cache(maxsize=256)
+def foundation_rules(name, application):
+    return tuple((lesson, gap, context) for family, goal, lesson, gap, context in _foundations
+                 if family.search(name) and goal.search(application))
+
+
+def foundation_lessons(rules, lessons, title):
+    for pattern, gap, context in rules:
+        for unit in lessons:
+            if pattern.search(unit) and (not context or context.search(title) or context.search(unit)):
+                yield unit, gap
 
 
 _practice = re.compile(r'구성|실습|연습|재현|측정|검증|구현|실행|할당|적용|작성|테스트|exercise|configure|implement', re.I)
@@ -179,13 +214,16 @@ def curriculum_score(index, rid, topics):
     doc = index[rid]
     cache = doc['topic_scores']
     if topics not in cache:
-        units = [unit for unit, _, _ in doc['units']] if doc['rows'] else []
-        units.extend(claims(doc['lines']))
-        cache[topics] = max((lesson_score(topics, doc['record']['title'], unit) for unit in units), default=0)
+        rows = (doc['record'].get('curriculum') or {}).get('items') or []
+        units = [(unit, rows[i].get('section') or '') for i, unit in doc['own_rows'].items()]
+        units.extend((line, '') for line in claims(doc['lines']))
+        cache[topics] = max((lesson_score(topics, doc['record']['title'], unit, section)
+                             for unit, section in units), default=0)
     return cache[topics]
 
 
-def course_window(matches, items, skill, topics, track, limit, has_learning_evidence):
+def course_window(matches, items, skill, topics, track, limit, has_learning_evidence, *, allow_topic_foundation=False,
+                  related_basis=None, challenge_rank=None):
     """벡터와 실습 근거가 있는 공통 후보에서 조건에 맞는 최대 20개를 자세히 검토한다."""
     index = catalog_candidates.cached_index(items) if topics and matches else {}
     scores = {row['resource_id']: curriculum_score(index, row['resource_id'], topics) for row in matches}
@@ -203,21 +241,34 @@ def course_window(matches, items, skill, topics, track, limit, has_learning_evid
         if track == 'A2':
             # 같은 관련성 문턱을 넘은 후보는 2시간 구간·키워드 횟수보다 실제 시간을 먼저 비교한다.
             return duration, -scores[rid], -row['similarity'], rid
-        return band, -scores[rid], -row['similarity'], rid
+        if challenge_rank and len(relevant) > limit and (scores[rid] or not topics):
+            priority, title = challenge_rank(rid)
+            return 0, priority, -row['similarity'], title, rid
+        return 1, -scores[rid], band, -row['similarity'], rid
 
     ordered = sorted(relevant, key=order)
     seen = set()
     window = []
-    for allow_audit_gap in (False, True):
-        target = min(limit, MIN_COURSE_CANDIDATES) if allow_audit_gap else limit
+    for allow_foundation in (False, True):
+        target = min(limit, MIN_COURSE_CANDIDATES) if allow_foundation else limit
         if len(window) >= target:
             break
         for row in ordered:
             rid = row['resource_id']
             key = identity(items[rid], rid)
-            if key not in seen and (not topics or scores[rid]) and has_learning_evidence(rid, skill, allow_audit_gap):
+            if (key not in seen and (not topics or scores[rid] or (allow_foundation and allow_topic_foundation))
+                    and has_learning_evidence(rid, skill, allow_foundation)):
                 seen.add(key)
                 window.append(row)
                 if len(window) == target:
+                    break
+    if related_basis and len(window) < min(limit, MIN_COURSE_CANDIDATES):
+        for row in ordered:
+            rid = row['resource_id']
+            key = identity(items[rid], rid)
+            if key not in seen and related_basis(rid, skill):
+                seen.add(key)
+                window.append(row)
+                if len(window) == min(limit, MIN_COURSE_CANDIDATES):
                     break
     return window

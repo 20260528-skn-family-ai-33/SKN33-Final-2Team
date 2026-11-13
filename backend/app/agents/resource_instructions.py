@@ -9,6 +9,8 @@ COMMON = """[입력·범위]
 도서는 공통 bookCatalog 중 해당 스킬의 books에 있는 키만 허용, 다른 스킬의 도서 전용·차용으로 개수 채우기 금지.
 자료 하나가 모든 세부 목표를 충족할 필요는 없다. 확인된 내용이 해당 스킬의 핵심 부분에 직접 도움이 되면 보조 강좌나 기초 도서로 선택할 수 있다. 예를 들어 파이프라인 설계 책은 원리를 보완할 수 있으며, 책에 없는 dbt 실습을 다룬다고 설명하지 않는다. 도구가 필수인 구현을 다른 도구의 구현으로 대체하지 않고, 중요한 미충족 범위는 해당 자료의 진단으로 설명한다.
 learningEvidence.auditScopeFoundation이 참인 강좌는 접근 로그 분석 차시를 확인하지 못했지만 해당 스킬을 가르치는 보충 후보다. 확인된 기초 내용을 근거로 선택하고, 접근 로그 분석 실습은 미확인 범위로 설명한다.
+learningEvidence.partialScopeFoundation이 참인 강좌는 목표의 일부 과업만 확인된 보충 후보다. 실제 차시가 다루는 범위와 unverifiedTargetTopics를 구분하고, 부족분을 채우기 위해 전부 추천할 필요는 없다.
+candidateKind가 direct인 강좌를 먼저 검토한다. supplemental은 같은 코스에서 일부 과업을 배우는 보충 후보다. 선택하면 확인된 차시와 미확인 도구·범위를 구분하고 다른 도구의 수업을 요청 도구의 실습으로 설명하지 않는다.
 추천 자료는 key만 반환, 주차 설명 작성 금지.
 
 [근거·불확실성]
@@ -42,6 +44,6 @@ def instructions(course):
     from app.track_policy import crash_guidance
     course_id = course.get('id') if isinstance(course, dict) else course
     policy = POLICIES.get(course_id, '')
-    level_policy = {'A3': '강좌 난이도는 ADVANCED(상)를 먼저 선택한다. 관련 상 후보가 부족할 때만 UPPER_INTERMEDIATE(중상)로 보완하고 중·하 강좌는 제외한다. 기초 보강은 이 강좌 난이도 제한의 예외가 아니다.',
+    level_policy = {'A3': 'ADVANCED(상)와 UPPER_INTERMEDIATE(중상)는 모두 직접 추천할 수 있다. 중·하 강좌는 제외한다. 목표에 명시한 기술과 과업을 실습하고 결과를 검증하는 실제 차시를 우선한다. 이 근거가 더 좋은 중상 강좌는 상 후보가 있어도 먼저 추천하고, 근거가 동등할 때만 상을 우선한다.',
                     'A2': 'ADVANCED(상)·UPPER_INTERMEDIATE(중상) 강좌는 제외한다. 같은 목표·스킬의 관련성 문턱을 통과한 후보는 실제 전체 강좌 시간이 짧은 순으로 검토한다. 키워드 일치 횟수·벡터 점수·초급 표지·2시간 경계 때문에 더 긴 강좌를 먼저 선택하지 않는다. 공동 학습 근거가 있는 동일 강좌의 시간은 한 번만 합산한다.'}
     return COMMON + ('\n' + policy if policy else '') + crash_guidance(course_id, 'resources') + '\n' + level_policy.get(course_id, '')

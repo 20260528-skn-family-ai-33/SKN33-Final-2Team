@@ -44,6 +44,44 @@ class CourseFocusTests(unittest.TestCase):
         self.assert_delivered('NoSQL & 분산 DB', 'PostgreSQL 조인과 MongoDB 문서 조회를 구현한다',
                               examples, {'mongo': unit, 'comparison': unit})
 
+    def test_section_can_supply_subject_but_not_another_units_action(self):
+        name, goal = '대용량 트래픽 처리 & 캐싱', 'Redis 캐시 만료 시간을 설정한다'
+        spec = {'name': name, 'application': goal}
+        selection = {'skills': [spec], 'commonApplications': {name: goal}}
+        units = {
+            '차시': [('Redis 캐싱', 'TTL과 만료 시간 설정')], '질문': [('Redis 캐싱', 'Q. TTL을 설정하나요?')],
+            '선수': [('선수지식: Redis', 'TTL 설정')], '다른 장': [('Redis', '설치 안내'), ('다른 제품', 'TTL 만료 설정')],
+        }
+        course = {'id': 'A1', 'learningSkills': [spec]}
+        items = {k: dict(id=k, title=k, type='course', usable=True, cost=0, skills=[name],
+                         curriculum={'items': [dict(section=s, title=u) for s, u in rows]}) for k, rows in units.items()}
+        pools, _ = rag.retrieve({'goal': goal}, selection, items, course,
+            embed=lambda ts: [[1.] * rag.DIMENSIONS for _ in ts],
+            search=lambda kind, ids, *args: [dict(resource_id=i, similarity=.8, current_cost=0) for i in ids])
+        model = Mock(return_value={'skills': [{'name': name, 'courses': [], 'books': []}]})
+        recommend_resources({'goal': goal}, selection, items, model, course=course, retrieved_pools=pools)
+        cards = model.call_args.args[1]['skills'][0]['courses']
+        self.assertEqual([c['title'] for c in cards], ['차시'])
+        self.assertIn('TTL', cards[0]['outline'][0]['title'])
+
+    def test_topic_foundations_require_a_real_unit_and_the_requested_technology(self):
+        cases = [
+            ('네트워크 보안 & 침입 탐지', '방화벽 규칙으로 포트 접근을 제한한다',
+             'Azure Firewall 배포 및 구성', 'Q. Azure Firewall 배포 및 구성은 어떻게 하나요?'),
+            ('멀티스레딩 & 비동기 동시성', '공유 자원에 뮤텍스를 적용한다',
+             '스레드 사이의 통신과 스레드 동기화', '스레드의 생성과 시작'),
+            ('클라우드 컴퓨팅 아키텍처 (AWS/Azure)', 'AWS 가용 영역에 로드 밸런서를 구성한다',
+             'AWS 클라우드 ALB(Application Load Balancer)', 'Azure Load Balancer'),
+            ('클라우드 IAM & 네트워크 보안', 'Azure 서비스 계정에 역할 기반 접근 권한을 부여한다',
+             'Microsoft Entra 역할 구성 및 관리', 'AWS IAM 역할 구성 및 관리'),
+            ('자연어 처리(NLP) & LLM 기초', 'LLM 답변의 근거성과 정답 일치를 평가한다',
+             'LLM 서비스 운영 지표: 지연, 비용, 출력 품질', 'LLM 서비스 운영 지표: 지연과 비용'),
+        ]
+        for name, goal, positive, negative in cases:
+            with self.subTest(name=name):
+                self.assert_delivered(name, goal, {'관련 차시': ('', [positive]), '부적합': ('', [negative]),
+                    '제목에만 ' + positive: ('', ['일정 안내'])}, {'관련 차시': positive})
+
     def test_nosql_storage_lessons_need_database_evidence(self):
         examples = {
             'cosmos': ('', ['Azure Cosmos DB 컨테이너 쿼리 실습']),
@@ -211,7 +249,12 @@ class CourseFocusTests(unittest.TestCase):
                 ids = [r['id'] for r in pools[0]['courses']]
                 self.assertEqual(ids[0],first)
                 self.assertNotIn('irrelevant',ids)
-                self.assertNotIn('other-engine',ids)
+                kinds = {row['id']: row['candidateKind'] for row in pools[0]['courses']}
+                self.assertEqual(kinds[first], 'direct')
+                if track == 'A2':
+                    self.assertNotIn('other-engine', ids)  # 이 코스에서는 심화 강좌를 제외한다.
+                else:
+                    self.assertEqual(kinds['other-engine'], 'supplemental')
         self.assertEqual(queries, [queries[0]] * 3)
 
     def setUp(self):

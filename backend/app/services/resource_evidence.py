@@ -123,7 +123,7 @@ _stacks = {
     'express': r'express(?:\.js)?|익스프레스', 'nestjs': r'nest\.?js',
     'python': r'python|파이썬|asyncio', 'java': r'java|자바(?!스크립트)',
     'javascript': r'javascript|typescript|node\.?js|자바스크립트|타입스크립트',
-    'aws': r'aws|아마존\s*웹', 'azure': r'azure|애저', 'gcp': r'gcp|google\s*cloud',
+    'aws': r'aws|아마존\s*웹', 'azure': r'azure|애저|microsoft\s+entra(?:\s+id)?', 'gcp': r'gcp|google\s*cloud',
     'pytorch': r'pytorch|파이토치|torchvision|torch\.(?:nn|optim|utils\.data)',
     'tensorflow': r'tensorflow|텐서플로(?:우)?',
 }
@@ -300,7 +300,9 @@ def _missing_targets(skill: dict, name: str, stage: str, applied: list[str]) -> 
 
 
 def target_gaps(info: dict, skill: str) -> list[str]:
-    return list(((info.get('suitability') or {}).get(skill) or {}).get('unverifiedTargetTopics') or [])
+    profile = (info.get('suitability') or {}).get(skill) or {}
+    return list(dict.fromkeys([*(profile.get('unverifiedTargetTopics') or []),
+                              *info.get('relatedGaps', {}).get(skill, ())]))
 
 
 def _dbt_facets(row: dict, value: str, targets: tuple[re.Pattern, ...]) -> set[int]:
@@ -390,15 +392,92 @@ def suitable(info: dict, skill: str) -> bool:
             and not (info.get('hasAnchors') and not info.get('anchorHits')))
 
 
-def course_applicable(info: dict, skill: dict, *, allow_audit_gap: bool = False) -> bool:
+def course_applicable(info: dict, skill: dict, *, allow_foundation: bool = False) -> bool:
     """세 코스가 공유하는 목표·스킬·실제 학습 근거 문턱. 계획의 코스별 예시는 요구하지 않는다."""
     name = skill['name']
     profile = info['suitability'][name]
-    foundation = allow_audit_gap and profile.get('auditScopeFoundation', False)
+    foundation = allow_foundation and (profile.get('auditScopeFoundation') or profile.get('partialScopeFoundation'))
     return bool(name in info['supported']
                 and (foundation or (info['scopeEvidence'][name] and profile['evidenceLevel'] in ('applied', 'conceptual')))
                 and not profile['missingStack'] and not profile['conflictingStack']
-                and (not requested_topics(skill) or info.get('focusScores', {}).get(name, 0)))
+                and (not requested_topics(skill) or info.get('focusScores', {}).get(name, 0)
+                     or (allow_foundation and profile.get('topicFoundation'))))
+
+
+# 제품명은 달라도 같은 과업을 실습하는 표현. 단순히 '실습'이나 '검증'만 일치하면 부족하다.
+_related_tasks = tuple((re.compile(family, re.I), re.compile(goal, re.I), re.compile(lesson, re.I))
+                       for family, goal, lesson in (
+    ('ETL|파이프라인', r'품질|무결성|테스트|검증',
+     r'(?:행\s*수|해시|합계|주문\s*키|레코드|정합성|무결성).{0,28}(?:대조|검사|검증|검증\s*규칙)|(?:검증|격리)\s*태스크'),
+    ('ETL|파이프라인', r'백필|재처리|backfill',
+     r'(?:파티션|마트|주문|데이터|증분|날짜).{0,40}(?:재처리|백필|재실행)|(?:백필|재처리).{0,35}(?:복구|검증|파티션|실행)'),
+    ('웹 프레임워크|RESTful', r'요청.{0,18}(?:검증|저장)|입력\s*검증',
+     r'(?:요청|입력|본문|필드|pydantic).{0,35}(?:검증|검사|거절|오류|누락)|(?:검증|검사).{0,22}(?:요청|입력)'),
+    ('웹 프레임워크|RESTful', r'ORM|모델.{0,20}(?:조회|수정)',
+     r'(?:모델|상품|사용자|레코드|데이터|엔드포인트).{0,22}(?:조회|부분\s*수정)|(?:부분\s*수정|patch).{0,26}(?:모델|엔드포인트|저장)'),
+    ('클라우드 IAM', r'권한|역할|RBAC',
+     r'(?:역할|서비스\s*계정|권한).{0,38}(?:위임|부여|할당|허용|분리|제거)|(?:RBAC|역할\s*기반).{0,24}(?:액세스|접근)\s*제어'),
+))
+
+
+def related_basis(info: dict, skill: dict) -> str:
+    """해당 스킬의 실제 차시·학습 설명에서 목표와 겹치는 과업을 찾고 원문을 보관한다."""
+    name = skill['name']
+    cache = info.setdefault('relatedEvidence', {})
+    if name in cache:
+        return cache[name]
+    cache[name] = ''
+    if name not in info['registeredSkills']:
+        return ''
+    goal = skill.get('stageApplication') or skill.get('application') or ''
+    tasks = [lesson for family, trigger, lesson in _related_tasks if family.search(name) and trigger.search(goal)]
+    terms = focus_terms({}, {'name': name, 'application': goal}) if not tasks and name in info['supported'] else []
+    if not tasks and len(terms) < 2:
+        return ''
+    from app.services.course_focus import claims
+    units = [text for _, row, text in info['rows'] if not _discussion.search(normalize(row.get('section')))]
+    best = 0
+    for unit in (*units, *claims(info['descriptions'])):
+        if _question.search(unit) or _discussion.search(unit) or _business.search(unit):
+            continue
+        if tasks:
+            score = evidence.matches(unit, tasks)
+        else:
+            if not (_practice.search(unit) or _build.search(unit) or _operate.search(unit)):
+                continue
+            score = evidence.matches(unit, terms) - 1
+        if score > best:
+            cache[name], best = unit, score
+    if cache[name]:
+        profile = info['suitability'][name]
+        gaps = [*profile['missingStack']]
+        if _dbt.search(goal) and not info['scopeEvidence'][name]:
+            gaps.append('dbt 실습')
+        info.setdefault('relatedGaps', {})[name] = gaps or [goal]
+    return cache[name]
+
+
+def select_course_candidates(rows, cache, skill, limit):
+    from app.services.course_focus import distinct_courses, identity, MIN_COURSE_CANDIDATES
+    direct, remaining = [], []
+    for row in rows:
+        if course_applicable(cache[row['id']], skill):
+            direct.append(dict(row, candidateKind='direct'))
+        else:
+            remaining.append(row)
+    selected = distinct_courses(direct)[:limit]
+    target = min(limit, MIN_COURSE_CANDIDATES)
+    seen = {identity(row, row['id']) for row in selected}
+    for matches in (lambda info: course_applicable(info, skill, allow_foundation=True),
+                    lambda info: related_basis(info, skill)):
+        for row in remaining:
+            if len(selected) >= target:
+                return selected
+            key = identity(row, row['id'])
+            if key not in seen and matches(cache[row['id']]):
+                selected.append(dict(row, candidateKind='supplemental'))
+                seen.add(key)
+    return selected
 
 
 def suitability_key(info: dict, skill: str) -> tuple:
@@ -520,6 +599,23 @@ def _profile(skill: dict, project: dict, rows: list, descriptions: list[str], te
         result['unverifiedTargetTopics'] = [label for label, request, proof in _linux_security_topics
             if linux_security and request.search(_skill_context(skill))
             and not any(proof.search(value) for value in learning)] + missing_targets
+    # 목표 단계에는 못 미쳐도 같은 스킬을 실제로 연습하는 차시는 부족분을 채울 수 있다.
+    # 태그·제목뿐인 강좌, 질문·토론 또는 필요한 기술·범위가 다른 강좌는 근거가 아니다.
+    if supported and scope and gap == 2 and not missing and not conflicts and not missing_targets:
+        basis = None
+        for other_stage in ('build', 'operate'):
+            other_units, other_claims = applied_evidence(other_stage)
+            basis = next((v for v in [*(v for _, v in other_units), *other_claims]
+                          if not _question.search(v) and not _discussion.search(v) and not _business.search(v)), None)
+            if basis:
+                break
+        if basis:
+            result['partialScopeFoundation'] = True
+            result['foundationEvidence'] = basis[:240]
+            result.setdefault('unverifiedTargetTopics', []).append({
+                'design': '목표의 설계 단계', 'build': '목표의 구현 단계',
+                'operate': '목표의 운영 단계', 'security': '목표의 보안 검증 단계',
+            }.get(stage, '목표 학습 단계'))
     return result
 
 def hours(item: dict) -> float | None:
@@ -581,7 +677,7 @@ def learning_rows(item: dict) -> list[tuple[int, dict, str]]:
     return result
 
 def facts(item: dict, project: dict, selection: dict) -> dict:
-    from app.services.course_focus import claims, lesson_score, profile_descriptions
+    from app.services.course_focus import claims, foundation_lessons, foundation_rules, lesson_score, profile_descriptions
     rows = learning_rows(item)
     # 수집 소개문에는 전체 목차가 붙기도 한다. 섹션명·중단 단원이 소개 근거로 재진입하지 않게 한다.
     outline_lines = {line.strip() for row in (item.get('curriculum') or {}).get('items') or [] if isinstance(row, dict)
@@ -602,8 +698,10 @@ def facts(item: dict, project: dict, selection: dict) -> dict:
     for skill in selection['skills']:
         name = skill['name']
         topics = requested_topics(skill)
-        units = [row[2] for row in rows] + list(claims(descriptions)) if topics else []
-        scores = [(lesson_score(topics, title, unit), unit) for unit in units] if topics else []
+        units = [(v, normalize(row.get('section'))) for _, row, v in rows] if topics else []
+        if topics:
+            units.extend((v, '') for v in claims(descriptions))
+        scores = [(lesson_score(topics, title, unit, section), unit) for unit, section in units]
         focus_scores[name] = max((score for score, _ in scores), default=0)
         focused[name] = {unit for score, unit in scores if score}
         if focused[name] and name in (item.get('skills') or []) and name not in supported:
@@ -615,6 +713,7 @@ def facts(item: dict, project: dict, selection: dict) -> dict:
     anchor_terms = evidence.query_terms([' '.join(anchors)])
     scope = {}
     document_gaps = set()
+    missing_document = set()
     audit_gaps = set()
     missing_audit = set()
     for skill in selection['skills']:
@@ -656,7 +755,8 @@ def facts(item: dict, project: dict, selection: dict) -> dict:
                                      for _, row, value in rows)
                                  or any(_rag_retrieval_practice.search(line) and not _media_search.search(line)
                                         for line in descriptions)))
-            scope[skill['name']] &= bool(explicit or transferable)
+            if not explicit and not transferable:
+                missing_document.add(skill['name'])
             if transferable:
                 document_gaps.add(skill['name'])
         for _, skill_pattern, request, proof in _scope_topics:
@@ -674,20 +774,45 @@ def facts(item: dict, project: dict, selection: dict) -> dict:
             scope[skill['name']] &= not (_windows.search(title) and not _linux.search(title))
     # 다른 범위 검사까지 실패한 강좌는 접근 로그 차시만 미확인인 보충 후보에 넣지 않는다.
     audit_only_gaps = {name for name in missing_audit if scope[name]}
-    for name in missing_audit:
+    # 문서 입력을 확인하지 못해도 목표의 다른 과업을 실제로 가르치면 부족한 자리만 보충한다.
+    # 기술·플랫폼 등 다른 범위 검사까지 실패한 자료는 보충하지 않는다.
+    partial_gaps = {name for name in missing_document if scope[name] and focused[name]}
+    for name in missing_audit | missing_document:
         scope[name] = False
     discussion_context = bool(_discussion.search(normalize(item.get('title')) + '\n' + '\n'.join(descriptions)))
     profiles = {skill['name']: _profile(skill, project, rows, profile_descriptions(descriptions, focused[skill['name']]), text,
                                        skill['name'] in supported, scope[skill['name']], terms=terms[skill['name']],
                                        discussion_context=discussion_context, focused_units=focused[skill['name']],
                                        audit_only_gap=skill['name'] in audit_only_gaps) for skill in selection['skills']}
-    for name in document_gaps:
+    for name in partial_gaps:
+        if profiles[name]['evidenceLevel'] in ('conceptual', 'applied'):
+            profiles[name]['partialScopeFoundation'] = True
+    for name in document_gaps | missing_document:
         profiles[name]['unverifiedTargetTopics'] = [*target_gaps({'suitability': profiles}, name), '문서 입력·전처리']
     for name in audit_gaps:
         profiles[name].setdefault('unverifiedTargetTopics', []).append('접근 거절 사례 판별')
     for name in missing_audit:
         profiles[name].setdefault('unverifiedTargetTopics', []).append('접근 로그 분석')
+    for skill in selection['skills']:
+        name = skill['name']
+        rules = foundation_rules(name, skill.get('stageApplication') or skill.get('application') or '')
+        if (not rules or name not in (item.get('skills') or ()) or not scope[name] or focus_scores[name]
+                or not requested_topics(skill) or profiles[name]['conflictingStack']):
+            continue
+        lessons = [v for _, row, v in rows if not _discussion.search(normalize(row.get('section')))]
+        lessons.extend(claims(descriptions))
+        lessons = [v for v in lessons if not _question.search(v) and not _discussion.search(v)]
+        for unit, gap in foundation_lessons(rules, lessons, title):
+            _, missing, conflicts = _stack_evidence(text, [unit], project, skill, _stage(project, skill))
+            if not missing and not conflicts:
+                if name not in supported:
+                    supported.append(name)
+                profiles[name].update(topicFoundation=True, partialScopeFoundation=True, missingStack=[],
+                                      foundationEvidence=unit[:240])
+                profiles[name].setdefault('unverifiedTargetTopics', []).append(gap)
+                break
     return {'rows': rows, 'descriptions': descriptions, 'title': title, 'supported': supported,
+            'registeredSkills': tuple(item.get('skills') or ()),
             'focusScores': focus_scores, 'focusedUnits': focused,
             'scopeEvidence': scope, 'suitability': profiles, 'topicHits': hits,
             'topicCoverage': hits / len(topics) if topics else 1,
@@ -731,6 +856,9 @@ def outline(item: dict, project: dict, selection: dict, skill: dict, course=None
     terms = _course_terms(skill, info['title'])
     challenge = (course.get('id') if isinstance(course, dict) else course) == 'A3'
     profile = (info.get('suitability') or {}).get(skill['name']) or {}
+    basis = info.get('relatedEvidence', {}).get(skill['name']) or profile.get('foundationEvidence')
+    def is_basis(row):
+        return bool(basis and row[2].startswith(basis))
     stage_units = set(profile.get('unitIndices') or []) if profile.get('requiredStage') != 'conceptual' else set()
     dbt_targets = _dbt_targets(skill)
     facets = {index: _dbt_facets(row, text, dbt_targets) for index, row, text in info['rows']} if dbt_targets else {}
@@ -740,11 +868,11 @@ def outline(item: dict, project: dict, selection: dict, skill: dict, course=None
         focused, tagged = evidence.matches(text, local), evidence.matches(text, terms)
         targeted = facets.get(row[0], set())
         direct = text in info.get('focusedUnits', {}).get(skill['name'], ())
-        related = direct or focused or tagged or targeted or evidence.matches(text, topic) or row[0] in stage_units
+        related = direct or focused or tagged or targeted or evidence.matches(text, topic) or row[0] in stage_units or is_basis(row)
         depth = len(_depth.findall(text)) if challenge and (focused or tagged) and _depth_evidence(text) else 0
         return (4 * min(focused, 4) + 2 * min(tagged, 2) + min(evidence.matches(text, topic), 3)
                 + 3 * min(depth, 2) + 4 * (row[0] in stage_units) + 6 * len(targeted)
-                + 3 * bool(targeted and not _concept.search(text)) + 4 * direct) if related else 0
+                + 3 * bool(targeted and not _concept.search(text)) + 4 * direct + int(is_basis(row))) if related else 0
 
     remaining = [row for row in info['rows'] if score(row) > 0]
     ordered, covered, covered_facets = [], set(), set()
@@ -752,9 +880,9 @@ def outline(item: dict, project: dict, selection: dict, skill: dict, course=None
     from app.services.course_focus import lesson_score
     task = _task_topics(skill)
     def task_score(row):
-        return lesson_score(task, info['title'], row[2]) if task else 0
+        return lesson_score(task, info['title'], row[2], normalize(row[1].get('section'))) if task else 0
     task_rows = [row for row in remaining if task_score(row)]
-    grounded = task_rows or [row for row in remaining if row[0] in stage_units]
+    grounded = [row for row in remaining if is_basis(row)] or task_rows or [row for row in remaining if row[0] in stage_units]
     if grounded:
         chosen = max(grounded, key=lambda row: (task_score(row), score(row), -row[0]))
         ordered.append(chosen)
@@ -785,14 +913,18 @@ def description_excerpt(info: dict, project: dict, skill: dict, course=None) -> 
     """순위에 사용한 학습 소개를 모델에 발췌한다. 선수지식·목차 복제본은 제외한다."""
     local = focus_terms({}, skill) or focus_terms(project, skill)
     terms = _course_terms(skill, info['title'])
-    applied = set(info['suitability'][skill['name']]['appliedDescription'])
+    profile = info['suitability'][skill['name']]
+    applied = set(profile['appliedDescription'])
+    basis = info.get('relatedEvidence', {}).get(skill['name']) or profile.get('foundationEvidence')
     challenge = (course.get('id') if isinstance(course, dict) else course) == 'A3'
     async_target = bool(re.search(_async_io, _skill_context(skill), re.I))
     dbt_targets = _dbt_targets(skill)
     from app.services.course_focus import lesson_score, profile_descriptions
     task = _task_topics(skill)
-    descriptions = profile_descriptions(info['descriptions'], info['focusedUnits'][skill['name']])
+    focused_units = info['focusedUnits'][skill['name']]
+    descriptions = profile_descriptions(info['descriptions'], focused_units)
     lines = sorted(dict.fromkeys(descriptions), key=lambda line: (
+        not (basis and basis in line.casefold()),
         -len(_dbt_facets({}, line, dbt_targets)),
         -lesson_score(task, info['title'], line.casefold()) if task else 0,
         -bool(async_target and _async_context.search(line)),
@@ -819,24 +951,25 @@ def _rank_signals(info: dict, project: dict, skill: dict, challenge: bool) -> tu
     return focus, depth, title
 
 
+def course_rank_key(info: dict, project: dict, skill: dict, source: dict, challenge: bool) -> tuple:
+    """검토 20개와 최종 6개에 동일한 과업·심화 근거를 우선한다."""
+    focus, depth, title = _rank_signals(info, project, skill, challenge)
+    band = course_levels.preference(source, 'A3') if challenge else 0
+    practice = focus_priority(info, skill['name'])
+    evidence_key = (not bool(practice), not suitable(info, skill['name']), -depth, -practice,
+                    *suitability_key(info, skill['name']), len(target_gaps(info, skill['name'])), -focus, band)
+    return evidence_key, -title
+
+
 def rank_applicable(rows: list[dict], project: dict, selection: dict, skill: dict, course,
                     *, limit: int, sources: dict, cache: dict) -> list[dict]:
     """단계·스택·범위 다음으로 단원/소개 근거와 벡터 순위를 비교한다."""
     challenge = (course.get('id') if isinstance(course, dict) else course) == 'A3'
-
     def key(row):
-        if row['id'] not in cache:
-            cache[row['id']] = facts(sources.get(row['id'], row), project, selection)
         info = cache[row['id']]
-        focus, depth, title = _rank_signals(info, project, skill, challenge)
-        band = course_levels.preference(sources.get(row['id'], row), 'A3') if challenge else 0
-        practice = focus_priority(info, skill['name'])
-        # 같은 목표 실습을 다루면 Challenge에서는 키워드 일치 횟수보다 심화 차시와 수준을 앞세운다.
-        return (band, not bool(practice), not suitable(info, skill['name']), -depth, -practice, *suitability_key(info, skill['name']),
-                len(target_gaps(info, skill['name'])), -focus,
-                -float(row.get('retrievalScore') or 0), -title, row['id'])
+        priority, title = course_rank_key(info, project, skill, sources.get(row['id'], row), challenge)
+        return priority, -float(row.get('retrievalScore') or 0), title, row['id']
 
-    from app.services.course_focus import distinct_courses
     track = (course.get('id') if isinstance(course, dict) else course)
     eligible = []
     for row in rows:
@@ -845,6 +978,5 @@ def rank_applicable(rows: list[dict], project: dict, selection: dict, skill: dic
             continue
         if row['id'] not in cache:
             cache[row['id']] = facts(sources.get(row['id'], row), project, selection)
-        if course_applicable(cache[row['id']], skill, allow_audit_gap=True):
-            eligible.append(row)
-    return distinct_courses(sorted(eligible, key=key))[:limit]
+        eligible.append(row)
+    return select_course_candidates(sorted(eligible, key=key), cache, skill, limit)

@@ -5,7 +5,7 @@ import math
 from app import course_levels
 from app.services.course_focus import distinct_courses
 from copy import deepcopy
-from app.services.resource_evidence import course_applicable, facts, focus_priority, hours, suitable, suitability_key, target_gaps
+from app.services.resource_evidence import course_applicable, facts, focus_priority, hours, select_course_candidates, suitable, suitability_key, target_gaps
 
 VERSION = 'crash-short-courses/v15-preserve-valid-model-choices'
 
@@ -65,7 +65,7 @@ def shortest_bundle(pools: list[dict], project: dict, selection: dict, cache: di
             rid = row['id']
             if rid not in cache:
                 cache[rid] = facts(row, project, selection)
-            if suitable(cache[rid], pool['name']):
+            if row.get('candidateKind') != 'supplemental' and suitable(cache[rid], pool['name']):
                 applicable.append(row)
         # 명시한 세부 대상을 가장 많이 확인한 강좌만 남긴다. 더 적게 다루는 짧은 강좌로 시간을 줄이지 않는다.
         fewest = min((len(target_gaps(cache[row['id']], pool['name'])) for row in applicable), default=0)
@@ -128,6 +128,7 @@ def share_candidates(pools: list[dict], project: dict, selection: dict, sources:
                 continue
             card = deepcopy(row)
             card.pop('retrievalScore', None)
+            card.pop('candidateKind', None)
             card.update(sharedCandidate=True, sourceSkill=origin)
             shared.append(card)
         result.append({**pool, 'courses': shared})
@@ -141,6 +142,8 @@ def share_candidates(pools: list[dict], project: dict, selection: dict, sources:
                 and suitable(cache[rows[0]['id']], pool['name'])
                 and focus_priority(cache[rows[0]['id']], pool['name']) >= focus_priority(cache[ordered[0]['id']], pool['name'])):
             ordered = distinct_courses([rows[0], *ordered, *rows])
+        if any(row.get('candidateKind') for row in rows):
+            ordered = select_course_candidates(distinct_courses([*ordered, *rows]), cache, skill_specs[pool['name']], 6)
         shortlist.append({**pool, 'courses': ordered[:6]})
     return shortlist
 
@@ -155,7 +158,7 @@ def study_plan(pools: list[dict], project: dict, selection: dict, references: di
                 cache[row['id']] = facts(row, project, selection)
     aligned = align_shared_courses(pools, project, selection, cache)
     picked = [pool['courses'][0] for pool in aligned]
-    if any(not course_levels.eligible(row, 'A2') or not suitable(cache[row['id']], pool['name'])
+    if any(row.get('candidateKind') == 'supplemental' or not course_levels.eligible(row, 'A2') or not suitable(cache[row['id']], pool['name'])
            for pool, row in zip(aligned, picked)):
         return None
     unique = {row['id']: row for row in picked}

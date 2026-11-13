@@ -323,7 +323,7 @@ def install(conn, courses: list[dict], *, apply: bool = False, refresh: bool = F
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--database', required=True)
-    parser.add_argument('--package', action='append', type=Path, help='지정하면 기본 목록 대신 사용. 추가분은 기본 3개와 함께 반복 지정')
+    parser.add_argument('--package', action='append', type=Path, help='지정하면 기본 목록 대신 사용. 여러 패키지는 이 옵션을 반복 지정')
     parser.add_argument('--apply', action='store_true')
     parser.add_argument('--refresh', action='store_true', help='검토한 패키지로 소유 필드·스킬 연결 갱신. 기존 난이도는 보존')
     parser.add_argument('--vector-cache', type=Path)

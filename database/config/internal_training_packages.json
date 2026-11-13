@@ -3,6 +3,9 @@
   "packages": [
     "internal_training_pilot.json",
     "internal_training_expansion.json",
-    "free_course_supply_147.json"
+    "free_course_supply_147.json",
+    "challenge_drf_supply_249.json",
+    "resource_practice_supply_249.json",
+    "course_practice_coverage_249.json"
   ]
 }
