@@ -75,68 +75,73 @@ const repWait = new Set<string>();
 export async function waitReport(go: ReturnType<typeof useGo>, pid: string, jobId: string): Promise<void> {
   if (repWait.has(jobId)) return;
   repWait.add(jobId);
-  let out: { reportId?: string } | null = null;
+  const employeeId = me()?.id;
   try {
-    out = await waitJob<{ reportId?: string }>(jobId);
-  } catch {
-    /* 실패 원인은 서버(post.fail)에 남아 있다 */
-  }
-  repWait.delete(jobId);
-  if (!me()) return;
-  const here = () => typeof window !== 'undefined' && window.location.pathname === paths.post(pid);
-  if (out && out.reportId) {
-    const reportId = out.reportId;
+    let out: { reportId?: string } | null = null;
     try {
-      if (!await reloadWorkspace()) return;
-    } catch (error) {
-      failToast(error, '보고서는 저장됐어요. 보고서 화면에서 다시 불러와 주세요.');
+      out = await waitJob<{ reportId?: string }>(jobId);
+    } catch {
+      /* 실패 원인은 서버(post.fail)에 남아 있다 */
+    }
+
+    if (!employeeId || me()?.id !== employeeId) return;
+    const here = () => typeof window !== 'undefined' && window.location.pathname === paths.post(pid);
+    if (out && out.reportId) {
+      const reportId = out.reportId;
+      try {
+        if (!await reloadWorkspace()) return;
+      } catch (error) {
+        failToast(error, '보고서는 저장됐어요. 보고서 화면에서 다시 불러와 주세요.');
+        if (here()) {
+          updateWs((s) => { if (s.plans[pid]) { s.plans[pid].post.running = false; s.plans[pid].post.reportId = reportId; } });
+          toast('결과 보고서 작성이 완료되었어요');
+          go(paths.report(reportId));
+        }
+        return;
+      }
       if (here()) {
         updateWs((s) => { if (s.plans[pid]) { s.plans[pid].post.running = false; s.plans[pid].post.reportId = reportId; } });
         toast('결과 보고서 작성이 완료되었어요');
         go(paths.report(reportId));
-      }
-      return;
-    }
-    if (here()) {
-      updateWs((s) => { if (s.plans[pid]) { s.plans[pid].post.running = false; s.plans[pid].post.reportId = reportId; } });
-      toast('결과 보고서 작성이 완료되었어요');
-      go(paths.report(reportId));
-    } else {
-      updateWs((s) => {
-        if (s.plans[pid]) {
-          s.plans[pid].post.running = false;
-          s.plans[pid].post.reportId = reportId;
-        }
-      });
-      toast('결과 보고서가 나왔어요 · 점검·보고서에서 볼 수 있어요');
-    }
-  } else {
-    const updated = await pullPlan(pid);
-    if (updated?.status === 'done' && !updated.post.running) {
-      try {
-        if (!await reloadWorkspace()) return;
-      } catch {
-        return;
-      }
-      const repId = planReports(ws(), updated)[0]?.id;
-      if (repId && here()) {
-        updateWs((s) => { if (s.plans[pid]) { s.plans[pid].post.running = false; s.plans[pid].post.reportId = repId; } });
-        toast('결과 보고서 작성이 완료되었어요');
-        go(paths.report(repId));
-      } else if (repId) {
-        updateWs((s) => { if (s.plans[pid]) { s.plans[pid].post.running = false; s.plans[pid].post.reportId = repId; } });
+      } else {
+        updateWs((s) => {
+          if (s.plans[pid]) {
+            s.plans[pid].post.running = false;
+            s.plans[pid].post.reportId = reportId;
+          }
+        });
         toast('결과 보고서가 나왔어요 · 점검·보고서에서 볼 수 있어요');
-      } else if (here()) {
-        updateWs((s) => { if (s.plans[pid]) s.plans[pid].post.running = false; });
-        toast('결과 보고서 저장이 완료되었어요');
-        go(paths.roadmap(pid));
       }
-    } else if (!updated && here()) {
-      updateWs((s) => {
-        if (s.plans[pid]) s.plans[pid].post.running = false;
-      });
-      toast('네트워크 상태를 확인한 후 다시 시도해 주세요.');
+    } else {
+      let updated = await pullPlan(pid);
+      while (!updated || updated.post.running) {
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+        if (me()?.id !== employeeId || ws().plans[pid]?.post.jobId !== jobId) return;
+        updated = await pullPlan(pid);
+      }
+      if (updated?.status === 'done' && !updated.post.running) {
+        try {
+          if (!await reloadWorkspace()) return;
+        } catch {
+          return;
+        }
+        const repId = planReports(ws(), updated)[0]?.id;
+        if (repId && here()) {
+          updateWs((s) => { if (s.plans[pid]) { s.plans[pid].post.running = false; s.plans[pid].post.reportId = repId; } });
+          toast('결과 보고서 작성이 완료되었어요');
+          go(paths.report(repId));
+        } else if (repId) {
+          updateWs((s) => { if (s.plans[pid]) { s.plans[pid].post.running = false; s.plans[pid].post.reportId = repId; } });
+          toast('결과 보고서가 나왔어요 · 점검·보고서에서 볼 수 있어요');
+        } else if (here()) {
+          updateWs((s) => { if (s.plans[pid]) s.plans[pid].post.running = false; });
+          toast('결과 보고서 저장이 완료되었어요');
+          go(paths.roadmap(pid));
+        }
+      }
     }
+  } finally {
+    repWait.delete(jobId);
   }
 }
 

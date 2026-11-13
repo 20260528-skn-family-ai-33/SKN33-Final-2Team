@@ -126,7 +126,7 @@ def rebuild_revision(option, plan, handoff):
                     activity.get('res') == d.get('res') or activity.get('key') == d.get('id')
                     for d in skill_done_courses
                 )
-                if not is_existing_done:
+                if not old and not is_existing_done:
                     continue
             if resource.get('type') in ('course', 'book') and activity['stage'] >= handoff.get('startStage', plan['start']):
                 resources[activity['skill']][resource['id']] = deepcopy(resource)
@@ -149,7 +149,7 @@ def rebuild_revision(option, plan, handoff):
                 if done_id not in done_course_seen_ids:
                     done_course_seen_ids.add(done_id)
                     deduped_kept.append(activity)
-            continue
+                continue
         deduped_kept.append(activity)
     option['acts'] = deduped_kept
     weekly = (handoff.get('prefs') or {}).get('weeklyHours') or option.get('weeklyHours') or plan['hours']

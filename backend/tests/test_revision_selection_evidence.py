@@ -28,6 +28,7 @@ class RevisionSelectionEvidenceTests(TestCase):
         revision = {'to': to, 'label': 'Revision', 'prefsTo': {}, 'handoff': {}}
         row = {'roadmap_id': 'roadmap', 'content': current}
         tx = Mock()
+        tx.all.return_value = []
         tx.one.side_effect = [{'status': 'ready', 'result': revision}, {'baseline_content': baseline}]
         original = deepcopy((baseline, current, revision))
         with patch.object(plans, '_owned', return_value=row), \
