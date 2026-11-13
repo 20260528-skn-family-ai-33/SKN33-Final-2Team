@@ -105,7 +105,7 @@ export async function waitReport(go: ReturnType<typeof useGo>, pid: string, jobI
       updateWs((s) => {
         if (s.plans[pid]) {
           s.plans[pid].post.running = false;
-          if (s.plans[pid].post.reportId) s.plans[pid].post.reportId = null;
+          s.plans[pid].post.reportId = reportId;
         }
       });
       toast('결과 보고서가 나왔어요 · 점검·보고서에서 볼 수 있어요');
@@ -124,7 +124,7 @@ export async function waitReport(go: ReturnType<typeof useGo>, pid: string, jobI
         toast('결과 보고서 작성이 완료되었어요');
         go(paths.report(repId));
       } else if (repId) {
-        updateWs((s) => { if (s.plans[pid]) s.plans[pid].post.running = false; });
+        updateWs((s) => { if (s.plans[pid]) { s.plans[pid].post.running = false; s.plans[pid].post.reportId = repId; } });
         toast('결과 보고서가 나왔어요 · 점검·보고서에서 볼 수 있어요');
       } else if (here()) {
         updateWs((s) => { if (s.plans[pid]) s.plans[pid].post.running = false; });

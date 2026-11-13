@@ -182,7 +182,30 @@ describe("결과 보고서 작성 완료 후 알림 및 라우팅", () => {
       "결과 보고서가 나왔어요 · 점검·보고서에서 볼 수 있어요",
     );
     expect(go).not.toHaveBeenCalled();
+    expect(wsMod.ws().plans.p1.post.reportId).toBe("rep-123");
     vi.unstubAllGlobals();
+  });
+
+  it("restores the report link from the server after missing the completion response", async () => {
+    vi.stubGlobal("window", { location: { pathname: "/" } });
+    try {
+      const plan = wsMod.ws().plans.p1;
+      api.waitJob.mockRejectedValueOnce(new Error("connection lost"));
+      api.pullPlan.mockResolvedValueOnce({ ...plan, status: "done" } as never);
+      api.reloadWorkspace.mockImplementationOnce(async () => {
+        wsMod.updateWs((state) => {
+          state.reports = [{ id: "rep-recovered", planId: "p1" }] as typeof state.reports;
+        });
+        return true;
+      });
+
+      await act.waitReport(go as never, "p1", "job-recovered");
+
+      expect(wsMod.ws().plans.p1.post.reportId).toBe("rep-recovered");
+      expect(go).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("보고서 생성 요청 API가 실패하면 에러 알림을 띄우고 입력 상태를 보존한다", async () => {
