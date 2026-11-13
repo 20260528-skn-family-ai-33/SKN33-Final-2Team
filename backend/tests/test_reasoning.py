@@ -54,7 +54,7 @@ class OllamaThinkTest(unittest.TestCase):
             self.assertIs(self.think(), False)
 
     def test_ping_does_not_ask_reasoning_levels(self):
-        def fake(path, payload, timeout=None):
+        def fake(path, payload, timeout=None, *, connection=None):
             self.shows += path == 'api/show'
             return {'api/version': {'version': '0.40'}, 'api/tags': {'models': [{'name': 'growpath-27b'}]},
                     'api/ps': {'models': []}}.get(path, {})
