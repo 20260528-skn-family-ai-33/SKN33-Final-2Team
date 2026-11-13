@@ -148,6 +148,8 @@ def _read_activities(acts, choices, source, *, requested_skills=None):
                 rid = aliases[0]
                 if not isinstance(rid, str) or not rid or any(value != rid for value in aliases):
                     raise ApiError(422, 'ACTIVITIES_INVALID', '활동의 자료 ID를 확인하지 못했어요.')
+        if source == 'ollama' and isinstance(rid, dict):
+            rid = rid.get('id', rid)
         if rid is not None and not isinstance(rid, str):
             raise ApiError(422, 'ACTIVITIES_INVALID', '활동의 자료 ID를 확인하지 못했어요.')
         skill = row.get('skill')
@@ -187,7 +189,28 @@ def _read_activities(acts, choices, source, *, requested_skills=None):
 def _parse_proposal(raw, choices, source):
     answer = _answer(raw)
     summaries = validate_summaries(answer.get('skillSummaries'), choices, normalize=source == 'ollama')
-    tasks, materials = _read_activities(answer.get('acts'), choices, source)
+    rows = answer.get('acts')
+    if source != 'ollama' or not isinstance(rows, list):
+        tasks, materials = _read_activities(rows, choices, source)
+        return summaries, tasks, materials
+
+    # Keep valid tasks when another skill returns a malformed activity.
+    task_rows = [
+        row for row in rows if isinstance(row, dict) and isinstance(row.get('skill'), str) and row['skill'] in choices
+        and 'res' in row and row['res'] is None
+    ]
+    other_rows = [row for row in rows if not any(row is task for task in task_rows)]
+    tasks, materials = _read_activities(other_rows, choices, source)
+    duplicates = set()
+    for row in task_rows:
+        try:
+            parsed_tasks, _ = _read_activities([row], choices, source)
+        except ApiError:
+            continue
+        duplicates.update(tasks.keys() & parsed_tasks.keys())
+        tasks.update(parsed_tasks)
+    for skill in duplicates:
+        tasks.pop(skill)
     return summaries, tasks, materials
 
 
@@ -216,7 +239,12 @@ def propose(saved, draft, generate, source, *, previous=None):
         if previous:
             retry_payload['previousProposals'] = [{'acts': [a for a in row['option']['acts'] if a.get('skill') in missing]}
                                                   for row in previous]
-        repair_system = system + '\n[누락 과제 보완] skillOrder에 지정한 스킬의 과제를 하나씩 acts에 반환한다. 기존 역량 요약은 다시 작성할 필요가 없다.'
+        repair_system = (
+            '[누락 과제 보완] project 목표와 choices·materials의 선택 자료를 근거로 과제 작성. '
+            'skillOrder의 각 스킬에 과제 정확히 하나. 자료 활동·역량 요약 제외. '
+            '이전 과제와 다른 제안. JSON: {"acts":[{"skill":"정확한 스킬명","stage":2,'
+            '"title":"과제 제목","res":null,"hours":2,"how":"만들 것·필수 항목·제출물·평가 기준"}]}'
+        ) if source == 'ollama' else system + '\n[누락 과제 보완] skillOrder에 지정한 스킬의 과제를 하나씩 acts에 반환한다. 기존 역량 요약은 다시 작성할 필요가 없다.'
         repair = _answer(generate(repair_system, retry_payload))
         try:
             additional, _ = _read_activities(repair.get('acts'), choices, source, requested_skills=missing)
