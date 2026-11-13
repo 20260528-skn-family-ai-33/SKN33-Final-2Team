@@ -30,7 +30,7 @@ class RegulationFollowUpTest(unittest.TestCase):
         data = {'regs': {item['key']: item for item in regs}, 'arts': self.articles,
                 'sets': {'일반직': {'regs': regs}}}
         for target, name, value in [(reg.regstore, 'data', data), (reg.llm, 'available', True),
-                                    (reg.question_classifier, 'classify', {'label': '사내 규정'})]:
+                                    (reg.question_classifier, 'classify', {'label': '사내 규정', 'confidence': 0.9})]:
             mock = patch.object(target, name, return_value=value)
             setattr(self, name, mock.start())
             self.addCleanup(mock.stop)
@@ -42,13 +42,15 @@ class RegulationFollowUpTest(unittest.TestCase):
                                'basis': ['edu-7'], 'apply': '이전 적용 안내', 'more': ['이전 추가 안내'],
                                'missing': ['이전 미등록 기준']}}]
 
-    def ask(self, question, history=None, status='found', source_ids=None, summary='교육 신청은 교육포털에서 해요.'):
+    def ask(self, question, history=None, status='found', source_ids=None, summary='교육 신청은 교육포털에서 해요.',
+            reclassified_label=None):
         inp = {'question': question, 'me': self.ctx.me, 'context': {},
                'history': self.history if history is None else history}
         response = {'status': status, 'summary': summary,
                     'sourceIds': source_ids if source_ids is not None else
                                  ['S001'] if status in ('found', 'partial') else []}
-        with patch.object(rt, 'llm_json', return_value=response) as model:
+        responses = [response] if reclassified_label is None else [{'label': reclassified_label}, response]
+        with patch.object(rt, 'llm_json', side_effect=responses) as model:
             result = reg._api(self.ctx, inp)
         return result, model, inp
 
@@ -58,6 +60,66 @@ class RegulationFollowUpTest(unittest.TestCase):
             {'role': 'assistant', 'content': self.history[0]['a']['summary']},
         ])
 
+    def test_high_confidence_including_threshold_skips_reclassification(self):
+        for confidence in (0.8, 0.9):
+            with self.subTest(confidence=confidence):
+                self.classify.return_value = {'label': '사내 규정', 'confidence': confidence}
+                result, model, _ = self.ask('그럼 제9조는?')
+                self.assertEqual(result['basis'], ['edu-9'])
+                model.assert_called_once()
+                self.assertEqual(model.call_args.args[2]['topic'], 'regulation')
+
+    def test_low_or_missing_confidence_reclassifies_before_grounded_follow_up(self):
+        for provider in ('ollama', 'openai'):
+            for confidence in ({'confidence': 0.79}, {'confidence': 0.0}, {'confidence': None}, {}):
+                with self.subTest(provider=provider, confidence=confidence):
+                    self.ctx.provider = provider
+                    self.classify.return_value = {'label': '사내 규정', **confidence}
+                    result, model, inp = self.ask('그럼 제9조는?', reclassified_label='사내 규정')
+                    self.assertEqual(model.call_count, 2)
+                    classify_call, answer_call = model.call_args_list
+                    self.assertEqual(classify_call.args[2], {'question': '그럼 제9조는?'})
+                    self.assertEqual(classify_call.kwargs['role'], 'regulation')
+                    self.assertEqual(classify_call.kwargs['temperature'], 0 if provider == 'ollama' else None)
+                    self.assertEqual(classify_call.kwargs['history'], answer_call.kwargs['history'])
+                    self.assert_summary_history(model)
+                    self.assertEqual(answer_call.args[2]['requested']['where'], '제9조')
+                    self.assertEqual(answer_call.args[2]['sources'][0]['id'], 'S001')
+                    self.assertEqual(result['basis'], ['edu-9'])
+                    self.assertEqual(result['retrieved'], ['edu-9', 'work-2', 'edu-7'])
+                    self.assertTrue(inp['_classification']['usedHistory'])
+
+    def test_reclassified_outside_follow_up_skips_search_and_answer_generation(self):
+        self.classify.return_value = {'label': '사내 규정', 'confidence': 0.79}
+        result, model, _ = self.ask('그 내용을 더 설명해 주세요', reclassified_label='범위 밖')
+        self.assertEqual(result['kind'], 'out')
+        model.assert_called_once()
+        self.assert_summary_history(model)
+        self.search.assert_not_called()
+
+    def test_invalid_reclassification_stops_before_search(self):
+        self.classify.return_value = {'label': '사내 규정'}
+        with patch.object(rt, 'llm_json', return_value={'label': 'unknown'}) as model:
+            with self.assertRaisesRegex(LlmError, '재분류 라벨 형식 오류'):
+                reg._api(self.ctx, {'question': '그럼 제9조는?', 'me': self.ctx.me,
+                                    'history': self.history, 'context': {}})
+        model.assert_called_once()
+        self.search.assert_not_called()
+
+    def test_reclassification_transport_failure_stops_before_search(self):
+        self.classify.return_value = {'label': '사내 규정', 'confidence': 0.79}
+        with patch.object(rt, 'llm_json', side_effect=LlmError('재분류 연결 실패')) as model:
+            with self.assertRaisesRegex(LlmError, '재분류 연결 실패'):
+                reg._api(self.ctx, {'question': '그럼 제9조는?', 'me': self.ctx.me,
+                                    'history': self.history, 'context': {}})
+        model.assert_called_once()
+        self.search.assert_not_called()
+
+    def test_reclassified_follow_up_still_rejects_real_citation_id(self):
+        self.classify.return_value = {'label': '사내 규정', 'confidence': 0.79}
+        with self.assertRaisesRegex(LlmError, '출처'):
+            self.ask('그럼 제9조는?', reclassified_label='사내 규정', source_ids=['edu-7'])
+
     def test_article_follow_up_prioritizes_requested_article_and_keeps_summary(self):
         for question in ('그 규정 제9조 내용을 알려줘', '그럼 제9조는?', '제9조는요?',
                          '앞에서 설명한 규정의 제9조 내용을 자세히 알려 주세요'):
@@ -66,7 +128,7 @@ class RegulationFollowUpTest(unittest.TestCase):
                 self.history[0]['a'] = first
                 result, model, _ = self.ask(question)
                 self.assertEqual(result['basis'], ['edu-9'])
-                self.assertEqual(result['retrieved'], ['edu-9', 'edu-7', 'work-2'])
+                self.assertEqual(result['retrieved'], ['edu-9', 'work-2', 'edu-7'])
                 payload = model.call_args.args[2]
                 self.assertEqual(payload['requested']['where'], '제9조')
                 self.assertEqual(payload['sources'][0]['regulation'], '인재개발규정')
@@ -89,7 +151,7 @@ class RegulationFollowUpTest(unittest.TestCase):
             'status': 'partial', 'summary': '지급기준은 따로 확인해야 해요.', 'sourceIds': ['S003'],
         }) as model):
             answer = reg.answer(self.ctx, '교육비 지원 신청 조건이 궁금해요', [], {}, documents_only=True)
-        self.assertEqual(answer['retrieved'], ['edu-24-5', 'edu-9', 'edu-24-1', 'edu-24-4'])
+        self.assertEqual(answer['retrieved'], ['edu-24-5', 'edu-9', 'edu-24-1'])
         self.assertEqual(answer['basis'], ['edu-24-1'])
         self.assertEqual(answer['evidenceStatus'], 'partial')
         self.assertEqual(model.call_args.args[2]['sources'][2]['no'], '제24조 제1항')
@@ -192,7 +254,7 @@ class RegulationFollowUpTest(unittest.TestCase):
                 self.assertEqual(model.call_args.kwargs['history'], [])
 
     def test_outside_classification_with_history_skips_search_and_llm(self):
-        self.classify.return_value = {'label': '범위 밖'}
+        self.classify.return_value = {'label': '범위 밖', 'confidence': 0.9}
         result, model, inp = self.ask('그럼 오늘 날씨는 어때?')
         self.assertEqual(result['kind'], 'out')
         self.assertFalse(inp['_classification']['usedHistory'])
@@ -208,7 +270,7 @@ class RegulationFollowUpTest(unittest.TestCase):
         ]
         for label, search_name, previous_question, summary, question, is_virtual in cases:
             with self.subTest(label=label):
-                self.classify.return_value = {'label': label}
+                self.classify.return_value = {'label': label, 'confidence': 0.9}
                 history = [{'q': previous_question, 'a': {'summary': summary}}]
                 hit = {'chunk_id': 'doc-1', 'document_id': 'doc', 'document_title': label,
                        'category': label, 'is_virtual': is_virtual, 'chunk_text': summary,
@@ -222,7 +284,7 @@ class RegulationFollowUpTest(unittest.TestCase):
                 self.search.assert_not_called()
 
     def test_contextual_outside_follow_up_uses_summary_only_for_classification(self):
-        self.classify.return_value = {'label': '범위 밖'}
+        self.classify.return_value = {'label': '범위 밖', 'confidence': 0.9}
         result, model, inp = self.ask('그 내용을 더 설명해 주세요')
         self.assertEqual(result['kind'], 'out')
         self.assertTrue(inp['_classification']['usedHistory'])
@@ -231,14 +293,14 @@ class RegulationFollowUpTest(unittest.TestCase):
         model.assert_not_called()
 
     def test_company_without_hits_keeps_summary_and_empty_sources(self):
-        self.classify.return_value = {'label': '수자원공사 정보'}
+        self.classify.return_value = {'label': '수자원공사 정보', 'confidence': 0.9}
         with patch.object(reg.knowledge, 'search_company', return_value=[]):
             _, model, _ = self.ask('그 내용을 더 설명해 주세요', status='not_found')
         self.assert_summary_history(model)
         self.assertEqual(model.call_args.args[2]['sources'], [])
 
     def test_life_menu_answer_can_be_summarized_without_model_raw_output(self):
-        self.classify.return_value = {'label': '사내 생활안내'}
+        self.classify.return_value = {'label': '사내 생활안내', 'confidence': 0.9}
         menu = reg.D['intranet'][0]
         history = [{'q': '사내 공지사항은 어디서 볼 수 있나요?',
                     'a': {'summary': '', 'intranet': [menu['id']]}}]
@@ -316,6 +378,49 @@ class RegulationFollowUpTest(unittest.TestCase):
     def test_old_real_citation_id_is_still_rejected(self):
         with self.assertRaisesRegex(LlmError, '출처'):
             self.ask('그럼 제9조는?', source_ids=['edu-7'])
+
+    def test_new_topic_does_not_inherit_group_from_previous_question(self):
+        history = [{'q': '실무직 교육비 지원 기준은?', 'a': {'summary': '실무직 기준 안내', 'basis': ['edu-7']}}]
+        classified = reg.classify_question_roberta('다른 질문인데 연차휴가는 며칠인가요?', history, me={'empGroup': '일반직'})
+        self.assertEqual(classified['group'], '일반직')
+        self.assertFalse(classified['detectedFromQuestion'])
+        self.assertEqual(classified['follow_history'], [])
+
+    def test_follow_up_inherits_group_from_previous_question(self):
+        history = [{'q': '실무직 교육비 지원 기준은?', 'a': {'summary': '실무직 기준 안내', 'basis': ['edu-7']}}]
+        classified = reg.classify_question_roberta('그럼 지원 한도는 얼마야?', history, me={'empGroup': '일반직'})
+        self.assertEqual(classified['group'], '실무직')
+        self.assertTrue(classified['detectedFromQuestion'])
+        self.assertEqual(len(classified['follow_history']), 1)
+
+    def test_pipeline_passes_selected_group_to_search_without_mutating_login_profile(self):
+        history = [{'q': '실무직 교육비 지원 기준은?', 'a': {'summary': '실무직 기준 안내', 'basis': []}}]
+        cases = (
+            ('교육비 지원 기준은?', [], '일반직'),
+            ('실무직 교육비 지원 기준은?', [], '실무직'),
+            ('그럼 지원 한도는 얼마야?', history, '실무직'),
+            ('그럼 신청 방법은?', history + [
+                {'q': '그럼 지원 한도는 얼마야?', 'a': {'summary': '지원 한도 안내', 'basis': []}}], '실무직'),
+            ('운영직은 어떻게 돼?', history, '운영직'),
+            ('다른 질문인데 연차휴가는 며칠인가요?', history, '일반직'),
+            ('연차휴가는 며칠인가요?', history, '일반직'),
+        )
+        original_me = copy.deepcopy(self.ctx.me)
+        for question, turns, group in cases:
+            with self.subTest(question=question):
+                self.search.reset_mock()
+                self.search.return_value = []
+                self.ask(question, history=turns, status='not_found')
+                self.assertTrue(self.search.called)
+                self.assertTrue(all(call.args[2] == group for call in self.search.call_args_list))
+                self.assertEqual(self.ctx.me, original_me)
+
+    def test_pipeline_passes_normalized_login_group_to_search(self):
+        self.ctx.me = {'empGroup': ' 일반직 '}
+        _, _, inp = self.ask('교육비 지원 기준은?', history=[])
+        self.assertEqual(inp['me']['empGroup'], '일반직')
+        self.assertEqual(self.search.call_args.args[2], '일반직')
+        self.assertEqual(self.ctx.me['empGroup'], ' 일반직 ')
 
 
 if __name__ == '__main__':

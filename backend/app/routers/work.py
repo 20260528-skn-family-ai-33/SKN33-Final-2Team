@@ -419,9 +419,11 @@ def api_ask(request: Request, body: dict, a: Account = Depends(require_employee)
     if not q:
         raise ApiError(400, 'EMPTY_QUESTION', '질문을 적어 주세요')
     hist = body.get('history') or []
+    # 백엔드에서 로그인한 직원의 직군 확인
+    user_info = {'empGroup': profile.employee_group(a.id)}
 
     def work(job: jobs.JobCtx):
-        ctx = rt.context(a.id, me={'empGroup': profile.employee_group(a.id)})
+        ctx = rt.context(a.id, me=user_info)
         ans = REG.answer(ctx, q, hist, {}, sim=rt.sim_once(ctx, 'reg', q), documents_only=True)
         ids = list(ans.get('basis') or []) + list(ans.get('ref') or [])
         return {'answer': ans, 'reg': regstore.bundle(ids), 'meta': ctx.meta}
