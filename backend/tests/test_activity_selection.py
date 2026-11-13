@@ -1,6 +1,6 @@
 import unittest
 from copy import deepcopy
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from app.errors import ApiError
 from app.services.activity_selection import propose,current_record,selection_option
 
@@ -24,6 +24,28 @@ class ActivityTests(unittest.TestCase):
   with self.assertRaises(ApiError):self.propose(acts)
  def test_missing_selected_material_rejected(self):
   with self.assertRaises(ApiError):self.propose(self.acts[1:])
+ def test_ollama_recovers_material_id_alias(self):
+  acts=deepcopy(self.acts)
+  acts[0]['materialId']=acts[0].pop('res')
+  with patch('app.services.activity_selection.catalog.items',return_value={'c':{'id':'c','title':'자료','cost':0,'hours':2}}):
+   result=propose(self.saved,self.draft,lambda *_:{'acts':acts,'skillSummaries':{'S':['이해','적용','검증']}},'ollama')
+  self.assertTrue(any(act.get('res')=='c' for act in result['option']['acts']))
+
+ def test_ollama_retries_missing_material_once(self):
+  summaries={'S':['이해','적용','검증']}
+  for recover in (True,False):
+   with self.subTest(recover=recover):
+    with patch('app.services.activity_selection.catalog.items',return_value={'c':{'id':'c','title':'자료','cost':0}}), patch('app.services.activity_selection.RM.finish_option',side_effect=lambda pid,raw,source:{**raw,'acts':[dict(a,id=str(i)) for i,a in enumerate(raw['acts'])]}):
+     with patch('app.services.activity_selection.instructions',return_value='system'):
+      generate=Mock(side_effect=[{'acts':self.acts[1:],'skillSummaries':summaries},{'acts':self.acts if recover else self.acts[1:],'skillSummaries':summaries}])
+      if recover:
+       self.assertEqual(propose(self.saved,self.draft,generate,'ollama')['selectedIds'],['0','1'])
+      else:
+       with self.assertRaises(ApiError):
+        propose(self.saved,self.draft,generate,'ollama')
+      self.assertEqual(generate.call_count,2)
+      self.assertIn('검증 실패 후 재시도',generate.call_args.args[0])
+
  def test_excluded_skill_rejected(self):
   acts=deepcopy(self.acts);acts[0]['skill']='other'
   with self.assertRaises(ApiError):self.propose(acts)
