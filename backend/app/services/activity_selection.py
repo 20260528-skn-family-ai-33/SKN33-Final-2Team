@@ -124,7 +124,7 @@ def _answer(raw):
     return raw if isinstance(raw, dict) else {}
 
 
-def _read_activities(acts, choices):
+def _read_activities(acts, choices, source):
     """기존 모델의 자료 활동도 보존하되, 다른 스킬이나 미선택 자료는 거절한다."""
     tasks = {}
     materials = {}
@@ -134,6 +134,12 @@ def _read_activities(acts, choices):
         if not isinstance(row, dict):
             raise ApiError(422, 'ACTIVITIES_INVALID', '활동의 형식을 확인하지 못했어요.')
         rid = row.get('res')
+        if source == 'ollama' and 'res' not in row:
+            aliases = [row[key] for key in ('resourceId', 'materialId') if row.get(key) is not None]
+            if aliases:
+                rid = aliases[0]
+                if not isinstance(rid, str) or not rid or any(value != rid for value in aliases):
+                    raise ApiError(422, 'ACTIVITIES_INVALID', '활동의 자료 ID를 확인하지 못했어요.')
         if rid is not None and not isinstance(rid, str):
             raise ApiError(422, 'ACTIVITIES_INVALID', '활동의 자료 ID를 확인하지 못했어요.')
         skill = row.get('skill')
@@ -150,7 +156,7 @@ def _read_activities(acts, choices):
         how = str(row.get('how') or row.get('description') or row.get('content') or row.get('detail') or '').strip()
         if not isinstance(skill, str) or skill not in choices or not title or not how:
             raise ApiError(422, 'ACTIVITIES_INVALID', '활동의 역량 또는 설명이 일치하지 않아요.')
-        act = dict(row, skill=skill, title=title, how=how)
+        act = dict(row, skill=skill, title=title, how=how, res=rid)
         if not rid:
             if skill in tasks:
                 raise ApiError(422, 'ACTIVITIES_INVALID', f'「{skill}」의 산출물 과제가 여러 개예요. 하나만 필요해요.')
@@ -166,17 +172,32 @@ def _read_activities(acts, choices):
     return tasks, materials
 
 
+def _parse_proposal(raw, choices, source):
+    answer = _answer(raw)
+    summaries = validate_summaries(answer.get('skillSummaries'), choices)
+    tasks, materials = _read_activities(answer.get('acts'), choices, source)
+    return summaries, tasks, materials
+
+
 def propose(saved, draft, generate, source, *, previous=None):
     active, payload = learning_context(saved, draft)
     system = instructions(draft['chosen'])
     if previous:
         payload['previousProposals'] = [{'acts': record['option']['acts']} for record in previous]
-    raw = _answer(generate(system, payload))
-    summaries = validate_summaries(raw.get('skillSummaries'), active)
     choices = payload['choices']
-    tasks, material_acts = _read_activities(raw.get('acts'), choices)
+    retried = False
+    try:
+        summaries, tasks, material_acts = _parse_proposal(generate(system, payload), choices, source)
+    except ApiError as error:
+        if source != 'ollama' or error.code != 'ACTIVITIES_INVALID':
+            raise
+        retried = True
+        retry_system = (f'{system}\n[검증 실패 후 재시도] {error.message} '
+                        'skillOrder의 각 스킬에 res=null인 산출물 과제 하나와 역량 요약 3개를 담은 전체 JSON을 반환한다.')
+        summaries, tasks, material_acts = _parse_proposal(generate(retry_system, payload), choices, source)
+
     missing = [name for name in active if name not in tasks]
-    if missing:
+    if missing and not retried:
         name_list = ', '.join(missing)
         scoped = dict(saved, skillOrder=missing)
         _, retry_payload = learning_context(scoped, draft)
@@ -186,13 +207,13 @@ def propose(saved, draft, generate, source, *, previous=None):
         repair_system = system + '\n[누락 과제 보완] skillOrder에 지정한 스킬의 과제를 하나씩 acts에 반환한다. 기존 역량 요약은 다시 작성할 필요가 없다.'
         repair = _answer(generate(repair_system, retry_payload))
         try:
-            additional, _ = _read_activities(repair.get('acts'), retry_payload['choices'])
+            additional, _ = _read_activities(repair.get('acts'), retry_payload['choices'], source)
         except ApiError as error:
             raise ApiError(422, 'ACTIVITIES_INVALID', f'산출물 과제를 보완하지 못했어요({name_list}). {error.message}') from error
         tasks.update(additional)
-        still_missing = [name for name in missing if name not in tasks]
-        if still_missing:
-            raise ApiError(422, 'ACTIVITIES_INVALID', f'산출물 과제가 빠졌어요({", ".join(still_missing)}). 다시 제안받아 주세요.')
+        missing = [name for name in missing if name not in tasks]
+    if missing:
+        raise ApiError(422, 'ACTIVITIES_INVALID', f'산출물 과제가 빠졌어요({", ".join(missing)}). 다시 제안받아 주세요.')
 
     resources = {row['id']: row for row in payload['materials']}
     start_stage = (draft.get('handoff') or {}).get('startStage') or 1

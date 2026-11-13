@@ -11,7 +11,7 @@ import { me, setWorkspaceLoader } from '@/shared/state/session';
 import { failToast } from '@/shared/lib/fail';
 import { freshDraft, fromWorkspace, updateWs, useWs, ws, type WsState } from '@/shared/state/workspace';
 
-const CLIENT = ['goal', 'project', 'prefs', 'detailsOk', 'answers', 'deepOn', 'deepMcq', 'deepEssay', 'chosen', 'edit', 'selectedSkills', 'skillInputKey', 'skillCandidates', 'startMode'] as const;
+const CLIENT = ['goal', 'project', 'prefs', 'detailsOk', 'answers', 'deepOn', 'deepMcq', 'deepEssay', 'chosen', 'edit', 'selectedSkills', 'skillInputKey', 'skillCandidates', 'fixedSkillNames', 'skillPool', 'startMode'] as const;
 
 const snap = (st: WsState): string =>
   JSON.stringify([CLIENT.map((k) => st.draft[k]), st.lastNew, st.draft.doc ? st.draft.doc.summary : null, (st.draft.gen && st.draft.gen.cur) || null, st.pendingFlow === 'inputs' || st.pendingFlow === 'options' ? st.pendingFlow : null]);

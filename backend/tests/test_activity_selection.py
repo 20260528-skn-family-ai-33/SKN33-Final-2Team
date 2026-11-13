@@ -1,6 +1,6 @@
 import unittest
 from copy import deepcopy
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from app.errors import ApiError
 from app.services.activity_selection import propose,current_record,selection_option
 
@@ -26,6 +26,45 @@ class ActivityTests(unittest.TestCase):
   result = self.propose(self.acts[1:])
   self.assertEqual([(act['res'], act['title']) for act in result['option']['acts']],
                    [('c', '자료'), (None, '적용')])
+
+ def test_ollama_recovers_material_id_alias_without_regenerating(self):
+  for alias in ('materialId', 'resourceId'):
+   with self.subTest(alias=alias), patch('app.services.activity_selection.catalog.items',
+                                        return_value={'c': {'id': 'c', 'title': '자료', 'cost': 0, 'hours': 2}}):
+    acts = deepcopy(self.acts)
+    acts[0][alias] = acts[0].pop('res')
+    model = Mock(return_value={'acts': acts, 'skillSummaries': {'S': ['이해', '적용', '검증']}})
+    result = propose(self.saved, self.draft, model, 'ollama')
+    self.assertEqual([(act['res'], act['title']) for act in result['option']['acts']],
+                     [('c', '학습'), (None, '적용')])
+    model.assert_called_once()
+
+ def test_ollama_validation_retry_and_task_repair_share_one_retry(self):
+  summaries = {'S': ['이해', '적용', '검증']}
+  bad_material = dict(self.acts[0], materialId='outside', resourceId='c')
+  del bad_material['res']
+  invalid = {'acts': [bad_material, self.acts[1]], 'skillSummaries': summaries}
+  cases = [
+   ('서버가 선택 자료를 편성', {'acts': self.acts[1:], 'skillSummaries': summaries}, None),
+   ('과제가 빠진 재응답', {'acts': self.acts[:1], 'skillSummaries': summaries}, '산출물 과제가 빠졌어요'),
+   ('자료 ID가 계속 충돌', invalid, '자료 ID'),
+  ]
+  for case, second, expected_error in cases:
+   with self.subTest(case=case), patch('app.services.activity_selection.catalog.items',
+                                       return_value={'c': {'id': 'c', 'title': '자료', 'cost': 0, 'hours': 2}}):
+    model = Mock(side_effect=[invalid, second])
+    if expected_error:
+     with self.assertRaises(ApiError) as caught:
+      propose(self.saved, self.draft, model, 'ollama')
+     self.assertEqual(caught.exception.code, 'ACTIVITIES_INVALID')
+     self.assertIn(expected_error, caught.exception.message)
+    else:
+     result = propose(self.saved, self.draft, model, 'ollama')
+     self.assertEqual([(act['res'], act['title']) for act in result['option']['acts']],
+                      [('c', '자료'), (None, '적용')])
+    self.assertEqual(model.call_count, 2)
+    self.assertIn('검증 실패 후 재시도', model.call_args.args[0])
+
  def test_excluded_skill_rejected(self):
   acts=deepcopy(self.acts);acts[0]['skill']='other'
   with self.assertRaises(ApiError):self.propose(acts)

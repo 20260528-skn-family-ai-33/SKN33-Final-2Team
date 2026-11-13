@@ -1,10 +1,9 @@
 /* 작성 흐름 규칙 (화면과 분리한 순수 함수 · 5차 gp-app.js 의 STEPS·quizKey·diagKey·stale·busyDraft 등을 옮김).
    열쇠 계산은 서버(drafts.quiz_key·diag_key)와 같아야 한다 — 서버가 바뀌면 여기도 함께 고친다 */
-import type { DraftDoc, EditDoc, Prefs } from '@/api/types/draft';
+import type { DraftDoc, EditDoc } from '@/api/types/draft';
 import { paths } from '@/app/paths';
 import { canContinueSkills } from './details/skillInput';
 import { sameJ } from '@/shared/lib/format';
-import { certOf } from '@/shared/lib/prefs';
 import type { WsState } from '@/shared/state/workspace';
 
 export type StepKey = 'goal' | 'details' | 'check' | 'quiz' | 'result' | 'options' | 'materials' | 'review';
@@ -61,12 +60,14 @@ export function blockedTo(s: Pick<WsState, 'draft' | 'draftPlan'> & Partial<Pick
   return b ? b[2] : null;
 }
 
-/* ── 열쇠: 역량 테스트 문항은 목표·기획서(파일과 요약)·자격증 계획으로 만든다 ── */
+/* ── 열쇠: 역량 테스트 문항은 목표·기획서(파일과 요약)으로 만든다 ── */
 export const docSummary = (d: DraftDoc): string => (d.doc && d.doc.status === 'ok' ? String(d.doc.summary || '').trim() : '');
-export const certKey = (p: Prefs): string => (certOf(p) ? p.cert : '');
 export const quizRest = (d: DraftDoc): string => String(d.goal || '').trim() + '|' + (d.project ? d.project.name : '') + '|' + docSummary(d);
-export const quizKey = (d: DraftDoc): string => quizRest(d) + (certKey(d.prefs) ? '|cert:' + certKey(d.prefs) : '');
-const keyCert = (key: string): string => String(key).split('|cert:')[1] || '';
+export const quizKey = (d: DraftDoc): string => {
+  const current = quizRest(d);
+  const saved = d.quiz?.key;
+  return saved?.startsWith(current + '|cert:') ? saved : current;
+};
 
 /** 심화 질문을 골랐으면 객관식 답(자가 진단 문항 순서)과 서술형 답도 열쇠에 넣는다(서버 drafts.diag_key 와 같다) */
 export const deepOnOf = (d: DraftDoc | null | undefined): boolean => !!(d && d.deepOn && d.quiz && d.quiz.deep);
@@ -91,7 +92,6 @@ export function diagKey(d: DraftDoc): string {
    '바꾼 내용으로 계속'이면 서버가 그때 지우고(API-17), '원래대로 되돌리기'면 결과를 만들 때의 입력으로 돌려 놓는다(API-18) */
 export interface Stale {
   kind: 'quiz' | 'diag' | 'gen';
-  note?: 'cert';
   input: string;
   what: string;
   back: boolean;
@@ -103,15 +103,12 @@ export const DOWN: Record<Stale['kind'], string[]> = {
   gen: [paths.newGen, paths.newOptions, paths.newReview],
 };
 
-/** 지금 입력이 뒤 단계 결과를 만들 때와 다르면 그 단계: quiz(목표·기획서·자격증 계획) > diag(역량 테스트 응답) > gen(그 밖의 세부 사항) */
+/** 지금 입력이 뒤 단계 결과를 만들 때와 다르면 그 단계: quiz(목표·기획서) > diag(역량 테스트 응답) > gen(그 밖의 세부 사항) */
 export function staleOf(d: DraftDoc): Stale | null {
   // V_2의 문항·응답 유효성은 입력 스냅샷을 확인하는 API가 판정한다.
   if (d.v2Assessment) return null;
   if (d.quiz && d.quiz.key !== quizKey(d)) {
-    const rest = String(d.quiz.key).split('|cert:')[0] !== quizRest(d);
-    const cert = keyCert(d.quiz.key) !== certKey(d.prefs);
-    if (cert && !rest) return { kind: 'quiz', note: 'cert', input: paths.newDetails, what: '자격증 계획을', back: !!d.quiz.base };
-    return { kind: 'quiz', input: paths.newGoal, what: cert ? '목표·기획서와 자격증 계획을' : '목표·기획서를', back: !!d.quiz.base };
+    return { kind: 'quiz', input: paths.newGoal, what: '목표·기획서를', back: !!d.quiz.base };
   }
   if (d.diag && d.diag.key !== diagKey(d)) return { kind: 'diag', input: paths.newQuiz, what: '역량 테스트 응답을', back: !!d.diag.answers };
   if ((d.handoff || d.gen) && d.genPrefs && !sameJ(d.genPrefs, d.prefs)) return { kind: 'gen', input: paths.newDetails, what: '세부 사항을', back: true };

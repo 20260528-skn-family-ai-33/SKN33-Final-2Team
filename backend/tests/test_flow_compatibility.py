@@ -32,6 +32,17 @@ class FlowCompatibilityTests(unittest.TestCase):
   base=merge_scope(base,scoped);base['courseRecommendations']['A3']={'marker':'보존'}
   return {'gp5':1,'draft':d,'v2Survey':base,'draftPlan':{'opt':'A1','marker':'이전 검토 결과'}},scoped
 
+ def test_legacy_quiz_reuse_ignores_cert_preference_but_respects_project_changes(self):
+  draft = drafts.fresh_draft()
+  draft.update(goal='검색 구현', doc={'status': 'ok', 'summary': '원래 기획서'})
+  legacy_key = drafts.quiz_rest(draft) + '|cert:legacy-code'
+  draft['prefs']['cert'] = 'old-selection'
+  self.assertEqual(drafts.quiz_key(draft), drafts.quiz_rest(draft))
+  draft['quiz'] = {'key': legacy_key}
+  self.assertEqual(drafts.quiz_key(draft), legacy_key)
+  draft['doc']['summary'] = '수정한 기획서'
+  self.assertEqual(drafts.quiz_key(draft), drafts.quiz_rest(draft))
+
  def test_goal_or_conditions_edit_clears_every_downstream_stage(self):
   for change in ({'goal':'바꾼 목표'},{'prefs':{'hours':8}}):
    with self.subTest(change=change):
