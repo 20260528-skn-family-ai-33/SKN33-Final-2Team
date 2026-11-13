@@ -30,6 +30,8 @@
 .roadmap-learning-group>summary{cursor:pointer;list-style:none}.roadmap-learning-group>summary::-webkit-details-marker{display:none}
 .learning-toggle-more,.learning-toggle-less{font-size:11px;color:var(--muted)}.learning-toggle-less{display:none}.roadmap-learning-group[open] .learning-toggle-more{display:none}.roadmap-learning-group[open] .learning-toggle-less{display:inline}.roadmap-learning-group:not([open])>summary{margin-bottom:0}
 
-.roadmap-learning-group.is-current-week{background:var(--accent-soft);border-color:var(--accent-line)}
-.roadmap-learning-anchor.is-current-week{background:var(--accent-soft2)}.roadmap-learning-anchor.is-current-week .act-row{background:transparent}
-.roadmap-learning-group.is-current-week{box-shadow:inset 4px 0 0 var(--accent)}
+.roadmap-learning-group.is-current-week{background:var(--week-soft);border-color:var(--week-line)}
+.roadmap-learning-anchor.is-current-week{background:var(--week-soft2)}.roadmap-learning-anchor.is-current-week .act-row{background:transparent}
+.roadmap-learning-group.is-current-week{box-shadow:inset 4px 0 0 var(--week)}
+/* 모든 활동을 마친 주차는 이번 주와 다른 완료색(#101) */
+.roadmap-learning-group.is-week-done{background:var(--done-soft);border-color:var(--done-line);box-shadow:inset 4px 0 0 var(--done)}

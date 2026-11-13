@@ -14,6 +14,43 @@ function render(courses?: string[], outcomes = ['기존 역량'], estimate: Dura
   return renderToStaticMarkup(createElement(ReviewSkillBlocks, { materials, acts: [], selectedIds: [], busy: false }));
 }
 
+describe('확정한 로드맵의 이번 주·완료 표시(#101)', () => {
+  const materials: ReviewMaterials = {
+    recommendations: { skills: [{ name: 'SQL', courses: [{ id: 'c', title: 'SQL 강좌' }], books: [{ id: 'b', title: 'SQL 도서' }] }] },
+    choices: { SQL: { course: 'c', books: ['b'] } }, skillOrder: ['SQL'],
+  };
+  const acts = [
+    { id: 'course', title: 'SQL 강좌', skill: 'SQL', how: '', hours: 4, res: 'c' },
+    { id: 'book', title: 'SQL 도서', skill: 'SQL', how: '', hours: 0, res: 'b' },
+    { id: 'task', title: '쿼리 정리', skill: 'SQL', how: '', hours: 2, res: null },
+  ];
+  const render = (progress: Record<string, { status: 'done' | 'doing' }>, currentSkillNames: string[] = ['SQL']) =>
+    renderToStaticMarkup(createElement(ReviewSkillBlocks, { materials, acts, busy: false, progress, currentSkillNames }));
+
+  it('이번 주 스킬을 모두 마치면 이번 주 색 대신 완료색으로 바꾸고 이번 주 표시는 남긴다', () => {
+    const html = render({ course: { status: 'done' }, task: { status: 'done' } });
+    expect(html).toContain('rv-skill review-skill-block is-week-done"');
+    expect(html).not.toContain('is-current-week');
+    expect(html).toContain('<span class="tag week">이번 주</span>');
+    expect(html).toContain('<span class="tag done">완료</span>');
+    expect(html).toContain('rv-task is-static is-done');
+  });
+  it('일부만 마쳤으면 이번 주 색을 유지하고, 도서는 완료 판단에서 뺀다', () => {
+    const partial = render({ course: { status: 'done' } });
+    expect(partial).toContain('rv-skill review-skill-block is-current-week"');
+    expect(partial).not.toContain('<span class="tag done">완료</span>');
+    expect(render({ course: { status: 'done' }, task: { status: 'done' }, book: { status: 'doing' } })).toContain('is-week-done');
+  });
+  it('이번 주가 아니어도 모두 마친 스킬은 완료색, 남은 스킬은 강조하지 않는다', () => {
+    const done = render({ course: { status: 'done' }, task: { status: 'done' } }, []);
+    expect(done).toContain('is-week-done');
+    expect(done).not.toContain('이번 주');
+    const left = render({}, []);
+    expect(left).not.toContain('is-week-done');
+    expect(left).not.toContain('is-current-week');
+  });
+});
+
 describe('수정 후 스킬별 자료 상세', () => {
   it('추가된 강좌도 같은 스킬의 상세에 표시한다', () => {
     const html = render(['one', 'two']);
