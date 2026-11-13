@@ -8,7 +8,7 @@ contentTruncated·curriculumOmitted 존재 시 일부 근거만 제공된 상태
 자료 없는 스킬은 자료 학습 성과와 구분되는 프로젝트 직접 수행의 목표 역량으로 표현.
 
 [통합 역량 작성]
-스킬마다 선택 강좌·도서를 통합한 구체적 수행 능력 정확히 3개. 자료별 분리 금지, 각 항목은 대상·수행 능력을 함께 담은 짧은 명사형 한 줄.
+스킬마다 선택 강좌·도서를 통합한 구체적 수행 능력 1~3개(3개 권장). 자료별 분리 금지, 각 항목은 대상·수행 능력을 함께 담은 짧은 명사형 한 줄.
 학습 주제·목차·활동 지시 및 '이해·활용·역량 강화'만의 추상적 나열 금지. 예: 'SQL 문법 학습' 대신 '다중 테이블 조인과 집계 쿼리 작성 능력', '데이터 분석' 대신 '분석 결과의 해석 및 근거 기반 설명 능력'. 예시 기술 복제 금지, 해당 스킬·선택 자료의 DB 근거 기준.
 
 [기존 지식·업무 맥락]
@@ -42,8 +42,8 @@ def current(saved,draft):
     return None
 
 
-def generate(saved,draft,model):
+def generate(saved,draft,model, *, source=None):
     active,payload=activities.learning_context(saved,draft)
     raw=model(instructions(draft['chosen']),payload)
-    summaries=activities.validate_summaries(raw.get('skillSummaries') if isinstance(raw,dict) else None,active)
+    summaries=activities.validate_summaries(raw.get('skillSummaries') if isinstance(raw,dict) else None, active, normalize=source == 'ollama')
     return {'key':activities.fingerprint(saved,draft),'summaries':summaries}

@@ -26,7 +26,7 @@ class LearningOutcomesTests(unittest.TestCase):
  def test_invalid_summary_rejected_without_mutating_inputs(self):
   saved,draft,resources=self.setup_data();before=copy.deepcopy(saved)
   with patch.object(activity_selection.catalog,'items',return_value=resources),self.assertRaises(ApiError):
-   learning_outcomes.generate(saved,draft,lambda *_:{'skillSummaries':{'S':['한 줄']}})
+   learning_outcomes.generate(saved,draft,lambda *_:{'skillSummaries':{'S':[]}})
   self.assertEqual(saved,before)
 
  def test_unified_instructions_keep_input_cache_key_and_summary_schema_for_all_courses(self):

@@ -61,6 +61,23 @@ class ReviewActivityCoverageTests(TestCase):
                          [task['title'] for task in self.tasks])
         self.assertEqual(proposal['skillSummaries'], self.summaries)
 
+    def test_ollama_repairs_only_malformed_task(self):
+        missing = self.skills[-1]
+        first = {'skillSummaries': self.summaries, 'acts': [*self.tasks[:-1], dict(self.tasks[-1], how='')]}
+        before = deepcopy(first)
+        model = Mock(side_effect=[first, {'acts': [self.tasks[-1]]}])
+        proposal = activities.propose(self.saved, self.draft, model, 'ollama')
+        self.assertEqual(first, before)
+        self.assertEqual(model.call_count, 2)
+        self.assertIn('JSON:', model.call_args.args[0])
+        retry = model.call_args.args[1]
+        self.assertEqual(retry['skillOrder'], [missing])
+        self.assertEqual(list(retry['choices']), [missing])
+        self.assertEqual([row['id'] for row in retry['materials']], ['c2', 'b2'])
+        self.assertEqual([act['title'] for act in proposal['option']['acts'] if not act['res']],
+                         [task['title'] for task in self.tasks])
+        self.assertEqual(proposal['skillSummaries'], self.summaries)
+
     def test_unsuccessful_repair_identifies_missing_skill_and_stops(self):
         model = Mock(side_effect=[{'skillSummaries': self.summaries, 'acts': self.tasks[:-1]}, {'acts': []}])
         with self.assertRaises(ApiError) as error:

@@ -393,7 +393,7 @@ def generate_learning_outcomes(project_id:UUID,a:Account=Depends(require_employe
             if existing is not None:return {'summaries':existing}
         ctx=runtime.context(a.id)
         if not ctx.live:raise ApiError(503,'MODEL_REQUIRED','실제 모델 연결이 필요해요.')
-        result=learning_outcomes.generate(saved,draft,runtime.model(ctx,f'로드맵 계획 · {course}','학습 결과 요약',role='roadmap'))
+        result=learning_outcomes.generate(saved,draft,runtime.model(ctx,f'로드맵 계획 · {course}','학습 결과 요약',role='roadmap'), source=ctx.mode)
         def save(t,w):
             latest,d=activity_selection.context(t,a.id,str(project_id),**({'course':course} if course else {}))
             if activity_selection.fingerprint(latest,d)!=result['key']:raise ApiError(409,'MATERIALS_CHANGED','선택한 자료가 변경됐어요. 다시 확인해 주세요.')
