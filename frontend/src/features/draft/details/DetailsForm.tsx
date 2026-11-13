@@ -56,7 +56,7 @@ export function DetailsForm({ path, learningConditionsOnly = false }: { path: st
       <Field k="weeks" help={learningConditionsOnly ? undefined : "비워 두면 기간을 정하지 않아요"}>
         <Num path={path} k="weeks" unit="주 안에" min={1} max={52} step={1} />
       </Field>
-      <Field k="budget" help={learningConditionsOnly ? undefined : "0을 넣으면 무료 자료만 써요. 비워 두면 알아서 골라요"}>
+      <Field k="budget" help="0원이면 무료 강좌만 추천해요. 유료·가격 미확인 도서는 직접 선택할 수 있어요.">
         <Num path={path} k="budget" unit="원" min={0} step={10000} />
       </Field>
       <Field k="etc" wide help="로드맵을 만들 때 고려할 상황을 자유롭게 적어 주세요. 로드맵 계획 에이전트에게 그대로 전달해요">

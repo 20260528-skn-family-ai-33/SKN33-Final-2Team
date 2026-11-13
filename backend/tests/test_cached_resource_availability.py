@@ -177,6 +177,28 @@ class CachedResourceAvailabilityTests(TestCase):
         self.assertEqual(response.json()['choices'], {})
         self.tx.run.assert_not_called()
 
+    def test_zero_budget_challenge_rechecks_price_on_save_and_discards_paid_cache(self):
+        self.project['details'] = {'budget': '0'}
+        self.rec['skills'][0]['selectedBooks'] = []
+        self.fresh_items['alt-course']['cost'] = 48000
+        self.assertEqual(self.put(course_id='alt-course').status_code, 422)
+        self.rec['retrieval']['version'] = 'old'
+        self.cache['materialsSelectionKey'] = 'previously-confirmed-selection'
+        self.items['course'] = dict(self.items['course'], cost=48000)
+        response = self.client.get(self.url, params={'course': 'A3'})
+        self.assertIsNone(response.json()['recommendations'])
+        self.assertEqual(response.json()['choices'], {})
+        self.tx.run.assert_not_called()
+
+    def test_zero_budget_book_default_that_became_paid_requires_new_selection(self):
+        self.project['details'] = {'budget': 0}
+        self.rec['skills'][0]['selectedBooks'] = ['book']
+        self.rec['skills'][0]['books'][0] = dict(self.items['book'], cost=0)
+        response = self.client.get(self.url, params={'course': 'A3'})
+        self.assertIsNone(response.json()['recommendations'])
+        self.cache['materialsSelectionKey'] = 'saved-by-employee'
+        self.assertEqual(self.put(books=['book']).status_code, 200)
+
     def test_empty_current_lists_can_save_empty_choices(self):
         row = self.rec['skills'][0]
         row.update(courses=[], books=[], selectedCourse=None, selectedBooks=[])

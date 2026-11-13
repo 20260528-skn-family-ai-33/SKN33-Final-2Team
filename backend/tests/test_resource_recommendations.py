@@ -83,6 +83,18 @@ class RecommendationTests(unittest.TestCase):
         self.assertEqual(row['selectedCourse'],'course0')
         self.assertEqual(row['selectedBooks'],['book0'])
         self.assertEqual([r['aiRecommended'] for r in row['courses']],[True,False,False])
+
+    def test_zero_budget_keeps_reference_books_optional_and_selects_only_free_defaults(self):
+        books = [dict(self.items['book0'], id=rid, cost=cost) for rid, cost in
+                 [('paid', 22000), ('unknown', None), ('free', 0)]]
+        for budget, expected in [(0, ['free']), ('', ['paid'])]:
+            for candidates in (books, books[:2]):
+                project = dict(self.project, details={'budget': budget})
+                raw = {'skills': [{'name': '분석', 'courses': [], 'books': [{'id': b['id']} for b in candidates]}]}
+                row, = recommend_resources(project, self.selection, {b['id']: b for b in candidates},
+                                           lambda *_: raw, course={'id': 'A3'})['skills']
+                self.assertEqual([b['id'] for b in row['books']], [b['id'] for b in candidates])
+                self.assertEqual(row['selectedBooks'], [] if budget == 0 and len(candidates) == 2 else expected)
     def test_unrelated_and_unusable_resources_filtered_before_limit(self):
         items={f'bad{i}':dict(self.items['course0'],id=f'bad{i}',title='AAA',skills=['다른스킬']) for i in range(30)}
         items['free']=dict(self.items['course0'],id='free',title='ZZZ')

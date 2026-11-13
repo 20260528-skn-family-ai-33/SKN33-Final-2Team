@@ -326,7 +326,7 @@ class CoursePolicyTests(unittest.TestCase):
                     timeStatus='confirmed', estimated=[],
                     curriculum={'items': [{'title': lesson or self.lesson}]}, **extra)
 
-    def retrieve(self, items, track):
+    def retrieve(self, items, track, *, details=None):
         self.queries = []
         self.search_ids = []
         skill = dict(name=self.name, application=self.goal)
@@ -337,9 +337,51 @@ class CoursePolicyTests(unittest.TestCase):
             self.search_ids.extend(ids)
             return [dict(resource_id=rid, similarity=items[rid].get('retrievalScore', .8),
                          current_cost=items[rid]['cost']) for rid in ids]
-        pools, _ = rag.retrieve({'goal': self.goal}, {'skills': [skill]}, items,
+        pools, _ = rag.retrieve({'goal': self.goal, 'details': details or {}}, {'skills': [skill]}, items,
                                 {'id': track, 'learningSkills': [skill]}, embed=embed, search=search)
         return pools
+
+    def test_zero_budget_filters_before_ranking_and_default_selection(self):
+        skill = {'name': self.name, 'application': self.goal}
+        for track, level in [('A1', 'INTERMEDIATE'), ('A2', 'INTERMEDIATE'), ('A3', 'ADVANCED')]:
+            items = {f'paid-{i}': self.item(f'paid-{i}', level, cost=48000) for i in range(23)}
+            items['unknown'] = self.item('unknown', level, cost=None)
+            items['free'] = self.item('free', level, retrievalScore=.1)
+            for budget in (0, '0', '', None, 100000):
+                details = {'budget': budget}
+                course = {'id': track, 'learningSkills': [skill]}
+                with self.subTest(track=track, budget=budget):
+                    pools = self.retrieve(items, track, details=details)
+                    ids = {r['id'] for r in pools[0]['courses']}
+                    if track == 'A1' or budget in (0, '0'):
+                        self.assertEqual(ids, {'free'})
+                    else:
+                        self.assertTrue(any(r.startswith('paid-') for r in ids))
+                    def pick_first(_, payload):
+                        row, = payload['skills']
+                        return {'skills': [{'name': self.name, 'courses': [{'key': row['courses'][0]['choiceKey']}], 'books': []}]}
+                    result = recommend_resources({'goal': self.goal, 'details': details}, {'skills': [skill]},
+                                                 items, pick_first, course=course, retrieved_pools=pools)
+                    selected = result['skills'][0]['selectedCourse']
+                    self.assertIn(selected, ids)
+                    if track == 'A1' or budget in (0, '0'):
+                        self.assertEqual(selected, 'free')
+
+    def test_paid_only_challenge_has_no_default_with_zero_budget(self):
+        skill = {'name': self.name, 'application': self.goal}
+        course = {'id': 'A3', 'learningSkills': [skill]}
+        items = {'paid': self.item('paid', 'ADVANCED', cost=48000)}
+        previous_pool = self.retrieve(items, 'A3')
+        self.assertEqual(previous_pool[0]['courses'][0]['id'], 'paid')
+        for pools in (None, previous_pool, self.retrieve(items, 'A3', details={'budget': 0})):
+            generate = Mock()
+            result = recommend_resources({'goal': self.goal, 'details': {'budget': 0}}, {'skills': [skill]},
+                                         items, generate, course=course, retrieved_pools=pools)
+            row, = result['skills']
+            self.assertEqual(row['courses'], [])
+            self.assertIsNone(row['selectedCourse'])
+            self.assertEqual(row['courseDiagnostic']['reason'], 'no_candidates')
+            generate.assert_not_called()
 
     def test_eligibility_rejects_price_booleans_and_disallows_low_challenge_levels(self):
         self.assertFalse(course_levels.eligible({'cost': False}, 'A1'))

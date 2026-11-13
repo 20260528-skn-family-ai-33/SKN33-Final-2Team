@@ -14,7 +14,7 @@ import json
 import uuid
 from datetime import date, timedelta
 
-from .. import catalog, course_time, db, jobs
+from .. import catalog, course_levels, course_time, db, jobs
 from ..llm import LlmError
 from ..agents import deepcheck as DC
 from ..agents import diag as DG
@@ -55,15 +55,19 @@ def _d(v) -> str | None:
 
 # ── 확정 (drafts.confirm 이 부름) ──
 def _write_steps(t: db.Tx, roadmap_id: str, plan: dict) -> None:
-    items = catalog.items(refresh=plan.get('opt') == 'A1')
+    free_courses_only = plan.get('opt') == 'A1' or course_levels.zero_budget((plan.get('prefs') or {}).get('budget'))
+    items = catalog.items(refresh=free_courses_only)
     done = {r['activity_id'] for r in t.all("SELECT activity_id FROM app_ext.activity_progress WHERE roadmap_id = CAST(:r AS uuid) AND status = 'done'", r=roadmap_id)}
     t.run('DELETE FROM public.roadmap_steps WHERE roadmap_id = CAST(:r AS uuid)', r=roadmap_id)
     for i, a in enumerate(plan['acts'], 1):
         res = items.get(a.get('res') or '')
+        cost = res.get('cost') if res else None
+        if free_courses_only and res and res.get('type') == 'course':
+            cost = 0  # 확정 트랜잭션에서 검증한 강좌 가격
         sid = t.val("""INSERT INTO public.roadmap_steps(roadmap_id, step_order, title, activity, estimated_duration, estimated_cost, is_completed, details)
                        VALUES(CAST(:r AS uuid), :o, :t, :a, :du, :c, :done, :d) RETURNING step_id""",
                     r=roadmap_id, o=i, t=a['title'], a=a.get('how') or (res['title'] if res else None), du=f"{course_time.display_hours(a['hours'])} · {a['wFrom']}~{a['wTo']}주차",
-                    c=0 if plan.get('opt') == 'A1' and a.get('res') else res['cost'] if res and res['cost'] is not None else None, done=a['id'] in done,
+                    c=cost, done=a['id'] in done,
                     d=db.J({k: a.get(k) for k in ('id', 'stage', 'res', 'task', 'hours', 'wFrom', 'wTo', 'skills', 'skill',
                                                 'hoursEstimated', 'hoursBasis', 'timeStatus', 'hoursAllocation', 'catalogHours')}))
         if res and res['type'] in ('course', 'book', 'cert'):
@@ -728,7 +732,7 @@ def accept_revision(employee_id: int, roadmap_id: str, revision_id: str, selecte
         plan.pop('selectionEvidence', None)
         if isinstance(evidence, dict):
             plan['selectionEvidence'] = copy.deepcopy(evidence)
-        validate_free_plan(t, plan)
+        validate_free_plan(t, plan, budget=(plan.get('prefs') or {}).get('budget'))
         # 로드맵 내용이 바뀌면 팀 DB 트리거가 코멘트에 '수정 완료' 시각만 적는다. 그 갱신은 작성자 검사 트리거(본문·작성자·로드맵 열)를 거치지 않는다
         t.run('UPDATE public.roadmaps SET content = :c, strategy_type = :st, strategy_title = :tt, summary = :s, updated_at = now() WHERE roadmap_id = :r',
               c=db.J(plan), st=plan['opt'], tt=plan['name'], s=plan['tagline'], r=row['roadmap_id'])

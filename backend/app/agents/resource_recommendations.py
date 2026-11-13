@@ -227,7 +227,7 @@ def candidate_pools(project: dict, selection: dict, items: dict[str, dict], limi
         by_kind = {}
         for kind, key in (('course', 'courses'), ('book', 'books')):
             # 스킬·종류·사용 가능 여부를 후보 개수 제한보다 먼저 적용한다.
-            available = [row for row in items.values() if row.get('usable') and row.get('type') == kind and not exclusion(row,knowledge,str(project.get('goal') or '')) and skill['name'] in (row.get('skills') or []) and (not free_only or kind == 'book' or (row.get('cost') == 0 and not isinstance(row.get('cost'), bool)))]
+            available = [row for row in items.values() if row.get('usable') and row.get('type') == kind and not exclusion(row,knowledge,str(project.get('goal') or '')) and skill['name'] in (row.get('skills') or []) and (not free_only or kind == 'book' or course_levels.is_free(row.get('cost')))]
             available.sort(key=lambda row: (-score(row), str(row.get('title') or ''), row['id']))
             track = course.get('id') if isinstance(course, dict) else course
             if kind == 'course' and track == 'A2':
@@ -252,9 +252,14 @@ def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
     from app.services import resource_evidence
     plan_selection = selection
     selection = resource_evidence.course_selection(project, selection, course)
+    track = (course or {}).get('id')
+    zero_budget = course_levels.zero_budget((project.get('details') or {}).get('budget'))
     pools = retrieved_pools if retrieved_pools is not None else candidate_pools(
-        project, selection, items, free_only=bool(course and course.get('id') == 'A1'), course=course,
-        course_limit=len(items) if (course or {}).get('id') in ('A1', 'A2', 'A3') else None)
+        project, selection, items, free_only=zero_budget or track == 'A1', course=course,
+        course_limit=len(items) if track in ('A1', 'A2', 'A3') else None)
+    if zero_budget and retrieved_pools is not None:
+        pools = [{**pool, 'courses': [row for row in pool['courses'] if course_levels.is_free(row.get('cost'))]}
+                 for pool in pools]
     if not any(row['courses'] or row['books'] for row in pools):
         return {'skills': [_empty_skill(row['name']) for row in pools]}
     # 원문·개인 식별정보 대신 프로젝트 맥락과 확인된 자료 후보를 전달한다.
@@ -262,7 +267,6 @@ def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
     from app.services import book_candidates
     crash_cache = {}
     is_crash = crash_courses.is_crash(course)
-    track = (course or {}).get('id')
     rejected_diagnostics = {}
     if track in ('A1', 'A2', 'A3'):
         # 직접 호출과 저장 후보의 재사용도 검색 진입점과 같은 가격·수준·관련성 문턱을 통과한다.
@@ -442,7 +446,8 @@ def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
                               'knowledge': recommendation.get('knowledge', '').strip(), 'aiRecommended': len(cards) == 0})
             output[key] = cards
         output['selectedCourse'] = output['courses'][0]['id'] if output['courses'] else None
-        output['selectedBooks'] = [output['books'][0]['id']] if output['books'] else []
+        output['selectedBooks'] = [book['id'] for book in output['books']
+                                   if not zero_budget or course_levels.is_free(book.get('cost'))][:1]
         eligible = [card for rid, (_, card) in provided['courses'].items() if pool['name'] in course_eligibility[rid]]
         diagnostic = _diagnostic(row, 'course', bool(eligible), bool(output['courses']))
         if diagnostic and diagnostic['reason'] == 'stack_mismatch':

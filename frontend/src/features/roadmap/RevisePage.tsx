@@ -148,7 +148,7 @@ function RevCtl({ k, R }: { k: string; R: PlanRecord }) {
   );
   if (k === 'hours') return num('시간 / 주', 0.5, 40, 0.5, '알아서', '0.5~40시간. 비우면 관점과 기간에 맞게 에이전트가 정해요');
   if (k === 'weeks') return num('주 안에', 1, 52, 1, '없음', '1~52주. 비우면 기간을 정하지 않아요');
-  if (k === 'budget') return num('원', 0, undefined, 10000, '알아서', '0을 넣으면 무료 자료만 써요. 비우면 알아서 골라요');
+  if (k === 'budget') return num('원', 0, undefined, 10000, '알아서', '0원이면 무료 강좌만 써요. 비우면 알아서 골라요');
   if (k === 'format')
     return (
       <select className={`input df-sel ${r.v.format ? '' : 'empty'}`} aria-label={lab} value={r.v.format} onChange={(e) => setAt(`${base}.format`, e.target.value)}>

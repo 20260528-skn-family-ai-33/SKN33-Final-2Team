@@ -174,6 +174,18 @@ class FreeTrackRegressions(unittest.TestCase):
                 items.assert_called_once_with(refresh=pid == 'A1')
                 self.assertEqual(t.val.call_args.kwargs['c'], 0 if pid == 'A1' else 100)
 
+    def test_zero_budget_step_prices_match_free_course_and_optional_book(self):
+        t = Mock()
+        t.all.return_value = []
+        resources = {'sql': {'type': 'course', 'cost': 0}, 'book_sql': {'type': 'book', 'cost': 24000}}
+        acts = [dict(id=rid, res=rid, title='SQL', how='실습', hours=1, wFrom=1, wTo=1) for rid in resources]
+        with patch.object(catalog, 'items', return_value=resources) as lookup:
+            for track in ('A1', 'A2', 'A3'):
+                t.reset_mock()
+                plans._write_steps(t, 'roadmap', {'opt': track, 'prefs': {'budget': 0}, 'acts': acts})
+                lookup.assert_called_with(refresh=True)
+                self.assertEqual([call.kwargs['c'] for call in t.val.call_args_list], [0, 24000])
+
     def test_valid_free_uses_current_zero_and_keeps_activities(self):
         t=Mock(); t.all.return_value=[{'resource_key':'free','cost_won':0}]
         plan={'opt':'A1','acts':[{'res':'free'},{'res':None}],'cost':100,'costUnknown':True}

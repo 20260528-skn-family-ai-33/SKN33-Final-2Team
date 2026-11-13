@@ -2,7 +2,7 @@
 from copy import deepcopy
 from hashlib import sha256
 import json
-from app import db, track_policy
+from app import course_levels, db, track_policy
 FIELDS=('recommendations','resourceChoices','durationEstimates','activityProposal','activityVersions','materialsSelectionKey','skillSelectionKey','learningOutcomes')
 
 def option_cache_key(option):
@@ -138,28 +138,33 @@ def completed_course_ids(t: db.Tx, employee_id: int) -> frozenset[str]:
     return frozenset(row['course_id'] for row in rows)
 
 
-def available_recommendations(recommendations: dict, course: str | None, *, refresh: bool = False,
+def available_recommendations(recommendations: dict, course: str | None, *, budget=None, refresh: bool = False,
                               completed: frozenset[str] = frozenset()) -> dict:
     """추천 근거는 보존하고 현재 선택할 수 없는 후보와 기본 선택만 제거한다."""
     from app import catalog
     rows = recommendations.get('skills') or []
     items = catalog.items(refresh=refresh) if any(row['courses'] or row['books'] for row in rows) else {}
+    zero_budget = course_levels.zero_budget(budget)
+    free_courses_only = course == 'A1' or zero_budget
 
     def available(resource: dict, kind: str) -> bool:
         item = items.get(resource['id'])
         return bool(item and item.get('usable') and item.get('type') == kind
-                    and (course != 'A1' or kind != 'course' or item.get('cost') == resource.get('cost') == 0))
+                    and (not free_courses_only or kind != 'course'
+                         or (course_levels.is_free(item.get('cost')) and course_levels.is_free(resource.get('cost')))))
 
     filtered = []
     for row in rows:
         courses = catalog.refresh_course_levels([item for item in row['courses']
                                                 if item['id'] not in completed and available(item, 'course')], items)
         books = catalog.refresh_book_links([item for item in row['books'] if available(item, 'book')], items)
+        if zero_budget:
+            books = [dict(book, cost=items[book['id']].get('cost')) for book in books]
         result = dict(row, courses=courses, books=books)
         if 'selectedCourse' in row and not any(item['id'] == row['selectedCourse'] for item in courses):
             result['selectedCourse'] = None
         if 'selectedBooks' in row:
-            book_ids = {item['id'] for item in books}
+            book_ids = {item['id'] for item in books if not zero_budget or course_levels.is_free(item.get('cost'))}
             result['selectedBooks'] = [rid for rid in row['selectedBooks'] if rid in book_ids]
         filtered.append(result)
     result = dict(recommendations, skills=filtered)
@@ -179,7 +184,15 @@ def compatible_recommendations(saved: dict, version: str, completed: frozenset[s
     outdated = (recommendations.get('retrieval') or {}).get('version') != version
     if outdated and (not recommendations.get('skills') or not choices):
         return None
-    available = available_recommendations(recommendations, saved.get('_course'), completed=completed)
+    budget = ((saved.get('project') or {}).get('details') or {}).get('budget')
+    if outdated and course_levels.zero_budget(budget) and not saved.get('materialsSelectionKey'):
+        # 구버전은 무료 후보를 우선 검색하지 않았고 유료 도서도 기본 선택했다.
+        return None
+    available = available_recommendations(recommendations, saved.get('_course'), budget=budget, completed=completed)
+    if course_levels.zero_budget(budget) and not saved.get('materialsSelectionKey'):
+        if any(row.get('selectedBooks') != current.get('selectedBooks')
+               for row, current in zip(recommendations['skills'], available['skills'])):
+            return None
     # 이전에 제시한 강좌를 모두 이수했다면 빈 캐시 대신 더 낮은 순위의 후보를 다시 검색한다.
     if any(row['courses'] and all(c['id'] in completed for c in row['courses']) for row in recommendations['skills']):
         return None
