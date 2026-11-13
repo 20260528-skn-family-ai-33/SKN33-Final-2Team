@@ -148,11 +148,12 @@ export function revOk(R: PlanRecord | null | undefined): boolean {
   return ks.every((k) => revItemOk(r, k, R.plan.opt)) && (ks.length > 0 || !!String(r.note || '').trim());
 }
 
-export async function revise(pid: string): Promise<void> {
+export async function revise(pid: string, settingsOnly = false): Promise<void> {
   const R = ws().plans[pid];
   const r = R && R.rev;
   if (!r || r.running) return;
-  const key = revKey(r);
+  const request = settingsOnly ? { ...r, on: Object.fromEntries(REV_ITEMS.filter(([, , group]) => group === "cond").map(([k]) => [k, r.on[k]])), note: "학습 여건만 조정하고 기존 활동은 모두 그대로 유지해 주세요." } : r;
+  const key = revKey(request);
   updateWs((s) => {
     const x = s.plans[pid];
     if (!x.rev) return;
@@ -161,7 +162,7 @@ export async function revise(pid: string): Promise<void> {
     x.pending = null;
   });
   try {
-    await plansApi.revise(pid, { rev: { on: r.on, v: r.v, note: r.note, fromComment: r.fromComment }, key });
+    await plansApi.revise(pid, { rev: { on: request.on, v: request.v, note: request.note, fromComment: request.fromComment }, key });
   } catch (err) {
     updateWs((s) => {
       const x = s.plans[pid];
@@ -412,7 +413,7 @@ export function confirmReviseComment(
   }
 
   const doneTitles = doneActs.map((a) => a.title).join(', ');
-  const undoneTitles = undoneActs.map((a) => a.title).join(', ');
+  const undoneTitles = skill ? '미완료 강좌와 산출물 중 유형별 최대 1개' : undoneActs.map((a) => a.title).join(', ');
 
   openSheet({
     title: skill ? `${skill} 코멘트 수정 요청` : '코멘트 수정 요청 확인',

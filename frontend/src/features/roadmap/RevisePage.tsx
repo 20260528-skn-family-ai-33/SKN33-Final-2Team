@@ -310,7 +310,7 @@ function GoalRow({ R }: { R: PlanRecord }) {
   );
 }
 
-function RevForm({ R }: { R: PlanRecord }) {
+function RevForm({ R, settingsOnly = false }: { R: PlanRecord; settingsOnly?: boolean }) {
   const r = R.rev as RevForm;
   const grp = (g: 'cond' | 'plan' | 'acts', title: string) => (
     <div className="card rv-g">
@@ -326,6 +326,7 @@ function RevForm({ R }: { R: PlanRecord }) {
   return (
     <>
       {grp('cond', '학습 여건')}
+      {!settingsOnly && <>
       {grp('plan', '로드맵 구성')}
       {grp('acts', '활동')}
       <div className="card rv-g">
@@ -339,6 +340,7 @@ function RevForm({ R }: { R: PlanRecord }) {
         ) : null}
         <BText path={`plans.${R.id}.rev.note`} maxLength={600} ariaLabel="요청 내용" placeholder="예: 평일 저녁에만 시간이 나요. 실습을 늘려 주세요." />
       </div>
+      </>}
     </>
   );
 }
@@ -546,7 +548,7 @@ function Revise({ R }: { R: PlanRecord }) {
         }
         ops={<OpsBox items={[['', fail]]} />}
         foot={
-          <button className="btn pri" disabled={!ok} onClick={() => (skillComment || r.fromComment ? confirmReviseComment(R, skillComment || undefined, () => void revise(R.id)) : confirmReviseSkillsExclusion(R, () => void revise(R.id)))}>
+          <button className="btn pri" disabled={!ok} onClick={() => (skillComment || r.fromComment ? confirmReviseComment(R, skillComment || undefined, () => void revise(R.id)) : confirmReviseSkillsExclusion(R, () => void revise(R.id, settingsOnly)))}>
             <Icon name="retry" />
             {skillComment ? '재요청하기' : '다시 시도하기'}
           </button>
@@ -643,10 +645,10 @@ function Revise({ R }: { R: PlanRecord }) {
       </>}
     >
       {cmt}
-      {!skillComment && !mixed && <RevForm R={R} />}
+      {!skillComment && !mixed && <RevForm R={R} settingsOnly={settingsOnly && !r.fromComment} />}
       {fail && !busy ? null : (
         <div className="actions rv-act">
-          <button className={`btn ${pd ? 'line' : 'pri'}`} disabled={!ok || !!retrying} onClick={() => (skillComment || r.fromComment ? confirmReviseComment(R, skillComment || undefined, () => void revise(R.id)) : confirmReviseSkillsExclusion(R, () => void revise(R.id)))}>
+          <button className={`btn ${pd ? 'line' : 'pri'}`} disabled={!ok || !!retrying} onClick={() => (skillComment || r.fromComment ? confirmReviseComment(R, skillComment || undefined, () => void revise(R.id)) : confirmReviseSkillsExclusion(R, () => void revise(R.id, settingsOnly)))}>
             {busy ? '수정안을 만드는 중…' : mixed ? '전체 재요청' : skillComment ? '재요청하기' : pd ? '수정안 다시 만들기' : '수정안 만들기'}
           </button>
         </div>
