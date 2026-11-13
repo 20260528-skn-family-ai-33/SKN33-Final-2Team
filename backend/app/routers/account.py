@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import JSONResponse
 
-from .. import db, llm, provider_policy, regulation_embeddings
+from .. import db, llm, provider_keys, provider_policy, regulation_embeddings
 from ..agents import runtime as rt
 from ..auth import COOKIE, Account, end_session, hash_password, login, require_account, require_employee, start_session, verify_password
 from ..browser_console import demo_enabled, options as browser_options
@@ -146,9 +146,10 @@ def api_goals_ensure(a: Account = Depends(require_employee)):
 def api_providers(a: Account = Depends(require_account)):
     policy, level = provider_policy.selection()
     settings = _settings(a.id, (policy, level)) if a.type == 'employee' else {}
+    connection = provider_keys.runpod(S) if a.type == 'admin' else llm.ollama_connection()
     return {'current': settings.get('aiProvider') or provider_policy.resolve(policy, None),
             'policy': policy, 'employeeReasoning': settings.get('reasoning', {}), 'demoMode': demo_enabled(S.demo_mode), 'providers': [
-        {'id': 'ollama', 'label': 'RunPod-Ollama', 'available': llm.available('ollama'), 'reason': unavailable_reason('ollama'), 'target': 'runpod' if browser_options.get().ollama_url else S.ollama_target if S.ollama_url else '',
+        {'id': 'ollama', 'label': 'RunPod-Ollama', 'available': bool(connection.url), 'reason': '' if connection.url else unavailable_reason('ollama'), 'target': connection.target if connection.url else '',
          'models': dict({r: llm.model_name('ollama', r) for r in ('default', 'roadmap', 'regulation', 'vision')}, embed=regulation_embeddings.model()),
          'timeout': S.ollama_timeout,
          # 추론 정도: 모든 역할을 늘 끄고 부르므로 고를 단계가 없다(빈 목록 → 화면에 고르는 칸을 두지 않음)
@@ -212,6 +213,8 @@ def api_status(provider: str = 'ollama', a: Account = Depends(require_account)):
     if a.type == 'employee' and provider_policy.current() not in ('employee', provider):
         raise ApiError(409, 'PROVIDER_MANAGED', '관리자가 지정한 모델의 연결만 확인할 수 있어요')
     try:
+        if a.type == 'admin' and provider == 'ollama':
+            return llm.ping('ollama', connection=provider_keys.runpod(S))
         return llm.ping(provider)
     except llm.LlmError as e:
         from ..errors import cause
