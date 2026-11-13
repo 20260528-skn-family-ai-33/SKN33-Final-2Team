@@ -69,7 +69,7 @@ class EmployeeChatbotTest(unittest.TestCase):
                   patch.object(rt.db, 'one', return_value=settings) as load_settings,
                   patch.object(profile, 'employee_group', return_value='일반직') as load_group,
                   patch.object(profile, 'view', side_effect=AssertionError('프로필 조회 금지')),
-                  patch.object(reg.question_classifier, 'classify', return_value={'label': '사내 규정'}) as classify,
+                  patch.object(reg.question_classifier, 'classify', return_value={'label': '사내 규정', 'confidence': 0.9}) as classify,
                   patch.object(reg.llm, 'available', return_value=True), patch.object(rt, '_log') as log,
                   patch.object(regstore, 'search', return_value=[{'id': 'work-7'}]) as search,
                   patch.object(regstore, 'explicit_ref', return_value=None),
@@ -184,18 +184,22 @@ class DocumentScopeTest(unittest.TestCase):
         self.assertEqual(result['summary'], '원문 안내')
         group.assert_not_called()
 
-    def test_regulation_question_without_employee_group_fails_before_search_and_model(self):
-        for group in (None, '', '  '):
+    def test_all_questions_without_employee_group_fail_before_classification_search_and_model(self):
+        cases = [(group, question) for group in (None, '', '  ')
+                 for question in ('교육비 지원 조건', '구내식당 메뉴는?', '수자원공사는 어떤 일을 하나요?',
+                                  '오늘 날씨는?', '실무직 교육비 지원 기준은?')]
+        for group, question in cases:
             ctx = rt.Ctx(employee_id=42, me={'empGroup': group})
-            with (self.subTest(group=group),
+            with (self.subTest(group=group, question=question),
                   patch.object(reg.llm, 'available', return_value=True),
-                  patch.object(reg.question_classifier, 'classify', return_value={'label': '사내 규정'}),
+                  patch.object(reg.question_classifier, 'classify') as classify,
                   patch.object(rt, '_log') as log,
                   patch.object(regstore, 'search') as search,
                   patch.object(regstore, 'explicit_ref') as explicit_ref,
-                  patch.object(reg.grounded_answer, 'generate') as model,
+                  patch.object(rt, 'llm_json') as model,
                   self.assertRaises(AgentError) as error):
-                reg.answer(ctx, '교육비 지원 조건', [], {}, documents_only=True)
+                reg.answer(ctx, question, [], {}, documents_only=True)
+            classify.assert_not_called()
             search.assert_not_called()
             explicit_ref.assert_not_called()
             model.assert_not_called()
