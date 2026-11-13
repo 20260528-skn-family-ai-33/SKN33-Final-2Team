@@ -655,6 +655,35 @@ docker compose exec -T db sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d 
 ALTER TABLE app_ext.user_settings DROP COLUMN IF EXISTS tutorial_answered_at;
 ```
 
+### 진단 설문 사전 생성 풀 (#225, 2026-11-12)
+
+진단 요청 때 설문 문항을 모델로 만들며 기다리던 시간을 없앤다. 스킬 태그마다 5점 자기평가 문항 5개를 미리 만들어 DB에 두고, 진단 요청에서는 바로 읽어 보여 준다. 퀴즈는 이전처럼 설문을 푸는 동안 모델로 만든다(`quizStatus=pending` → `ready`).
+
+- 저장: `app_ext.skill_survey_pool`(스킬 태그당 1행, `surveys` jsonb 5개, 생성 모델·프롬프트 해시). 태그 이름이 바뀐 행은 쓰지 않는다.
+- 읽기: `services/survey_pool.py`. 선택 스킬이 1개면 5문항, 여러 개면 스킬마다 앞의 3문항을 쓴다(`generate_survey`의 문항 수 규칙과 같다).
+- 대체: 표가 없거나 선택 스킬 중 하나라도 풀이 없으면 그 진단은 이전처럼 모델로 설문을 만든다.
+- 문항은 특정 직원·프로젝트를 가정하지 않는 스킬 공통 문항이다. 프로젝트 맥락은 퀴즈에만 반영된다.
+
+**DB 적용(이 버전의 앱을 올리기 전에 DB마다 한 번):** 저장소 루트에서 실행한다. 다시 실행해도 결과는 같다.
+
+```bash
+docker compose exec -T db sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < backend/db/migrate_survey_pool.sql
+```
+
+**문항 채우기:** `backend/`에서 실행한다. 옵션 없이 실행하면 만들 스킬 수만 보여 주고 모델 호출·DB 쓰기를 하지 않는다. `--apply`는 풀이 없는 스킬마다 모델을 1회 호출하고 저장하며, `--max-calls`보다 많으면 시작하지 않는다. 중간에 실패해도 저장된 스킬은 남고, 다시 실행하면 남은 스킬만 만든다.
+
+```bash
+python tools/generate_survey_pool.py
+python tools/generate_survey_pool.py --apply --provider openai --max-calls 5 --skill Python
+python tools/generate_survey_pool.py --apply --provider openai --max-calls <스킬 수>
+```
+
+**복구:** 풀을 지우면 모든 진단이 이전처럼 모델로 설문을 만든다.
+
+```sql
+DROP TABLE IF EXISTS app_ext.skill_survey_pool;
+```
+
 ### LLM 도서 후보 최소 확보 (#76)
 
 세 코스는 스킬별 도서 검색 결과를 공유한다. `book_candidates.common_pool`은 공통 스킬의 적용 목표와 책의 제목·소개로 순위를 보완하고, 각 스킬의 후보 3권을 먼저 확보한 뒤 나머지를 교차 배분한다. 고유 도서는 최대 30권이다. 실제로 태그가 연결된 공유 도서만 다른 스킬의 후보로 사용할 수 있고, 사용 불가 자료·태그 불일치·중복 ISBN은 최소 수량에 포함하지 않는다.

@@ -28,6 +28,7 @@ SUMMARY = {'purpose':'공개 규정의 수집·정제, RAG 검색·생성, 근�
 class SurveyMemory:
     def __init__(self,draft):self.raw={'gp5':1,'draft':deepcopy(draft)};self.writes=[]
     def one(self,*args,**kwargs):return {'draft_choices':deepcopy(self.raw)}
+    def val(self,*args,**kwargs):return None  # 설문 풀(#225) 표가 없는 DB: 이전처럼 모델로 설문을 만든다
     def run(self,sql,**params):
         self.writes.append((sql,deepcopy(params)))
         if 'value' in params:self.raw['v2Survey']=json.loads(params['value'])
