@@ -65,6 +65,7 @@ function ModelCall({ call, n, total }: { call: AgentModelCall; n: number; total:
         </span>
       </p>
       {call.error ? <p className="small log-err">{call.error}</p> : null}
+      {call.stageId ? <p className="small muted">호출 단계 · {call.stageId}</p> : null}
       <TextBlock label="시스템 지시" text={call.system} />
       {call.messages.map((m, i) => (
         <TextBlock key={i} label={i === last ? '보낸 입력' : `이전 대화 · ${m.role === 'assistant' ? '답변' : '질문'}`} text={m.content} />
@@ -80,6 +81,9 @@ export function AgentLogBody({ detail }: { detail: AgentLogDetail }) {
   return (
     <>
       {detail.error ? <p className="small log-err">{detail.error}</p> : null}
+      {detail.failedStage ? <p className="small log-err">실패 단계 · {detail.failedStage.label} ({detail.failedStage.id})</p> : null}
+      {detail.traceId ? <p className="small muted">추적 ID · {detail.traceId}</p> : null}
+      {detail.stages?.length ? <TextBlock label="단계별 실행 로그 (ok: 성공 · failed: 실패 · running: 진행)" text={JSON.stringify(detail.stages, null, 2)} /> : null}
       {run ? <TextBlock label="에이전트 입력" text={detail.input ?? ''} /> : null}
       {run ? <TextBlock label="에이전트 출력" text={detail.output ?? ''} /> : null}
       {detail.calls.map((c, i) => (

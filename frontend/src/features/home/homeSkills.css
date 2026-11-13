@@ -4,3 +4,7 @@
 
 /* 첫 화면 단계 안내: 작성 단계 수만큼 한 줄에(좁으면 두 칸씩) */
 .pstrip.steps{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+/* 주차 강조(#101): 펼친 '전체 활동'의 이번 주 묶음은 이번 주 색, 모든 활동(도서 제외)을 마친 묶음은 완료색. 색은 테마 변수(gp-v2.css --week·--done)에서 */
+.home-skill-group>h3{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.home-skill-group.is-current-week{border-color:var(--week-line);background:var(--week-soft);box-shadow:inset 4px 0 0 var(--week)}
+.home-skill-group.is-week-done{border-color:var(--done-line);background:var(--done-soft);box-shadow:inset 4px 0 0 var(--done)}

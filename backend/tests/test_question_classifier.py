@@ -131,8 +131,8 @@ class ClassifierRoutingTest(unittest.TestCase):
             reg._api(self.ctx, self.inp)
         model.assert_not_called()
 
-    def test_regulation_four_states_keep_server_route(self):
-        for status in ('found', 'partial', 'not_found', 'refused'):
+    def test_regulation_sources_support_cited_answers_and_refusal(self):
+        for status in ('found', 'partial', 'refused'):
             with self.subTest(status=status):
                 result, model = self.route('사내 규정', self.response(status))
                 self.assertEqual(result['kind'], 'regulation')
@@ -151,7 +151,7 @@ class ClassifierRoutingTest(unittest.TestCase):
         self.assertEqual(result['basis'], [])
         _, system, payload = model.call_args.args
         self.assertEqual(payload['sources'], [])
-        self.assertIn('not_found를 쓰고 sourceIds=[]', system)
+        self.assertIn('sources가 비어 있을 때만 status=not_found로 반환하고', system)
         self.assertIn('자료 부족이나 질문 뜻이 불명확한 경우는 refused가 아니다', system)
         self.assertIn('승진·보상 결과를 예측하지 않는다', system)
 
@@ -223,12 +223,15 @@ class ClassifierRoutingTest(unittest.TestCase):
             with self.subTest(status=status):
                 result, _ = self.route('사내 생활안내', self.response(status, summary='등록된 생활 안내예요.'))
                 self.assertEqual(result['evidenceStatus'], status)
+                self.assertEqual(result['summary'], '등록된 생활 안내예요.')
                 self.assertEqual(len(result['knowledgeSources']), 1 if status in ('found', 'partial') else 0)
 
-    def test_life_refusal_is_distinct_and_does_not_echo_sensitive_output(self):
-        result, _ = self.route('사내 생활안내', self.response(status='refused', summary='sensitive-secret'))
+    def test_life_refusal_preserves_reason_and_prohibits_sensitive_values_in_prompt(self):
+        reason = '비밀번호 공개 요청이라 인증정보 보호를 위해 제공할 수 없어요.'
+        result, model = self.route('사내 생활안내', self.response(status='refused', summary=reason))
         self.assertEqual(result['evidenceStatus'], 'refused')
-        self.assertNotIn('sensitive-secret', str(result))
+        self.assertEqual(result['summary'], reason)
+        self.assertIn('개인정보·비밀번호·키의 실제 값이나 민감한 원문을 재출력하지 않는다', model.call_args.args[1])
 
     def test_company_without_hits_does_not_invent_evidence(self):
         result, model = self.route('수자원공사 정보', self.response(status='not_found'))
@@ -244,6 +247,7 @@ class ClassifierRoutingTest(unittest.TestCase):
                 result, model = self.route('수자원공사 정보', self.response(status, summary='수돗물 공급 업무를 해요.'))
                 self.assertEqual(result['evidenceStatus'], status)
                 self.assertEqual(result['topic'], 'company')
+                self.assertEqual(result['summary'], '수돗물 공급 업무를 해요.')
                 if status in ('found', 'partial'):
                     self.assertEqual(result['knowledgeSources'][0]['chunkId'], 'company-1')
                     self.assertEqual(result['summary'], '수돗물 공급 업무를 해요.')

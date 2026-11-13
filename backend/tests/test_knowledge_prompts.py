@@ -50,13 +50,16 @@ class KnowledgePromptTest(unittest.TestCase):
                         response = {'status': status, 'summary': '기존 안내문', 'sourceIds': ids}
                         result, payload, schema = self.generate(provider, topic, response)
                         self.assertEqual(result, dict(response, sourceIds=['real-article-1'] if ids else []))
-                        self.assertIsNone(schema)
+                        if provider == 'ollama':
+                            self.assertEqual(schema['required'], ['status', 'summary', 'sourceIds'])
+                        else:
+                            self.assertIsNone(schema)
                         expected = answer.COMPANY_SYSTEM if topic == 'company' else answer.LIFE_SYSTEM
                         self.assertEqual(payload['messages'][0]['content'], expected)
                         self.assertNotEqual(expected, answer.REGULATION_SYSTEM)
                         self.assertNotEqual(answer.COMPANY_SYSTEM, answer.LIFE_SYSTEM)
                         if provider == 'ollama':
-                            self.assertEqual(payload['format'], 'json')
+                            self.assertEqual(payload['format'], schema)
                         else:
                             self.assertEqual(payload['response_format'], {'type': 'json_object'})
 

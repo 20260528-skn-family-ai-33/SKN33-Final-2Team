@@ -44,6 +44,9 @@
   --warn: #FBBF24; --warn-soft: rgba(251, 191, 36, .12);
   --danger: #F87171; --danger-soft: rgba(248, 113, 113, .12); --danger-line: rgba(248, 113, 113, .4);
   --ok: #4ADE80; --ok-soft: rgba(74, 222, 128, .12);
+  /* 주차 강조(#101): 강조색이 흰색이라 이번 주 강조가 색으로 보이지 않는다 → 이 테마에 있던 파랑(과정·정답 표시)을 쓰고, 완료는 초록을 진하게 */
+  --week: #60A5FA; --week-ink: #93C5FD; --week-soft: rgba(96, 165, 250, .13); --week-soft2: rgba(96, 165, 250, .22); --week-line: rgba(96, 165, 250, .55);
+  --done-ink: #86EFAC; --done-soft: rgba(74, 222, 128, .13); --done-line: rgba(74, 222, 128, .5);
   /* 사전 점검 설문(style.css)이 읽는 색 */
   --card: var(--surface); --soft: var(--sunk); --muted: var(--ink-3);
   --side-w: 0px; --r-lg: 0px; --r-md: 0px;
@@ -300,6 +303,8 @@
   .choice:hover, .chip:hover, .scale label:hover, .lik label:hover, .dq-opt:hover { border-color: var(--tm-w70); }
   .tag { background: var(--sunk); color: var(--ink-2); }
   .tag.line, .tag.dash { background: transparent; }
+  .tag.week { background: var(--week-soft2); color: var(--week-ink); }
+  .tag.done { background: var(--done-soft); color: var(--done-ink); }
   .cmp thead th { background: var(--surface-2); }
   .btn.ghost { color: var(--ink-2); }
   .btn.ghost:hover { background: rgba(255, 255, 255, .08); color: #fff; }
@@ -325,8 +330,9 @@
   .review-resource-card[data-kind=book] .review-kind-badge { color: #E5C995; }
   .review-task-choice:has(input:checked) { border-color: var(--accent-line); background: var(--accent-soft); }
   .review-generation-status { background: var(--accent-soft); color: var(--accent-ink); }
-  .review-skill-block.is-current-week, .roadmap-learning-group.is-current-week { border-color: var(--accent-line); background: var(--accent-soft); box-shadow: inset 4px 0 0 var(--accent); }
-  .roadmap-learning-anchor.is-current-week { background: var(--accent-soft2); }
+  .review-skill-block.is-current-week, .roadmap-learning-group.is-current-week, .home-skill-group.is-current-week { border-color: var(--week-line); background: var(--week-soft); box-shadow: inset 4px 0 0 var(--week); }
+  .review-skill-block.is-week-done, .roadmap-learning-group.is-week-done, .home-skill-group.is-week-done { border-color: var(--done-line); background: var(--done-soft); box-shadow: inset 4px 0 0 var(--done); }
+  .roadmap-learning-anchor.is-current-week { background: var(--week-soft2); }
   /* 결과 보고서의 사전·사후 색(#116): 어두운 바탕에서는 강조색을 낮추지 않고 그대로 쓴다 */
   .cmp-summary, .learning-check, .report-survey, .rpt-viz { --cmp-post: var(--accent); }
   /* #59 로 들어온 역량 테스트 결과 보기도 정답·오답 칸과 문항 번호에 옅은 바탕색을 직접 적어, 어두운 화면에서 밝은 상자로 튄다 */

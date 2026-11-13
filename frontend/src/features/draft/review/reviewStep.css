@@ -98,7 +98,15 @@ details.rv-skill > summary { display: flex; align-items: center; gap: 10px; list
 details.rv-skill > summary::-webkit-details-marker { display: none; }
 details.rv-skill > summary h3 { flex: 1; min-width: 0; margin: 0; font-size: 17px; overflow-wrap: anywhere; }
 details.rv-skill[open] > summary { padding-bottom: 14px; margin-bottom: 16px; border-bottom: 1px solid var(--line); }
-details.rv-skill.is-current-week { border-color: var(--accent-line); background: var(--accent-soft); box-shadow: inset 4px 0 0 var(--accent); }
+details.rv-skill.is-current-week { border-color: var(--week-line); background: var(--week-soft); box-shadow: inset 4px 0 0 var(--week); }
+details.rv-skill.is-week-done { border-color: var(--done-line); background: var(--done-soft); box-shadow: inset 4px 0 0 var(--done); }
+.rv-task.is-static.is-done { border-color: var(--done-line); background: var(--done-soft); }
+.rv-task.is-static.is-done .rv-task-kicker { color: var(--done-ink); }
+/* 좁은 화면: 이번 주·완료·기간 표시가 스킬 이름을 몇 글자 폭으로 누르지 않게 이름 다음 줄로 내린다(#101) */
+@media (max-width: 600px) {
+  details.rv-skill > summary { flex-wrap: wrap; row-gap: 8px; }
+  details.rv-skill > summary h3 { flex-basis: calc(100% - 40px); }
+}
 .rv-mini:focus-visible, .rv-task:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
 .rv-title-btn { padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
 .rv-title-btn:hover { text-decoration: underline; }
