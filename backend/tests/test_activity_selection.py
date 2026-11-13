@@ -22,8 +22,10 @@ class ActivityTests(unittest.TestCase):
  def test_unselected_material_rejected(self):
   acts=deepcopy(self.acts);acts[0]['res']='outside'
   with self.assertRaises(ApiError):self.propose(acts)
- def test_missing_selected_material_rejected(self):
-  with self.assertRaises(ApiError):self.propose(self.acts[1:])
+ def test_task_only_output_includes_the_selected_course(self):
+  result = self.propose(self.acts[1:])
+  self.assertEqual([(act['res'], act['title']) for act in result['option']['acts']],
+                   [('c', '자료'), (None, '적용')])
  def test_excluded_skill_rejected(self):
   acts=deepcopy(self.acts);acts[0]['skill']='other'
   with self.assertRaises(ApiError):self.propose(acts)

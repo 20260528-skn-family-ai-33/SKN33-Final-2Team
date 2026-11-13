@@ -113,78 +113,108 @@ def validate_summaries(summaries, active):
     return {name:[line.strip() for line in summaries[name]] for name in active}
 
 
-def propose(saved, draft, generate, source, *, previous=None):
-    active,payload=learning_context(saved,draft)
-    choices=saved['resourceChoices']
-    ids=[row['id'] for row in payload['materials']]
-    system=instructions(draft['chosen'])
-    if previous:
-        payload['previousProposals']=[{'acts':record['option']['acts']} for record in previous]
-    raw=generate(system,payload)
+def _answer(raw):
     if isinstance(raw, dict) and 'acts' not in raw and 'answer' in raw:
-        if isinstance(raw['answer'], dict):
-            raw = raw['answer']
-        elif isinstance(raw['answer'], str):
+        raw = raw['answer']
+        if isinstance(raw, str):
             try:
-                raw = json.loads(raw['answer'])
-            except Exception:
-                pass
-    acts=raw.get('acts') if isinstance(raw,dict) else None
-    if not isinstance(acts,list) or not acts: raise ApiError(422,'ACTIVITIES_INVALID','활동 제안을 확인하지 못했어요.')
-    # 모델 응답 정규화: 파인튜닝 모델이 skills 목록이나 res 키만으로 활동을 제안한 경우 복구
-    for act in acts:
-        if not isinstance(act, dict):
+                raw = json.loads(raw)
+            except ValueError:
+                return {}
+    return raw if isinstance(raw, dict) else {}
+
+
+def _read_activities(acts, choices):
+    """기존 모델의 자료 활동도 보존하되, 다른 스킬이나 미선택 자료는 거절한다."""
+    tasks = {}
+    materials = {}
+    if not isinstance(acts, list):
+        raise ApiError(422, 'ACTIVITIES_INVALID', '활동 제안을 확인하지 못했어요.')
+    for row in acts:
+        if not isinstance(row, dict):
+            raise ApiError(422, 'ACTIVITIES_INVALID', '활동의 형식을 확인하지 못했어요.')
+        rid = row.get('res')
+        if rid is not None and not isinstance(rid, str):
+            raise ApiError(422, 'ACTIVITIES_INVALID', '활동의 자료 ID를 확인하지 못했어요.')
+        skill = row.get('skill')
+        if not skill:
+            tags = row.get('skills')
+            if isinstance(tags, list):
+                skill = next((tag for tag in tags if isinstance(tag, str) and tag in choices), None)
+            if not skill and rid:
+                skill = next((name for name, choice in choices.items()
+                             if rid == choice['course'] or rid in choice['books']), None)
+            if not skill and len(choices) == 1:
+                skill = next(iter(choices))
+        title = str(row.get('title') or row.get('name') or '').strip()
+        how = str(row.get('how') or row.get('description') or row.get('content') or row.get('detail') or '').strip()
+        if not isinstance(skill, str) or skill not in choices or not title or not how:
+            raise ApiError(422, 'ACTIVITIES_INVALID', '활동의 역량 또는 설명이 일치하지 않아요.')
+        act = dict(row, skill=skill, title=title, how=how)
+        if not rid:
+            if skill in tasks:
+                raise ApiError(422, 'ACTIVITIES_INVALID', f'「{skill}」의 산출물 과제가 여러 개예요. 하나만 필요해요.')
+            tasks[skill] = act
             continue
-        if not act.get('skill'):
-            if isinstance(act.get('skills'), list):
-                match = next((s for s in act['skills'] if s in active), None)
-                if match:
-                    act['skill'] = match
-            if not act.get('skill') and act.get('res'):
-                match = next((s for s in active if act['res'] in choices[s]['books'] or choices[s]['course'] == act['res']), None)
-                if match:
-                    act['skill'] = match
-            if not act.get('skill') and len(active) == 1:
-                act['skill'] = active[0]
-        if not str(act.get('how') or '').strip():
-            act['how'] = str(act.get('description') or act.get('content') or act.get('detail') or '').strip()
-        if not str(act.get('title') or '').strip() and act.get('name'):
-            act['title'] = str(act.get('name')).strip()
-    summaries=validate_summaries(raw.get('skillSummaries'),active)
-    used=set(); covered=set(); task_skills=set()
-    for act in acts:
-        if not isinstance(act,dict) or act.get('skill') not in active or not str(act.get('title') or '').strip() or not str(act.get('how') or '').strip():
-            raise ApiError(422,'ACTIVITIES_INVALID','활동의 역량 또는 설명이 일치하지 않아요.')
-        skill=act['skill'];allowed=set(choices[skill]['books'])|{choices[skill]['course']}
-        if act.get('res') and act['res'] not in allowed: raise ApiError(422,'ACTIVITIES_INVALID','선택하지 않은 자료가 활동에 포함됐어요.')
-        if act.get('res'):used.add(act['res'])
-        covered.add(skill)
-        if not act.get('res'):task_skills.add(skill)
-    if covered!=set(active) or task_skills!=set(active) or used!=set(ids): raise ApiError(422,'ACTIVITIES_INVALID','선택한 역량·자료를 모두 반영하지 못했어요. 다시 제안받아 주세요.')
-    if any(sum(1 for act in acts if act['skill']==name and not act.get('res'))!=1 for name in active):
-        raise ApiError(422,'ACTIVITIES_INVALID','스킬마다 산출물 과제 하나가 필요해요.')
-    deduped=[]; by_pair={}; by_res={}
-    for act in acts:
-        if not act.get('res'):
-            deduped.append(deepcopy(act))
-            continue
-        by_res.setdefault(act['res'], deepcopy(act))
-        pair=(act['skill'],act['res'])
-        if pair not in by_pair:
-            item=deepcopy(act); by_pair[pair]=item; deduped.append(item)
-        else:
-            how=str(act.get('how') or '').strip()
-            if how and how not in by_pair[pair]['how']:
-                by_pair[pair]['how']=f"{by_pair[pair]['how'].rstrip()}\n{how}"
+        if rid != choices[skill]['course'] and rid not in choices[skill]['books']:
+            raise ApiError(422, 'ACTIVITIES_INVALID', '선택하지 않은 자료가 활동에 포함됐어요.')
+        pair = (skill, rid)
+        if pair not in materials:
+            materials[pair] = act
+        elif how not in materials[pair]['how']:
+            materials[pair]['how'] += '\n' + how
+    return tasks, materials
+
+
+def propose(saved, draft, generate, source, *, previous=None):
+    active, payload = learning_context(saved, draft)
+    system = instructions(draft['chosen'])
+    if previous:
+        payload['previousProposals'] = [{'acts': record['option']['acts']} for record in previous]
+    raw = _answer(generate(system, payload))
+    summaries = validate_summaries(raw.get('skillSummaries'), active)
+    choices = payload['choices']
+    tasks, material_acts = _read_activities(raw.get('acts'), choices)
+    missing = [name for name in active if name not in tasks]
+    if missing:
+        name_list = ', '.join(missing)
+        scoped = dict(saved, skillOrder=missing)
+        _, retry_payload = learning_context(scoped, draft)
+        if previous:
+            retry_payload['previousProposals'] = [{'acts': [a for a in row['option']['acts'] if a.get('skill') in missing]}
+                                                  for row in previous]
+        repair_system = system + '\n[누락 과제 보완] skillOrder에 지정한 스킬의 과제를 하나씩 acts에 반환한다. 기존 역량 요약은 다시 작성할 필요가 없다.'
+        repair = _answer(generate(repair_system, retry_payload))
+        try:
+            additional, _ = _read_activities(repair.get('acts'), retry_payload['choices'])
+        except ApiError as error:
+            raise ApiError(422, 'ACTIVITIES_INVALID', f'산출물 과제를 보완하지 못했어요({name_list}). {error.message}') from error
+        tasks.update(additional)
+        still_missing = [name for name in missing if name not in tasks]
+        if still_missing:
+            raise ApiError(422, 'ACTIVITIES_INVALID', f'산출물 과제가 빠졌어요({", ".join(still_missing)}). 다시 제안받아 주세요.')
+
+    resources = {row['id']: row for row in payload['materials']}
+    start_stage = (draft.get('handoff') or {}).get('startStage') or 1
+    acts = []
     for name in active:
-        for rid in [choices[name]['course']]+list(choices[name]['books']):
-            if rid and (name,rid) not in by_pair and rid in by_res:
-                item=dict(deepcopy(by_res[rid]),skill=name)
-                by_pair[(name,rid)]=item; deduped.append(item)
-    acts=deduped
-    base=deepcopy(draft['gen']['options'][draft['chosen']]);base['acts']=acts
-    option=RM.finish_option(draft['chosen'],base,source)
-    for target,source in zip(option['acts'],acts):target['skill']=source['skill']
+        choice = choices[name]
+        for rid in [choice['course'], *choice['books']]:
+            if not rid:
+                continue
+            material = material_acts.get((name, rid))
+            if material is None:
+                resource = resources[rid]
+                material = {'skill': name, 'stage': 2, 'res': rid, 'title': resource['title'],
+                            'hours': resource.get('hours'), 'how': f'선택한 자료에서 {name} 과제에 적용할 내용을 정리하세요.'}
+            acts.append(material)
+        acts.append(tasks[name])
+    base = deepcopy(draft['gen']['options'][draft['chosen']])
+    base['acts'] = acts
+    option = RM.finish_option(draft['chosen'], base, source)
+    # 최종 계획은 시작 단계보다 앞선 활동을 제외하므로 선택한 자료와 과제를 시작 단계부터 편성한다.
+    for act in option['acts']:
+        act['stage'] = max(act['stage'], start_stage)
     return {'id':str(uuid4()),'key':fingerprint(saved,draft),'option':option,'skillSummaries':summaries,'selectedIds':[act['id'] for act in option['acts']]}
 
 def selection_option(saved,draft,selected,proposal_id_=None):

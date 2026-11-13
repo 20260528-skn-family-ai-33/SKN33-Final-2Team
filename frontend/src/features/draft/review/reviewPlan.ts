@@ -9,7 +9,7 @@ export type ReviewProposal = {
   id: string; key: string; skillProposalIds?: Record<string, string>; skillSummaries?: Record<string, string[]>;
   option: ReviewOption; selectedIds: string[];
 };
-export type ReviewPlanState = { scope: string; plan: PlanContent | null; error?: string };
+export type ReviewPlanState = { scope: string; plan: PlanContent | null; error?: 'preparation' | 'calculation' };
 
 /** 계산 대기·실패 중에는 확인 가능한 과제만 표시하고 자료의 원본 시간을 사용하지 않는다. */
 export function reviewTaskDisplay(proposal: ReviewProposal | null, versions: ReviewProposal[], picks: Record<string, string>, start = 1): ReviewActivity[] {

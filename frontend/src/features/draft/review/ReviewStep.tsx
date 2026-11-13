@@ -95,7 +95,7 @@ export function ReviewStep() {
   const taskCount = reviewPlan ? reviewPlan.acts.filter(act => !act.res).length : 0;
   const costText = (cost: number, unknown: boolean) => cost === 0 ? (unknown ? '가격 확인 필요' : '무료') : `${cost.toLocaleString('ko-KR')}원${unknown ? '+' : ''}`;
   /* 계산을 기다리는 동안에는 값 자리에 뼈대를 그린다(높이는 값이 들어왔을 때와 같다). 실패하면 글로 알린다 */
-  const waiting = reviewError ? '계산하지 못했어요' : <span className="skel rv-skel-num" aria-hidden="true" />;
+  const waiting = reviewError ? '—' : <span className="skel rv-skel-num" aria-hidden="true" />;
   const waitingSub = reviewError ? ' ' : <span className="skel rv-skel-sub" aria-hidden="true" />;
   const skillCount = Math.min(3, Math.max(1, selectedSkills || 2));
   /* 확정할 수 없는 이유는 버튼 옆에 미리 적는다 */
@@ -160,7 +160,9 @@ export function ReviewStep() {
                 </li>
               ))}
             </ol>
-          ) : reviewError ? <div className="rv-weeks-wait" role="status">일정을 계산하지 못했어요.</div>
+          ) : reviewError ? <div className="rv-weeks-wait" role="status">{reviewError === 'calculation'
+            ? '일정을 계산하지 못했어요. 아래 오류 내용을 확인해 주세요.'
+            : '자료와 산출물 제안이 준비되면 주차별 일정이 표시돼요.'}</div>
             : <div className="rv-weeks-skel" role="status" aria-label="일정을 계산하고 있어요"><Skeleton kind="columns" count={skillCount} /></div>}
         </section>
 
