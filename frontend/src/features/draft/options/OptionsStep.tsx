@@ -1,4 +1,4 @@
-import { currentMaterialTotals } from './materialTotals';
+import { courseCostText, currentMaterialTotals } from './materialTotals';
 import { planDescription } from '@/shared/lib/planDescription';
 import { activityTime } from '@/shared/lib/resourceTime';
 import { invalidateDraft, invalidateMaterialChoices } from '../invalidation';
@@ -266,7 +266,7 @@ export function OptionsStep() {
   const showMaterials=()=>requestAnimationFrame(()=>materialPanel.current?.scrollIntoView({behavior:'smooth',block:'start'}));
   const editors=useRef<Record<string,ResourceSelectionHandle|null>>({});
   const [totals,setTotals]=useState<Record<string,MaterialTotals>>({});
-  const receiveTotals=useCallback((course:string,value:MaterialTotals)=>setTotals(old=>old[course]?.weeks===value.weeks&&old[course]?.amount===value.amount&&old[course]?.unknown===value.unknown&&old[course]?.version===value.version&&old[course]?.weeklyHours===value.weeklyHours?old:{...old,[course]:value}),[]);
+  const receiveTotals=useCallback((course:string,value:MaterialTotals)=>setTotals(old=>old[course]?.weeks===value.weeks&&old[course]?.courseCount===value.courseCount&&old[course]?.amount===value.amount&&old[course]?.unknown===value.unknown&&old[course]?.version===value.version&&old[course]?.weeklyHours===value.weeklyHours?old:{...old,[course]:value}),[]);
   async function changeVersion(course:string,direction:number){
     if(selecting)return;
     setSelecting(true);
@@ -300,14 +300,13 @@ export function OptionsStep() {
   const comparisonVisible=preparation.scope===comparisonScope&&(readyToReveal||preparation.revealed);
   const stateOf = (p: PlanContent) => materialPrepared[`${p.opt}:${materialVersionKey(p.def)}`];
   const currentTotals = (p: PlanContent) => currentMaterialTotals(totals[p.opt], materialVersionKey(p.def), p.hours, !regenBusy(d,p.opt) && stateOf(p) === 'ready');
-  const amountText = (t: MaterialTotals) => t.amount === 0 ? (t.unknown ? '가격 미확인' : '무료') : `${t.amount.toLocaleString()}원${t.unknown ? ' + 가격 미확인' : ''}`;
   /** 자료가 준비되기 전이나 주차를 계산하는 동안에는 계산값 대신 지금 상태를 적는다(사용자가 할 일이 있는 것처럼 보이지 않게).
       값과 같은 굵기·크기로 적어 옆 칸의 값과 높이를 맞춘다(#227).
       계산에 실패하면 자료 영역이 이유와 다시 시도를 보여 준다 */
   const waitText = (p: PlanContent) => <b><Wait>{regenBusy(d, p.opt) ? '다시 만드는 중' : stateOf(p) === 'failed' ? '준비 실패' : '계산 중…'}</Wait></b>;
   const materialSummary = (p: PlanContent) => {
     const current = currentTotals(p);
-    return current ? `자료 학습 ${current.weeks === null ? '주차 산정 필요' : `예상 ${current.weeks}주`} · 강좌 ${amountText(current)}` : '자료 준비 중…';
+    return current ? `자료 학습 ${current.weeks === null ? '주차 산정 필요' : `예상 ${current.weeks}주`} · 강좌 ${courseCostText(current)}` : '자료 준비 중…';
   };
   useCatalog((s) => s.res);
   useDraftWatch();
@@ -392,7 +391,7 @@ export function OptionsStep() {
         <dl className="opt-facts">
           <div><dt>자료 학습 기간</dt><dd>{t && t.weeks != null ? <><b>{t.weeks}</b>주</> : waitText(p)}</dd></div>
           <div><dt>주당</dt><dd><b>{p.hours}</b>시간</dd></div>
-          <div><dt>강좌 비용</dt><dd>{t ? <b>{amountText(t)}</b> : waitText(p)}</dd></div>
+          <div><dt>강좌 비용</dt><dd>{t ? <b>{courseCostText(t)}</b> : waitText(p)}</dd></div>
         </dl>
         <OptionSummary id={`course-summary-${p.opt}`} reason={p.def.reason} pros={p.def.pros} expanded />
         {versions(p)}
@@ -487,7 +486,7 @@ export function OptionsStep() {
           <div className="step-bar-sum" aria-live="polite">
             {chosen ? <b>{trackName(chosen.opt, chosen.name)}</b> : null}
             {block ? <span className="step-bar-wait">{block}</span>
-              : chosenTotals && chosen ? <><span>자료 학습 {chosenTotals.weeks == null ? '기간 계산 중…' : `${chosenTotals.weeks}주`}</span><span>주 {chosen.hours}시간</span><span>강좌 {amountText(chosenTotals)}</span></>
+              : chosenTotals && chosen ? <><span>자료 학습 {chosenTotals.weeks == null ? '기간 계산 중…' : `${chosenTotals.weeks}주`}</span><span>주 {chosen.hours}시간</span><span>강좌 {courseCostText(chosenTotals)}</span></>
               : null}
           </div>
           <div className="step-bar-btns">

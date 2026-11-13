@@ -43,10 +43,22 @@ def challenge_band(record: dict) -> int:
     return 2
 
 
+def zero_budget(value: int | float | str | None) -> bool:
+    """입력하지 않은 예산과 숫자·문자열로 저장된 명시적 0원을 구분한다."""
+    try:
+        return not isinstance(value, bool) and float(value) == 0
+    except (TypeError, ValueError):
+        return False
+
+
+def is_free(cost) -> bool:
+    return cost == 0 and not isinstance(cost, bool)
+
+
 def eligible(record: dict, track: str | None) -> bool:
     """관련성 검사와 별개인 코스별 가격·난이도 조건. 난이도는 강좌 단위로 적용한다."""
     if track == 'A1':
-        return record.get('cost') == 0 and not isinstance(record.get('cost'), bool)
+        return is_free(record.get('cost'))
     if track == 'A2':
         return challenge_band(record) == 2
     if track == 'A3':

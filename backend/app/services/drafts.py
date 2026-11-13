@@ -102,7 +102,7 @@ def pref_text(k: str, p: dict) -> str:
     if k == 'weeks':
         return f'{v}주 안에' if num(v) > 0 else '알아서 (정해진 기간 없음)'
     if k == 'budget':
-        return '알아서' if blank(v) else f'{int(num(v)):,}원' if num(v) > 0 else '0원 (무료 자료만)'
+        return '알아서' if blank(v) else f'{int(num(v)):,}원' if num(v) > 0 else '0원 (무료 강좌만)'
     if k == 'etc':
         return str(v or '').strip() or '없음'
     return ''
@@ -1022,7 +1022,7 @@ def confirm(employee_id: int, draft_id: str, start_mode: str | None = None) -> d
         else:
             o = g['options'][d['chosen']]
         plan = RM.build_plan(o, RM.params_of(d['handoff'], o), d['goal'])
-        validate_free_plan(t, plan)
+        validate_free_plan(t, plan, budget=(d.get('prefs') or {}).get('budget'))
         if assessment:
             questions = [dict(q, skill=group['skill'], area=group['skill']) for group in assessment['survey']['groups'] for q in group['surveys']]
             answers = {q['id']: str(assessment['answers'][q['id']]) for q in questions}

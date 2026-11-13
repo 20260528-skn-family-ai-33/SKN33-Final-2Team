@@ -83,7 +83,7 @@ export interface HandoffPrefs {
   formatKey: string;
   certRes: string | null;
   certPlan: string;
-  budgetWon: number;
+  budgetWon: number | null;
   budgetAuto: boolean;
   budgetLimit: number | null;
   weeklyHours: number | null;
