@@ -97,6 +97,11 @@ _excluded_lesson = re.compile(
     re.I)
 _lesson_clause_break = re.compile(r'[;\n]+|(?<=[.!?])\s+|(?<=지만)[,\s]+|(?<=않고)[,\s]+|(?<=하며)[,\s]+|'
                                   r'(?<!\w)(?:반면|하지만|but|whereas)(?!\w)', re.I)
+# 다른 수업의 미학습 범위를 수식어로 쓰고 이어서 이 수업의 학습을 명시한 경우.
+_other_course_comparison = re.compile(
+    r'(?:다른|기존|이전|앞선)\s*(?:강의|강좌|과정|수업|차시)(?:에서(?:는|도)?|가|는)\s*'
+    r'(?:다루|가르치|학습하|실습하)지(?:는)?\s*않(?:았던|은|는)\s+'
+    r'(?=.*(?:(?:학습|실습)(?:하|할|합)|배우|배울|배웁|다루|다룰|다룹|익히|익힐|익힙))')
 _linux_security_topics = (
     ('Linux 권한 설정', re.compile(r'권한|' + _en(r'permissions?'), re.I),
      re.compile(r'권한|접근\s*제어|' + _en(r'(?:permissions?|access control|chmod|chown|setuid|setgid|sudo)'), re.I)),
@@ -673,7 +678,7 @@ def _taught_text(text: str) -> str:
     if not _excluded_lesson.search(text):
         return text
     return ' '.join(clause.strip() for clause in _lesson_clause_break.split(text)
-                    if clause.strip() and not _excluded_lesson.search(clause))
+                    if clause.strip() and not _excluded_lesson.search(_other_course_comparison.sub('', clause)))
 
 
 def _platform_learning(skill: dict, context: str, title: str, rows: list, descriptions: list[str]) -> tuple[list, list[str]]:
@@ -707,7 +712,8 @@ def learning_rows(item: dict) -> list[tuple[int, dict, str]]:
         if any(part.strip() and not evidence.learning_lines(part) for part in parts):
             continue
         # 섹션 이름을 모든 하위 단원의 학습 근거로 반복 인정하지 않는다.
-        text = _taught_text(' '.join(' '.join(evidence.learning_lines(part)) for part in parts[1:]).strip()).casefold()
+        taught = (_taught_text(' '.join(evidence.learning_lines(part))) for part in parts[1:])
+        text = ' '.join(filter(None, taught)).casefold()
         if text:
             result.append((index, row, text))
     return result
