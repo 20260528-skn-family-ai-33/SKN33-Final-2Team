@@ -33,7 +33,7 @@ from . import profile as PF
 STEP_ROUTES = ['new-goal', 'new-details', 'new-details-check', 'new-quiz', 'new-result', 'new-result-edit', 'new-gen', 'new-options', 'new-materials', 'new-review']
 # deepOn·deepMcq·deepEssay: 심화 질문을 풀지(체크)와 객관식·서술형 답(10/23)
 # startMode: 진행 중인 로드맵이 있을 때 작성 탭에 들어오며 고른 시작 방식(확정 때 화면이 보낸다)
-CLIENT_KEYS = ('goal', 'project', 'prefs', 'detailsOk', 'answers', 'deepOn', 'deepMcq', 'deepEssay', 'chosen', 'edit', 'lastNew', 'selectedSkills', 'skillInputKey', 'skillCandidates', 'startMode')
+CLIENT_KEYS = ('goal', 'project', 'prefs', 'detailsOk', 'answers', 'deepOn', 'deepMcq', 'deepEssay', 'chosen', 'edit', 'lastNew', 'selectedSkills', 'skillInputKey', 'skillCandidates', 'fixedSkillNames', 'skillPool', 'startMode')
 _images: dict[str, list] = {}   # 기획서 이미지(base64)는 DB에 넣지 않고 서버 메모리에만 잠깐 둔다
 _img_lock = threading.Lock()
 
