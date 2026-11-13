@@ -101,7 +101,7 @@ class ClassifierRoutingTest(unittest.TestCase):
         self.addCleanup(mock.stop)
 
     def route(self, label, response):
-        self.classify.return_value = {'label': label}
+        self.classify.return_value = {'label': label, 'confidence': 0.9}
         with patch.object(rt, 'llm_json', return_value=response) as model:
             result = reg._api(self.ctx, self.inp)
         return result, model
@@ -190,7 +190,8 @@ class ClassifierRoutingTest(unittest.TestCase):
                 self.route('사내 규정', value)
 
     def test_explicit_unregistered_article_keeps_note(self):
-        self.explicit_ref.return_value = {'ids': [], 'note': '요청한 조항이 등록되지 않았어요.'}
+        self.explicit_ref.return_value = {'ids': [], 'where': '제99조', 'focus': None,
+                                          'note': '요청한 조항이 등록되지 않았어요.'}
         result, _ = self.route('사내 규정', self.response(status='not_found'))
         self.assertEqual(result['evidenceStatus'], 'not_found')
         self.assertIn('요청한 조항', result['summary'])

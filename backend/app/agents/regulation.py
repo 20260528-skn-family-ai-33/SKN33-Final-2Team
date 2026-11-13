@@ -768,7 +768,8 @@ def answer(ctx: rt.Ctx, question: str, history: list, context: dict, sim: str | 
     """
     me = ctx.me if ctx.me else {}
     inp = isolate_input(question, history, me, context, documents_only=documents_only)
-    task = f"사내 생활 질문 분류·답변{f' (앞 대화 {len(inp[\"history\"])}턴 포함)' if inp['history'] else ''}"
+    history_suffix = f" (앞 대화 {len(inp['history'])}턴 포함)" if inp['history'] else ''
+    task = f'사내 생활 질문 분류·답변{history_suffix}'
     mock = _mock_documents if documents_only else _mock
     a = rt.run(ctx, '규정 에이전트', task, inp, mock, lambda i: _api(ctx, i), role='regulation', sim=sim, mock_delay=0.38,
                log_input={'question': question, 'context': inp['context'], 'history': inp['history']})

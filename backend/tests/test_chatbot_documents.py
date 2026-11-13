@@ -69,7 +69,7 @@ class EmployeeChatbotTest(unittest.TestCase):
                   patch.object(rt.db, 'one', return_value=settings) as load_settings,
                   patch.object(profile, 'employee_group', return_value='일반직') as load_group,
                   patch.object(profile, 'view', side_effect=AssertionError('프로필 조회 금지')),
-                  patch.object(reg.question_classifier, 'classify', return_value={'label': '사내 규정'}) as classify,
+                  patch.object(reg.question_classifier, 'classify', return_value={'label': '사내 규정', 'confidence': 0.9}) as classify,
                   patch.object(reg.llm, 'available', return_value=True), patch.object(rt, '_log') as log,
                   patch.object(regstore, 'search', return_value=[{'id': 'work-7'}]) as search,
                   patch.object(regstore, 'explicit_ref', return_value=None),
