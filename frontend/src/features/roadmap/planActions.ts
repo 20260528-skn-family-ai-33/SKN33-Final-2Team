@@ -23,11 +23,11 @@ export function takePlan(r: PlanResponse | null | undefined): PlanRecord | null 
   return ws().plans[r.plan.id] || null;
 }
 
-export async function pullPlan(pid: string): Promise<PlanRecord | null> {
+export async function pullPlan(pid: string, quiet = false): Promise<PlanRecord | null> {
   try {
     return takePlan(await plansApi.get(pid));
   } catch (err) {
-    failToast(err, '로드맵을 불러오지 못했어요');
+    if (!quiet) failToast(err, '로드맵을 불러오지 못했어요');
     return null;
   }
 }
@@ -162,7 +162,7 @@ export async function revise(pid: string, settingsOnly = false): Promise<void> {
     x.pending = null;
   });
   try {
-    await plansApi.revise(pid, { rev: { on: request.on, v: request.v, note: request.note, fromComment: request.fromComment }, key });
+    await plansApi.revise(pid, { rev: { on: request.on, v: request.v, note: request.note, fromComment: request.fromComment }, key, settingsOnly });
   } catch (err) {
     updateWs((s) => {
       const x = s.plans[pid];

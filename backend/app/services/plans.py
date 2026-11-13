@@ -505,6 +505,11 @@ def _revision_content(plan: dict, skills: set[str] | None = None) -> tuple:
     return settings, activities
 
 
+def _revision_activities(plan: dict) -> list:
+    return [(a['id'], a.get('res'), a.get('title'), a.get('how') or '', a.get('stage'),
+             a.get('hours'), a.get('skill'), a.get('skills') or []) for a in plan['acts']]
+
+
 def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
     """수정안 작성(API-43). 확정하기 전까지 기존 로드맵은 그대로. 실패하면 가데이터로 대신하지 않는다"""
     from .drafts import handoff_prefs
@@ -519,9 +524,12 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
             raise ApiError(422, 'REVISION_SKILLS_INVALID', '다시 제안받을 스킬을 확인해 주세요.')
         retry = _revision(str(row['roadmap_id']))
         pending = (retry or {}).get('result') or {}
-        if not retry or retry['status'] != 'ready' or str(retry['revision_id']) != body.get('revisionId') or pending.get('fromComment') or pending.get('from') != base:
+        if not retry or retry['status'] != 'ready' or str(retry['revision_id']) != body.get('revisionId') or pending.get('fromComment') or pending.get('settingsOnly') or pending.get('from') != base:
             raise ApiError(409, 'REVISION_CHANGED', '현재 수정안을 다시 확인해 주세요.')
     rev = body.get('rev') or {}
+    settings_only = body.get('settingsOnly') is True
+    if settings_only and (retry_skill is not None or rev.get('fromComment') or set(k for k, enabled in (rev.get('on') or {}).items() if enabled) - {'hours', 'weeks', 'budget', 'format', 'cert', 'etc'}):
+        raise ApiError(422, 'REVISION_SETTINGS_ONLY', '학습 여건만 선택해 주세요.')
     comment = next((c for c in _comments(roadmap_id) if c['id'] == rev['fromComment']), None) if rev.get('fromComment') else None
     if rev.get('fromComment') and not comment:
         raise not_found('코멘트')
@@ -569,7 +577,7 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
             req = f'{skill}의 강좌는 이미 완료되었습니다. 완료된 강좌는 새 강좌를 추가하지 말고 그대로 유지하고, 미완료 산출물만 새로 작성해 주세요.\n{req}'
         elif 'task' not in targets and 'course' in targets:
             req = f'{skill}의 산출물은 이미 완료되었습니다. 완료된 산출물은 그대로 유지하고, 미완료 강좌만 새로 추천해 주세요.\n{req}'
-    if not skill and not rev.get('fromComment') and (base.get('def') or {}).get('learningReport'):
+    if not settings_only and not skill and not rev.get('fromComment') and (base.get('def') or {}).get('learningReport'):
         # 일반 수정 요청(전체 수정안): 완료된 활동/도서는 보존하고, 미완료된 각 스킬의 강좌·산출물을 새 제안으로 교체 (#226)
         undone_changeable = [
             a for a in base['acts']
@@ -602,6 +610,11 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
             out = RM.revise(ctx, inp, sim=rt.sim_once(ctx, 'rev', str(body.get('key') or rev_id)))
             if skill:
                 out = _skill_comment_option(out, base, targets, skill, handoff)
+            if settings_only:
+                proposed = RM.keep_ids(out, base, base['version'] + 1)
+                candidate = RM.build_plan(proposed, {'start': base['start'], 'hours': base['hours']}, base['goal'])
+                if candidate['opt'] != base['opt'] or _revision_activities(candidate) != _revision_activities(base):
+                    raise ApiError(422, 'REVISION_SETTINGS_ONLY', '학습 여건 수정안에서 기존 활동이 변경됐어요. 다시 요청해 주세요.')
         except (AgentError, ApiError) as error:
             with db.tx() as t:
                 t.run("UPDATE app_ext.roadmap_revisions SET status = 'failed', error = :e, updated_at = now() WHERE revision_id = CAST(:i AS uuid) AND status = 'running'",
@@ -642,7 +655,7 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
             return {'revisionId': rev_id, 'noChanges': _revision_content(pending['to'], {retry_skill}) == _revision_content(updated, {retry_skill})}
         summary = str(out.get('summary') or '').strip()
         pd = {'from': base, 'to': to, 'key': body.get('key'), 'request': req, 'fromComment': rev.get('fromComment') or False, 'summary': summary, 'notes': out.get('notes') or [],
-              'source': d.get('source'), 'prefsFrom': base.get('prefs'), 'prefsTo': ch['raw'], 'handoff': handoff,
+              'settingsOnly': settings_only, 'source': d.get('source'), 'prefsFrom': base.get('prefs'), 'prefsTo': ch['raw'], 'handoff': handoff,
               'label': f"{'부서장 코멘트 반영' if rev.get('fromComment') else '수정 요청 반영'}{' · ' + summary if summary else ''}"[:70]}
         if comment:
             pd['commentStamp'] = comment['stamp']
@@ -769,6 +782,10 @@ def accept_revision(employee_id: int, roadmap_id: str, revision_id: str, selecte
             for aid, old_a in cur_done_acts.items():
                 if aid not in to_acts or any(to_acts[aid].get(k) != old_a.get(k) for k in ('res', 'title', 'how', 'stage', 'hours', 'skill', 'skills')):
                     raise ApiError(409, 'REVISION_CHANGED', '완료한 활동은 바꿀 수 없어요. 기존 계획을 유지해 주세요.')
+        if pd.get('settingsOnly'):
+            current = t.val('SELECT content FROM public.roadmaps WHERE roadmap_id = :r', r=row['roadmap_id'])
+            if current != pd['from'] or plan['opt'] != current['opt'] or _revision_activities(plan) != _revision_activities(current):
+                raise ApiError(409, 'REVISION_CHANGED', '기존 활동이 변경됐어요. 수정안을 다시 요청해 주세요.')
         evidence = baseline.get('selectionEvidence') if isinstance(baseline, dict) else None
         if not isinstance(evidence, dict):
             evidence = cur.get('selectionEvidence')

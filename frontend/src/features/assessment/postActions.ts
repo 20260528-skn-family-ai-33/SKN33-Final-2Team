@@ -113,11 +113,11 @@ export async function waitReport(go: ReturnType<typeof useGo>, pid: string, jobI
         toast('결과 보고서가 나왔어요 · 점검·보고서에서 볼 수 있어요');
       }
     } else {
-      let updated = await pullPlan(pid);
+      let updated = await pullPlan(pid, true);
       while (!updated || updated.post.running) {
         await new Promise((resolve) => setTimeout(resolve, 5000));
         if (me()?.id !== employeeId || ws().plans[pid]?.post.jobId !== jobId) return;
-        updated = await pullPlan(pid);
+        updated = await pullPlan(pid, true);
       }
       if (updated?.status === 'done' && !updated.post.running) {
         try {
