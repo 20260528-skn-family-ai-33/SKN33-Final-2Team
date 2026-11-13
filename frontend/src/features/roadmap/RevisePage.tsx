@@ -13,13 +13,12 @@ import { trackName } from '@/shared/constants/data';
 import { useEffect, useId, useRef, useState } from 'react';
 import { newIdToPath, paths } from '@/app/paths';
 import type { PendingRevision, PlanContent, PlanRecord, RevForm } from '@/api/types/plan';
-import { CertPicker } from '@/features/draft/details/CertPicker';
 import { enterNewRoadmap } from '@/features/draft/startModeSheet';
 import { D } from '@/shared/constants/data';
 import { useGo } from '@/shared/hooks/useGo';
 import { clone } from '@/shared/lib/format';
 import { actMeta, diff, isBookActivity, st, stageName } from '@/shared/lib/plan';
-import { certNameOf, prefText } from '@/shared/lib/prefs';
+import { prefText } from '@/shared/lib/prefs';
 import { ai, cause, errText, PROV } from '@/shared/state/ai';
 import { setAt } from '@/shared/state/bind';
 import { useCatalog } from '@/shared/state/catalog';
@@ -95,7 +94,6 @@ export function DiffView({ pd }: { pd: PendingRevision }) {
 const curText = (k: string, pl: PlanContent): string => {
   const p = pl.prefs || emptyPrefs();
   if (k === 'hours') return `주 ${pl.hours}시간${+p.hours > 0 ? '' : ' (에이전트가 정함)'}`;
-  if (k === 'cert') return certNameOf(p) || '계획 없음';
   if (['weeks', 'budget', 'format', 'etc'].includes(k)) return prefText(k as 'weeks', p);
   if (k === 'start') return `${pl.start}단계 ${stageName(pl.start)}`;
   if (k === 'pid') return `${trackName(pl.opt, pl.name)}`;
@@ -160,13 +158,6 @@ function RevCtl({ k, R }: { k: string; R: PlanRecord }) {
         ))}
       </select>
     );
-  if (k === 'cert')
-    return (
-      <>
-        <CertPicker path={`${base}.cert`} />
-        <small className="muted">분야를 고른 뒤 자격을 골라 주세요. ‘계획 없음’이면 자격 준비 활동을 빼요</small>
-      </>
-    );
   if (k === 'etc')
     return <BText path={`${base}.etc`} className="textarea sm" maxLength={500} ariaLabel={lab} placeholder="예: 다음 달 둘째 주는 출장이 많아요. 평일 저녁에만 공부할 수 있어요." />;
   if (k === 'start')
@@ -216,7 +207,6 @@ function RevCtl({ k, R }: { k: string; R: PlanRecord }) {
           ariaLabel="직접 할 과제"
           placeholder={'직접 할 과제를 한 줄에 하나씩 적어 주세요 (선택)\n예: 부서 FAQ 20건으로 답변 품질 점검하기'}
         />
-        <small className="muted">자격증은 위 ‘자격증 계획’에서 바꿔요</small>
       </>
     );
   }
@@ -526,7 +516,7 @@ function Revise({ R }: { R: PlanRecord }) {
   };
   const stale = !!(cm && r.cmStamp && cm.stamp !== r.cmStamp);
   const fail = r.fail && 'cause' in r.fail && r.fail.cause ? cause(r.fail.cause) : null;
-  const ok = revOk(R) && !cm?.deleted && cm?.status !== 'applied';
+  const ok = revOk(R, settingsOnly && !r.fromComment) && !cm?.deleted && cm?.status !== 'applied';
   let out: React.ReactNode = null;
   if (busy)
     out = (

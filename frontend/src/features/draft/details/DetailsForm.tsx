@@ -4,10 +4,8 @@ import './detailsForm.css';
 import { D } from '@/shared/constants/data';
 import { fieldLabel } from '@/shared/lib/prefs';
 import { setAt, useAt } from '@/shared/state/bind';
-import { useCatalog } from '@/shared/state/catalog';
 import { BNum, BText } from '@/shared/ui/bound';
 import type { Prefs } from '@/api/types/draft';
-import { CertPicker } from './CertPicker';
 
 function Field({ k, wide, help, children }: { k: string; wide?: boolean; help?: string; children: React.ReactNode }) {
   return (
@@ -41,14 +39,10 @@ const Num = ({ path, k, unit, min, max, step }: { path: string; k: keyof Prefs; 
 );
 
 export function DetailsForm({ path, learningConditionsOnly = false }: { path: string; learningConditionsOnly?: boolean }) {
-  const n = useCatalog((s) => s.certGroups.reduce((a, g) => a + g.certs.length, 0));
   return (
     <div className={`dform${learningConditionsOnly ? ' dform-conditions' : ''}`}>
       {!learningConditionsOnly && <Field k="format" help="비워 두면 목표와 자료에 맞게 정해요">
         <Sel path={path} k="format" opts={D.formatOpts} />
-      </Field>}
-      {!learningConditionsOnly && <Field k="cert" help={`분야를 고른 뒤 자격을 골라 주세요(${n}종). 고르지 않으면 자격 준비는 넣지 않아요`}>
-        <CertPicker path={`${path}.cert`} />
       </Field>}
       <Field k="hours" help={learningConditionsOnly ? undefined : "비워 두면 로드맵 계획 에이전트가 목표와 기간에 맞게 정해요"}>
         <Num path={path} k="hours" unit="시간 / 주" min={0.5} max={40} step={0.5} />

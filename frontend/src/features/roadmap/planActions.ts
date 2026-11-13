@@ -77,7 +77,6 @@ export const REV_ITEMS: [string, string, 'cond' | 'plan' | 'acts'][] = [
   ['weeks', '정해진 기간', 'cond'],
   ['budget', '교육 예산', 'cond'],
   ['format', '학습 방식', 'cond'],
-  ['cert', '자격증 계획', 'cond'],
   ['etc', '일정·환경 제약', 'cond'],
   ['start', '시작 단계', 'plan'],
   ['pid', '관점', 'plan'],
@@ -141,17 +140,25 @@ export const revKey = (r: RevForm): string =>
     r.v.replaceHow,
     String(r.note || '').trim(),
   ]);
-export function revOk(R: PlanRecord | null | undefined): boolean {
+export function revOk(R: PlanRecord | null | undefined, settingsOnly = false): boolean {
   const r = R?.rev;
   if (!R || !r || r.running) return false;
   const ks = revPicked(r);
+  if (settingsOnly) {
+    const changed = REV_ITEMS.some(([k, , group]) => {
+      const field = k as keyof RevForm["v"];
+      const prior = R.plan.prefs?.[k as keyof NonNullable<typeof R.plan.prefs>];
+      return group === "cond" && r.on[k] && String(r.v[field] ?? "").trim() !== String(prior ?? "").trim();
+    });
+    if (!changed) return false;
+  }
   return ks.every((k) => revItemOk(r, k, R.plan.opt)) && (ks.length > 0 || !!String(r.note || '').trim());
 }
 
 export async function revise(pid: string, settingsOnly = false): Promise<void> {
   const R = ws().plans[pid];
   const r = R && R.rev;
-  if (!r || r.running) return;
+  if (!r || r.running || (settingsOnly && !revOk(R, true))) return;
   const request = settingsOnly ? { ...r, on: Object.fromEntries(REV_ITEMS.filter(([, , group]) => group === "cond").map(([k]) => [k, r.on[k]])), note: "학습 여건만 조정하고 기존 활동은 모두 그대로 유지해 주세요." } : r;
   const key = revKey(request);
   updateWs((s) => {

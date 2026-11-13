@@ -414,18 +414,18 @@ def resume(employee_id: int, roadmap_id: str) -> dict:
 
 
 # ── 수정안 (API-43~45) ──
-REV_FIELDS = {'hours': '주당 학습 시간', 'weeks': '정해진 기간', 'budget': '교육 예산', 'format': '학습 방식', 'cert': '자격증 계획', 'etc': '일정·환경 제약',
+REV_FIELDS = {'hours': '주당 학습 시간', 'weeks': '정해진 기간', 'budget': '교육 예산', 'format': '학습 방식', 'etc': '일정·환경 제약',
               'start': '시작 단계', 'pid': '관점', 'remove': '활동 빼기', 'replace': '활동 바꾸기', 'add': '활동 추가'}
 
 
 def _rev_changes(r: dict, pl: dict) -> dict:
     """수정 요청 화면에서 고른 항목만 사람이 읽는 값으로 (4차 revChanges)"""
-    from .drafts import pref_text, cert_res
+    from .drafts import pref_text
     v, on, c = r['v'], r.get('on') or {}, {}
     blank = lambda x: x in ('', None)  # noqa: E731
     act_ref = lambda i: next(({'key': a['id'], 'title': a['title']} for a in pl['acts'] if a['id'] == i), None)  # noqa: E731
     raw = dict(pl.get('prefs') or {})
-    for k in ('hours', 'weeks', 'budget', 'format', 'cert', 'etc'):
+    for k in ('hours', 'weeks', 'budget', 'format', 'etc'):
         if on.get(k):
             raw[k] = v.get(k)
     if on.get('hours'):
@@ -436,9 +436,6 @@ def _rev_changes(r: dict, pl: dict) -> dict:
         c['budgetWon'] = '알아서' if blank(v.get('budget')) else int(float(v['budget']))
     if on.get('format'):
         c['format'] = pref_text('format', raw)
-    if on.get('cert'):
-        cc = catalog.cert_by_code(raw.get('cert'))
-        c['certification'] = cc['title'] if cc else '계획 없음'
     if on.get('etc'):
         c['constraints'] = str(v.get('etc') or '').strip() or '없음'
     if on.get('start'):
@@ -457,8 +454,7 @@ def _rev_changes(r: dict, pl: dict) -> dict:
         tasks = [x.strip() for x in str(v.get('addTask') or '').split('\n') if x.strip()][:5]
         if tasks:
             c['addTasks'] = tasks
-    return {'c': c, 'raw': raw, 'pid': v['pid'] if on.get('pid') and v.get('pid') != pl['opt'] else pl['opt'], 'start': int(v['start']) if on.get('start') else pl['start'],
-            'certRes': cert_res(raw)}
+    return {'c': c, 'raw': raw, 'pid': v['pid'] if on.get('pid') and v.get('pid') != pl['opt'] else pl['opt'], 'start': int(v['start']) if on.get('start') else pl['start']}
 
 
 def _skill_comment_option(out: dict, base: dict, targets: dict, skill: str, handoff: dict) -> dict:
@@ -528,7 +524,7 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
             raise ApiError(409, 'REVISION_CHANGED', '현재 수정안을 다시 확인해 주세요.')
     rev = body.get('rev') or {}
     settings_only = body.get('settingsOnly') is True
-    if settings_only and (retry_skill is not None or rev.get('fromComment') or set(k for k, enabled in (rev.get('on') or {}).items() if enabled) - {'hours', 'weeks', 'budget', 'format', 'cert', 'etc'}):
+    if settings_only and (retry_skill is not None or rev.get('fromComment') or set(k for k, enabled in (rev.get('on') or {}).items() if enabled) - {'hours', 'weeks', 'budget', 'format', 'etc'}):
         raise ApiError(422, 'REVISION_SETTINGS_ONLY', '학습 여건만 선택해 주세요.')
     comment = next((c for c in _comments(roadmap_id) if c['id'] == rev['fromComment']), None) if rev.get('fromComment') else None
     if rev.get('fromComment') and not comment:
@@ -539,7 +535,13 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
     if skill:
         rev = dict(rev, on={})
     ch = _rev_changes(rev, base)
-    prefs_h = handoff_prefs(ch['raw'])
+    if settings_only and not any(
+        str(value if value is not None else "").strip() != str(previous if previous is not None else "").strip()
+        for key, value in ch["raw"].items()
+        for previous in [(base.get("prefs") or {}).get(key)]
+    ):
+        raise ApiError(422, "REVISION_SETTINGS_ONLY", "변경할 학습 여건을 선택해 주세요.")
+    prefs_h = handoff_prefs(ch["raw"])
     previous_handoff = dict(base.get('handoff') or {})
     if 'userNotes' not in previous_handoff and 'etc' not in (previous_handoff.get('details') or {}):
         legacy_note = str((base.get('prefs') or {}).get('etc') or '').strip()
