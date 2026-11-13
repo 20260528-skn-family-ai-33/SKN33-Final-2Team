@@ -569,7 +569,7 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
             req = f'{skill}의 강좌는 이미 완료되었습니다. 완료된 강좌는 새 강좌를 추가하지 말고 그대로 유지하고, 미완료 산출물만 새로 작성해 주세요.\n{req}'
         elif 'task' not in targets and 'course' in targets:
             req = f'{skill}의 산출물은 이미 완료되었습니다. 완료된 산출물은 그대로 유지하고, 미완료 강좌만 새로 추천해 주세요.\n{req}'
-    if not skill and (base.get('def') or {}).get('learningReport'):
+    if not skill and not rev.get('fromComment') and (base.get('def') or {}).get('learningReport'):
         # 일반 수정 요청(전체 수정안): 완료된 활동/도서는 보존하고, 미완료된 각 스킬의 강좌·산출물을 새 제안으로 교체 (#226)
         undone_changeable = [
             a for a in base['acts']
