@@ -8,7 +8,7 @@ COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY frontend/ .
 COPY VERSION /app/VERSION
-# 시연 도구는 기본으로 숨긴다. 로컬 시연에서만 --build-arg VITE_DEMO_TOOLS=on과 서버 GP5_DEMO_MODE=on을 함께 설정한다.
+# 시연 도구의 빌드 기본값. 사용자는 콘솔에서 이 브라우저의 설정을 바꿀 수 있다.
 ARG VITE_DEMO_TOOLS=off
 ENV VITE_DEMO_TOOLS=$VITE_DEMO_TOOLS
 RUN npm run build

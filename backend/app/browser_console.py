@@ -7,8 +7,8 @@ import re
 
 @dataclass(frozen=True)
 class BrowserOptions:
-    picker_off: bool = False
-    demo_off: bool = False
+    picker: bool | None = None
+    demo: bool | None = None
     timeout: int | None = None
     input_tokens: int | None = None
     output_tokens: int | None = None
@@ -19,8 +19,9 @@ class BrowserOptions:
 options = ContextVar('browser_options', default=BrowserOptions())
 
 
-def demo_enabled(server_allowed: bool) -> bool:
-    return server_allowed and not options.get().demo_off
+def demo_enabled(default: bool) -> bool:
+    override = options.get().demo
+    return default if override is None else override
 
 
 def runpod_url(value: str) -> str:
@@ -39,24 +40,29 @@ def runpod_url(value: str) -> str:
     raise ValueError('RunPod HTTPS 프록시 또는 공개 IPv4와 TCP 포트를 입력해 주세요.')
 
 
-def from_headers(headers, demo_allowed: bool) -> BrowserOptions:
+def from_headers(headers, demo_default: bool) -> BrowserOptions:
+    def toggle(name: str) -> bool | None:
+        return {'on': True, 'off': False}.get(headers.get(name))
+
+    demo = toggle('x-growpath-demo')
+    enabled = demo_default if demo is None else demo
+
     def number(name: str, maximum: int) -> int | None:
         raw = headers.get(name)
-        if raw is None or not demo_allowed or demo_off:
+        if raw is None or not enabled:
             return None
         if not raw.isascii() or not raw.isdecimal() or len(raw) > 6 or not 1 <= int(raw) <= maximum:
             raise ValueError(f'{name} 범위는 1~{maximum}입니다.')
         return int(raw)
 
-    demo_off = headers.get('x-growpath-demo') == 'off'
     url = key = None
-    if demo_allowed and not demo_off:
+    if enabled:
         url = headers.get('x-growpath-ollama-url')
         if url is not None:
             url = runpod_url(url)
         key = headers.get('x-growpath-ollama-key')
         if key is not None and not re.fullmatch(r'[!-~]{1,1024}', key):
             raise ValueError('Ollama API 키는 공백 없는 ASCII 문자 1~1024자여야 합니다.')
-    return BrowserOptions(headers.get('x-growpath-picker') == 'off', demo_off,
+    return BrowserOptions(toggle('x-growpath-picker'), demo,
                           number('x-growpath-timeout', 900), number('x-growpath-input', 131072),
                           number('x-growpath-output', 32768), url, key)
