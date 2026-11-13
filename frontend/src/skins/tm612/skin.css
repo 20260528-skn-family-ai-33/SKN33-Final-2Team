@@ -44,8 +44,9 @@
   --warn: #FBBF24; --warn-soft: rgba(251, 191, 36, .12);
   --danger: #F87171; --danger-soft: rgba(248, 113, 113, .12); --danger-line: rgba(248, 113, 113, .4);
   --ok: #4ADE80; --ok-soft: rgba(74, 222, 128, .12);
-  /* 주차 강조(#101): 강조색이 흰색이라 이번 주 강조가 색으로 보이지 않는다 → 이 테마에 있던 파랑(과정·정답 표시)을 쓰고, 완료는 초록을 진하게 */
-  --week: #60A5FA; --week-ink: #93C5FD; --week-soft: rgba(96, 165, 250, .13); --week-soft2: rgba(96, 165, 250, .22); --week-line: rgba(96, 165, 250, .55);
+  /* 주차 강조(#101 · #227): 이번 주는 이 테마의 강조색인 흰색으로(파랑은 흑백 화면에서 혼자 떠 보였다). 바탕 차이가 작아 왼쪽 흰 띠와 꼬리표가 구분을 맡는다.
+     완료는 초록을 진하게 */
+  --week: var(--accent); --week-ink: var(--accent-ink); --week-soft: var(--accent-soft); --week-soft2: var(--accent-soft2); --week-line: var(--accent-line);
   --done-ink: #86EFAC; --done-soft: rgba(74, 222, 128, .13); --done-line: rgba(74, 222, 128, .5);
   /* 사전 점검 설문(style.css)이 읽는 색 */
   --card: var(--surface); --soft: var(--sunk); --muted: var(--ink-3);
@@ -303,7 +304,8 @@
   .choice:hover, .chip:hover, .scale label:hover, .lik label:hover, .dq-opt:hover { border-color: var(--tm-w70); }
   .tag { background: var(--sunk); color: var(--ink-2); }
   .tag.line, .tag.dash { background: transparent; }
-  .tag.week { background: var(--week-soft2); color: var(--week-ink); }
+  /* 꼬리표는 주 버튼처럼 흰 바탕에 어두운 글자 */
+  .tag.week { background: var(--week); color: var(--tm-on-accent); box-shadow: none; }
   .tag.done { background: var(--done-soft); color: var(--done-ink); }
   .cmp thead th { background: var(--surface-2); }
   .btn.ghost { color: var(--ink-2); }
@@ -311,6 +313,9 @@
   .back { border-color: var(--line-2); color: var(--ink-2); }
   .back:hover { border-color: #fff; color: #fff; }
   .stepper li.done .sn { background: var(--accent-soft2); border-color: var(--accent-line); color: var(--accent-ink); }
+  /* 단계 이름은 사진 위에 놓인다: 지금 단계가 아닌 이름도 읽히게 한 단계 밝히고 그림자로 사진에서 띄운다(#227) */
+  .stepper .sl { text-shadow: 0 1px 2px rgba(0, 0, 0, .8); }
+  .stepper li:not(.cur) .sl { color: var(--ink-2); }
   .ov { background: rgba(0, 0, 0, .68); }
   .sheet, .regp, .adm-panel { border: 1px solid var(--line); }
   .sheet-h, .sheet-f, .chat-f, .adm-ph, .adm-pf { border-color: var(--line); }

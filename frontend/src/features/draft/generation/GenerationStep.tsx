@@ -17,7 +17,6 @@ import { draftCall, syncGenCur } from '../draftSync';
 import { startEdit, genStart } from '../result/ResultStep';
 import { Stepper } from '../Stepper';
 import { useDraftWatch } from '../useDraftWatch';
-import { stepLabel } from '../model';
 import { EducationGuide } from './EducationGuide';
 import { genStartedAt } from './genStartedAt';
 
@@ -240,7 +239,7 @@ export function GenerationStep() {
         title={done ? '로드맵 3안이 준비됐어요' : '로드맵 3안을 만들고 있어요'}
         lead={
           done
-            ? `‘다음: ${stepLabel('options')}’을 눌러 세 코스를 비교해 보세요.`
+            ? '‘세 코스 비교하기’를 눌러 코스를 고르고 자료를 정해 보세요.'
             : ai.mode() === 'ollama'
               ? '방식이 다른 세 코스를 함께 요청했어요. AI 서버 사정에 따라 차례대로 처리돼 시간이 더 걸릴 수 있어요. 다른 화면에 다녀와도 계속 만들어요.'
               : '방식이 다른 세 코스를 동시에 만들고 있어요. 보통 1~2분 걸리고, 다른 화면에 다녀와도 계속 만들어요.'
@@ -252,7 +251,7 @@ export function GenerationStep() {
               이전
             </button>
             <button className="btn pri" disabled={!done} onClick={() => go(paths.newOptions)}>
-              다음: {stepLabel('options')}
+              세 코스 비교하기
             </button>
           </>
         }

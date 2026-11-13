@@ -151,10 +151,10 @@ export function StageCard({ R }: { R: PlanRecord }) {
   });
   const hasHiddenShared = shared.some(course => course.to < week || course.from > week);
   const hasMore = hasHiddenActs || hasHiddenShared || orderedSkills.length > currentSkills.size;
-  /* 묶음 강조(#101): 모든 활동(도서 제외)을 마친 묶음은 완료색, 펼친 '전체 활동'에서는 이번 주 묶음을 이번 주 색으로 칠한다.
-     접힌 '이번 주차 활동'은 모두 이번 주라 이번 주 색은 쓰지 않는다 */
+  /* 묶음 강조(#101): 모든 활동(도서 제외)을 마친 묶음은 완료색, 이번 주 묶음은 이번 주 색으로 칠한다.
+     접힌 '이번 주차 활동'에서도 같은 색을 쓴다: 펼쳤을 때 같은 묶음의 모양이 바뀌지 않게(#227) */
   const tone = (activities: typeof pl.acts, inThisWeek: boolean) => {
-    const current = expanded && !later && inThisWeek;
+    const current = !later && inThisWeek;
     const className = weekToneClass(trackedActs(activities), R.progress, current);
     return { className, tags: <>{current ? <span className="tag week">이번 주</span> : null}{className === ' is-week-done' ? <span className="tag done">완료</span> : null}</> };
   };

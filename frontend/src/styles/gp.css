@@ -777,7 +777,8 @@ body:has(#toast:not([hidden])) .nfloat { bottom: 140px; }
 .nfloat-go > svg.i { width: 16px; height: 16px; flex: none; }
 .nfloat-tx { flex: 1; min-width: 0; display: grid; gap: 2px; }
 .nfloat-tx b { font-size: 14px; font-weight: 650; overflow-wrap: anywhere; }
-.nfloat-tx small { overflow: hidden; font-size: 12px; opacity: .75; text-overflow: ellipsis; white-space: nowrap; }
+/* 설명은 두 줄까지 보여 준다(한 줄로 자르면 로드맵 이름이 중간에 끊겼다 · #227) */
+.nfloat-tx small { display: -webkit-box; overflow: hidden; font-size: 12px; opacity: .75; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; }
 .nfloat-cta { display: inline-flex; flex: none; align-items: center; gap: 2px; font-size: 13px; font-weight: 600; }
 .nfloat-cta svg.i, .nfloat-x svg.i { width: 14px; height: 14px; }
 .nfloat-x { flex: none; width: 40px; display: grid; place-items: center; border: 0; border-left: 1px solid color-mix(in srgb, currentColor 18%, transparent); background: none; opacity: .8; }
@@ -946,7 +947,8 @@ body:has(#toast:not([hidden])) .nfloat { bottom: 140px; }
 
 .roadmap-preview-toggle {
   display: flex;
-  align-items: center;
+  /* 지도 아이콘은 두 줄 묶음의 가운데가 아니라 제목 줄에 맞춘다(가운데에 두면 제목보다 처져 보였다 · #227) */
+  align-items: flex-start;
   gap: 10px;
   flex: 1;
   min-width: 0;
@@ -975,6 +977,10 @@ body:has(#toast:not([hidden])) .nfloat { bottom: 140px; }
   color: var(--ink-3);
   font-size: 12px;
 }
+
+.roadmap-preview-toggle > svg { margin-top: 3px; }
+/* 펼치기 표시(▾)는 바로 옆 '바로가기' 버튼과 같은 높이(카드 가운데)에 둔다 */
+.roadmap-preview-toggle > span:last-child { align-self: center; }
 
 .roadmap-preview-head > .btn {
   flex-shrink: 0;
@@ -1010,11 +1016,14 @@ body:has(#toast:not([hidden])) .nfloat { bottom: 140px; }
   font-weight: 700;
 }
 
+/* 보고서 구역은 로드맵 제목 글자의 시작선(아이콘 18px + 간격 10px)에 맞추고, 소제목은 제목보다 작은 라벨로 둔다(#227) */
 .roadmap-preview-reports {
+  margin-top: 16px;
   border-top: 1px solid var(--line);
-  padding: 12px 16px;
+  padding: 14px 0 0 28px;
 }
-.roadmap-preview-reports > h3 { margin: 0 0 8px; }
+.roadmap-preview .roadmap-preview-reports > h3.st { margin: 0 0 8px; font-size: 12.5px; font-weight: 500; line-height: 1.5; letter-spacing: 0; text-transform: none; color: var(--ink-3); }
+.roadmap-preview-reports .li { padding: 8px 14px; }
 
 .roadmap-preview-request {
   margin-top: 16px;
@@ -1054,7 +1063,8 @@ body:has(#toast:not([hidden])) .nfloat { bottom: 140px; }
   display: inline-flex;
   align-items: center;
   flex-shrink: 0;
-  padding: 4px 8px;
+  /* 제목 줄(24px)을 밀어내지 않는 높이 */
+  padding: 2px 8px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: transparent;
@@ -1064,10 +1074,11 @@ body:has(#toast:not([hidden])) .nfloat { bottom: 140px; }
   line-height: 1.4;
 }
 
+/* 완료 배지는 테마 강조색에서 가져온다(고정 연두색은 어두운 테마에서 혼자 떠 보였다 · #227) */
 .roadmap-info-badge.done {
-  border-color: #83b58e;
-  background: #eaf6ed;
-  color: #23743a;
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
   font-weight: 600;
 }
 

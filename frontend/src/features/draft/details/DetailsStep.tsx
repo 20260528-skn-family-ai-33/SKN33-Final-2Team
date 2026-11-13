@@ -62,7 +62,7 @@ export function DetailsStep() {
 export const DetailsView = ({ p }: { p: Prefs }) => (
   <div className="card acc preview">
     <p className="eyebrow">
-      세부사항
+      세부 사항
     </p>
     <dl className="kv">
       {D.detailFields.filter(([key]) => key !== 'format' && key !== 'cert').map(([k, l]) => (

@@ -220,7 +220,7 @@ export function DemoTools() {
       <p className="small muted" style={{ margin: '2px 0 8px 24px', fontSize: 11.5, lineHeight: 1.4 }}>
         {srv}
         <br />
-        사용자 모드는 좌측 ‘AI 모델’에서 골라요 · 서버가 가데이터 응답을 만들어요
+        사용자 모드는 화면 위 ‘AI 모델’에서 골라요 · 서버가 가데이터 응답을 만들어요
       </p>
       <div className="foot-lbl" style={{ marginTop: 4 }}>
         생성 실패 시연

@@ -133,7 +133,7 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
         const skillLabel=`${course.skills.join(' · ')} 공통`;
         const show=()=>openSheet({title:course.title,sub:skillLabel,body:()=> <div>{course.activities.map(activity=><section key={activity.id}><h3>{activity.skill}</h3><ul className="acts"><ActRow a={activity} R={R}/></ul></section>)}</div>});
         return <Row key={`shared:${course.id}`} lv={1} ins={up}
-          label={<button className="gt-a" aria-label={`${course.title} · ${skillLabel} · 관련 스킬 기록 열기`} onClick={show}><span className="gt-name">{course.title}<small>{skillLabel}</small></span>{done?<Icon name="check" cls="gt-ok"/>:null}</button>}
+          label={<button className="gt-a" aria-label={`${course.title} · ${skillLabel} · 관련 스킬 기록 열기`} onClick={show}><span className="gt-name" title={course.title}>{course.title}<small>{skillLabel}</small></span>{done?<Icon name="check" cls="gt-ok"/>:null}</button>}
           bar={<button type="button" className={`gt-bar act gt-materials-open${done?' done':''}`} aria-label={`${course.title} · ${skillLabel} · ${course.from}~${course.to}주차`} onClick={show} style={gtPos(off+7*(course.from-1),off+7*course.to,T)}>{done?<Icon name="check"/>:null}</button>}
           tip={{v:when(course.from,course.to),t:course.title,m:skillLabel}}/>;
       })}
@@ -208,7 +208,7 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
                   <>
                     <Tg k={cluster.key} name={cluster.title} onToggle={() => onToggle(cluster.key)} />
                     <span className="gt-no">{cluster.noLabel}</span>
-                    <span className="gt-name">{cluster.title}</span>
+                    <span className="gt-name" title={cluster.title}>{cluster.title}</span>
                     <span className="gt-sub">
                       {dn}/{total}
                     </span>
@@ -304,7 +304,7 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
                           label={
                             <button className="gt-a" aria-label={`${no} ${a.title}, ${w}, ${m}, ${task ? '과제물 제출 열기' : '실행 기록 열기'}`} onClick={() => openRecord(R.id, a.id)}>
                               <span className="gt-no">{no}</span>
-                              <span className="gt-name">{a.title}</span>
+                              <span className="gt-name" title={a.title}>{a.title}</span>
                               {done ? <Icon name="check" cls="gt-ok" /> : null}
                             </button>
                           }
@@ -533,7 +533,7 @@ export function GanttAll({ list, onMove }: { list: PlanRecord[]; onMove?: (id: s
             <>
               <Tg k={R.id} name={pl.displayTitle || pl.goal} onToggle={() => toggle(R.id)} />
               <button className="gt-r" onClick={() => go(paths.roadmap(R.id))}>
-                <span className="gt-name">{pl.displayTitle || pl.goal}</span>
+                <span className="gt-name" title={pl.displayTitle || pl.goal}>{pl.displayTitle || pl.goal}</span>
                 <small>
                   {at} · {trackName(pl.opt, pl.name)}
                 </small>
