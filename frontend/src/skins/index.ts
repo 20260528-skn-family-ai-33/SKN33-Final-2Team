@@ -11,6 +11,7 @@
    - 기본 테마는 612 Parallax Starter · 상단 메뉴(pick.ts DEFAULT_SKIN · 2026-11-12 #211에서 464 → 612). 테마를 덧씌우지 않은 '원래 화면'은 고르기에서 뺐지만,
      원래 화면의 CSS(styles/gp*.css)는 모든 테마가 그 위에 얹히므로 그대로 둔다.
    - 테마마다 메뉴 위치가 다른 두 버전: 상단 메뉴(기본) · 좌측 메뉴(<html data-nav="side">, 예전 원래 화면과 같은 배치).
+     좌측 메뉴는 화면 폭이 1200px 이상일 때만 그린다(pick.ts SIDE_NAV_MIN_WIDTH · 좁으면 상단 메뉴로).
      skin.css 에서 상단 메뉴 규칙은 &:not([data-nav="side"]) { … }, 좌측 메뉴 규칙은 &[data-nav="side"] { … } 안에 둔다.
    - 본문 폭도 두 가지: 넓은 본문 폭(기본 · gp.css) · 이전 본문 폭(<html data-width="narrow"> · width.css). 테마와 상관없이 고른다.
    - 테마 추가 = 폴더 추가, 빼기 = 폴더 삭제. 이 파일이 폴더를 알아서 찾는다.
@@ -18,7 +19,7 @@
      (형식은 pick.ts). 상자에서 고른 값과 ?skin= 으로 연 값만 이 브라우저에 기억한다. 열기만 해서는 기억하지 않으므로
      아무것도 고르지 않은 브라우저는 기본 테마가 바뀌면 따라간다(2026-11-12 #211).
    - 최종 결정 뒤에는 최신 main 에서 새 브랜치를 만들고 고른 폴더만 가져가 정식으로 적용한다. 이 고르기 장치(width.css 포함)는 가져가지 않는다. */
-import { type Choice, choiceToRemember, formatChoice, pickChoice } from './pick';
+import { type Choice, choiceToRemember, formatChoice, pickChoice, SIDE_NAV_MIN_WIDTH } from './pick';
 import './width.css';
 import './reveal.css';
 import './reveal';
@@ -70,6 +71,10 @@ function forgetOld(): void {
   }
 }
 
+/* 좌측 메뉴는 넓은 화면에서만 쓴다(#227): 메뉴 248px 를 빼면 본문이 좁아져 작성 단계 줄이 잘렸다.
+   이 폭보다 좁으면 고른 값은 그대로 기억한 채 상단 메뉴로 그리고, 다시 넓히면 좌측 메뉴로 돌아온다 */
+const sideFits = window.matchMedia(`(min-width: ${SIDE_NAV_MIN_WIDTH}px)`);
+
 const query = new URLSearchParams(window.location.search).get('skin');
 let current: Choice = pickChoice(query, load(), IDS);
 
@@ -81,7 +86,7 @@ function apply(c: Choice): void {
   else delete root.dataset.skin;
   if (skin?.reveal) root.dataset.reveal = '';
   else delete root.dataset.reveal;
-  if (skin && c.side) root.dataset.nav = 'side';
+  if (skin && c.side && sideFits.matches) root.dataset.nav = 'side';
   else delete root.dataset.nav;
   if (c.narrow) root.dataset.width = 'narrow';
   else delete root.dataset.width;
@@ -114,6 +119,7 @@ export function setChoice(c: Choice): void {
 }
 
 apply(current);
+sideFits.addEventListener('change', () => apply(current));
 forgetOld();
 // 열기만 한 때는 기억하지 않는다(?skin= 으로 연 때만 · pick.ts choiceToRemember)
 const remember = choiceToRemember(query, IDS);

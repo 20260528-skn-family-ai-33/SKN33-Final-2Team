@@ -315,11 +315,11 @@ export function userTodo(kind?: string): string[] {
   const canSwitch = (!g().status.policy || g().status.policy === 'employee') && ai.available(other);
   if (kind === 'off')
     return ['서버 연결과 모델 설정을 확인해 주세요.', '자동 대체하지 않아요. 연결한 뒤 다시 시도해 주세요.'].concat(
-      canSwitch ? [`좌측 ‘AI 모델’에서 ${PROV[other]}를 골라 볼 수도 있어요.`] : [],
+      canSwitch ? [`화면 위 ‘AI 모델’에서 ${PROV[other]}를 골라 볼 수도 있어요.`] : [],
     );
   if (kind === 'lost') return ['다시 시도하면 새로 만들어요.'];
   const t = [kind === 'format' ? '다시 시도하면 대부분 해결돼요.' : '잠시 뒤 다시 시도해 주세요.'];
-  if (kind !== 'server' && !ai.demoMock() && canSwitch) t.push(`좌측 ‘AI 모델’에서 ${PROV[other]}를 골라 볼 수도 있어요.`);
+  if (kind !== 'server' && !ai.demoMock() && canSwitch) t.push(`화면 위 ‘AI 모델’에서 ${PROV[other]}를 골라 볼 수도 있어요.`);
   t.push('계속되면 담당자에게 알려 주세요.');
   return t;
 }

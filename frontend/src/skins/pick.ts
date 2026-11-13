@@ -7,6 +7,9 @@
     열기만 한 브라우저는 고른 값을 기억하지 않으므로(choiceToRemember), 기본값을 바꾸면 직접 고르지 않은 브라우저는 다음에 열 때 따라간다 */
 export const DEFAULT_SKIN = 'tm612';
 
+/** 좌측 메뉴를 그리는 가장 좁은 화면 폭(px). 본문에 상단 메뉴 버전의 960px 만큼은 남긴다(메뉴 248px 포함) */
+export const SIDE_NAV_MIN_WIDTH = 1200;
+
 export interface Choice {
   /** 테마 id(skins/<id>/) */
   skin: string;

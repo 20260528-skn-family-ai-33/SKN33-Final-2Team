@@ -20,6 +20,7 @@ import { FillAnswersButton } from '@/features/demo/FillAnswersButton';
 import { Icon } from '@/shared/ui/Icon';
 import { AgentRow, FailPage, Note, OpsBox, Page, runSub, via } from '@/shared/ui/parts';
 import { Skeleton } from '@/shared/ui/Skeleton';
+import { Wait } from '@/shared/ui/Wait';
 import { deepOpen, ensurePostQuiz, makeReport, savePost, waitReport } from './postActions';
 import { QuizBody } from './quizParts';
 import { PostQuiz } from './PostQuiz';
@@ -210,7 +211,7 @@ function Post({ R }: { R: PlanRecord }) {
             </button>
             <button type="button" className="btn pri" disabled role="status">
               <span className="sp" aria-hidden="true" />
-              보고서 작성 중
+              <Wait>보고서 작성 중…</Wait>
             </button>
           </>
         ) : hasQuiz && curPhase === 'surveys' ? (

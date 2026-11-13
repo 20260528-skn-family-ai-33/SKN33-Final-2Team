@@ -38,6 +38,7 @@ import { syncGenCur, DraftSaveError, draftCall, flush, takeDraft } from '../draf
 import { STEPS } from '../model';
 import { Stepper } from '../Stepper';
 import { useDraftWatch } from '../useDraftWatch';
+import { Wait } from '@/shared/ui/Wait';
 
 /** 고른 안의 계획 계산 매개변수(진단 에이전트가 넘긴 학습 선호 기준) */
 export function paramsOf(d: DraftDoc, opt?: OptionDef) {
@@ -301,8 +302,9 @@ export function OptionsStep() {
   const currentTotals = (p: PlanContent) => currentMaterialTotals(totals[p.opt], materialVersionKey(p.def), p.hours, !regenBusy(d,p.opt) && stateOf(p) === 'ready');
   const amountText = (t: MaterialTotals) => t.amount === 0 ? (t.unknown ? '가격 미확인' : '무료') : `${t.amount.toLocaleString()}원${t.unknown ? ' + 가격 미확인' : ''}`;
   /** 자료가 준비되기 전이나 주차를 계산하는 동안에는 계산값 대신 지금 상태를 적는다(사용자가 할 일이 있는 것처럼 보이지 않게).
+      값과 같은 굵기·크기로 적어 옆 칸의 값과 높이를 맞춘다(#227).
       계산에 실패하면 자료 영역이 이유와 다시 시도를 보여 준다 */
-  const waitText = (p: PlanContent) => regenBusy(d, p.opt) ? '다시 만드는 중' : stateOf(p) === 'failed' ? '준비 실패' : '계산 중…';
+  const waitText = (p: PlanContent) => <b><Wait>{regenBusy(d, p.opt) ? '다시 만드는 중' : stateOf(p) === 'failed' ? '준비 실패' : '계산 중…'}</Wait></b>;
   const materialSummary = (p: PlanContent) => {
     const current = currentTotals(p);
     return current ? `자료 학습 ${current.weeks === null ? '주차 산정 필요' : `예상 ${current.weeks}주`} · 강좌 ${amountText(current)}` : '자료 준비 중…';
@@ -408,7 +410,7 @@ export function OptionsStep() {
             {on ? <><Icon name="check" /> 선택한 코스</> : '이 코스 선택'}
           </button>
           <button type="button" className="btn sm ghost" disabled={busy} onClick={() => askRegenerate(p.opt)}>
-            {remaking ? <><span className="sp" aria-hidden="true" /> 다시 만드는 중…</> : <><Icon name="retry" /> 다르게 다시 만들기</>}
+            {remaking ? <><span className="sp" aria-hidden="true" /> <Wait>다시 만드는 중…</Wait></> : <><Icon name="retry" /> 다르게 다시 만들기</>}
           </button>
         </div>
       </article>
@@ -473,7 +475,7 @@ export function OptionsStep() {
               {compare ? <MaterialSkillTabs names={materialNames} active={activeMaterialSkill} onChange={setMaterialSkill} id={materialTabsId} panelId="material-comparison-panel"/> : null}
               <div className={compare ? 'material-course-comparison' : 'opt-material-list'} role={compare ? 'tabpanel' : undefined} id="material-comparison-panel" aria-labelledby={compare ? `${materialTabsId}-tab-${materialNames.indexOf(activeMaterialSkill)}` : undefined}>
                 {ps.map(p=><section className={`material-course-column${cur===p.opt?' is-selected':''}`} key={p.opt} hidden={!compare&&cur!==p.opt} aria-label={`${trackName(p.opt,p.name)} 자료`}>
-                  <header><h3>{trackName(p.opt,p.name)}</h3>{regenBusy(d,p.opt)?<span role="status"><span className="sp" aria-hidden="true"/> 이 코스의 로드맵을 다시 만드는 중…</span>:stateOf(p)!=='ready'?<span role="status">{stateOf(p)==='failed'?'이 코스의 자료 준비 실패':'이 코스의 자료 준비 중…'}</span>:null}<span hidden={regenBusy(d,p.opt)||stateOf(p)!=='ready'} title={materialSummary(p)}>{materialSummary(p)}</span></header>
+                  <header><h3>{trackName(p.opt,p.name)}</h3>{regenBusy(d,p.opt)?<span role="status"><span className="sp" aria-hidden="true"/> <Wait>이 코스의 로드맵을 다시 만드는 중…</Wait></span>:stateOf(p)!=='ready'?<span role="status"><Wait>{stateOf(p)==='failed'?'이 코스의 자료 준비 실패':'이 코스의 자료 준비 중…'}</Wait></span>:null}<span hidden={regenBusy(d,p.opt)||stateOf(p)!=='ready'} title={materialSummary(p)}>{materialSummary(p)}</span></header>
                   <ResourceSelection key={`${p.opt}:${p.def.optionId||p.tagline}`} ref={value=>{editors.current[p.opt]=value;}} courseId={p.opt} stacked={!compare} skillFilter={compare?activeMaterialSkill:undefined} sectionOpen={compare?materialSections:undefined} onSectionToggle={toggleMaterialSection} locked={regenBusy(d,p.opt)||selecting} onTotals={receiveTotals} onPrepared={receivePrepared} onChoicesChanged={()=>updateWs(state=>invalidateMaterialChoices(state,p.opt))}/>
                 </section>)}
               </div>
