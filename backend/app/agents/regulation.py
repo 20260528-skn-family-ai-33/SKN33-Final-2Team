@@ -409,7 +409,7 @@ def classify_question_roberta(question: str, history: list | None = None, me: di
        - 실제 모델 모드의 규정·회사 정보·생활안내·범위 밖 질문 모두 분류 전에 확인한다.
        - 직군이 없거나 빈 문자열·공백이면 즉시 AgentError를 발생시켜 인사 담당 부서 문의를 안내한다.
          질문이나 이전 대화의 직군으로 로그인한 직원의 누락 정보를 대신하지 않는다.
-    2. 질문(question) 안에 특정 직군 명칭이 언급되어 있으면 해당 직군을 우선 사용한다.
+    2. 질문(question) 안에 특정 직군 명칭이 언급되어 있으면 이번 조회에 해당 직군을 우선 사용한다.
     3. 질문에 직군이 없더라도 앞 대화와 실제로 이어지는 후속 질문(_follow_history)이라면,
        이어지는 대화 범위 내에서 다룬 직군을 계승한다. 새 주제로 전환되었으면 로그인한 직원의 직군을 사용한다.
     4. 직군과 대화 맥락을 결합하여 RoBERTa로 질문 유형을 1차 분류한다.
@@ -506,7 +506,10 @@ def retrieve_regulation_slots(ctx: rt.Ctx, inp: dict) -> list[str]:
     """⭐ [3-1단계 - 사내 규정 RAG를 통해서 근거 가져오기 (조항 및 부모 슬롯 확보)]
     BGE-M3(벡터) + BM25(키워드) 하이브리드 검색으로 사내 규정 관련 조항을 찾고,
     명시적으로 요청한 조항(explicit_ref)을 검색 후보보다 먼저 최우선 확보하며,
-    부모 조항(parent_context) 최대 2슬롯을 우선 확보하여 조항 ID(ids)를 선별한다. (이슈 #138 해결)
+    기본 7슬롯을 핵심 근거 4개·부모 문맥 최대 2개·참조 문단 최대 1개로 배분한다.
+    현재 질문의 검색 근거를 먼저 확보하고 이전 답변 근거는 최대 1개만 보충한다.
+    부모·참조가 부족하면 남은 자리는 검색 근거로 채운다.
+    명시 조항이 4개를 넘으면 기존처럼 모두 보존하고 보충 문맥 예산을 줄인다.
     """
     q, me, hist = inp['question'], inp['me'], inp.get('history') or []
     group = me.get('empGroup')
@@ -554,24 +557,26 @@ def retrieve_regulation_slots(ctx: rt.Ctx, inp: dict) -> list[str]:
         inp['_ref_empty_note'] = f"{ref['note']}. 규정명과 조 번호를 확인하거나 담당 부서에 문의해 주세요."
         return []
 
-    # 핵심 후보: 명시적 요청 조항(ref_ids) -> 이전 답변 근거(previous_ids) -> 검색 결과(mix)
-    core_candidates = [v for v in rt.uniq(ref_ids + previous_ids + mix) if regstore.article(v)]
+    # 단독 질문의 유효한 검색 결과 2개를 이전 근거보다 먼저 확보한다.
+    current_ids = [aid for aid in rt.uniq(hit['id'] for hit in alone) if regstore.article(aid)]
+    previous_ids = [aid for aid in rt.uniq(previous_ids) if regstore.article(aid)][:1]
+    core_candidates = [aid for aid in rt.uniq(ref_ids + current_ids[:2] + previous_ids + mix)
+                       if regstore.article(aid)]
     if not core_candidates:
         return []
 
-    # ⭐ [이슈 #138 핵심 해결: 7개 슬롯 예산 최적 배분]
-    # (1) 명시적 요청 조항 및 핵심 검색 조항 확보 (최소 4개, ref_ids가 많으면 그 이상)
+    # (1) 핵심 근거 4개. 명시 조항은 기존 계약에 따라 개수와 관계없이 보존한다.
     base_limit = max(4, len(ref_ids))
     selected_ids = list(core_candidates[:base_limit])
 
-    # (2) 부모 문맥(parent_context) 최대 2개 슬롯 우선 확보! (조건, 예외, 상위 항 보존)
+    # (2) 현재 질문의 근거부터 부모 조건·예외 문맥을 최대 2개 보충한다.
     if documents_only and ctx.mode in ('ollama', 'openai') and hybrid_search.enabled():
         parent_ids = regstore.parent_context(selected_ids, group, q, limit=min(2, max(0, 7 - len(selected_ids))))
         selected_ids = rt.uniq(selected_ids + parent_ids)
 
-    # (3) 참조 조항(referenced_paragraphs) 슬롯 보충
+    # (3) 부모 문맥과 중복되지 않는 직접 참조 문단을 최대 1개 보충한다.
     if documents_only:
-        ref_para_ids = regstore.referenced_paragraphs(selected_ids, limit=min(3, max(0, 7 - len(selected_ids))))
+        ref_para_ids = regstore.referenced_paragraphs(selected_ids, limit=min(1, max(0, 7 - len(selected_ids))))
         selected_ids = rt.uniq(selected_ids + ref_para_ids)
 
     # (4) 남은 슬롯은 core_candidates로 채움
@@ -728,8 +733,8 @@ def answer_with_pipeline(ctx: rt.Ctx, inp: dict) -> dict:
 
     inp['_history'] = follow_history
     inp['_classification'] = {k: v for k, v in classified.items() if k not in ('follow_history', 'group', 'detectedFromQuestion')}
-    if classified.get('detectedFromQuestion') and classified.get('group'):
-        inp['me'] = dict(me, empGroup=classified['group'])
+    # 1단계에서 정규화·결정한 조회 직군을 전달하고 로그인 프로필 원본은 보존한다.
+    inp['me'] = dict(me, empGroup=classified['group'])
 
     # [2단계] RoBERTa 확신도가 80% 미만이거나 없으면 LLM 재분류
     effective_label = verify_or_reclassify_label_with_llm(ctx, q, label, confidence, follow_history)

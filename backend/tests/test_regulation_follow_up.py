@@ -86,7 +86,7 @@ class RegulationFollowUpTest(unittest.TestCase):
                     self.assertEqual(answer_call.args[2]['requested']['where'], '제9조')
                     self.assertEqual(answer_call.args[2]['sources'][0]['id'], 'S001')
                     self.assertEqual(result['basis'], ['edu-9'])
-                    self.assertEqual(result['retrieved'], ['edu-9', 'edu-7', 'work-2'])
+                    self.assertEqual(result['retrieved'], ['edu-9', 'work-2', 'edu-7'])
                     self.assertTrue(inp['_classification']['usedHistory'])
 
     def test_reclassified_outside_follow_up_skips_search_and_answer_generation(self):
@@ -128,7 +128,7 @@ class RegulationFollowUpTest(unittest.TestCase):
                 self.history[0]['a'] = first
                 result, model, _ = self.ask(question)
                 self.assertEqual(result['basis'], ['edu-9'])
-                self.assertEqual(result['retrieved'], ['edu-9', 'edu-7', 'work-2'])
+                self.assertEqual(result['retrieved'], ['edu-9', 'work-2', 'edu-7'])
                 payload = model.call_args.args[2]
                 self.assertEqual(payload['requested']['where'], '제9조')
                 self.assertEqual(payload['sources'][0]['regulation'], '인재개발규정')
@@ -151,7 +151,7 @@ class RegulationFollowUpTest(unittest.TestCase):
             'status': 'partial', 'summary': '지급기준은 따로 확인해야 해요.', 'sourceIds': ['S003'],
         }) as model):
             answer = reg.answer(self.ctx, '교육비 지원 신청 조건이 궁금해요', [], {}, documents_only=True)
-        self.assertEqual(answer['retrieved'], ['edu-24-5', 'edu-9', 'edu-24-1', 'edu-24-4'])
+        self.assertEqual(answer['retrieved'], ['edu-24-5', 'edu-9', 'edu-24-1'])
         self.assertEqual(answer['basis'], ['edu-24-1'])
         self.assertEqual(answer['evidenceStatus'], 'partial')
         self.assertEqual(model.call_args.args[2]['sources'][2]['no'], '제24조 제1항')
@@ -392,6 +392,35 @@ class RegulationFollowUpTest(unittest.TestCase):
         self.assertEqual(classified['group'], '실무직')
         self.assertTrue(classified['detectedFromQuestion'])
         self.assertEqual(len(classified['follow_history']), 1)
+
+    def test_pipeline_passes_selected_group_to_search_without_mutating_login_profile(self):
+        history = [{'q': '실무직 교육비 지원 기준은?', 'a': {'summary': '실무직 기준 안내', 'basis': []}}]
+        cases = (
+            ('교육비 지원 기준은?', [], '일반직'),
+            ('실무직 교육비 지원 기준은?', [], '실무직'),
+            ('그럼 지원 한도는 얼마야?', history, '실무직'),
+            ('그럼 신청 방법은?', history + [
+                {'q': '그럼 지원 한도는 얼마야?', 'a': {'summary': '지원 한도 안내', 'basis': []}}], '실무직'),
+            ('운영직은 어떻게 돼?', history, '운영직'),
+            ('다른 질문인데 연차휴가는 며칠인가요?', history, '일반직'),
+            ('연차휴가는 며칠인가요?', history, '일반직'),
+        )
+        original_me = copy.deepcopy(self.ctx.me)
+        for question, turns, group in cases:
+            with self.subTest(question=question):
+                self.search.reset_mock()
+                self.search.return_value = []
+                self.ask(question, history=turns, status='not_found')
+                self.assertTrue(self.search.called)
+                self.assertTrue(all(call.args[2] == group for call in self.search.call_args_list))
+                self.assertEqual(self.ctx.me, original_me)
+
+    def test_pipeline_passes_normalized_login_group_to_search(self):
+        self.ctx.me = {'empGroup': ' 일반직 '}
+        _, _, inp = self.ask('교육비 지원 기준은?', history=[])
+        self.assertEqual(inp['me']['empGroup'], '일반직')
+        self.assertEqual(self.search.call_args.args[2], '일반직')
+        self.assertEqual(self.ctx.me['empGroup'], ' 일반직 ')
 
 
 if __name__ == '__main__':
