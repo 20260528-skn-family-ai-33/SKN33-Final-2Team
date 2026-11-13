@@ -124,10 +124,11 @@ def _answer(raw):
     return raw if isinstance(raw, dict) else {}
 
 
-def _read_activities(acts, choices, source):
+def _read_activities(acts, choices, source, *, requested_skills=None):
     """기존 모델의 자료 활동도 보존하되, 다른 스킬이나 미선택 자료는 거절한다."""
     tasks = {}
     materials = {}
+    requested = choices if requested_skills is None else requested_skills
     if not isinstance(acts, list):
         raise ApiError(422, 'ACTIVITIES_INVALID', '활동 제안을 확인하지 못했어요.')
     for row in acts:
@@ -150,11 +151,17 @@ def _read_activities(acts, choices, source):
             if not skill and rid:
                 skill = next((name for name, choice in choices.items()
                              if rid == choice['course'] or rid in choice['books']), None)
-            if not skill and len(choices) == 1:
-                skill = next(iter(choices))
+            if not skill and len(requested) == 1 and (not tags or requested_skills is None):
+                skill = next(iter(requested))
+        if not isinstance(skill, str) or skill not in choices:
+            raise ApiError(422, 'ACTIVITIES_INVALID', '활동의 역량 또는 설명이 일치하지 않아요.')
+        if rid and rid != choices[skill]['course'] and rid not in choices[skill]['books']:
+            raise ApiError(422, 'ACTIVITIES_INVALID', '선택하지 않은 자료가 활동에 포함됐어요.')
+        if skill not in requested:
+            continue
         title = str(row.get('title') or row.get('name') or '').strip()
         how = str(row.get('how') or row.get('description') or row.get('content') or row.get('detail') or '').strip()
-        if not isinstance(skill, str) or skill not in choices or not title or not how:
+        if not title or not how:
             raise ApiError(422, 'ACTIVITIES_INVALID', '활동의 역량 또는 설명이 일치하지 않아요.')
         act = dict(row, skill=skill, title=title, how=how, res=rid)
         if not rid:
@@ -162,8 +169,6 @@ def _read_activities(acts, choices, source):
                 raise ApiError(422, 'ACTIVITIES_INVALID', f'「{skill}」의 산출물 과제가 여러 개예요. 하나만 필요해요.')
             tasks[skill] = act
             continue
-        if rid != choices[skill]['course'] and rid not in choices[skill]['books']:
-            raise ApiError(422, 'ACTIVITIES_INVALID', '선택하지 않은 자료가 활동에 포함됐어요.')
         pair = (skill, rid)
         if pair not in materials:
             materials[pair] = act
@@ -207,7 +212,7 @@ def propose(saved, draft, generate, source, *, previous=None):
         repair_system = system + '\n[누락 과제 보완] skillOrder에 지정한 스킬의 과제를 하나씩 acts에 반환한다. 기존 역량 요약은 다시 작성할 필요가 없다.'
         repair = _answer(generate(repair_system, retry_payload))
         try:
-            additional, _ = _read_activities(repair.get('acts'), retry_payload['choices'], source)
+            additional, _ = _read_activities(repair.get('acts'), choices, source, requested_skills=missing)
         except ApiError as error:
             raise ApiError(422, 'ACTIVITIES_INVALID', f'산출물 과제를 보완하지 못했어요({name_list}). {error.message}') from error
         tasks.update(additional)

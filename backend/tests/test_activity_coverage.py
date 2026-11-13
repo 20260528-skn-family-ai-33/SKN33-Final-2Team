@@ -69,3 +69,37 @@ class ReviewActivityCoverageTests(TestCase):
         self.assertIn(self.skills[-1], error.exception.message)
         self.assertEqual(model.call_count, 2)
         self.assertNotIn('activityProposal', self.saved)
+
+    def test_repair_ignores_completed_skills_and_keeps_initial_tasks(self):
+        first = {'skillSummaries': self.summaries, 'acts': self.tasks[:-1]}
+        repeated = dict(self.tasks[0], title='이미 받은 과제를 다시 쓴 제목')
+        tagged = dict(self.tasks[1], skills=[self.skills[1]])
+        del tagged['skill']
+        material = {'materialId': 'c0', 'title': '앞 스킬 자료', 'how': '다시 받은 자료 설명'}
+        unnamed = dict(self.tasks[-1])
+        del unnamed['skill']
+        for rows in ([repeated, self.tasks[-1]], [unnamed, tagged, material]):
+            with self.subTest(rows=rows):
+                model = Mock(side_effect=[first, {'acts': rows}])
+                proposal = activities.propose(self.saved, self.draft, model, 'ollama')
+                self.assertEqual(model.call_count, 2)
+                acts = proposal['option']['acts']
+                self.assertEqual([a['title'] for a in acts if not a['res']], [t['title'] for t in self.tasks])
+                self.assertEqual([a['res'] for a in acts if a['res']], ['c0', 'b0', 'c1', 'b1', 'c2', 'b2'])
+                self.assertEqual(proposal['skillSummaries'], self.summaries)
+
+    def test_repair_still_requires_a_valid_task_for_the_missing_skill(self):
+        first = {'skillSummaries': self.summaries, 'acts': self.tasks[:-1]}
+        missing = self.tasks[-1]
+        tagged = dict(self.tasks[0], skills=[self.skills[0]])
+        del tagged['skill']
+        for rows in ([tagged], [dict(tagged, skills=['미선택 스킬'])],
+                     [missing, missing], [missing, dict(missing, skill='미선택 스킬')],
+                     [missing, dict(missing, res='c0')]):
+            with self.subTest(rows=rows):
+                model = Mock(side_effect=[first, {'acts': rows}])
+                with self.assertRaises(ApiError) as error:
+                    activities.propose(self.saved, self.draft, model, 'ollama')
+                self.assertEqual(error.exception.code, 'ACTIVITIES_INVALID')
+                self.assertIn(self.skills[-1], error.exception.message)
+                self.assertEqual(model.call_count, 2)
