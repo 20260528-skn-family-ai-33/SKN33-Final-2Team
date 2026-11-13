@@ -1,5 +1,6 @@
 """사전 퀴즈와 개념·유형·난이도를 맞춘 새 사후 퀴즈를 생성한다."""
 from copy import deepcopy
+from app import llm
 from app.errors import ApiError
 
 
@@ -119,7 +120,7 @@ def ensure_generated(employee_id,plan_id):
         try:
             survey=generate(row['content'],rt.model(ctx,'진단 에이전트','사후 퀴즈 문항 생성',role='quiz'))
         except Exception:
-            if ctx.provider == 'openai' and (ctx.reasoning.get('openai') in ('high', 'xhigh') or ctx.reasoning.get('openai') is None):
+            if ctx.provider == 'openai' and llm.effective_openai_reasoning('quiz', ctx.reasoning.get('openai')) in ('high', 'xhigh'):
                 from dataclasses import replace
                 fallback_ctx = replace(ctx, reasoning={**ctx.reasoning, 'openai': 'medium'})
                 survey=generate(row['content'],rt.model(fallback_ctx,'진단 에이전트','사후 퀴즈 문항 생성',role='quiz'))

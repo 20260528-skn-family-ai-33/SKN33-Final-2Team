@@ -83,7 +83,8 @@ def select_skills(
     if not rows:
         raise SelectionError('핵심 스킬을 찾지 못했습니다. 프로젝트와 DB 태그를 확인해 주세요.')
     # 모델이 상한보다 많이 내도 오류로 막지 않고 중요도 순 앞 3개만 제시한다.
-    known_techs = [str(t).strip().casefold() for t in (payload.get('learnerKnowledge') or {}).get('technologies') or [] if str(t).strip()]
+    from app.learner_knowledge import normal, technology_names
+    known_techs = {normal(term) for term in technology_names(payload.get('learnerKnowledge') or {})}
     selected, seen = [], set()
     for row in rows[:MAX_SKILLS]:
         if not isinstance(row, dict):
@@ -98,7 +99,7 @@ def select_skills(
         if any(not isinstance(row.get(k), str) or not row[k].strip() for k in ('reason', 'application')):
             raise SelectionError('선정 이유와 프로젝트 사용 부분이 필요합니다.')
         seen.add(name)
-        is_learned = name.casefold() in known_techs or _normalized_tag(name) in known_techs
+        is_learned = normal(name) in known_techs
         item = dict(name=name, reason=row['reason'].strip(), application=row['application'].strip())
         if is_learned:
             item['learned'] = True

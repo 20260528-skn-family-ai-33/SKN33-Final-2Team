@@ -80,7 +80,7 @@ class StagedPoolTests(TestCase):
         def transaction():
             yield memory
 
-        def model(ctx, system, payload):
+        def model(ctx, system, payload, **kwargs):
             phase = 'surveys' if payload['surveysPerSkill'] else 'quizzes'
             calls.append(phase)
             if phase == 'quizzes' and started is not None:
