@@ -104,12 +104,19 @@ def learning_context(saved, draft):
     return active, payload
 
 
-def validate_summaries(summaries, active):
+def validate_summaries(summaries, active, *, normalize=False):
+    if normalize and isinstance(summaries, dict):
+        keys = [key.strip() for key in summaries]
+        if len(set(keys)) == len(keys):
+            summaries = {
+                key.strip(): [lines] if isinstance(lines, str) else lines
+                for key, lines in summaries.items()
+            }
     if not isinstance(summaries,dict) or set(summaries)!=set(active) or any(
-        not isinstance(lines,list) or len(lines)!=3 or any(not isinstance(line,str) or not line.strip() for line in lines)
+        not isinstance(lines,list) or not 1 <= len(lines) <= 3 or any(not isinstance(line,str) or not line.strip() for line in lines)
         for lines in summaries.values()
     ):
-        raise ApiError(422,'ACTIVITIES_INVALID','스킬별 통합 역량 요약 3개를 확인하지 못했어요. 다시 제안받아 주세요.')
+        raise ApiError(422,'ACTIVITIES_INVALID','스킬별 통합 역량 요약 1~3개를 확인하지 못했어요. 다시 제안받아 주세요.')
     return {name:[line.strip() for line in summaries[name]] for name in active}
 
 
@@ -179,7 +186,7 @@ def _read_activities(acts, choices, source, *, requested_skills=None):
 
 def _parse_proposal(raw, choices, source):
     answer = _answer(raw)
-    summaries = validate_summaries(answer.get('skillSummaries'), choices)
+    summaries = validate_summaries(answer.get('skillSummaries'), choices, normalize=source == 'ollama')
     tasks, materials = _read_activities(answer.get('acts'), choices, source)
     return summaries, tasks, materials
 
@@ -198,7 +205,7 @@ def propose(saved, draft, generate, source, *, previous=None):
             raise
         retried = True
         retry_system = (f'{system}\n[검증 실패 후 재시도] {error.message} '
-                        'skillOrder의 각 스킬에 res=null인 산출물 과제 하나와 역량 요약 3개를 담은 전체 JSON을 반환한다.')
+                        'skillOrder의 각 스킬에 res=null인 산출물 과제 하나와 역량 요약 1~3개를 담은 전체 JSON을 반환한다.')
         summaries, tasks, material_acts = _parse_proposal(generate(retry_system, payload), choices, source)
 
     missing = [name for name in active if name not in tasks]
