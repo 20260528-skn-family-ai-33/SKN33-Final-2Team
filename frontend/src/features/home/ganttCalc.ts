@@ -68,3 +68,41 @@ export function dailyCols(base: Date, days: number, now?: Date): GtCol[] {
     return { top: i === 0 || day.getDate() === 1 ? `${day.getMonth() + 1}월` : '', sub: day.getDate(), on: i === current, weekStart: i % 7 === 0 };
   });
 }
+
+/** 일정표의 막대 하나. from~to 는 축 첫날부터의 일 수(to 는 포함하지 않음) */
+export interface GtSpan {
+  from: number;
+  to: number;
+}
+export interface GtBar extends GtSpan {
+  done: boolean;
+}
+/** 상위 막대 안에서 칠할 구간. 둘 다 상위 막대 너비에 대한 백분율이다 */
+export interface GtFill {
+  left: number;
+  width: number;
+}
+
+/** 스킬·로드맵 막대에서 칠할 구간: 완료한 하위 활동 막대가 차지하는 가로 구간의 합집합.
+    겹치거나 맞닿은 구간은 하나로 합치고 상위 막대 밖은 잘라 낸다. 먼저 끝낸 뒤쪽 활동만 칠해져 앞·가운데가 빌 수 있다.
+    하위 활동을 모두 끝냈으면 활동 막대가 없는 날(도서만 있는 주 등)이 있어도 전체를 칠한다 */
+export function doneFills(range: GtSpan, bars: GtBar[]): GtFill[] {
+  const size = range.to - range.from;
+  if (!(size > 0) || !bars.length) return [];
+  if (bars.every((bar) => bar.done)) return [{ left: 0, width: 100 }];
+  const spans = bars
+    .filter((bar) => bar.done)
+    .map((bar) => ({ from: Math.max(range.from, bar.from), to: Math.min(range.to, bar.to) }))
+    .filter((span) => span.to > span.from)
+    .sort((a, b) => a.from - b.from);
+  const merged: GtSpan[] = [];
+  for (const span of spans) {
+    const last = merged[merged.length - 1];
+    if (last && span.from <= last.to) last.to = Math.max(last.to, span.to);
+    else merged.push(span);
+  }
+  return merged.map((span) => ({ left: ((span.from - range.from) / size) * 100, width: ((span.to - span.from) / size) * 100 }));
+}
+
+/** 칠할 구간의 위치. 막대는 gtPos 로 양옆 1px 씩 줄어 있어, 그만큼 보정해 하위 활동 막대의 끝과 맞춘다 */
+export const gtFillPos = (fill: GtFill) => ({ left: `calc(${fill.left}% + ${fill.left * 0.02}px)`, width: `calc(${fill.width}% + ${fill.width * 0.02 - 2}px)` });

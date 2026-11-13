@@ -32,3 +32,8 @@
 .gt-key .k-sum>i{display:block;width:55%;height:100%;border-radius:0;background:var(--accent)}
 /* 막대가 놓이는 일정 구간: 날짜 칸을 더 그렸을 때는 그만큼 좁아진다 */
 .gt-row .gt-span{position:absolute;inset:0 auto 0 0;width:calc(var(--gt-span,1) * 100%)}
+/* 스킬·로드맵 막대는 완료한 활동 막대가 놓인 구간만 칠한다. 구간이 여럿일 수 있어 자리를 직접 준다 */
+.gt-bar.rm>i,.gt-bar.sum>i{position:absolute;top:0}
+.gt-key .k-sum{position:relative}
+.gt-key .k-sum>i{position:absolute;top:0;left:0;width:30%}
+.gt-key .k-sum>i+i{left:60%;width:40%}
