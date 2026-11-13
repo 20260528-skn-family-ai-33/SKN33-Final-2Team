@@ -9,11 +9,12 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import Response
+from starlette.concurrency import run_in_threadpool
 
-from .. import admin_io, db, llm, provider_keys, provider_policy, regfiles
+from .. import admin_io, browser_console, db, llm, provider_keys, provider_policy, regfiles
 from ..config import S
 from ..auth import Account, require_admin
-from ..errors import ApiError, provider_label, unavailable_reason
+from ..errors import ApiError, cause, provider_label, unavailable_reason
 from . import validated_uuid
 
 r = APIRouter(prefix='/api/v1/admin')
@@ -23,15 +24,21 @@ MAX_FILE = 20_000_000
 @r.get('/ai-provider')
 def api_provider_policy(a: Account = Depends(require_admin)):
     providers = {}
+    connection = provider_keys.runpod(S)
     for p in ('openai', 'ollama'):
-        credential = provider_keys.read(S, p)
-        providers[p] = {'available': bool(credential.value) if p == 'openai' else bool(S.ollama_url),
+        credential = provider_keys.read(S, p) if p == 'openai' else connection.key
+        providers[p] = {'available': bool(credential.value) if p == 'openai' else bool(connection.url),
                         'model': llm.model_name(p), 'keyConfigured': bool(credential.value),
                         'keySource': credential.source, 'hasDefaultKey': bool(S.openai_key if p == 'openai' else S.ollama_key)}
     policy, level, status = provider_policy.admin_selection()
     providers['openai']['levels'] = list(S.openai_reasoning_levels)
+    # 기존 환경 주소에는 사용자 정보나 쿼리가 있을 수 있어 관리 화면에 그대로 노출하지 않는다.
+    try:
+        public_url = browser_console.runpod_url(connection.url)
+    except ValueError:
+        public_url = ''
     return {'policy': policy, 'level': level, 'employeeSelectionAllowed': S.employee_ai_selection,
-            'policyStatus': status, 'providers': providers}
+            'policyStatus': status, 'providers': providers, 'runpod': {'url': public_url, 'managed': connection.managed}}
 
 
 @r.put('/ai-provider')
@@ -46,6 +53,60 @@ def api_save_provider(body: dict, a: Account = Depends(require_admin)):
     return api_provider_policy(a)
 
 
+async def _runpod_candidate(request: Request, *, allow_current: bool = False) -> provider_keys.RunpodConnection:
+    # 요청 본문의 키가 입력 오류 응답에 포함되지 않도록 직접 검사한다.
+    try:
+        data = await request.json()
+    except ValueError:
+        data = None
+    if allow_current and data == {}:
+        return provider_keys.runpod(S)
+    if not isinstance(data, dict) or set(data) != {'url', 'key'} or not isinstance(data['url'], str):
+        raise ApiError(422, 'BAD_RUNPOD', 'RunPod 주소와 키를 확인해 주세요')
+    try:
+        url = browser_console.runpod_url(data['url'].strip())
+    except ValueError as exc:
+        raise ApiError(422, 'BAD_RUNPOD_URL', str(exc)) from exc
+    key = data['key']
+    if not isinstance(key, str) or len(key) > 4096 or (key and not (key.isascii() and key.isprintable() and ' ' not in key)):
+        raise ApiError(422, 'BAD_PROVIDER_KEY', '키는 공백 없는 ASCII 문자로 입력해 주세요')
+    return provider_keys.RunpodConnection(url, provider_keys.Credential(key, 'admin' if key else 'none'), 'runpod', True)
+
+
+def _check_runpod(connection: provider_keys.RunpodConnection) -> dict:
+    if not connection.url:
+        raise ApiError(409, 'AI_UNAVAILABLE', '공용 RunPod 주소가 설정되지 않았어요')
+    try:
+        status = llm.ping('ollama', connection=connection)
+    except llm.LlmError as exc:
+        info = cause(str(exc), 'ollama')
+        raise ApiError(502, info['code'], info['user']) from exc
+    missing = [m['name'] for m in status['models'] if not m['installed']]
+    if missing:
+        raise ApiError(409, 'RUNPOD_MODEL_MISSING', '설치가 필요한 모델 · ' + ', '.join(missing))
+    return status
+
+
+@r.post('/ai-provider/ollama/connection/check')
+async def api_check_runpod(request: Request, a: Account = Depends(require_admin)):
+    candidate = await _runpod_candidate(request, allow_current=True)
+    return await run_in_threadpool(_check_runpod, candidate)
+
+
+@r.put('/ai-provider/ollama/connection')
+async def api_save_runpod(request: Request, a: Account = Depends(require_admin)):
+    candidate = await _runpod_candidate(request)
+    await run_in_threadpool(_check_runpod, candidate)
+    provider_keys.save_runpod(S, candidate)
+    return api_provider_policy(a)
+
+
+@r.delete('/ai-provider/ollama/connection')
+def api_reset_runpod(a: Account = Depends(require_admin)):
+    provider_keys.reset_runpod(S)
+    return api_provider_policy(a)
+
+
 @r.put('/ai-provider/{provider}/key')
 async def api_save_provider_key(provider: provider_keys.Provider, request: Request, a: Account = Depends(require_admin)):
     # 검증 오류 응답에 요청 본문이나 입력한 키가 포함되지 않도록 직접 검사한다.
@@ -56,12 +117,16 @@ async def api_save_provider_key(provider: provider_keys.Provider, request: Reque
     value = body.get('key') if isinstance(body, dict) and set(body) == {'key'} else None
     if not isinstance(value, str) or not 1 <= len(value) <= 4096 or not value.isascii() or not value.isprintable() or ' ' in value:
         raise ApiError(422, 'BAD_PROVIDER_KEY', '공백 없이 올바른 API 키를 입력해 주세요')
+    if provider == 'ollama' and provider_keys.runpod(S).managed:
+        raise ApiError(409, 'RUNPOD_MANAGED', '공용 RunPod 연결 설정에서 주소와 키를 함께 변경해 주세요')
     provider_keys.save(S, provider, value)
     return api_provider_policy(a)
 
 
 @r.delete('/ai-provider/{provider}/key')
 def api_reset_provider_key(provider: provider_keys.Provider, a: Account = Depends(require_admin)):
+    if provider == 'ollama' and provider_keys.runpod(S).managed:
+        raise ApiError(409, 'RUNPOD_MANAGED', '공용 RunPod 연결 설정에서 기본 연결을 복원해 주세요')
     provider_keys.reset(S, provider)
     return api_provider_policy(a)
 

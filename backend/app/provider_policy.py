@@ -2,7 +2,7 @@
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-from . import llm
+from . import llm, provider_keys
 from .config import S, level_ok
 from .errors import ApiError, unavailable_reason
 
@@ -58,7 +58,9 @@ def save(mode: str, level: str | None = None) -> None:
         raise ApiError(422, 'BAD_PROVIDER', '사용할 AI 제공자를 선택해 주세요')
     if mode == 'employee' and not S.employee_ai_selection:
         raise ApiError(409, 'EMPLOYEE_SELECTION_DISABLED', '이 배포에서는 관리자만 모델을 선택할 수 있어요')
-    if mode != 'employee' and not llm.available(mode):
+    if mode == 'ollama' and not provider_keys.runpod(S).url:
+        raise ApiError(409, 'AI_UNAVAILABLE', '공용 RunPod 주소를 설정해 주세요', kind='config')
+    if mode == 'openai' and not llm.available(mode):
         raise ApiError(409, 'AI_UNAVAILABLE', unavailable_reason(mode), kind='config')
     if level is not None:
         if not isinstance(level, str) or not level_ok(level) or mode == 'employee':
