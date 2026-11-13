@@ -40,7 +40,7 @@
   const SUB = { 'new-details-check': 'details', 'new-result-edit': 'result', 'new-gen': 'options' };
   GP.newRoute = () => S().lastNew || 'new-goal';
 
-  /* 사전 점검 문항은 목표·기획서(파일과 요약)·자격증 계획으로 만든다. 요약이나 자격증 계획을 고쳐도 문항을 다시 만든다
+  /* 사전 점검 문항은 목표·기획서(파일과 요약)으로 만든다. 요약이나 자격증 계획을 고쳐도 문항을 다시 만든다
      (설계서 v1.7 SCR-NEW-12 · 10/20). 열쇠 계산은 서버(drafts.quiz_key·diag_key)와 같다 */
   P.docSummary = d => (d.doc && d.doc.status === 'ok' ? String(d.doc.summary || '').trim() : '');
   P.certKey = p => (AI.certOf(p) ? p.cert : '');
@@ -380,8 +380,8 @@
     nav: 'new', newStep: true, title: '세부 사항', width: 'wide', guard: () => blockedTo('details'),
     render: () => GP.stepper('details') + P.page({
       title: '학습 여건을 알려 주세요',
-      lead: '모두 선택 사항이에요. 비워 둔 칸은 ‘알아서’로 두고 로드맵 계획 에이전트가 목표에 맞게 정해요. 자격증 계획은 고르지 않으면 ‘계획 없음’이에요.',
-      body: `<div class="card">${P.detailsForm('draft.prefs')}</div>${staleNote('gen')}${staleNote('cert')}${S().draft.quiz ? P.note('사전 점검 문항은 이미 만들었어요. 자격증 계획을 바꾸면 문항부터 다시 만들고, 나머지는 로드맵을 만들 때 반영해요.') : ''}`,
+      lead: '모두 선택 사항이에요. 비워 둔 칸은 ‘알아서’로 두고 로드맵 계획 에이전트가 목표에 맞게 정해요.',
+      body: `<div class="card">${P.detailsForm('draft.prefs')}</div>${staleNote('gen')}`,
       foot: `<button class="btn line" data-go="new-goal">${icon('left')}이전</button><button class="btn pri" data-go="new-details-check">다음: 입력 내용 확인</button>`
     })
   };
@@ -389,7 +389,7 @@
   /* 2-1. 세부 사항 확인: 입력한 내용(빈 칸은 '알아서')과 진단 에이전트 연결 상태를 보여 주고, '다음'을 누르면 사전 점검 문항을 만든다 */
   P.detailsView = p => `<div class="card acc preview">
       <p class="eyebrow">${icon('spark')}진단 에이전트에게 넘길 세부 사항</p>
-      <dl class="kv">${D.detailFields.map(([k, l]) => `<dt>${l}</dt><dd class="${AI.prefAuto(k, p) ? 'auto' : ''}${k === 'etc' ? ' etc' : ''}">${esc(AI.prefText(k, p))}</dd>`).join('')}</dl></div>`;
+      <dl class="kv">${D.detailFields.filter(([k]) => k !== 'cert').map(([k, l]) => `<dt>${l}</dt><dd class="${AI.prefAuto(k, p) ? 'auto' : ''}${k === 'etc' ? ' etc' : ''}">${esc(AI.prefText(k, p))}</dd>`).join('')}</dl></div>`;
   /* 진단 에이전트 연결 상태: 가데이터 / 확인 중 / 연결됨 / 모델 대기 중(Ollama · 모델이 아직 GPU에 없음) / 연결 안 됨.
      좌측 'AI 모델'에서 고른 모드를 서버가 확인하고(API-12), 이후 호출 결과로 갱신 */
   const via = role => `${AI.PROV[AI.mode()]} · ${esc(AI.modelName(role))}`;
@@ -424,7 +424,7 @@
       return GP.stepper('details') + P.page({
         eyebrow: '세부 사항 확인', title: made ? '입력한 세부 사항이에요' : '이 내용으로 사전 점검을 만들까요?',
         lead: made ? '사전 점검 문항은 이미 만들었어요. ‘다음’을 누르면 사전 점검으로 넘어가요. 여기 내용은 로드맵을 만들 때 반영해요.'
-          : '‘다음’을 누르면 진단 에이전트가 목표·기획서 요약·자격증 계획으로 사전 점검 문항을 만들어요. 나머지 항목은 로드맵을 만들 때 반영하고, ‘알아서’인 항목은 로드맵 계획 에이전트가 목표에 맞게 정해요.',
+          : '‘다음’을 누르면 진단 에이전트가 목표·기획서 요약으로 사전 점검 문항을 만들어요. 나머지 항목은 로드맵을 만들 때 반영하고, ‘알아서’인 항목은 로드맵 계획 에이전트가 목표에 맞게 정해요.',
         body: `<p class="small muted goal-line">목표 · ${esc(d.goal)}</p>${P.docSummary(d) ? `<div class="card flat doc-line"><p class="eyebrow">${icon('file')}기획서 요약 · ${esc(d.doc.name)}</p><p class="pre small">${esc(P.docSummary(d))}</p></div>` : ''}${P.detailsView(d.prefs)}${P.connBox()}`,
         foot: `<button class="btn line" data-go="new-details">${icon('edit')}수정</button><button class="btn pri" data-act="details-ok">다음: 사전 점검</button>`
       });
