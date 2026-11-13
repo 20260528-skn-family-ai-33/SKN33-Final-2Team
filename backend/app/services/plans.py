@@ -679,6 +679,8 @@ def _mix_revision_skills(current: dict, proposal: dict, handoff: dict, selected:
         book_ids.update((new_report.get('choices', {}).get(name) or {}).get('books') or [])
         new = old
         if name in chosen:
+            if any(a['id'] in done for a in old):
+                raise ApiError(409, 'REVISION_CHANGED', '완료한 활동이 있는 스킬은 기존 안을 선택해 주세요.')
             new = [a for a in proposal['acts'] if a.get('skill') == name and a.get('res') not in book_ids]
             if not new:
                 raise ApiError(422, 'REVISION_SKILLS_INVALID', '추천 활동이 없는 스킬은 기존 계획을 유지해 주세요.')
