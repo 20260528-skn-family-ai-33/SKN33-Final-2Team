@@ -38,7 +38,7 @@ class RegulationResponseTest(unittest.TestCase):
         self.article_lookup.assert_not_called()
         self.model.assert_not_called()
 
-    def test_not_found_preserves_reason_and_explicit_missing_article_note(self):
+    def test_empty_search_keeps_model_not_found_reason(self):
         reason = '이번 검색에서 성과급 지급 기준을 확인하지 못했어요.'
         result = self.format('not_found', summary=reason, source_ids=[], retrieved=[])
         self.assertEqual(result['evidenceStatus'], 'not_found')
@@ -46,13 +46,18 @@ class RegulationResponseTest(unittest.TestCase):
         self.assertEqual(result['basis'], [])
         self.inp['_ref_empty_note'] = '요청한 규정의 제99조가 등록되지 않았어요.'
         result = self.format('not_found', summary=reason, source_ids=[], retrieved=[])
-        self.assertIn(self.inp['_ref_empty_note'], result['summary'])
-        self.assertIn(reason, result['summary'])
+        self.assertEqual(result['summary'], reason)
         self.article_lookup.assert_not_called()
 
-    def test_not_found_with_retrieved_sources_is_a_contract_error(self):
-        with self.assertRaisesRegex(LlmError, '검색 자료가 있는'):
-            self.format('not_found', source_ids=[])
+    def test_no_match_with_retrieved_sources_is_not_a_contract_error(self):
+        reason = '검색된 자료는 교육 신청 안내여서 성과급 지급 기준을 확인할 수 없어요.'
+        result = self.format('no_match', summary=reason, source_ids=[])
+        self.assertEqual((result['evidenceStatus'], result['level']), ('no_match', 'none'))
+        self.assertEqual(result['summary'], reason)
+        self.assertEqual(result['basis'], [])
+        self.assertEqual(result['retrieved'], ['reg-1'])
+        self.article_lookup.assert_not_called()
+        self.model.assert_not_called()
 
     def test_partial_keeps_cited_scope_even_when_hr_question_term_is_absent(self):
         self.article.update(title='직원 평가', text='직원 평가는 정기적으로 실시한다.')

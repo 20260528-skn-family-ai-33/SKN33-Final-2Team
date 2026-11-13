@@ -44,11 +44,12 @@ class KnowledgePromptTest(unittest.TestCase):
     def test_company_and_life_keep_existing_full_response_contract(self):
         for provider in ('ollama', 'openai'):
             for topic in ('company', 'life'):
-                for status in ('found', 'partial', 'not_found', 'refused'):
+                for status in answer.STATUSES:
                     with self.subTest(provider=provider, topic=topic, status=status):
                         ids = ['S001'] if status in ('found', 'partial') else []
                         response = {'status': status, 'summary': '기존 안내문', 'sourceIds': ids}
-                        result, payload, schema = self.generate(provider, topic, response)
+                        result, payload, schema = self.generate(provider, topic, response,
+                                                               [] if status == 'not_found' else self.sources)
                         self.assertEqual(result, dict(response, sourceIds=['real-article-1'] if ids else []))
                         if provider == 'ollama':
                             self.assertEqual(schema['required'], ['status', 'summary', 'sourceIds'])

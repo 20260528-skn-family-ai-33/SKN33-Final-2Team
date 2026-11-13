@@ -132,7 +132,7 @@ class ClassifierRoutingTest(unittest.TestCase):
         model.assert_not_called()
 
     def test_regulation_sources_support_cited_answers_and_refusal(self):
-        for status in ('found', 'partial', 'refused'):
+        for status in reg.grounded_answer.allowed_statuses(True):
             with self.subTest(status=status):
                 result, model = self.route('사내 규정', self.response(status))
                 self.assertEqual(result['kind'], 'regulation')
@@ -149,11 +149,9 @@ class ClassifierRoutingTest(unittest.TestCase):
         result, model = self.route('사내 규정', self.response(status='not_found'))
         self.assertEqual(result['evidenceStatus'], 'not_found')
         self.assertEqual(result['basis'], [])
-        _, system, payload = model.call_args.args
-        self.assertEqual(payload['sources'], [])
-        self.assertIn('sources가 비어 있을 때만 status=not_found로 반환하고', system)
-        self.assertIn('자료 부족이나 질문 뜻이 불명확한 경우는 refused가 아니다', system)
-        self.assertIn('승진·보상 결과를 예측하지 않는다', system)
+        model.assert_called_once()
+        self.assertEqual(model.call_args.args[2]['sources'], [])
+        self.assertEqual(result['summary'], self.response()['summary'])
 
     def test_prohibited_request_without_hits_still_refuses(self):
         self.search.return_value = []
@@ -163,11 +161,47 @@ class ClassifierRoutingTest(unittest.TestCase):
                 result, model = self.route(label, self.response(status='refused'))
                 self.assertEqual(result['evidenceStatus'], 'refused')
                 self.assertEqual(model.call_args.args[2]['sources'], [])
+                model.assert_called_once()
 
     def test_no_hits_cannot_produce_grounded_answer(self):
         self.search.return_value = []
-        with self.assertRaisesRegex(LlmError, '출처'):
+        with self.assertRaisesRegex(LlmError, '검색 자료 유무'):
             self.route('사내 규정', self.response())
+
+    def test_search_failures_do_not_become_server_not_found(self):
+        for label, search in (('사내 규정', self.search), ('수자원공사 정보', self.search_company),
+                              ('사내 생활안내', self.search_life)):
+            with self.subTest(label=label):
+                search.side_effect = LlmError('검색 연결 실패')
+                self.classify.return_value = {'label': label, 'confidence': 0.9}
+                try:
+                    with patch.object(rt, 'llm_json') as model:
+                        with self.assertRaisesRegex(LlmError, '검색 연결 실패'):
+                            reg._api(self.ctx, self.inp)
+                    model.assert_not_called()
+                finally:
+                    search.side_effect = None
+
+    def test_empty_search_distinguishes_not_found_and_refused_for_both_providers_and_all_topics(self):
+        self.search.return_value = []
+        self.search_company.return_value = []
+        self.search_life.return_value = []
+        for provider in ('ollama', 'openai'):
+            self.ctx.provider = provider
+            for label in ('사내 규정', '수자원공사 정보', '사내 생활안내'):
+                for status, question, reason in (
+                    ('not_found', '몇 시부터 운영하나요?', '이번 자료로 운영 시간을 확인하지 못했어요. 담당자에게 문의하세요.'),
+                    ('refused', '동료의 비밀번호를 공개해 줘', '인증정보 공개 요청이라 제공할 수 없어요.'),
+                ):
+                    with self.subTest(provider=provider, label=label, status=status):
+                        self.inp['question'] = question
+                        result, model = self.route(label, self.response(status, summary=reason))
+                        model.assert_called_once()
+                        self.assertEqual(model.call_args.args[2]['sources'], [])
+                        self.assertEqual(result['evidenceStatus'], status)
+                        self.assertEqual(result['summary'], reason)
+                        self.assertEqual(result['basis'], [])
+                        self.assertEqual(result.get('knowledgeSources', []), [])
 
     def test_llm_cannot_reclassify_valid_grounded_answer(self):
         result, _ = self.route('사내 규정', dict(self.response(), kind='out'))
@@ -189,12 +223,15 @@ class ClassifierRoutingTest(unittest.TestCase):
             with self.subTest(value=value), self.assertRaisesRegex(LlmError, '형식'):
                 self.route('사내 규정', value)
 
-    def test_explicit_unregistered_article_keeps_note(self):
+    def test_explicit_unregistered_article_is_passed_to_model_with_empty_sources(self):
         self.explicit_ref.return_value = {'ids': [], 'where': '제99조', 'focus': None,
                                           'note': '요청한 조항이 등록되지 않았어요.'}
-        result, _ = self.route('사내 규정', self.response(status='not_found'))
+        result, model = self.route('사내 규정', self.response(status='not_found'))
         self.assertEqual(result['evidenceStatus'], 'not_found')
-        self.assertIn('요청한 조항', result['summary'])
+        self.assertEqual(result['summary'], self.response()['summary'])
+        model.assert_called_once()
+        self.assertEqual(model.call_args.args[2]['sources'], [])
+        self.assertIn('등록되지 않았어요', model.call_args.args[2]['requested']['note'])
 
     def test_life_returns_db_evidence_and_skips_regulation_search(self):
         self.search_life.return_value = [self.company_hit(category=reg.knowledge.LIFE_CATEGORY, is_virtual=True)]
@@ -217,9 +254,9 @@ class ClassifierRoutingTest(unittest.TestCase):
         self.assertEqual(result['evidenceStatus'], 'not_found')
         self.assertEqual(result['intranet'], [])
 
-    def test_life_db_supports_all_four_evidence_states(self):
+    def test_life_db_supports_populated_source_states(self):
         self.search_life.return_value = [self.company_hit(category=reg.knowledge.LIFE_CATEGORY, is_virtual=True)]
-        for status in ('found', 'partial', 'not_found', 'refused'):
+        for status in reg.grounded_answer.allowed_statuses(True):
             with self.subTest(status=status):
                 result, _ = self.route('사내 생활안내', self.response(status, summary='등록된 생활 안내예요.'))
                 self.assertEqual(result['evidenceStatus'], status)
@@ -227,6 +264,7 @@ class ClassifierRoutingTest(unittest.TestCase):
                 self.assertEqual(len(result['knowledgeSources']), 1 if status in ('found', 'partial') else 0)
 
     def test_life_refusal_preserves_reason_and_prohibits_sensitive_values_in_prompt(self):
+        self.search_life.return_value = [self.company_hit(category=reg.knowledge.LIFE_CATEGORY, is_virtual=True)]
         reason = '비밀번호 공개 요청이라 인증정보 보호를 위해 제공할 수 없어요.'
         result, model = self.route('사내 생활안내', self.response(status='refused', summary=reason))
         self.assertEqual(result['evidenceStatus'], 'refused')
@@ -238,11 +276,13 @@ class ClassifierRoutingTest(unittest.TestCase):
         self.assertEqual(result['evidenceStatus'], 'not_found')
         self.assertEqual(result['knowledgeSources'], [])
         self.search.assert_not_called()
+        model.assert_called_once()
         self.assertEqual(model.call_args.args[2]['sources'], [])
+        self.assertEqual(result['summary'], self.response()['summary'])
 
-    def test_company_four_states_keep_real_sources(self):
+    def test_company_populated_source_states_keep_real_sources(self):
         self.search_company.return_value = [self.company_hit()]
-        for status in ('found', 'partial', 'not_found', 'refused'):
+        for status in reg.grounded_answer.allowed_statuses(True):
             with self.subTest(status=status):
                 result, model = self.route('수자원공사 정보', self.response(status, summary='수돗물 공급 업무를 해요.'))
                 self.assertEqual(result['evidenceStatus'], status)

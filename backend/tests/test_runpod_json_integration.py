@@ -37,26 +37,53 @@ class RunpodJsonIntegrationTest(unittest.TestCase):
         self.client = self.enterContext(TestClient(app))
         self.identity = self.enterContext(patch.object(auth, 'account_of', return_value=auth.Account('admin', 1, '시험')))
 
-    def test_shared_connection_and_four_state_schema_are_used_in_same_request(self):
+    def test_shared_connection_and_model_schema_are_used_in_same_request(self):
         self.assertTrue(llm.available('ollama'))
         self.assertEqual(errors.unavailable_reason('ollama'), '')
-        for status in ('found', 'partial', 'not_found', 'refused'):
-            cited = status in ('found', 'partial')
-            response = {'status': status, 'summary': '확인한 내용 또는 확인할 수 없는 이유예요.',
-                        'sourceIds': ['S001'] if cited else []}
-            sources = [{'id': 'doc-1', 'text': '공개 이용 안내'}] if cited else []
-            wire = json.dumps({'message': {'content': json.dumps(response, ensure_ascii=False)}}).encode()
-            with self.subTest(status=status), patch.object(llm, '_http', return_value=io.BytesIO(wire)) as send:
-                result = grounded_answer.generate(runtime.Ctx(1), 'life', '질문', sources, {})
-            send.assert_called_once()
-            url, payload, headers, _ = send.call_args.args
-            self.assertEqual(url, self.connection.url + '/api/chat')
-            self.assertEqual(headers['Authorization'], 'Bearer shared-fixture-key')
-            self.assertIs(send.call_args.kwargs['allow_redirects'], False)
-            self.assertEqual(payload['format']['required'], ['status', 'summary', 'sourceIds'])
-            self.assertEqual(result['status'], status)
-            self.assertEqual(result['sourceIds'], ['doc-1'] if cited else [])
-            self.assertTrue(result['summary'])
+        for topic in ('regulation', 'company', 'life'):
+            for has_sources in (False, True):
+                for status in grounded_answer.allowed_statuses(has_sources):
+                    cited = status in ('found', 'partial')
+                    response = {'status': status, 'summary': '확인한 내용 또는 확인할 수 없는 이유예요.',
+                                'sourceIds': ['S001'] if cited else []}
+                    sources = [{'id': 'doc-1', 'text': '공개 이용 안내'}] if has_sources else []
+                    wire = json.dumps({'message': {'content': json.dumps(response, ensure_ascii=False)}}).encode()
+                    with self.subTest(topic=topic, has_sources=has_sources, status=status):
+                        with patch.object(llm, '_http', return_value=io.BytesIO(wire)) as send:
+                            result = grounded_answer.generate(runtime.Ctx(1), topic, '질문', sources, {})
+                        send.assert_called_once()
+                        url, payload, headers, _ = send.call_args.args
+                        self.assertEqual(url, self.connection.url + '/api/chat')
+                        self.assertEqual(headers['Authorization'], 'Bearer shared-fixture-key')
+                        self.assertIs(send.call_args.kwargs['allow_redirects'], False)
+                        schema = payload['format']
+                        self.assertEqual(schema['required'], ['status', 'summary', 'sourceIds'])
+                        self.assertEqual(set(schema['properties']), set(response))
+                        self.assertFalse(schema['additionalProperties'])
+                        self.assertEqual(schema['properties']['status']['enum'],
+                                         ['refused', 'no_match', 'partial', 'found'] if has_sources
+                                         else ['refused', 'not_found'])
+                        if not has_sources:
+                            self.assertEqual(schema['properties']['sourceIds']['maxItems'], 0)
+                        self.assertEqual(result, dict(response, sourceIds=['doc-1'] if cited else []))
+
+    def test_ollama_wire_format_errors_remain_distinct_from_valid_empty_evidence(self):
+        cases = [
+            ('{"summary":"안내","sourceIds":[]}', '근거 확인 상태를 읽을 수'),
+            ('{"status":"found|partial|not_found|refused","summary":"안내","sourceIds":[]}', '근거 확인 상태를 읽을 수'),
+            ('{"status":"no_match","summary":" ","sourceIds":[]}', '이유가 비어'),
+            ('{"status":"found","summary":"안내","sourceIds":["S999"]}', '검색 자료에 없는 출처'),
+            ('{"status":', 'JSON 형식'),
+        ]
+        for topic in ('regulation', 'company', 'life'):
+            for content, expected_error in cases:
+                with self.subTest(topic=topic, content=content):
+                    wire = json.dumps({'message': {'content': content}}).encode()
+                    with patch.object(llm, '_http', return_value=io.BytesIO(wire)) as send:
+                        with self.assertRaisesRegex(llm.LlmError, expected_error):
+                            grounded_answer.generate(runtime.Ctx(1), topic, '질문',
+                                                     [{'id': 'doc-1', 'text': '공개 이용 안내'}], {})
+                    send.assert_called_once()
 
     def test_admin_provider_info_and_ping_use_shared_connection_despite_browser_override(self):
         browser_console.options.set(browser_console.BrowserOptions(

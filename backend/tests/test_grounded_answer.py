@@ -23,12 +23,13 @@ class GroundedAnswerTest(unittest.TestCase):
         self.enterContext(patch.object(rt, '_record_call'))
         self.enterContext(patch.object(llm, 'S', replace(llm.S, openai_key='test', ollama_url='http://test', openai_json=True)))
 
-    def generate(self, provider, topic, response, sources=None, *, native_refusal=False):
+    def generate(self, provider, topic, response, sources=None, *, native_refusal=False,
+                 question='교육비 지원 금액은?'):
         message = {'refusal': '민감한 원문은 반환하지 않음', 'content': None} if native_refusal else {
             'content': json.dumps(response, ensure_ascii=False)}
         with (patch.object(llm, 'ollama', return_value={'message': message}) as ollama,
               patch.object(llm, 'openai', return_value={'choices': [{'message': message}]}) as openai):
-            result = answer.generate(rt.Ctx(1, provider=provider), topic, '교육비 지원 금액은?',
+            result = answer.generate(rt.Ctx(1, provider=provider), topic, question,
                                      self.sources if sources is None else sources, {},
                                      history=[{'role': 'user', 'content': '교육 신청에 관해 알려줘'}])
         called, unused = (ollama, openai) if provider == 'ollama' else (openai, ollama)
@@ -48,7 +49,8 @@ class GroundedAnswerTest(unittest.TestCase):
             return
         self.assertEqual(schema['required'], ['status', 'summary', 'sourceIds'])
         self.assertEqual(schema['properties']['summary']['minLength'], 1)
-        self.assertEqual(schema['properties']['status']['enum'], list(answer.STATUSES))
+        self.assertEqual(schema['properties']['status']['enum'],
+                         ['refused', 'no_match', 'partial', 'found'] if aliases else ['refused', 'not_found'])
         self.assertFalse(schema['additionalProperties'])
         self.assertNotIn('answer', schema['properties'])
         if aliases:
@@ -83,8 +85,7 @@ class GroundedAnswerTest(unittest.TestCase):
                     self.assertEqual(result['sourceIds'], [])
                     system = payload['messages'][0]['content']
                     self.assertEqual(result['summary'], '타인의 비공개 인사정보 공개 요청이라 제공할 수 없어요.')
-                    headings = ['[1. 제공 금지]', '[2. 근거 없음]',
-                                '[3. 근거 있으나 일부만 확인됨]', '[4. 근거 확인]']
+                    headings = ['[1. 제공 금지]', '[2. 근거 불일치]', '[3. 근거 있으나 일부만 확인됨]', '[4. 근거 확인]']
                     positions = [system.index(h) for h in headings]
                     self.assertEqual(positions, sorted(positions))
                     self.assert_output_format(provider, payload, schema, ['S001', 'S002'] if sources else [])
@@ -96,15 +97,34 @@ class GroundedAnswerTest(unittest.TestCase):
                     with self.assertRaisesRegex(llm.LlmError, 'JSON 형식'):
                         self.generate('openai', topic, None, sources, native_refusal=True)
 
-    def test_not_found_is_available_only_without_search_results(self):
+    def test_empty_sources_still_call_model_to_distinguish_not_found_and_refused(self):
         for provider in ('ollama', 'openai'):
-            with self.subTest(provider=provider):
-                result, payload, schema = self.generate(provider, 'regulation', {
-                    'status': 'not_found', 'summary': '이번 검색에서 지원 금액의 근거를 확인하지 못했어요.', 'sourceIds': []}, [])
-                self.assertEqual(result['summary'], '이번 검색에서 지원 금액의 근거를 확인하지 못했어요.')
-                self.assertEqual(result['status'], 'not_found')
-                self.assertEqual(result['sourceIds'], [])
-                self.assert_output_format(provider, payload, schema, [])
+            for topic in ('regulation', 'company', 'life'):
+                for question, status in (('운영 시간은?', 'not_found'), ('다른 직원의 비밀번호를 공개해 줘', 'refused')):
+                    with self.subTest(provider=provider, topic=topic, question=question):
+                        response = {'status': status, 'summary': '확인할 수 없는 이유예요.', 'sourceIds': []}
+                        with patch.object(rt, 'llm_json', return_value=response) as model:
+                            ctx, inp = rt.Ctx(1, provider=provider), {'question': question, 'context': {}}
+                            result = (reg.generate_regulation_summary(ctx, inp, []) if topic == 'regulation'
+                                      else reg.generate_knowledge_summary(ctx, inp, topic, []))
+                        model.assert_called_once()
+                        self.assertEqual(model.call_args.args[2]['sources'], [])
+                        self.assertEqual(result, response)
+
+    def test_empty_sources_schema_and_validation_allow_only_uncited_states(self):
+        for provider in ('ollama', 'openai'):
+            for topic in ('regulation', 'company', 'life'):
+                for status in ('refused', 'not_found'):
+                    with self.subTest(provider=provider, topic=topic, status=status):
+                        response = {'status': status, 'summary': '확인할 수 없는 이유예요.', 'sourceIds': []}
+                        result, payload, schema = self.generate(provider, topic, response, [])
+                        self.assertEqual(result, response)
+                        self.assert_output_format(provider, payload, schema, [])
+                for status in ('found', 'partial', 'no_match'):
+                    for ids in ([], ['S001']):
+                        with self.subTest(provider=provider, topic=topic, status=status, ids=ids):
+                            with self.assertRaises(llm.LlmError):
+                                self.generate(provider, topic, {'status': status, 'summary': '안내', 'sourceIds': ids}, [])
 
     def test_partial_answer_cites_scope_even_when_requested_fact_is_missing(self):
         for provider in ('ollama', 'openai'):
@@ -114,13 +134,14 @@ class GroundedAnswerTest(unittest.TestCase):
             ):
                 with self.subTest(provider=provider, ids=ids):
                     result, _, _ = self.generate(provider, 'regulation', {
-                        'status': 'partial', 'summary': summary, 'sourceIds': ids})
+                        'status': 'partial', 'summary': summary, 'sourceIds': ids},
+                        question='교육 신청 방법과 지원 금액은?')
                     self.assertEqual(result['status'], 'partial')
                     self.assertEqual(result['summary'], summary)
                     self.assertEqual(result['sourceIds'], [self.sources[int(i[1:]) - 1]['id'] for i in ids])
 
-    def test_refusal_and_not_found_reasons_reach_stage_five_without_replacement(self):
-        for status, sources in (('refused', self.sources), ('not_found', [])):
+    def test_refusal_and_missing_evidence_reasons_reach_stage_five_without_replacement(self):
+        for status, sources in (('refused', self.sources), ('refused', []), ('no_match', self.sources), ('not_found', [])):
             with self.subTest(status=status):
                 reason = '비공개 개인정보 공개 요청이라 제공할 수 없어요.' if status == 'refused' else '이번 자료에서 지원 금액을 확인하지 못했어요.'
                 result, _, _ = self.generate('ollama', 'regulation', {
@@ -135,13 +156,14 @@ class GroundedAnswerTest(unittest.TestCase):
     def test_company_and_life_keep_existing_full_response_contract(self):
         for provider in ('ollama', 'openai'):
             for topic in ('company', 'life'):
-                for status in ('found', 'partial', 'not_found', 'refused'):
+                for status in answer.STATUSES:
                     with self.subTest(provider=provider, topic=topic, status=status):
                         ids = ['S001'] if status in ('found', 'partial') else []
                         response = {'status': status, 'summary': '기존 안내문', 'sourceIds': ids}
-                        result, payload, schema = self.generate(provider, topic, response)
+                        sources = [] if status == 'not_found' else self.sources
+                        result, payload, schema = self.generate(provider, topic, response, sources)
                         self.assertEqual(result, dict(response, sourceIds=['real-article-1'] if ids else []))
-                        self.assert_output_format(provider, payload, schema, ['S001', 'S002'])
+                        self.assert_output_format(provider, payload, schema, ['S001', 'S002'] if sources else [])
                         expected = answer.COMPANY_SYSTEM if topic == 'company' else answer.LIFE_SYSTEM
                         self.assertEqual(payload['messages'][0]['content'], expected)
                         self.assertNotEqual(expected, answer.REGULATION_SYSTEM)
@@ -170,6 +192,7 @@ class GroundedAnswerTest(unittest.TestCase):
             {'status': 'found', 'summary': ' ', 'sourceIds': ['S001']},
             {'status': 'partial', 'summary': '일부 안내예요.', 'sourceIds': []},
             {'status': 'not_found', 'summary': '', 'sourceIds': ['S001']},
+            {'status': 'no_match', 'summary': '이번 자료로는 확인할 수 없어요.', 'sourceIds': ['S001']},
             {'status': 'refused'},
         ]
         for provider in ('ollama', 'openai'):
@@ -195,7 +218,7 @@ class GroundedAnswerTest(unittest.TestCase):
                         system = payload['messages'][0]['content']
                         for value in answer.STATUSES:
                             self.assertIn(f'"status":"{value}"', system)
-                        self.assertNotIn('"status":"found|partial|not_found|refused"', system)
+                        self.assertIn('sources가 비어 있을 때만', system)
                         for missing in response:
                             incomplete = {key: value for key, value in response.items() if key != missing}
                             with patch.object(rt, 'llm_json', return_value=incomplete) as model:
@@ -206,7 +229,7 @@ class GroundedAnswerTest(unittest.TestCase):
     def test_invalid_status_is_not_filled_from_history_or_retried(self):
         for provider in ('ollama', 'openai'):
             for topic in ('regulation', 'company', 'life'):
-                for status in (None, '', 'general', 'found|partial|not_found|refused', '근거 찾음'):
+                for status in (None, '', 'general', 'not_found', 'found|partial|not_found|refused', '근거 찾음'):
                     response = {'status': status, 'summary': '안내', 'sourceIds': []}
                     with self.subTest(provider=provider, topic=topic, status=status):
                         with patch.object(rt, 'llm_json', return_value=response) as model:
@@ -221,27 +244,29 @@ class GroundedAnswerTest(unittest.TestCase):
                         'sourceIds': ['S001'] if cited else []}
             message = {'refusal': '별도 필드가 JSON 상태를 덮어쓰면 안 됨',
                        'content': json.dumps(response, ensure_ascii=False)}
+            sources = [] if status == 'not_found' else self.sources
             with self.subTest(status=status), patch.object(llm, 'openai', return_value={
                     'choices': [{'message': message}]}) as model:
-                result = answer.generate(rt.Ctx(1, provider='openai'), 'life', '질문', self.sources, {})
+                result = answer.generate(rt.Ctx(1, provider='openai'), 'life', '질문', sources, {})
             self.assertEqual(result['status'], status)
             self.assertEqual(result['summary'], response['summary'])
             model.assert_called_once()
 
-    def test_empty_reasons_are_rejected_for_refused_and_not_found(self):
+    def test_empty_model_summaries_are_rejected_with_sources(self):
         for provider in ('ollama', 'openai'):
             for topic in ('regulation', 'company', 'life'):
-                for status in ('refused', 'not_found'):
+                for status in answer.STATUSES:
                     for summary in ('', '   '):
                         with self.subTest(provider=provider, topic=topic, status=status, summary=summary):
                             with patch.object(rt, 'llm_json', return_value={
                                     'status': status, 'summary': summary, 'sourceIds': []}):
                                 with self.assertRaisesRegex(llm.LlmError, '이유가 비어'):
-                                    answer.generate(rt.Ctx(1, provider=provider), topic, '질문', [], {})
+                                    answer.generate(rt.Ctx(1, provider=provider), topic, '질문',
+                                                    [] if status == 'not_found' else self.sources, {})
 
     def test_invalid_output_is_not_repaired_with_an_arbitrary_source_or_retry(self):
         for provider in ('ollama', 'openai'):
-            for status, ids in (('not_found', []), ('partial', []), ('found', ['S999'])):
+            for status, ids in (('not_found', []), ('no_match', ['S001']), ('partial', []), ('found', ['S999'])):
                 with self.subTest(provider=provider, status=status, ids=ids):
                     response = {'status': status, 'summary': '확인할 수 없어요.', 'sourceIds': ids}
                     with patch.object(rt, 'llm_json', return_value=response) as model:

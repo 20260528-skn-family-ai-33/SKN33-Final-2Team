@@ -7,7 +7,7 @@ import type { JobStarted } from '../types/common';
 export type AnswerKind = 'regulation' | 'general' | 'clarify' | 'out';
 /** 근거 상태·제공 금지 거절. 기존 대화의 missing·scope·clarify 등도 유지한다. */
 export type AnswerLevel = 'ok' | 'missing' | 'unclear' | 'none' | 'scope' | 'general' | 'clarify' | 'out' | 'refused';
-export type EvidenceStatus = 'found' | 'partial' | 'not_found' | 'refused';
+export type EvidenceStatus = 'found' | 'partial' | 'not_found' | 'no_match' | 'refused';
 
 /** 회사·생활 답변이 실제로 인용한 DB 원문 출처. 규정 조항 basis와 구분한다. */
 export interface CompanyKnowledgeSource {

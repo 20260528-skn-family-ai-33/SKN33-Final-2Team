@@ -5,7 +5,7 @@
   regulation  규정·인사 제도 — 내 직원 구분의 등록 규정에 명시된 경우에만 근거와 함께. 없으면 답하지 않고 담당 부서 안내
   general     회사 정보는 실제 DB 원문, 사내 생활은 등록된 가상 홈페이지 메뉴 안내만 근거로 사용한다.
   out         범위 밖 — RoBERTa 분류 뒤 검색·LLM 없이 종료한다. 가데이터의 clarify 등 이전 응답은 보존한다.
-실제 답변은 found/partial/not_found/refused를 구분한다. 연결·JSON·출처·숫자 검증 실패는 오류로 유지한다.
+실제 답변은 found/partial/not_found/no_match/refused를 구분한다. 연결·JSON·출처·숫자 검증 실패는 오류로 유지한다.
 가데이터 모드는 같은 유형을 키워드 규칙과 고정 답으로 흉내 낸다(분류 모델 아님). 고정 답의 근거는 (규정 이름, 조 번호)로 팀 DB 청크에 잇는다.
 """
 from __future__ import annotations
@@ -380,13 +380,12 @@ def isolate_input(question: str, history: list | None, me: dict, context: dict |
 # ⭐ [공통 응답 헬퍼 함수] (근거 없음·제공 거절 등 파이프라인에서 사용)
 # ==============================================================================
 
-def _no_evidence(topic: str, retrieved: list | None = None, note: str = '') -> dict:
-    title = {'regulation': '사내 규정', 'company': '수자원공사 정보', 'life': '사내 생활안내'}.get(topic, '사내')
+def _no_evidence(topic: str, retrieved: list | None = None, note: str = '', *, status: str) -> dict:
     return ans(kind='regulation' if topic == 'regulation' else 'general',
                level='none' if topic == 'regulation' else 'general',
                source={'regulation': '', 'company': 'work', 'life': 'intranet'}[topic],
-               topic=topic, evidenceStatus='not_found',
-               summary=note or f'이번에 검색한 {title} 자료에서 질문에 답할 근거를 찾지 못했어요. 질문을 구체적으로 적거나 담당 부서에 확인해 주세요.',
+               topic=topic, evidenceStatus=status,
+               summary=note or '근거를 확인하지 못했어요. 담당자에게 문의하세요.',
                retrieved=retrieved or [], **({'knowledgeSources': []} if topic in ('company', 'life') else {}))
 
 
@@ -594,8 +593,8 @@ def generate_regulation_summary(ctx: rt.Ctx, inp: dict, ids: list[str]) -> dict:
     """⭐ [4-1단계 - 사내 규정 근거를 통해서 LLM이 요약하기]
     3-1단계(규정 RAG)에서 선별된 조항 원문을 바탕으로 LLM에게 요약 답변 생성을 요청한다.
     명시적으로 요청한 조항(requested)이 있으면 함께 전달한다.
-    한 번의 호출에서 제공 금지 요청을 먼저 판단한다. 허용된 질문에 자료가 있으면
-    답 또는 자료의 안내 범위·확인하지 못한 부분을 요약하고 출처를 반드시 선택한다.
+    근거가 없어도 모델이 제공 금지 요청을 먼저 판단한다. 자료가 없으면 not_found,
+    자료가 있으나 답을 뒷받침하지 못하면 no_match, 일부만 확인되면 partial로 구분한다.
     """
     q = inp['question']
     follow_history = inp.get('_history') or []
@@ -613,8 +612,8 @@ def generate_regulation_summary(ctx: rt.Ctx, inp: dict, ids: list[str]) -> dict:
 
 def format_regulation_response(ctx: rt.Ctx, inp: dict, ids: list[str], result: dict) -> dict:
     """⭐ [5-1단계 - 사내 규정 요약 결과 검증 및 최종 화면 출력]
-    refused → not_found → partial → found 순서로 4-1단계의 결과를 화면 응답으로 옮긴다.
-    거절·빈 검색도 모델이 작성한 이유를 전달하고, 인용 답변은 출처·숫자를 검증한다.
+    거절·근거 부족의 모델 상태와 이유를 그대로 전달한다.
+    인용 답변은 출처·숫자를 검증한다.
     """
     if not isinstance(result, dict) or result.get('status') not in grounded_answer.STATUSES:
         raise llm.LlmError('답변 형식 오류: 규정 답변의 근거 확인 상태를 읽을 수 없어요')
@@ -629,12 +628,13 @@ def format_regulation_response(ctx: rt.Ctx, inp: dict, ids: list[str], result: d
     if status == 'refused':
         return _refused('regulation', summary)
 
-    # 2) 근거 없음: 검색 결과가 비어 있을 때 확인하지 못한 내용을 전달한다.
+    # 검색 자료 자체가 없는 결과를 그대로 전달한다.
     if status == 'not_found':
-        if ids:
-            raise llm.LlmError('답변 형식 오류: 검색 자료가 있는 규정 답변을 근거 없음으로 처리할 수 없어요')
-        note = inp.get('_ref_empty_note', '')
-        return _no_evidence('regulation', retrieved=ids, note=f'{note} {summary}'.strip() if note else summary)
+        return _no_evidence('regulation', retrieved=ids, note=summary, status='not_found')
+
+    # 검색 자료가 있지만 질문을 뒷받침하지 못하는 결과를 그대로 전달한다.
+    if status == 'no_match':
+        return _no_evidence('regulation', retrieved=ids, note=summary, status='no_match')
 
     # 인용 답변의 계약만 검증한다. 질문의 단어 일치로 4-1단계의 판단을 바꾸지 않는다.
     basis, summary = result.get('sourceIds'), result.get('summary')
@@ -703,9 +703,13 @@ def format_knowledge_response(ctx: rt.Ctx, inp: dict, topic: str, sources: list[
     if result['status'] == 'refused':
         return _refused(topic, result['summary'])
 
-    # 2) 수자원공사 정보('company') 또는 사내 생활안내('life') 근거 없음(not_found) 상태 처리
+    # 2) 검색 자료 자체가 없는 결과 처리
     if result['status'] == 'not_found':
-        return _no_evidence(topic, note=result['summary'])
+        return _no_evidence(topic, note=result['summary'], status='not_found')
+
+    # 검색 자료가 있지만 질문을 뒷받침하지 못하는 결과 처리
+    if result['status'] == 'no_match':
+        return _no_evidence(topic, note=result['summary'], status='no_match')
 
     # 3) 인용 자료에 없는 숫자 환각 검증
     hits = inp.get('_knowledge_hits') or []
@@ -819,7 +823,7 @@ def answer(ctx: rt.Ctx, question: str, history: list, context: dict, sim: str | 
         ctx.meta['classification'] = inp['_classification']
     if documents_only:
         return a
-    return scope_answer(a, me) if a['kind'] == 'regulation' and a.get('evidenceStatus') != 'refused' and not regstore.set_for(me.get('empGroup')) else a
+    return scope_answer(a, me) if a['kind'] == 'regulation' and a.get('evidenceStatus') not in ('refused', 'not_found', 'no_match') and not regstore.set_for(me.get('empGroup')) else a
 
 
 def _api(ctx: rt.Ctx, inp: dict) -> dict:
@@ -858,13 +862,12 @@ def _company_answer(ctx: rt.Ctx, inp: dict) -> dict:
 
 def _empty_evidence_answer(ctx: rt.Ctx, topic: str, inp: dict, note: str = '', retrieved: list | None = None,
                            history: list | None = None) -> dict:
-    # 검색 자료가 없어도 제공 금지 요청과 단순 근거 부족은 구분해야 한다.
     if history is None:
         history = _hist_msgs(inp.get('_history') or [])
-    result = grounded_answer.generate(ctx, topic, inp['question'], [], inp['context'],
+    result = grounded_answer.generate(ctx, topic, inp['question'], [], inp.get('context') or {},
                                      history=history)
-    return (_refused(topic, result['summary']) if result['status'] == 'refused'
-            else _no_evidence(topic, retrieved, f"{note} {result['summary']}".strip()))
+    return _refused(topic, result['summary']) if result['status'] == 'refused' else _no_evidence(
+        topic, retrieved, result['summary'], status=result['status'])
 
 
 # ==============================================================================
@@ -921,7 +924,7 @@ def classify_with_context(question: str, history: list, me: dict) -> dict:
 
 def _regulation_answer(ctx: rt.Ctx, inp: dict) -> dict:
     ids = retrieve_regulation_slots(ctx, inp)
-    return format_regulation_response(ctx, inp, ids, generate_regulation_summary(ctx, inp, ids)) if ids else _no_evidence('regulation')
+    return format_regulation_response(ctx, inp, ids, generate_regulation_summary(ctx, inp, ids))
 
 
 # 레거시 호환용 별칭

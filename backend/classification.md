@@ -71,39 +71,51 @@
 
 | 답변 상태 | 규정·회사·사내 생활 표시 | 사내 규정 4-1단계의 의미 |
 | --- | --- | --- |
-| `refused` | 답변 불가 | 자료 유무보다 먼저 제공 금지 요청으로 판단하여 거절 |
-| `not_found` | 근거 확인 불가 | 검색 결과가 비어 있음. 서버의 고정 안내를 사용 |
-| `partial` | 근거 확인 | 검색 자료를 인용하여 확인된 내용과 확인하지 못한 부분을 구분. 질문의 답이 없으면 자료의 실제 안내 범위와 한계를 설명 |
+| `refused` | 답변 불가 | 검색 자료 유무와 관계없이 모델이 제공 금지 요청으로 판단하여 거절 |
+| `not_found` | 근거 확인 불가 | 검색 자료가 없음. 모델이 검색 근거 부족 이유와 담당자 문의 안내를 반환 |
+| `no_match` | 근거 확인 불가 | 검색 자료는 있으나 질문의 어느 부분도 뒷받침하지 못함. 모델이 확인할 수 없는 이유를 반환 |
+| `partial` | 근거 확인 | 질문 일부를 실제로 확인하여 인용하고 확인하지 못한 부분을 구분 |
 | `found` | 근거 확인 | 질문 전체를 자료로 확인하여 인용과 함께 답변 |
 | ML 범위 밖 | 답변 불가 | 앞 분류 단계에서 챗봇 범위를 벗어난 질문으로 확정하여 답변 생성 생략 |
 | 작업 실패 | 오류 | 모든 질문 유형에 공통인 직원 구분 누락, 연결·시간 초과·응답 검증 실패 등 |
 
 근거 상태는 ML 질문 분류 옆에 표시합니다. `답변 불가`와 `오류`는 각각 단일 결과 라벨로 표시합니다. 시연용 가데이터 표시는 실행 모드를 안내합니다. LLM 근거 상태 라벨은 테스트용이며 배포 시 화면에서 제거할 예정입니다.
 
-`app/agents/grounded_answer.py`에서 규정 4-1단계는 `REGULATION_SYSTEM`, 4-2단계의 수자원공사 정보는 `COMPANY_SYSTEM`, 사내 생활안내는 `LIFE_SYSTEM`으로 프롬프트를 함께 관리합니다. 서버가 확정한 `topic=regulation/company/life`에 따라 해당 프롬프트 하나를 선택합니다. 회사·생활은 공통 근거·출력 지시(`KNOWLEDGE_COMMON_RULES`)를 공유하되, 규정의 적용 대상·별표 판단 지시는 사용하지 않습니다. 회사는 실제 회사 자료의 기준 시점·사업 범위, 생활은 가상 표시·운영 시점·메뉴 안내 범위를 각각 지킵니다. 회사·생활의 세 필드 응답은 유지하며, 검색 자료가 있어도 질문에 답할 수 없으면 `not_found`를 사용할 수 있습니다. `not_found/refused`도 모델이 이유를 `summary`에 작성하며 `sourceIds`만 빈 배열로 유지합니다. 5-2단계는 그 이유를 고정 문구로 교체하지 않습니다.
+`app/agents/grounded_answer.py`에서 규정 4-1단계는 `REGULATION_SYSTEM`, 4-2단계의 수자원공사 정보는 `COMPANY_SYSTEM`, 사내 생활안내는 `LIFE_SYSTEM`으로 프롬프트를 함께 관리합니다. 서버가 확정한 `topic=regulation/company/life`에 따라 해당 프롬프트 하나를 선택합니다. 회사·생활은 공통 근거·출력 지시(`KNOWLEDGE_COMMON_RULES`)를 공유하되, 규정의 적용 대상·별표 판단 지시는 사용하지 않습니다. 회사는 실제 회사 자료의 기준 시점·사업 범위, 생활은 가상 표시·운영 시점·메뉴 안내 범위를 각각 지킵니다. 세 필드 응답 계약은 모든 유형에서 같습니다. 무관한 자료를 억지로 partial로 인용하지 않으며, 질문의 어느 부분도 뒷받침하지 못하면 no_match로 답합니다.
 
 생활 검색은 `knowledge.documents.category=사내 생활안내`로 한정하고 DB의 원문·문서명·위치·자료 시점·가상 여부·제약을 전달합니다. 실제 인용한 자료만 `knowledgeSources`에 담고 원문 발췌(`excerpt`)와 가상 표시를 화면의 ‘사내 생활 근거 보기’에 제공합니다. DB 자료가 없으면 고정 메뉴로 대체하지 않으며, 가상 식단·시간표·연락처를 실제 운영 정보로 단정하지 않도록 지시합니다. 사실성·검색 품질은 별도 평가가 필요합니다.
 
 연결·시간 초과·JSON 파싱·출처/숫자 검증 실패는 기존 작업 실패 응답을 유지하며 화면에 **오류**로 표시합니다. 검색 실패나 제공 금지 거절로 숨기지 않습니다. 잘못된 인용 ID를 버리고 `근거 확인 불가`로 처리하던 규정 경로도 오류로 구분합니다. 거절 이유는 보호 대상의 종류와 제공 금지 사유만 설명하도록 지시하며, 민감한 원문·개인 식별값·비밀번호·키의 실제 값은 재출력하지 않도록 합니다. 자유 문장의 민감값 여부를 자동 판정하는 검증기를 추가한 것은 아닙니다.
 
-4-1단계는 **제공 금지 → 근거 없음 → 근거 있으나 일부만 확인됨 → 근거 확인** 순서로 판단합니다. 검색을 실행한 뒤 결과가 비어 있어도 LLM에 빈 근거 목록을 전달해 제공 금지 요청인지 먼저 구분합니다. 거절과 빈 검색도 `status`, `summary`, `sourceIds` 세 필드를 모두 반환하며, `refused`는 제공 금지 유형과 이유, `not_found`는 이번 자료에서 확인하지 못한 내용을 요약합니다. 두 상태의 출처는 빈 배열이며 5단계는 그 설명을 그대로 전달합니다. 명시적으로 미등록 조항을 요청한 경우에는 서버가 확인한 조항 안내를 함께 보존합니다. 규정 답변은 자료에서 확인되는 일반 기준과 절차를 안내하며 개인의 승진·보상 결과를 예측하지 않습니다.
+3단계의 검색 근거가 0건이어도 4-1단계 `generate_regulation_summary()`와 4-2단계 `generate_knowledge_summary()`는 공통 `grounded_answer.generate()`를 호출합니다. 제공 금지 요청은 자료 유무와 관계없이 refused, 일반 질문의 빈 검색은 not_found, 자료가 있으나 질문을 뒷받침하지 못하는 경우는 no_match로 모델이 직접 구별합니다. 서버가 no_match를 not_found로 바꾸지 않습니다. 세 상태 모두 비어 있지 않은 이유와 sourceIds=[]를 반환하며, 5단계도 상태와 이유를 그대로 전달합니다. 2단계 재분류는 별도로 유지하고 검색 연결 실패는 0건 결과로 바꾸지 않습니다.
 
-규정 검색 자료가 있으면 제공 금지 요청을 제외하고 `partial` 또는 `found`로 요약하며 출처를 최소 하나 선택합니다. 예를 들어 교육 신청 안내만 검색됐는데 지원 금액을 물으면, 신청 안내의 실제 내용과 금액을 확인하지 못한 부분을 두 문장 이내로 설명하고 신청 안내 자료를 인용합니다. 검색됐다는 이유로 질문의 답이 확인된 것처럼 쓰거나, 서버가 임의의 출처를 붙이지 않습니다.
+모델 허용 상태 `STATUSES`는 `refused`, `not_found`, `no_match`, `partial`, `found` 다섯 가지입니다. 제공 금지 요청을 먼저 판단하고, 그다음 검색 자료 유무와 질문에 답할 수 있는 범위를 판단합니다. `allowed_statuses()`를 스키마와 서버 검증에서 함께 사용하여 빈 검색에서는 refused/not_found, 자료가 있으면 refused/no_match/partial/found만 허용합니다. 규정 답변은 자료에서 확인되는 일반 기준과 절차를 안내하며 개인의 승진·보상 결과를 예측하지 않습니다.
 
-4-1·4-2단계는 Ollama의 `format`에만 `answer_response_schema()`를 전달합니다. OpenAI는 기존 `response_format: {"type":"json_object"}` 호출 방식을 유지하며 출력 스키마를 새로 전달하지 않습니다. [Ollama 공식 문서](https://docs.ollama.com/capabilities/structured-outputs)에 맞춰 최상위 객체에 `status`, `summary`, `sourceIds`를 모두 필수로 지정하고, 다른 속성은 허용하지 않습니다. `answer` 외피는 생성 지시에서 제거했습니다. `status`는 네 값의 열거형이며 출처는 이번 `S001` 같은 별칭으로 제한합니다. `summary`는 `minLength: 1`로 빈 문자열을 금지하며, 공백만 있는 문장도 서버의 `strip()` 검사로 거부합니다. 빈 검색은 빈 출처 배열만 허용합니다. 상태별 인용 개수·규정의 검색 자료 유무 조건은 프롬프트와 서버 검증에서 확인합니다. 추가 재시도나 `evidenceQuote` 필드는 없습니다. OpenAI 응답의 별도 refusal 필드를 refused JSON으로 변환하지 않습니다. LLM이 반환한 JSON의 status만 검증하며, JSON content가 없으면 형식 오류로 남깁니다.
+2026-11-13 후속 요청으로 모델이 not_found/no_match/refused를 직접 구별하도록 조정했습니다. `llm.py`·검색 구현·2단계 재분류는 수정하지 않았습니다. 프런트는 no_match 타입과 기존 표시 규칙의 테스트만 추가하고 새 상태 라벨은 만들지 않습니다. 실제 모델의 분류 정확도·DB·운영 사이트는 별도 확인 대상입니다.
+
+최종 관련 검증: 읽기 전용·네트워크 차단 Docker에서 `python -m unittest tests.test_knowledge_prompts tests.test_runpod_json_integration tests.test_provider_policy tests.test_browser_console tests.test_grounded_answer tests.test_assistant_stage_log tests.test_agent_log tests.test_regulation_response tests.test_regulation_follow_up tests.test_question_classifier tests.test_chatbot_documents tests.test_reasoning tests.test_runtime_json -q`로 180건 실행·통과했습니다. OpenAI·Ollama 모의 응답으로 빈 검색에서도 모델 호출, not_found/refused 구분, 검색 자료가 있는 no_match의 정상 처리, 5-1·5-2의 개별 분기와 상태·이유 보존, 잘못된 출처 거부와 단계 로그를 확인했습니다. 수정한 Python 코드·테스트의 `py_compile`도 통과했습니다. 프런트는 잠금 파일이 같은 기존 의존성을 재사용하여 `node node_modules/typescript/bin/tsc -b`, `node node_modules/eslint/bin/eslint.js .`, `node --test scripts/version.test.mjs`, `node node_modules/vitest/vitest.mjs run`, `node node_modules/vite/bin/vite.js build`를 실행했습니다. 타입·빌드 통과, 린트 오류 0건·경고 44건, VERSION 검사 3건·Vitest 664건 통과입니다. 실제 모델 추론·검색 품질·브라우저 화면은 이 검사에 포함하지 않았으며 운영 배포도 하지 않았습니다.
+
+PR 최종 검토의 전체 검사: 같은 이미지·옵션으로 `python -m unittest discover -s tests -q`를 실행한 결과 PR은 1,302건, 최신 main `8c0800d` 스냅샷은 1,254건을 실행했습니다. 두 쪽 모두 실패 3건·오류 16건(하위 사례 포함)·스킵 13건으로 전체 검사는 통과하지 않았으며, 실패·오류 사례 이름 19개는 동일했습니다. 해당 모듈은 `test_confirm_start_mode`, `test_free_track_regressions`, `test_issue67_scenarios`, `test_revision_course_targets`, `test_learner_knowledge`입니다. 이번 변경으로 추가된 실패 사례는 확인되지 않았고, 이 모듈들의 제품 코드·테스트는 수정하지 않았습니다.
+
+Ollama JSON 재확인: 모의 HTTP 통합 검사를 규정·회사·생활과 빈 검색의 거절까지 확장했습니다. `/api/chat` 요청의 `format`에 세 필드 필수·허용 상태·빈 출처 제약이 전달되고, 응답의 `message.content`를 파싱한 뒤 같은 세 필드로 검증되는지 확인했습니다. status 누락·잘못된 상태·빈 이유·없는 출처·깨진 JSON은 오류로 검출합니다. `python -m unittest tests.test_grounded_answer tests.test_knowledge_prompts tests.test_runpod_json_integration tests.test_assistant_stage_log tests.test_runtime_json -q`로 39건 실행·통과했습니다. 현재 작업 폴더와 기존 로컬 설정에서 Ollama 연결 주소를 확인하지 못해 실제 서버의 생성 결과는 미검증입니다. 이 재확인에서는 테스트와 설명만 보완했고 `llm.py`는 수정하지 않았습니다.
+
+예를 들어 신청 방법과 지원 금액을 함께 물었는데 신청 안내만 검색되면 방법을 답하고 금액은 확인하지 못했다고 partial로 인용합니다. 성과급만 물었는데 무관한 교육 신청 안내만 검색됐다면 no_match와 빈 출처를 반환합니다. 검색됐다는 이유로 질문의 답이 확인된 것처럼 쓰거나 서버가 임의의 출처를 붙이지 않습니다.
+
+4-1·4-2단계는 Ollama의 `format`에만 `answer_response_schema()`를 전달합니다. OpenAI는 기존 `response_format: {"type":"json_object"}` 호출 방식을 유지하며 출력 스키마를 새로 전달하지 않습니다. [Ollama 공식 문서](https://docs.ollama.com/capabilities/structured-outputs)에 맞춰 최상위 객체에 `status`, `summary`, `sourceIds`를 모두 필수로 지정하고, 다른 속성은 허용하지 않습니다. `answer` 외피는 생성 지시에서 제거했습니다. 상태의 열거형은 검색 자료 유무에 따라 제한하며 출처는 이번 `S001` 같은 별칭으로 제한합니다. `summary`는 `minLength: 1`로 빈 문자열을 금지하며, 공백만 있는 문장도 서버의 `strip()` 검사로 거부합니다. 빈 검색은 빈 출처 배열만 허용합니다. 상태별 인용 개수·검색 자료 유무 조건은 프롬프트와 서버 검증에서 확인합니다. 추가 재시도나 `evidenceQuote` 필드는 없습니다. OpenAI 응답의 별도 refusal 필드를 refused JSON으로 변환하지 않습니다. LLM이 반환한 JSON의 status만 검증하며, JSON content가 없으면 형식 오류로 남깁니다.
 
 ```json
 {"status":"found","summary":"신청은 사내 포털에서 해요.","sourceIds":["S001"]}
 {"status":"partial","summary":"교육 신청 절차는 확인돼요. 지원 금액은 이번 자료에서 확인되지 않아요.","sourceIds":["S001"]}
-{"status":"not_found","summary":"이번 자료에서 통근버스 운영 시간을 확인하지 못했어요.","sourceIds":[]}
+{"status":"not_found","summary":"검색 근거가 없어 확인하지 못했어요. 담당자에게 문의하세요.","sourceIds":[]}
+{"status":"no_match","summary":"검색된 교육 안내로는 성과급 기준을 확인하지 못했어요. 담당자에게 문의하세요.","sourceIds":[]}
 {"status":"refused","summary":"타인의 비공개 인사정보 공개 요청이라 제공할 수 없어요.","sourceIds":[]}
 ```
 
-4-1·4-2단계는 네 상태 모두 세 필드의 타입과 비어 있지 않은 `summary`를 검증합니다. `status`만 있는 예전 응답이나 필드 누락·잘못된 상태값·빈 이유는 자동 보완하지 않고 `4.contract`의 오류로 남깁니다. `refused/not_found`의 이유를 비우거나 고정 안내로 교체하지 않으며, 두 상태에 출처가 들어오면 계약 오류입니다. 실제 출처가 없는 상황에서 ID를 지어내지 않습니다. 없는 ID·빈 인용·규정 자료가 있는데 `not_found`를 반환하는 응답은 검증 오류로 유지하며 임의 인용으로 복구하지 않습니다. 인용·숫자 확인은 근거 존재 검사이며 문장 전체의 의미적 사실성을 보증하지 않습니다.
+위 다섯 예시는 모두 LLM 응답입니다. 4-1·4-2단계는 필드 타입과 비어 있지 않은 `summary`를 검증합니다. `status`만 있는 예전 응답이나 필드 누락·잘못된 상태값·빈 이유는 자동 보완하지 않고 `4.contract`의 오류로 남깁니다. `refused/not_found/no_match`의 이유를 비우거나 고정 안내로 교체하지 않으며 출처가 들어오면 계약 오류입니다. `found/partial`은 실제 출처가 필수입니다. 없는 ID·빈 인용은 오류로 유지하며 임의 인용으로 복구하지 않습니다. 인용·숫자 확인은 근거 존재 검사이며 문장 전체의 의미적 사실성을 보증하지 않습니다.
 
-규정 5-1단계도 `format_regulation_response()` 안에서 **refused → not_found → partial → found** 순서로 처리합니다. 앞 두 상태도 생성된 이유를 표시하며, 명시적으로 요청한 미등록 조항의 안내도 보존합니다. `not_found`인데 검색 ID가 남아 있으면 상태 계약 오류로 처리합니다. `partial/found`는 비어 있지 않은 요약, 이번 검색 목록에 속하고 실제 존재하는 출처, 원문·사용자 조건에 있는 숫자를 검증한 뒤 4-1단계의 요약·인용·상태를 그대로 전달합니다. 질문의 인사 용어와 원문의 단순 문자열 일치 여부로 `not_found`로 바꾸던 처리는 실제 5-1단계에서 제거했습니다. 잘못된 형식·출처·숫자는 검증 오류로 유지하며 추가 LLM 호출은 없습니다.
+규정 5-1단계는 `format_regulation_response()`에서 모델의 `not_found/no_match/refused`와 이유를 그대로 전달합니다. `partial/found`는 비어 있지 않은 요약, 이번 검색 목록에 속하고 실제 존재하는 출처, 원문·사용자 조건에 있는 숫자를 검증한 뒤 4-1단계의 요약·인용·상태를 그대로 전달합니다. 질문의 인사 용어와 원문의 단순 문자열 일치 여부로 `not_found`로 바꾸던 처리는 제거한 상태를 유지합니다. 잘못된 형식·출처·숫자는 검증 오류로 유지하며 추가 LLM 호출은 없습니다.
 
-2026-11-13 사용자 요청으로 네 상태의 JSON 모양을 규정·회사·생활에서 통일했습니다. `REGULATION_*`는 규정, 회사·생활 전용 프롬프트는 각 유형에서 유지하며 공통 출력 지시 `ANSWER_OUTPUT_RULES`와 스키마를 함께 사용합니다. 후속 요청으로 `refused/not_found`도 이유를 비우지 않도록 수정했으며 `sourceIds: []`는 유지합니다. 1단계 분류·2단계 재분류의 `label` 응답, 3단계 검색, 외부 API의 `answer/reg/meta` 구조는 유지합니다. AI가 프롬프트·스키마·검증·5단계 이유 보존과 관련 모의 테스트를 수정했으며, 실제 모델의 지시 준수·인용 품질·응답시간·운영 배포는 별도로 확인해야 합니다.
+2026-11-13 초기 변경에서는 네 상태의 JSON 모양을 규정·회사·생활에서 통일했고, 후속 요청으로 no_match를 추가하여 다섯 상태로 확장했습니다. `REGULATION_*`는 규정, 회사·생활 전용 프롬프트는 각 유형에서 유지하며 공통 출력 지시 `ANSWER_OUTPUT_RULES`와 스키마를 함께 사용합니다. `refused/not_found/no_match`도 이유를 비우지 않으며 `sourceIds: []`는 유지합니다. 1단계 분류·2단계 재분류의 `label` 응답, 3단계 검색, 외부 API의 `answer/reg/meta` 구조는 유지합니다. AI가 프롬프트·스키마·검증·5단계 이유 보존과 관련 모의 테스트를 수정했으며, 실제 모델의 지시 준수·인용 품질·응답시간·운영 배포는 별도로 확인해야 합니다.
 
 이유 보존 변경 후 위 9개 테스트 모듈을 같은 읽기 전용·네트워크 차단 컨테이너에서 재검사해 146건 실행·통과했습니다. `found/partial`의 출처 필수, `refused/not_found`의 빈 출처·비어 있지 않은 이유, 공백만 있는 이유 거부, 5단계까지 이유 보존을 확인했습니다. `PYTHONPYCACHEPREFIX=/tmp/pycache python -m py_compile app/agents/grounded_answer.py app/agents/regulation.py app/llm.py tests/test_grounded_answer.py tests/test_question_classifier.py tests/test_regulation_response.py tests/test_assistant_stage_log.py`와 `git diff --check`도 통과했습니다. 현재 `/assistant/ask`의 정상 경로는 LLM의 `status`를 `evidenceStatus`로 그대로 전달하고 계약 오류는 실패로 처리합니다. 기존 화면의 `answerStatus.ts`는 `partial`을 출처 유무에 따라 ‘근거 확인/근거 확인 불가’ 라벨로 표시하지만 실제 `evidenceStatus`를 변경하지 않습니다. 이번 작업에서 해당 표시 규칙은 수정하지 않았습니다.
 

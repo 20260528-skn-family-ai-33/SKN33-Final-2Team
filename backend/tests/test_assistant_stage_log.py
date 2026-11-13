@@ -126,14 +126,51 @@ class AssistantStageLogTest(unittest.TestCase):
                 if label == '범위 밖':
                     self.assertEqual(ids, ['1.classify', '2.reclassify', '5.out'])
 
-    def test_empty_search_still_records_generation_and_not_found(self):
+    def test_empty_search_records_generation_and_keeps_not_found_or_refused(self):
         self.retrieve.return_value = ([], [])
-        self.chat.return_value['content'] = '{"status":"not_found","summary":"이번 자료에서 운영 시간을 확인하지 못했어요.","sourceIds":[]}'
+        for provider in ('ollama', 'openai'):
+            for status in ('not_found', 'refused'):
+                with self.subTest(provider=provider, status=status):
+                    self.chat.reset_mock()
+                    response = {'status': status, 'summary': '확인할 수 없는 이유예요.', 'sourceIds': []}
+                    self.chat.return_value['content'] = json.dumps(response)
+                    with self.assertLogs(rt.logger, level='INFO'):
+                        result = self.ask(provider)
+                    self.assertEqual(result['evidenceStatus'], status)
+                    self.assertEqual(result['summary'], response['summary'])
+                    self.chat.assert_called_once()
+                    entry = self.latest()
+                    self.assertEqual(entry['stages'][2]['sourceCount'], 0)
+                    self.assertEqual([call['stageId'] for call in entry['calls']], ['4-2.generate'])
+                    self.assertTrue(all(step['status'] == 'ok' for step in entry['stages']))
+                    self.assertNotIn('failedStage', entry)
+
+    def test_empty_search_keeps_reclassification_and_answer_model_calls(self):
+        self.classifier.return_value['confidence'] = 0.5
+        self.retrieve.return_value = ([], [])
+        self.chat.side_effect = [
+            {'content': '{"label":"사내 생활안내"}', 'model': 'test-model'},
+            {'content': '{"status":"not_found","summary":"이번 자료에서 확인하지 못했어요.","sourceIds":[]}', 'model': 'test-model'}]
         with self.assertLogs(rt.logger, level='INFO'):
             result = self.ask()
+        self.assertEqual(self.chat.call_count, 2)
         self.assertEqual(result['evidenceStatus'], 'not_found')
-        self.assertEqual(self.latest()['stages'][2]['sourceCount'], 0)
-        self.assertEqual(self.latest()['stages'][-1]['status'], 'ok')
+        self.assertEqual([call['stageId'] for call in self.latest()['calls']], ['2.reclassify', '4-2.generate'])
+        self.assertIn('4-2.generate.model', [step['id'] for step in self.latest()['stages']])
+
+    def test_unrelated_sources_keep_no_match_as_success_without_conversion(self):
+        reason = '검색된 자료로 운영 시간을 확인하지 못했어요. 담당자에게 문의하세요.'
+        self.chat.return_value['content'] = json.dumps({
+            'status': 'no_match', 'summary': reason, 'sourceIds': []})
+        for provider in ('ollama', 'openai'):
+            with self.subTest(provider=provider), self.assertLogs(rt.logger, level='INFO'):
+                result = self.ask(provider)
+            self.assertEqual(result['evidenceStatus'], 'no_match')
+            self.assertEqual(result['summary'], reason)
+            self.assertEqual(result['knowledgeSources'], [])
+            self.assertEqual(self.latest()['stages'][2]['sourceCount'], 1)
+            self.assertNotIn('failedStage', self.latest())
+            self.assertTrue(all(step['status'] == 'ok' for step in self.latest()['stages']))
 
     def test_unexpected_exception_is_not_replaced(self):
         error = ValueError('민감한 원문')
