@@ -281,6 +281,8 @@ export interface DraftDoc {
   selectionNotice?: string;
   selectedSkills?: SelectedSkill[];
   skillCandidates?: SelectedSkill[];
+  fixedSkillNames?: string[];
+  skillPool?: { key: string; rows: SelectedSkill[]; shown: string[] };
   skillInputKey?: string;
   v2Assessment?: { generationId: string; completed: boolean; materialsReady?: boolean; materialsKey?: string | null; activitiesReady?: boolean };
   goal: string;

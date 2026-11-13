@@ -114,6 +114,25 @@ def validate_summaries(summaries, active):
 
 
 def propose(saved, draft, generate, source, *, previous=None):
+    try:
+        return _propose(saved, draft, generate, source, previous=previous)
+    except ApiError as error:
+        if source != 'ollama' or error.code != 'ACTIVITIES_INVALID':
+            raise
+        feedback = error.message
+
+    def retry(system, payload):
+        return generate(
+            f'{system}\n[검증 실패 후 재시도] {feedback} '
+            'skillOrder의 각 스킬에 res=null인 산출물 1개와 choices에 지정된 모든 자료의 활동 포함. '
+            '자료 활동의 res에는 해당 자료의 정확한 ID 사용. 전체 JSON 반환.',
+            payload,
+        )
+
+    return _propose(saved, draft, retry, source, previous=previous)
+
+
+def _propose(saved, draft, generate, source, *, previous=None):
     active,payload=learning_context(saved,draft)
     choices=saved['resourceChoices']
     ids=[row['id'] for row in payload['materials']]
@@ -135,6 +154,10 @@ def propose(saved, draft, generate, source, *, previous=None):
     for act in acts:
         if not isinstance(act, dict):
             continue
+        if source == 'ollama' and 'res' not in act:
+            aliases = [act[key] for key in ('resourceId', 'materialId') if act.get(key) is not None]
+            if aliases and all(isinstance(value, str) and value == aliases[0] for value in aliases):
+                act['res'] = aliases[0]
         if not act.get('skill'):
             if isinstance(act.get('skills'), list):
                 match = next((s for s in act['skills'] if s in active), None)

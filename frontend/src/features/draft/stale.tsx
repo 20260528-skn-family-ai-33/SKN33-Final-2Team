@@ -98,16 +98,15 @@ export function DraftNavGuard() {
 
 const NOTE: Record<string, string> = {
   quiz: '목표·기획서를 바꿨어요. 다음으로 넘어갈 때 역량 테스트 문항부터 다시 만들지 확인해요.',
-  cert: '자격증 계획을 바꿨어요. 역량 테스트 문항에 쓰이는 조건이라, 다음으로 넘어갈 때 역량 테스트 문항부터 다시 만들지 확인해요.',
   diag: '응답을 바꿨어요. 다음으로 넘어갈 때 점검 결과부터 다시 만들지 확인해요.',
   gen: '세부 사항을 바꿨어요. 다음으로 넘어갈 때 로드맵 3안을 다시 만들지 확인해요.',
 };
 
 /** 입력 화면 안내: 바꾼 내용이 있으면 미리 알려 주고 바로 되돌릴 수 있게 한다 */
-export function StaleNote({ kind }: { kind: 'quiz' | 'cert' | 'diag' | 'gen' }) {
+export function StaleNote({ kind }: { kind: 'quiz' | 'diag' | 'gen' }) {
   const go = useGo();
   const st = useWs(useShallow((s) => staleOf(s.draft)));
-  const show = !!st && (st.note || st.kind) === kind;
+  const show = !!st && st.kind === kind;
   return (
     <p className="note stale-note" data-stale={kind} hidden={!show}>
       <Icon name="info" />
