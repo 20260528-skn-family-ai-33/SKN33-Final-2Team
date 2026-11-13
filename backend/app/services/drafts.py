@@ -116,15 +116,15 @@ def pref_summary(p: dict) -> dict:
 
 
 def cert_res(p: dict) -> str | None:
-    c = catalog.cert_by_code(p.get('cert'))
-    return c['id'] if c else None
+    # 기존 호출 계약 유지. 자격증은 로드맵의 참고 추천으로만 제공한다.
+    return None
 
 
 def handoff_prefs(p: dict) -> dict:
     budget = None if blank(p.get('budget')) else max(0, int(num(p.get('budget'))))
     hours = num(p.get('hours'))
     weeks = num(p.get('weeks'))
-    return {'format': pref_text('format', p), 'formatKey': p.get('format') or 'auto', 'certPlan': pref_text('cert', p), 'certRes': cert_res(p),
+    return {'format': pref_text('format', p), 'formatKey': p.get('format') or 'auto', 'certPlan': '없음', 'certRes': cert_res(p),
             'weeklyHours': min(40, hours) if hours > 0 else None, 'hoursAuto': not hours > 0, 'deadlineWeeks': min(52, round(weeks)) if weeks > 0 else None,
             'budgetWon': budget, 'budgetAuto': budget is None, 'budgetLimit': budget}
 
@@ -553,7 +553,7 @@ def assessment_start(employee_id: int, draft_id: str) -> str | None:
             if st == 'running':
                 return d['quizRun']['jobId']
         inp = {'goal': d['goal'], 'project': (d.get('project') or {}).get('name') if d.get('project') else None, 'projectSummary': doc_summary(d) or None,
-               'certPlan': (catalog.cert_by_code(d['prefs'].get('cert')) or {}).get('title')}
+               'certPlan': None}
         base = {'goal': d['goal'], 'project': copy.deepcopy(d.get('project')), 'doc': copy.deepcopy(d.get('doc')) if (d.get('doc') or {}).get('status') == 'ok' else None}
 
     def work(job: jobs.JobCtx):

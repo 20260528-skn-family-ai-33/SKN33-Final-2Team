@@ -481,7 +481,7 @@ export function ResultEdit() {
             <Ef label="듣게 될 강좌·자료">
               <ResPicker path="draft.edit.resourceIds" stage={start} />
               <p className="small muted ef-n">
-                팀 DB 등록 자료에서 검색해 골라요. 시작 지점 이후 단계만 보여요. 자격증은 아래 학습 선호에서 정해요. <SugBack k="resourceIds" />
+                팀 DB 등록 자료에서 검색해 골라요. 시작 지점 이후 단계만 보여요. <SugBack k="resourceIds" />
               </p>
             </Ef>
             <Ef label="만들 결과물">
