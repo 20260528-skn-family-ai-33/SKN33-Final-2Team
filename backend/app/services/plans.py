@@ -556,16 +556,22 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
     done = {p['activity_id'] for p in db.all_("SELECT activity_id FROM app_ext.activity_progress WHERE roadmap_id = :r AND status = 'done'", r=row['roadmap_id'])}
     targets = {}
     if skill:
+        completed_course = False
         for activity in base['acts']:
-            if activity.get('skill') != skill or activity['id'] in done:
+            if activity.get('skill') != skill:
                 continue
             resource = activity.get('res')
-            if not resource:
+            is_course = bool(resource and (RM._res(resource) or {}).get('type') == 'course')
+            if activity['id'] in done:
+                completed_course = completed_course or is_course
+            elif not resource:
                 targets.setdefault('task', activity)
-            elif (RM._res(resource) or {}).get('type') == 'course':
+            elif is_course:
                 targets.setdefault('course', activity)
+        if completed_course:
+            targets.pop('course', None)
         if len(targets) == 0:
-            raise ApiError(422, 'SKILL_REVISION_TARGET', '이 스킬의 활동이 모두 완료되어 수정할 대상이 없어요.')
+            raise ApiError(422, 'SKILL_REVISION_TARGET', '이 스킬에 교체할 수 있는 강좌나 산출물이 없어요.')
         ch['c']['replaceActs'] = [{'key': a['id'], 'title': a['title']} for a in targets.values()]
         needed_parts = []
         if 'course' in targets:
@@ -576,7 +582,7 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
         feedback = ' / '.join(comment.get(key) or '' for key in ('fit', 'fitText', 'level', 'levelText', 'free')).strip(' /')
         req = f'{skill} 담당 부서장 의견: {feedback}\n{req}'.strip()
         if 'course' not in targets and 'task' in targets:
-            req = f'{skill}의 강좌는 이미 완료되었습니다. 완료된 강좌는 새 강좌를 추가하지 말고 그대로 유지하고, 미완료 산출물만 새로 작성해 주세요.\n{req}'
+            req = f'{skill}의 기존 강좌를 모두 유지하고, 강좌를 추가하지 말고 미완료 산출물만 새로 작성해 주세요.\n{req}'
         elif 'task' not in targets and 'course' in targets:
             req = f'{skill}의 산출물은 이미 완료되었습니다. 완료된 산출물은 그대로 유지하고, 미완료 강좌만 새로 추천해 주세요.\n{req}'
     if not settings_only and not skill and not rev.get('fromComment') and (base.get('def') or {}).get('learningReport'):
