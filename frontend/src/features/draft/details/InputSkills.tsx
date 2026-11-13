@@ -43,7 +43,7 @@ export function InputSkills(){
   const [dragging,setDragging]=useState<string|null>(null);
   const [dropTarget,setDropTarget]=useState<string|null>(null);
   const list = useRef<HTMLOListElement>(null);
-  const loadingHeights = useRef(new Map<string, number>());
+  const [loadingHeights, setLoadingHeights] = useState(new Map<string, number>());
   const positions = useRef(new Map<string, number>());
   useLayoutEffect(()=>{
     const previous=positions.current;
@@ -60,7 +60,7 @@ export function InputSkills(){
     if(stage!=='ready'||!owner||!shouldRecommendSkills(ws().draft,attempt>0))return;
     let active=true;
     const timer=setTimeout(()=>{
-      loadingHeights.current = new Map(Array.from(list.current?.querySelectorAll<HTMLElement>('[data-skill]') ?? [], card => [card.dataset.skill!, card.getBoundingClientRect().height]));
+      setLoadingHeights(new Map(Array.from(list.current?.querySelectorAll<HTMLElement>('[data-skill]') ?? [], card => [card.dataset.skill!, card.getBoundingClientRect().height])));
       setBusy(true);setError('');
       const before = ws().draft;
       const old = skillsReady(before) ? before.selectedSkills || [] : [];
@@ -114,7 +114,7 @@ export function InputSkills(){
     {ready&&available.length>0&&<>
       <div className="input-skills-meta"><span>선택 <b>{selected.length}</b>개 · 제안 {available.length-excluded.length}개</span><span>카드를 드래그하거나 화살표로 순서를 바꿔 주세요.</span></div>
       <ol ref={list} className="input-skills-list" aria-label="선택한 스킬과 학습 순서">
-        {selected.map((row,index)=>busy && !draft.fixedSkillNames?.includes(row.name) ? <li key={row.name} className="input-skill-placeholder" style={{ minHeight: loadingHeights.current.get(row.name) }}><Skeleton kind="rows" count={1}/></li> : <li key={row.name} data-skill={row.name} className={`input-skill-card${dragging===row.name?' is-dragging':''}${dropTarget===row.name&&dragging!==row.name?' is-drop-target':''}`} draggable={!busy}
+        {selected.map((row,index)=>busy && !draft.fixedSkillNames?.includes(row.name) ? <li key={row.name} className="input-skill-placeholder" style={{ minHeight: loadingHeights.get(row.name) }}><Skeleton kind="rows" count={1}/></li> : <li key={row.name} data-skill={row.name} className={`input-skill-card${dragging===row.name?' is-dragging':''}${dropTarget===row.name&&dragging!==row.name?' is-drop-target':''}`} draggable={!busy}
           onDragStart={event=>{if(busy){event.preventDefault();return;}setDragging(row.name);event.dataTransfer.effectAllowed='move';event.dataTransfer.setData('text/plain',row.name);}}
           onDragOver={event=>{if(dragging&&!busy){event.preventDefault();event.dataTransfer.dropEffect='move';setDropTarget(row.name);}}}
           onDragEnd={()=>{setDragging(null);setDropTarget(null);}}
