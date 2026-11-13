@@ -7,7 +7,7 @@ import './reviewSkills.css';
 import './reviewStep.css';
 import { ResourceImage } from '@/shared/ui/ResourceImage';
 import { TaskDescription } from '@/shared/ui/TaskDescription';
-import { activityAnchor } from '@/features/roadmap/roadmapLearningData';
+import { activityAnchor, weekToneClass } from '@/features/roadmap/roadmapLearningData';
 import { durationLabel, type DurationEstimate } from '../result/skillOrder';
 import { courseDifficulty } from '@/shared/lib/courseDifficulty';
 import type { MaterialResource } from '@/api/types/draft';
@@ -107,16 +107,21 @@ export function ReviewSkillBlocks({ materials, acts, busy, readOnly = false, onS
     const tasks = acts.filter(a => a.skill === name && !a.res);
     const estimate = materials.durationEstimates?.[name];
     const current = currentSkillNames.includes(name);
+    // 진행 상태를 남기는 활동(강좌·산출물 과제). 모두 마치면 '이번 주'와 다른 완료 색으로 표시한다(#101)
+    const tracked = acts.filter(a => a.skill === name && (!a.res || mine.some(({ resource, kind }) => kind === 'course' && resource.id === a.res)));
+    const tone = weekToneClass(tracked, progress, current);
+    const complete = tone === ' is-week-done';
     return <Fragment key={name}>
       {lead.length ? <section className="rv-shared" aria-label="함께 배우는 자료">
         <header><h3>함께 배우는 자료</h3><span className="tag acc">스킬 {leadSkills.map(number).join(' · ')} 공통</span></header>
         {lead.map(({ resource, kind }) => row(resource, kind, owners.get(resource.id)!))}
       </section> : null}
-      <details open className={`rv-skill review-skill-block${current ? ' is-current-week' : ''}`}>
+      <details open className={`rv-skill review-skill-block${tone}`}>
         <summary>
           <span className="rv-skill-n">{String(index + 1).padStart(2, '0')}</span>
           <h3>{name}</h3>
-          {current ? <span className="tag acc">이번 주</span> : null}
+          {current ? <span className="tag week">이번 주</span> : null}
+          {complete ? <span className="tag done">완료</span> : null}
           {estimate?.weeks != null ? <span className="tag line">{durationLabel(estimate)}</span> : null}
           {skillAction?.(name)}
           <span className="review-skill-toggle-more">펼치기</span><span className="review-skill-toggle-less">접기</span>
@@ -141,7 +146,7 @@ export function ReviewSkillBlocks({ materials, acts, busy, readOnly = false, onS
             {!readOnly ? <button type="button" className="btn sm line" disabled={busy || !onSubmit} onClick={() => onSubmit?.(name)}>과제물 제출</button> : null}
           </div>
           <div className="rv-task-grid">
-            {tasks.map(task => <div className={`rv-task is-static${done(task.id) ? ' is-on' : ''}`} key={task.id} id={activityAnchor(task.id)} tabIndex={-1}>
+            {tasks.map(task => <div className={`rv-task is-static${done(task.id) ? ' is-done' : ''}`} key={task.id} id={activityAnchor(task.id)} tabIndex={-1}>
               {progress ? <Stt done={done(task.id)} /> : null}
               <span className="rv-task-tx">
                 {/* 저장되는 것은 활동의 완료 여부뿐이라(첨부 없이 완료하거나 첨부하고 진행 중일 수 있다) 제출 여부로 적지 않는다 */}

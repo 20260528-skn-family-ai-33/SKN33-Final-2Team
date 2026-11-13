@@ -6,6 +6,16 @@
   --danger-line: #F1C6C2;
   --ok: #1F8A4C;
   --ok-soft: #E8F5ED;
+  /* 주차 강조(#101): 이번 주는 테마 강조색, 모든 활동을 마친 주차는 완료색. 강조색에 색이 없는 테마(612)는 skin.css 에서 바꾼다 */
+  --week: var(--accent);
+  --week-ink: var(--accent-ink);
+  --week-soft: var(--accent-soft);
+  --week-soft2: var(--accent-soft2);
+  --week-line: var(--accent-line);
+  --done: var(--ok);
+  --done-ink: var(--ok);
+  --done-soft: var(--ok-soft);
+  --done-line: color-mix(in srgb, var(--ok) 40%, transparent);
 }
 
 .ribbon .mode { margin-left: auto; padding: 3px 10px; border-radius: 99px; background: rgba(255, 255, 255, .12); color: #E4E4E0; font-size: 12px; }
@@ -501,6 +511,8 @@ details.ops.sm .ops-b { padding: 8px 10px; gap: 6px; }
 .past-l .link svg { width: 13px; height: 13px; }
 .acts .tx .memo { display: block; margin-top: 3px; color: var(--ink-2); }
 .tag.ok { background: var(--ok-soft); color: var(--ok); }
+.tag.week { background: var(--week-soft); color: var(--week-ink); box-shadow: inset 0 0 0 1px var(--week-line); }
+.tag.done { background: var(--done-soft); color: var(--done-ink); box-shadow: inset 0 0 0 1px var(--done-line); }
 .ck-list { margin-top: 14px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
 .ck-list .li .btn { flex: none; }
 .cm-item { padding: 16px 18px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }

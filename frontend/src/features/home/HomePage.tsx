@@ -10,7 +10,8 @@ import { Stepper } from '@/features/draft/Stepper';
 import { ActRow, Alerts, postStart } from '@/features/roadmap/parts';
 import { useGo } from '@/shared/hooks/useGo';
 import { failToast } from '@/shared/lib/fail';
-import { count } from '@/shared/lib/plan';
+import { count, trackedActs } from '@/shared/lib/plan';
+import { weekToneClass } from '@/features/roadmap/roadmapLearningData';
 import { useState } from 'react';
 import { monthDay, planStart, startsLater, weekNow } from './ganttCalc';
 import { useClockRefresh } from '@/shared/state/demoClock';
@@ -94,7 +95,7 @@ function PostCta({ R }: { R: PlanRecord }) {
   );
 }
 
-function StageCard({ R }: { R: PlanRecord }) {
+export function StageCard({ R }: { R: PlanRecord }) {
   const pl = R.plan;
   const [expanded, setExpanded] = useState(false);
   useClockRefresh();
@@ -150,6 +151,13 @@ function StageCard({ R }: { R: PlanRecord }) {
   });
   const hasHiddenShared = shared.some(course => course.to < week || course.from > week);
   const hasMore = hasHiddenActs || hasHiddenShared || orderedSkills.length > currentSkills.size;
+  /* 묶음 강조(#101): 모든 활동(도서 제외)을 마친 묶음은 완료색, 펼친 '전체 활동'에서는 이번 주 묶음을 이번 주 색으로 칠한다.
+     접힌 '이번 주차 활동'은 모두 이번 주라 이번 주 색은 쓰지 않는다 */
+  const tone = (activities: typeof pl.acts, inThisWeek: boolean) => {
+    const current = expanded && !later && inThisWeek;
+    const className = weekToneClass(trackedActs(activities), R.progress, current);
+    return { className, tags: <>{current ? <span className="tag week">이번 주</span> : null}{className === ' is-week-done' ? <span className="tag done">완료</span> : null}</> };
+  };
   return (
     <div className="card">
       <div className="sec-h">
@@ -162,21 +170,21 @@ function StageCard({ R }: { R: PlanRecord }) {
       </div>
       {!groups.size && !visibleShared.length && <p className="small muted">{later ? `${startText}부터 시작해요.` : '이번 주차에 예정된 활동이 없어요.'}{hasMore ? ' ‘모두 보기’에서 전체 활동을 확인할 수 있어요.' : ''}</p>}
       <div className="home-skill-groups">
-        {visibleShared.map(course => <section className="home-skill-group" key={`shared:${course.id}`}>
-          <h3>{course.skills.join(' · ')}</h3>
+        {visibleShared.map(course => { const t = tone(course.activities, course.from <= week && week <= course.to); return <section className={`home-skill-group${t.className}`} key={`shared:${course.id}`}>
+          <h3>{course.skills.join(' · ')}{t.tags}</h3>
           <div className="home-material-group" data-kind="강좌">
             <h4>강좌<span>1개 · 공통</span></h4>
             {/* 같은 강좌라 한 줄만 보여 준다. 기록을 저장하면 다른 스킬의 활동에도 같이 저장된다 */}
             <ul className="acts"><ActRow a={course.activities[0]} R={R} /></ul>
           </div>
-        </section>)}
-        {[...groups].map(([skill, categories]) => <section className="home-skill-group" key={skill}>
-        <h3>{skill}</h3>
+        </section>; })}
+        {[...groups].map(([skill, categories]) => { const t = tone(bySkill.get(skill)!, currentSkills.has(skill)); return <section className={`home-skill-group${t.className}`} key={skill}>
+        <h3>{skill}{t.tags}</h3>
         {['도서', '강좌', '과제', '기타 자료'].filter(kind => categories.has(kind)).map(kind => <div className="home-material-group" data-kind={kind} key={kind}>
           <h4>{kind}<span>{categories.get(kind)!.length}개</span></h4>
           <ul className="acts">{categories.get(kind)!.map(a => <ActRow key={a.id} a={a} R={R} />)}</ul>
         </div>)}
-      </section>)}</div>
+      </section>; })}</div>
       <PostCta R={R} />
     </div>
   );

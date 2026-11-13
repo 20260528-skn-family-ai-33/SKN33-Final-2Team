@@ -8,7 +8,7 @@ import { useClockRefresh } from '@/shared/state/demoClock';
 import { useMe } from '@/shared/state/session';
 import { ActThumb, Stt } from '@/shared/ui/parts';
 import { ActRow } from './parts';
-import { activitiesOutsideSkillCards, activityAnchor, groupLearningActivities, matchingCertificates } from './roadmapLearningData';
+import { activitiesOutsideSkillCards, activityAnchor, groupLearningActivities, inWeek, matchingCertificates, weekToneClass } from './roadmapLearningData';
 import './roadmapLearning.css';
 import { weekNow } from '@/features/home/ganttCalc';
 import { ResourceImage } from '@/shared/ui/ResourceImage';
@@ -61,12 +61,14 @@ export function RoadmapResources({ R, owned }: { R: PlanRecord; owned?: string[]
 export function RoadmapActivityList({ R, readOnly = false, skipSkillCardDuplicates = false }: { R: PlanRecord; readOnly?: boolean; skipSkillCardDuplicates?: boolean }) {
   useClockRefresh();
   const week = weekNow(R);
-  const due = (activity: PlanRecord['plan']['acts'][number]) => R.status === 'active' && activity.wFrom <= week && week <= activity.wTo && st(R.progress, activity.id) !== 'done';
+  // 줄은 이번 주에 남은 활동만 이번 주 색으로 칠한다. 묶음은 일정으로 이번 주를, 모두 마치면 완료 색을 쓴다(#101)
+  const live = R.status === 'active';
+  const due = (activity: PlanRecord['plan']['acts'][number]) => live && inWeek(activity, week) && st(R.progress, activity.id) !== 'done';
   const resources = useCatalog(state => state.res);
   const plan = skipSkillCardDuplicates ? { ...R.plan, acts: activitiesOutsideSkillCards(R.plan) } : R.plan;
   const groups = groupLearningActivities(plan, resources);
   if (!groups.length) return null;
-  return <div className="roadmap-learning-groups">{groups.map((group, index) => { const tracked = trackedActs(group.activities); return <details open className={`card roadmap-learning-group${R.status === 'active' && group.activities.some(a => a.wFrom <= week && week <= a.wTo) && tracked.some(a => st(R.progress, a.id) !== 'done') ? ' is-current-week' : ''}`} key={group.name}>
+  return <div className="roadmap-learning-groups">{groups.map((group, index) => { const tracked = trackedActs(group.activities); return <details open className={`card roadmap-learning-group${weekToneClass(tracked, R.progress, live && tracked.some(a => inWeek(a, week)))}`} key={group.name}>
     <summary><span className="no">{index + 1}</span><h2>{group.name}</h2><span className="small muted">{range(group.activities)}{tracked.length ? ` · ${tracked.filter(activity => st(R.progress, activity.id) === 'done').length}/${tracked.length} 완료` : ''}</span><span className="learning-toggle-more">펼치기</span><span className="learning-toggle-less">접기</span></summary>
     {[{ title: '자료 학습', acts: group.materials }, { title: '산출물', acts: group.tasks }].filter(category => category.acts.length).map(category => <div className="roadmap-learning-category" key={category.title}>
       <h3>{category.title}</h3><ul className="acts">{category.acts.map(activity => <li id={activityAnchor(activity.id)} tabIndex={-1} className={`roadmap-learning-anchor${due(activity) ? ' is-current-week' : ''}`} key={activity.id}>
