@@ -49,8 +49,9 @@ def main(argv=None) -> int:
     parser.add_argument('--max-calls', type=int, default=0, help='--apply 때 허용할 최대 모델 호출 수(필수)')
     args = parser.parse_args(argv)
     with db.tx() as t:
-        if not survey_pool.table_exists(t):
-            parser.error('app_ext.skill_survey_pool 표가 없습니다. 먼저 db/migrate_survey_pool.sql 을 적용하세요.')
+        if not survey_pool.readable(t):
+            parser.error('app_ext.skill_survey_pool 표가 없거나 이 계정에 읽기 권한이 없습니다. '
+                         '먼저 db/migrate_survey_pool.sql 을 적용하고 권한을 확인하세요.')
         todo, ready = targets(t, args.skill, args.force)
     summary = {'skills_to_generate': len(todo), 'already_pooled': ready, 'prompt_hash': survey_pool.PROMPT_HASH}
     if not args.apply:

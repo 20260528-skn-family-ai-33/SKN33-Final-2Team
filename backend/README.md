@@ -661,13 +661,21 @@ ALTER TABLE app_ext.user_settings DROP COLUMN IF EXISTS tutorial_answered_at;
 
 - 저장: `app_ext.skill_survey_pool`(스킬 태그당 1행, `surveys` jsonb 5개, 생성 모델·프롬프트 해시). 태그 이름이 바뀐 행은 쓰지 않는다.
 - 읽기: `services/survey_pool.py`. 선택 스킬이 1개면 5문항, 여러 개면 스킬마다 앞의 3문항을 쓴다(`generate_survey`의 문항 수 규칙과 같다).
-- 대체: 표가 없거나 선택 스킬 중 하나라도 풀이 없으면 그 진단은 이전처럼 모델로 설문을 만든다.
+- 대체: 표가 없거나, 앱 DB 계정에 표 읽기 권한(`app_ext` USAGE·표 SELECT)이 없거나, 선택 스킬 중 하나라도 풀이 없으면 그 진단은 이전처럼 모델로 설문을 만든다. 권한은 조회 전에 `has_table_privilege`로 확인한다.
 - 문항은 특정 직원·프로젝트를 가정하지 않는 스킬 공통 문항이다. 프로젝트 맥락은 퀴즈에만 반영된다.
 
 **DB 적용(이 버전의 앱을 올리기 전에 DB마다 한 번):** 저장소 루트에서 실행한다. 다시 실행해도 결과는 같다.
 
 ```bash
 docker compose exec -T db sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < backend/db/migrate_survey_pool.sql
+```
+
+마이그레이션을 적용한 계정과 앱이 접속하는 계정이 다르면 앱 계정에 읽기 권한을 준다. 주지 않으면 풀을 쓰지 않고 모델로 설문을 만든다. `<앱 계정>`은 실제 앱 `DATABASE_URL`의 사용자다.
+
+```sql
+GRANT USAGE ON SCHEMA app_ext TO <앱 계정>;
+GRANT SELECT ON app_ext.skill_survey_pool TO <앱 계정>;
+SELECT has_table_privilege('<앱 계정>', 'app_ext.skill_survey_pool', 'SELECT');  -- true 여야 한다
 ```
 
 **문항 채우기:** `backend/`에서 실행한다. 옵션 없이 실행하면 만들 스킬 수만 보여 주고 모델 호출·DB 쓰기를 하지 않는다. `--apply`는 풀이 없는 스킬마다 모델을 1회 호출하고 저장하며, `--max-calls`보다 많으면 시작하지 않는다. 중간에 실패해도 저장된 스킬은 남고, 다시 실행하면 남은 스킬만 만든다.

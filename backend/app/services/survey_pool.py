@@ -64,13 +64,22 @@ def clean(skill: str, raw: Any) -> dict[str, Any]:
     return {'title': title, 'surveys': surveys}
 
 
-def table_exists(t: Any) -> bool:
-    return t.val("SELECT to_regclass('app_ext.skill_survey_pool') IS NOT NULL") is True
+def readable(t: Any) -> bool:
+    """풀 표가 있고 현재 DB 계정이 읽을 수 있을 때만 참.
+
+    마이그레이션 계정과 앱 계정이 다르면 표는 보여도 SELECT 권한이 없을 수 있다.
+    풀은 선택 기능이라 그때는 조회하지 않고 호출 측이 모델 생성으로 돌아가게 한다.
+    has_*_privilege 에 이름 대신 oid 를 넘겨 표가 없을 때도 오류 없이 거짓이 된다.
+    """
+    return t.val("SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_class c "
+                 "JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace "
+                 "WHERE n.nspname = 'app_ext' AND c.relname = 'skill_survey_pool' "
+                 "AND has_schema_privilege(n.oid, 'USAGE') AND has_table_privilege(c.oid, 'SELECT'))") is True
 
 
 def load(t: Any, names: list[str]) -> dict[str, dict[str, Any]]:
     """현재 스킬 태그 이름과 일치하는 풀만 읽는다. 태그 이름이 바뀐 풀은 쓰지 않는다."""
-    if not names or not table_exists(t):
+    if not names or not readable(t):
         return {}
     rows = t.all(f"SELECT s.name, p.title, p.surveys FROM {TABLE} p "
                  "JOIN public.skill_tags s ON s.skill_id = p.skill_id AND s.name = p.skill_name "

@@ -19,15 +19,18 @@ def pool_item(name):
 
 
 class PoolMemory(SurveyMemory):
-    """설문 풀 표가 있는 DB. pool 에 든 스킬만 풀 문항이 있다."""
-    def __init__(self, draft, pool):
+    """설문 풀 표가 있는 DB. pool 에 든 스킬만 풀 문항이 있다. can_read=False 면 표는 있으나 앱 계정에 SELECT 권한이 없다."""
+    def __init__(self, draft, pool, can_read=True):
         super().__init__(draft)
         self.pool = pool
+        self.can_read = can_read
 
     def val(self, sql, **params):
-        return True if 'to_regclass' in sql else None
+        return self.can_read if 'has_table_privilege' in sql else None
 
     def all(self, sql, **params):
+        if 'skill_survey_pool' in sql and not self.can_read:
+            raise AssertionError('permission denied for table skill_survey_pool')
         return [{'name': name, **self.pool[name]} for name in params['names'] if name in self.pool]
 
 
@@ -64,6 +67,10 @@ class SurveysForTests(TestCase):
         self.assertIsNone(survey_pool.surveys_for(SurveyMemory({}), {'skills': [{'name': 'A'}]}))
         self.assertIsNone(survey_pool.surveys_for(memory, {'skills': []}))
 
+    def test_unreadable_pool_returns_none_without_querying(self):
+        memory = PoolMemory({}, {'A': pool_item('A')}, can_read=False)
+        self.assertIsNone(survey_pool.surveys_for(memory, {'skills': [{'name': 'A'}]}))
+
 
 class StagedPoolTests(TestCase):
     setUp = concurrency.GenerationConcurrencyTests.setUp
@@ -92,14 +99,25 @@ class StagedPoolTests(TestCase):
                 patch('app.catalog.skill_names', return_value=names), patch.object(api.runtime, 'context', return_value=SimpleNamespace(live=True)),
                 patch.object(api.runtime, 'llm_json', side_effect=model))
 
-    def setup_case(self, count, pool_names):
+    def setup_case(self, count, pool_names, can_read=True):
         f = fixture.SurveyTests()
         f.setUp()
         project = {k: v for k, v in f.project.items() if k != 'rawText'}
         project['selectedSkills'] = f.selection(count)['skills']
         names = [row['name'] for row in project['selectedSkills']]
-        memory = PoolMemory({'goal': project['goal']}, {name: pool_item(name) for name in names if name in pool_names})
+        memory = PoolMemory({'goal': project['goal']}, {name: pool_item(name) for name in names if name in pool_names}, can_read)
         return f, project, names, memory
+
+    def generate(self, memory, project, f, names):
+        calls = []
+        patches = self.run_staged(memory, project, f, names, calls)
+        for p in patches:
+            p.start()
+        try:
+            return api.generate_for(1, 'p', staged=True), calls
+        finally:
+            for p in patches:
+                p.stop()
 
     def test_pool_surveys_shown_while_quizzes_generate(self):
         f, project, names, memory = self.setup_case(2, {'스킬0', '스킬1'})
@@ -159,3 +177,16 @@ class StagedPoolTests(TestCase):
                 p.stop()
         self.assertEqual(calls, ['surveys', 'quizzes'])
         self.assertEqual(final['quizStatus'], 'ready')
+
+    def test_pool_without_select_privilege_falls_back_then_reads_after_grant(self):
+        # 마이그레이션 계정과 앱 계정이 달라 SELECT 권한이 없으면 모델 생성, 권한을 주면 풀 문항을 읽는다.
+        f, project, names, memory = self.setup_case(2, {'스킬0', '스킬1'}, can_read=False)
+        final, calls = self.generate(memory, project, f, names)
+        self.assertEqual(calls, ['surveys', 'quizzes'])
+        self.assertEqual(final['quizStatus'], 'ready')
+
+        f, project, names, memory = self.setup_case(2, {'스킬0', '스킬1'}, can_read=True)
+        final, calls = self.generate(memory, project, f, names)
+        self.assertEqual(calls, ['quizzes'])
+        self.assertEqual([[q['text'] for q in g['surveys']] for g in final['groups']],
+                         [pool_item(name)['surveys'][:3] for name in names])
