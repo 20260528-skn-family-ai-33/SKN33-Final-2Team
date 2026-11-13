@@ -414,18 +414,18 @@ def resume(employee_id: int, roadmap_id: str) -> dict:
 
 
 # ── 수정안 (API-43~45) ──
-REV_FIELDS = {'hours': '주당 학습 시간', 'weeks': '정해진 기간', 'budget': '교육 예산', 'format': '학습 방식', 'cert': '자격증 계획', 'etc': '일정·환경 제약',
+REV_FIELDS = {'hours': '주당 학습 시간', 'weeks': '정해진 기간', 'budget': '교육 예산', 'format': '학습 방식', 'etc': '일정·환경 제약',
               'start': '시작 단계', 'pid': '관점', 'remove': '활동 빼기', 'replace': '활동 바꾸기', 'add': '활동 추가'}
 
 
 def _rev_changes(r: dict, pl: dict) -> dict:
     """수정 요청 화면에서 고른 항목만 사람이 읽는 값으로 (4차 revChanges)"""
-    from .drafts import pref_text, cert_res
+    from .drafts import pref_text
     v, on, c = r['v'], r.get('on') or {}, {}
     blank = lambda x: x in ('', None)  # noqa: E731
     act_ref = lambda i: next(({'key': a['id'], 'title': a['title']} for a in pl['acts'] if a['id'] == i), None)  # noqa: E731
     raw = dict(pl.get('prefs') or {})
-    for k in ('hours', 'weeks', 'budget', 'format', 'cert', 'etc'):
+    for k in ('hours', 'weeks', 'budget', 'format', 'etc'):
         if on.get(k):
             raw[k] = v.get(k)
     if on.get('hours'):
@@ -436,9 +436,6 @@ def _rev_changes(r: dict, pl: dict) -> dict:
         c['budgetWon'] = '알아서' if blank(v.get('budget')) else int(float(v['budget']))
     if on.get('format'):
         c['format'] = pref_text('format', raw)
-    if on.get('cert'):
-        cc = catalog.cert_by_code(raw.get('cert'))
-        c['certification'] = cc['title'] if cc else '계획 없음'
     if on.get('etc'):
         c['constraints'] = str(v.get('etc') or '').strip() or '없음'
     if on.get('start'):
@@ -457,8 +454,7 @@ def _rev_changes(r: dict, pl: dict) -> dict:
         tasks = [x.strip() for x in str(v.get('addTask') or '').split('\n') if x.strip()][:5]
         if tasks:
             c['addTasks'] = tasks
-    return {'c': c, 'raw': raw, 'pid': v['pid'] if on.get('pid') and v.get('pid') != pl['opt'] else pl['opt'], 'start': int(v['start']) if on.get('start') else pl['start'],
-            'certRes': cert_res(raw)}
+    return {'c': c, 'raw': raw, 'pid': v['pid'] if on.get('pid') and v.get('pid') != pl['opt'] else pl['opt'], 'start': int(v['start']) if on.get('start') else pl['start']}
 
 
 def _skill_comment_option(out: dict, base: dict, targets: dict, skill: str, handoff: dict) -> dict:
@@ -469,9 +465,15 @@ def _skill_comment_option(out: dict, base: dict, targets: dict, skill: str, hand
     courses = [a for a in proposals if a.get('res') and a['res'] not in old_ids
                and (RM._res(a['res']) or {}).get('type') == 'course']
     tasks = [a for a in proposals if not a.get('res') and (a['title'], a.get('how') or '') not in old_tasks]
-    if len(courses) != 1 or len(tasks) != 1:
-        raise ApiError(422, 'SKILL_REVISION_INVALID', '이 스킬의 새 강좌와 산출물을 하나씩 확인하지 못했어요. 다시 요청해 주세요.')
-    replacement = {targets['course']['id']: courses[0], targets['task']['id']: tasks[0]}
+    replacement = {}
+    if 'course' in targets:
+        if not courses:
+            raise ApiError(422, 'SKILL_REVISION_INVALID', '이 스킬의 새 강좌를 확인하지 못했어요. 다시 요청해 주세요.')
+        replacement[targets['course']['id']] = courses[0]
+    if 'task' in targets:
+        if not tasks:
+            raise ApiError(422, 'SKILL_REVISION_INVALID', '이 스킬의 새 산출물을 확인하지 못했어요. 다시 요청해 주세요.')
+        replacement[targets['task']['id']] = tasks[0]
     option = copy.deepcopy(base['def'])
     option.pop('support', None)
     option.pop('supportFail', None)
@@ -499,6 +501,11 @@ def _revision_content(plan: dict, skills: set[str] | None = None) -> tuple:
     return settings, activities
 
 
+def _revision_activities(plan: dict) -> list:
+    return [(a['id'], a.get('res'), a.get('title'), a.get('how') or '', a.get('stage'),
+             a.get('hours'), a.get('skill'), a.get('skills') or []) for a in plan['acts']]
+
+
 def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
     """수정안 작성(API-43). 확정하기 전까지 기존 로드맵은 그대로. 실패하면 가데이터로 대신하지 않는다"""
     from .drafts import handoff_prefs
@@ -513,9 +520,12 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
             raise ApiError(422, 'REVISION_SKILLS_INVALID', '다시 제안받을 스킬을 확인해 주세요.')
         retry = _revision(str(row['roadmap_id']))
         pending = (retry or {}).get('result') or {}
-        if not retry or retry['status'] != 'ready' or str(retry['revision_id']) != body.get('revisionId') or pending.get('fromComment') or pending.get('from') != base:
+        if not retry or retry['status'] != 'ready' or str(retry['revision_id']) != body.get('revisionId') or pending.get('fromComment') or pending.get('settingsOnly') or pending.get('from') != base:
             raise ApiError(409, 'REVISION_CHANGED', '현재 수정안을 다시 확인해 주세요.')
     rev = body.get('rev') or {}
+    settings_only = body.get('settingsOnly') is True
+    if settings_only and (retry_skill is not None or rev.get('fromComment') or set(k for k, enabled in (rev.get('on') or {}).items() if enabled) - {'hours', 'weeks', 'budget', 'format', 'etc'}):
+        raise ApiError(422, 'REVISION_SETTINGS_ONLY', '학습 여건만 선택해 주세요.')
     comment = next((c for c in _comments(roadmap_id) if c['id'] == rev['fromComment']), None) if rev.get('fromComment') else None
     if rev.get('fromComment') and not comment:
         raise not_found('코멘트')
@@ -525,7 +535,13 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
     if skill:
         rev = dict(rev, on={})
     ch = _rev_changes(rev, base)
-    prefs_h = handoff_prefs(ch['raw'])
+    if settings_only and not any(
+        str(value if value is not None else "").strip() != str(previous if previous is not None else "").strip()
+        for key, value in ch["raw"].items()
+        for previous in [(base.get("prefs") or {}).get(key)]
+    ):
+        raise ApiError(422, "REVISION_SETTINGS_ONLY", "변경할 학습 여건을 선택해 주세요.")
+    prefs_h = handoff_prefs(ch["raw"])
     previous_handoff = dict(base.get('handoff') or {})
     if 'userNotes' not in previous_handoff and 'etc' not in (previous_handoff.get('details') or {}):
         legacy_note = str((base.get('prefs') or {}).get('etc') or '').strip()
@@ -540,20 +556,47 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
     done = {p['activity_id'] for p in db.all_("SELECT activity_id FROM app_ext.activity_progress WHERE roadmap_id = :r AND status = 'done'", r=row['roadmap_id'])}
     targets = {}
     if skill:
+        completed_course = False
         for activity in base['acts']:
-            if activity.get('skill') != skill or activity['id'] in done:
+            if activity.get('skill') != skill:
                 continue
             resource = activity.get('res')
-            if not resource:
+            is_course = bool(resource and (RM._res(resource) or {}).get('type') == 'course')
+            if activity['id'] in done:
+                completed_course = completed_course or is_course
+            elif not resource:
                 targets.setdefault('task', activity)
-            elif (RM._res(resource) or {}).get('type') == 'course':
+            elif is_course:
                 targets.setdefault('course', activity)
-        if len(targets) != 2:
-            raise ApiError(422, 'SKILL_REVISION_TARGET', '이 스킬에 교체 가능한 미완료 강좌와 산출물이 각각 필요해요.')
+        if completed_course:
+            targets.pop('course', None)
+        if len(targets) == 0:
+            raise ApiError(422, 'SKILL_REVISION_TARGET', '이 스킬에 교체할 수 있는 강좌나 산출물이 없어요.')
         ch['c']['replaceActs'] = [{'key': a['id'], 'title': a['title']} for a in targets.values()]
-        ch['c']['replaceHint'] = f'{skill}의 지정 강좌 1개와 산출물 1개 교체. 강좌는 실제 카탈로그의 다른 강좌. 그 외 활동 유지.'
+        needed_parts = []
+        if 'course' in targets:
+            needed_parts.append('강좌 1개')
+        if 'task' in targets:
+            needed_parts.append('산출물 1개')
+        ch['c']['replaceHint'] = f"{skill}의 {'와 '.join(needed_parts)} 교체. 그 외 활동 유지."
         feedback = ' / '.join(comment.get(key) or '' for key in ('fit', 'fitText', 'level', 'levelText', 'free')).strip(' /')
         req = f'{skill} 담당 부서장 의견: {feedback}\n{req}'.strip()
+        if 'course' not in targets and 'task' in targets:
+            req = f'{skill}의 기존 강좌를 모두 유지하고, 강좌를 추가하지 말고 미완료 산출물만 새로 작성해 주세요.\n{req}'
+        elif 'task' not in targets and 'course' in targets:
+            req = f'{skill}의 산출물은 이미 완료되었습니다. 완료된 산출물은 그대로 유지하고, 미완료 강좌만 새로 추천해 주세요.\n{req}'
+    if not settings_only and not skill and not rev.get('fromComment') and (base.get('def') or {}).get('learningReport'):
+        # 일반 수정 요청(전체 수정안): 완료된 활동/도서는 보존하고, 미완료된 각 스킬의 강좌·산출물을 새 제안으로 교체 (#226)
+        undone_changeable = [
+            a for a in base['acts']
+            if a['id'] not in done and not (RM._res(a.get('res')) or {}).get('type') == 'book'
+        ]
+        if undone_changeable and not ch['c']:
+            ch['c']['replaceActs'] = [{'key': a['id'], 'title': a['title']} for a in undone_changeable]
+            ch['c']['replaceHint'] = '완료된 활동과 도서는 원본 그대로 유지하고, 미완료된 각 스킬의 강좌는 카탈로그의 다른 강좌로 교체하며 산출물은 새로운 실습 목표와 과제로 반드시 새로 작성해 주세요. 현재 계획과 동일한 내용을 반환하지 마세요.'
+            req = (req + '\n완료된 활동과 도서는 유지하고, 미완료된 각 스킬의 강좌는 다른 추천 강좌로, 산출물은 새 과제로 차별화하여 새 제안을 작성해 주세요.').strip()
+    if not skill and rev.get('fromComment'):
+        req = (req + '\n완료된 활동(done: true)과 진행 기록은 안전하게 보존되어야 하므로 어떠한 경우에도 삭제·변경·교체하지 마세요.').strip()
     if (base.get('def') or {}).get('learningReport') and (skill or not rev.get('fromComment')):
         req = (req + '\n도서 유지. 새 산출물 설명 형식: 만들 것:, 필수 항목:, 제출물:, 평가 기준:. 각 항목 내용 필수.').strip()
     if retry:
@@ -575,12 +618,19 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
             out = RM.revise(ctx, inp, sim=rt.sim_once(ctx, 'rev', str(body.get('key') or rev_id)))
             if skill:
                 out = _skill_comment_option(out, base, targets, skill, handoff)
+            if settings_only:
+                proposed = RM.keep_ids(out, base, base['version'] + 1)
+                candidate = RM.build_plan(proposed, {'start': base['start'], 'hours': base['hours']}, base['goal'])
+                if candidate['opt'] != base['opt'] or _revision_activities(candidate) != _revision_activities(base):
+                    raise ApiError(422, 'REVISION_SETTINGS_ONLY', '학습 여건 수정안에서 기존 활동이 변경됐어요. 다시 요청해 주세요.')
         except (AgentError, ApiError) as error:
             with db.tx() as t:
                 t.run("UPDATE app_ext.roadmap_revisions SET status = 'failed', error = :e, updated_at = now() WHERE revision_id = CAST(:i AS uuid) AND status = 'running'",
                       e=db.J({'cause': jobs.error_info(error)}), i=rev_id)
             raise
-        d = RM.keep_ids(out, base, base['version'] + 1)
+        d = copy.deepcopy(base['def']) if settings_only else RM.keep_ids(out, base, base['version'] + 1)
+        if settings_only:
+            d['acts'] = copy.deepcopy(base['acts'])
         if retry:
             existing_ids = {activity['id'] for activity in base['acts']}
             for activity in d['acts']:
@@ -589,8 +639,19 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
         if skill:
             # 교체된 산출물에는 이전 완료 기록을 연결하지 않는다.
             for index, activity in enumerate(d['acts']):
-                if activity['id'] == targets['task']['id']:
+                if 'task' in targets and activity['id'] == targets['task']['id']:
                     activity['id'] = f"{base['opt'].lower()}-v{base['version'] + 1}-task-{index + 1}"
+        if done:
+            # 완료 활동 보존 강제: done에 속한 활동은 base['acts'] 원본 속성 그대로 보존 (#235)
+            base_done_acts = {a['id']: a for a in base['acts'] if a['id'] in done}
+            existing_d_done_ids = set()
+            for index, activity in enumerate(d['acts']):
+                if activity['id'] in base_done_acts:
+                    d['acts'][index] = copy.deepcopy(base_done_acts[activity['id']])
+                    existing_d_done_ids.add(activity['id'])
+            for done_id, orig_act in base_done_acts.items():
+                if done_id not in existing_d_done_ids:
+                    d['acts'].append(copy.deepcopy(orig_act))
         to = RM.build_plan(d, {'start': ch['start'], 'hours': base['hours'] if skill else prefs_h['weeklyHours'] or d.get('weeklyHours') or base['hours'] or D['autoHours'], 'format': prefs_h['formatKey'], 'patch': {}}, base['goal'])
         if retry:
             pending = retry['result']
@@ -604,7 +665,7 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
             return {'revisionId': rev_id, 'noChanges': _revision_content(pending['to'], {retry_skill}) == _revision_content(updated, {retry_skill})}
         summary = str(out.get('summary') or '').strip()
         pd = {'from': base, 'to': to, 'key': body.get('key'), 'request': req, 'fromComment': rev.get('fromComment') or False, 'summary': summary, 'notes': out.get('notes') or [],
-              'source': d.get('source'), 'prefsFrom': base.get('prefs'), 'prefsTo': ch['raw'], 'handoff': handoff,
+              'settingsOnly': settings_only, 'source': d.get('source'), 'prefsFrom': base.get('prefs'), 'prefsTo': ch['raw'], 'handoff': handoff,
               'label': f"{'부서장 코멘트 반영' if rev.get('fromComment') else '수정 요청 반영'}{' · ' + summary if summary else ''}"[:70]}
         if comment:
             pd['commentStamp'] = comment['stamp']
@@ -641,6 +702,8 @@ def _mix_revision_skills(current: dict, proposal: dict, handoff: dict, selected:
         book_ids.update((new_report.get('choices', {}).get(name) or {}).get('books') or [])
         new = old
         if name in chosen:
+            if any(a['id'] in done for a in old):
+                raise ApiError(409, 'REVISION_CHANGED', '완료한 활동이 있는 스킬은 기존 안을 선택해 주세요.')
             new = [a for a in proposal['acts'] if a.get('skill') == name and a.get('res') not in book_ids]
             if not new:
                 raise ApiError(422, 'REVISION_SKILLS_INVALID', '추천 활동이 없는 스킬은 기존 계획을 유지해 주세요.')
@@ -650,7 +713,7 @@ def _mix_revision_skills(current: dict, proposal: dict, handoff: dict, selected:
         old_by_id = {a['id']: a for a in old}
         new_by_id = {a['id']: a for a in new}
         if any(a['id'] in done and (
-            a['id'] not in new_by_id or any(new_by_id[a['id']].get(key) != a.get(key) for key in ('res', 'title', 'how'))
+            a['id'] not in new_by_id or any(new_by_id[a['id']].get(key) != a.get(key) for key in ('res', 'title', 'how', 'stage', 'hours', 'skill', 'skills'))
         ) for a in old):
             raise ApiError(409, 'REVISION_CHANGED', '완료한 활동은 바꿀 수 없어요. 기존 안을 선택해 주세요.')
         activities.extend(dict(a, key=a['id'] if a['id'] in old_by_id else None) for a in new)
@@ -713,15 +776,40 @@ def accept_revision(employee_id: int, roadmap_id: str, revision_id: str, selecte
             if (not source or source['fit'] == '__deleted__' or source['status'] == 'applied'
                     or not stamp or source['updated_at'].isoformat() != stamp):
                 raise ApiError(409, 'COMMENT_UNAVAILABLE', '코멘트가 변경됐어요. 수정안을 다시 요청해 주세요.')
+        done_ids = {item['activity_id'] for item in t.all(
+            "SELECT activity_id FROM app_ext.activity_progress WHERE roadmap_id = :r AND status = 'done'",
+            r=row['roadmap_id'])}
         if scoped:
             current = t.val('SELECT content FROM public.roadmaps WHERE roadmap_id = :r', r=row['roadmap_id'])
             if current != pd['from']:
                 raise ApiError(409, 'REVISION_CHANGED', '로드맵이 변경됐어요. 수정안을 다시 요청해 주세요.')
-            done_ids = {item['activity_id'] for item in t.all(
-                "SELECT activity_id FROM app_ext.activity_progress WHERE roadmap_id = :r AND status = 'done'",
-                r=row['roadmap_id'])}
             if done_ids.intersection(scoped['targets']):
                 raise ApiError(409, 'REVISION_CHANGED', '완료한 활동이 있어요. 수정안을 다시 요청해 주세요.')
+        elif done_ids:
+            # 확정 시점의 완료 활동을 보호한다.
+            cur_done_acts = {a['id']: a for a in cur['acts'] if a['id'] in done_ids}
+            to_acts = {a['id']: a for a in plan['acts']}
+            for aid, old_a in cur_done_acts.items():
+                if aid not in to_acts or any(to_acts[aid].get(k) != old_a.get(k) for k in ('res', 'title', 'how', 'stage', 'hours', 'skill', 'skills')):
+                    raise ApiError(409, 'REVISION_CHANGED', '완료한 활동은 바꿀 수 없어요. 기존 계획을 유지해 주세요.')
+        if pd.get('settingsOnly'):
+            current = t.val('SELECT content FROM public.roadmaps WHERE roadmap_id = :r', r=row['roadmap_id'])
+            if current != pd['from'] or plan['opt'] != current['opt'] or _revision_activities(plan) != _revision_activities(current):
+                raise ApiError(409, 'REVISION_CHANGED', '기존 활동이 변경됐어요. 수정안을 다시 요청해 주세요.')
+            # 설정에서 파생된 일정만 남기고 설명과 자료 정의는 현재 계획에서 복원한다.
+            definition = copy.deepcopy(current['def'])
+            if 'materialSchedule' in definition:
+                definition['materialSchedule'] = plan['def'].get('materialSchedule', definition['materialSchedule'])
+            report = definition.get('learningReport')
+            estimates = (plan['def'].get('learningReport') or {}).get('durationEstimates')
+            if isinstance(report, dict) and estimates is not None:
+                report['durationEstimates'] = estimates
+            plan['def'] = definition
+            for key in ('displayTitle', 'name', 'short', 'tagline', 'goal'):
+                if key in current:
+                    plan[key] = current[key]
+                else:
+                    plan.pop(key, None)
         evidence = baseline.get('selectionEvidence') if isinstance(baseline, dict) else None
         if not isinstance(evidence, dict):
             evidence = cur.get('selectionEvidence')

@@ -14,7 +14,7 @@ import { newComments, updateWs, useWs } from '@/shared/state/workspace';
 import { Icon } from '@/shared/ui/Icon';
 import { Page } from '@/shared/ui/parts';
 import { cmBy } from './parts';
-import { freshRev, revise, takePlan } from './planActions';
+import { confirmReviseComment, freshRev, revise, takePlan } from './planActions';
 
 export function CommentView({ c }: { c: Pick<Comment, 'fit' | 'fitText' | 'level' | 'levelText' | 'free'> }) {
   const fit = D.commentFit.find((x) => x[0] === c.fit)?.[1];
@@ -102,9 +102,11 @@ export function CommentsPage({ R }: { R: PlanRecord }) {
   useWs((s) => s.plans[R.id]);
   if (!list.length) return <Page back={paths.roadmap(R.id)} title="받은 코멘트가 없어요" lead="이 로드맵에 부서장이 의견을 남기면 여기에 쌓여요." />;
   const apply = (c: Comment) => {
-    if (!prepareCommentRevision(R.id, c)) return;
-    go(paths.revise(R.id));
-    if (c.skill) void revise(R.id);
+    confirmReviseComment(R, c.skill || undefined, () => {
+      if (!prepareCommentRevision(R.id, c)) return;
+      go(paths.revise(R.id));
+      if (c.skill) void revise(R.id);
+    });
   };
   const read = async (c: Comment) => {
     try {

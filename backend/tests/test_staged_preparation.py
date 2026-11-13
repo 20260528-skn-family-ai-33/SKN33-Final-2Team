@@ -21,7 +21,7 @@ class StagedPreparationTests(TestCase):
         started,release=Event(),Event();calls=[]
         @contextmanager
         def transaction():yield memory
-        def model(ctx,system,payload):
+        def model(ctx,system,payload, **kwargs):
             phase='surveys' if payload['surveysPerSkill'] else 'quizzes';calls.append(phase)
             if phase=='quizzes':
                 started.set()
@@ -68,7 +68,7 @@ class StagedPreparationTests(TestCase):
         value=deepcopy(memory.raw['v2Survey'])
         value['quizStatus']='failed';store._write(memory,1,'p',value)
         calls=[]
-        def model(ctx,system,payload):
+        def model(ctx,system,payload, **kwargs):
             calls.append(payload['quizzesPerSkill'] and 'quizzes')
             result=f.result(5)
             for group in result['groups']:

@@ -155,7 +155,7 @@ export function DetailsCheck() {
           <header className="skill-confirm-header"><h2 id="confirmedSkillsTitle">선택한 스킬 · 학습 순서</h2><span>{d.selectedSkills?.length||0}개 스킬</span></header>
           <ol className="skill-confirm-list">{d.selectedSkills?.map((row,index)=><li key={row.name}>
             <span className="skill-confirm-number" aria-hidden="true">{String(index+1).padStart(2,'0')}</span>
-            <div><h3>{row.name}</h3><p>{row.application}</p></div>
+            <div><h3>{row.name}{row.learned && <span className="tag acc" style={{ marginLeft: 8, fontSize: '0.75rem', padding: '2px 6px' }}>보유 기술</span>}</h3><p>{row.application}</p></div>
           </li>)}</ol>
         </section>
         </div>

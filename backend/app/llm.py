@@ -134,6 +134,12 @@ def _with_images(messages: list, provider: str) -> list:
     return out
 
 
+def effective_openai_reasoning(role: str, reasoning: str | None) -> str | None:
+    if model_name('openai', role) != S.openai_model:
+        return None
+    return reasoning if role != 'vision' and reasoning in S.openai_reasoning_levels else S.openai_reasoning
+
+
 def chat(provider: str, messages: list, role: str = 'default', json_mode: bool = True, reasoning: str | None = None,
          temperature: float | None = None, response_schema: dict | None = None) -> dict:
     """한 번의 대화 호출 → {content, model, provider, loadMs, totalMs}.
@@ -148,7 +154,6 @@ def chat(provider: str, messages: list, role: str = 'default', json_mode: bool =
         count = FRAMING_RESERVE + sum(tokens(message.get('content') or '') + tokens(message.get('role') or '') for message in messages)
         if count > limits.input_tokens:
             raise LlmError(f'모델 입력이 브라우저 한도를 넘었어요 ({count} / {limits.input_tokens} 토큰).')
-    mine = None if role == 'vision' else reasoning
     if provider == 'ollama':
         if role == 'vision' and not S.ollama_vision:
             raise LlmError('Ollama 비전 모델 설정이 없어요 (RunPod-Ollama 팀 모델은 이미지를 읽지 않음)')
@@ -203,11 +208,11 @@ def chat(provider: str, messages: list, role: str = 'default', json_mode: bool =
         payload['max_completion_tokens'] = OUTPUT_RESERVE
     # .env 의 단계 목록은 OPENAI_MODEL 의 것이라 다른 비전 모델에는 보내지 않는다.
     # 목록에서 빠진 값(목록을 바꾼 뒤 남은 옛 선택)은 400 이 나므로 기본값으로 돌린다
-    level = (mine if mine in S.openai_reasoning_levels else S.openai_reasoning) if model == S.openai_model else None
+    level = effective_openai_reasoning(role, reasoning)
     if level:
         payload['reasoning_effort'] = level
-    # 상세 계획을 쓰는 로드맵만 더 기다린다. 사용자 추론 선택과 다른 기능의 제한은 유지한다.
-    timeout = S.openai_roadmap_timeout if role == 'roadmap' else 90
+    # 상세 계획을 쓰는 로드맵과 퀴즈 생성은 더 기다린다. 사용자 추론 선택과 다른 기능의 제한은 유지한다.
+    timeout = S.openai_roadmap_timeout if role in ('roadmap', 'quiz', 'assessment') else 90
     if limits.output_tokens is not None:
         payload['max_completion_tokens'] = limits.output_tokens
     res = openai('chat/completions', payload, timeout=limits.timeout or timeout)

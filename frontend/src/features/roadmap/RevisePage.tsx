@@ -10,16 +10,15 @@ import { activityTime } from '@/shared/lib/resourceTime';
 import { trackName } from '@/shared/constants/data';
 /* 수정 요청 (10/14 · 5차 scr.revise · P.revForm·revCtl·revRow·goalRow·diffView)
    여러 항목을 함께 골라도 된다. 고른 항목과 요청 내용을 관점 에이전트가 함께 보고 수정안을 먼저 보여 준다. 확정하기 전까지 지금 로드맵은 그대로 */
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { newIdToPath, paths } from '@/app/paths';
 import type { PendingRevision, PlanContent, PlanRecord, RevForm } from '@/api/types/plan';
-import { CertPicker } from '@/features/draft/details/CertPicker';
 import { enterNewRoadmap } from '@/features/draft/startModeSheet';
 import { D } from '@/shared/constants/data';
 import { useGo } from '@/shared/hooks/useGo';
 import { clone } from '@/shared/lib/format';
 import { actMeta, diff, isBookActivity, st, stageName } from '@/shared/lib/plan';
-import { certNameOf, prefText } from '@/shared/lib/prefs';
+import { prefText } from '@/shared/lib/prefs';
 import { ai, cause, errText, PROV } from '@/shared/state/ai';
 import { setAt } from '@/shared/state/bind';
 import { useCatalog } from '@/shared/state/catalog';
@@ -32,7 +31,7 @@ import { ResPicker } from '@/shared/ui/ResPicker';
 import { Skeleton } from '@/shared/ui/Skeleton';
 import { CommentView, commentReq, CmTag } from './comments';
 import { cmBy, PlanGate } from './parts';
-import { acceptRevision, dropRevision, freshRev, pullPlan, REV_ITEMS, revise, revItemOk, revKey, revOk, usePlanWatch } from './planActions';
+import { acceptRevision, confirmReviseComment, confirmReviseSkillsExclusion, confirmSkillRevisionSingle, dropRevision, freshRev, pullPlan, REV_ITEMS, revise, revItemOk, revKey, revOk, usePlanWatch } from './planActions';
 
 
 /** 수정안 비교 (5차 P.diffView) */
@@ -95,7 +94,6 @@ export function DiffView({ pd }: { pd: PendingRevision }) {
 const curText = (k: string, pl: PlanContent): string => {
   const p = pl.prefs || emptyPrefs();
   if (k === 'hours') return `주 ${pl.hours}시간${+p.hours > 0 ? '' : ' (에이전트가 정함)'}`;
-  if (k === 'cert') return certNameOf(p) || '계획 없음';
   if (['weeks', 'budget', 'format', 'etc'].includes(k)) return prefText(k as 'weeks', p);
   if (k === 'start') return `${pl.start}단계 ${stageName(pl.start)}`;
   if (k === 'pid') return `${trackName(pl.opt, pl.name)}`;
@@ -160,13 +158,6 @@ function RevCtl({ k, R }: { k: string; R: PlanRecord }) {
         ))}
       </select>
     );
-  if (k === 'cert')
-    return (
-      <>
-        <CertPicker path={`${base}.cert`} />
-        <small className="muted">분야를 고른 뒤 자격을 골라 주세요. ‘계획 없음’이면 자격 준비 활동을 빼요</small>
-      </>
-    );
   if (k === 'etc')
     return <BText path={`${base}.etc`} className="textarea sm" maxLength={500} ariaLabel={lab} placeholder="예: 다음 달 둘째 주는 출장이 많아요. 평일 저녁에만 공부할 수 있어요." />;
   if (k === 'start')
@@ -216,7 +207,6 @@ function RevCtl({ k, R }: { k: string; R: PlanRecord }) {
           ariaLabel="직접 할 과제"
           placeholder={'직접 할 과제를 한 줄에 하나씩 적어 주세요 (선택)\n예: 부서 FAQ 20건으로 답변 품질 점검하기'}
         />
-        <small className="muted">자격증은 위 ‘자격증 계획’에서 바꿔요</small>
       </>
     );
   }
@@ -310,7 +300,7 @@ function GoalRow({ R }: { R: PlanRecord }) {
   );
 }
 
-function RevForm({ R }: { R: PlanRecord }) {
+function RevForm({ R, settingsOnly = false }: { R: PlanRecord; settingsOnly?: boolean }) {
   const r = R.rev as RevForm;
   const grp = (g: 'cond' | 'plan' | 'acts', title: string) => (
     <div className="card rv-g">
@@ -326,6 +316,7 @@ function RevForm({ R }: { R: PlanRecord }) {
   return (
     <>
       {grp('cond', '학습 여건')}
+      {!settingsOnly && <>
       {grp('plan', '로드맵 구성')}
       {grp('acts', '활동')}
       <div className="card rv-g">
@@ -339,20 +330,30 @@ function RevForm({ R }: { R: PlanRecord }) {
         ) : null}
         <BText path={`plans.${R.id}.rev.note`} maxLength={600} ariaLabel="요청 내용" placeholder="예: 평일 저녁에만 시간이 나요. 실습을 늘려 주세요." />
       </div>
+      </>}
     </>
   );
 }
 
-function SkillRevisionChoices({ pd, selected, onPick, retrying, onRetry }: {
+function SkillRevisionChoices({ pd, selected, onPick, retrying, onRetry, progress }: {
   pd: PendingRevision; selected: string[]; onPick: (skill: string, recommended: boolean) => void;
-  retrying: string | null; onRetry: (skill: string) => void;
+  retrying: string | null; onRetry: (skill: string) => void; progress?: PlanRecord['progress'];
 }) {
-  const names = commentSkillNames(pd.from);
+  const allNames = commentSkillNames(pd.from);
+  // 이미 완료된 강좌나 산출물이 있는 스킬은 수정안 선택 탭 및 고르는 버튼 자체를 제외 (#226)
+  const isSkillDone = (name: string) =>
+    pd.from.acts.some(
+      (a) =>
+        a.skill === name &&
+        !isBookActivity(a) &&
+        st(progress, a.id) === 'done',
+    );
+  const names = allNames.filter((name) => !isSkillDone(name));
   const [active, setActive] = useState('');
   const id = useId();
   const resources = useCatalog(state => state.res);
   const skill = names.includes(active) ? active : names[0];
-  if (!skill) return null;
+  if (!skill) return <p className="small muted">모든 스킬에 완료된 활동이 있어 수정할 스킬이 없어요.</p>;
   return <div className="stack">
     {names.length > 1 && <MaterialSkillTabs names={names} active={skill} onChange={setActive} id={id} panelId={id + '-panel'} />}
     <div id={id + '-panel'} role={names.length > 1 ? 'tabpanel' : undefined} aria-label={skill} className="stack">
@@ -406,25 +407,55 @@ function SkillRevisionChoices({ pd, selected, onPick, retrying, onRetry }: {
 function Revise({ R }: { R: PlanRecord }) {
   const go = useGo();
   const [retrying, setRetrying] = useState<string | null>(null);
-  const [picks, setPicks] = useState<{ revisionId?: string; skills: string[] }>({ skills: [] });
+  const pd = R.pending;
+  const revisionId = R.revision?.id;
+  const allSkills = pd ? commentSkillNames(pd.from) : [];
+  const activeSkills = pd
+    ? allSkills.filter(
+        (name) =>
+          !pd.from.acts.some(
+            (a) =>
+              a.skill === name &&
+              !isBookActivity(a) &&
+              st(R.progress, a.id) === 'done',
+          ),
+      )
+    : [];
+  const [picks, setPicks] = useState<{ revisionId?: string; skills: string[] }>(() => ({
+    revisionId,
+    skills: activeSkills,
+  }));
+  const initializedRef = useRef<string | undefined>(pd ? revisionId : undefined);
+  useEffect(() => {
+    if (pd && revisionId && initializedRef.current !== revisionId) {
+      initializedRef.current = revisionId;
+      setPicks({ revisionId, skills: activeSkills });
+    }
+  }, [pd, revisionId, activeSkills]);
   usePlanWatch(R.id);
   const base = R.plan;
   const noForm = !R.rev || !R.rev.v;
   useEffect(() => {
-    if (noForm) updateWs((s) => void (s.plans[R.id].rev = freshRev(s.plans[R.id])));
+    if (noForm) {
+      updateWs((s) => {
+        const init = (s.plans[R.id].revision?.request as RevForm | undefined) || freshRev(s.plans[R.id]);
+        s.plans[R.id].rev = init;
+      });
+    }
   }, [noForm, R.id]);
   if (!R.rev || !R.rev.v) return null;
   const r = R.rev;
-  const pd = R.pending;
   const busy = !!r.running;
   const pid = r.on.pid && r.v.pid !== base.opt ? r.v.pid : base.opt;
   const agent = `${D.perspectives[pid].name}`;
   const cm = r.fromComment ? (R.comments || []).find((c) => c.id === r.fromComment) : undefined;
   /* 요청 내용을 채운 뒤 부서장이 코멘트를 고쳤으면(10/23 코멘트 수정) 알리고, 고친 내용으로 다시 채울 수 있게 한다 */
   const skillComment = cm?.skill;
-  const mixed = !r.fromComment && !!base.def.learningReport;
-  const revisionId = R.revision?.id;
-  const selectedSkills = picks.revisionId === revisionId ? picks.skills : [];
+  const activitySkills = new Set(base.acts.filter(a => !isBookActivity(a) && a.skill).map(a => a.skill));
+  const completedSkills = new Set(base.acts.filter(a => !isBookActivity(a) && a.skill && st(R.progress, a.id) === 'done').map(a => a.skill));
+  const settingsOnly = activitySkills.size > 0 && activitySkills.size === completedSkills.size;
+  const mixed = !r.fromComment && !!base.def.learningReport && !settingsOnly;
+  const selectedSkills = picks.revisionId === revisionId ? picks.skills : activeSkills;
   const confirmRevision = () => {
     if (!pd) return;
     if (mixed) {
@@ -485,7 +516,7 @@ function Revise({ R }: { R: PlanRecord }) {
   };
   const stale = !!(cm && r.cmStamp && cm.stamp !== r.cmStamp);
   const fail = r.fail && 'cause' in r.fail && r.fail.cause ? cause(r.fail.cause) : null;
-  const ok = revOk(R) && !cm?.deleted && cm?.status !== 'applied';
+  const ok = revOk(R, settingsOnly && !r.fromComment) && !cm?.deleted && cm?.status !== 'applied';
   let out: React.ReactNode = null;
   if (busy)
     out = (
@@ -507,7 +538,7 @@ function Revise({ R }: { R: PlanRecord }) {
         }
         ops={<OpsBox items={[['', fail]]} />}
         foot={
-          <button className="btn pri" disabled={!ok} onClick={() => void revise(R.id)}>
+          <button className="btn pri" disabled={!ok} onClick={() => (skillComment || r.fromComment ? confirmReviseComment(R, skillComment || undefined, () => void revise(R.id)) : confirmReviseSkillsExclusion(R, () => void revise(R.id, settingsOnly)))}>
             <Icon name="retry" />
             {skillComment ? '재요청하기' : '다시 시도하기'}
           </button>
@@ -528,7 +559,13 @@ function Revise({ R }: { R: PlanRecord }) {
             const rows = plan.acts.filter(activity => activity.skill === skillComment && !unchanged.has(activity.id));
             return <section className={`card${index ? ' rv-recommendation-new' : ''}`} key={title}>
               <div className="sec-h"><h3 className="st">{title}</h3><span className={`tag ${index ? 'acc' : 'line'}`}>{index ? '새 제안' : '현재 계획'}</span></div>
-              <div className="stack">{rows.map(activity => {
+              <div className="stack">
+                {plan.acts.filter(activity => activity.skill === skillComment && activity.res && st(R.progress, activity.id) === 'done').map(activity => (
+                  <p className="small muted" key={'done-' + activity.id}>
+                    <span className="tag ok">강좌 완료</span> {activity.title} (기존 유지)
+                  </p>
+                ))}
+                {rows.map(activity => {
                 const item = { ...activity, skill: skillComment, how: activity.how || '' };
                 if (!activity.res) return <div className="review-task" key={activity.id}><ReviewTaskCopy task={item} /></div>;
                 const report = plan.def.learningReport as ReviewMaterials | undefined;
@@ -539,7 +576,7 @@ function Revise({ R }: { R: PlanRecord }) {
               })}</div>
             </section>;
           })}
-        </div> : mixed ? <SkillRevisionChoices pd={pd} selected={selectedSkills} retrying={retrying} onRetry={skill => void retrySkill(skill)} onPick={(skill, recommended) =>
+        </div> : mixed ? <SkillRevisionChoices pd={pd} selected={selectedSkills} retrying={retrying} progress={R.progress} onRetry={skill => confirmSkillRevisionSingle(R, skill, () => void retrySkill(skill))} onPick={(skill, recommended) =>
           setPicks({ revisionId, skills: recommended ? [...new Set([...selectedSkills, skill])] : selectedSkills.filter(name => name !== skill) })
         } /> : <DiffView pd={pd} />}
       </>
@@ -598,10 +635,10 @@ function Revise({ R }: { R: PlanRecord }) {
       </>}
     >
       {cmt}
-      {!skillComment && !mixed && <RevForm R={R} />}
+      {!skillComment && !mixed && <RevForm R={R} settingsOnly={settingsOnly && !r.fromComment} />}
       {fail && !busy ? null : (
         <div className="actions rv-act">
-          <button className={`btn ${pd ? 'line' : 'pri'}`} disabled={!ok || !!retrying} onClick={() => void revise(R.id)}>
+          <button className={`btn ${pd ? 'line' : 'pri'}`} disabled={!ok || !!retrying} onClick={() => (skillComment || r.fromComment ? confirmReviseComment(R, skillComment || undefined, () => void revise(R.id)) : confirmReviseSkillsExclusion(R, () => void revise(R.id, settingsOnly)))}>
             {busy ? '수정안을 만드는 중…' : mixed ? '전체 재요청' : skillComment ? '재요청하기' : pd ? '수정안 다시 만들기' : '수정안 만들기'}
           </button>
         </div>

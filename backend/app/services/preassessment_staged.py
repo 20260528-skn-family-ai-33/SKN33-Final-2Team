@@ -1,6 +1,7 @@
 """설문 먼저 저장·노출 후 퀴즈 생성. 기존 초안 JSON과 세대 검증 사용.
 설문은 미리 저장한 스킬별 풀(#225)에서 읽고, 풀이 없을 때만 모델로 만든다. 퀴즈는 설문을 푸는 동안 모델로 만든다."""
 from copy import deepcopy
+from app import llm
 from app.errors import ApiError
 from app.services import survey_store as store
 from app.track_policy import LEGACY_MAX_SKILLS, MAX_SKILLS
@@ -44,7 +45,14 @@ def generate_for(employee_id, project_id):
                 raise ApiError(409,'SURVEY_INPUT_CHANGED','생성 중 입력이 변경됐어요. 다시 준비해 주세요.')
         def generate(phase):
             task='역량 테스트 설문 문항 생성' if phase=='surveys' else '역량 테스트 퀴즈 문항 생성'
-            return api.generate_survey(project,selection,personal,api.runtime.model(ctx,'진단 에이전트',task),require_measurement=True,phase=phase,max_skills=limit)
+            try:
+                return api.generate_survey(project,selection,personal,api.runtime.model(ctx,'진단 에이전트',task,role='quiz'),require_measurement=True,phase=phase,max_skills=limit)
+            except Exception:
+                if ctx.provider == 'openai' and llm.effective_openai_reasoning('quiz', ctx.reasoning.get('openai')) in ('high', 'xhigh'):
+                    from dataclasses import replace
+                    fallback_ctx = replace(ctx, reasoning={**ctx.reasoning, 'openai': 'medium'})
+                    return api.generate_survey(project,selection,personal,api.runtime.model(fallback_ctx,'진단 에이전트',task,role='quiz'),require_measurement=True,phase=phase,max_skills=limit)
+                raise
         if not same:
             partial=pooled_surveys(project,selection,personal,limit)
             if partial is None:partial=generate('surveys')

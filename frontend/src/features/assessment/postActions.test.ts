@@ -9,7 +9,11 @@ const api = vi.hoisted(() => ({
   savePost: vi.fn(),
   makeReport: vi.fn(),
   toast: vi.fn(),
+  uiToast: vi.fn(),
   takePlan: vi.fn(),
+  pullPlan: vi.fn(async () => null),
+  waitJob: vi.fn(() => new Promise(() => {})),
+  reloadWorkspace: vi.fn(async () => true),
 }));
 vi.mock("@/api/endpoints/plans", () => ({
   plansApi: {
@@ -19,13 +23,15 @@ vi.mock("@/api/endpoints/plans", () => ({
     makeReport: api.makeReport,
   },
 }));
-vi.mock("@/api/jobs", () => ({ waitJob: vi.fn(() => new Promise(() => {})) }));
+vi.mock("@/api/jobs", () => ({ waitJob: api.waitJob }));
 vi.mock("@/features/roadmap/planActions", () => ({
   takePlan: api.takePlan,
-  pullPlan: vi.fn(async () => null),
+  pullPlan: api.pullPlan,
 }));
-vi.mock("@/features/draft/draftSync", () => ({ reloadWorkspace: vi.fn() }));
+vi.mock("@/features/draft/draftSync", () => ({ reloadWorkspace: api.reloadWorkspace }));
 vi.mock("@/shared/lib/fail", () => ({ failToast: api.toast }));
+vi.mock("@/shared/state/ui", () => ({ toast: api.uiToast }));
+vi.mock("@/shared/state/session", () => ({ me: () => ({ id: "u1" }) }));
 
 type Actions = typeof import("./postActions");
 type Ws = typeof import("@/shared/state/workspace");
@@ -154,5 +160,65 @@ describe("사후 심화 문항이 준비된 로드맵의 저장", () => {
     expect(api.get).toHaveBeenCalledExactlyOnceWith("p1");
     expect(api.postQuiz).not.toHaveBeenCalled();
     expect(api.takePlan).toHaveBeenCalledWith(ready);
+  });
+});
+
+describe("결과 보고서 작성 완료 후 알림 및 라우팅", () => {
+  it("사후 점검 화면에서 보고서 생성이 완료되면 완료 알림을 띄우고 결과 보고서 화면으로 이동한다", async () => {
+    vi.stubGlobal("window", { location: { pathname: "/roadmaps/p1/post" } });
+    api.waitJob.mockResolvedValueOnce({ reportId: "rep-123" });
+    await act.waitReport(go as never, "p1", "job-123");
+    expect(api.uiToast).toHaveBeenCalledWith("결과 보고서 작성이 완료되었어요");
+    expect(go).toHaveBeenCalledWith("/reports/rep-123");
+    expect(wsMod.ws().plans.p1.post.reportId).toBe("rep-123");
+    vi.unstubAllGlobals();
+  });
+
+  it("사후 점검 화면을 벗어난 상태에서 완료되면 이동 없이 토스트 알림만 띄운다", async () => {
+    vi.stubGlobal("window", { location: { pathname: "/" } });
+    api.waitJob.mockResolvedValueOnce({ reportId: "rep-123" });
+    await act.waitReport(go as never, "p1", "job-123");
+    expect(api.uiToast).toHaveBeenCalledWith(
+      "결과 보고서가 나왔어요 · 점검·보고서에서 볼 수 있어요",
+    );
+    expect(go).not.toHaveBeenCalled();
+    expect(wsMod.ws().plans.p1.post.reportId).toBe("rep-123");
+    vi.unstubAllGlobals();
+  });
+
+  it("restores the report link from the server after missing the completion response", async () => {
+    vi.stubGlobal("window", { location: { pathname: "/" } });
+    try {
+      const plan = wsMod.ws().plans.p1;
+      api.waitJob.mockRejectedValueOnce(new Error("connection lost"));
+      api.pullPlan.mockResolvedValueOnce({ ...plan, status: "done" } as never);
+      api.reloadWorkspace.mockImplementationOnce(async () => {
+        wsMod.updateWs((state) => {
+          state.reports = [{ id: "rep-recovered", planId: "p1" }] as typeof state.reports;
+        });
+        return true;
+      });
+
+      await act.waitReport(go as never, "p1", "job-recovered");
+
+      expect(wsMod.ws().plans.p1.post.reportId).toBe("rep-recovered");
+      expect(go).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("보고서 생성 요청 API가 실패하면 에러 알림을 띄우고 입력 상태를 보존한다", async () => {
+    api.savePost.mockResolvedValue({});
+    api.makeReport.mockRejectedValue(new Error("네트워크 연결 실패"));
+    await act.makeReport(go as never, "p1");
+    expect(api.toast).toHaveBeenCalledWith(
+      expect.anything(),
+      "결과 보고서를 만들지 못했어요",
+    );
+    const post = wsMod.ws().plans.p1.post;
+    expect(post.running).toBe(false);
+    expect(post.answers).toEqual({ q1: 4 });
+    expect(post.goalSelf).toBe("3");
   });
 });
