@@ -760,8 +760,8 @@ def accept_revision(employee_id: int, roadmap_id: str, revision_id: str, selecte
                 raise ApiError(409, 'REVISION_CHANGED', '로드맵이 변경됐어요. 수정안을 다시 요청해 주세요.')
             if done_ids.intersection(scoped['targets']):
                 raise ApiError(409, 'REVISION_CHANGED', '완료한 활동이 있어요. 수정안을 다시 요청해 주세요.')
-        elif pd.get('fromComment'):
-            # 범용 코멘트 수정안 확정 시에도 완료 활동 보존 검증 (#235)
+        elif done_ids:
+            # 확정 시점의 완료 활동을 보호한다.
             cur_done_acts = {a['id']: a for a in cur['acts'] if a['id'] in done_ids}
             to_acts = {a['id']: a for a in plan['acts']}
             for aid, old_a in cur_done_acts.items():
