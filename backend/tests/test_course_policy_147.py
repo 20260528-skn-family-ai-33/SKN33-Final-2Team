@@ -53,6 +53,63 @@ class CoursePolicyTests(unittest.TestCase):
                     self.assertEqual(output['courses'][0]['candidateKind'], output['modelCourseCandidates'][-1]['candidateKind'])
                     self.assertTrue(output['modelCourseCandidates'][-1]['recommended'])
 
+    def assert_supplemental_recommendations(self, name, goal, lessons, expected):
+        spec = dict(name=name, application=goal)
+        selection = dict(skills=[spec], commonApplications={name: goal})
+        project = {'goal': goal}
+        for track, level in [('A1', 'INTERMEDIATE'), ('A2', 'INTERMEDIATE'), ('A3', 'UPPER_INTERMEDIATE')]:
+            with self.subTest(track=track):
+                course = dict(id=track, learningSkills=[spec])
+                items = {title: dict(self.item(title, level), skills=[name], content=intro,
+                                     curriculum={'items': units}) for title, (intro, units) in lessons.items()}
+                pools, _ = rag.retrieve(project, selection, items, course,
+                    embed=lambda texts: [[1.] * rag.DIMENSIONS for _ in texts],
+                    search=lambda kind, ids, *args: [dict(resource_id=k, current_cost=0, similarity=.8) for k in ids])
+                self.assertEqual({row['id'] for row in pools[0]['courses']}, set(expected))
+
+                def choose_all(system, payload):
+                    cards = payload['skills'][0]['courses']
+                    self.assertEqual({c['title'] for c in cards}, set(expected))
+                    for card in cards:
+                        self.assertEqual(card['candidateKind'], 'supplemental')
+                        proof = card['learningEvidence']['foundationEvidence']
+                        self.assertIn(expected[card['title']], proof)
+                        self.assertNotRegex(proof.casefold(), r'다루지 않|windows')
+                    return {'skills': [dict(name=name, courses=[{'key': c['choiceKey']} for c in cards], books=[])]}
+
+                for provided in (pools, None):
+                    result = recommend_resources(project, selection, items, choose_all, course=course,
+                                                 retrieved_pools=provided)['skills'][0]
+                    self.assertEqual({c['id'] for c in result['courses']}, set(expected))
+
+    def test_excluded_tasks_are_not_lesson_or_description_evidence(self):
+        negated = '이 과정에서는 파티션 재처리 및 행 수 대조를 다루지 않습니다.'
+        practice = '누락 파티션을 재처리하고 행 수를 대조한다.'
+        quality = '누락 행을 포함하지 않는 결과와 원본의 행 수를 대조한다.'
+        lessons = {
+            '차시에서 제외': ('', [{'title': '범위 안내', 'description': negated}]),
+            '소개에서 제외': (negated, []),
+            '별도 실습': ('', [{'title': negated}, {'title': practice}]),
+            '같은 차시의 실습': ('', [{'title': '과정 안내', 'description':
+                '파티션 재처리 및 행 수 대조는 다루지 않지만, ' + quality}]),
+        }
+        self.assert_supplemental_recommendations('ETL & 데이터 파이프라인', 'dbt 모델과 품질 테스트, 백필을 구현한다',
+            lessons, {'별도 실습': practice, '같은 차시의 실습': quality})
+
+    def test_windows_only_evidence_cannot_fill_posix_shortfall(self):
+        windows = 'Windows GUI로 뮤텍스를 사용해 공유 자원 동기화를 구현하는 실습'
+        portable = '공유 자원의 동기화 문제를 재현하는 실습'
+        lessons = {
+            'Windows GUI': ('', [{'title': windows}]),
+            '운영체제 실습': ('', [{'title': windows}]),
+            '플랫폼별 동기화': ('', [{'section': 'Windows GUI', 'title': '뮤텍스로 공유 자원 동기화를 구현'}]),
+            '동시성 기초': ('', [{'title': portable}]),
+            '두 환경의 실습': ('', [{'title': windows}, {'title': portable}]),
+        }
+        self.assert_supplemental_recommendations('멀티스레딩 & 비동기 동시성',
+            'Linux POSIX에서 뮤텍스로 공유 자원 동기화를 구현한다', lessons,
+            {'동시성 기초': portable, '두 환경의 실습': portable})
+
     def test_classification_fills_missing_model_slots_with_evidenced_partial_courses(self):
         name = '자연어 처리(NLP) & LLM 기초'
         goal = '문서 전처리와 임베딩 생성으로 분류기를 학습·평가해 LLM과 전통 분류 방법을 비교한다'
