@@ -377,6 +377,11 @@ export function confirmReviseComment(
     return;
   }
 
+  if (undoneActs.length === 0 && !skill) {
+    onConfirm();
+    return;
+  }
+
   if (undoneActs.length === 0) {
     openSheet({
       title: skill ? `${skill} 수정 요청 불가` : '수정 요청 불가',
