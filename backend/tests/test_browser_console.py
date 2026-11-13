@@ -16,11 +16,13 @@ class BrowserConsoleTests(unittest.TestCase):
         token = console.options.set(console.BrowserOptions())
         self.addCleanup(console.options.reset, token)
 
-    def test_bounds_and_server_permissions(self):
+    def test_limits_follow_effective_demo_setting(self):
         headers = {'x-growpath-picker': 'off', 'x-growpath-timeout': '900',
                    'x-growpath-input': '131072', 'x-growpath-output': '32768'}
-        self.assertEqual(console.from_headers(headers, True), console.BrowserOptions(True, False, 900, 131072, 32768))
-        self.assertEqual(console.from_headers(headers, False), console.BrowserOptions(picker_off=True))
+        self.assertEqual(console.from_headers(headers, True), console.BrowserOptions(False, None, 900, 131072, 32768))
+        self.assertEqual(console.from_headers(headers, False), console.BrowserOptions(picker=False))
+        self.assertEqual(console.from_headers({**headers, 'x-growpath-demo': 'on'}, False).timeout, 900)
+        self.assertIsNone(console.from_headers({**headers, 'x-growpath-demo': 'invalid'}, False).timeout)
         self.assertIsNone(console.from_headers(dict(headers, **{'x-growpath-demo': 'off'}), True).timeout)
         for field, value in [('input', '0'), ('input', '131073'), ('output', '32769'), ('timeout', '901'), ('timeout', '1.5')]:
             with self.subTest(field=field, value=value), self.assertRaises(ValueError):
@@ -69,12 +71,38 @@ class BrowserConsoleTests(unittest.TestCase):
         client = TestClient(main.app)
         config = replace(main.S, demo_mode=True, beta_account_picker=True)
         with patch.object(main, 'S', config), patch.object(account, 'S', config), patch.object(account.profile, 'accounts', return_value=[]):
-            self.assertEqual(client.get('/api/v1/console/capabilities').json(), {'demo': True, 'picker': True})
+            self.assertEqual(client.get('/api/v1/console/capabilities').json(), {'demo': True, 'picker': True, 'browserOverrides': True})
             self.assertEqual(client.get('/api/v1/demo/accounts', headers={'X-GrowPath-Picker': 'off'}).status_code, 404)
             self.assertEqual(client.get('/api/v1/demo/accounts').status_code, 200)
             response = client.get('/api/v1/console/capabilities', headers={'X-GrowPath-Output': '0'})
             self.assertEqual(response.status_code, 422)
             self.assertEqual(response.json()['error']['code'], 'INVALID_CONSOLE_OPTION')
+
+    def test_console_commands_override_off_defaults_independently(self):
+        from dataclasses import replace
+        from fastapi.testclient import TestClient
+        from app import auth, main
+        from app.routers import account
+
+        config = replace(main.S, demo_mode=False, beta_account_picker=False)
+        client = TestClient(main.app, base_url='http://testserver/api/v1/')
+        picker = {'X-GrowPath-Picker': 'on'}
+        demo = {'X-GrowPath-Demo': 'on'}
+        with patch.object(main, 'S', config), patch.object(account, 'S', config), \
+             patch.object(account.profile, 'accounts', return_value=[{'code': 'TEST01'}]) as accounts:
+            self.assertEqual(client.get('demo/accounts', headers=demo).status_code, 404)
+            self.assertEqual(client.get('demo/accounts', headers=picker).json()['accounts'], [{'code': 'TEST01'}])
+            self.assertEqual(client.get('demo/accounts').status_code, 404)
+            accounts.assert_called_once()
+            self.assertEqual(client.post('demo/jump', headers=picker, json={'stage': 'comment'}).status_code, 404)
+            self.assertEqual(client.post('demo/jump', headers=demo, json={'stage': 'comment'}).status_code, 401)
+            with patch.object(auth, 'account_of', return_value=auth.Account('employee', 1, 'test')):
+                self.assertEqual(client.post('demo/jump', headers=demo, json={'stage': 'comment'}).json(), {'entry': 'home'})
+                self.assertEqual(client.post('demo/jump', headers={'X-GrowPath-Demo': 'off'}, json={'stage': 'comment'}).status_code, 404)
+                with patch.object(account.rt, 'logs', return_value=[]) as logs, patch.object(account.rt, 'log_entry', return_value={'employeeId': 2}):
+                    self.assertEqual(client.get('ai/log', headers=demo).json(), {'log': []})
+                    logs.assert_called_once_with(1)
+                    self.assertEqual(client.get('ai/log/7', headers=demo).status_code, 404)
 
     def test_job_preserves_originating_request_only(self):
         settings = console.BrowserOptions(timeout=180, input_tokens=8192, output_tokens=2048,

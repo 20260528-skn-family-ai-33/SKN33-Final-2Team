@@ -41,7 +41,7 @@ export interface ProvidersResponse {
   current: ServerProvider;
   policy?: ProviderPolicy;
   employeeReasoning?: ReasoningPicks;
-  /** 서버의 시연 허용 여부. 구버전 응답의 누락은 허용하지 않는 것으로 처리한다. */
+  /** 서버가 이 요청에 적용한 시연 상태. 구버전 응답에서 누락되면 화면에서 숨긴다. */
   demoMode?: boolean;
   providers: ProviderInfo[];
   docLibs: Record<string, boolean>;
@@ -65,7 +65,7 @@ export interface AiStatusResponse {
 export interface AgentLogEntry {
   id: number;
   at: string;
-  /** 그 호출이 누구의 일이었는지(직원 번호·이름) · 시연·디버그용이라 모든 계정의 호출이 온다 */
+  /** 그 호출이 누구의 일이었는지(직원 번호·이름) */
   employeeId?: number;
   employee?: string;
   /** 관리자 화면에서 시작한 호출이면 '관리자' */

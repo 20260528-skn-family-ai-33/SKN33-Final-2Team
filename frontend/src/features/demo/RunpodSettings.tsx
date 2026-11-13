@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { browserDemoEnabled, storeOptions, useBrowserOptions } from '@/shared/lib/browserOptions';
+import { consoleEnabled, storeOptions, useBrowserOptions } from '@/shared/lib/browserOptions';
 
 export function RunpodSettings({ focus, onDone }: { focus: 'url' | 'key'; onDone: (message: string) => void }) {
   const [url, setUrl] = useState(() => useBrowserOptions.getState().options.ollamaUrl || '');
@@ -28,13 +28,17 @@ export function RunpodSettings({ focus, onDone }: { focus: 'url' | 'key'; onDone
     setError('');
     try {
       // 주소의 허용 범위는 서버가 판정한다. 확인 중에 실제 Pod를 호출하지 않는다.
+      const headers: Record<string, string> = {};
+      if (useBrowserOptions.getState().options.demo === true) headers['X-GrowPath-Demo'] = 'on';
+      if (base) headers['X-GrowPath-Ollama-Url'] = base;
       const response = await fetch('/api/v1/console/capabilities', {
         credentials: 'same-origin', mode: 'same-origin', cache: 'no-store', signal: controller.signal,
-        headers: base ? { 'X-GrowPath-Ollama-Url': base } : {},
+        headers,
       });
       const data = await response.json();
       if (controller.signal.aborted) return;
-      if (!response.ok || !data.demo || !browserDemoEnabled(useBrowserOptions.getState().options)) {
+      const options = useBrowserOptions.getState().options;
+      if (!response.ok || !consoleEnabled('demo', options, data)) {
         setError(data.error?.message || '시연 모드를 확인해 주세요.');
         return;
       }

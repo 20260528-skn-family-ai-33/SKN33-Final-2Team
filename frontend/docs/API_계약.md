@@ -72,25 +72,25 @@
 | --- | --- |
 | `POST /auth/login` · `POST /auth/logout` · `GET /me` | 로그인·로그아웃·새로 고침 때 계정 |
 | `GET /me/workspace` | 로그인 뒤 내 기록 전체(작성 문서·로드맵·보고서) |
-| `GET /console/capabilities` | 로그인 전에도 확인 가능한 서버 허용 여부 `{ "picker": true, "demo": false }` |
+| `GET /console/capabilities` | 로그인 전 확인 가능한 배포 기본값과 브라우저 전환 지원 여부 `{ "picker": false, "demo": false, "browserOverrides": true }` |
 | `GET /me/profile` · `PUT`/`DELETE /me/profile/self` | 내 정보 |
 | `GET /me/goal-suggestions` · `POST /me/goal-suggestions/ensure` · `POST /me/goal-suggestions/regenerate` | 저장된 후보 조회 · 누락/변경 확인 · 명시적 다시 만들기 |
-| `GET /ai/providers` · `PUT /me/ai-provider` · `GET /ai/status?provider=` · `GET /ai/log` · `GET /ai/log/{id}` | 좌측 AI 모델 고르기·연결 상태·에이전트 동작 보기(시연·디버그 전용 · 직원·관리자 계정 모두 · 누가 호출했든 모든 계정의 최근 호출을 `employee`(누구의 일)·`by`(관리자 화면에서 시작하면 '관리자')와 함께 줌 · 운영에서는 끔). 목록은 요약과 `callCount`(모델 호출 수)만, `/ai/log/{id}`는 그 기록의 에이전트 입력·출력과 모델 호출마다 보낸 메시지·응답 원문(`calls`)을 자르지 않고 줌(이미지는 개수만). 오래돼 밀려난 기록은 `404 LOG_NOT_FOUND` |
+| `GET /ai/providers` · `PUT /me/ai-provider` · `GET /ai/status?provider=` · `GET /ai/log` · `GET /ai/log/{id}` | AI 모델 선택·연결 상태와 시연 호출 기록. 목록은 요약과 `callCount`를, 상세는 입력·출력과 호출 전문을 제공합니다. `GP5_DEMO_MODE=off`에서 콘솔로 시연을 켠 직원은 본인의 기록만 조회합니다. 다른 직원의 기록이나 오래된 기록은 `404 LOG_NOT_FOUND`입니다. 서버 기본 시연을 켠 배포와 관리자 시연은 전체 기록을 제공합니다. |
 | `PUT /me/reasoning` | AI 모델 창에서 OpenAI 추론 정도 고르기(직원 계정만 · RunPod-Ollama는 `level: null`만 받음) |
-| `GET /demo/accounts` | 베타 로그인 직원 선택. `GP5_BETA_ACCOUNT_PICKER=on`일 때만 인증 없이 DB 직원 목록·관리자 로그인 아이디 제공. 비밀번호는 제외 |
+| `GET /demo/accounts` | 직원 선택기가 켜진 요청에서 로그인 전 테스트 계정 목록과 관리자 로그인 아이디를 제공합니다. 비밀번호는 제외합니다. |
 | `PUT /me/demo-settings` · `POST /demo/reset` · `POST /demo/jump` | 시연 전용(가데이터·실패 시연·단계 이동·초기화) |
 
 초기화와 단계 이동은 로그인한 직원의 단계 이동으로 생성한 프로젝트만 교체합니다. 출처가 표시되지 않은 기존 기록과 실제 코멘트를 받은 로드맵은 보존합니다. 기존 작성 중인 로드맵과 시연 초안이 겹치면 `409 EXISTING_DRAFT`를 반환하고 이전 상태를 유지합니다. 코멘트 예시는 화면에서만 열리며 기존 클라이언트의 `stage: "comment"` 요청은 기록·알림 생성 없이 `{"entry":"home"}`을 반환합니다.
 
 단계 이동으로 만든 초안은 조회 응답의 `draft.demoSeeded`가 `true`입니다. 서버가 저장한 출처만 사용하며 확정 후에도 시연 초기화 대상입니다. 이 초안은 `together`와 `after`로 확정할 수 있고 부서장에게 확정 알림을 보내지 않습니다. `{"startMode":"archive"}`는 `409 DEMO_ARCHIVE_FORBIDDEN`으로 거절해 기존 로드맵과 수정안을 보존합니다. 시연 도구가 켜져 있어도 직원이 직접 생성한 초안에는 일반 확정 규칙이 적용됩니다.
 
-`GP5_BETA_ACCOUNT_PICKER`는 시연 모드와 독립적입니다. 베타 예시는 on이며, 미설정 또는 off이면 `GET /demo/accounts`는 DB 조회 전에 `404 / NOT_FOUND`를 반환하고 화면에서 직원 선택을 숨깁니다. 베타 종료 시 off로 변경하고 백엔드를 다시 생성한 뒤 화면을 새로고침합니다. on일 때도 비밀번호를 반환하지 않으며 직원 선택은 사번만 채웁니다. 직접 입력 로그인은 어느 설정에서도 유지합니다.
+`GP5_BETA_ACCOUNT_PICKER`는 직원 선택기의 배포 기본값이며 시연 모드와 독립적입니다. 요청에서 선택기가 꺼져 있으면 DB 조회 전에 `404 / NOT_FOUND`를 반환합니다.
 
-브라우저 콘솔은 API 요청의 `X-GrowPath-Picker: off`, `X-GrowPath-Demo: off`로 해당 기능을 끕니다. 시연이 허용된 환경에서는 `X-GrowPath-Timeout`(1~900초), `X-GrowPath-Input`(1~131072토큰), `X-GrowPath-Output`(1~32768토큰)을 모델 호출과 해당 요청이 시작한 작업에 적용합니다. 범위 밖의 값은 `422 / INVALID_CONSOLE_OPTION`입니다. 시연 모드에서는 `X-GrowPath-Ollama-Url`과 `X-GrowPath-Ollama-Key`로 같은 요청의 Ollama 주소와 Bearer 키를 지정합니다. 주소를 지정하고 키를 생략하면 해당 Pod에는 인증 없이 연결합니다. 두 헤더를 모두 생략하면 서버 주소와 키를 사용합니다.
+브라우저의 `X-GrowPath-Picker`와 `X-GrowPath-Demo` 헤더는 각각 `on` 또는 `off`로 해당 요청의 기본값을 덮어씁니다. 헤더가 없거나 인식할 수 없으면 서버 기본값을 사용합니다. 시연이 켜진 요청에서는 `X-GrowPath-Timeout`(1~900초), `X-GrowPath-Input`(1~131072토큰), `X-GrowPath-Output`(1~32768토큰)을 모델 호출과 해당 요청이 시작한 작업에 적용합니다. 범위 밖의 값은 `422 / INVALID_CONSOLE_OPTION`입니다. `X-GrowPath-Ollama-Url`과 `X-GrowPath-Ollama-Key`는 해당 요청의 Ollama 주소와 Bearer 키입니다. 주소만 지정하면 해당 Pod에 인증 없이 연결하며 두 헤더가 모두 없으면 공용 연결을 사용합니다.
 
-`GP5_DEMO_MODE=off`이면 위 시연 전용 3개 API와 `GET /ai/log`·`GET /ai/log/{id}`는 인증·조회 전에 `404 / NOT_FOUND`를 반환합니다. 직원·관리자 모두 같은 제한을 받습니다. `GET /me`와 실행 컨텍스트는 off에서 저장된 `demo_mock`·`fail_sim`을 무시하고 `demoMock: false`, `failSim: {}`를 사용하며 DB 원본·선택한 AI 제공자·추론값은 유지합니다.
+현재 요청의 시연 모드가 off이면 시연 전용 초기화·단계 이동·설정·AI 로그 API는 인증·조회 전에 `404 / NOT_FOUND`를 반환합니다. 내 정보 응답과 실행 컨텍스트는 저장된 가데이터·실패 시연 설정을 무시하며 DB 원본은 보존합니다.
 
-`GET /ai/providers`에는 서버 시연 허용 여부인 최상위 `demoMode: boolean`이 추가됩니다. 예를 들어 `{ "current": "ollama", "demoMode": false, "providers": [...], "docLibs": {...} }`이면 화면은 시연 도구와 관리자 가데이터 선택지를 숨깁니다. 값이 없거나 조회가 실패해도 표시하지 않습니다. 서버 `GP5_DEMO_MODE`와 프런트 `VITE_DEMO_TOOLS`는 미설정·빈 값·공백·알 수 없는 값이면 off이며, 앞뒤 공백과 대소문자를 정리한 on만 허용합니다. 서버는 빈 환경변수도 파일 설정보다 우선합니다. 브라우저는 `VITE_DEMO_TOOLS`를 시연 모드의 초기값으로 사용하며 콘솔의 `demo on/off`로 변경할 수 있습니다. 서버가 허용하고 브라우저 시연 모드가 켜져야 시연 도구와 개인 모델 설정이 활성화됩니다. 직원의 미설정 AI 기본값은 `ollama`이며 OpenAI 키 설정만으로 선택이 바뀌지 않습니다.
+`GET /ai/providers`의 `demoMode`는 해당 요청에 적용된 시연 상태입니다. 브라우저에 콘솔 설정이 없으면 기존 서버·화면 기본값을 따릅니다. `demo on/off`를 저장하면 이후 요청과 화면이 해당 값을 사용합니다.
 
 시연 설정 저장은 서버가 성공 응답을 보낸 뒤에만 화면에 반영합니다. 가데이터·실패 시연 저장은 같은 큐에서 요청하고, 실패 시 기존값을 유지합니다. 이전 로그인 회차의 응답은 버리며 시연 응답으로 제공자·추론값을 덮지 않습니다.
 
@@ -244,7 +244,7 @@
 | `GET /admin/regulations/uploads/{id}/pdf` | 올린 PDF 내려받기 |
 | `DELETE /admin/regulations/uploads/{id}` | 잘못 올린 PDF 지우기(서버 파일과 기록을 함께 · 되돌릴 수 없음 · 204, 없으면 404 `NO_UPLOAD`) |
 
-서버 시연 모드가 off일 때 관리자 목표 생성의 `mode: "mock"`과 직원 수정·자료 반영의 `goalMode: "mock"`은 `409 / DEMO_DISABLED`입니다. 예: `{ "error": { "code": "DEMO_DISABLED", "message": "시연 모드가 꺼져 있어 가데이터로 만들 수 없어요", ... } }`. 저장·작업 생성 전에 거절하고 실제 모델로 자동 전환하지 않습니다. 관리자 일괄 생성의 초기 선택은 `ollama`, 수정·자료 반영은 기존 직원 선택을 따릅니다. 이전 화면에 남은 mock 선택은 다시 고르도록 안내하고 실행을 막습니다. on에서만 명시적인 가데이터 생성을 허용합니다.
+요청의 시연 모드가 off일 때 관리자 목표 생성의 `mode: "mock"`과 직원 수정·자료 반영의 `goalMode: "mock"`은 `409 / DEMO_DISABLED`입니다. 예: `{ "error": { "code": "DEMO_DISABLED", "message": "시연 모드가 꺼져 있어 가데이터로 만들 수 없어요", ... } }`. 저장·작업 생성 전에 거절하고 실제 모델로 자동 전환하지 않습니다. 관리자 일괄 생성의 초기 선택은 `ollama`, 수정·자료 반영은 기존 직원 선택을 따릅니다. 이전 화면에 남은 mock 선택은 다시 고르도록 안내하고 실행을 막습니다. on에서만 명시적인 가데이터 생성을 허용합니다.
 
 규정은 관리자가 고치지 않아요(2026-10-26 사용자 결정): 규정은 벡터 DB를 거친 RAG에 쓰여서, 관리자가 올린 PDF는 시스템 관리자(서비스 운영팀)가 내려받아 임베딩·벡터 DB를 갱신해요. 그래서 예전의 규정·조항 엑셀/한 건 고치기(`/admin/datasets/regulations/*`)와 규정 색인 만들기(`POST /admin/regulations/index`)는 없앴어요. 개요(`GET /admin/overview`)의 `regulations` 는 `{count, files, uploads, lastUpload}` 이고, 모델 설정 여부는 맨 위 `providers` 에 있어요.
 

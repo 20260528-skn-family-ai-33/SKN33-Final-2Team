@@ -2,13 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { http } from '@/api/client';
 import { accountApi } from '@/api/endpoints/account';
 import { useLocation } from 'react-router';
-import { activeRunpodSettings, browserDemoEnabled, limits, storeOptions, useBrowserOptions, type BrowserOptions } from '@/shared/lib/browserOptions';
-import { canUseDemo } from '@/shared/lib/demoAccess';
+import { activeRunpodSettings, browserDemoEnabled, consoleEnabled, limits, storeOptions, useBrowserOptions, type BrowserOptions, type ConsoleDefaults } from '@/shared/lib/browserOptions';
 import { ai, applySettings, checkStatus, resetConn, useAi } from '@/shared/state/ai';
 import { loadDemoAccounts, signInSeq, useSession } from '@/shared/state/session';
 import { useConsoleActions, type ConsoleAction } from './consoleActions';
 import { RunpodSettings } from './RunpodSettings';
-import { ConsoleStatus, type Capabilities } from './ConsoleStatus';
+import { ConsoleStatus } from './ConsoleStatus';
 import './browserConsole.css';
 
 const toggleText = (value: boolean) => value ? '켜짐' : '꺼짐';
@@ -45,7 +44,7 @@ export function BrowserConsole() {
         if (!useSession.getState().account) void loadDemoAccounts(true);
       }
       const demoEnabled = browserDemoEnabled(options);
-      const demoChanged = demoEnabled !== browserDemoEnabled(prev.options);
+      const demoChanged = options.demo !== prev.options.demo;
       const previousPod = activeRunpodSettings(prev.options);
       const currentPod = activeRunpodSettings(options);
       const runpodChanged = currentPod.ollamaUrl !== previousPod.ollamaUrl || currentPod.ollamaKey !== previousPod.ollamaKey;
@@ -72,7 +71,7 @@ function CommandDialog({ close }: { close: () => void }) {
   const [selected, setSelected] = useState<string>();
   const [result, setResult] = useState<{ command?: string; message: string }>();
   const running = useRef(false);
-  const [caps, setCaps] = useState<Capabilities | null>();
+  const [caps, setCaps] = useState<ConsoleDefaults | null>();
   const options = useBrowserOptions(s => s.options);
   const screenActions = useConsoleActions(s => s.actions);
   const employee = useSession(s => s.account?.accountType === 'employee');
@@ -80,16 +79,16 @@ function CommandDialog({ close }: { close: () => void }) {
     const element = dialog.current!;
     element.showModal();
     let active = true;
-    void http.get<Capabilities>('/console/capabilities').then(value => { if (active) setCaps(value); })
+    void http.get<ConsoleDefaults>('/console/capabilities').then(value => { if (active) setCaps(value); })
       .catch(() => {
         if (active) {
           setCaps(null);
-          setResult(previous => previous ?? { message: '서버의 콘솔 허용 상태를 확인하지 못했습니다.' });
+          setResult(previous => previous ?? { message: '서버의 콘솔 설정을 확인하지 못했습니다.' });
         }
       });
     return () => { active = false; element.close(); };
   }, []);
-  const demo = canUseDemo(caps?.demo);
+  const demo = consoleEnabled('demo', options, caps);
   const prefix = normalize(query).replace(/^tools(?= |$)/, 'demo').replace(/^도구(켜기|끄기)$/, '시연$1')
     .replace(/^tokens (input|output)(?= |$)/, (_, direction: string) => direction + 'tokens');
   const commands: Command[] = [];
@@ -106,7 +105,7 @@ function CommandDialog({ close }: { close: () => void }) {
     const label = { picker: '로그인 직원 고르기', demo: '시연 도구와 개인 모델 설정' }[field];
     for (const enabled of [true, false]) {
       add(field + (enabled ? ' on' : ' off'), toggleNames[field] + (enabled ? '켜기' : '끄기'), `이 브라우저에서 ${label}를 ${enabled ? '켭니다' : '끕니다'}.`, () => {
-        if (enabled && !caps?.[field]) return '서버에서 이 기능을 허용해야 켤 수 있습니다.';
+        if (enabled && caps && !caps.browserOverrides && !caps[field]) return '현재 서버 버전은 이 설정의 전환을 지원하지 않습니다.';
         return change(label, field, enabled);
       });
     }

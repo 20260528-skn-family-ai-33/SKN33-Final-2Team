@@ -18,13 +18,13 @@ r = APIRouter(prefix='/api/v1')
 
 @r.get('/console/capabilities')
 def console_capabilities():
-    return {'picker': S.beta_account_picker, 'demo': S.demo_mode}
+    return {'picker': S.beta_account_picker, 'demo': S.demo_mode, 'browserOverrides': True}
 
 
 def _settings(employee_id: int, selection: tuple[str, str | None] | None = None) -> dict:
     policy, level = selection or provider_policy.selection()
     s = db.one('SELECT ai_provider, demo_mock, fail_sim, reasoning FROM app_ext.user_settings WHERE employee_id = :e', e=employee_id) or {}
-    # 시연을 끈 배포에서는 DB에 남아 있는 시연 옵션도 화면에 적용하지 않는다.
+    # 이 요청에서 시연을 끄면 DB에 남아 있는 시연 옵션도 화면에 적용하지 않는다.
     return {'aiProvider': provider_policy.resolve(policy, s.get('ai_provider')), 'demoMock': demo_enabled(S.demo_mode) and bool(s.get('demo_mock')),
             'failSim': (s.get('fail_sim') or {}) if demo_enabled(S.demo_mode) else {},
             'reasoning': (s.get('reasoning') or {}) if policy == 'employee' else ({policy: level} if level else {})}
@@ -57,7 +57,8 @@ def require_demo_mode() -> None:
 
 
 def require_beta_account_picker() -> None:
-    if not S.beta_account_picker or browser_options.get().picker_off:
+    override = browser_options.get().picker
+    if not (S.beta_account_picker if override is None else override):
         raise ApiError(404, 'NOT_FOUND', '요청한 기능을 찾을 수 없어요')
 
 
@@ -231,18 +232,19 @@ def _named_logs(L: list[dict]) -> list[dict]:
 
 @r.get('/ai/log', dependencies=[Depends(require_demo_mode)])
 def api_log(a: Account = Depends(require_account)):
-    """에이전트 동작 보기(시연·디버그 도구 · 운영에서는 아무도 쓰지 않음): 누가 호출했든 모든 계정의 최근 호출, 서버 메모리에만 있다.
+    """에이전트 동작 보기. 개인 브라우저에서만 켠 시연은 해당 직원의 호출을 보여 준다.
     employee 는 그 호출이 누구의 일이었는지, by 는 관리자 화면에서 시작했는지.
     입력·출력·모델 호출 전문은 길어서 목록에는 넣지 않고 펼칠 때 /ai/log/{id} 로 받는다(callCount 는 모델 호출 수)"""
+    entries = rt.logs(a.id) if a.type == 'employee' and not S.demo_mode else rt.all_logs()
     return {'log': [dict({k: v for k, v in e.items() if k not in ('input', 'output', 'calls')}, callCount=len(e.get('calls') or []))
-                    for e in _named_logs(rt.all_logs())]}
+                    for e in _named_logs(entries)]}
 
 
 @r.get('/ai/log/{entry_id}', dependencies=[Depends(require_demo_mode)])
 def api_log_entry(entry_id: int, a: Account = Depends(require_account)):
     """기록 한 건의 전문: 에이전트 입력·출력과 그 안의 모델 호출마다 보낸 메시지·받은 원문(자르지 않음)"""
     e = rt.log_entry(entry_id)
-    if e is None:
+    if e is None or (a.type == 'employee' and not S.demo_mode and e.get('employeeId') != a.id):
         raise ApiError(404, 'LOG_NOT_FOUND', '오래된 기록이라 지워졌어요. 목록을 다시 열어 주세요')
     return _named_logs([e])[0]
 
