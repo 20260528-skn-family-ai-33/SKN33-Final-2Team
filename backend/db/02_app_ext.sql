@@ -353,6 +353,18 @@ CREATE TABLE IF NOT EXISTS app_ext.report_tasks (
 );
 CREATE INDEX IF NOT EXISTS report_tasks_roadmap_idx ON app_ext.report_tasks (roadmap_id, created_at);
 
+-- 진단 설문 사전 생성 풀(#225): 스킬 태그마다 자기평가 문항 5개. 채우기는 tools/generate_survey_pool.py
+-- 이미 있는 DB는 db/migrate_survey_pool.sql 을 실행한다
+CREATE TABLE IF NOT EXISTS app_ext.skill_survey_pool (
+  skill_id integer PRIMARY KEY REFERENCES public.skill_tags(skill_id) ON DELETE CASCADE,
+  skill_name varchar(50) NOT NULL,
+  title text NOT NULL CHECK (length(btrim(title)) BETWEEN 1 AND 200),
+  surveys jsonb NOT NULL CHECK (jsonb_typeof(surveys) = 'array' AND jsonb_array_length(surveys) = 5),
+  model text NOT NULL,
+  prompt_hash char(64) NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS app_ext.notifications (
   notification_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   recipient_id integer NOT NULL REFERENCES public.employees(employee_id) ON DELETE CASCADE,

@@ -1,8 +1,19 @@
-"""설문 먼저 저장·노출 후 퀴즈 생성. 기존 초안 JSON과 세대 검증 사용."""
+"""설문 먼저 저장·노출 후 퀴즈 생성. 기존 초안 JSON과 세대 검증 사용.
+설문은 미리 저장한 스킬별 풀(#225)에서 읽고, 풀이 없을 때만 모델로 만든다. 퀴즈는 설문을 푸는 동안 모델로 만든다."""
 from copy import deepcopy
 from app.errors import ApiError
 from app.services import survey_store as store
 from app.track_policy import LEGACY_MAX_SKILLS, MAX_SKILLS
+
+
+def pooled_surveys(project,selection,personal,limit):
+    """#225 미리 저장한 스킬별 설문으로 설문 단계를 채운다. 풀에 없는 스킬이 있으면 None(모델 생성으로 대체)."""
+    from app.routers import preassessment as api
+    from app.services import survey_pool
+    with api.db.tx() as t:raw=survey_pool.surveys_for(t,selection)
+    if raw is None:return None
+    try:return api.generate_survey(project,selection,personal,lambda *_:raw,require_measurement=True,phase='surveys',max_skills=limit)
+    except api.SurveyError:return None  # 스킬 사이에 같은 문항이 있으면 이전처럼 모델로 만든다
 
 
 def generate_for(employee_id, project_id):
@@ -42,7 +53,8 @@ def generate_for(employee_id, project_id):
                     return api.generate_survey(project,selection,personal,api.runtime.model(fallback_ctx,'진단 에이전트',task,role='quiz'),require_measurement=True,phase=phase,max_skills=limit)
                 raise
         if not same:
-            partial=generate('surveys')
+            partial=pooled_surveys(project,selection,personal,limit)
+            if partial is None:partial=generate('surveys')
             with api.db.tx() as t:
                 store._owned(t,employee_id,project_id,lock=True);current(t)
                 existing=store.save_generated(t,employee_id,project_id,project,selection,personal,partial,replace_generation_id=existing['generationId'] if existing else None,phase='surveys')
