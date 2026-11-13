@@ -620,7 +620,9 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
                 t.run("UPDATE app_ext.roadmap_revisions SET status = 'failed', error = :e, updated_at = now() WHERE revision_id = CAST(:i AS uuid) AND status = 'running'",
                       e=db.J({'cause': jobs.error_info(error)}), i=rev_id)
             raise
-        d = RM.keep_ids(out, base, base['version'] + 1)
+        d = copy.deepcopy(base['def']) if settings_only else RM.keep_ids(out, base, base['version'] + 1)
+        if settings_only:
+            d['acts'] = copy.deepcopy(base['acts'])
         if retry:
             existing_ids = {activity['id'] for activity in base['acts']}
             for activity in d['acts']:
@@ -786,6 +788,20 @@ def accept_revision(employee_id: int, roadmap_id: str, revision_id: str, selecte
             current = t.val('SELECT content FROM public.roadmaps WHERE roadmap_id = :r', r=row['roadmap_id'])
             if current != pd['from'] or plan['opt'] != current['opt'] or _revision_activities(plan) != _revision_activities(current):
                 raise ApiError(409, 'REVISION_CHANGED', '기존 활동이 변경됐어요. 수정안을 다시 요청해 주세요.')
+            # 설정에서 파생된 일정만 남기고 설명과 자료 정의는 현재 계획에서 복원한다.
+            definition = copy.deepcopy(current['def'])
+            if 'materialSchedule' in definition:
+                definition['materialSchedule'] = plan['def'].get('materialSchedule', definition['materialSchedule'])
+            report = definition.get('learningReport')
+            estimates = (plan['def'].get('learningReport') or {}).get('durationEstimates')
+            if isinstance(report, dict) and estimates is not None:
+                report['durationEstimates'] = estimates
+            plan['def'] = definition
+            for key in ('displayTitle', 'name', 'short', 'tagline', 'goal'):
+                if key in current:
+                    plan[key] = current[key]
+                else:
+                    plan.pop(key, None)
         evidence = baseline.get('selectionEvidence') if isinstance(baseline, dict) else None
         if not isinstance(evidence, dict):
             evidence = cur.get('selectionEvidence')
