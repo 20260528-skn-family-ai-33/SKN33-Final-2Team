@@ -575,7 +575,7 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
             a for a in base['acts']
             if a['id'] not in done and not (RM._res(a.get('res')) or {}).get('type') == 'book'
         ]
-        if undone_changeable and not ch['c'].get('replaceActs'):
+        if undone_changeable and not ch['c']:
             ch['c']['replaceActs'] = [{'key': a['id'], 'title': a['title']} for a in undone_changeable]
             ch['c']['replaceHint'] = '완료된 활동과 도서는 원본 그대로 유지하고, 미완료된 각 스킬의 강좌는 카탈로그의 다른 강좌로 교체하며 산출물은 새로운 실습 목표와 과제로 반드시 새로 작성해 주세요. 현재 계획과 동일한 내용을 반환하지 마세요.'
             req = (req + '\n완료된 활동과 도서는 유지하고, 미완료된 각 스킬의 강좌는 다른 추천 강좌로, 산출물은 새 과제로 차별화하여 새 제안을 작성해 주세요.').strip()
@@ -688,7 +688,7 @@ def _mix_revision_skills(current: dict, proposal: dict, handoff: dict, selected:
         old_by_id = {a['id']: a for a in old}
         new_by_id = {a['id']: a for a in new}
         if any(a['id'] in done and (
-            a['id'] not in new_by_id or any(new_by_id[a['id']].get(key) != a.get(key) for key in ('res', 'title', 'how'))
+            a['id'] not in new_by_id or any(new_by_id[a['id']].get(key) != a.get(key) for key in ('res', 'title', 'how', 'stage', 'hours', 'skill', 'skills'))
         ) for a in old):
             raise ApiError(409, 'REVISION_CHANGED', '완료한 활동은 바꿀 수 없어요. 기존 안을 선택해 주세요.')
         activities.extend(dict(a, key=a['id'] if a['id'] in old_by_id else None) for a in new)
@@ -765,7 +765,7 @@ def accept_revision(employee_id: int, roadmap_id: str, revision_id: str, selecte
             cur_done_acts = {a['id']: a for a in cur['acts'] if a['id'] in done_ids}
             to_acts = {a['id']: a for a in plan['acts']}
             for aid, old_a in cur_done_acts.items():
-                if aid not in to_acts or any(to_acts[aid].get(k) != old_a.get(k) for k in ('res', 'title', 'how')):
+                if aid not in to_acts or any(to_acts[aid].get(k) != old_a.get(k) for k in ('res', 'title', 'how', 'stage', 'hours', 'skill', 'skills')):
                     raise ApiError(409, 'REVISION_CHANGED', '완료한 활동은 바꿀 수 없어요. 기존 계획을 유지해 주세요.')
         evidence = baseline.get('selectionEvidence') if isinstance(baseline, dict) else None
         if not isinstance(evidence, dict):

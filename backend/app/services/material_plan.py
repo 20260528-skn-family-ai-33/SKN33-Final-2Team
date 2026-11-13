@@ -151,6 +151,16 @@ def rebuild_revision(option, plan, handoff):
                     deduped_kept.append(activity)
                 continue
         deduped_kept.append(activity)
+    for skill, completed in done_courses_by_skill.items():
+        if skill not in resources:
+            continue
+        for activity in completed:
+            if activity['id'] in done_course_seen_ids:
+                continue
+            deduped_kept.append(dict(deepcopy(activity), key=activity['id']))
+            resource = roadmap._res(activity['res'])
+            if activity['stage'] >= handoff.get('startStage', plan['start']):
+                resources[skill][resource['id']] = deepcopy(resource)
     option['acts'] = deduped_kept
     weekly = (handoff.get('prefs') or {}).get('weeklyHours') or option.get('weeklyHours') or plan['hours']
     rec, choices = [], {}

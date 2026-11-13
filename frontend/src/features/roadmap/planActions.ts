@@ -259,7 +259,7 @@ export function confirmReviseSkillsExclusion(
           : h(
               'p',
               { key: 'p2', className: 'muted' },
-              '모든 스킬에 완료된 강좌 또는 산출물이 있어 새로 수정할 대상이 없습니다.',
+              '완료된 활동을 유지하면서 학습 여건을 조정할 수 있어요.',
             ),
         h(
           'p',
@@ -304,9 +304,9 @@ export function confirmReviseSkillsExclusion(
                   key: 'close',
                   type: 'button',
                   className: 'btn pri',
-                  onClick: closeSheet,
+                  onClick: () => { closeSheet(); onConfirm(doneSkills, remainingSkills); },
                 },
-                '확인',
+                '학습 여건 수정',
               ),
             ],
       ),
@@ -473,10 +473,10 @@ export function startRevise(go: Go, pid: string): void {
   const proceed = (doneSkills: string[] = [], remainingSkills: string[] = []) => {
     if (!resume)
       updateWs((s) => {
-        let note = integrated
+        let note = integrated && (!doneSkills.length || remainingSkills.length > 0)
           ? '기존 목표와 스킬 순서, 학습 여건을 유지하고 스킬별로 개선할 강좌와 산출물을 제안해 주세요. 도서와 완료한 활동은 유지해 주세요.'
           : '';
-        if (doneSkills.length > 0) {
+        if (doneSkills.length > 0 && remainingSkills.length > 0) {
           note += ` 이미 완료된 활동이 있는 스킬(${doneSkills.join(', ')})은 그대로 유지하고, 나머지 스킬(${remainingSkills.join(', ')})만 수정안을 작성해 주세요.`;
         }
         note +=
@@ -485,7 +485,7 @@ export function startRevise(go: Go, pid: string): void {
         s.plans[pid].pending = null;
       });
     go(paths.revise(pid));
-    if (integrated && !resume) void revise(pid);
+    if (integrated && !resume && (!doneSkills.length || remainingSkills.length)) void revise(pid);
   };
 
   if (!resume) {

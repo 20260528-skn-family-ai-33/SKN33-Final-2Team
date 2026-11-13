@@ -459,7 +459,10 @@ function Revise({ R }: { R: PlanRecord }) {
   const cm = r.fromComment ? (R.comments || []).find((c) => c.id === r.fromComment) : undefined;
   /* 요청 내용을 채운 뒤 부서장이 코멘트를 고쳤으면(10/23 코멘트 수정) 알리고, 고친 내용으로 다시 채울 수 있게 한다 */
   const skillComment = cm?.skill;
-  const mixed = !r.fromComment && !!base.def.learningReport;
+  const activitySkills = new Set(base.acts.filter(a => !isBookActivity(a) && a.skill).map(a => a.skill));
+  const completedSkills = new Set(base.acts.filter(a => !isBookActivity(a) && a.skill && st(R.progress, a.id) === 'done').map(a => a.skill));
+  const settingsOnly = activitySkills.size > 0 && activitySkills.size === completedSkills.size;
+  const mixed = !r.fromComment && !!base.def.learningReport && !settingsOnly;
   const selectedSkills = picks.revisionId === revisionId ? picks.skills : activeSkills;
   const confirmRevision = () => {
     if (!pd) return;
