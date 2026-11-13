@@ -1,0 +1,37 @@
+{
+  "schema_version": "internal-training/v1",
+  "origin": "Challenge 요청 검증·저장 실습 보강 (#249)",
+  "courses": [
+    {
+      "id": "INTERNAL_CHALLENGE_24901",
+      "title": "Django REST Framework 실습: 주문 요청 검증과 원자적 저장",
+      "audience": "Django 모델과 기본 API 작성 경험이 있는 직원",
+      "outcome": "주문과 품목을 함께 받는 API를 구현하고 입력 오류와 부분 저장 실패를 구분해 테스트 결과로 설명한다.",
+      "syllabus_summary": "Django REST Framework의 중첩 Serializer로 주문 요청을 검증한다. 승인된 주문과 품목을 하나의 트랜잭션에 저장하고, APIClient 테스트로 성공·검증 실패·저장 실패 후 DB 상태를 대조한다.",
+      "meta_note": "제출물: 주문 생성 API, 세 경로의 자동 테스트, 트랜잭션 경계에 따른 DB 상태 비교표.",
+      "difficulty": "UPPER_INTERMEDIATE",
+      "track": "challenge",
+      "fee_won": 0,
+      "skills": ["웹 프레임워크 (FastAPI/Django)"],
+      "url": "/resources/INTERNAL_CHALLENGE_24901?view=curriculum",
+      "image_url": "/images/resource-course.svg",
+      "units": [
+        {
+          "title": "중첩 Serializer로 주문 요청의 중복 품목과 합계 검증",
+          "minutes": 25,
+          "description": "주문 헤더와 품목 배열을 받는 Serializer의 validate에서 중복 SKU와 주문 합계 불일치를 거절한다. 정상 입력과 두 오류 입력을 is_valid로 검사하고 오류 필드와 validated_data를 비교한다."
+        },
+        {
+          "title": "serializer.save()로 주문과 품목 저장, 부분 실패 시 롤백 검증",
+          "minutes": 35,
+          "description": "CreateAPIView와 중첩 Serializer의 create를 구현하고 transaction.atomic 안에서 주문과 품목을 저장한다. 두 번째 품목 저장에서 DB 제약 위반을 재현하고 트랜잭션 적용 전후 남은 행 수를 비교한다."
+        },
+        {
+          "title": "APIClient로 201·400 응답과 실제 DB 저장 결과 대조",
+          "minutes": 30,
+          "description": "APIClient로 정상 요청의 201 응답과 주문·품목 수를 확인한다. 중복 품목 요청은 400이며 새 행이 없어야 한다. 검증을 통과한 뒤 저장이 실패하는 경우도 별도로 테스트해 주문과 품목이 모두 롤백되는지 검증한다."
+        }
+      ]
+    }
+  ]
+}

@@ -15,6 +15,171 @@ class CoursePolicyTests(unittest.TestCase):
     goal = 'PostgreSQL 실행계획의 인덱스 스캔 비용을 비교한다'
     lesson = 'PostgreSQL 실행계획의 순차 스캔과 인덱스 스캔 비용을 측정하고 비교하는 실습'
 
+    def test_related_dbt_candidates_are_local_grounded_and_only_fill_vacancies(self):
+        name = 'ETL & 데이터 파이프라인'
+        goal = 'dbt 모델과 품질 테스트, 백필을 구현한다'
+        spec = dict(name=name, application=goal)
+        selection = dict(skills=[spec], commonApplications={name: goal})
+        project, course = {'goal': goal}, {'id': 'A1', 'learningSkills': [spec]}
+        items = {}
+        def add(key, title, unit, cost=0):
+            items[key] = dict(self.item(key, cost=cost, lesson=unit), title=title, skills=[name])
+        for i in range(5):
+            add(f'partial{i}', f'적재 {i}', 'Airflow 파티션을 백필하고 행 수를 대조한다')
+        add('duplicate', '적재 0', 'Airflow 파티션을 백필하고 행 수를 대조한다')
+        add('question', '관련 질문', 'Q. Airflow 파티션을 백필하나요?')
+        add('unrelated', 'ETL 강좌', '업무 인터뷰를 실습한다')
+        add('paid', '유료', 'dbt 모델 작성과 데이터 품질 테스트 및 백필 실습', cost=100)
+        for count in range(5):
+            with self.subTest(direct=count):
+                if count:
+                    add(f'direct{count}', f'dbt {count}', 'dbt 모델 작성과 데이터 품질 테스트 및 백필 실습')
+                def capture(system, payload):
+                    cards = payload['skills'][0]['courses']
+                    self.assertEqual([c['candidateKind'] for c in cards],
+                                     ['direct'] * count + ['supplemental'] * max(0, 3-count))
+                    self.assertEqual(len({c['title'] for c in cards}), len(cards))
+                    for c in cards[count:]:
+                        self.assertTrue(c['title'].startswith('적재'))
+                        self.assertIn('백필', c['learningEvidence']['foundationEvidence'])
+                        self.assertIn('dbt 실습', c['learningEvidence']['unverifiedTargetTopics'])
+                        self.assertIn(name, c['eligibleSkills'])
+                    return {'skills': [dict(name=name, courses=[{'key': cards[-1]['choiceKey']}], books=[])]}
+                pools, _ = rag.retrieve(project, selection, items, course,
+                    embed=lambda q: [[1.] * rag.DIMENSIONS for _ in q],
+                    search=lambda kind, ids, *args: [dict(resource_id=i, current_cost=items[i]['cost'], similarity=.7) for i in ids])
+                for provided in (pools, None):
+                    output = recommend_resources(project, selection, items, capture, course=course, retrieved_pools=provided)['skills'][0]
+                    self.assertEqual(output['courses'][0]['candidateKind'], output['modelCourseCandidates'][-1]['candidateKind'])
+                    self.assertTrue(output['modelCourseCandidates'][-1]['recommended'])
+
+    def assert_supplemental_recommendations(self, name, goal, lessons, expected):
+        spec = dict(name=name, application=goal)
+        selection = dict(skills=[spec], commonApplications={name: goal})
+        project = {'goal': goal}
+        for track, level in [('A1', 'INTERMEDIATE'), ('A2', 'INTERMEDIATE'), ('A3', 'UPPER_INTERMEDIATE')]:
+            with self.subTest(track=track):
+                course = dict(id=track, learningSkills=[spec])
+                items = {title: dict(self.item(title, level), skills=[name], content=intro,
+                                     curriculum={'items': units}) for title, (intro, units) in lessons.items()}
+                pools, _ = rag.retrieve(project, selection, items, course,
+                    embed=lambda texts: [[1.] * rag.DIMENSIONS for _ in texts],
+                    search=lambda kind, ids, *args: [dict(resource_id=k, current_cost=0, similarity=.8) for k in ids])
+                self.assertEqual({row['id'] for row in pools[0]['courses']}, set(expected))
+
+                def choose_all(system, payload):
+                    cards = payload['skills'][0]['courses']
+                    self.assertEqual({c['title'] for c in cards}, set(expected))
+                    for card in cards:
+                        self.assertEqual(card['candidateKind'], 'supplemental')
+                        proof = card['learningEvidence']['foundationEvidence']
+                        self.assertIn(expected[card['title']], proof)
+                        self.assertNotRegex(proof.casefold(), r'다루지 않|windows')
+                    return {'skills': [dict(name=name, courses=[{'key': c['choiceKey']} for c in cards], books=[])]}
+
+                for provided in (pools, None):
+                    result = recommend_resources(project, selection, items, choose_all, course=course,
+                                                 retrieved_pools=provided)['skills'][0]
+                    self.assertEqual({c['id'] for c in result['courses']}, set(expected))
+
+    def test_excluded_tasks_are_not_lesson_or_description_evidence(self):
+        negated = '이 과정에서는 파티션 재처리 및 행 수 대조를 다루지 않습니다.'
+        practice = '누락 파티션을 재처리하고 행 수를 대조한다.'
+        quality = '누락 행을 포함하지 않는 결과와 원본의 행 수를 대조한다.'
+        lessons = {
+            '차시에서 제외': ('', [{'title': '범위 안내', 'description': negated}]),
+            '소개에서 제외': (negated, []),
+            '별도 실습': ('', [{'title': negated}, {'title': practice}]),
+            '같은 차시의 실습': ('', [{'title': '과정 안내', 'description':
+                '파티션 재처리 및 행 수 대조는 다루지 않지만, ' + quality}]),
+        }
+        self.assert_supplemental_recommendations('ETL & 데이터 파이프라인', 'dbt 모델과 품질 테스트, 백필을 구현한다',
+            lessons, {'별도 실습': practice, '같은 차시의 실습': quality})
+
+    def test_windows_only_evidence_cannot_fill_posix_shortfall(self):
+        windows = 'Windows GUI로 뮤텍스를 사용해 공유 자원 동기화를 구현하는 실습'
+        portable = '공유 자원의 동기화 문제를 재현하는 실습'
+        lessons = {
+            'Windows GUI': ('', [{'title': windows}]),
+            '운영체제 실습': ('', [{'title': windows}]),
+            '플랫폼별 동기화': ('', [{'section': 'Windows GUI', 'title': '뮤텍스로 공유 자원 동기화를 구현'}]),
+            '동시성 기초': ('', [{'title': portable}]),
+            '두 환경의 실습': ('', [{'title': windows}, {'title': portable}]),
+        }
+        self.assert_supplemental_recommendations('멀티스레딩 & 비동기 동시성',
+            'Linux POSIX에서 뮤텍스로 공유 자원 동기화를 구현한다', lessons,
+            {'동시성 기초': portable, '두 환경의 실습': portable})
+
+    def test_classification_fills_missing_model_slots_with_evidenced_partial_courses(self):
+        name = '자연어 처리(NLP) & LLM 기초'
+        goal = '문서 전처리와 임베딩 생성으로 분류기를 학습·평가해 LLM과 전통 분류 방법을 비교한다'
+        spec = {'name': name, 'application': goal}
+        pre = {'project': {'goal': goal}, 'selection': {'skills': [spec]}, '_commonApplications': {name: goal}}
+        course = {'id': 'A1', 'learningSkills': [spec]}
+        items = {}
+        def add(key, unit, cost=0, title=None):
+            items[key] = dict(self.item(key, cost=cost, lesson=unit), title=title or key, skills=[name])
+        for key in ('기초1', '기초2', '기초3', '이수', '중복', '유료'):
+            add(key, '자연어 처리 단어 임베딩 Word2Vec 실습', 100 if key == '유료' else 0,
+                '기초1' if key == '중복' else key)
+        add('무관', '웹 디자인 입문 실습')
+        add('다른 평가', 'RAGAS로 LLM 응답의 근거성 평가 실습')
+
+        def search(kind, ids, *args):
+            return [dict(resource_id=i, similarity=.8, current_cost=items[i]['cost']) for i in ids]
+
+        def model(ctx, system, payload, role):
+            cards = payload['skills'][0]['courses']
+            titles = [c['title'] for c in cards]
+            self.assertEqual(len(set(titles)), len(titles))
+            self.assertEqual(len(cards), expected_count)
+            self.assertEqual(sum(t.startswith('직접') for t in titles), direct)
+            self.assertFalse({'이수', '유료', '무관', '다른 평가'} & set(titles))
+            for card in cards:
+                self.assertIn(name, card['eligibleSkills'])
+                info = card['learningEvidence']
+                if not card['title'].startswith('직접'):
+                    self.assertTrue(info['partialScopeFoundation'])
+                    self.assertFalse(info['scopeMatch'])
+                    self.assertIn('문서 입력·전처리', info['unverifiedTargetTopics'])
+            return {'skills': [{'name': name, 'courses': [{'key': cards[0]['choiceKey']}], 'books': []}]}
+
+        with patch('app.catalog.items', return_value=items), \
+             patch.object(rag, 'cached_vectors', side_effect=lambda ts: [[1.] * rag.DIMENSIONS for _ in ts]), \
+             patch.object(rag, 'search_vectors', side_effect=search), \
+             patch('app.agents.runtime.llm_json', side_effect=model):
+            for direct, expected_count, completed in [(0, 2, {'이수', '기초3'}), (0, 3, {'이수'}),
+                                                       (1, 3, {'이수'}), (2, 3, {'이수'}),
+                                                       (3, 3, {'이수'}), (4, 4, {'이수'})]:
+                if direct:
+                    add(f'직접{direct}', '텍스트 문서 분류기를 학습하고 평가하는 실습')
+                with self.subTest(direct=direct, expected=expected_count):
+                    result = recommend_from_catalog(Mock(live=True), pre, course, completed=frozenset(completed))
+                    self.assertEqual(len(result['skills'][0]['modelCourseCandidates']), expected_count)
+                    self.assertEqual(len(result['skills'][0]['courses']), 1)
+
+    def test_practical_foundation_fills_design_shortfall_but_discussion_and_tag_do_not(self):
+        name, goal = 'ETL & 데이터 파이프라인', 'ETL 파이프라인 설계'
+        spec = {'name': name, 'application': goal}
+        selection, course = {'skills': [spec]}, {'id': 'A1', 'learningSkills': [spec]}
+        units = {'직접': 'ETL 파이프라인 설계와 전략 비교',
+                 '보충': 'ETL 데이터 적재 작업을 구현한다',
+                 '토론': 'ETL 데이터 적재 작업 구현',
+                 '태그만': '서비스 화면을 구현한다'}
+        items = {k: dict(self.item(k, lesson=v), skills=[name]) for k, v in units.items()}
+        items['토론']['curriculum']['items'][0]['section'] = '경험 공유'
+        pools, _ = rag.retrieve({'goal': goal}, selection, items, course,
+                                embed=lambda ts: [[1.] * rag.DIMENSIONS for _ in ts],
+                                search=lambda kind, ids, *args: [dict(resource_id=k, similarity=.8, current_cost=0) for k in ids])
+        model = Mock(return_value={'skills': [{'name': name, 'courses': [], 'books': []}]})
+        recommend_resources({'goal': goal}, selection, items, model, course=course, retrieved_pools=pools)
+        cards = {card['title']: card for card in model.call_args.args[1]['skills'][0]['courses']}
+        self.assertEqual(set(cards), {'직접', '보충'})
+        info = cards['보충']['learningEvidence']
+        self.assertTrue(info['partialScopeFoundation'])
+        self.assertIn('데이터 적재', info['foundationEvidence'])
+        self.assertIn('목표의 설계 단계', info['unverifiedTargetTopics'])
+
     def test_log_build_and_container_deploy_keep_their_own_stage_in_every_track(self):
         project = {'goal': 'Python으로 로그를 집계하고 Docker로 API를 배포한다'}
         specs = [{'name': name, 'application': '생성된 코스의 별도 예시'} for name in ('Python', 'Docker')]
@@ -198,12 +363,36 @@ class CoursePolicyTests(unittest.TestCase):
                 queries.append(self.queries)
         self.assertEqual(queries, [queries[0]] * 3)
 
-    def test_challenge_uses_six_high_courses_before_any_upper_intermediate(self):
+    def test_challenge_prefers_high_when_lesson_evidence_is_equal(self):
         items = {f'high{i}': self.item(f'high{i}', 'ADVANCED', retrievalScore=.4) for i in range(7)}
         items['upper'] = self.item('upper', 'UPPER_INTERMEDIATE', retrievalScore=.99)
         cards = self.retrieve(items, 'A3')[0]['courses']
         self.assertEqual(len(cards), 6)
         self.assertTrue(all(row['difficulty'] == 'ADVANCED' for row in cards))
+
+    def test_direct_upper_challenge_lab_survives_twenty_weaker_advanced_courses(self):
+        self.name = '웹 프레임워크 (FastAPI/Django)'
+        self.goal = 'Django REST Framework에서 요청 데이터를 검증하고 저장한다'
+        items = {f'advanced{i}': self.item(f'advanced{i}', 'ADVANCED', retrievalScore=.99,
+                                      lesson='Django Ninja의 요청 스키마로 게시글 API를 작성한다') for i in range(21)}
+        lab = 'Django REST Framework Serializer로 주문을 검증하고 저장 실패 시 롤백 결과를 비교하는 실습'
+        items['upper'] = self.item('upper', 'UPPER_INTERMEDIATE', retrievalScore=.2, lesson=lab)
+        items['middle'] = self.item('middle', 'INTERMEDIATE', retrievalScore=1, lesson=lab)
+        cards = self.retrieve(items, 'A3')[0]['courses']
+        self.assertEqual(cards[0]['id'], 'upper')
+        self.assertNotIn('middle', [card['id'] for card in cards])
+        skill = dict(name=self.name, application=self.goal)
+        def choose(system, payload):
+            first = payload['skills'][0]['courses'][0]
+            self.assertEqual(first['title'], 'upper')
+            self.assertEqual(first['candidateKind'], 'direct')
+            self.assertIn(lab, [unit['title'] for unit in first['outline']])
+            return {'skills': [{'name': self.name, 'courses': [{'key': first['choiceKey']}], 'books': []}]}
+        for pools in (None, [dict(name=self.name, courses=cards, books=[])]):
+            with self.subTest(using_search=pools is not None):
+                row = recommend_resources(dict(goal=self.goal), dict(skills=[skill]), items, choose,
+                                          course=dict(id='A3', learningSkills=[skill]), retrieved_pools=pools)
+                self.assertEqual(row['skills'][0]['selectedCourse'], 'upper')
 
     def test_completed_ids_excluded_before_vector_limit_for_all_tracks(self):
         skill = {'name': self.name, 'application': self.goal}
@@ -244,7 +433,7 @@ class CoursePolicyTests(unittest.TestCase):
             self.assertEqual(llm.call_count, 3)
         self.assertTrue(completed.issubset(items))
 
-    def test_challenge_fills_only_the_shortfall_with_upper_intermediate(self):
+    def test_challenge_keeps_both_levels_with_equal_evidence(self):
         items = {f'high{i}': self.item(f'high{i}', 'ADVANCED') for i in range(2)}
         items.update({f'upper{i}': self.item(f'upper{i}', 'UPPER_INTERMEDIATE') for i in range(6)})
         cards = self.retrieve(items, 'A3')[0]['courses']

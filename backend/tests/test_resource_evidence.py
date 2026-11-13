@@ -231,6 +231,33 @@ class ResourceEvidenceTests(unittest.TestCase):
         self.assertEqual(evidence.outline(genuine, self.project, selection, self.skill, 'A1'), [])
         self.assertIn('SQL 조인 실행과 결과 검증', evidence.description_excerpt(facts, self.project, self.skill))
 
+    def test_description_keeps_current_learning_after_other_course_comparison(self):
+        skill = {'name': 'Docker 컨테이너 가상화', 'application': 'Docker Security와 Logging 학습'}
+        project = {'goal': skill['application']}
+        comparison = '기존 다른 강의에서 다루지 않았던 Docker Security와 Logging'
+        offered = f'본 과정에서는 {comparison} 등과 같은 다양한 요소에 대해서도 학습할 수 있습니다.'
+        for text, expected in (
+            (offered, offered),
+            ('이 강좌에서는 Docker Security와 Logging을 다루지 않습니다.', ''),
+            (f'{comparison}은 이 과정에서도 다루지 않습니다.', ''),
+            ('이전 강의에서는 Docker Security를 다루지 않았습니다. 이번 강의에서 Docker Logging을 배웁니다.',
+             '이번 강의에서 Docker Logging을 배웁니다.'),
+        ):
+            with self.subTest(text=text):
+                course = dict(resource([]), skills=[skill['name']], content=text)
+                info = evidence.facts(course, project, {'skills': [skill]})
+                self.assertEqual(evidence.description_excerpt(info, project, skill), expected)
+
+    def test_unrelated_exclusion_does_not_erase_a_lesson_title_or_description(self):
+        practice = 'SQL 조인 결과의 정합성을 검증하는 실습'
+        excluded = '이 차시에서는 권한 관리를 다루지 않습니다.'
+        for title, description in ((practice, excluded), (excluded, practice)):
+            with self.subTest(title=title):
+                course = resource([{'title': title, 'description': description}])
+                self.assertEqual([text for _, _, text in evidence.learning_rows(course)], [practice.casefold()])
+                info = evidence.facts(course, self.project, self.selection)
+                self.assertTrue(evidence.course_applicable(info, self.skill))
+
 
 if __name__=='__main__':
     unittest.main()

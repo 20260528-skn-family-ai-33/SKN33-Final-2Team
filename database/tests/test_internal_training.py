@@ -1,4 +1,4 @@
-"""기본 412개와 야간 보강 2개 검증. 실제 적재 검사는 명시한 격리 DB에서만 실행한다."""
+"""기본 사내교육과 별도 야간 보강 검증. 실제 적재 검사는 명시한 격리 DB에서만 실행한다."""
 from copy import deepcopy
 import hashlib
 import json
@@ -19,19 +19,19 @@ class PackageTests(unittest.TestCase):
     def setUp(self):
         self.courses = training.read_packages()
 
-    def test_all_three_packages_have_412_unique_courses(self):
-        self.assertEqual([len(json.loads(p.read_text(encoding='utf-8'))['courses']) for p in training.DEFAULT_PACKAGES], [12, 394, 6])
-        self.assertEqual(len(self.courses), 412)
-        self.assertEqual(len({c['id'] for c in self.courses}), 412)
-        self.assertEqual(sum(c['fee_won'] == 0 for c in self.courses), 126)
+    def test_default_packages_have_430_unique_courses(self):
+        self.assertEqual([len(json.loads(p.read_text(encoding='utf-8'))['courses']) for p in training.DEFAULT_PACKAGES], [12, 394, 6, 1, 5, 12])
+        self.assertEqual(len(self.courses), 430)
+        self.assertEqual(len({c['id'] for c in self.courses}), 430)
+        self.assertEqual(sum(c['fee_won'] == 0 for c in self.courses), 144)
 
-    def test_base_412_and_separate_night_two_form_414_unique_courses(self):
+    def test_default_and_separate_night_packages_have_unique_ids(self):
         night = training.read_packages([training.NIGHT_PACKAGE])
         combined = training.read_packages([*training.DEFAULT_PACKAGES, training.NIGHT_PACKAGE])
         self.assertEqual(len(night), 2)
-        self.assertEqual(len(combined), 414)
-        self.assertEqual(len({c['id'] for c in combined}), 414)
-        self.assertEqual(sum(c['fee_won'] == 0 for c in combined), 128)
+        self.assertEqual(len(combined), 432)
+        self.assertEqual(len({c['id'] for c in combined}), 432)
+        self.assertEqual(sum(c['fee_won'] == 0 for c in combined), 146)
         self.assertNotIn(training.NIGHT_PACKAGE, training.default_packages())
 
     def test_night_metadata_and_duration_match_the_existing_supply_contract(self):
@@ -79,7 +79,7 @@ class PackageTests(unittest.TestCase):
             self.assertFalse(meta['is_real'])
             self.assertEqual(meta['source_label'], '사내교육')
         self.assertIsNone(training.course_fields(self.courses[0])['duration_weeks'])
-        self.assertEqual(training.course_fields(self.courses[-1])['duration_weeks'], 4)
+        self.assertEqual(training.course_fields(training.read_packages([training.DEFAULT_PACKAGES[2]])[-1])['duration_weeks'], 4)
 
     def _read_changed(self, change):
         package = json.loads(training.DEFAULT_PACKAGES[0].read_text(encoding='utf-8'))
@@ -106,8 +106,8 @@ class PackageTests(unittest.TestCase):
             path = Path(folder) / 'extra.json'
             path.write_text(json.dumps(dict(schema_version='internal-training/v1', courses=[extra])), encoding='utf-8')
             courses = training.read_packages([*training.DEFAULT_PACKAGES, path])
-        self.assertEqual(len(courses), 413)
-        self.assertEqual(len(training.read_packages()), 412)
+        self.assertEqual(len(courses), len(self.courses) + 1)
+        self.assertEqual(len(training.read_packages()), len(self.courses))
 
     def test_registered_team_package_is_loaded_by_default(self):
         extra = deepcopy(self.courses[-1])
@@ -122,7 +122,7 @@ class PackageTests(unittest.TestCase):
             index = folder / 'index.json'
             index.write_text(json.dumps(dict(schema_version='internal-training-index/v1', packages=names + ['additional_training.json'])), encoding='utf-8')
             with patch.object(training, 'PACKAGE_INDEX', index):
-                self.assertEqual(len(training.read_packages()), 413)
+                self.assertEqual(len(training.read_packages()), len(self.courses) + 1)
 
     def test_vector_must_match_source_model_and_normalization(self):
         source = dict(hash='a' * 64, text='확인할 원문')
@@ -166,7 +166,9 @@ def fingerprints(conn, ids: list[str], *, external: bool) -> dict:
 @unittest.skipUnless(os.environ.get('INTERNAL_TRAINING_TEST_DSN'), '격리 DB를 명시하지 않음')
 class IsolatedDatabaseTests(unittest.TestCase):
     def test_empty_install_retry_failures_and_vector_recovery(self):
-        courses = training.read_packages()
+        # #147 복구용 벡터 캐시는 당시 배포한 세 패키지에만 해당한다.
+        courses = training.read_packages([training.ROOT / 'config' / name for name in (
+            'internal_training_pilot.json', 'internal_training_expansion.json', 'free_course_supply_147.json')])
         ids = [c['id'] for c in courses]
         cache = Path(os.environ['INTERNAL_TRAINING_VECTOR_CACHE'])
         events = []

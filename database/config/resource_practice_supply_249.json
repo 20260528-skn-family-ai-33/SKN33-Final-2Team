@@ -1,0 +1,171 @@
+{
+  "schema_version": "internal-training/v1",
+  "origin": "목표별 직접 실습이 부족한 강좌 후보 보강 (#249)",
+  "courses": [
+    {
+      "id": "INTERNAL_CRASH_24902",
+      "title": "dbt 주문 마트 실습: 모델 작성부터 하루치 백필까지",
+      "audience": "SQL로 조회와 집계를 작성하는 직원",
+      "outcome": "누락된 하루의 주문을 복구하고 주문 키와 일별 합계를 원천 데이터와 대조한다.",
+      "syllabus_summary": "dbt seed에 정상 주문과 날짜가 늦게 들어온 주문을 준비한다. dbt 모델과 품질 테스트를 작성하고 한 날짜만 백필해 마트 집계가 바르게 갱신됐는지 확인한다.",
+      "meta_note": "제출물은 모델 SQL, 테스트 YAML, 백필 전후의 일별 합계표다.",
+      "difficulty": "INTERMEDIATE",
+      "track": "crash",
+      "fee_won": 0,
+      "skills": [
+        "ETL & 데이터 파이프라인"
+      ],
+      "url": "/resources/INTERNAL_CRASH_24902?view=curriculum",
+      "image_url": "/images/resource-course.svg",
+      "units": [
+        {
+          "title": "dbt 모델로 주문 원천과 일별 마트 연결",
+          "minutes": 15,
+          "description": "두 날짜의 주문 CSV를 dbt seed로 적재한다. ref로 주문과 일별 마트를 연결하는 SQL 모델을 작성하고 dbt run을 실행한다. 일별 행 수와 금액을 원천과 대조한다."
+        },
+        {
+          "title": "dbt 품질 테스트로 누락·중복 주문 키 찾기",
+          "minutes": 15,
+          "description": "주문 단위 모델에 not_null과 unique 테스트를 붙인다. 중복 주문 키를 넣고 dbt test를 실행해 실패한 검사를 찾는다. 입력을 고치고 다시 실행해 통과를 확인한다."
+        },
+        {
+          "title": "dbt 날짜 변수로 누락 일자 백필 후 마트 검증",
+          "minutes": 20,
+          "description": "일별 합계를 거래일 키로 갱신하는 증분 dbt 모델을 구현한다. 지연 주문을 추가하고 dbt run의 --vars로 해당 거래일을 지정해 백필을 두 번 실행한다. 그날 합계만 정정되고 다른 날짜의 행은 보존되는지 확인한다."
+        }
+      ]
+    },
+    {
+      "id": "INTERNAL_CHALLENGE_24903",
+      "title": "dbt 증분 모델의 지연 정정과 다일 백필 검증",
+      "audience": "증분 마트를 운영하며 정정 주문을 재처리하는 직원",
+      "outcome": "누락 날짜만 고치면 하류 누계가 틀리는 사례에서 재처리 범위를 설계하고 전체 재계산 결과로 검증한다.",
+      "syllabus_summary": "dbt 증분 모델에 과거 주문의 날짜·금액 정정을 주입한다. 하류 일별 누계의 품질 테스트가 실패하는 구간을 찾아 재처리 범위를 정하고, 선택적 백필 결과와 전체 재계산의 차이를 검증한다.",
+      "meta_note": "제출물은 정정 입력, 하류 영향 범위, 두 실행 결과의 행 단위 차이와 재실행 기록이다.",
+      "difficulty": "UPPER_INTERMEDIATE",
+      "track": "challenge",
+      "fee_won": 0,
+      "skills": [
+        "ETL & 데이터 파이프라인"
+      ],
+      "url": "/resources/INTERNAL_CHALLENGE_24903?view=curriculum",
+      "image_url": "/images/resource-course.svg",
+      "units": [
+        {
+          "title": "dbt 증분 모델에서 날짜가 이동한 주문 재현",
+          "minutes": 25,
+          "description": "기존 주문의 거래일과 금액을 함께 정정한다. dbt 모델을 증분 실행한 뒤 이전·새 거래일의 일별 합계와 하류 누계에서 어느 행이 틀렸는지 찾는다."
+        },
+        {
+          "title": "dbt 품질 테스트로 하류 누계 불일치 추적",
+          "minutes": 30,
+          "description": "원천을 전량 재집계한 기준 모델을 만든다. 기준과 운영 마트의 키·금액 차이를 반환하는 SQL 테스트를 구현하고 dbt test를 실행해 최초 불일치 일자와 파급 범위를 확인한다."
+        },
+        {
+          "title": "dbt 선택적 백필과 전체 재계산의 결과 비교",
+          "minutes": 35,
+          "description": "이전·새 거래일을 재집계하고 최초 변경일 이후의 하류 누계를 백필한다. 같은 입력을 다시 실행해 중복 키, 기준과의 차이, 다시 계산한 행 수를 비교한다."
+        }
+      ]
+    },
+    {
+      "id": "INTERNAL_CHALLENGE_24904",
+      "title": "Django ORM 실습: 조직별 주문 조회와 조건부 수정",
+      "audience": "Django ORM으로 여러 조직의 데이터를 함께 다루는 직원",
+      "outcome": "두 조직에서 같은 주문번호를 사용할 때 조회·수정 범위를 격리하고 충돌 시 덮어쓰기를 막는다.",
+      "syllabus_summary": "Django ORM QuerySet으로 조직과 주문번호를 함께 조회한다. 버전 조건이 있는 update를 구현하고 다른 조직의 주문과 먼저 저장된 수정이 보존되는지 DB에서 검증한다.",
+      "meta_note": "제출물은 조회·수정 코드와 정상·범위 밖·오래된 버전 입력을 대조하는 테스트다.",
+      "difficulty": "UPPER_INTERMEDIATE",
+      "track": "challenge",
+      "fee_won": 0,
+      "skills": [
+        "웹 프레임워크 (FastAPI/Django)"
+      ],
+      "url": "/resources/INTERNAL_CHALLENGE_24904?view=curriculum",
+      "image_url": "/images/resource-course.svg",
+      "units": [
+        {
+          "title": "Django ORM QuerySet으로 조직별 주문 조회",
+          "minutes": 20,
+          "description": "서로 다른 두 조직에 같은 주문번호를 준비한다. 조직과 주문번호로 filter한 QuerySet을 작성하고 요청한 조직의 레코드만 조회되는지 검증한다."
+        },
+        {
+          "title": "Django ORM으로 데이터 모델을 조건부 수정",
+          "minutes": 25,
+          "description": "조직·주문번호·버전을 함께 필터링해 상태와 버전을 한 번의 update로 변경한다. 갱신 행 수를 확인하고 다른 조직 주문의 상태가 보존되는지 다시 조회한다."
+        },
+        {
+          "title": "오래된 버전의 주문 수정과 범위 밖 갱신 검증",
+          "minutes": 25,
+          "description": "같은 버전을 읽은 두 요청이 차례로 같은 주문을 수정하는 상황을 재현한다. 첫 요청만 반영되는지, 다른 조직의 키로 수정하면 0행인지, 최종 저장 상태가 기대값과 일치하는지 확인한다."
+        }
+      ]
+    },
+    {
+      "id": "INTERNAL_CHALLENGE_24905",
+      "title": "Azure RBAC 실습: 서비스 주체에 Blob 컨테이너 읽기 역할 부여",
+      "audience": "Azure 워크로드의 데이터 접근 권한을 설계하는 직원",
+      "outcome": "배치 작업이 지정 컨테이너만 읽도록 서비스 주체의 역할 범위를 설정하고 접근 결과로 검증한다.",
+      "syllabus_summary": "Azure 서비스 계정으로 쓰는 서비스 주체에 한 컨테이너 범위의 Storage Blob Data Reader 역할을 할당한다. 데이터 읽기·쓰기 및 다른 컨테이너 읽기의 결과를 같은 주체로 비교하고 역할 회수 후 다시 확인한다.",
+      "meta_note": "제출물은 역할 할당 범위, 세 접근 시도의 기대·실제 결과표, 역할 회수 확인 기록이다.",
+      "difficulty": "UPPER_INTERMEDIATE",
+      "track": "challenge",
+      "fee_won": 0,
+      "skills": [
+        "클라우드 IAM & 네트워크 보안"
+      ],
+      "url": "/resources/INTERNAL_CHALLENGE_24905?view=curriculum",
+      "image_url": "/images/resource-course.svg",
+      "units": [
+        {
+          "title": "Azure 서비스 주체와 대상 컨테이너 범위 확인",
+          "minutes": 20,
+          "description": "교육용 저장소의 두 Blob 컨테이너에 서로 다른 샘플 파일을 준비한다. 배치 작업 서비스 주체의 개체 ID와 대상 컨테이너 리소스 ID를 확인하고 상속된 기존 역할을 점검한다."
+        },
+        {
+          "title": "Azure RBAC 읽기 역할을 서비스 계정에 할당",
+          "minutes": 25,
+          "description": "대상 컨테이너 범위에만 Storage Blob Data Reader 역할을 부여한다. 서비스 주체로 인증한 뒤 데이터 평면에서 대상 파일 읽기·쓰기와 다른 컨테이너 읽기를 실행하고 결과를 대조한다."
+        },
+        {
+          "title": "역할 할당 회수 후 Azure 데이터 접근 재검증",
+          "minutes": 25,
+          "description": "읽기 역할을 회수하고 권한 전파 시간을 고려해 같은 주체로 대상 Blob 읽기를 재시도한다. 상속 역할과 전파 중 상태를 구분하고 최종 접근 결과를 기록한다."
+        }
+      ]
+    },
+    {
+      "id": "INTERNAL_CHALLENGE_24906",
+      "title": "LLM 답변 평가 실습: 인용 근거성과 정답 일치를 따로 채점하기",
+      "audience": "문서 기반 LLM 답변의 품질을 평가하는 직원",
+      "outcome": "사실은 맞지만 인용이 틀린 답변과 인용은 맞지만 질문에 답하지 못한 답변을 구분한다.",
+      "syllabus_summary": "고정된 문서·질문·정답·LLM 답변으로 평가한다. 주장별 근거성과 질문별 정답 일치를 따로 측정하고, 근거 없는 응답을 거절할 임곗값을 개발용 사례에서 고른 뒤 보류 사례로 검증한다.",
+      "meta_note": "제출물은 판정 기준, 주장별 인용 대조표, 보류 사례의 오류 유형표다.",
+      "difficulty": "UPPER_INTERMEDIATE",
+      "track": "challenge",
+      "fee_won": 0,
+      "skills": [
+        "자연어 처리(NLP) & LLM 기초"
+      ],
+      "url": "/resources/INTERNAL_CHALLENGE_24906?view=curriculum",
+      "image_url": "/images/resource-course.svg",
+      "units": [
+        {
+          "title": "LLM 답변의 주장과 인용 문장을 대조해 근거성 평가",
+          "minutes": 20,
+          "description": "주장이 여러 개인 답변을 분리해 인용 문장과 연결한다. 지지·모순·근거 없음으로 판정하고 인용은 존재하지만 내용을 뒷받침하지 않는 사례를 표시한다."
+        },
+        {
+          "title": "질문별 정답 일치와 근거성 점수 비교",
+          "minutes": 25,
+          "description": "기준 정답과 허용 표현을 먼저 고정하고 LLM 답변의 정답 일치를 평가한다. 정답은 맞지만 인용이 틀린 사례와 인용은 맞지만 정답이 빠진 사례를 서로 다른 칸에 집계한다."
+        },
+        {
+          "title": "응답·거절 기준을 보류 사례로 검증",
+          "minutes": 25,
+          "description": "개발용 사례에서 근거성 임곗값을 선택한 뒤 겹치지 않는 보류 사례에 한 번 적용한다. 답해야 할 질문을 거절한 수와 근거 없는 답변을 내보낸 수를 세어 개선 전후를 비교한다."
+        }
+      ]
+    }
+  ]
+}

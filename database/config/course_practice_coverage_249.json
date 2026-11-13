@@ -1,0 +1,402 @@
+{
+  "schema_version": "internal-training/v1",
+  "origin": "직접 실습 3개 미만인 목표·코스 및 검증된 실습 공백 보강 (#249)",
+  "courses": [
+    {
+      "id": "INTERNAL_CRASH_24907",
+      "title": "dbt 환불 마트에서 참조 오류를 찾고 누락 환불 백필하기",
+      "audience": "SQL 집계와 주문·환불 관계를 아는 직원",
+      "outcome": "늦게 도착한 주문과 매칭되는 환불을 복구하고, 환불 합계와 미연결 건수를 검증한다.",
+      "syllabus_summary": "dbt 주문·환불 모델 구현 → dbt 품질 테스트로 고아 환불 찾기 → 누락 주문 도착 후 dbt 백필 실행. 늦게 도착한 주문과 매칭되는 환불을 복구하고, 환불 합계와 미연결 건수를 검증한다.",
+      "meta_note": "제출물은 미연결 환불 목록, 품질 테스트 결과와 백필 전후 환불 합계다.",
+      "difficulty": "INTERMEDIATE",
+      "track": "crash",
+      "fee_won": 0,
+      "skills": [
+        "ETL & 데이터 파이프라인"
+      ],
+      "url": "/resources/INTERNAL_CRASH_24907?view=curriculum",
+      "image_url": "/images/resource-course.svg",
+      "units": [
+        {
+          "title": "dbt 주문·환불 모델 구현",
+          "minutes": 15,
+          "description": "작은 주문·환불 CSV를 dbt seed로 적재하고 두 모델을 ref로 연결한다. 주문이 없는 환불을 별도로 집계하는 SQL 모델을 실행한다."
+        },
+        {
+          "title": "dbt 품질 테스트로 고아 환불 찾기",
+          "minutes": 15,
+          "description": "환불의 주문 키에 relationships 테스트를 구성하고 dbt test를 실행한다. 실패 행과 실제 누락 주문 키를 대조한다."
+        },
+        {
+          "title": "누락 주문 도착 후 dbt 백필 실행",
+          "minutes": 20,
+          "description": "늦게 도착한 주문을 추가한다. 거래일 변수로 영향받은 일자의 환불 모델을 백필하고 다시 실행한다. 미연결 수와 환불 합계가 원천과 일치하는지 비교한다."
+        }
+      ]
+    },
+    {
+      "id": "INTERNAL_CRASH_24908",
+      "title": "dbt 일별 재고 스냅샷에서 누락 영업일 복원하기",
+      "audience": "SQL 집계로 재고 현황표를 작성하는 직원",
+      "outcome": "입출고 이력으로 빠진 영업일의 재고를 복원하고 휴무일을 잘못 채우지 않았는지 검증한다.",
+      "syllabus_summary": "dbt 재고 모델과 영업일 달력 구성 → dbt 품질 테스트로 누락 영업일 검출 → dbt 백필로 누락 일자 재고 복원. 입출고 이력으로 빠진 영업일의 재고를 복원하고 휴무일을 잘못 채우지 않았는지 검증한다.",
+      "meta_note": "제출물은 달력 기준 누락 테스트와 날짜별 잔액 대조표다.",
+      "difficulty": "INTERMEDIATE",
+      "track": "crash",
+      "fee_won": 0,
+      "skills": [
+        "ETL & 데이터 파이프라인"
+      ],
+      "url": "/resources/INTERNAL_CRASH_24908?view=curriculum",
+      "image_url": "/images/resource-course.svg",
+      "units": [
+        {
+          "title": "dbt 재고 모델과 영업일 달력 구성",
+          "minutes": 15,
+          "description": "영업일 달력과 입출고 내역을 dbt seed로 적재한다. 창고·상품·날짜를 키로 기말 재고를 계산하는 SQL 모델을 구현한다."
+        },
+        {
+          "title": "dbt 품질 테스트로 누락 영업일 검출",
+          "minutes": 15,
+          "description": "영업일 달력에는 있고 재고 마트에는 없는 키를 반환하는 SQL 테스트를 작성한다. 하루를 누락시킨 뒤 dbt test를 실행해 휴무일과 구분한다."
+        },
+        {
+          "title": "dbt 백필로 누락 일자 재고 복원",
+          "minutes": 20,
+          "description": "빠진 날짜의 재고를 직전 잔액과 입출고로 재계산해 dbt 모델을 백필한다. 두 번 실행한 뒤 키 중복, 휴무일 행 수, 기대 잔액을 검증한다."
+        }
+      ]
+    },
+    {
+      "id": "INTERNAL_CHALLENGE_24909",
+      "title": "dbt 재처리 중 환율 버전이 바뀐 매출 마트 복구",
+      "audience": "증분 모델의 원천 데이터 버전을 관리하는 직원",
+      "outcome": "같은 입력이라도 환율 버전에 따라 매출이 달라지는 원인을 재현하고 지정한 버전으로 백필한다.",
+      "syllabus_summary": "dbt 매출 모델에 환율 유효기간 연결 → dbt 품질 테스트로 중복 환산과 미연결 탐지 → dbt 버전 고정 백필과 금액 대조. 같은 입력이라도 환율 버전에 따라 매출이 달라지는 원인을 재현하고 지정한 버전으로 백필한다.",
+      "meta_note": "제출물은 환율 버전별 기대값, 영향 키 목록과 재실행 대조표다.",
+      "difficulty": "UPPER_INTERMEDIATE",
+      "track": "challenge",
+      "fee_won": 0,
+      "skills": [
+        "ETL & 데이터 파이프라인"
+      ],
+      "url": "/resources/INTERNAL_CHALLENGE_24909?view=curriculum",
+      "image_url": "/images/resource-course.svg",
+      "units": [
+        {
+          "title": "dbt 매출 모델에 환율 유효기간 연결",
+          "minutes": 25,
+          "description": "통화·거래일로 환율 유효 구간을 하나만 연결하는 dbt 모델을 구현한다. 환율 버전 둘과 거래 경계일을 포함한 원천으로 매출을 계산한다."
+        },
+        {
+          "title": "dbt 품질 테스트로 중복 환산과 미연결 탐지",
+          "minutes": 20,
+          "description": "환율 구간을 겹치거나 비우고 거래별 매칭 수가 정확히 1인지 검사하는 dbt test를 실행한다. 매칭 실패와 환율 정정으로 인한 정상 금액 변화를 구분한다."
+        },
+        {
+          "title": "dbt 버전 고정 백필과 금액 대조",
+          "minutes": 30,
+          "description": "기준 환율 버전을 고정한 뒤 영향받은 통화·거래일만 백필한다. 서로 다른 버전의 전량 재계산 결과와 비교하고 같은 버전 재실행에서 차이가 없는지 검증한다."
+        }
+      ]
+    },
+    {
+      "id": "INTERNAL_CHALLENGE_24910",
+      "title": "dbt 고객 병합 후 고유 고객 수 백필 검증",
+      "audience": "고객 식별자를 통합하는 데이터 마트를 운영하는 직원",
+      "outcome": "서로 다른 고객 키가 하나로 병합될 때 과거 고유 고객 수의 과대 집계를 바로잡는다.",
+      "syllabus_summary": "dbt 모델에서 주문과 대표 고객 키 연결 → dbt 품질 테스트로 중복 매핑과 이중 집계 구분 → 고객 키 변경이 닿는 주간 dbt 백필 실행. 서로 다른 고객 키가 하나로 병합될 때 과거 고유 고객 수의 과대 집계를 바로잡는다.",
+      "meta_note": "제출물은 키 병합 전후 고유 수, 백필 범위와 주문 수 보존 검사다.",
+      "difficulty": "UPPER_INTERMEDIATE",
+      "track": "challenge",
+      "fee_won": 0,
+      "skills": [
+        "ETL & 데이터 파이프라인"
+      ],
+      "url": "/resources/INTERNAL_CHALLENGE_24910?view=curriculum",
+      "image_url": "/images/resource-course.svg",
+      "units": [
+        {
+          "title": "dbt 모델에서 주문과 대표 고객 키 연결",
+          "minutes": 25,
+          "description": "원본 고객 두 명이 같은 대표 키로 병합되는 입력을 넣는다. dbt 모델을 구현해 일·주별 고유 고객 수를 따로 집계하고 주문 수 보존을 확인한다."
+        },
+        {
+          "title": "dbt 품질 테스트로 중복 매핑과 이중 집계 구분",
+          "minutes": 25,
+          "description": "매핑 키 중복 테스트와 원천 기준 주별 고유 고객 수 비교 테스트를 실행한다. 일별 고유 수의 합이 주별 수와 달라도 정상인 예를 분리한다."
+        },
+        {
+          "title": "고객 키 변경이 닿는 주간 dbt 백필 실행",
+          "minutes": 25,
+          "description": "두 원본 키의 주문 이력으로 재처리 날짜와 주를 계산한다. 해당 집계만 백필하고 기존 키와 새 키로 중복 계산된 행이 없는지 전체 재계산 결과와 대조한다."
+        }
+      ]
+    },
+    {
+      "id": "INTERNAL_CHALLENGE_24911",
+      "title": "Azure RBAC로 모니터링 서비스 주체의 조회 범위 검증",
+      "audience": "Azure 서비스 계정으로 모니터링을 운영하는 직원",
+      "outcome": "서비스 주체가 담당 리소스 그룹의 메트릭만 조회하도록 역할 상속과 할당 범위를 검증한다.",
+      "syllabus_summary": "Azure 서비스 주체의 유효 역할과 상속 점검 → 리소스 그룹 범위의 모니터링 역할 할당 → Azure 역할 회수 후 접근 결과 비교. 서비스 주체가 담당 리소스 그룹의 메트릭만 조회하도록 역할 상속과 할당 범위를 검증한다.",
+      "meta_note": "제출물은 범위별 역할 할당표와 각 작업의 기대·관측 결과다.",
+      "difficulty": "UPPER_INTERMEDIATE",
+      "track": "challenge",
+      "fee_won": 0,
+      "skills": [
+        "클라우드 IAM & 네트워크 보안"
+      ],
+      "url": "/resources/INTERNAL_CHALLENGE_24911?view=curriculum",
+      "image_url": "/images/resource-course.svg",
+      "units": [
+        {
+          "title": "Azure 서비스 주체의 유효 역할과 상속 점검",
+          "minutes": 20,
+          "description": "교육 환경의 두 리소스 그룹에 같은 종류의 리소스를 준비한다. 서비스 주체의 개체 ID로 기존 역할과 상위 범위에서 상속된 역할을 확인한다."
+        },
+        {
+          "title": "리소스 그룹 범위의 모니터링 역할 할당",
+          "minutes": 25,
+          "description": "대상 그룹에 Monitoring Reader 역할을 부여한다. 같은 서비스 주체로 두 그룹의 메트릭 조회와 대상 그룹의 구성 변경 권한을 각각 검증한다."
+        },
+        {
+          "title": "Azure 역할 회수 후 접근 결과 비교",
+          "minutes": 20,
+          "description": "테스트 할당만 회수하고 권한 전파 후 조회 결과를 다시 확인한다. 범위 밖 조회가 가능했다면 실제 할당 목록에서 그 권한의 출처를 찾는다."
+        }
+      ]
+    },
+    {
+      "id": "INTERNAL_CHALLENGE_24912",
+      "title": "Azure Key Vault 서비스 계정의 비밀 읽기와 메타데이터 역할 비교",
+      "audience": "Azure 워크로드에서 비밀 조회 권한을 운영하는 직원",
+      "outcome": "RBAC 권한 모델을 쓰는 교육용 금고에서 서비스 주체가 메타데이터만 읽을 때와 비밀 값을 읽을 때를 구분한다.",
+      "syllabus_summary": "Azure 서비스 주체와 두 테스트 금고 범위 확인 → Azure RBAC 역할별 비밀 읽기 결과 검증 → 서비스 계정 역할 회수와 금고 경계 비교. RBAC 권한 모델을 쓰는 교육용 금고에서 서비스 주체가 메타데이터만 읽을 때와 비밀 값을 읽을 때를 구분한다.",
+      "meta_note": "제출물은 비밀 값이 없는 작업·역할·금고별 허용표다.",
+      "difficulty": "UPPER_INTERMEDIATE",
+      "track": "challenge",
+      "fee_won": 0,
+      "skills": [
+        "클라우드 IAM & 네트워크 보안"
+      ],
+      "url": "/resources/INTERNAL_CHALLENGE_24912?view=curriculum",
+      "image_url": "/images/resource-course.svg",
+      "units": [
+        {
+          "title": "Azure 서비스 주체와 두 테스트 금고 범위 확인",
+          "minutes": 20,
+          "description": "격리된 두 금고에 더미 값만 등록한다. 권한 모델과 서비스 주체의 개체 ID·상속 역할을 확인하고 값 자체를 로그에 남기지 않는 결과표를 준비한다."
+        },
+        {
+          "title": "Azure RBAC 역할별 비밀 읽기 결과 검증",
+          "minutes": 25,
+          "description": "첫 금고에 Key Vault Reader 역할을 할당해 메타데이터·값 조회의 성공 여부를 기록한다. 해당 할당을 Key Vault Secrets User로 바꾸고 같은 주체와 요청을 재검증한다."
+        },
+        {
+          "title": "서비스 계정 역할 회수와 금고 경계 비교",
+          "minutes": 25,
+          "description": "다른 금고와 쓰기 요청의 거부를 확인하고 교육용 할당을 회수한다. 전파 후 허용 범위가 기준 상태로 돌아왔는지 결과 코드로 대조한다."
+        }
+      ]
+    },
+    {
+      "id": "INTERNAL_CRASH_24913",
+      "title": "LLM 수치 답변의 단위·반올림과 인용 근거 평가",
+      "audience": "표에서 수치를 인용하는 LLM 답변을 검토하는 직원",
+      "outcome": "정답 수치가 같은지와 그 수치를 인용한 표가 실제로 지지하는지를 따로 평가한다.",
+      "syllabus_summary": "LLM 정답 일치 평가용 단위와 허용 오차 구성 → 표의 행·열·기준일로 LLM 답변 근거성 검증 → 근거성·정답 일치 교차 평가 실행. 정답 수치가 같은지와 그 수치를 인용한 표가 실제로 지지하는지를 따로 평가한다.",
+      "meta_note": "제출물은 단위 변환 규칙, 인용 위치, 정답·근거성 교차 채점표다.",
+      "difficulty": "INTERMEDIATE",
+      "track": "crash",
+      "fee_won": 0,
+      "skills": [
+        "자연어 처리(NLP) & LLM 기초"
+      ],
+      "url": "/resources/INTERNAL_CRASH_24913?view=curriculum",
+      "image_url": "/images/resource-course.svg",
+      "units": [
+        {
+          "title": "LLM 정답 일치 평가용 단위와 허용 오차 구성",
+          "minutes": 15,
+          "description": "같은 수치를 원·천 원·백분율로 적은 답변을 준비한다. 단위를 정규화하고 반올림 허용 범위를 정해 정답 일치를 판정한다."
+        },
+        {
+          "title": "표의 행·열·기준일로 LLM 답변 근거성 검증",
+          "minutes": 15,
+          "description": "인용한 표의 행과 열에서 수치를 다시 읽어 주장과 대조한다. 다른 연도의 우연히 같은 숫자를 인용한 답변은 근거 불일치로 기록한다."
+        },
+        {
+          "title": "근거성·정답 일치 교차 평가 실행",
+          "minutes": 15,
+          "description": "새 사례에 두 기준을 적용한다. 정답만 맞거나 인용만 맞는 사례 수와 대표 오류를 모아 채점표를 재현한다."
+        }
+      ]
+    },
+    {
+      "id": "INTERNAL_CHALLENGE_24914",
+      "title": "LLM 답변의 문서 개정 시점과 정답 일치 평가",
+      "audience": "여러 버전의 안내 문서를 사용하는 LLM 답변을 평가하는 직원",
+      "outcome": "같은 질문도 기준일에 따라 정답과 유효한 근거가 달라지는 사례를 판정한다.",
+      "syllabus_summary": "문서 버전과 질문 기준일로 정답 집합 구성 → LLM 응답 근거성과 정답 일치 평가 → 버전 전환 전후의 LLM 답변 오류 측정. 같은 질문도 기준일에 따라 정답과 유효한 근거가 달라지는 사례를 판정한다.",
+      "meta_note": "제출물은 기준일·문서 버전별 정답표와 두 답변 묶음의 판정 결과다.",
+      "difficulty": "UPPER_INTERMEDIATE",
+      "track": "challenge",
+      "fee_won": 0,
+      "skills": [
+        "자연어 처리(NLP) & LLM 기초"
+      ],
+      "url": "/resources/INTERNAL_CHALLENGE_24914?view=curriculum",
+      "image_url": "/images/resource-course.svg",
+      "units": [
+        {
+          "title": "문서 버전과 질문 기준일로 정답 집합 구성",
+          "minutes": 20,
+          "description": "변경 전·후 문서와 두 기준일을 조합한다. 질문별 기대 답변과 그 시점에 유효한 문장 위치를 기록하고 날짜 경계 사례를 분리한다."
+        },
+        {
+          "title": "LLM 응답 근거성과 정답 일치 평가",
+          "minutes": 25,
+          "description": "같은 답변이 인용한 문장을 찾아 내용 지지와 버전 유효성을 별도로 검증한다. 정답은 맞지만 폐기된 문서를 인용한 사례와 최신 문서를 잘못 해석한 사례를 비교한다."
+        },
+        {
+          "title": "버전 전환 전후의 LLM 답변 오류 측정",
+          "minutes": 20,
+          "description": "고정 평가표로 두 답변 묶음을 채점한다. 기준일별 근거성·정답 일치율을 각각 구하고 표본 수와 실패 유형을 함께 기록한다."
+        }
+      ]
+    },
+    {
+      "id": "INTERNAL_CHALLENGE_24915",
+      "title": "방화벽 변경 검토: 서비스 포트 허용표와 승인 로그 대조",
+      "audience": "사내 서비스의 네트워크 방화벽 변경을 검토하는 직원",
+      "outcome": "승인된 서비스 통신표를 인바운드 방화벽 규칙으로 구성하고 허용·거부 로그로 규칙 순서와 범위를 검증한다.",
+      "syllabus_summary": "서비스별 포트 접근표로 방화벽 규칙 설계 → 규칙 순서와 적용 범위 검증 → 변경 전후 방화벽 로그 대조와 복구 점검. 승인된 서비스 통신표를 인바운드 방화벽 규칙으로 구성하고 허용·거부 로그로 규칙 순서와 범위를 검증한다.",
+      "meta_note": "제출물은 서비스 통신표, 규칙 변경안과 기대·관측 결과의 차이표다.",
+      "difficulty": "UPPER_INTERMEDIATE",
+      "track": "challenge",
+      "fee_won": 0,
+      "skills": [
+        "네트워크 보안 & 침입 탐지"
+      ],
+      "url": "/resources/INTERNAL_CHALLENGE_24915?view=curriculum",
+      "image_url": "/images/resource-course.svg",
+      "units": [
+        {
+          "title": "서비스별 포트 접근표로 방화벽 규칙 설계",
+          "minutes": 20,
+          "description": "교육용 서비스의 출발지 그룹, 목적지, 승인 포트, 기본 거부 정책을 표로 정리한다. 문서화된 정상 요청과 거부되어야 할 요청의 기대 결과를 적는다."
+        },
+        {
+          "title": "규칙 순서와 적용 범위 검증",
+          "minutes": 25,
+          "description": "출발지·목적지·포트를 위에서부터 비교해 첫 일치 규칙을 기록하는 로컬 정책표를 구성한다. 정상·경계 요청 예시를 한 행씩 대입해 결정된 규칙과 기대값을 비교하고 범위가 넓은 규칙을 수정한다."
+        },
+        {
+          "title": "변경 전후 방화벽 로그 대조와 복구 점검",
+          "minutes": 20,
+          "description": "승인된 요청 표를 두 정책 버전에 다시 적용한다. 차이가 난 행에서 어떤 규칙이 결정했는지 확인하고 이전 버전으로 복구했을 때 기준 결과가 재현되는지 검증한다."
+        }
+      ]
+    },
+    {
+      "id": "INTERNAL_CRASH_24916",
+      "title": "AWS 두 가용 영역에 ALB 대상 그룹 구성과 상태 확인",
+      "audience": "AWS 애플리케이션 로드 밸런서 구성을 연습하는 직원",
+      "outcome": "AWS 교육 계정에서 두 가용 영역의 ALB 연결을 완성하고 한 대상의 상태 변화에 따른 라우팅 결과를 설명한다.",
+      "syllabus_summary": "교육 계정에서 AWS ALB를 두 가용 영역에 구성한다. 대상 그룹의 상태와 응답 표식을 비교하고 상태 확인 실패와 복구에 따라 달라진 요청 경로를 검증한다.",
+      "meta_note": "조직에서 승인한 AWS 교육 계정을 사용한다. 구성도와 영역별 라우팅 기록을 제출하고 종료 후 실습용 ALB와 대상 그룹을 정리한다.",
+      "difficulty": "INTERMEDIATE",
+      "track": "crash",
+      "fee_won": 0,
+      "skills": [
+        "클라우드 컴퓨팅 아키텍처 (AWS/Azure)"
+      ],
+      "url": "/resources/INTERNAL_CRASH_24916?view=curriculum",
+      "image_url": "/images/resource-course.svg",
+      "units": [
+        {
+          "title": "AWS 가용 영역 두 곳의 ALB 구성도 작성",
+          "minutes": 15,
+          "description": "AWS 교육 계정에서 서로 다른 가용 영역의 서브넷과 실습 대상 두 개를 선택한다. ALB에 두 서브넷을 연결하고 리스너가 전달할 대상 그룹과 상태 확인 경로를 구성한다."
+        },
+        {
+          "title": "로드 밸런서의 대상 상태와 실제 요청 경로 확인",
+          "minutes": 20,
+          "description": "두 대상이 정상 상태인지 확인하고 각 대상이 서로 다른 표식을 응답하게 한다. ALB 주소로 반복 요청을 보내 응답 표식과 대상별 로그에서 두 영역으로 라우팅되는지 확인한다."
+        },
+        {
+          "title": "상태 확인 실패와 복구 후 영역별 응답 비교",
+          "minutes": 15,
+          "description": "한 대상의 상태 확인 경로에 오류를 넣은 뒤 정상 대상을 통해 처리되는지 확인한다. 경로 복구 후 두 영역이 다시 응답하는 시점과 요청 기록을 비교한다."
+        }
+      ]
+    },
+    {
+      "id": "INTERNAL_CHALLENGE_24917",
+      "title": "Django REST Framework 예약 API의 시간대·중복 검증과 저장",
+      "audience": "예약 시스템의 날짜·시간 입력을 다루는 Django 개발자",
+      "outcome": "서로 다른 시간대 표기가 같은 예약 시각을 가리키는 경우를 검증하고 중복 예약이 저장되지 않게 한다.",
+      "syllabus_summary": "DRF Serializer로 요청 시간대와 예약 키 검증 → Django 예약 저장과 DB 고유 제약 충돌 처리 → APIClient로 요청 응답과 저장 행 대조. 서로 다른 시간대 표기가 같은 예약 시각을 가리키는 경우를 검증하고 중복 예약이 저장되지 않게 한다.",
+      "meta_note": "제출물은 시간대 경계 사례, 예약 API 테스트와 최종 저장 행 대조표다.",
+      "difficulty": "UPPER_INTERMEDIATE",
+      "track": "challenge",
+      "fee_won": 0,
+      "skills": [
+        "웹 프레임워크 (FastAPI/Django)"
+      ],
+      "url": "/resources/INTERNAL_CHALLENGE_24917?view=curriculum",
+      "image_url": "/images/resource-course.svg",
+      "units": [
+        {
+          "title": "DRF Serializer로 요청 시간대와 예약 키 검증",
+          "minutes": 25,
+          "description": "Django REST Framework Serializer에서 시간대 표기를 필수로 검증하고 UTC로 정규화한다. 다른 오프셋으로 표현한 같은 시각과 시간대가 빠진 입력을 테스트한다."
+        },
+        {
+          "title": "Django 예약 저장과 DB 고유 제약 충돌 처리",
+          "minutes": 25,
+          "description": "방과 정규화한 시각에 고유 제약을 둔다. Serializer의 검증된 데이터로 예약을 저장하고 검증 후 동시 저장에서 생긴 제약 충돌을 트랜잭션 밖에서 처리한다."
+        },
+        {
+          "title": "APIClient로 요청 응답과 저장 행 대조",
+          "minutes": 25,
+          "description": "정상 요청은 201, 잘못된 시간 입력은 400, 이미 예약한 시간은 계약한 충돌 응답인지 확인한다. 같은 예약 키에 해당하는 DB 행이 한 건인지 검증한다."
+        }
+      ]
+    },
+    {
+      "id": "INTERNAL_CHALLENGE_24918",
+      "title": "Django REST Framework 승인 API의 상태 전이 검증과 감사 이력 저장",
+      "audience": "Django에서 문서 승인 워크플로를 구현하는 직원",
+      "outcome": "승인 요청을 검증하고 문서 상태와 감사 이력을 일관되게 저장하며, 오래된 요청은 기존 상태를 보존하는지 확인한다.",
+      "syllabus_summary": "DRF Serializer로 상태 변경 요청 검증 → Django ORM으로 문서 조회·수정과 이력 저장 → APIClient로 응답별 DB 상태와 감사 이력 검증. 승인 요청을 검증하고 문서 상태와 감사 이력을 일관되게 저장하며, 오래된 요청은 기존 상태를 보존하는지 확인한다.",
+      "meta_note": "제출물은 상태 전이표와 응답별 문서·감사 이력 테스트다.",
+      "difficulty": "UPPER_INTERMEDIATE",
+      "track": "challenge",
+      "fee_won": 0,
+      "skills": [
+        "웹 프레임워크 (FastAPI/Django)"
+      ],
+      "url": "/resources/INTERNAL_CHALLENGE_24918?view=curriculum",
+      "image_url": "/images/resource-course.svg",
+      "units": [
+        {
+          "title": "DRF Serializer로 상태 변경 요청 검증",
+          "minutes": 20,
+          "description": "Django REST Framework에서 문서 ID·요청 버전·변경할 상태를 받는 Serializer를 구현한다. 허용된 전이와 필수 필드가 누락된 경우를 검증한다."
+        },
+        {
+          "title": "Django ORM으로 문서 조회·수정과 이력 저장",
+          "minutes": 30,
+          "description": "검증된 요청으로 현재 버전과 상태가 일치하는 문서만 조건부 수정한다. 갱신이 성공한 경우 같은 트랜잭션에 이력을 저장하고 이전 버전의 요청이 상태를 바꾸지 못하는지 비교한다."
+        },
+        {
+          "title": "APIClient로 응답별 DB 상태와 감사 이력 검증",
+          "minutes": 20,
+          "description": "정상 승인, 허용되지 않은 전이, 오래된 버전 요청을 실행한다. 응답과 문서 버전·상태·감사 행 수를 함께 비교해 거부된 요청이 저장되지 않았는지 확인한다."
+        }
+      ]
+    }
+  ]
+}

@@ -203,7 +203,7 @@ def _finalize_crash(result: list[dict], pools: list[dict], selection: dict, proj
 
 
 def candidate_pools(project: dict, selection: dict, items: dict[str, dict], limit: int = 6, *, free_only: bool = False,
-                    course: dict | None = None, rank_courses: bool = True) -> list[dict]:
+                    course: dict | None = None, rank_courses: bool = True, course_limit: int | None = None) -> list[dict]:
     rows = selection.get('skills')
     if not isinstance(rows, list) or not 1 <= len(rows) <= MAX_SKILLS:
         raise RecommendationError(f'선정 스킬 1~{MAX_SKILLS}개가 필요합니다.')
@@ -230,7 +230,7 @@ def candidate_pools(project: dict, selection: dict, items: dict[str, dict], limi
             available = [row for row in items.values() if row.get('usable') and row.get('type') == kind and not exclusion(row,knowledge,str(project.get('goal') or '')) and skill['name'] in (row.get('skills') or []) and (not free_only or kind == 'book' or (row.get('cost') == 0 and not isinstance(row.get('cost'), bool)))]
             available.sort(key=lambda row: (-score(row), str(row.get('title') or ''), row['id']))
             track = course.get('id') if isinstance(course, dict) else course
-            if kind == 'course' and track in ('A2', 'A3'):
+            if kind == 'course' and track == 'A2':
                 available.sort(key=lambda r: course_levels.preference(r, track))
             if kind == 'course' and rank_courses and crash_courses.is_crash(course):
                 available = crash_courses.rank(available, project, selection, skill, cache=crash_cache)
@@ -240,24 +240,26 @@ def candidate_pools(project: dict, selection: dict, items: dict[str, dict], limi
             if kind == 'course':
                 fields += ('difficulty', 'difficultyEstimated', 'difficultyBasis', 'difficultySource')
             by_kind[key] = [deepcopy({field: row.get(field) for field in fields})
-                for row in available[:limit]]
+                for row in available[:course_limit if kind == 'course' and course_limit is not None else limit]]
         pools.append({'name': skill['name'], 'application': skill.get('application') or '', **by_kind})
     return pools
 
 
 def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
                         generate: Callable[[str, dict], dict], *, course: dict | None = None, retrieved_pools: list[dict] | None = None) -> dict:
-    project = dict(project, selectedCourse=deepcopy(course or project.get('selectedCourse')))
+    course = course or project.get('selectedCourse')
+    project = dict(project, selectedCourse=deepcopy(course))
     from app.services import resource_evidence
     plan_selection = selection
     selection = resource_evidence.course_selection(project, selection, course)
-    pools = retrieved_pools if retrieved_pools is not None else candidate_pools(project, selection, items, free_only=bool(course and course.get('id') == 'A1'), course=course)
+    pools = retrieved_pools if retrieved_pools is not None else candidate_pools(
+        project, selection, items, free_only=bool(course and course.get('id') == 'A1'), course=course,
+        course_limit=len(items) if (course or {}).get('id') in ('A1', 'A2', 'A3') else None)
     if not any(row['courses'] or row['books'] for row in pools):
         return {'skills': [_empty_skill(row['name']) for row in pools]}
     # 원문·개인 식별정보 대신 프로젝트 맥락과 확인된 자료 후보를 전달한다.
     from app.services import crash_courses
     from app.services import book_candidates
-    from app.services.course_focus import MIN_COURSE_CANDIDATES, distinct_courses
     crash_cache = {}
     is_crash = crash_courses.is_crash(course)
     track = (course or {}).get('id')
@@ -266,24 +268,21 @@ def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
         # 직접 호출과 저장 후보의 재사용도 검색 진입점과 같은 가격·수준·관련성 문턱을 통과한다.
         filtered = []
         for pool, skill in zip(pools, selection['skills'], strict=True):
-            courses, rejected = [], []
+            eligible = []
             for row in pool['courses']:
                 source = items.get(row['id'], row)
                 if not course_levels.eligible({**source, 'cost': row.get('cost')}, track):
                     continue
                 if row['id'] not in crash_cache:
                     crash_cache[row['id']] = resource_evidence.facts(source, project, selection)
-                if resource_evidence.course_applicable(crash_cache[row['id']], skill):
-                    courses.append(row)
-                else:
-                    rejected.append(row)
-            courses = distinct_courses(courses)
-            if rejected and len(courses) < MIN_COURSE_CANDIDATES:
-                foundation = [row for row in rejected if resource_evidence.course_applicable(
-                    crash_cache[row['id']], skill, allow_audit_gap=True)]
-                courses = distinct_courses([*courses, *foundation])[:MIN_COURSE_CANDIDATES]
-                if not courses:
-                    rejected_diagnostics[pool['name']] = _course_gap(pool['name'], rejected, crash_cache)
+                eligible.append(row)
+            if track == 'A3' and retrieved_pools is None:
+                courses = resource_evidence.rank_applicable(eligible, project, selection, skill, course, limit=6,
+                                                            sources=items, cache=crash_cache)
+            else:
+                courses = resource_evidence.select_course_candidates(eligible, crash_cache, skill, 6)
+            if eligible and not courses:
+                rejected_diagnostics[pool['name']] = _course_gap(pool['name'], eligible, crash_cache)
             filtered.append({**pool, 'courses': courses})
         pools = filtered
     if is_crash:
@@ -318,8 +317,8 @@ def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
             crash_cache[rid] = resource_evidence.facts(items.get(rid, original), project, selection)
     skill_specs = {skill['name']: skill for skill in selection['skills']}
     course_eligibility = {rid: [name for name in names if name in (items.get(rid, original).get('skills') or [])
-                               and (track not in ('A1', 'A2', 'A3') or resource_evidence.course_applicable(
-                                   crash_cache[rid], skill_specs[name], allow_audit_gap=rid in local_courses[name]))
+                               and (track not in ('A1', 'A2', 'A3') or rid in local_courses[name]
+                                    or resource_evidence.course_applicable(crash_cache[rid], skill_specs[name]))
                                and (not is_crash or rid in local_courses[name]
                                     or resource_evidence.suitable(crash_cache[rid], name))]
                           for rid, (_, original) in provided['courses'].items()}
@@ -344,6 +343,11 @@ def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
             row['learningEvidence'] = {key: value for key, value in info['suitability'][pool['name']].items()
                                        if key not in ('stageGap', 'appliedDescription')}
             row['learningEvidence']['scopeMatch'] = info['scopeEvidence'][pool['name']]
+            if row.get('candidateKind') == 'supplemental':
+                related = info.get('relatedEvidence', {}).get(pool['name'])
+                if related:
+                    row['learningEvidence']['foundationEvidence'] = related[:350]
+                row['learningEvidence']['unverifiedTargetTopics'] = resource_evidence.target_gaps(info, pool['name'])
             row['applicableSelectedSkills'] = [name for name in names if resource_evidence.suitable(info, name)]
             row['eligibleSkills'] = course_eligibility[rid]
             if is_crash:
@@ -422,6 +426,8 @@ def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
                     raise RecommendationError('후보에 없거나 중복된 자료입니다.')
                 card = deepcopy(candidates.get(rid) or provided[key][rid][1])
                 if key == 'courses':
+                    if rid not in candidates and track in ('A1', 'A2', 'A3'):
+                        card['candidateKind'] = 'direct'
                     card.pop('unverifiedTargetTopics', None)
                     gaps = resource_evidence.target_gaps(crash_cache[rid], pool['name'])
                     if gaps:
@@ -462,7 +468,8 @@ def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
         output['modelBookCounts'] = {'candidates': len(pool['books']), 'recommended': len(output['books'])}
         selected = {row['id'] for row in output['courses']}
         output['modelCourseCandidates'] = [
-            {'id': row['id'], 'title': row['title'], 'provider': row.get('provider'), 'recommended': row['id'] in selected}
+            {'id': row['id'], 'title': row['title'], 'provider': row.get('provider'), 'recommended': row['id'] in selected,
+             **({'candidateKind': row['candidateKind']} if 'candidateKind' in row else {})}
             for row in pool['courses']
         ]
     return {'skills': result}

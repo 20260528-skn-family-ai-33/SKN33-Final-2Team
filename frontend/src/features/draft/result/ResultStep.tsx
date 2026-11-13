@@ -47,7 +47,8 @@ function ResourceCard({ resource, kind, checked, disabled, preload = false, onCh
     <ResourceImage className="v2-resource-image" image={resource.image} type={kind} />
     <div className="v2-resource-info"><label className="v2-resource-choice">
       <input type={kind === 'course' ? 'radio' : 'checkbox'} checked={checked} disabled={disabled} onChange={onChange} />
-      <span><b title={resource.title}>{resource.title}</b>{resource.aiRecommended && <span className="tag acc">AI 추천</span>}</span>
+      <span><b title={resource.title}>{resource.title}</b>{resource.aiRecommended && <span className="tag acc">AI 추천</span>}
+        {resource.candidateKind === 'supplemental' && <span className="tag">보충 강좌</span>}</span>
     </label>
     <div className="v2-resource-meta"><span>{resource.provider || '출처 미확인'}{price && ` · ${price}`}</span>
     {kind === 'course' && resource.difficulty && <span>{courseDifficulty(resource)}</span>}
@@ -192,7 +193,9 @@ function ResultSelection({ editorRef, onChoicesChanged, locked = false, courseId
       const candidates = result?.recommendations?.skills.find(s => s.name === shownSkill)?.modelCourseCandidates;
       if (!candidates) return '당시 후보 기록 없음';
       return [`${course} · ${shownSkill} | 모델에 전달 ${candidates.length}개 · 최종 추천 포함 ${candidates.filter(c => c.recommended).length}개`,
-        ...candidates.slice(0, 6).map((c, i) => `${i + 1}. ${c.title} · ${c.provider || '제공처 미상'} · ${c.recommended ? '추천 포함' : '미포함'}`)].join('\n');
+        ...candidates.slice(0, 6).map((c, i) => [`${i + 1}. ${c.title}`, c.provider || '제공처 미상',
+          c.candidateKind && (c.candidateKind === 'direct' ? '직접 후보' : '보충 후보'),
+          c.recommended ? '추천 포함' : '미포함'].filter(Boolean).join(' · '))].join('\n');
     }, course === draft.chosen);
   const content = <>
     <div className="v2-skill-summary"><h2>도서·강좌 선택</h2>
