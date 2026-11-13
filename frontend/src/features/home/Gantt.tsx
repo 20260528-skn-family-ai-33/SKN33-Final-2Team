@@ -17,7 +17,7 @@ import { useClockRefresh, useDemoDay } from '@/shared/state/demoClock';
 import { useGo } from '@/shared/hooks/useGo';
 import { count, isBookResource, st } from '@/shared/lib/plan';
 import { Icon } from '@/shared/ui/Icon';
-import { addDays, axisAll, colsOne, dailyCols, dayGap, gtPos, md, planStart, planWeeks, weekNow, type GtCol } from './ganttCalc';
+import { addDays, axisAll, colsOne, dailyCols, dayGap, doneFills, gtFillPos, gtPos, md, planStart, planWeeks, weekNow, type GtBar, type GtCol, type GtSpan } from './ganttCalc';
 
 import './ganttInteraction.css';
 
@@ -105,8 +105,14 @@ function Row({ lv, ins, label, bar, tip }: { lv: number; ins: string[]; label: R
   );
 }
 
-/** 로드맵 하나의 스킬·활동 줄. off = 축 첫날부터 이 로드맵 1주차 첫날까지 일 수, T = 축 전체 일 수, up = 위 줄(로드맵)의 접기 열쇠 */
-function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: number; up: string[]; onToggle: (k: string) => void }) {
+/** 스킬·로드맵 막대의 칠: 완료한 하위 활동 막대가 놓인 구간만 칠한다 */
+function Fills({ range, bars }: { range: GtSpan; bars: GtBar[] }) {
+  return <>{doneFills(range, bars).map((fill) => <i key={fill.left} style={gtFillPos(fill)} />)}</>;
+}
+
+/** 로드맵 하나의 스킬·활동 줄. off = 축 첫날부터 이 로드맵 1주차 첫날까지 일 수, T = 축 전체 일 수, up = 위 줄(로드맵)의 접기 열쇠,
+    head = 이 로드맵의 활동 막대 전체를 받아 맨 위에 그릴 줄(로드맵 막대) */
+function Stages({ R, off, T, up, onToggle, head }: { R: PlanRecord; off: number; T: number; up: string[]; onToggle: (k: string) => void; head?: (bars: GtBar[]) => ReactNode }) {
   const pl = R.plan;
   const base = planStart(R);
   const resources = useCatalog(state => state.res);
@@ -126,7 +132,27 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
   const shared=sharedCourses(acts,resources);
   const sharedIds=new Set(shared.map(course=>course.id));
   const when = (f: number, t: number) => `${f === t ? f : `${f}~${t}`}주차 · ${md(addDays(base, 7 * (f - 1)))}~${md(addDays(base, 7 * t - 1))}`;
-  return (
+  const isDone = (activity: (typeof acts)[number]) => st(R.progress, activity.id) === 'done';
+  /* 활동 막대의 자리. 스킬·로드맵 막대는 이 구간을 기준으로 칠하므로 그리는 곳과 같은 값을 쓴다 */
+  const materialSpan = (materials: typeof acts): GtSpan => ({ from: off + 7 * (Math.min(...materials.map(activity => activity.wFrom)) - 1), to: off + 7 * Math.max(...materials.map(activity => activity.wTo)) });
+  const taskSpan = (name: string, a: (typeof acts)[number], t: number): GtSpan => {
+    const taskWeek = a.wTo || t;
+    const nextCourseWeek = courseStarts.find(week => week > taskWeek) ?? taskWeek + 1;
+    const withoutCourse = R.plan.def.materialSchedule?.some(slot => slot.skill === name && slot.weeks === 0);
+    return { from: Math.max(0, off + 7 * (taskWeek - 1) + (withoutCourse ? 0 : 3.5)), to: Math.min(T, off + 7 * (withoutCourse ? taskWeek : nextCourseWeek - 0.5)) };
+  };
+  /** 한 스킬의 활동 줄에 그리는 막대들(자료 학습 한 줄 + 과제마다 한 줄) */
+  const skillBars = (name: string, t: number): GtBar[] => {
+    const as = groups.get(name) || [];
+    const separate = as.filter(activity => activity.res && !sharedIds.has(activity.res));
+    return [
+      ...(separate.length ? [{ ...materialSpan(separate), done: separate.every(isDone) }] : []),
+      ...as.filter(activity => !activity.res).map(a => ({ ...taskSpan(name, a, t), done: isDone(a) })),
+    ];
+  };
+  const sharedBars: GtBar[] = shared.map(course => ({ from: off + 7 * (course.from - 1), to: off + 7 * course.to, done: course.activities.every(isDone) }));
+  const allBars: GtBar[] = [...sharedBars];
+  const body = (
     <>
       {shared.map(course=>{
         const done=course.activities.every(activity=>st(R.progress,activity.id)==='done');
@@ -198,6 +224,10 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
             t = Math.max(...(deliverables.length ? deliverables : allActs).map(a => a.wTo));
           }
           const rangeEnd = Math.min(T, off + 7 * t + (allActs.some(activity => !activity.res) ? 3.5 : 0));
+          const range = { from: off + 7 * (f - 1), to: rangeEnd };
+          const own = cluster.skills.flatMap(name => skillBars(name, t));
+          allBars.push(...own);
+          const bars = cluster.sharedCourse ? [sharedBars[shared.indexOf(cluster.sharedCourse)], ...own] : own;
 
           return (
             <Fragment key={cluster.key}>
@@ -215,9 +245,12 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
                   </>
                 }
                 bar={
-                  <span className="gt-bar sum" style={gtPos(off + 7 * (f - 1), rangeEnd, T)}>
-                    <i style={{ width: `${(dn / (total || 1)) * 100}%` }} />
-                  </span>
+                  // 활동 줄을 펼쳤으면 활동 막대만 보이게 스킬 막대는 그리지 않는다
+                  gtFold.has(cluster.key) ? (
+                    <span className="gt-bar sum" style={gtPos(range.from, range.to, T)}>
+                      <Fills range={range} bars={bars} />
+                    </span>
+                  ) : null
                 }
                 tip={{ v: when(f, t), t: cluster.title, m: `활동 ${total}개 중 ${dn}개 완료` }}
               />
@@ -265,7 +298,7 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
                               className={`gt-bar act gt-materials-open${materialsDone ? ' done' : ''}`}
                               aria-label={`${name} 학습 자료 열기${materialsDone ? ' · 완료' : ''}`}
                               onClick={showMaterials}
-                              style={gtPos(off + 7 * (Math.min(...separateMaterials.map(activity => activity.wFrom)) - 1), off + 7 * Math.max(...separateMaterials.map(activity => activity.wTo)), T)}
+                              style={gtPos(materialSpan(separateMaterials).from, materialSpan(separateMaterials).to, T)}
                             >
                               {materialsDone ? <Icon name="check" /> : null}
                             </button>
@@ -286,10 +319,7 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
                     {as.filter(activity => !activity.res).map((a, i) => {
                       const task = !a.res;
                       const taskWeek = a.wTo || t;
-                      const nextCourseWeek = courseStarts.find(week => week > taskWeek) ?? taskWeek + 1;
-                      const withoutCourse = R.plan.def.materialSchedule?.some(slot => slot.skill === name && slot.weeks === 0);
-                      const taskMarkerStart = off + 7 * (taskWeek - 1) + (withoutCourse ? 0 : 3.5);
-                      const taskMarkerEnd = off + 7 * (withoutCourse ? taskWeek : nextCourseWeek - 0.5);
+                      const marker = taskSpan(name, a, t);
                       const activityFrom = a.wFrom || taskWeek;
                       const activityTo = taskWeek;
                       const done = st(R.progress, a.id) === 'done';
@@ -315,7 +345,7 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
                                 className={`gt-bar act gt-task-submit${done ? ' done' : ''}`}
                                 aria-label={`${a.title} 과제물 제출`}
                                 onClick={() => openRecord(R.id, a.id)}
-                                style={gtPos(Math.max(0, taskMarkerStart), Math.min(T, taskMarkerEnd), T)}
+                                style={gtPos(marker.from, marker.to, T)}
                               >
                                 {done ? <Icon name="check" /> : null}
                               </button>
@@ -338,6 +368,7 @@ function Stages({ R, off, T, up, onToggle }: { R: PlanRecord; off: number; T: nu
       })()}
     </>
   );
+  return <>{head?.(allBars)}{body}</>;
 }
 
 /** 하루 칸의 폭은 화면 폭과 상관없이 같게 둔다. 화면이 넓으면 칸을 늘리지 않고 일정 뒤의 날짜를 더 보여 주고,
@@ -463,8 +494,8 @@ function Card({ title, link, heads, cols, total, days, rows, note, cls }: { titl
           남은 활동
         </span>
         <span>
-          <i className="k-sum"><i /></i>
-          스킬·로드맵 진행(채운 만큼 완료)
+          <i className="k-sum"><i /><i /></i>
+          스킬·로드맵 진행(완료한 구간)
         </span>
         <span>
           <i className="k-now" />
@@ -526,6 +557,7 @@ export function GanttAll({ list, onMove }: { list: PlanRecord[]; onMove?: (id: s
     const at = `${wk < 1 ? `${md(starts[i])} 시작 / ` : wk <= w ? `지금 ${wk}주차 / ` : ''}전체 ${w}주`;
     return (
       <div className="gt-roadmap-group" key={R.id}>
+        <Stages R={R} off={off} T={T} up={[R.id]} onToggle={toggle} head={(bars) => (
         <Row
           lv={0}
           ins={[]}
@@ -546,12 +578,12 @@ export function GanttAll({ list, onMove }: { list: PlanRecord[]; onMove?: (id: s
           }
           bar={
             <span className="gt-bar rm" style={gtPos(off, off + 7 * w, T)}>
-              <i style={{ width: `${c.t ? (c.done / c.t) * 100 : 0}%` }} />
+              <Fills range={{ from: off, to: off + 7 * w }} bars={bars} />
             </span>
           }
           tip={{ v: `${md(starts[i])}~${md(addDays(starts[i], 7 * w - 1))} · ${at}`, t: pl.displayTitle || pl.goal, m: `${trackName(pl.opt, pl.name)} · 버전 ${pl.version} · 활동 ${c.t}개 중 ${c.done}개 완료` }}
         />
-        <Stages R={R} off={off} T={T} up={[R.id]} onToggle={toggle} />
+        )} />
       </div>
     );
   });

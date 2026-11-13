@@ -1,7 +1,7 @@
 /* 홈 로드맵 일정 간트: 실제 시작일부터 7일씩 주차를 센다 */
 import { describe, expect, it } from 'vitest';
 import type { PlanContent, PlanRecord } from '@/api/types/plan';
-import { axisAll, colsOne, dailyCols, followingStart, md, monday, planStart, planWeeks, startsLater, weekNow } from './ganttCalc';
+import { axisAll, colsOne, dailyCols, doneFills, followingStart, gtFillPos, md, monday, planStart, planWeeks, startsLater, weekNow } from './ganttCalc';
 
 const rec = (createdAt: string, weeks: number): PlanRecord => ({ createdAt, plan: { weeks, acts: [] } as unknown as PlanContent }) as PlanRecord;
 // 2026-10-26 은 월요일
@@ -76,4 +76,65 @@ it('진행 중인 로드맵의 기간이 이미 지났으면 오늘을 넘겨 �
 it('일 단위에서도 7일마다 주 시작 경계를 유지한다', () => {
   const days = dailyCols(new Date(2026, 9, 29), 21);
   expect(days.flatMap((day, index) => day.weekStart ? [index] : [])).toEqual([0,7,14]);
+});
+
+describe('doneFills: 상위 막대는 완료한 하위 활동 막대의 구간만 칠한다', () => {
+  // 4주(28일) 스킬: 1~2주 강좌, 2주 중반~3주 실습(강좌와 겹침), 4주 과제
+  const range = { from: 0, to: 28 };
+  const bars = (course: boolean, practice: boolean, task: boolean) => [
+    { from: 0, to: 14, done: course },
+    { from: 10.5, to: 21, done: practice },
+    { from: 21, to: 28, done: task },
+  ];
+
+  it('완료한 활동이 없으면 아무것도 칠하지 않는다', () => {
+    expect(doneFills(range, bars(false, false, false))).toEqual([]);
+    expect(doneFills(range, [])).toEqual([]);
+  });
+
+  it('모두 완료하면 전체를 칠한다(활동 막대가 없는 날이 끼어 있어도)', () => {
+    expect(doneFills(range, bars(true, true, true))).toEqual([{ left: 0, width: 100 }]);
+    expect(doneFills(range, [{ from: 0, to: 7, done: true }, { from: 21, to: 28, done: true }])).toEqual([{ left: 0, width: 100 }]);
+  });
+
+  it('앞쪽만 완료하면 앞쪽 구간만 칠한다', () => {
+    expect(doneFills(range, bars(true, false, false))).toEqual([{ left: 0, width: 50 }]);
+  });
+
+  it('뒤쪽만 완료하면 앞은 비우고 뒤쪽만 칠한다', () => {
+    expect(doneFills(range, bars(false, false, true))).toEqual([{ left: 75, width: 25 }]);
+  });
+
+  it('앞과 뒤만 완료하면 가운데가 빈다', () => {
+    const middleOpen = [
+      { from: 0, to: 7, done: true },
+      { from: 7, to: 21, done: false },
+      { from: 21, to: 28, done: true },
+    ];
+    expect(doneFills(range, middleOpen)).toEqual([{ left: 0, width: 25 }, { left: 75, width: 25 }]);
+  });
+
+  it('기간이 겹치는 두 활동 중 하나만 완료하면 그 활동의 구간만 칠한다', () => {
+    expect(doneFills(range, bars(false, true, false))).toEqual([{ left: 37.5, width: 37.5 }]);
+  });
+
+  it('겹치거나 맞닿은 완료 구간은 하나로 합친다', () => {
+    expect(doneFills(range, bars(true, true, false))).toEqual([{ left: 0, width: 75 }]); // 겹침
+    expect(doneFills(range, bars(false, true, true))).toEqual([{ left: 37.5, width: 62.5 }]); // 맞닿음
+  });
+
+  it('상위 막대 밖으로 나간 부분은 잘라 내고, 축 중간에서 시작하는 막대는 그 막대 기준으로 계산한다', () => {
+    const fills = doneFills({ from: 14, to: 42 }, [
+      { from: 7, to: 21, done: true },
+      { from: 21, to: 35, done: false },
+      { from: 38.5, to: 49, done: true },
+      { from: 0, to: 7, done: true }, // 완전히 밖
+    ]);
+    expect(fills).toEqual([{ left: 0, width: 25 }, { left: 87.5, width: 12.5 }]);
+  });
+
+  it('칠한 구간의 끝을 양옆 1px 씩 줄어든 활동 막대의 끝과 맞춘다', () => {
+    expect(gtFillPos({ left: 0, width: 100 })).toEqual({ left: 'calc(0% + 0px)', width: 'calc(100% + 0px)' });
+    expect(gtFillPos({ left: 50, width: 25 })).toEqual({ left: 'calc(50% + 1px)', width: 'calc(25% + -1.5px)' });
+  });
 });
