@@ -165,7 +165,7 @@ class ClassifierRoutingTest(unittest.TestCase):
 
     def test_no_hits_cannot_produce_grounded_answer(self):
         self.search.return_value = []
-        with self.assertRaisesRegex(LlmError, '검색 자료 유무'):
+        with self.assertRaisesRegex(LlmError, '답변 형식 오류: 검색 자료에 없는 출처가 포함됐어요'):
             self.route('사내 규정', self.response())
 
     def test_search_failures_do_not_become_server_not_found(self):
