@@ -76,6 +76,8 @@ export interface AgentLogEntry {
   mode: string;
   ms: number;
   error?: string;
+  traceId?: string;
+  failedStage?: { id: string; label: string };
   /** 그 기록 안에서 실제 모델을 부른 횟수 */
   callCount: number;
 }
@@ -91,6 +93,7 @@ export interface AgentModelCall {
   messages: { role: string; content: string }[];
   images: number;
   output: string;
+  stageId?: string;
 }
 
 /** 기록 한 건의 전문. 에이전트 실행 기록에만 input·output 이 있고, 모델을 바로 부른 기록은 calls 하나뿐 */
@@ -98,6 +101,7 @@ export interface AgentLogDetail extends Omit<AgentLogEntry, 'callCount'> {
   input?: string;
   output?: string;
   calls: AgentModelCall[];
+  stages?: { id: string; label: string; status: 'running' | 'ok' | 'failed'; ms?: number; parentId?: string; errorType?: string }[];
 }
 
 export const aiApi = {

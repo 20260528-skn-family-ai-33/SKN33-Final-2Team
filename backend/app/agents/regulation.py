@@ -5,7 +5,7 @@
   regulation  규정·인사 제도 — 내 직원 구분의 등록 규정에 명시된 경우에만 근거와 함께. 없으면 답하지 않고 담당 부서 안내
   general     회사 정보는 실제 DB 원문, 사내 생활은 등록된 가상 홈페이지 메뉴 안내만 근거로 사용한다.
   out         범위 밖 — RoBERTa 분류 뒤 검색·LLM 없이 종료한다. 가데이터의 clarify 등 이전 응답은 보존한다.
-실제 답변은 found/partial/not_found/refused를 구분한다. 연결·JSON·출처·숫자 검증 실패는 오류로 유지한다.
+실제 답변은 found/partial/not_found/no_match/refused를 구분한다. 연결·JSON·출처·숫자 검증 실패는 오류로 유지한다.
 가데이터 모드는 같은 유형을 키워드 규칙과 고정 답으로 흉내 낸다(분류 모델 아님). 고정 답의 근거는 (규정 이름, 조 번호)로 팀 DB 청크에 잇는다.
 """
 from __future__ import annotations
@@ -380,21 +380,20 @@ def isolate_input(question: str, history: list | None, me: dict, context: dict |
 # ⭐ [공통 응답 헬퍼 함수] (근거 없음·제공 거절 등 파이프라인에서 사용)
 # ==============================================================================
 
-def _no_evidence(topic: str, retrieved: list | None = None, note: str = '') -> dict:
-    title = {'regulation': '사내 규정', 'company': '수자원공사 정보', 'life': '사내 생활안내'}.get(topic, '사내')
+def _no_evidence(topic: str, retrieved: list | None = None, note: str = '', *, status: str) -> dict:
     return ans(kind='regulation' if topic == 'regulation' else 'general',
                level='none' if topic == 'regulation' else 'general',
                source={'regulation': '', 'company': 'work', 'life': 'intranet'}[topic],
-               topic=topic, evidenceStatus='not_found',
-               summary=note or f'이번에 검색한 {title} 자료에서 질문에 답할 근거를 찾지 못했어요. 질문을 구체적으로 적거나 담당 부서에 확인해 주세요.',
+               topic=topic, evidenceStatus=status,
+               summary=note or '근거를 확인하지 못했어요. 담당자에게 문의하세요.',
                retrieved=retrieved or [], **({'knowledgeSources': []} if topic in ('company', 'life') else {}))
 
 
-def _refused(topic: str) -> dict:
+def _refused(topic: str, summary: str = '') -> dict:
     return ans(kind='regulation' if topic == 'regulation' else 'general', level='refused',
                source={'regulation': '', 'company': 'work', 'life': 'intranet'}[topic],
                topic=topic, evidenceStatus='refused',
-               summary='개인정보·비공개 정보 공개나 권한 우회처럼 제공하면 안 되는 요청에는 답변하지 않아요.',
+               summary=summary or '개인정보·비공개 정보 공개나 권한 우회처럼 제공하면 안 되는 요청에는 답변하지 않아요.',
                **({'knowledgeSources': []} if topic in ('company', 'life') else {}))
 
 
@@ -594,7 +593,8 @@ def generate_regulation_summary(ctx: rt.Ctx, inp: dict, ids: list[str]) -> dict:
     """⭐ [4-1단계 - 사내 규정 근거를 통해서 LLM이 요약하기]
     3-1단계(규정 RAG)에서 선별된 조항 원문을 바탕으로 LLM에게 요약 답변 생성을 요청한다.
     명시적으로 요청한 조항(requested)이 있으면 함께 전달한다.
-    (비공개 개인정보·타인 인사정보나 제공 금지 요청은 LLM이 status='refused'로 판단하여 거절)
+    근거가 없어도 모델이 제공 금지 요청을 먼저 판단한다. 자료가 없으면 not_found,
+    자료가 있으나 답을 뒷받침하지 못하면 no_match, 일부만 확인되면 partial로 구분한다.
     """
     q = inp['question']
     follow_history = inp.get('_history') or []
@@ -612,28 +612,48 @@ def generate_regulation_summary(ctx: rt.Ctx, inp: dict, ids: list[str]) -> dict:
 
 def format_regulation_response(ctx: rt.Ctx, inp: dict, ids: list[str], result: dict) -> dict:
     """⭐ [5-1단계 - 사내 규정 요약 결과 검증 및 최종 화면 출력]
-    규정 요약 결과의 상태(refused, not_found, found)를 분기하고, 숫자 환각 방지(nums_ok) 검증 후 최종 화면 응답(ans)을 출력한다.
+    거절·근거 부족의 모델 상태와 이유를 그대로 전달한다.
+    인용 답변은 출처·숫자를 검증한다.
     """
-    q = inp['question']
+    if not isinstance(result, dict) or result.get('status') not in grounded_answer.STATUSES:
+        raise llm.LlmError('답변 형식 오류: 규정 답변의 근거 확인 상태를 읽을 수 없어요')
+    status = result['status']
 
-    # 1) 제공 금지(refused) 상태 처리 (개인정보·비공개 정보 등)
-    if result['status'] == 'refused':
-        return _refused('regulation')
+    summary = result.get('summary')
+    if not isinstance(summary, str) or not summary.strip():
+        raise llm.LlmError('답변 형식 오류: 답변 또는 제공 불가·근거 부족 이유가 비어 있어요')
+    summary = summary.strip()
 
-    # 2) 사내 규정 근거 없음(not_found) 상태 처리
-    if result['status'] == 'not_found':
-        return _no_evidence('regulation', retrieved=ids, note=inp.get('_ref_empty_note', ''))
+    # 1) 제공 금지: 민감한 원문 없이 생성한 제공 금지 이유를 전달한다.
+    if status == 'refused':
+        return _refused('regulation', summary)
 
-    # 3) 인사 용어 기재 여부 확인 및 원문에 없는 숫자 환각 차단
-    basis, summary = result['sourceIds'], result['summary']
-    if not hr_stated(q, basis):
-        return _no_evidence('regulation', retrieved=ids)
-    if not nums_ok(summary, basis, ctx_nums(inp['context'])):
+    # 검색 자료 자체가 없는 결과를 그대로 전달한다.
+    if status == 'not_found':
+        return _no_evidence('regulation', retrieved=ids, note=summary, status='not_found')
+
+    # 검색 자료가 있지만 질문을 뒷받침하지 못하는 결과를 그대로 전달한다.
+    if status == 'no_match':
+        return _no_evidence('regulation', retrieved=ids, note=summary, status='no_match')
+
+    # 인용 답변의 계약만 검증한다. 질문의 단어 일치로 4-1단계의 판단을 바꾸지 않는다.
+    basis, summary = result.get('sourceIds'), result.get('summary')
+    if not isinstance(summary, str) or not summary.strip() or not isinstance(basis, list) or not basis:
+        raise llm.LlmError('답변 형식 오류: 규정 답변의 요약 또는 출처가 비어 있어요')
+    if not all(isinstance(value, str) and value in ids and regstore.article(value) is not None for value in basis):
+        raise llm.LlmError('답변 형식 오류: 이번 검색 자료에 없는 규정 출처가 포함됐어요')
+    if not nums_ok(summary, basis, ctx_nums(inp.get('context') or {})):
         raise llm.LlmError('답변 형식 오류: 규정 답변의 숫자가 인용 조항에 없어요')
 
-    return ans(kind='regulation', topic='regulation', evidenceStatus=result['status'],
-               level='ok' if result['status'] == 'found' else 'unclear', summary=summary,
-               basis=basis, retrieved=ids)
+    # 3) 일부 확인: 확인된 내용·한계와 인용을 그대로 전달한다.
+    if status == 'partial':
+        return ans(kind='regulation', topic='regulation', evidenceStatus='partial',
+                   level='unclear', summary=summary, basis=basis, retrieved=ids)
+
+    # 4) 근거 확인: 검증된 요약과 인용을 그대로 전달한다.
+    if status == 'found':
+        return ans(kind='regulation', topic='regulation', evidenceStatus='found',
+                   level='ok', summary=summary, basis=basis, retrieved=ids)
 
 
 def retrieve_knowledge_slots(ctx: rt.Ctx, inp: dict, topic: str) -> tuple[list[dict], list[dict]]:
@@ -676,14 +696,20 @@ def format_knowledge_response(ctx: rt.Ctx, inp: dict, topic: str, sources: list[
     """
     title = '회사 정보' if topic == 'company' else '사내 생활'
     source_type = 'work' if topic == 'company' else 'intranet'
+    if not isinstance(result.get('summary'), str) or not result['summary'].strip():
+        raise llm.LlmError('답변 형식 오류: 답변 또는 제공 불가·근거 부족 이유가 비어 있어요')
 
     # 1) 제공 금지(refused) 상태 처리
     if result['status'] == 'refused':
-        return _refused(topic)
+        return _refused(topic, result['summary'])
 
-    # 2) 수자원공사 정보('company') 또는 사내 생활안내('life') 근거 없음(not_found) 상태 처리
+    # 2) 검색 자료 자체가 없는 결과 처리
     if result['status'] == 'not_found':
-        return _no_evidence(topic)
+        return _no_evidence(topic, note=result['summary'], status='not_found')
+
+    # 검색 자료가 있지만 질문을 뒷받침하지 못하는 결과 처리
+    if result['status'] == 'no_match':
+        return _no_evidence(topic, note=result['summary'], status='no_match')
 
     # 3) 인용 자료에 없는 숫자 환각 검증
     hits = inp.get('_knowledge_hits') or []
@@ -726,7 +752,10 @@ def answer_with_pipeline(ctx: rt.Ctx, inp: dict) -> dict:
     me = inp.get('me') or {}
 
     # [1단계] RoBERTa 질문 1차 분류 및 직군 결정
-    classified = classify_question_roberta(q, hist, me=me)
+    with rt.stage(ctx, '1.classify', '1단계 · 질문 분류') as step:
+        classified = classify_question_roberta(q, hist, me=me)
+        step.update(labelResult=classified['label'], confidence=classified.get('confidence'),
+                    usedHistory=classified['usedHistory'], historyTurns=len(classified['follow_history']))
     label = classified['label']
     confidence = classified.get('confidence')
     follow_history = classified['follow_history']
@@ -737,24 +766,36 @@ def answer_with_pipeline(ctx: rt.Ctx, inp: dict) -> dict:
     inp['me'] = dict(me, empGroup=classified['group'])
 
     # [2단계] RoBERTa 확신도가 80% 미만이거나 없으면 LLM 재분류
-    effective_label = verify_or_reclassify_label_with_llm(ctx, q, label, confidence, follow_history)
+    with rt.stage(ctx, '2.reclassify', '2단계 · 분류 확인·재분류') as step:
+        step['modelRequired'] = confidence is None or confidence < 0.8
+        effective_label = verify_or_reclassify_label_with_llm(ctx, q, label, confidence, follow_history)
+        step['labelResult'] = effective_label
 
     # 1) 범위 밖 질문: 즉시 정중히 거절
     if effective_label == '범위 밖':
-        return ans(kind='out', level='out')
+        with rt.stage(ctx, '5.out', '5단계 · 범위 밖 안내'):
+            return ans(kind='out', level='out')
 
     # 2) 사내 규정 질문: [3-1단계 RAG] -> [4-1단계 요약] -> [5-1단계 최종 출력]
     if effective_label == '사내 규정':
-        ids = retrieve_regulation_slots(ctx, inp)                              # [3-1단계] 사내 규정 RAG
-        summary_result = generate_regulation_summary(ctx, inp, ids)            # [4-1단계] 사내 규정 LLM 요약
-        return format_regulation_response(ctx, inp, ids, summary_result)       # [5-1단계] 사내 규정 요약 검증 및 최종 출력
+        with rt.stage(ctx, '3-1.retrieve', '3-1단계 · 규정 검색') as step:
+            ids = retrieve_regulation_slots(ctx, inp)
+            step['sourceCount'] = len(ids)
+        with rt.stage(ctx, '4-1.generate', '4-1단계 · 규정 답변 생성'):
+            summary_result = generate_regulation_summary(ctx, inp, ids)
+        with rt.stage(ctx, '5-1.validate', '5-1단계 · 규정 답변 최종 검증'):
+            return format_regulation_response(ctx, inp, ids, summary_result)
 
     # 3) 사내 생활안내 & 수자원공사 정보 질문: [3-2단계 RAG] -> [4-2단계 요약] -> [5-2단계 최종 출력]
     topic = 'life' if effective_label == '사내 생활안내' else 'company'
-    hits, sources = retrieve_knowledge_slots(ctx, inp, topic)                  # [3-2단계] 생활안내·수자원공사 정보 RAG
+    with rt.stage(ctx, '3-2.retrieve', '3-2단계 · 생활·회사 자료 검색') as step:
+        hits, sources = retrieve_knowledge_slots(ctx, inp, topic)
+        step.update(topic=topic, sourceCount=len(sources))
     inp['_knowledge_hits'] = hits
-    summary_result = generate_knowledge_summary(ctx, inp, topic, sources)        # [4-2단계] 생활안내·수자원공사 정보 LLM 요약
-    return format_knowledge_response(ctx, inp, topic, sources, summary_result) # [5-2단계] 생활안내·수자원공사 정보 요약 검증 및 최종 출력
+    with rt.stage(ctx, '4-2.generate', '4-2단계 · 생활·회사 답변 생성'):
+        summary_result = generate_knowledge_summary(ctx, inp, topic, sources)
+    with rt.stage(ctx, '5-2.validate', '5-2단계 · 생활·회사 답변 최종 검증'):
+        return format_knowledge_response(ctx, inp, topic, sources, summary_result)
 
 
 
@@ -782,7 +823,7 @@ def answer(ctx: rt.Ctx, question: str, history: list, context: dict, sim: str | 
         ctx.meta['classification'] = inp['_classification']
     if documents_only:
         return a
-    return scope_answer(a, me) if a['kind'] == 'regulation' and a.get('evidenceStatus') != 'refused' and not regstore.set_for(me.get('empGroup')) else a
+    return scope_answer(a, me) if a['kind'] == 'regulation' and a.get('evidenceStatus') not in ('refused', 'not_found', 'no_match') and not regstore.set_for(me.get('empGroup')) else a
 
 
 def _api(ctx: rt.Ctx, inp: dict) -> dict:
@@ -821,12 +862,12 @@ def _company_answer(ctx: rt.Ctx, inp: dict) -> dict:
 
 def _empty_evidence_answer(ctx: rt.Ctx, topic: str, inp: dict, note: str = '', retrieved: list | None = None,
                            history: list | None = None) -> dict:
-    # 검색 자료가 없어도 제공 금지 요청과 단순 근거 부족은 구분해야 한다.
     if history is None:
         history = _hist_msgs(inp.get('_history') or [])
-    result = grounded_answer.generate(ctx, topic, inp['question'], [], inp['context'],
+    result = grounded_answer.generate(ctx, topic, inp['question'], [], inp.get('context') or {},
                                      history=history)
-    return _refused(topic) if result['status'] == 'refused' else _no_evidence(topic, retrieved, note)
+    return _refused(topic, result['summary']) if result['status'] == 'refused' else _no_evidence(
+        topic, retrieved, result['summary'], status=result['status'])
 
 
 # ==============================================================================
@@ -883,7 +924,7 @@ def classify_with_context(question: str, history: list, me: dict) -> dict:
 
 def _regulation_answer(ctx: rt.Ctx, inp: dict) -> dict:
     ids = retrieve_regulation_slots(ctx, inp)
-    return format_regulation_response(ctx, inp, ids, generate_regulation_summary(ctx, inp, ids)) if ids else _no_evidence('regulation')
+    return format_regulation_response(ctx, inp, ids, generate_regulation_summary(ctx, inp, ids))
 
 
 # 레거시 호환용 별칭

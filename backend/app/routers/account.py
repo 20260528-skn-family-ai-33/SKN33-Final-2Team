@@ -234,7 +234,7 @@ def api_log(a: Account = Depends(require_account)):
     """에이전트 동작 보기(시연·디버그 도구 · 운영에서는 아무도 쓰지 않음): 누가 호출했든 모든 계정의 최근 호출, 서버 메모리에만 있다.
     employee 는 그 호출이 누구의 일이었는지, by 는 관리자 화면에서 시작했는지.
     입력·출력·모델 호출 전문은 길어서 목록에는 넣지 않고 펼칠 때 /ai/log/{id} 로 받는다(callCount 는 모델 호출 수)"""
-    return {'log': [dict({k: v for k, v in e.items() if k not in ('input', 'output', 'calls')}, callCount=len(e.get('calls') or []))
+    return {'log': [dict({k: v for k, v in e.items() if k not in ('input', 'output', 'calls', 'stages')}, callCount=len(e.get('calls') or []))
                     for e in _named_logs(rt.all_logs())]}
 
 

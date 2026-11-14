@@ -13,14 +13,17 @@ from __future__ import annotations
 
 import itertools
 import json
+import logging
 import re
 import threading
 import time
 from collections import deque
 from contextvars import ContextVar
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 from zoneinfo import ZoneInfo
+from uuid import uuid4
 
 from .. import db, llm, provider_policy
 from ..browser_console import demo_enabled
@@ -46,6 +49,8 @@ _logs: dict[int | None, deque] = {}
 _log_ids = itertools.count(1)
 # 지금 실행 중인 run() 의 기록. 그 안에서 부른 모델 호출은 이 기록의 calls 에 붙는다(스레드·요청마다 따로)
 _active: ContextVar[dict | None] = ContextVar('agent_log_active', default=None)
+_stage: ContextVar[dict | None] = ContextVar('agent_log_stage', default=None)
+logger = logging.getLogger('uvicorn.error.assistant')
 # run() 밖에서 부른 모델 호출의 (에이전트, 작업) 이름. model() 이 붙인다
 _label: ContextVar[tuple[str, str] | None] = ContextVar('agent_log_label', default=None)
 
@@ -112,6 +117,48 @@ def _text(v) -> str:
 
 def _ms(t0: float) -> int:
     return round((time.perf_counter() - t0) * 1000)
+
+
+@contextmanager
+def stage(ctx: Ctx, stage_id: str, label: str):
+    """단계 메타데이터만 서버에 남긴다. 원문·예외 메시지는 기존 디버그 기록에서 확인한다."""
+    entry = _active.get()
+    parent = _stage.get()
+    item = {'id': stage_id, 'label': label, 'status': 'running'}
+    if parent:
+        item['parentId'] = parent['id']
+    trace_id = entry.setdefault('traceId', uuid4().hex) if entry is not None else uuid4().hex
+    if entry is not None:
+        entry.setdefault('stages', []).append(item)
+    token = _stage.set(item)
+    t0 = time.perf_counter()
+    logger.info('assistant_stage trace_id=%s stage=%s event=start provider=%s', trace_id, stage_id, ctx.provider)
+    try:
+        yield item
+    except Exception as err:
+        item.update(status='failed', errorType=type(err).__name__)
+        if entry is not None:
+            # 외부 단계로 예외가 전파돼도 최초 실패한 내부 단계를 보존한다.
+            entry.setdefault('failedStage', {'id': stage_id, 'label': label})
+        raise
+    else:
+        item['status'] = 'ok'
+    finally:
+        item['ms'] = _ms(t0)
+        log = logger.error if item['status'] == 'failed' else logger.info
+        # 명시한 진단 필드만 출력해 모델 원문이나 임의의 예외 문자열이 서버 로그에 섞이지 않게 한다.
+        fields = ('labelResult', 'confidence', 'usedHistory', 'historyTurns', 'modelRequired',
+                  'sourceCount', 'topic', 'statusPresent', 'statusValid', 'summaryType', 'sourceIdsType')
+        details = {key: item[key] for key in fields if key in item}
+        log('assistant_stage trace_id=%s stage=%s event=%s provider=%s ms=%s error_type=%s details=%s',
+            trace_id, stage_id, item['status'], ctx.provider, item['ms'], item.get('errorType', '-'),
+            json.dumps(details, ensure_ascii=False))
+        _stage.reset(token)
+
+
+def _failure_context(entry: dict, err: AgentError) -> None:
+    if entry.get('failedStage'):
+        err.info.update(failedStage=entry['failedStage'], traceId=entry['traceId'])
 
 
 def _entry(ctx, agent: str, task: str, mode: str, model: str) -> dict:
@@ -188,6 +235,7 @@ def run(ctx: Ctx, agent: str, task: str, inp, mock_fn, live_fn, role: str = 'def
             out = live_fn(inp)
         ctx.meta = {'mode': mode, 'model': e['model'], 'ms': _ms(t0), 'loadMs': ctx.meta.get('loadMs', 0) if mode != 'mock' else 0}
     except AgentError as err:
+        _failure_context(e, err)
         if e['mode'] not in ('sim', 'off'):
             e['mode'] = 'error'
         e.update(error=str(err), kind=err.info['kind'], output='(결과 없음)', ms=_ms(t0))
@@ -196,6 +244,7 @@ def run(ctx: Ctx, agent: str, task: str, inp, mock_fn, live_fn, role: str = 'def
     except llm.LlmError as err:
         e.update(mode='error', error=str(err), output='(결과 없음)', ms=_ms(t0))
         ae = AgentError(str(err), ctx.provider)
+        _failure_context(e, ae)
         e['kind'] = ae.info['kind']
         _log(ctx, e)
         raise ae from err
@@ -267,11 +316,21 @@ def llm_json(ctx: Ctx, system: str, inp, role: str = 'default', images: list | N
     call = {'role': role, 'model': llm.model_name(ctx.mode, role) if ctx.mode in ('ollama', 'openai') else '', 'system': system,
             'messages': [{'role': m.get('role', ''), 'content': _text(m.get('content') or '')} for m in messages[1:]],
             'images': sum(len(m.get('images') or []) for m in messages[1:]), 'output': ''}
+    current_stage = _stage.get()
+    if current_stage:
+        call['stageId'] = current_stage['id']
     t0 = time.perf_counter()
     try:
-        res = llm.chat(ctx.mode, messages, role=role, json_mode=True, reasoning=ctx.reasoning.get(ctx.mode), **options)
+        if current_stage:
+            with stage(ctx, current_stage['id'] + '.model', '모델 요청·응답 수신'):
+                res = llm.chat(ctx.mode, messages, role=role, json_mode=True, reasoning=ctx.reasoning.get(ctx.mode), **options)
+        else:
+            res = llm.chat(ctx.mode, messages, role=role, json_mode=True, reasoning=ctx.reasoning.get(ctx.mode), **options)
         ctx.meta = {'loadMs': res.get('loadMs', 0)}
         call.update(model=res.get('model') or call['model'], output=res['content'])
+        if current_stage:
+            with stage(ctx, current_stage['id'] + '.parse', '모델 응답 JSON 파싱'):
+                return parse_json(res['content'])
         return parse_json(res['content'])
     except Exception as err:
         call['error'] = str(err) or type(err).__name__

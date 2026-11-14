@@ -292,12 +292,13 @@ class RegulationFollowUpTest(unittest.TestCase):
         self.search.assert_not_called()
         model.assert_not_called()
 
-    def test_company_without_hits_keeps_summary_and_empty_sources(self):
+    def test_company_without_hits_keeps_summary_history_and_not_found(self):
         self.classify.return_value = {'label': '수자원공사 정보', 'confidence': 0.9}
         with patch.object(reg.knowledge, 'search_company', return_value=[]):
-            _, model, _ = self.ask('그 내용을 더 설명해 주세요', status='not_found')
+            result, model, _ = self.ask('그 내용을 더 설명해 주세요', status='not_found')
         self.assert_summary_history(model)
         self.assertEqual(model.call_args.args[2]['sources'], [])
+        self.assertEqual(result['evidenceStatus'], 'not_found')
 
     def test_life_menu_answer_can_be_summarized_without_model_raw_output(self):
         self.classify.return_value = {'label': '사내 생활안내', 'confidence': 0.9}
@@ -354,12 +355,11 @@ class RegulationFollowUpTest(unittest.TestCase):
                 self.assertNotIn('edu-9', str(model.call_args.args[2]['sources']))
                 self.assertEqual(bool(model.call_args.kwargs['history']), bool(history))
 
-    def test_unregistered_article_keeps_note_and_summary_history(self):
-        result, model, _ = self.ask('그 규정 제99조 내용을 알려줘', status='not_found')
+    def test_unregistered_article_keeps_not_found_and_summary_history(self):
+        result, model, inp = self.ask('그 규정 제99조 내용을 알려줘', status='not_found')
         self.assertEqual(result['evidenceStatus'], 'not_found')
-        self.assertIn('인재개발규정', result['summary'])
-        self.assertIn('제99조', result['summary'])
-        self.assertIn('담당 부서에 문의', result['summary'])
+        self.assertEqual(result['summary'], '교육 신청은 교육포털에서 해요.')
+        self.assertIn('제99조', inp['_ref_empty_note'])
         self.assertEqual(result['basis'], [])
         self.assertEqual(model.call_args.args[2]['sources'], [])
         self.assert_summary_history(model)
