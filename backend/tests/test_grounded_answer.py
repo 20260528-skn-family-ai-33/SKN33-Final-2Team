@@ -114,13 +114,13 @@ class GroundedAnswerTest(unittest.TestCase):
     def test_empty_sources_schema_and_validation_allow_only_uncited_states(self):
         for provider in ('ollama', 'openai'):
             for topic in ('regulation', 'company', 'life'):
-                for status in ('refused', 'not_found'):
+                for status in ('refused', 'not_found', 'no_match'):
                     with self.subTest(provider=provider, topic=topic, status=status):
                         response = {'status': status, 'summary': '확인할 수 없는 이유예요.', 'sourceIds': []}
                         result, payload, schema = self.generate(provider, topic, response, [])
                         self.assertEqual(result, response)
                         self.assert_output_format(provider, payload, schema, [])
-                for status in ('found', 'partial', 'no_match'):
+                for status in ('found', 'partial'):
                     for ids in ([], ['S001']):
                         with self.subTest(provider=provider, topic=topic, status=status, ids=ids):
                             with self.assertRaises(llm.LlmError):
@@ -141,13 +141,14 @@ class GroundedAnswerTest(unittest.TestCase):
                     self.assertEqual(result['sourceIds'], [self.sources[int(i[1:]) - 1]['id'] for i in ids])
 
     def test_refusal_and_missing_evidence_reasons_reach_stage_five_without_replacement(self):
-        for status, sources in (('refused', self.sources), ('refused', []), ('no_match', self.sources), ('not_found', [])):
+        for status, sources in (('refused', self.sources), ('refused', []), ('no_match', self.sources),
+                                ('no_match', []), ('not_found', []), ('not_found', self.sources)):
             with self.subTest(status=status):
                 reason = '비공개 개인정보 공개 요청이라 제공할 수 없어요.' if status == 'refused' else '이번 자료에서 지원 금액을 확인하지 못했어요.'
                 result, _, _ = self.generate('ollama', 'regulation', {
                     'status': status, 'summary': reason, 'sourceIds': []}, sources)
                 ctx, inp = rt.Ctx(1), {'question': '질문', 'context': {}}
-                final = reg.format_regulation_response(ctx, inp, [], result)
+                final = reg.format_regulation_response(ctx, inp, [source['id'] for source in sources], result)
                 self.assertEqual(final['evidenceStatus'], status)
                 self.assertEqual(final['summary'], reason)
                 self.assertNotIn(status, final['summary'])
@@ -229,7 +230,7 @@ class GroundedAnswerTest(unittest.TestCase):
     def test_invalid_status_is_not_filled_from_history_or_retried(self):
         for provider in ('ollama', 'openai'):
             for topic in ('regulation', 'company', 'life'):
-                for status in (None, '', 'general', 'not_found', 'found|partial|not_found|refused', '근거 찾음'):
+                for status in (None, '', 'general', 'found|partial|not_found|refused', '근거 찾음'):
                     response = {'status': status, 'summary': '안내', 'sourceIds': []}
                     with self.subTest(provider=provider, topic=topic, status=status):
                         with patch.object(rt, 'llm_json', return_value=response) as model:
@@ -266,7 +267,7 @@ class GroundedAnswerTest(unittest.TestCase):
 
     def test_invalid_output_is_not_repaired_with_an_arbitrary_source_or_retry(self):
         for provider in ('ollama', 'openai'):
-            for status, ids in (('not_found', []), ('no_match', ['S001']), ('partial', []), ('found', ['S999'])):
+            for status, ids in (('not_found', ['S001']), ('no_match', ['S001']), ('partial', []), ('found', ['S999'])):
                 with self.subTest(provider=provider, status=status, ids=ids):
                     response = {'status': status, 'summary': '확인할 수 없어요.', 'sourceIds': ids}
                     with patch.object(rt, 'llm_json', return_value=response) as model:

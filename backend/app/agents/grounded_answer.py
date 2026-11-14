@@ -135,7 +135,7 @@ def generate(ctx: rt.Ctx, topic: str, question: str, sources: list[dict], contex
     with rt.stage(ctx, '4.contract', '4단계 · 답변 필드·출처 검증') as step:
         step.update(sourceCount=len(sources),
                     statusPresent=isinstance(result, dict) and 'status' in result,
-                    statusValid=isinstance(result, dict) and result.get('status') in allowed_statuses(bool(sources)),
+                    statusValid=isinstance(result, dict) and result.get('status') in STATUSES,
                     summaryType=type(result.get('summary')).__name__ if isinstance(result, dict) else 'missing',
                     sourceIdsType=type(result.get('sourceIds')).__name__ if isinstance(result, dict) else 'missing')
         return _validate_result(topic, sources, aliases, result)
@@ -146,8 +146,6 @@ def _validate_result(topic: str, sources: list[dict], aliases: dict[str, str], r
     if not isinstance(result, dict) or result.get('status') not in STATUSES:
         raise llm.LlmError('답변 형식 오류: 근거 확인 상태를 읽을 수 없어요')
     status, summary, ids = result['status'], result.get('summary'), result.get('sourceIds')
-    if status not in allowed_statuses(bool(sources)):
-        raise llm.LlmError('답변 형식 오류: 근거 확인 상태와 검색 자료 유무가 맞지 않아요')
     if not isinstance(summary, str) or not isinstance(ids, list):
         raise llm.LlmError('답변 형식 오류: 답변 요약과 출처 목록이 맞지 않아요')
     if not all(isinstance(value, str) and value in aliases for value in ids):

@@ -89,7 +89,7 @@
 
 3단계의 검색 근거가 0건이어도 4-1단계 `generate_regulation_summary()`와 4-2단계 `generate_knowledge_summary()`는 공통 `grounded_answer.generate()`를 호출합니다. 제공 금지 요청은 자료 유무와 관계없이 refused, 일반 질문의 빈 검색은 not_found, 자료가 있으나 질문을 뒷받침하지 못하는 경우는 no_match로 모델이 직접 구별합니다. 서버가 no_match를 not_found로 바꾸지 않습니다. 세 상태 모두 비어 있지 않은 이유와 sourceIds=[]를 반환하며, 5단계도 상태와 이유를 그대로 전달합니다. 2단계 재분류는 별도로 유지하고 검색 연결 실패는 0건 결과로 바꾸지 않습니다.
 
-모델 허용 상태 `STATUSES`는 `refused`, `not_found`, `no_match`, `partial`, `found` 다섯 가지입니다. 제공 금지 요청을 먼저 판단하고, 그다음 검색 자료 유무와 질문에 답할 수 있는 범위를 판단합니다. `allowed_statuses()`를 스키마와 서버 검증에서 함께 사용하여 빈 검색에서는 refused/not_found, 자료가 있으면 refused/no_match/partial/found만 허용합니다. 규정 답변은 자료에서 확인되는 일반 기준과 절차를 안내하며 개인의 승진·보상 결과를 예측하지 않습니다.
+모델 허용 상태 `STATUSES`는 `refused`, `not_found`, `no_match`, `partial`, `found` 다섯 가지입니다. 제공 금지 요청을 먼저 판단하고, 그다음 검색 자료 유무와 질문에 답할 수 있는 범위를 판단합니다. 생성 지시와 스키마는 기존 `allowed_statuses()`에 따라 빈 검색에서는 refused/not_found, 자료가 있으면 refused/no_match/partial/found를 사용합니다. 서버의 `statusValid`와 `_validate_result()`는 반환된 상태가 `STATUSES`의 다섯 값 중 하나인지 확인하며, 검색 자료 유무만으로 추가 예외를 발생시키거나 상태를 변환하지 않습니다. 요약·출처 형식과 숫자 검증은 유지합니다. 규정 답변은 자료에서 확인되는 일반 기준과 절차를 안내하며 개인의 승진·보상 결과를 예측하지 않습니다.
 
 2026-11-13 후속 요청으로 모델이 not_found/no_match/refused를 직접 구별하도록 조정했습니다. `llm.py`·검색 구현·2단계 재분류는 수정하지 않았습니다. 프런트는 no_match 타입과 기존 표시 규칙의 테스트만 추가하고 새 상태 라벨은 만들지 않습니다. 실제 모델의 분류 정확도·DB·운영 사이트는 별도 확인 대상입니다.
 

@@ -158,19 +158,22 @@ class AssistantStageLogTest(unittest.TestCase):
         self.assertEqual([call['stageId'] for call in self.latest()['calls']], ['2.reclassify', '4-2.generate'])
         self.assertIn('4-2.generate.model', [step['id'] for step in self.latest()['stages']])
 
-    def test_unrelated_sources_keep_no_match_as_success_without_conversion(self):
+    def test_uncited_states_with_sources_are_preserved_without_conversion(self):
         reason = '검색된 자료로 운영 시간을 확인하지 못했어요. 담당자에게 문의하세요.'
-        self.chat.return_value['content'] = json.dumps({
-            'status': 'no_match', 'summary': reason, 'sourceIds': []})
-        for provider in ('ollama', 'openai'):
-            with self.subTest(provider=provider), self.assertLogs(rt.logger, level='INFO'):
-                result = self.ask(provider)
-            self.assertEqual(result['evidenceStatus'], 'no_match')
-            self.assertEqual(result['summary'], reason)
-            self.assertEqual(result['knowledgeSources'], [])
-            self.assertEqual(self.latest()['stages'][2]['sourceCount'], 1)
-            self.assertNotIn('failedStage', self.latest())
-            self.assertTrue(all(step['status'] == 'ok' for step in self.latest()['stages']))
+        for status in ('not_found', 'no_match'):
+            self.chat.return_value['content'] = json.dumps({
+                'status': status, 'summary': reason, 'sourceIds': []})
+            for provider in ('ollama', 'openai'):
+                with self.subTest(provider=provider, status=status), self.assertLogs(rt.logger, level='INFO'):
+                    result = self.ask(provider)
+                self.assertEqual(result['evidenceStatus'], status)
+                self.assertEqual(result['summary'], reason)
+                self.assertEqual(result['knowledgeSources'], [])
+                self.assertEqual(self.latest()['stages'][2]['sourceCount'], 1)
+                self.assertNotIn('failedStage', self.latest())
+                self.assertTrue(all(step['status'] == 'ok' for step in self.latest()['stages']))
+                contract = next(step for step in self.latest()['stages'] if step['id'] == '4.contract')
+                self.assertTrue(contract['statusValid'])
 
     def test_unexpected_exception_is_not_replaced(self):
         error = ValueError('민감한 원문')
