@@ -22,12 +22,12 @@
 .rpt-gantt-label small{flex-shrink:0;font-size:12px;line-height:1.6;color:var(--ink-3)}
 .rpt-gantt-title{display:-webkit-box;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow-wrap:anywhere}
 .rpt-gantt-weeks{display:grid;grid-template-columns:repeat(var(--n),minmax(14px,1fr));gap:3px;align-items:center;font-variant-numeric:tabular-nums}
-.rpt-gantt-weeks i{height:8px;border-radius: var(--rad-1);background:var(--cmp-track)}
+.rpt-gantt-weeks i{height:8px;border-radius:2px;background:var(--cmp-track)}
 .rpt-gantt-weeks i.on,.rpt-gantt-swatch{background:color-mix(in srgb,var(--cmp-post) 30%,var(--cmp-surface));box-shadow:inset 0 0 0 1.5px var(--cmp-post)}
 .rpt-gantt-weeks i.on.done,.rpt-gantt-swatch.done{background:var(--cmp-post);box-shadow:none}
 .rpt-gantt-state{font-size:12px;white-space:nowrap;color:var(--ink-3)}
 .rpt-gantt-state.done{font-weight: 700;color:var(--cmp-post-ink)}
-.rpt-gantt-swatch{width:16px;height:8px;border-radius: var(--rad-1);flex-shrink:0}
+.rpt-gantt-swatch{width:16px;height:8px;border-radius:2px;flex-shrink:0}
 .rpt-gantt-key{margin-top:12px}
 
 /* 스킬별 사전·사후 카드 두 장: 넓으면 나란히, 좁으면 위아래 */

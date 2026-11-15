@@ -702,7 +702,7 @@ a.me .me-go { width: 16px; height: 16px; flex: none; color: var(--ink-4); }
 .gt-r:hover .gt-name { color: var(--accent-ink); }
 .gt-move { flex: 0 0 24px; width: 24px; height: 24px; padding: 0; border: 1px solid var(--line-2); border-radius: var(--rad-1); background: var(--surface); color: var(--ink); font-size: 12px; line-height: 1; }
 .gt-move:disabled { opacity: .4; cursor: default; }
-.gt-bar { position: absolute; top: 50%; transform: translateY(-50%); overflow: hidden; border-radius: var(--rad-1); }
+.gt-bar { position: absolute; top: 50%; transform: translateY(-50%); overflow: hidden; border-radius: 4px; }
 .gt-bar i { display: block; height: 100%; }
 .gt-bar.rm { height: 12px; background: var(--accent-soft2); box-shadow: inset 0 0 0 1px var(--accent-line); }
 .gt-bar.rm i { background: var(--accent-ink); }
@@ -714,10 +714,10 @@ a.me .me-go { width: 16px; height: 16px; flex: none; color: var(--ink-4); }
 .gt-row:hover .gt-bar.act { box-shadow: inset 0 0 0 1.5px var(--accent-ink); }
 .gt-key { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; margin-top: 12px; font-size: 12px; color: var(--ink-3); }
 .gt-key span { display: inline-flex; align-items: center; gap: 6px; }
-.gt-key i { width: 16px; height: 10px; border-radius: var(--rad-1); }
+.gt-key i { width: 16px; height: 10px; border-radius: 3px; }
 .gt-key .k-done { background: var(--accent); }
 .gt-key .k-left { background: var(--accent-soft2); box-shadow: inset 0 0 0 1px var(--accent-line); }
-.gt-key .k-now { width: 12px; height: 14px; border-radius: var(--rad-1); background: var(--accent-soft2); }
+.gt-key .k-now { width: 12px; height: 14px; border-radius: 2px; background: var(--accent-soft2); }
 .gt-key .gt-note { margin-left: auto; color: var(--ink-4); }
 .gt-tip { position: fixed; z-index: 60; max-width: 280px; padding: 9px 12px; border-radius: var(--rad-2); background: #1C1D20; color: #fff; font-size: 13px; line-height: 1.45; box-shadow: var(--shadow-pop); pointer-events: none; }
 .gt-tip b { display: block; font-size: 13px; font-weight: 700; }

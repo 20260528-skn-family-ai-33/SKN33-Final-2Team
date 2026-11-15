@@ -23,7 +23,7 @@
 .rv-weeks ul li em { flex-shrink: 0; font-style: normal; font-size: 13px; color: var(--ink-3); }
 .rv-dot { flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); transform: translateY(-1px); }
 .rv-dot.is-book { background: var(--accent-line); }
-.rv-dot.is-task { border-radius: var(--rad-1); background: var(--ink-2); }
+.rv-dot.is-task { border-radius: 2px; background: var(--ink-2); }
 .rv-weeks-wait { padding: 22px; border: 1.5px dashed var(--line-2); border-radius: var(--r-md); text-align: center; font-size: 14px; color: var(--ink-3); }
 
 /* 스킬 블록 */
@@ -37,7 +37,7 @@
 .rv-learn { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
 .rv-skill h4 { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--ink-3); }
 .rv-mini { display: flex; align-items: center; gap: 12px; padding: 6px 0; }
-.rv-thumb { flex-shrink: 0; width: 36px; height: 46px; object-fit: contain; border-radius: var(--rad-1); }
+.rv-thumb { flex-shrink: 0; width: 36px; height: 46px; object-fit: contain; border-radius: 4px; }
 .rv-mini-tx { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .rv-mini-tx b { font-size: 14px; font-weight: 600; line-height: 1.45; color: var(--ink); overflow-wrap: anywhere; }
 .rv-mini-tx b .tag { margin-right: 6px; vertical-align: 1px; }
