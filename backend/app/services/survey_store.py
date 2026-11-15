@@ -167,7 +167,8 @@ def save_resource_choices(t: Any, employee_id: int, project_id: str, generation_
     recommendations = current.get('recommendations')
     if not recommendations or recommendations.get('id') != recommendation_id:
         raise StoreError('추천 자료가 변경되었습니다. 다시 조회해 주세요.')
-    recommendations = available_recommendations(recommendations, course, refresh=True,
+    budget = ((current.get('project') or {}).get('details') or {}).get('budget')
+    recommendations = available_recommendations(recommendations, course, budget=budget, refresh=True,
                                                 completed=completed_course_ids(t, employee_id))
     validate_choices(recommendations, choices)
     order = skill_order if skill_order is not None else current.get('skillOrder', [row['name'] for row in recommendations['skills']])

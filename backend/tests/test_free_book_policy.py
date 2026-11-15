@@ -17,3 +17,19 @@ class FreeBookPolicyTests(unittest.TestCase):
   with self.assertRaises(ApiError):self.check([{'resource_key':'c','resource_type':'course','cost_won':1}])
  def test_deleted_book_is_still_rejected(self):
   with self.assertRaises(ApiError):self.check([{'resource_key':'book_b','resource_type':'book','cost_won':23000,'deleted':True}])
+
+ def test_zero_budget_rechecks_crash_and_challenge_at_confirmation(self):
+  for track in ('A2', 'A3'):
+   for price in (48000, None, 0):
+    with self.subTest(track=track, price=price):
+     t = Mock()
+     t.all.return_value = [{'resource_key':'c', 'resource_type':'course', 'cost_won':price}]
+     plan = {'opt':track, 'acts':[{'res':'c'}]}
+     if price == 0:
+      validate_free_plan(t, plan, budget='0')
+      self.assertEqual(plan['cost'], 0)
+     else:
+      with self.assertRaises(ApiError) as error:
+       validate_free_plan(t, plan, budget='0')
+      self.assertEqual(error.exception.code, 'ZERO_BUDGET_PRICE_CHANGED')
+     self.assertIn('FOR SHARE', t.all.call_args.args[0])

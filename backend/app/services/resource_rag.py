@@ -8,14 +8,14 @@ import math
 from threading import Lock
 from time import perf_counter
 from weakref import WeakValueDictionary
-from app import db
+from app import course_levels, db
 from app import regulation_embeddings as embeddings
 from app.agents.resource_recommendations import RecommendationError, candidate_pools
 from app.services import book_candidates, course_focus, resource_evidence
 
 MODEL = embeddings.BGE_MODEL
 DIMENSIONS = embeddings.BGE_DIMENSIONS
-VERSION = 'resource-pgvector-rag/v38-related-course-candidates'
+VERSION = 'resource-pgvector-rag/v39-zero-budget'
 PER_KIND = 6
 COURSE_REVIEW = 20
 FIELDS = ('id','title','provider','cost','hours','estimated','image','url','skills','content','curriculum')
@@ -98,8 +98,8 @@ def search_vectors(resource_type, ids, vector, limit, free_only, *, read=None):
 
 def retrieve(project, selection, items, course=None, *, embed=None, search=None, book_search=None):
     started=perf_counter()
-    free_only=bool(course and course.get('id')=='A1')
     track = (course or {}).get('id')
+    zero_budget = course_levels.zero_budget((project.get('details') or {}).get('budget'))
     shared = resource_evidence.course_selection(project, selection, course)
     all_pools = candidate_pools(dict(project, selectedCourse=None), selection, items,
                                 limit=max(1, len(items)), rank_courses=False)
@@ -142,14 +142,14 @@ def retrieve(project, selection, items, course=None, *, embed=None, search=None,
             vector = vectors[queries[index, key]]
             scoped_course = track in ('A1', 'A2', 'A3')
             review_limit = (COURSE_REVIEW if key == 'courses' else book_candidates.REVIEW_LIMIT) if scoped_course else PER_KIND
-            limit = len(allowed) if scoped_course and key == 'courses' else review_limit
+            limit = len(allowed) if key == 'courses' and (scoped_course or zero_budget) else review_limit
             if key == 'books' and scoped_course and book_search is not None:
                 rows = book_search(pools[index]['name'], queries[index, key], list(allowed), vector, limit)
             else:
                 rows = search(kind, list(allowed), vector, limit, False)
             if not rows:
                 raise RecommendationError('조건에 맞는 자료의 검색 벡터를 찾지 못했어요. 등록된 임베딩 상태를 확인해 주세요.')
-            if scoped_course and key == 'courses':
+            if key == 'courses' and (scoped_course or zero_budget):
                 unique_ids = set()
                 for row in rows:
                     rid = row['resource_id']
@@ -159,6 +159,9 @@ def retrieve(project, selection, items, course=None, *, embed=None, search=None,
                     if not isinstance(row.get('similarity'), (int, float)) or not math.isfinite(row['similarity']):
                         raise RecommendationError('자료 검색 유사도가 올바르지 않아요.')
                 rows = [dict(row, current_cost=row.get('current_cost', allowed[row['resource_id']].get('cost'))) for row in rows]
+                if zero_budget:
+                    rows = [row for row in rows if course_levels.is_free(row['current_cost'])]
+            if scoped_course and key == 'courses':
                 spec = shared['skills'][index]
                 def challenge_rank(rid):
                     return resource_evidence.course_rank_key(course_info(rid), project, spec, items[rid], True)
@@ -173,7 +176,6 @@ def retrieve(project, selection, items, course=None, *, embed=None, search=None,
                 rid=str(match['resource_id'])
                 if rid not in allowed or rid in seen:raise RecommendationError('벡터 검색 결과가 허용된 자료와 일치하지 않아요.')
                 row=deepcopy(allowed[rid]);row['cost']=match.get('current_cost',row.get('cost'))
-                if free_only and key == 'courses' and row.get('cost')!=0:raise RecommendationError('Free Course 검색에 유료 자료가 포함됐어요.')
                 score=match.get('similarity')
                 if score is None or not math.isfinite(float(score)):raise RecommendationError('자료 검색 유사도가 올바르지 않아요.')
                 seen.add(rid)

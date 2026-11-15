@@ -20,6 +20,12 @@ describe('계산값과 AI 설명 분리', () => {
     expect(optionSummary('SQL 검증에 집중해요. '.repeat(6), []).expandable).toBe(true);
     expect(optionSummary('', ['첫째', '둘째', '셋째']).expandable).toBe(true);
   });
+  it('자료 선택 전에 생성된 무료 안내를 현재 비용처럼 표시하지 않는다', () => {
+    const text = '자료 비용이 들지 않는 직접 실습으로 결과와 검증 근거를 남겨요. SQL 조인 결과를 비교해요.';
+    expect(planDescription(text)).toBe('SQL 조인 결과를 비교해요.');
+    expect(optionSummary(text, ['무료 강좌만으로 구성해요.']).benefits.join(' ')).not.toContain('무료 강좌만');
+    expect(planDescription('SQL 실행계획의 비용을 비교해요.')).toBe('SQL 실행계획의 비용을 비교해요.');
+  });
   it('주차·개별 강좌 설명과 한 문장에 있는 전체 합계는 여전히 제한한다', () => {
     expect(planDescription('3일차 실습 후 총 17시간이면 끝나요.')).not.toContain('17시간');
     expect(planDescription('약 2시간짜리 강좌를 들어 총 20시간으로 마쳐요.')).not.toContain('20시간');
