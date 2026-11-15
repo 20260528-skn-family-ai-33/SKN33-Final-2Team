@@ -41,10 +41,13 @@ def env(key: str, default: str = '') -> str:
     return os.environ.get(key) or _FILE.get(key) or default
 
 
-def _demo_mode() -> bool:
-    # 명시적으로 비운 환경변수도 존중해 파일의 on 설정으로 되돌아가지 않는다.
-    value = os.environ.get('GP5_DEMO_MODE', _FILE.get('GP5_DEMO_MODE', 'off'))
-    return value.strip().lower() == 'on'
+def _explicit_on(*names: str, default: bool = False) -> bool:
+    # 환경변수가 파일보다 우선하며, 같은 출처에서는 새 이름을 먼저 읽는다. 빈 값은 명시적인 off다.
+    for source in (os.environ, _FILE):
+        for name in names:
+            if name in source:
+                return source[name].strip().lower() == 'on'
+    return default
 
 
 def _local_db_url() -> str:
@@ -63,6 +66,7 @@ class Settings:
     host: str
     port: int
     demo_mode: bool
+    browser_overrides: bool
     beta_account_picker: bool
     employee_ai_selection: bool
     demo_password: str
@@ -152,7 +156,8 @@ def load() -> Settings:
         host=env('GP5_HOST', '127.0.0.1'),
         port=int(env('GP5_PORT', '8785')),
         # 공개 저장소라 기본값을 두지 않는다(팀 database/RESTORE.md: 공용 기본 비밀번호 없음 · 2026-10-26). 비우면 시연 비밀번호를 쓰는 준비 단계를 건너뛴다
-        demo_mode=_demo_mode(),
+        demo_mode=_explicit_on('GP5_DEMO_MODE'),
+        browser_overrides=_explicit_on('GP5_CONSOLE_OVERRIDES', 'GP5_BROWSER_OVERRIDES', default=True),
         employee_ai_selection=env('GP5_EMPLOYEE_AI_SELECTION', 'on').strip().lower() == 'on',
         beta_account_picker=env('GP5_BETA_ACCOUNT_PICKER', 'off').lower() == 'on',
         demo_password=env('GP5_DEMO_PASSWORD'),

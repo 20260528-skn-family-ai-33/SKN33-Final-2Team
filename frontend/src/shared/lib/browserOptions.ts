@@ -2,6 +2,7 @@ import { create } from 'zustand';
 
 export const limits = { timeout: 900, input: 131072, output: 32768 } as const;
 export type BrowserOptions = Partial<Record<'picker' | 'demo', boolean> & Record<keyof typeof limits, number> & Record<'ollamaUrl' | 'ollamaKey', string>>;
+export type ConsoleDefaults = { picker: boolean; demo: boolean; browserOverrides?: boolean };
 const key = 'growpath.browser-console.v1';
 
 function read(): BrowserOptions {
@@ -34,6 +35,13 @@ export function browserDemoEnabled(options: BrowserOptions): boolean {
   return options.demo ?? ((import.meta.env.VITE_DEMO_TOOLS ?? '').trim().toLowerCase() === 'on');
 }
 
+export function consoleEnabled(field: 'picker' | 'demo', options: BrowserOptions, defaults?: ConsoleDefaults | null): boolean {
+  if (!defaults) return false;
+  const override = options[field];
+  if (override !== undefined) return override && (defaults.browserOverrides === true || defaults[field]);
+  return defaults[field] && (field === 'picker' || browserDemoEnabled(options));
+}
+
 export function activeRunpodSettings(options: BrowserOptions): Pick<BrowserOptions, 'ollamaUrl' | 'ollamaKey'> {
   return browserDemoEnabled(options) ? options : {};
 }
@@ -41,11 +49,12 @@ export function activeRunpodSettings(options: BrowserOptions): Pick<BrowserOptio
 export function browserHeaders(): Record<string, string> {
   const { options } = useBrowserOptions.getState();
   const headers: Record<string, string> = {};
-  if (options.picker === false) headers['X-GrowPath-picker'] = 'off';
+  if (options.picker !== undefined) headers['X-GrowPath-picker'] = options.picker ? 'on' : 'off';
   if (!browserDemoEnabled(options)) {
     headers['X-GrowPath-demo'] = 'off';
     return headers;
   }
+  if (options.demo === true) headers['X-GrowPath-demo'] = 'on';
   for (const name of ['input', 'output', 'timeout'] as const) {
     if (options[name] !== undefined) headers['X-GrowPath-' + name] = String(options[name]);
   }
