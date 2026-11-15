@@ -2,7 +2,8 @@ import io
 import os
 import unittest
 from contextvars import Context
-from types import SimpleNamespace
+from tempfile import TemporaryDirectory
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 os.environ.setdefault('DATABASE_URL', 'postgresql+psycopg://test:test@127.0.0.1:1/test')
@@ -47,8 +48,10 @@ class BrowserConsoleTests(unittest.TestCase):
             (None, 'browser-fixture', 'browser-fixture'), (None, None, 'env-fixture'),
         ]:
             with self.subTest(url=custom_url, key=bool(custom_key)), patch.object(llm, 'S', wraps=llm.S) as config, \
-                 patch.object(llm.provider_keys, 'read', return_value=SimpleNamespace(value='env-fixture')) as shared, \
+                 TemporaryDirectory() as directory, \
                  patch.object(llm, '_http', return_value=io.BytesIO(b'{}')) as transport:
+                config.var_dir = Path(directory)
+                config.ollama_key = 'env-fixture'
                 config.ollama_url = 'http://default.invalid'
                 console.options.set(console.BrowserOptions(ollama_url=custom_url, ollama_key=custom_key))
                 llm.ollama('api/chat', {})
@@ -56,7 +59,6 @@ class BrowserConsoleTests(unittest.TestCase):
                 self.assertEqual(destination, (custom_url or config.ollama_url) + '/api/chat')
                 self.assertEqual(headers.get('Authorization'), 'Bearer ' + expected if expected else None)
                 self.assertEqual(transport.call_args.kwargs.get('allow_redirects', True), not (custom_url or custom_key))
-                self.assertEqual(shared.called, not (custom_url or custom_key))
 
     def test_http_settings_are_scoped_to_one_request(self):
         from dataclasses import replace
@@ -96,7 +98,9 @@ class BrowserConsoleTests(unittest.TestCase):
             llm.chat('openai', messages)
             self.assertEqual(openai.call_args.kwargs['timeout'], 180)
             self.assertEqual(openai.call_args.args[1]['max_completion_tokens'], 2048)
-            with patch.object(llm, 'S', wraps=llm.S) as config, patch.object(llm.provider_keys, 'read', return_value=SimpleNamespace(value='')), patch.object(llm, '_http', return_value=io.BytesIO(b'{"message":{"content":"ok"}}')) as http:
+            with patch.object(llm, 'S', wraps=llm.S) as config, TemporaryDirectory() as directory, patch.object(llm, '_http', return_value=io.BytesIO(b'{"message":{"content":"ok"}}')) as http:
+                config.var_dir = Path(directory)
+                config.ollama_key = ''
                 config.ollama_url = 'http://test.invalid'
                 config.ollama_model = 'model'
                 llm.chat('ollama', messages)

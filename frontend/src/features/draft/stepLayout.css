@@ -1,7 +1,7 @@
 /* 작성 단계 공통 배치(#224): 번호가 붙은 구획 머리와, 화면 아래에 붙어 있는 요약·이동 줄. 색은 테마 변수에서만 가져온다 */
 .step-sec { margin-top: 36px; }
 .step-sec-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
-.step-sec-head h2 { margin: 0; font-size: 19px; line-height: 1.5; }
+.step-sec-head h2 { margin: 0; font-size: 20px; line-height: 1.5; }
 .step-sec-head p { margin: 2px 0 0; font-size: 14px; color: var(--ink-3); }
 .step-sec-right { margin-left: auto; align-self: center; flex-shrink: 0; }
 /* 강조색 위 글자는 바탕색으로: 밝은 테마는 흰색, 어두운 테마(강조색이 흰색)는 어두운 색이 된다 */
@@ -26,4 +26,4 @@
 }
 
 /* 다음 버튼이 꺼져 있을 때 그 이유(버튼 줄 위에 한 줄) */
-.actions-why { flex-basis: 100%; margin: 0; font-size: 13.5px; color: var(--ink-3); }
+.actions-why { flex-basis: 100%; margin: 0; font-size: 14px; color: var(--ink-3); }

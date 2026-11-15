@@ -228,8 +228,9 @@ class FreeTrackRegressions(unittest.TestCase):
                 plan={'opt':pid,'def':{},'acts':[{'res':'free'}],'name':pid,'tagline':'test','cost':100}
                 pd={'to':plan,'label':'test','prefsTo':{},'handoff':{}}
                 row={'roadmap_id':'roadmap','content':{'opt':pid,'version':1}}
-                t=Mock(); t.one.return_value={'result':pd,'status':'ready'}
-                t.all.return_value=[] if cost=='missing' else [{'resource_key':'free','cost_won':cost}]
+                t=Mock(); t.one.side_effect=[{'result':pd,'status':'ready'}, row]
+                prices=[] if cost=='missing' else [{'resource_key':'free','cost_won':cost}]
+                t.all.side_effect=lambda sql, **_: prices if 'resource_meta' in sql else []
                 with self.subTest(pid=pid,cost=cost), ExitStack() as stack:
                     stack.enter_context(patch.object(plans.db,'tx',side_effect=lambda:tx_of(t)))
                     stack.enter_context(patch.object(plans,'_owned',return_value=row))
@@ -241,7 +242,47 @@ class FreeTrackRegressions(unittest.TestCase):
                     else:
                         self.assertEqual(plans.accept_revision(1,'roadmap','revision'),{'ok':True})
                         write.assert_called_once()
-                        if pid!='A1': t.all.assert_not_called()
+                        if pid!='A1': self.assertFalse(any('resource_meta' in c.args[0] for c in t.all.call_args_list))
+
+    def test_zero_budget_revision_uses_saved_assignments_and_preserves_step_costs(self):
+        resources = {key: {'type': 'course', 'cost': price} for key, price in
+                     [('old', 48000), ('free', 0), ('paid', 7000), ('unknown', None)]}
+        def activity(aid, res):
+            return dict(id=aid, res=res, title=res, how='학습', hours=1, wFrom=1, wTo=1)
+
+        old = activity('a', 'old')
+        for track in ('A1', 'A2', 'A3'):
+            for done, proposed, ok in [
+                (False, [old], True), (True, [old, activity('b', 'free')], True),
+                (False, [old, activity('b', 'old')], False),
+                (False, [activity('a', 'paid')], False), (False, [activity('a', 'unknown')], False),
+            ]:
+                with self.subTest(track=track, done=done, proposed=proposed), ExitStack() as ctx:
+                    previous = dict(opt=track, version=1, acts=[old], prefs={'budget': 50000 if done else 0})
+                    proposal = dict(opt=track, acts=proposed, name=track, tagline='test', **{'def': {}})
+                    revision = {'to': proposal, 'from': proposal, 'label': '시간 변경', 'prefsTo': {'budget': 0, 'hours': 6}, 'handoff': {}}
+                    row = {'roadmap_id': 'roadmap', 'content': previous}
+                    t = Mock()
+                    t.one.side_effect = [{'result': revision, 'status': 'ready'}, row]
+                    def rows(sql, **kwargs):
+                        if 'resource_meta' in sql:
+                            return [dict(resource_key=k, resource_type='course', cost_won=resources[k]['cost']) for k in kwargs['keys']]
+                        return [{'activity_id': 'a'}] if done else []
+                    t.all.side_effect = rows
+                    ctx.enter_context(patch.object(plans.db, 'tx', side_effect=lambda: tx_of(t)))
+                    ctx.enter_context(patch.object(plans, '_owned', return_value=row))
+                    ctx.enter_context(patch.object(plans, 'record', return_value={'ok': True}))
+                    ctx.enter_context(patch.object(catalog, 'items', return_value=resources))
+                    if ok and track != 'A1':
+                        self.assertEqual(plans.accept_revision(1, 'roadmap', 'revision'), {'ok': True})
+                        self.assertEqual(t.run.call_args_list[0].kwargs['c'].obj['cost'], 48000)
+                        self.assertEqual([(c.kwargs['c'], c.kwargs['done']) for c in t.val.call_args_list],
+                                         [(resources[a['res']]['cost'], done and a['id'] == 'a') for a in proposed])
+                    else:
+                        with self.assertRaises(ApiError) as err:
+                            plans.accept_revision(1, 'roadmap', 'revision')
+                        self.assertEqual(err.exception.code, 'FREE_TRACK_PRICE_CHANGED' if track == 'A1' else 'ZERO_BUDGET_PRICE_CHANGED')
+                        t.run.assert_not_called()
 
 if __name__=='__main__':
     unittest.main()

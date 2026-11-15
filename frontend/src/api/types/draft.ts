@@ -273,7 +273,7 @@ export interface RegenRequest {
   replaceActs: { key: string; title: string }[];
 }
 
-export interface SelectedSkill { name: string; application: string; reason?: string }
+export interface SelectedSkill { name: string; application: string; reason?: string; learned?: boolean; }
 export interface DraftDoc {
   readonly demoSeeded?: boolean;
   /** 작성 탭에 들어올 때 고른 시작 방식. 확정할 때 서버에 보낸다 */
@@ -281,6 +281,8 @@ export interface DraftDoc {
   selectionNotice?: string;
   selectedSkills?: SelectedSkill[];
   skillCandidates?: SelectedSkill[];
+  fixedSkillNames?: string[];
+  skillPool?: { key: string; rows: SelectedSkill[]; shown: string[] };
   skillInputKey?: string;
   v2Assessment?: { generationId: string; completed: boolean; materialsReady?: boolean; materialsKey?: string | null; activitiesReady?: boolean };
   goal: string;

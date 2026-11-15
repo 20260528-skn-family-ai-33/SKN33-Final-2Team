@@ -15,13 +15,13 @@
 .opt-facts dd { margin: 2px 0 0; min-height: 27px; display: flex; align-items: baseline; flex-wrap: wrap; font-size: 13px; color: var(--ink-2); overflow-wrap: anywhere; }
 .opt-facts dd b { font-size: 18px; font-weight: 700; color: var(--ink); }
 .opt-course.is-busy .opt-facts dd, .opt-course.is-busy .course-explanation { opacity: .55; }
-.opt-course .course-explanation { flex: 1; margin-top: 12px; font-size: 13.5px; line-height: 1.6; color: var(--ink-2); }
+.opt-course .course-explanation { flex: 1; margin-top: 12px; font-size: 14px; line-height: 1.6; color: var(--ink-2); }
 .opt-course .course-explanation-label { font-weight: 600; }
 .opt-course .course-reason { margin: 4px 0 10px; }
 .opt-course .course-benefits { padding-top: 10px; }
 .opt-course .course-benefits li + li { margin-top: 3px; }
-.opt-vnav { display: inline-flex; align-items: center; gap: 4px; margin-top: 12px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
-.opt-vnav button { width: 26px; height: 26px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: inherit; cursor: pointer; }
+.opt-vnav { display: inline-flex; align-items: center; gap: 4px; margin-top: 12px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.opt-vnav button { width: 26px; height: 26px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: var(--rad-2); background: var(--surface); color: inherit; cursor: pointer; }
 .opt-vnav button:disabled { opacity: .35; cursor: default; }
 .opt-vnav svg { width: 13px; height: 13px; }
 .opt-rev { margin-top: 6px; font-size: 13px; line-height: 1.5; color: var(--ink-2); }
@@ -41,17 +41,17 @@
 .opt-materials .v2-skills-board { margin-top: 0; gap: 14px; }
 .opt-materials .v2-skills-board > .v2-skill:not([hidden]) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 24px; padding: 20px; }
 .opt-materials .v2-skill-heading { grid-column: 1 / -1; align-items: center; justify-content: flex-start; gap: 10px; padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
-.opt-materials .v2-skill-heading h2 { flex: 1; margin: 0; font-size: 17px; }
-.opt-materials .v2-skill-heading .small { font-size: 12.5px; }
-.v2-skill-order { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: var(--accent-soft2); color: var(--accent-ink); font-size: 13px; font-weight: 700; }
+.opt-materials .v2-skill-heading h2 { flex: 1; margin: 0; font-size: 18px; }
+.opt-materials .v2-skill-heading .small { font-size: 13px; }
+.v2-skill-order { display: grid; place-items: center; width: 30px; height: 30px; border-radius: var(--rad-2); background: var(--accent-soft2); color: var(--accent-ink); font-size: 13px; font-weight: 700; }
 .opt-materials .material-kind { margin: 0; grid-row: 2; }
 .opt-materials .material-kind-courses { grid-column: 1; }
 .opt-materials .material-kind-books { grid-column: 2; }
 .opt-materials .material-kind > summary { padding-top: 0; font-size: 14px; }
-.opt-materials .material-kind > summary > small { font-size: 12.5px; }
+.opt-materials .material-kind > summary > small { font-size: 13px; }
 .opt-materials .course-material-editor .v2-resource { padding: 10px 12px; }
 .opt-materials .course-material-editor .v2-resource-choice, .opt-materials .course-material-editor .v2-resource-choice b { font-size: 14px; }
-.opt-materials .course-material-editor .v2-resource-meta { font-size: 12.5px; }
+.opt-materials .course-material-editor .v2-resource-meta { font-size: 13px; }
 .opt-materials .course-material-editor .v2-resource-link { font-size: 13px; }
 .opt-materials .material-reason { font-size: 13px; line-height: 1.6; }
 .opt-materials .course-material-editor > .loading { padding: 20px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); }

@@ -22,6 +22,19 @@ class SkillSelectionTests(unittest.TestCase):
                 rows = [self.row(tag) for tag in reversed(self.tags[:count])]
                 self.assertEqual(self.select(rows)['skills'], rows)
 
+    def test_fixed_skills_are_excluded_and_only_open_slots_are_requested(self):
+        fixed = tuple(self.tags[:2])
+        generate = Mock(return_value={'skills': [self.row(tag) for tag in self.tags[2:4]]})
+        self.assertEqual(select_skills(self.project, self.tags, generate, fixed=fixed)['skills'], [self.row(self.tags[2])])
+        _, payload = generate.call_args.args
+        self.assertEqual(payload['maxSkills'], 1)
+        self.assertEqual(payload['availableSkills'], self.tags[2:])
+
+    def test_all_fixed_skills_skip_model_generation(self):
+        generate = Mock()
+        self.assertEqual(select_skills(self.project, self.tags, generate, fixed=tuple(self.tags[:3])), {'skills': []})
+        generate.assert_not_called()
+
     def test_goal_summary_details_and_all_db_tags_reach_model(self):
         generate = Mock(return_value={'skills': [self.row(self.tags[0])]})
         select_skills(self.project, self.tags, generate)

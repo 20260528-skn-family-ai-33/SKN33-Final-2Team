@@ -2,6 +2,7 @@
    · 규정: 고치지 않고 원문 PDF 올리기·내려받기만 */
 import { API_BASE, enc, fileForm, http } from '../client';
 import type { ProviderPolicy, ServerProvider } from '../types/account';
+import type { AiStatusResponse } from './account';
 import type {
   AdminOverview,
   AdminRows,
@@ -23,10 +24,14 @@ export interface AdminProviderSettings {
   level: string | null;
   employeeSelectionAllowed: boolean;
   providers: Record<ServerProvider, { model: string; levels?: string[]; available: boolean; keyConfigured: boolean; keySource: 'admin' | 'env' | 'none'; hasDefaultKey: boolean }>;
+  runpod: { url: string; managed: boolean };
 }
 
 export const adminApi = {
   providerSettings: () => http.get<AdminProviderSettings>('/admin/ai-provider'),
+  checkRunpod: (draft?: { url: string; key: string }) => http.post<AiStatusResponse>('/admin/ai-provider/ollama/connection/check', draft ?? {}),
+  saveRunpod: (draft: { url: string; key: string }) => http.put<AdminProviderSettings>('/admin/ai-provider/ollama/connection', draft),
+  resetRunpod: () => http.del<AdminProviderSettings>('/admin/ai-provider/ollama/connection'),
   setProviderPolicy: (selection: {policy: ProviderPolicy; level: string | null}) => http.put<AdminProviderSettings>('/admin/ai-provider', selection),
   setProviderKey: (p: ServerProvider, key: string) => http.put<AdminProviderSettings>(`/admin/ai-provider/${p}/key`, { key }),
   resetProviderKey: (p: ServerProvider) => http.del<AdminProviderSettings>(`/admin/ai-provider/${p}/key`),

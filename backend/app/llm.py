@@ -24,7 +24,7 @@ class LlmError(Exception):
 def available(provider: str) -> bool:
     # RunPod-Ollama 모델은 비워 두면 팀 모델(config.OLLAMA_TEAM_*)이라 주소만 있으면 쓸 수 있다
     if provider == 'ollama':
-        return bool(browser_console.options.get().ollama_url or S.ollama_url)
+        return bool(ollama_connection().url)
     return provider == 'openai' and bool(provider_keys.read(S, 'openai').value)
 
 
@@ -68,22 +68,31 @@ def openai(path: str, payload: dict | None, timeout: int = 90) -> dict:
         raise LlmError(f'OpenAI 연결 실패: {e.reason}') from e
 
 
-def ollama(path: str, payload: dict | None, timeout: int | None = None) -> dict:
+def ollama_connection() -> provider_keys.RunpodConnection:
     settings = browser_console.options.get()
-    base_url = settings.ollama_url or S.ollama_url
+    if settings.ollama_url:
+        return provider_keys.RunpodConnection(settings.ollama_url, provider_keys.Credential(settings.ollama_key or '', 'none'), 'runpod')
+    shared = provider_keys.runpod(S)
+    if settings.ollama_key:
+        return provider_keys.RunpodConnection(shared.url, provider_keys.Credential(settings.ollama_key, 'none'), shared.target)
+    return shared
+
+
+def ollama(path: str, payload: dict | None, timeout: int | None = None, *, connection: provider_keys.RunpodConnection | None = None) -> dict:
+    connection = connection or ollama_connection()
+    base_url = connection.url
     if not base_url:
-        raise LlmError('Ollama 설정이 없어요 (.env 의 OLLAMA_BASE_URL)')
+        raise LlmError('Ollama 설정이 없어요 (공용 RunPod 주소 또는 OLLAMA_BASE_URL)')
     timeout = timeout or (browser_console.options.get().timeout if path == 'api/chat' else None) or S.ollama_timeout
     headers = {}
-    key = settings.ollama_key
-    if key is None and not settings.ollama_url:
-        key = provider_keys.read(S, 'ollama').value
+    key = connection.key.value
     if key:
         headers['Authorization'] = f'Bearer {key}'
     if payload is not None:
         headers['Content-Type'] = 'application/json'
     try:
-        transport = {'allow_redirects': False} if settings.ollama_url or settings.ollama_key else {}
+        options = browser_console.options.get()
+        transport = {'allow_redirects': False} if connection.managed or options.ollama_url or options.ollama_key else {}
         with _http(f'{base_url}/{path}', payload, headers, timeout, **transport) as res:
             body = res.read().decode('utf-8', 'replace')
     except urllib.error.HTTPError as e:
@@ -134,6 +143,12 @@ def _with_images(messages: list, provider: str) -> list:
     return out
 
 
+def effective_openai_reasoning(role: str, reasoning: str | None) -> str | None:
+    if model_name('openai', role) != S.openai_model:
+        return None
+    return reasoning if role != 'vision' and reasoning in S.openai_reasoning_levels else S.openai_reasoning
+
+
 def chat(provider: str, messages: list, role: str = 'default', json_mode: bool = True, reasoning: str | None = None,
          temperature: float | None = None, response_schema: dict | None = None) -> dict:
     """한 번의 대화 호출 → {content, model, provider, loadMs, totalMs}.
@@ -148,7 +163,6 @@ def chat(provider: str, messages: list, role: str = 'default', json_mode: bool =
         count = FRAMING_RESERVE + sum(tokens(message.get('content') or '') + tokens(message.get('role') or '') for message in messages)
         if count > limits.input_tokens:
             raise LlmError(f'모델 입력이 브라우저 한도를 넘었어요 ({count} / {limits.input_tokens} 토큰).')
-    mine = None if role == 'vision' else reasoning
     if provider == 'ollama':
         if role == 'vision' and not S.ollama_vision:
             raise LlmError('Ollama 비전 모델 설정이 없어요 (RunPod-Ollama 팀 모델은 이미지를 읽지 않음)')
@@ -203,36 +217,48 @@ def chat(provider: str, messages: list, role: str = 'default', json_mode: bool =
         payload['max_completion_tokens'] = OUTPUT_RESERVE
     # .env 의 단계 목록은 OPENAI_MODEL 의 것이라 다른 비전 모델에는 보내지 않는다.
     # 목록에서 빠진 값(목록을 바꾼 뒤 남은 옛 선택)은 400 이 나므로 기본값으로 돌린다
-    level = (mine if mine in S.openai_reasoning_levels else S.openai_reasoning) if model == S.openai_model else None
+    level = effective_openai_reasoning(role, reasoning)
     if level:
         payload['reasoning_effort'] = level
-    # 상세 계획을 쓰는 로드맵만 더 기다린다. 사용자 추론 선택과 다른 기능의 제한은 유지한다.
-    timeout = S.openai_roadmap_timeout if role == 'roadmap' else 90
+    # 상세 계획을 쓰는 로드맵과 퀴즈 생성은 더 기다린다. 사용자 추론 선택과 다른 기능의 제한은 유지한다.
+    timeout = S.openai_roadmap_timeout if role in ('roadmap', 'quiz', 'assessment') else 90
     if limits.output_tokens is not None:
         payload['max_completion_tokens'] = limits.output_tokens
     res = openai('chat/completions', payload, timeout=limits.timeout or timeout)
     return {'content': res['choices'][0]['message'].get('content') or '', 'model': res.get('model', model), 'provider': 'openai', 'loadMs': 0, 'totalMs': 0}
 
 
-def ping(provider: str) -> dict:
+def ping(provider: str, *, connection: provider_keys.RunpodConnection | None = None) -> dict:
     """연결 확인 (토큰을 쓰지 않음). Ollama: 버전 → 설치 모델 → GPU에 올라간 모델"""
     t0 = time.perf_counter()
     if provider == 'openai':
         res = openai(f"models/{quote(S.openai_model, safe='')}", None, timeout=15)
         return {'ok': True, 'provider': 'openai', 'model': res.get('id', S.openai_model), 'ms': round((time.perf_counter() - t0) * 1000)}
-    version = ollama('api/version', None, timeout=15).get('version', '')
-    tags = ollama('api/tags', None, timeout=15).get('models') or []
+    connection = connection or ollama_connection()
+    def query(path: str) -> dict:
+        result = ollama(path, None, timeout=15, connection=connection)
+        if not isinstance(result, dict):
+            raise LlmError('Ollama 연결 실패: 서버 응답 형식을 확인해 주세요')
+        return result
+
+    version = query('api/version').get('version')
+    if not isinstance(version, str) or not version.strip():
+        raise LlmError('Ollama 연결 실패: 서버 버전을 확인할 수 없어요')
+    tags = query('api/tags').get('models')
+    if not isinstance(tags, list) or any(not isinstance(m, dict) for m in tags):
+        raise LlmError('Ollama 연결 실패: 설치 모델 목록을 읽을 수 없어요')
     try:
-        ps = ollama('api/ps', None, timeout=15).get('models') or []
+        ps = query('api/ps').get('models') or []
     except LlmError:
         ps = []
-    names = lambda ms: {n for m in ms for n in (m.get('name'), m.get('model')) if n}  # noqa: E731
-    have, loaded = names(tags), names(ps)
+    def names(models):
+        return {n for m in models if isinstance(m, dict) for n in (m.get('name'), m.get('model')) if isinstance(n, str)}
+    have, loaded = names(tags), names(ps) if isinstance(ps, list) else set()
     hit = lambda n, pool: n in pool or (':' not in n and f'{n}:latest' in pool)  # noqa: E731
     # 진단 모델과 이름이 다른 역할만 더한다: 같은 이름이면 Ollama 에 한 번만 올라가므로 따로 확인할 필요가 없다
     roles = [('default', S.ollama_model)]
     if S.ollama_model_regulation != S.ollama_model:
         roles.append(('regulation', S.ollama_model_regulation))
-    return {'ok': True, 'provider': 'ollama', 'target': 'runpod' if browser_console.options.get().ollama_url else S.ollama_target, 'version': version,
+    return {'ok': True, 'provider': 'ollama', 'target': connection.target, 'version': version,
             'models': [{'role': r, 'name': n, 'installed': hit(n, have), 'loaded': hit(n, loaded)} for r, n in roles],
             'ms': round((time.perf_counter() - t0) * 1000)}

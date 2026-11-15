@@ -25,7 +25,7 @@ export interface QuizScore {
 export interface SkillMark {
   level: SkillLevel;
   /** 이 스킬을 배운 내 로드맵(뱃지가 높은 것부터). 개수가 학습한 횟수다 */
-  plans: { id: string; title: string; level: SkillLevel; quiz?: QuizScore }[];
+  plans: { id: string; title: string; level: SkillLevel; finished: boolean; quiz?: QuizScore }[];
 }
 
 export interface Earned {
@@ -66,7 +66,7 @@ export function earnedSkills(data: SkillMapData, records: PlanRecord[], reports:
       if (!level) continue;
       const mark = marks.get(id) || { level, plans: [] };
       if (RANK[level] > RANK[mark.level]) mark.level = level;
-      mark.plans.push({ id: record.id, title: record.plan.displayTitle || record.plan.goal, level, quiz });
+      mark.plans.push({ id: record.id, title: record.plan.displayTitle || record.plan.goal, level, finished, quiz });
       marks.set(id, mark);
     }
   }

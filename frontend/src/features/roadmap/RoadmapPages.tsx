@@ -12,9 +12,9 @@ import { paths } from '@/app/paths';
 import { SkillMap } from '@/features/skillmap/SkillMap';
 import { RoadmapResources, RoadmapActivityList } from './RoadmapLearning';
 import { useGo } from '@/shared/hooks/useGo';
-import { count, isPlanComplete, st, trackedActs } from '@/shared/lib/plan';
-import { monthDay, planStart, startsLater, weekNow } from '@/features/home/ganttCalc';
-import { commentSkillNames, groupLearningActivities } from './roadmapLearningData';
+import { count, isPlanComplete } from '@/shared/lib/plan';
+import { monthDay, planStart, startsLater } from '@/features/home/ganttCalc';
+import { commentSkillNames, currentWeekSkillNames } from './roadmapLearningData';
 import { useCatalog } from '@/shared/state/catalog';
 import { useClockRefresh } from '@/shared/state/demoClock';
 import { useMe } from '@/shared/state/session';
@@ -23,7 +23,7 @@ import { newComments, planReports, recs, updateWs, useWs } from '@/shared/state/
 import { Icon } from '@/shared/ui/Icon';
 import { Note, Page, Stats } from '@/shared/ui/parts';
 import { Alerts, NoPlan, openPreAnswers, openVersions, PlanGate, postStart } from './parts';
-import { archivePlan, resumePlan, revise, startRevise } from './planActions';
+import { archivePlan, confirmReviseComment, resumePlan, revise, startRevise } from './planActions';
 import { useState } from 'react';
 import { won } from '@/shared/lib/format';
 
@@ -327,10 +327,12 @@ function RoadView({ R }: { R: PlanRecord }) {
       onClick={event => {
         event.preventDefault();
         event.stopPropagation();
-        if (prepareCommentRevision(R.id, comment)) {
-          go(paths.revise(R.id));
-          void revise(R.id);
-        }
+        confirmReviseComment(R, skill, () => {
+          if (prepareCommentRevision(R.id, comment)) {
+            go(paths.revise(R.id));
+            void revise(R.id);
+          }
+        });
       }}>수정 요청</button>;
   };
   return (
@@ -356,7 +358,7 @@ function RoadView({ R }: { R: PlanRecord }) {
       {pl.def.learningReport ? <ReviewSkillBlocks confirmed materials={pl.def.learningReport as ReviewMaterials}
         acts={pl.acts.filter((act): act is typeof act & { skill: string; how: string; hours: number } => !!act.skill).map(act => ({ ...act, how: act.how || '' }))}
         selectedIds={pl.acts.map(act => act.id)} progress={R.progress} busy={!live}
-        currentSkillNames={live ? groupLearningActivities(pl, resources).filter(group => trackedActs(group.activities).some(a => a.wFrom <= weekNow(R) && weekNow(R) <= a.wTo && st(R.progress, a.id) !== 'done')).map(group => group.name) : []}
+        currentSkillNames={currentWeekSkillNames(R, resources)}
         skillAction={skillRevisionAction}
         skillFooter={skill => {
           const comments = (R.comments || []).filter(c => c.skill === skill);

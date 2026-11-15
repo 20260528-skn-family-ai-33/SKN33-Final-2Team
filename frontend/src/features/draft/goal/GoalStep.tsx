@@ -16,6 +16,7 @@ import { resolveGoalInput } from './goalInput';
 import { Icon } from '@/shared/ui/Icon';
 import { AgentRow, Note, OpsBox, Page, runSub } from '@/shared/ui/parts';
 import { Skeleton } from '@/shared/ui/Skeleton';
+import { Wait } from '@/shared/ui/Wait';
 import { draftCall, pullDraft } from '../draftSync';
 import { clearProject, docDoneText, uploadProject } from './projectDoc';
 import { DownstreamNotice } from '../DownstreamNotice';
@@ -272,7 +273,7 @@ function ProjectField() {
           </div>
           {/* 올리는 중에는 빼거나 다른 파일로 바꾸지 않는다(늦게 끝난 업로드가 바꾼 상태를 덮지 않게) */}
           {uploading ? (
-            <span className="small muted">올리는 중…</span>
+            <span className="small muted"><Wait>올리는 중…</Wait></span>
           ) : (
             <button className="link quiet" onClick={() => void clearProject()}>
               빼기

@@ -1,4 +1,5 @@
 """관리자 전환부터 에이전트의 실제 HTTP 요청 형식까지 검증한다."""
+import io
 import json
 import os
 import threading
@@ -8,12 +9,13 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
+from urllib.error import HTTPError
 
 os.environ.setdefault('DATABASE_URL', 'postgresql+psycopg://test:test@127.0.0.1:1/test')
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app import auth, errors, llm, provider_keys, provider_policy
+from app import auth, browser_console, errors, llm, provider_keys, provider_policy
 from app.agents import runtime
 from app.errors import ApiError, api_error_handler
 from app.routers import account, admin
@@ -39,6 +41,84 @@ class ProviderPolicyTests(unittest.TestCase):
 
     def save(self, mode):
         return self.client.put('/api/v1/admin/ai-provider', json={'policy': mode})
+
+    def test_shared_runpod_check_save_read_and_restore(self):
+        endpoint = '/api/v1/admin/ai-provider/ollama/connection'
+        url = 'https://team-11434.proxy.runpod.net'
+        draft = {'url': url + '/', 'key': 'test-pod-key'}
+        provider_keys.save(self.settings, 'ollama', 'previous-key')
+        models = [self.settings.ollama_model, self.settings.ollama_model_regulation]
+        installed = list(models)
+        denied = False
+
+        def transport(destination, payload, headers, timeout, *, allow_redirects):
+            self.assertFalse(allow_redirects)
+            self.assertTrue(destination.startswith(url + '/api/'))
+            self.assertEqual(headers.get('Authorization'), 'Bearer test-pod-key')
+            if denied:
+                raise HTTPError(destination, 401, 'Unauthorized', {}, io.BytesIO(b''))
+            result = {'version': '0.40', 'models': [{'name': n + ':latest'} for n in installed]}
+            return io.BytesIO(json.dumps(result).encode())
+
+        with patch.object(llm, '_http', side_effect=transport):
+            token = browser_console.options.set(browser_console.BrowserOptions(ollama_url='https://personal.proxy.runpod.net', ollama_key='personal-key'))
+            try:
+                response = self.client.post(endpoint + '/check', json=draft)
+                self.assertEqual(response.status_code, 200, response.text)
+                self.assertEqual([m['name'] for m in response.json()['models']], models)
+                self.assertFalse(provider_keys.runpod(self.settings).managed)
+                denied = True
+                self.assertEqual(self.client.put(endpoint, json=draft).status_code, 502)
+                self.assertFalse(provider_keys.runpod(self.settings).managed)
+                denied = False
+                installed.pop()
+                failed = self.client.put(endpoint, json=draft)
+                self.assertEqual(failed.status_code, 409)
+                self.assertIn(models[-1], failed.json()['error']['message'])
+                self.assertFalse(provider_keys.runpod(self.settings).managed)
+                installed.append(models[-1])
+                saved = self.client.put(endpoint, json=draft)
+                self.assertEqual(saved.status_code, 200, saved.text)
+                self.assertEqual(saved.json()['runpod'], {'url': url, 'managed': True})
+                self.assertNotIn(draft['key'], saved.text)
+                self.assertEqual(self.client.post(endpoint + '/check', json={}).status_code, 200)
+                self.assertEqual(self.client.get('/api/v1/ai/status?provider=ollama').status_code, 200)
+            finally:
+                browser_console.options.reset(token)
+            self.assertEqual(provider_policy.current(), 'employee')
+            llm.ollama('api/chat', {'messages': []})
+        with patch.object(llm, 'S', replace(self.settings, ollama_url='')):
+            self.assertTrue(llm.available('ollama'))
+            self.assertEqual(llm.ollama_connection().target, 'runpod')
+        self.assertEqual(self.client.delete(endpoint).status_code, 200)
+        restored = provider_keys.runpod(self.settings)
+        self.assertEqual((restored.url, restored.key.value), (self.settings.ollama_url, 'previous-key'))
+
+    def test_runpod_input_and_permissions(self):
+        endpoint = '/api/v1/admin/ai-provider/ollama/connection'
+        draft = {'url': 'https://team.proxy.runpod.net', 'key': 'test-only-secret'}
+        with patch.object(llm, '_http') as send:
+            for body in ({**draft, 'url': 'http://127.0.0.1:8080'}, {**draft, 'key': ['test-only-secret']}, {'url': draft['url']}):
+                response = self.client.put(endpoint, json=body)
+                self.assertEqual(response.status_code, 422)
+                self.assertNotIn('test-only-secret', response.text)
+            for account, code in ((auth.Account('employee', 1, 'employee'), 403), (None, 401)):
+                self.identity.return_value = account
+                self.assertEqual(self.client.put(endpoint, json=draft).status_code, code)
+                self.assertEqual(self.client.post(endpoint + '/check', json=draft).status_code, code)
+                self.assertEqual(self.client.delete(endpoint).status_code, code)
+            send.assert_not_called()
+
+    def test_personal_url_cannot_enable_shared_policy(self):
+        settings = replace(self.settings, ollama_url='')
+        with patch.object(provider_policy, 'S', settings), patch.object(llm, 'S', settings):
+            token = browser_console.options.set(browser_console.BrowserOptions(ollama_url='https://personal.proxy.runpod.net'))
+            try:
+                self.assertTrue(llm.available('ollama'))
+                self.assertEqual(self.save('ollama').status_code, 409)
+                self.assertEqual(provider_policy.current(), 'employee')
+            finally:
+                browser_console.options.reset(token)
 
     def test_permissions_missing_key_and_invalid_choice_preserve_policy(self):
         self.assertEqual(self.save('ollama').status_code, 200)

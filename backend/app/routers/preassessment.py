@@ -9,7 +9,7 @@ import hashlib
 from app.services.generation_lock import generation_guard
 from uuid import UUID
 
-from fastapi import Depends, APIRouter
+from fastapi import Depends, APIRouter, Query
 from pydantic import BaseModel, ConfigDict, StrictBool, StrictInt
 
 from app import db
@@ -405,7 +405,7 @@ def generate_learning_outcomes(project_id:UUID,a:Account=Depends(require_employe
 
 @r.post('/api/v2/drafts/{project_id}/skills')
 @queued_generation
-def preview_skills(project_id: UUID, a: Account = Depends(require_employee)):
+def preview_skills(project_id: UUID, a: Account = Depends(require_employee), fixed: list[str] | None = Query(default=None), excluded: list[str] | None = Query(default=None), previous: list[str] | None = Query(default=None), pool: bool = False):
     import json
     def snapshot():
         personal = profile_input(profile.view(a.id) or {})
@@ -416,7 +416,7 @@ def preview_skills(project_id: UUID, a: Account = Depends(require_employee)):
         return project, personal
 
     project, personal = snapshot()
-    version = hashlib.sha256(json.dumps([project, personal], ensure_ascii=False,
+    version = hashlib.sha256(json.dumps([project, personal, fixed if isinstance(fixed, list) else [], excluded if isinstance(excluded, list) else [], previous if isinstance(previous, list) else [], pool], ensure_ascii=False,
         sort_keys=True, separators=(',', ':')).encode('utf-8')).hexdigest()
     # 문항 생성과 분리하며 동일 입력의 스킬 추천만 중복 방지한다.
     with generation_guard('draft-skills', f'{project_id}:{version}'):
@@ -424,7 +424,7 @@ def preview_skills(project_id: UUID, a: Account = Depends(require_employee)):
         if not ctx.live:
             raise ApiError(503, 'MODEL_REQUIRED', '스킬 추천에 사용할 모델을 연결해 주세요.')
         from app.learner_knowledge import from_profile, hr_context
-        result = select_from_catalog(ctx, dict(project, learnerKnowledge=from_profile(personal), hrContext=hr_context(personal)))
+        result = select_from_catalog(ctx, dict(project, learnerKnowledge=from_profile(personal), hrContext=hr_context(personal)), **({'fixed': tuple(fixed)} if isinstance(fixed, list) and fixed else {}), **({'excluded': tuple(excluded)} if isinstance(excluded, list) and excluded else {}), **({'previous': tuple(previous)} if isinstance(previous, list) and previous else {}), **({'pool': True} if pool else {}))
         latest_project, latest_personal = snapshot()
         if latest_project != project or latest_personal != personal:
             raise ApiError(409, 'SKILL_INPUT_CHANGED', '추천 중 입력이나 개인 정보가 변경됐어요. 현재 내용으로 다시 추천받아 주세요.')

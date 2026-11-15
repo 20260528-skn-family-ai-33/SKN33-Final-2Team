@@ -10,8 +10,11 @@
      원본은 글이 적어 사진 위에 바로 쓰지만, 이 서비스는 표·목록이 빽빽해 사진 위에서는 읽기 어렵다
      → 사진은 머리와 맨 아래 띠에만 두고, 내용 상자는 비치지 않는 어두운 바탕으로 했다.
    - 시차: 머리 사진이 본문보다 느리게 올라간다(원본과 같은 감속 곡선). 맨 아래 띠는 사진이 창에 고정된 채 띠만 지나간다.
-   - 반투명 흐림(blur 8px) 상단 메뉴: 맨 위에서는 거의 투명(.25), 80px 넘게 내려가면 짙어짐(.9)
-   - Oswald 대문자 제목·메뉴(한글은 자간을 줄이고 굵기를 올려 읽기 쉽게) · Source Sans 3 본문
+   - 상단 메뉴: 맨 위에서는 머리 사진 위에 얹힌 검은 막(.45 · 이때 뒤에 있는 것은 사진뿐이다), 40px 넘게 내려가면(본문이 메뉴 밑으로
+     들어가기 전) 비치지 않는 바탕. 띠와 로그인 상자는 늘 비치지 않는 바탕. 원본의 흐림(blur)은 쓰지 않는다
+     (내용 뒤로 사진이 흐리게 비치면 글자가 묻힌다)
+   - Oswald 제목·메뉴 · Source Sans 3 본문. 원본의 대문자·넓은 자간은 로고(영문)에만 남겼다
+     (한글에는 대문자가 없고, 자간을 벌리면 음절이 흩어져 읽기 어렵다)
    - 뒤집히는 버튼: 테두리 버튼은 마우스를 올리면 흰 바탕 + 검은 글자로(원본 EXPLORE), 주 버튼은 그 반대로
    - 나타나기: 화면에 들어올 때 30px 아래에서 0.8초 동안 떠오른다(한 번만) */
 
@@ -44,9 +47,14 @@
   --warn: #FBBF24; --warn-soft: rgba(251, 191, 36, .12);
   --danger: #F87171; --danger-soft: rgba(248, 113, 113, .12); --danger-line: rgba(248, 113, 113, .4);
   --ok: #4ADE80; --ok-soft: rgba(74, 222, 128, .12);
+  /* 주차 강조(#101 · #227): 이번 주는 이 테마의 강조색인 흰색으로(파랑은 흑백 화면에서 혼자 떠 보였다). 바탕 차이가 작아 왼쪽 흰 띠와 꼬리표가 구분을 맡는다.
+     완료는 초록을 진하게 */
+  --week: var(--accent); --week-ink: var(--accent-ink); --week-soft: var(--accent-soft); --week-soft2: var(--accent-soft2); --week-line: var(--accent-line);
+  --done-ink: #86EFAC; --done-soft: rgba(74, 222, 128, .13); --done-line: rgba(74, 222, 128, .5);
   /* 사전 점검 설문(style.css)이 읽는 색 */
   --card: var(--surface); --soft: var(--sunk); --muted: var(--ink-3);
   --side-w: 0px; --r-lg: 0px; --r-md: 0px;
+  --rad-1: 0px; --rad-2: 0px; --rad-3: 0px; --rad-4: 0px;
   --shadow-pop: 0 24px 60px rgba(0, 0, 0, .7), 0 0 0 1px #303030;
 
   /* 사진 층(body::before)이 body 바탕 아래에 깔리므로 바탕색은 html 에 두고 body 는 비운다 */
@@ -101,14 +109,12 @@
   .v2-survey section, .v2-survey fieldset { border-radius: 0; }
   .v2-survey button { border-radius: 0; }
 
-  /* ── 상단 띠(AI 모델 고르기): 메뉴와 함께 내려가면 짙어진다 ── */
+  /* ── 상단 띠(AI 모델 고르기): 사진이 비치지 않는 바탕 ── */
   .ribbon {
     padding: 0 max(20px, calc((100% - var(--tm-wrap)) / 2));
-    background-color: rgba(0, 0, 0, .38); color: var(--tm-w70); border-bottom: 1px solid rgba(255, 255, 255, .08);
-    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
-    font-size: 12px; transition: background-color .3s ease;
+    background-color: #0B0B0B; color: var(--tm-w70); border-bottom: 1px solid rgba(255, 255, 255, .08);
+    font-size: 12px;
   }
-  &[data-tm612-scrolled] .ribbon { background-color: rgba(8, 8, 8, .92); }
   .ribbon .mode { background: var(--tm-w12); color: #fff; font-family: var(--tm-head); letter-spacing: 1.5px; text-transform: uppercase; }
   .api-picker-button { padding: 5px 12px; font-size: 12px; font-family: var(--tm-head); letter-spacing: 1.5px; text-transform: uppercase; }
   body.auth .ribbon { display: none; }
@@ -127,11 +133,10 @@
         height: var(--nav-h); min-height: var(--nav-h); overflow: visible;
         flex-direction: row; flex-wrap: nowrap; align-items: center; gap: 0 12px;
         padding: 0 max(30px, calc((100% - var(--tm-wrap)) / 2));
-        border: 0; background-color: rgba(0, 0, 0, .25); color: #fff;
-        -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
-        transition: background-color .3s ease, box-shadow .3s ease;
+        border: 0; background-color: rgba(0, 0, 0, .45); color: #fff;
+        transition: background-color .2s ease, box-shadow .2s ease;
       }
-      &[data-tm612-scrolled] .side { background-color: rgba(8, 8, 8, .9); box-shadow: 0 1px 0 rgba(255, 255, 255, .08); }
+      &[data-tm612-scrolled] .side { background-color: #0B0B0B; box-shadow: 0 1px 0 rgba(255, 255, 255, .08); }
       .side:empty { display: none; }
       .side .brand { order: 0; margin-right: 0; padding: 0; font-family: var(--tm-head); font-size: 22px; font-weight: 600; letter-spacing: 4px; text-transform: uppercase; }
       .side .brand .logo { display: none; }
@@ -144,15 +149,15 @@
       .side .nav { order: 1; flex-direction: row; align-items: stretch; gap: 0; }
       .side .nav a {
         position: relative; height: var(--nav-h); padding: 0 13px; border-radius: 0; background: transparent; white-space: nowrap;
-        color: rgba(255, 255, 255, .8); font-family: var(--tm-head); font-size: 14px; font-weight: 500; letter-spacing: 1px; text-transform: uppercase;
-        transition: color .3s ease;
+        color: rgba(255, 255, 255, .8); font-family: var(--tm-head); font-size: 14px; font-weight: 500; letter-spacing: 0;
+        transition: color .15s ease;
       }
       .side .nav a svg { display: none; }
       .side .nav a:hover, .side .nav a.on { background: transparent; color: #fff; }
       /* 현재 메뉴: 글자 아래 흰 줄이 가운데서 펼쳐진다 */
       .side .nav a::after {
         content: ''; position: absolute; left: 13px; right: 13px; bottom: 17px; height: 2px; background: #fff;
-        transform: scaleX(0); transition: transform .35s var(--tm-ease);
+        transform: scaleX(0); transition: transform .2s var(--tm-ease);
       }
       .side .nav a:hover::after { transform: scaleX(.45); }
       .side .nav a.on::after { transform: scaleX(1); }
@@ -160,7 +165,7 @@
       .side .nav-appx { order: 2; display: flex; align-items: center; margin: 0; padding: 0; border: 0; }
       .side .nav-appx::before { content: ''; width: 1px; height: 18px; margin: 0 4px; background: var(--tm-w20); }
       .side .nav-appx .lbl { display: none; }
-      .side .me { order: 3; margin: 0 0 0 6px; padding: 4px 12px 4px 4px; gap: 8px; border: 1px solid var(--tm-w20); border-radius: 0; background: transparent; transition: border-color .3s ease; }
+      .side .me { order: 3; margin: 0 0 0 6px; padding: 4px 12px 4px 4px; gap: 8px; border: 1px solid var(--tm-w20); border-radius: 0; background: transparent; transition: border-color .15s ease; }
       .side .me .avatar { width: 30px; height: 30px; font-size: 11px; border-radius: 0; background: #fff; color: #111; }
       .side .me small, .side .me .me-go { display: none; }
       .side .me b { font-size: 13px; white-space: nowrap; }
@@ -209,14 +214,14 @@
     --nav-h: 0px;
     @media (min-width: 901px) {
       --side-w: 248px;
-      .side { background: rgba(8, 8, 8, .72); border-right: 1px solid var(--tm-w12); color: #fff; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+      .side { background: rgba(8, 8, 8, .92); border-right: 1px solid var(--tm-w12); color: #fff; }
       .side .brand { font-family: var(--tm-head); font-size: 20px; font-weight: 600; letter-spacing: 4px; text-transform: uppercase; }
       .side .brand .logo { border-radius: 0; background: #fff; color: #111; }
       .side .me { border: 1px solid var(--tm-w20); border-radius: 0; background: transparent; }
       .side .me small, .side .me .me-go { color: var(--tm-w70); }
       .side .me .avatar { border-radius: 0; background: #fff; color: #111; }
       .side a.me:hover, .side a.me.on { box-shadow: none; border-color: #fff; }
-      .side .nav a { border-radius: 0; color: rgba(255, 255, 255, .8); font-family: var(--tm-head); font-size: 14.5px; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; transition: color .3s, background .3s; }
+      .side .nav a { border-radius: 0; color: rgba(255, 255, 255, .8); font-family: var(--tm-head); font-size: 15px; font-weight: 500; letter-spacing: 0; transition: color .15s, background .15s; }
       .side .nav a:hover { background: rgba(255, 255, 255, .08); color: #fff; }
       .side .nav a.on { background: rgba(255, 255, 255, .12); color: #fff; box-shadow: inset 2px 0 0 #fff; }
       .side .nav-appx { border-top-color: var(--tm-w12); }
@@ -300,12 +305,18 @@
   .choice:hover, .chip:hover, .scale label:hover, .lik label:hover, .dq-opt:hover { border-color: var(--tm-w70); }
   .tag { background: var(--sunk); color: var(--ink-2); }
   .tag.line, .tag.dash { background: transparent; }
+  /* 꼬리표는 주 버튼처럼 흰 바탕에 어두운 글자 */
+  .tag.week { background: var(--week); color: var(--tm-on-accent); box-shadow: none; }
+  .tag.done { background: var(--done-soft); color: var(--done-ink); }
   .cmp thead th { background: var(--surface-2); }
   .btn.ghost { color: var(--ink-2); }
   .btn.ghost:hover { background: rgba(255, 255, 255, .08); color: #fff; }
   .back { border-color: var(--line-2); color: var(--ink-2); }
   .back:hover { border-color: #fff; color: #fff; }
   .stepper li.done .sn { background: var(--accent-soft2); border-color: var(--accent-line); color: var(--accent-ink); }
+  /* 단계 이름은 사진 위에 놓인다: 지금 단계가 아닌 이름도 읽히게 한 단계 밝히고 그림자로 사진에서 띄운다(#227) */
+  .stepper .sl { text-shadow: 0 1px 2px rgba(0, 0, 0, .8); }
+  .stepper li:not(.cur) .sl { color: var(--ink-2); }
   .ov { background: rgba(0, 0, 0, .68); }
   .sheet, .regp, .adm-panel { border: 1px solid var(--line); }
   .sheet-h, .sheet-f, .chat-f, .adm-ph, .adm-pf { border-color: var(--line); }
@@ -325,8 +336,9 @@
   .review-resource-card[data-kind=book] .review-kind-badge { color: #E5C995; }
   .review-task-choice:has(input:checked) { border-color: var(--accent-line); background: var(--accent-soft); }
   .review-generation-status { background: var(--accent-soft); color: var(--accent-ink); }
-  .review-skill-block.is-current-week, .roadmap-learning-group.is-current-week { border-color: var(--accent-line); background: var(--accent-soft); box-shadow: inset 4px 0 0 var(--accent); }
-  .roadmap-learning-anchor.is-current-week { background: var(--accent-soft2); }
+  .review-skill-block.is-current-week, .roadmap-learning-group.is-current-week, .home-skill-group.is-current-week { border-color: var(--week-line); background: var(--week-soft); box-shadow: inset 4px 0 0 var(--week); }
+  .review-skill-block.is-week-done, .roadmap-learning-group.is-week-done, .home-skill-group.is-week-done { border-color: var(--done-line); background: var(--done-soft); box-shadow: inset 4px 0 0 var(--done); }
+  .roadmap-learning-anchor.is-current-week { background: var(--week-soft2); }
   /* 결과 보고서의 사전·사후 색(#116): 어두운 바탕에서는 강조색을 낮추지 않고 그대로 쓴다 */
   .cmp-summary, .learning-check, .report-survey, .rpt-viz { --cmp-post: var(--accent); }
   /* #59 로 들어온 역량 테스트 결과 보기도 정답·오답 칸과 문항 번호에 옅은 바탕색을 직접 적어, 어두운 화면에서 밝은 상자로 튄다 */
@@ -345,27 +357,27 @@
   .card { border-color: var(--line); background: var(--surface); }
   .list, .stage, .opt, .tblwrap, .stats, .roadmap-preview, .check-plan-group, .pstrip div, .ls-card { border-color: var(--line); }
   .card.flat, .docbox, .gsug, .basis .art, .ef-sub, .lg-pick, .ops-b, .agent .detail, .reg-long { background: var(--surface-2); }
-  .card.tap, .opt, .gs-it, .pstrip div, .li { transition: border-color .3s ease, background-color .3s ease; }
+  .card.tap, .opt, .gs-it, .pstrip div, .li { transition: border-color .15s ease, background-color .15s ease; }
   .card.tap:hover, .opt:hover, .pstrip div:hover { border-color: #fff; background-color: #1F1F1F; box-shadow: none; }
   .pstrip div { padding: 14px; }
   .pstrip div b { color: #fff; }
 
   /* ── 글자: Oswald 대문자 제목. 한글은 원본의 가는 굵기·넓은 자간이 읽기 어려워 굵기를 올리고 자간을 줄였다 ── */
-  .eyebrow { font-family: var(--tm-head); font-size: 13px; font-weight: 500; letter-spacing: 2px; text-transform: uppercase; color: var(--tm-w70); }
-  .t { font-family: var(--tm-head); font-size: 40px; font-weight: 500; letter-spacing: .03em; line-height: 1.25; text-transform: uppercase; color: #fff; }
+  .eyebrow { font-family: var(--tm-head); font-size: 13px; font-weight: 600; letter-spacing: 0; color: var(--tm-w70); }
+  .t { font-family: var(--tm-head); font-size: 40px; font-weight: 600; letter-spacing: -.015em; line-height: 1.25; color: #fff; }
   .t.lg { font-size: 46px; }
-  .lead { font-size: 16.5px; color: var(--tm-w90); line-height: 1.75; }
+  .lead { font-size: 16px; color: var(--tm-w90); line-height: 1.75; }
   /* 머리 사진 위에 놓이는 글자는 사진 밝기에 묻히지 않게 그림자를 깐다 */
   .view > .eyebrow, .view > .t, .view > .lead, .view > .page-title-row .t { text-shadow: 0 1px 16px rgba(0, 0, 0, .6); }
-  .st, .hp-t { font-family: var(--tm-head); font-weight: 600; letter-spacing: .03em; color: #fff; }
+  .st, .hp-t { font-family: var(--tm-head); font-weight: 600; letter-spacing: -.005em; color: #fff; }
   .muted { color: var(--ink-3); }
-  .link { color: #fff; text-decoration: underline; text-decoration-color: var(--tm-w40); text-underline-offset: 3px; transition: text-decoration-color .3s ease; }
+  .link { color: #fff; text-decoration: underline; text-decoration-color: var(--tm-w40); text-underline-offset: 3px; transition: text-decoration-color .15s ease; }
   .link:hover { color: #fff; text-decoration-color: #fff; }
 
   /* ── 버튼: 템플릿의 뒤집히는 버튼. 주 버튼은 흰 바탕 → 테두리만, 테두리 버튼은 테두리만 → 흰 바탕 ── */
   .btn {
-    font-family: var(--tm-head); font-size: 13.5px; font-weight: 500; letter-spacing: 1px; text-transform: uppercase;
-    transition: background-color .3s ease, color .3s ease, border-color .3s ease;
+    font-family: var(--tm-head); font-size: 14px; font-weight: 600; letter-spacing: 0;
+    transition: background-color .15s ease, color .15s ease, border-color .15s ease;
   }
   .btn.pri { background: #fff; border: 1px solid #fff; }
   .btn.pri:hover { background: transparent; border-color: #fff; color: #fff; }
@@ -374,7 +386,7 @@
   .btn.line:hover:not(:disabled) { background: #fff; border-color: #fff; color: #111; }
   .chip:has(input:checked), .chip.on { background: #fff; border-color: #fff; }
   .choice:has(input:checked) { border-color: #fff; background: var(--accent-soft); box-shadow: inset 0 0 0 1px #fff; }
-  .input, .textarea, .cp-btn { transition: border-color .3s ease; }
+  .input, .textarea, .cp-btn { transition: border-color .15s ease; }
   .input:focus, .textarea:focus, .cpick.open .cp-btn { border-color: #fff; box-shadow: 0 0 0 3px rgba(255, 255, 255, .12); }
   .next { background: #fff; }
   .next .btn { background: #111; border-color: #111; color: #fff; }
@@ -392,27 +404,27 @@
   .hero .actions { justify-content: center; }
   .hero .actions .btn.pri { flex: 0 1 auto; padding-inline: 45px; }
 
-  /* ── 홈 '나의 학습 공간' 카드: 사진(모서리 8px · 템플릿 About 사진) + 흰 번호 ── */
-  .ls-card .ls-art { height: 170px; margin: 22px 0 20px; border-radius: 8px; background-size: cover; background-position: center; mix-blend-mode: normal; }
+  /* ── 홈 '나의 학습 공간' 카드: 사진(템플릿 About 사진 · 모서리는 다른 상자처럼 각지게) + 흰 번호 ── */
+  .ls-card .ls-art { height: 170px; margin: 22px 0 20px; border-radius: 0; background-size: cover; background-position: center; mix-blend-mode: normal; }
   .ls-card:nth-child(1) .ls-art { background-image: url('./bg-03.jpg'); }
   .ls-card:nth-child(2) .ls-art { background-image: url('./about-02.jpg'); }
   .ls-card:nth-child(3) .ls-art { background-image: url('./bg-05.jpg'); }
-  .ls-card { transition: border-color .3s ease, background-color .3s ease; }
+  .ls-card { transition: border-color .15s ease, background-color .15s ease; }
   .ls-card:hover { border-color: #fff; background-color: #1F1F1F; box-shadow: none; transform: none; }
   .ls-card:nth-child(n) { --ls-c: #fff; }
   .ls-no { color: #111; }
-  .ls-go { font-family: var(--tm-head); font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; color: #fff; }
+  .ls-go { font-family: var(--tm-head); font-size: 13px; font-weight: 600; letter-spacing: 0; color: #fff; }
 
-  /* ── 로그인: 빌딩 사진 위에 놓인 상자. 입력 상자는 거의 비치지 않게, 소개는 사진이 조금 비치게 ── */
+  /* ── 로그인: 빌딩 사진 위에 놓인 상자. 두 상자 모두 사진이 비치지 않는 바탕 ── */
   body.auth .app { min-height: 100vh; }
   body.auth .main { min-height: 100vh; display: flex; align-items: center; padding-bottom: 56px; }
   body.auth .view { width: 100%; }
-  .login-card { border: 1px solid var(--tm-w20); background-color: rgba(14, 14, 14, .9); }
-  .login-side { background: rgba(0, 0, 0, .55); border: 1px solid var(--tm-w20); color: #fff; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+  .login-card { border: 1px solid var(--tm-w20); background-color: var(--bg); }
+  .login-side { background: var(--bg); border: 1px solid var(--tm-w20); color: #fff; }
   .login-side::after { display: none; }
-  .login-side h2 { font-family: var(--tm-head); font-weight: 500; letter-spacing: .03em; }
+  .login-side h2 { font-family: var(--tm-head); font-weight: 600; letter-spacing: -.015em; }
   .login-side > p, .login-side .small { color: var(--tm-w90); }
-  .login-side .pill { border: 1px solid var(--tm-w40); background: transparent; color: #fff; font-family: var(--tm-head); letter-spacing: 1.5px; }
+  .login-side .pill { border: 1px solid var(--tm-w40); background: transparent; color: #fff; font-family: var(--tm-head); letter-spacing: 0; }
   .feat { border-color: var(--tm-w20); background: rgba(0, 0, 0, .35); }
   .feat .ico { background: #fff; color: #111; }
   .feat small { color: var(--tm-w70); }
@@ -420,7 +432,7 @@
 
   /* ── 좁은 화면(900px 이하): 두 버전 모두 원래의 한 줄 메뉴 배치에 색만 ── */
   @media (max-width: 900px) {
-    .side { border-bottom: 0; background: rgba(8, 8, 8, .9); color: #fff; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+    .side { border-bottom: 0; background: #0B0B0B; color: #fff; }
     .side .brand { font-family: var(--tm-head); letter-spacing: 3px; text-transform: uppercase; }
     .side .brand .logo { border-radius: 0; background: #fff; color: #111; }
     .side .nav a { color: rgba(255, 255, 255, .8); }

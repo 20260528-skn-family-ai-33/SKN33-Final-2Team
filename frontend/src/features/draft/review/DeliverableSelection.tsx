@@ -108,7 +108,7 @@ function ScopedDeliverableSelection({ ref, onReadyChange, onBusyChange, onPlanCh
     }
   }, [scope, loading, busy, versions, chosen, skillPicks, preview.error]);
   useEffect(() => {
-    onPlanChange({ scope, plan: preview.value?.plan || null, error: preview.error || error });
+    onPlanChange({ scope, plan: preview.value?.plan || null, error: preview.error ? 'calculation' : error ? 'preparation' : undefined });
   }, [scope, preview, error, onPlanChange]);
   useEffect(() => onReadyChange(!!proposal?.selectedIds.length && !!preview.value && !loading), [proposal, preview, loading, onReadyChange]);
   useEffect(() => onBusyChange(busy || loading), [busy, loading, onBusyChange]);

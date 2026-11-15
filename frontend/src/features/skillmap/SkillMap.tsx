@@ -16,7 +16,7 @@ import { actWeek, canvasMeasure, coverOf, edgeEnds, place, relOf, weeksOf, type 
 
 let layoutCache: { d: SkillMapData; m: Layout } | null = null;
 let bigPref: boolean | null = null;
-// 넓은 화면은 칸에 맞추고, 좁은 화면은 실제 크기로 두고 옆으로 밀어 본다
+// 넓은 화면은 칸에 맞추고, 좁은 화면은 크게 두고 옆으로 밀어 본다
 const bigNow = () => (bigPref != null ? bigPref : typeof window !== 'undefined' && window.innerWidth <= 900);
 
 function layoutOf(d: SkillMapData): Layout {
@@ -174,7 +174,8 @@ function Svg({ data, view, picked, onPick, big, zoom }: { data: SkillMapData; vi
       viewBox={`${(b.x0 - pad).toFixed(1)} ${(b.y0 - pad).toFixed(1)} ${W} ${H}`}
       width={W}
       height={H}
-      style={{ width: big ? W * zoom : `${zoom * 100}%`, maxWidth: W * zoom, height: 'auto' }}
+      /* 크게 보기: 실제 크기와 칸 너비의 1.4배 중 큰 쪽. 넓은 화면에서는 실제 크기가 칸보다 작아 눌러도 그대로였다(#227) */
+      style={big ? { width: `calc(max(${W}px, 140%) * ${zoom})`, height: 'auto' } : { width: `${zoom * 100}%`, maxWidth: W * zoom, height: 'auto' }}
       role="img"
       aria-label={view.label}
     >
@@ -310,7 +311,7 @@ export function MapBox({ id, title, viewKey, build, wheelZoom = false }: { id: s
       <p className="small muted sm-sum">{view.sum}</p>
       <div className="card flat sm-card">
         <div className="sm-key">{view.keys}</div>
-        <div className="sm-wrap" ref={wrapRef} title={wheelZoom ? 'Ctrl + 스크롤로 확대·축소' : undefined}>
+        <div className={`sm-wrap${big ? ' sm-big' : ''}`} ref={wrapRef} title={wheelZoom ? 'Ctrl + 스크롤로 확대·축소' : undefined}>
           <Svg data={data} view={view} picked={pid} onPick={pick} big={big} zoom={zoom} />
         </div>
         <div className="sm-info" aria-live="polite">

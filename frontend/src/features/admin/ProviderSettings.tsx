@@ -5,6 +5,7 @@ import { aiApi } from '@/api/endpoints/account';
 import type { ProviderPolicy, ServerProvider } from '@/api/types/account';
 import { checkStatus, levelLabel, PROV } from '@/shared/state/ai';
 import { FailBox } from './parts';
+import { RunpodConnection } from './RunpodConnection';
 
 const key = ['admin', 'ai-provider'] as const;
 const label = (p: ProviderPolicy) => p === 'employee' ? '직원별 선택 (베타)' : PROV[p];
@@ -97,9 +98,13 @@ export function ProviderSettings() {
           {!validLevel && <option disabled value={level}>{levelLabel(level)} · 현재 모델에서 사용 불가</option>}
         </select></label>}
         {selected === 'ollama' && <p className="small muted">추론 없음</p>}
-        {selected && selected !== 'employee' && <ProviderKey key={selected} provider={selected} settings={data.providers[selected]} />}
+        {selected === 'openai' && <ProviderKey provider="openai" settings={data.providers.openai} />}
+        {selected === 'ollama' && !data.runpod.managed && <details>
+          <summary>기존 서버 주소의 API 키 관리</summary>
+          <ProviderKey provider="ollama" settings={data.providers.ollama} />
+        </details>}
         <div className="actions">
-          {selected && selected !== 'employee' && <button className="btn line sm" disabled={save.isPending || check.isPending || !data.providers[selected].available}
+          {selected === 'openai' && <button className="btn line sm" disabled={save.isPending || check.isPending || !data.providers[selected].available}
             onClick={() => { setNotice(''); check.mutate(selected); }}>{check.isPending ? '확인 중…' : '연결 확인'}</button>}
           <button className="btn pri sm" disabled={!selected || (data.policyStatus !== 'default_ollama' && selected === data.policy && level === savedLevel) || !validLevel || save.isPending || check.isPending || (selected !== 'employee' && !data.providers[selected].available)}
             onClick={() => { if (selected) { setNotice(''); save.mutate({ policy: selected, level: level || null }); } }}>설정 저장</button>
@@ -107,6 +112,7 @@ export function ProviderSettings() {
         {save.isError && <FailBox err={save.error} what="AI 설정을 저장하지 못했어요" />}
         {check.isError && <p role="alert">모델 연결에 실패했어요. 서버 주소와 API 키 설정을 확인해 주세요.</p>}
         {notice && <p role="status">{notice}</p>}
+        <RunpodConnection settings={data} />
       </> : q.isPending && <p>설정을 불러오는 중…</p>}
     </section>
   );

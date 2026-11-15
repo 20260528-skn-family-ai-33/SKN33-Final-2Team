@@ -1,6 +1,8 @@
 import type { Cert, ResourceMap } from '@/api/types/catalog';
-import type { Activity, PlanContent } from '@/api/types/plan';
+import type { Activity, PlanContent, PlanRecord } from '@/api/types/plan';
 import type { ReviewMaterials } from '@/features/draft/review/ReviewSkillBlocks';
+import { weekNow } from '@/features/home/ganttCalc';
+import { trackedActs } from '@/shared/lib/plan';
 
 export function commentSkillNames(plan: PlanContent): string[] {
   const report = plan.def.learningReport as ReviewMaterials | undefined;
@@ -33,6 +35,25 @@ export function groupLearningActivities(plan: PlanContent, resources: ResourceMa
     const activities = groups.get(name)!;
     return { name, activities, materials: activities.filter(activity => !!activity.res), tasks: activities.filter(activity => !activity.res) };
   });
+}
+
+/** 이번 주차 일정에 들어 있는 활동인지. 완료 여부는 따로 보여 주므로 보지 않는다(#101) */
+export const inWeek = (activity: Pick<Activity, 'wFrom' | 'wTo'>, week: number) => activity.wFrom <= week && week <= activity.wTo;
+
+/** 스킬(주차) 묶음의 강조 클래스(#101). 진행 상태를 남기는 활동(강좌·과제, 도서 제외)을 모두 마쳤으면 완료 색,
+    아니고 이번 주 일정이면 이번 주 색. 이번 주 스킬을 다 마치면 완료 색으로 바뀌고 위치는 '이번 주' 표시로 남긴다 */
+export function weekToneClass(tracked: Pick<Activity, 'id'>[], progress: PlanRecord['progress'] | undefined, current: boolean): string {
+  if (tracked.length && tracked.every(activity => progress?.[activity.id]?.status === 'done')) return ' is-week-done';
+  return current ? ' is-current-week' : '';
+}
+
+/** 진행 중인 로드맵에서 이번 주차에 걸친 활동(도서 제외)이 있는 스킬. 이번 주 활동을 모두 마쳐도 위치를 알 수 있게 그대로 표시한다(#101) */
+export function currentWeekSkillNames(R: Pick<PlanRecord, 'status' | 'createdAt' | 'plan'>, resources: ResourceMap): string[] {
+  if (R.status !== 'active') return [];
+  const week = weekNow(R);
+  return groupLearningActivities(R.plan, resources)
+    .filter(group => trackedActs(group.activities).some(activity => inWeek(activity, week)))
+    .map(group => group.name);
 }
 
 const normal = (value: string) => value.replace(/\([^)]*\)/g, '').toLocaleLowerCase().replace(/[^a-z0-9가-힣]/g, '');

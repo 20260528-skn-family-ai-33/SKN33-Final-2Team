@@ -3,11 +3,9 @@
 import type { ReactNode } from 'react';
 import type { PlanRecord } from '@/api/types/plan';
 import { ReviewSkillBlocks, type ReviewMaterials } from '@/features/draft/review/ReviewSkillBlocks';
-import { weekNow } from '@/features/home/ganttCalc';
 import { RoadmapActivityList, RoadmapResources } from '@/features/roadmap/RoadmapLearning';
-import { commentSkillNames, groupLearningActivities } from '@/features/roadmap/roadmapLearningData';
+import { commentSkillNames, currentWeekSkillNames } from '@/features/roadmap/roadmapLearningData';
 import { SkillMap } from '@/features/skillmap/SkillMap';
-import { st, trackedActs } from '@/shared/lib/plan';
 import { useCatalog } from '@/shared/state/catalog';
 import { useClockRefresh } from '@/shared/state/demoClock';
 import { Stats } from '@/shared/ui/parts';
@@ -18,14 +16,8 @@ export function MemberRoadView({ R, skillAction, skillFooter }: { R: PlanRecord;
   const pl = R.plan;
   const learning = pl.def.learningReport as ReviewMaterials | undefined;
   useClockRefresh();
-  const week = weekNow(R);
-  // 직원 화면처럼 이번 주에 할 스킬을 표시한다(진행 중인 로드맵만)
-  const current =
-    R.status === 'active'
-      ? groupLearningActivities(pl, resources)
-          .filter((group) => trackedActs(group.activities).some((a) => a.wFrom <= week && week <= a.wTo && st(R.progress, a.id) !== 'done'))
-          .map((group) => group.name)
-      : [];
+  // 직원 화면처럼 이번 주 스킬을 표시한다(진행 중인 로드맵만 · 완료 여부와 상관없이)
+  const current = currentWeekSkillNames(R, resources);
   return (
     <>
       {learning ? <PlanSummary R={R} /> : <Stats pl={pl} periodLabel="기간" />}

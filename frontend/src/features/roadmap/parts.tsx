@@ -35,8 +35,9 @@ export function ActRow({ a, R }: { a: Activity; R: PlanRecord }) {
             {memo ? ' · 메모 있음' : ''}
           </small>
         </span>
+        {/* 완료는 '이번 주'(테마 강조색)와 다른 완료 색으로 보여 준다(#101) */}
         {isBook ? null : done ? (
-          <span className="tag acc">
+          <span className="tag done">
             <Icon name="check" />
             {isCourse ? '완료 · 100%' : '완료'}
           </span>

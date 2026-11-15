@@ -435,7 +435,7 @@ export function ResultEdit() {
     <>
       <Stepper cur="result" />
       <Page
-        eyebrow="점검 결과 수정"
+        eyebrow="테스트 결과 수정"
         title="바꿀 내용을 고친 뒤 저장해 주세요"
         lead="점검 결과 화면에 보이는 내용을 여기서 한꺼번에 고쳐요. 저장해야 반영되고, 취소하면 그대로예요. 목표·기획서나 역량 테스트 응답은 위 단계를 눌러 고치세요."
         foot={
@@ -481,7 +481,7 @@ export function ResultEdit() {
             <Ef label="듣게 될 강좌·자료">
               <ResPicker path="draft.edit.resourceIds" stage={start} />
               <p className="small muted ef-n">
-                팀 DB 등록 자료에서 검색해 골라요. 시작 지점 이후 단계만 보여요. 자격증은 아래 학습 선호에서 정해요. <SugBack k="resourceIds" />
+                팀 DB 등록 자료에서 검색해 골라요. 시작 지점 이후 단계만 보여요. <SugBack k="resourceIds" />
               </p>
             </Ef>
             <Ef label="만들 결과물">

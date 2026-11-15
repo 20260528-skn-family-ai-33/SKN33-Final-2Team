@@ -33,7 +33,7 @@ from . import profile as PF
 STEP_ROUTES = ['new-goal', 'new-details', 'new-details-check', 'new-quiz', 'new-result', 'new-result-edit', 'new-gen', 'new-options', 'new-materials', 'new-review']
 # deepOn·deepMcq·deepEssay: 심화 질문을 풀지(체크)와 객관식·서술형 답(10/23)
 # startMode: 진행 중인 로드맵이 있을 때 작성 탭에 들어오며 고른 시작 방식(확정 때 화면이 보낸다)
-CLIENT_KEYS = ('goal', 'project', 'prefs', 'detailsOk', 'answers', 'deepOn', 'deepMcq', 'deepEssay', 'chosen', 'edit', 'lastNew', 'selectedSkills', 'skillInputKey', 'skillCandidates', 'startMode')
+CLIENT_KEYS = ('goal', 'project', 'prefs', 'detailsOk', 'answers', 'deepOn', 'deepMcq', 'deepEssay', 'chosen', 'edit', 'lastNew', 'selectedSkills', 'skillInputKey', 'skillCandidates', 'fixedSkillNames', 'skillPool', 'startMode')
 _images: dict[str, list] = {}   # 기획서 이미지(base64)는 DB에 넣지 않고 서버 메모리에만 잠깐 둔다
 _img_lock = threading.Lock()
 
@@ -54,18 +54,15 @@ def doc_summary(d: dict) -> str:
     return str(doc.get('summary') or '').strip() if doc.get('status') == 'ok' else ''
 
 
-def cert_key(p: dict) -> str:
-    return p.get('cert') or '' if catalog.cert_by_code(p.get('cert')) else ''
-
-
 def quiz_rest(d: dict) -> str:
     return f"{(d.get('goal') or '').strip()}|{(d.get('project') or {}).get('name', '') if d.get('project') else ''}|{doc_summary(d)}"
 
 
 def quiz_key(d: dict) -> str:
-    ck = cert_key(d.get('prefs') or {})
-    return quiz_rest(d) + (f'|cert:{ck}' if ck else '')
-
+    current = quiz_rest(d)
+    saved = (d.get('quiz') or {}).get('key') or ''
+    # Keep completed legacy assessments when their actual inputs match.
+    return saved if saved.startswith(current + '|cert:') else current
 
 def deep_on(d: dict) -> bool:
     return bool(d.get('deepOn') and (d.get('quiz') or {}).get('deep'))
@@ -116,15 +113,15 @@ def pref_summary(p: dict) -> dict:
 
 
 def cert_res(p: dict) -> str | None:
-    c = catalog.cert_by_code(p.get('cert'))
-    return c['id'] if c else None
+    # 기존 호출 계약 유지. 자격증은 로드맵의 참고 추천으로만 제공한다.
+    return None
 
 
 def handoff_prefs(p: dict) -> dict:
     budget = None if blank(p.get('budget')) else max(0, int(num(p.get('budget'))))
     hours = num(p.get('hours'))
     weeks = num(p.get('weeks'))
-    return {'format': pref_text('format', p), 'formatKey': p.get('format') or 'auto', 'certPlan': pref_text('cert', p), 'certRes': cert_res(p),
+    return {'format': pref_text('format', p), 'formatKey': p.get('format') or 'auto', 'certPlan': '없음', 'certRes': cert_res(p),
             'weeklyHours': min(40, hours) if hours > 0 else None, 'hoursAuto': not hours > 0, 'deadlineWeeks': min(52, round(weeks)) if weeks > 0 else None,
             'budgetWon': budget, 'budgetAuto': budget is None, 'budgetLimit': budget}
 
@@ -422,7 +419,11 @@ def discard(employee_id: int, draft_id: str) -> None:
 
 # ── ERD: 진단 회차·문항·응답 ──
 def _round(t: db.Tx, draft_id: str, d: dict) -> str:
-    snap = {'goal': d.get('goal'), 'projectSummary': doc_summary(d) or None, 'certPlan': catalog.cert_by_code((d.get('prefs') or {}).get('cert')) and pref_text('cert', d['prefs'])}
+    saved_key = (d.get('quiz') or {}).get('key') or ''
+    legacy_prefix = quiz_rest(d) + '|cert:'
+    legacy_cert = saved_key[len(legacy_prefix):] if saved_key.startswith(legacy_prefix) else ''
+    certification = catalog.cert_by_code(legacy_cert) if legacy_cert else None
+    snap = {'goal': d.get('goal'), 'projectSummary': doc_summary(d) or None, 'certPlan': (certification or {}).get('title')}
     rid = t.val('SELECT diagnostic_round_id FROM public.diagnostic_rounds WHERE project_id = CAST(:p AS uuid) AND round_number = 1', p=draft_id)
     if rid:
         t.run('UPDATE public.diagnostic_rounds SET project_snapshot = :s WHERE diagnostic_round_id = :r', s=db.J(snap), r=rid)
@@ -553,7 +554,7 @@ def assessment_start(employee_id: int, draft_id: str) -> str | None:
             if st == 'running':
                 return d['quizRun']['jobId']
         inp = {'goal': d['goal'], 'project': (d.get('project') or {}).get('name') if d.get('project') else None, 'projectSummary': doc_summary(d) or None,
-               'certPlan': (catalog.cert_by_code(d['prefs'].get('cert')) or {}).get('title')}
+               'certPlan': None}
         base = {'goal': d['goal'], 'project': copy.deepcopy(d.get('project')), 'doc': copy.deepcopy(d.get('doc')) if (d.get('doc') or {}).get('status') == 'ok' else None}
 
     def work(job: jobs.JobCtx):
@@ -667,7 +668,6 @@ def changes_revert(employee_id: int, draft_id: str, kind: str) -> dict:
         if kind == 'quiz' and d.get('quiz') and d['quiz'].get('base'):
             b = d['quiz']['base']
             d['goal'], d['project'], d['doc'] = b['goal'], copy.deepcopy(b.get('project')), copy.deepcopy(b.get('doc'))
-            d['prefs']['cert'] = (str(d['quiz']['key']).split('|cert:') + [''])[1]
             d['quizFail'] = None
         elif kind == 'diag' and d.get('diag'):
             d['answers'] = dict(d['diag']['answers'])

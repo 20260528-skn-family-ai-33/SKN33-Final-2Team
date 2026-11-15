@@ -166,7 +166,10 @@ export function prepRec(R: PlanRecord, rev: RevForm | null | undefined): PlanRec
     R.rev.running = rv.status === 'running';
     R.rev.fail = rv.status === 'failed' ? rv.error || {} : null;
     R.rev.jobId = rv.status === 'running' ? rv.jobId : null;
-  } else if (rv && rv.status !== 'ready' && rv.request) {
+    if (rv.request && (!R.rev.v || (!Object.keys(R.rev.on || {}).length && !R.rev.note))) {
+      Object.assign(R.rev, rv.request);
+    }
+  } else if (rv && rv.request) {
     R.rev = {
       ...({ on: {}, v: {}, note: '' } as unknown as RevForm),
       ...(rv.request as unknown as RevForm),

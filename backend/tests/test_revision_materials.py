@@ -28,6 +28,18 @@ class RevisionMaterialsTests(TestCase):
     def rebuild(self):
         return rebuild_revision(self.option, self.old, self.handoff)
 
+    def test_cannot_select_new_version_for_skill_with_completed_activity(self):
+        from app.services import plans
+        current = {
+            'opt': 'free',
+            'def': {'learningReport': {'skillOrder': ['SQL']}},
+            'acts': [{'id': 'done', 'skill': 'SQL'}, {'id': 'pending', 'skill': 'SQL'}],
+        }
+        proposal = dict(current, acts=[current['acts'][0], {'id': 'replacement', 'skill': 'SQL'}])
+        with self.assertRaises(plans.ApiError) as ctx:
+            plans._mix_revision_skills(current, proposal, {}, ['SQL'], {'done'})
+        self.assertEqual(ctx.exception.code, 'REVISION_CHANGED')
+
     def test_retained_id_and_skill_come_from_existing_activity_not_model(self):
         self.option['acts'][0]['skill'] = 'Invented'
         out = self.rebuild()

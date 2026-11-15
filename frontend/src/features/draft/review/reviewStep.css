@@ -4,49 +4,49 @@
 .rv-summary h2 { margin: 2px 0 0; font-size: 21px; line-height: 1.4; overflow-wrap: anywhere; }
 .rv-goal { margin: 8px 0 0; font-size: 14px; line-height: 1.6; color: var(--ink-2); }
 .rv-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 18px 0 0; padding-top: 16px; border-top: 1px solid var(--line); }
-.rv-stats dt { font-size: 12.5px; color: var(--ink-3); }
+.rv-stats dt { font-size: 13px; color: var(--ink-3); }
 .rv-stats dd { margin: 4px 0 0; }
 /* 계산 전후로 높이가 달라지지 않게 줄 높이를 고정한다 */
 .rv-stats dd b { display: block; min-height: 30px; font-size: 20px; line-height: 30px; font-weight: 700; color: var(--ink); }
-.rv-stats dd span { display: block; min-height: 19px; margin-top: 2px; font-size: 12.5px; line-height: 19px; color: var(--ink-3); overflow-wrap: anywhere; }
+.rv-stats dd > span { display: block; min-height: 19px; margin-top: 2px; font-size: 13px; line-height: 19px; color: var(--ink-3); overflow-wrap: anywhere; }
 
 /* 주차별 일정 */
 .rv-weeks { list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin: 0; padding: 0; }
 .rv-weeks > li { min-width: 0; padding: 16px 18px; border: 1px solid var(--line); border-top: 3px solid var(--accent); border-radius: var(--r-md); background: var(--surface); }
 .rv-week-head { display: flex; align-items: baseline; gap: 8px; }
 .rv-week-head b { font-size: 14px; color: var(--accent-ink); }
-.rv-week-head span { font-size: 12.5px; color: var(--ink-3); }
-.rv-weeks h3 { margin: 4px 0 10px; font-size: 15.5px; overflow-wrap: anywhere; }
+.rv-week-head span { font-size: 13px; color: var(--ink-3); }
+.rv-weeks h3 { margin: 4px 0 10px; font-size: 16px; overflow-wrap: anywhere; }
 .rv-weeks ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.rv-weeks ul li { display: flex; align-items: baseline; gap: 8px; font-size: 13.5px; line-height: 1.5; color: var(--ink-2); }
+.rv-weeks ul li { display: flex; align-items: baseline; gap: 8px; font-size: 14px; line-height: 1.5; color: var(--ink-2); }
 .rv-week-tx { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.rv-weeks ul li em { flex-shrink: 0; font-style: normal; font-size: 12.5px; color: var(--ink-3); }
+.rv-weeks ul li em { flex-shrink: 0; font-style: normal; font-size: 13px; color: var(--ink-3); }
 .rv-dot { flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); transform: translateY(-1px); }
 .rv-dot.is-book { background: var(--accent-line); }
 .rv-dot.is-task { border-radius: 2px; background: var(--ink-2); }
 .rv-weeks-wait { padding: 22px; border: 1.5px dashed var(--line-2); border-radius: var(--r-md); text-align: center; font-size: 14px; color: var(--ink-3); }
 
 /* 스킬 블록 */
-.rv-status { display: flex; align-items: center; gap: 8px; margin: 0 0 14px; padding: 12px 14px; border-radius: var(--r-md); background: var(--accent-soft); font-size: 13.5px; color: var(--accent-ink); }
+.rv-status { display: flex; align-items: center; gap: 8px; margin: 0 0 14px; padding: 12px 14px; border-radius: var(--r-md); background: var(--accent-soft); font-size: 14px; color: var(--accent-ink); }
 .rv-error { margin: 0 0 14px; }
 .rv-skills { display: grid; gap: 14px; }
 .rv-skill { min-width: 0; padding: 20px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); }
 .rv-skill > header { display: flex; align-items: center; gap: 10px; padding-bottom: 14px; margin-bottom: 16px; border-bottom: 1px solid var(--line); }
-.rv-skill > header h3 { flex: 1; margin: 0; font-size: 17px; overflow-wrap: anywhere; }
-.rv-skill-n { flex-shrink: 0; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: var(--accent-soft2); color: var(--accent-ink); font-size: 13px; font-weight: 700; }
+.rv-skill > header h3 { flex: 1; margin: 0; font-size: 18px; overflow-wrap: anywhere; }
+.rv-skill-n { flex-shrink: 0; display: grid; place-items: center; width: 30px; height: 30px; border-radius: var(--rad-2); background: var(--accent-soft2); color: var(--accent-ink); font-size: 13px; font-weight: 700; }
 .rv-learn { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
-.rv-skill h4 { margin: 0 0 8px; font-size: 12.5px; font-weight: 600; color: var(--ink-3); }
+.rv-skill h4 { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--ink-3); }
 .rv-mini { display: flex; align-items: center; gap: 12px; padding: 6px 0; }
 .rv-thumb { flex-shrink: 0; width: 36px; height: 46px; object-fit: contain; border-radius: 4px; }
 .rv-mini-tx { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .rv-mini-tx b { font-size: 14px; font-weight: 600; line-height: 1.45; color: var(--ink); overflow-wrap: anywhere; }
 .rv-mini-tx b .tag { margin-right: 6px; vertical-align: 1px; }
-.rv-mini-tx small { font-size: 12.5px; color: var(--ink-3); }
+.rv-mini-tx small { font-size: 13px; color: var(--ink-3); }
 .rv-link { flex-shrink: 0; padding: 0; border: 0; background: none; font: inherit; font-size: 13px; color: var(--accent-ink); text-decoration: none; cursor: pointer; }
 .rv-link:hover:not(:disabled) { text-decoration: underline; }
 .rv-link:disabled { opacity: .5; cursor: default; }
 .rv-outcomes { margin: 0; padding-left: 18px; }
-.rv-outcomes li { font-size: 13.5px; line-height: 1.6; color: var(--ink-2); }
+.rv-outcomes li { font-size: 14px; line-height: 1.6; color: var(--ink-2); }
 .rv-outcomes li + li { margin-top: 4px; }
 .rv-muted { margin: 0; font-size: 13px; color: var(--ink-3); }
 
@@ -54,7 +54,7 @@
 .rv-tasks { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
 .rv-tasks-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
 .rv-tasks-head h4 { margin: 0; font-size: 14px; color: var(--ink); }
-.rv-tasks-head > span { flex: 1; min-width: 0; font-size: 12.5px; color: var(--ink-3); }
+.rv-tasks-head > span { flex: 1; min-width: 0; font-size: 13px; color: var(--ink-3); }
 .rv-tasks-head .btn svg { width: 15px; height: 15px; }
 .rv-tasks-head .btn .sp { width: 12px; height: 12px; }
 .rv-tasks-head .btn[aria-busy=true] { display: inline-flex; align-items: center; gap: 6px; }
@@ -67,18 +67,18 @@
 .rv-task-kicker { font-size: 12px; font-weight: 600; color: var(--accent-ink); }
 .rv-task-tx > b { font-size: 16px; line-height: 1.45; color: var(--ink); overflow-wrap: anywhere; }
 .rv-task > em { flex-shrink: 0; font-style: normal; font-size: 13px; font-weight: 600; color: var(--ink-2); }
-.rv-task .task-description { margin-top: 2px; font-size: 13.5px; line-height: 1.6; color: var(--ink-2); }
+.rv-task .task-description { margin-top: 2px; font-size: 14px; line-height: 1.6; color: var(--ink-2); }
 .rv-task .task-description-text { line-height: 1.6; }
 .rv-task .task-description .task-description-toggle { font-size: 13px; }
 .rv-task .task-description-section { grid-template-columns: 72px minmax(0, 1fr); }
-.rv-task .task-description-section .task-description-heading { font-size: 12.5px; }
-.rv-task-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; min-height: 20px; margin: 10px 0 0; font-size: 12.5px; color: var(--ink-3); }
+.rv-task .task-description-section .task-description-heading { font-size: 13px; }
+.rv-task-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; min-height: 20px; margin: 10px 0 0; font-size: 13px; color: var(--ink-3); }
 
 /* 확정하면 */
 .rv-after { margin-top: 36px; padding: 20px 24px; border-radius: var(--r-lg); background: var(--sunk); }
 .rv-after h2 { margin: 0 0 10px; font-size: 16px; }
 .rv-after ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
-.rv-after li { display: flex; gap: 10px; font-size: 13.5px; line-height: 1.6; color: var(--ink-2); }
+.rv-after li { display: flex; gap: 10px; font-size: 14px; line-height: 1.6; color: var(--ink-2); }
 .rv-after li svg { flex-shrink: 0; width: 18px; height: 18px; margin-top: 2px; color: var(--accent-ink); }
 .rv-after li b { display: block; color: var(--ink); }
 
@@ -87,19 +87,25 @@
   .rv-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-/* 계산을 기다리는 동안의 뼈대: 값이 들어왔을 때와 같은 자리·높이 */
-.rv-stats dd b .rv-skel-num { width: 96px; height: 20px; margin: 5px 0; }
-.rv-stats dd span .rv-skel-sub { width: 150px; max-width: 100%; height: 11px; margin: 4px 0; }
+/* 계산을 기다리는 동안의 주차 뼈대 */
 .rv-weeks-skel .skel-wrap { margin-top: 0; gap: 14px; }
 .rv-skills .skel-wrap { margin-top: 0; }
 
 /* 확정한 로드맵의 스킬 블록(ReviewSkillBlocks): 작성 7단계와 같은 모양에 접기·상태 표시를 더한다 */
 details.rv-skill > summary { display: flex; align-items: center; gap: 10px; list-style: none; cursor: pointer; }
 details.rv-skill > summary::-webkit-details-marker { display: none; }
-details.rv-skill > summary h3 { flex: 1; min-width: 0; margin: 0; font-size: 17px; overflow-wrap: anywhere; }
+details.rv-skill > summary h3 { flex: 1; min-width: 0; margin: 0; font-size: 18px; overflow-wrap: anywhere; }
 details.rv-skill[open] > summary { padding-bottom: 14px; margin-bottom: 16px; border-bottom: 1px solid var(--line); }
-details.rv-skill.is-current-week { border-color: var(--accent-line); background: var(--accent-soft); box-shadow: inset 4px 0 0 var(--accent); }
-.rv-mini:focus-visible, .rv-task:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+details.rv-skill.is-current-week { border-color: var(--week-line); background: var(--week-soft); box-shadow: inset 4px 0 0 var(--week); }
+details.rv-skill.is-week-done { border-color: var(--done-line); background: var(--done-soft); box-shadow: inset 4px 0 0 var(--done); }
+.rv-task.is-static.is-done { border-color: var(--done-line); background: var(--done-soft); }
+.rv-task.is-static.is-done .rv-task-kicker { color: var(--done-ink); }
+/* 좁은 화면: 이번 주·완료·기간 표시가 스킬 이름을 몇 글자 폭으로 누르지 않게 이름 다음 줄로 내린다(#101) */
+@media (max-width: 600px) {
+  details.rv-skill > summary { flex-wrap: wrap; row-gap: 8px; }
+  details.rv-skill > summary h3 { flex-basis: calc(100% - 40px); }
+}
+.rv-mini:focus-visible, .rv-task:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--rad-1); }
 .rv-title-btn { padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
 .rv-title-btn:hover { text-decoration: underline; }
 .rv-title-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -112,10 +118,10 @@ details.rv-skill.is-current-week { border-color: var(--accent-line); background:
 .rv-shared { padding: 16px 20px; border: 1px solid var(--accent-line); border-radius: var(--r-lg); background: var(--surface); }
 .rv-shared > header { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
 .rv-shared > header h3 { margin: 0; font-size: 15px; }
-.rv-shared-ref { display: flex; align-items: baseline; gap: 8px; margin: 0 0 6px; font-size: 13.5px; line-height: 1.5; color: var(--ink-2); overflow-wrap: anywhere; }
+.rv-shared-ref { display: flex; align-items: baseline; gap: 8px; margin: 0 0 6px; font-size: 14px; line-height: 1.5; color: var(--ink-2); overflow-wrap: anywhere; }
 .rv-shared-ref .tag { flex-shrink: 0; }
 .rv-stt-gap { flex: none; width: 22px; }
 .rv-anchor { position: absolute; width: 0; height: 0; outline: 0; }
 .rv-mini { position: relative; }
-.rv-mini:has(.rv-anchor:focus) { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+.rv-mini:has(.rv-anchor:focus) { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--rad-1); }
 .rv-records { display: flex; align-items: baseline; gap: 10px; }
