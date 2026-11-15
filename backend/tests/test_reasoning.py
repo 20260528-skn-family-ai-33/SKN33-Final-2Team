@@ -78,6 +78,12 @@ class OllamaThinkTest(unittest.TestCase):
             llm.chat('ollama', MSGS, role='regulation', temperature=0)
             self.assertEqual(self.sent[-1]['options'], {'num_gpu': -1, 'num_ctx': 16384, 'temperature': 0})
 
+    def test_explicit_schema_replaces_json_mode_without_an_extra_call(self):
+        schema = {'type': 'object', 'properties': {'answer': {'type': 'string'}}}
+        llm.chat('ollama', MSGS, role='regulation', response_schema=schema)
+        self.assertEqual(len(self.sent), 1)
+        self.assertEqual(self.sent[0]['format'], schema)
+
     def test_roadmap_and_resources_set_num_predict_and_context(self):
         for role in ('roadmap', 'resources'):
             with self.subTest(role=role):
@@ -119,6 +125,11 @@ class OpenAiReasoningTest(unittest.TestCase):
     def effort(self, reasoning=None, role='default'):
         llm.chat('openai', MSGS, role=role, reasoning=reasoning)
         return self.sent[-1].get('reasoning_effort', '(없음)')
+
+    def test_openai_keeps_existing_json_object_format(self):
+        with patch.object(llm, 'S', dataclasses.replace(llm.S, openai_json=True)):
+            llm.chat('openai', MSGS, role='regulation')
+        self.assertEqual(self.sent[0]['response_format'], {'type': 'json_object'})
 
     def test_level_in_the_list_is_sent(self):
         self.assertEqual(self.effort('low'), 'low')

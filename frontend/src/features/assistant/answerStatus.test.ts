@@ -9,6 +9,7 @@ describe('답변 근거 상태와 제공 금지 거절', () => {
     ['found', '근거 확인', 'ok'],
     ['partial', '근거 확인 불가', 'warn'],
     ['not_found', '근거 확인 불가', 'warn'],
+    ['no_match', '근거 확인 불가', 'warn'],
     ['refused', '답변 불가', 'fail'],
   ];
   for (const [status, label, style] of states) {
