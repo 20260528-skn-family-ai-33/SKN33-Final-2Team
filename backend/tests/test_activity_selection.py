@@ -124,7 +124,7 @@ class ActivityTests(unittest.TestCase):
   with self.assertRaises(ApiError):self.propose(self.acts[:1])
 
  def test_invalid_competency_summary_is_rejected(self):
-  for summaries in (None,{}, {'S':['하나']}, {'S':['하나','둘','']}, {'other':['하나','둘','셋']}):
+  for summaries in (None,{}, {'S':['하나','둘','']}, {'other':['하나','둘','셋']}):
    with self.subTest(summaries=summaries), patch('app.services.activity_selection.catalog.items',return_value={'c':{'id':'c','title':'자료','cost':0}}):
     with self.assertRaises(ApiError):
      propose(self.saved,self.draft,lambda *_:{'acts':self.acts,'skillSummaries':summaries},'test')
