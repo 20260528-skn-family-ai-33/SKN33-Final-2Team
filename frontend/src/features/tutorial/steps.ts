@@ -87,7 +87,7 @@ export const TOUR_STEPS: TourStep[] = [
 
   {
     id: 'summary', path: paths.newReview, screen: '검토·확정', targets: ['summary'], text: '전체 기간과 학습 시간이에요.', advance: 'next',
-    when: ON('confirm'), wait: { targets: ['summary'], text: 'AI가 고른 자료로 일정과 과제를 만들고 있어요. 30초에서 1분쯤 걸려요.' },
+    when: ON('confirm'), wait: { targets: ['summary'], text: 'AI가 고른 자료로 일정과 과제를 만들고 있어요. 30초에서 1분쯤 걸려요.', busy: '.rv-status' },
   },
   { id: 'schedule', path: paths.newReview, screen: '검토·확정', targets: ['schedule'], text: '주차마다 할 일이에요.', advance: 'next', when: ON('confirm') },
   { id: 'tasks', path: paths.newReview, screen: '검토·확정', targets: ['tasks'], text: '스킬마다 해 볼 과제예요. 다른 과제로 바꿀 수 있어요.', advance: 'next', when: ON('confirm'), focus: '.rv-skill' },

@@ -68,6 +68,10 @@ describe('기다리는 안내', () => {
     for (const s of TOUR_STEPS.filter((x) => x.pick)) expect(s.advance).toBe('next');
   });
 
+  it('만들다 실패할 수 있는 구간은 만드는 중 표시가 있을 때만 기다리라고 한다(실패 화면의 오류·다시 시도를 가리지 않음)', () => {
+    for (const id of ['skills', 'materials', 'summary']) expect(TOUR_STEPS[at(id)].wait?.busy).toBeTruthy();
+  });
+
   it('버튼 단계의 기다리는 안내는 만드는 중 표시가 있을 때만 뜬다(저장하는 잠깐 동안에는 뜨지 않음)', () => {
     for (const s of TOUR_STEPS.filter((x) => x.advance === 'click' && x.wait && x.id !== 'gen')) expect(s.wait?.busy).toBeTruthy();
   });

@@ -8,7 +8,7 @@ import { paths } from '@/app/paths';
 import { meOf, useSession } from '@/shared/state/session';
 import { useUi } from '@/shared/state/ui';
 import { Icon } from '@/shared/ui/Icon';
-import { draftActive, recs, ws } from '@/shared/state/workspace';
+import { draftActive, recs, useWs, ws } from '@/shared/state/workspace';
 import { afterReveal } from '@/skins/afterReveal';
 import { holeOf, placeAway, placeNote, type Box, type NotePlace } from './spot';
 import { isTourEnd, stepForPath, TOUR_STEPS, type TourStep } from './steps';
@@ -292,17 +292,21 @@ export function TourHost() {
   const { pathname } = useLocation();
   const sheetOpen = useUi((s) => !!s.sheet);
   const { intro, active, index, closedAt } = useTour();
+  const owner = useWs((s) => s.owner);
   const uid = user?.id;
 
-  // 로그인할 때 한 번: 하던 튜토리얼이 있으면 잇고, 아직 답하지 않았고 로드맵·초안이 없는 계정이면 따라갈지 묻는다
+  // 로그인할 때 한 번: 하던 튜토리얼이 있으면 잇고, 아직 답하지 않았고 로드맵·초안이 없는 계정이면 따라갈지 묻는다.
+  // 로그인 직후에는 계정이 먼저 정해지고 작업 공간은 조금 뒤에 온다. 빈 작업 공간을 보고 기존 사용자에게 묻지 않도록,
+  // 이 계정의 작업 공간을 받은 뒤(owner 가 이 계정)에 판정한다
+  const loaded = uid != null && owner === uid;
   useEffect(() => {
-    if (uid == null) return;
+    if (!loaded || uid == null) return;
     if (tourInProgress(uid)) startTour();
     else if (answered === false && !recs(ws()).length && !draftActive(ws())) useTour.setState({ intro: true });
-    return resetTour;
     // 답한 뒤에는 다시 판정하지 않는다
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [uid]);
+  }, [uid, loaded]);
+  useEffect(() => resetTour, [uid]);
 
   // 화면이 바뀌면 그 화면의 단계로 맞추고, 닫아 둔 안내를 다시 잇는다
   useEffect(() => {
