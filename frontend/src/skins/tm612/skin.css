@@ -9,7 +9,7 @@
    - 구간마다 다른 큰 사진 + 검은 막 위의 흰 제목 → 메뉴마다 다른 사진을 화면 머리(제목 자리)에 깔았다.
      원본은 글이 적어 사진 위에 바로 쓰지만, 이 서비스는 표·목록이 빽빽해 사진 위에서는 읽기 어렵다
      → 사진은 머리와 맨 아래 띠에만 두고, 내용 상자는 비치지 않는 어두운 바탕으로 했다.
-   - 시차: 머리 사진이 본문보다 느리게 올라간다(원본과 같은 감속 곡선). 맨 아래 띠는 사진이 창에 고정된 채 띠만 지나간다.
+   - 시차: 머리 사진이 본문보다 느리게 올라간다(원본과 같은 감속 곡선).
    - 상단 메뉴: 맨 위에서는 머리 사진 위에 얹힌 검은 막(.45 · 이때 뒤에 있는 것은 사진뿐이다), 40px 넘게 내려가면(본문이 메뉴 밑으로
      들어가기 전) 비치지 않는 바탕. 띠와 로그인 상자는 늘 비치지 않는 바탕. 원본의 흐림(blur)은 쓰지 않는다
      (내용 뒤로 사진이 흐리게 비치면 글자가 묻힌다)
@@ -37,11 +37,14 @@
   --tm-w12: rgba(255, 255, 255, .12);
   --tm-head: 'Oswald', 'Pretendard Variable', Pretendard, -apple-system, 'Malgun Gothic', sans-serif;
   --tm-ease: cubic-bezier(.22, 1, .36, 1);
-  /* 머리 사진 위의 검은 막: 글자가 놓이는 왼쪽은 조금 더 어둡게, 아래로 갈수록 바탕색에 녹아든다 */
+  /* 머리 사진 위의 검은 막: 글자가 놓이는 왼쪽은 조금 더 어둡게, 아래로 갈수록 바탕색에 녹아든다.
+     바탕색으로 끝나는 세로 막을 맨 위에 둔다(#280). 전에는 왼쪽 어두운 막이 그 위에 있어서, 사진 층이 끝나는 줄에서
+     왼쪽이 바탕(#0E0E0E)보다 어둡게 끊겨 보였다. mask 는 쓰지 않는다(시차로 움직이는 층에 걸면 스크롤할 때 자글거린다) */
   --tm-dim: .5;
   --tm-veil:
-    linear-gradient(90deg, rgba(0, 0, 0, .4) 0%, rgba(0, 0, 0, .18) 50%, rgba(0, 0, 0, 0) 85%),
-    linear-gradient(180deg, rgba(0, 0, 0, var(--tm-dim)) 0%, rgba(0, 0, 0, var(--tm-dim)) 38%, rgba(14, 14, 14, .88) 78%, #0E0E0E 100%);
+    linear-gradient(180deg, rgba(0, 0, 0, var(--tm-dim)) 0%, rgba(0, 0, 0, var(--tm-dim)) 38%, rgba(14, 14, 14, .74) 58%, rgba(14, 14, 14, .89) 72%,
+      rgba(14, 14, 14, .96) 84%, rgba(14, 14, 14, .99) 93%, #0E0E0E 100%),
+    linear-gradient(90deg, rgba(0, 0, 0, .4) 0%, rgba(0, 0, 0, .18) 50%, rgba(0, 0, 0, 0) 85%);
   --bg: #0E0E0E; --surface: #191919; --surface-2: #141414; --sunk: #272727; --line: #303030; --line-2: #4A4A4A;
   --ink: #FFFFFF; --ink-2: #E0E0E0; --ink-3: #B0B0B0; --ink-4: #8F8F8F;
   --warn: #FBBF24; --warn-soft: rgba(251, 191, 36, .12);
@@ -90,13 +93,22 @@
     opacity: 1;
   }
 
-  /* ── 맨 아래 띠: 사진은 창에 고정되고 띠만 지나가는 시차(원본의 구간 사이 사진 느낌) ── */
-  /* 내용이 짧아도 띠가 창 맨 아래에 놓이게 본문 높이를 채운다. 띠 위쪽은 서서히 나타나게 해서(mask) 머리 사진과 겹쳐도 끊겨 보이지 않는다 */
-  .main { position: relative; box-sizing: border-box; min-height: calc(100vh - var(--rib-h) - var(--nav-h)); padding: 56px 40px 190px; }
+  /* ── 맨 아래 띠: 내용이 끝난 자리에서 서서히 나타나는 사진(원본의 구간 사이 사진 느낌) ──
+     사진은 띠와 함께 움직인다. 창에 고정(fixed)하면 흐려지는 구간 밑으로 잔 불빛이 지나가며 스크롤할 때 자글거린다
+     어느 화면의 머리 사진과도 겹치지 않는 전용 사진(밤 도시의 불빛)을 모든 화면이 함께 쓴다(#280). 전에는 내 로드맵 머리와 같은
+     밤의 지구(bg-03.jpg)였고, 띠가 본문 아래쪽과 겹쳐 상자 옆으로 비쳤다 → 띠는 내용이 끝난 다음에 놓는다.
+     내용이 짧아도 띠가 창 맨 아래에 놓이게 본문 높이를 채운다.
+     foot.jpg: Florian Schindler · https://unsplash.com/photos/5PJe9BFNibY (Unsplash 라이선스 · 밤의 지구와 같은 짙은 남색 + 금빛 불빛.
+     불빛이 없는 맨 아래를 잘라 도시가 띠에 오게 했다) */
+  /* 띠가 선을 긋듯 시작하지 않게 위쪽을 길고 완만하게 흐린다(여러 단계의 mask). 맨 위 120px 은 거의 보이지 않아(16% 이하)
+     그만큼은 본문 아래 여백과 겹쳐 둔다 → 어두운 바탕에서 사진으로 끊김 없이 넘어간다 */
+  & { --tm-foot-h: 420px; --tm-foot-lap: 120px; }
+  .main { position: relative; box-sizing: border-box; min-height: calc(100vh - var(--rib-h) - var(--nav-h)); padding: 56px 40px calc(var(--tm-foot-h) - var(--tm-foot-lap)); }
   body:not(.auth) .main::after {
-    content: ''; position: absolute; z-index: -1; left: 0; right: 0; bottom: 0; height: 340px; pointer-events: none;
-    background: linear-gradient(rgba(14, 14, 14, .52), rgba(14, 14, 14, .62)), url('./bg-03.jpg') center 35% / cover fixed no-repeat;
-    -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 60%); mask-image: linear-gradient(180deg, transparent 0%, #000 60%);
+    content: ''; position: absolute; z-index: -1; left: 0; right: 0; bottom: 0; height: var(--tm-foot-h); pointer-events: none;
+    background: linear-gradient(rgba(14, 14, 14, .4), rgba(14, 14, 14, .52)), url('./foot.jpg') center 100% / cover no-repeat;
+    -webkit-mask-image: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, .05) 15%, rgba(0, 0, 0, .16) 30%, rgba(0, 0, 0, .36) 45%, rgba(0, 0, 0, .62) 60%, rgba(0, 0, 0, .86) 75%, #000 88%);
+    mask-image: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, .05) 15%, rgba(0, 0, 0, .16) 30%, rgba(0, 0, 0, .36) 45%, rgba(0, 0, 0, .62) 60%, rgba(0, 0, 0, .86) 75%, #000 88%);
   }
 
   /* ── 공통 모서리: 템플릿처럼 각지게 ── */
@@ -395,20 +407,27 @@
   .fab:hover { background: #D9D9D9; }
   .msg.me { background: #fff; }
 
-  /* ── 첫 화면 띠(.hero): 템플릿 첫 구간처럼 사진 위 가운데 큰 제목 ── */
+  /* ── 첫 화면 띠(.hero): 템플릿 첫 구간처럼 사진 위 가운데 큰 제목 ──
+     화면 머리 배경(bg-*.jpg)과 겹치지 않는 전용 사진이다(#280 · 전에는 학습 자료 화면 배경과 같은 bg-02.jpg 였다).
+     hero.jpg: Grant McIver · https://unsplash.com/photos/pmUEwPKL5IE (Unsplash 라이선스 · 세로 사진에서 지평선 둘레만 잘랐다) */
   .hero {
     padding: 64px 32px; text-align: center; border-color: var(--line);
-    background: linear-gradient(rgba(0, 0, 0, .58), rgba(0, 0, 0, .58)), url('./bg-02.jpg') center / cover no-repeat;
+    background: linear-gradient(rgba(0, 0, 0, .58), rgba(0, 0, 0, .58)), url('./hero.jpg') center / cover no-repeat;
   }
   .hero .t, .hero .lead { text-shadow: 0 1px 16px rgba(0, 0, 0, .6); }
   .hero .actions { justify-content: center; }
   .hero .actions .btn.pri { flex: 0 1 auto; padding-inline: 45px; }
 
-  /* ── 홈 '나의 학습 공간' 카드: 사진(템플릿 About 사진 · 모서리는 다른 상자처럼 각지게) + 흰 번호 ── */
+  /* ── 홈 '나의 학습 공간' 카드: 사진(모서리는 다른 상자처럼 각지게) + 흰 번호 ──
+     화면 머리 배경(bg-*.jpg)과 파일도 소재도 겹치지 않는 카드 전용 사진이다(#280).
+     템플릿에 남는 사진이 없어 Unsplash 라이선스 사진을 640px 폭으로 줄여 넣었다
+     - card-roadmap.jpg: Eugene Triguba · https://unsplash.com/photos/jwAkA8JUpZY
+     - card-resources.jpg: Declan Sun · https://unsplash.com/photos/aon-6I6Y6uQ (원본의 붉은 기를 줄였다)
+     - card-growth.jpg: Jan Behnisch · https://unsplash.com/photos/LEjOvw6XEkM */
   .ls-card .ls-art { height: 170px; margin: 22px 0 20px; border-radius: 0; background-size: cover; background-position: center; mix-blend-mode: normal; }
-  .ls-card:nth-child(1) .ls-art { background-image: url('./bg-03.jpg'); }
-  .ls-card:nth-child(2) .ls-art { background-image: url('./about-02.jpg'); }
-  .ls-card:nth-child(3) .ls-art { background-image: url('./bg-05.jpg'); }
+  .ls-card:nth-child(1) .ls-art { background-image: url('./card-roadmap.jpg'); }
+  .ls-card:nth-child(2) .ls-art { background-image: url('./card-resources.jpg'); }
+  .ls-card:nth-child(3) .ls-art { background-image: url('./card-growth.jpg'); }
   .ls-card { transition: border-color .15s ease, background-color .15s ease; }
   .ls-card:hover { border-color: #fff; background-color: #1F1F1F; box-shadow: none; transform: none; }
   .ls-card:nth-child(n) { --ls-c: #fff; }
@@ -439,16 +458,13 @@
     .side .nav a.on { background: transparent; color: #fff; box-shadow: inset 0 -2px 0 #fff; }
     .side a.me { border-color: var(--tm-w20); background: transparent; color: #fff; }
     .side .logout { color: inherit; }
-    .main { padding: 32px 16px 170px; }
+    & { --tm-foot-h: 280px; --tm-foot-lap: 90px; }
+    .main { padding: 32px 16px calc(var(--tm-foot-h) - var(--tm-foot-lap)); }
     .t { font-size: 26px; }
     .t.lg { font-size: 30px; }
     .hero { padding: 40px 20px; }
     body.auth .main { padding: 24px 16px; }
     .adm-panel { top: var(--rib-h); }
-  }
-  /* 원본처럼 좁은 화면에서는 시차를 끈다(맨 아래 띠의 사진 고정도 풀어 둔다) */
-  @media (max-width: 768px) {
-    body:not(.auth) .main::after { background-attachment: scroll, scroll; }
   }
 
   /* ════════════ 움직임 ════════════ */
@@ -463,6 +479,5 @@
   }
   @media (prefers-reduced-motion: reduce) {
     body::before { transition: none; }
-    body:not(.auth) .main::after { background-attachment: scroll, scroll; }
   }
 }
