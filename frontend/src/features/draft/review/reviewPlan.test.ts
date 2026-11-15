@@ -37,6 +37,13 @@ describe('검토 선택과 확정 계획의 시간 기준', () => {
     expect(card).not.toContain('가격 확인 필요'); expect(card).toContain('1,000원');
     expect(stats).toContain('강좌 시간 기준 · 13시간 30분'); expect(stats).not.toContain('과제 별도'); expect(proposal).toEqual(original);
   });
+  it('저장된 추천에 도서 가격이 남아 있어도 합계에 더하지 않는다', () => {
+    const {materials, proposal, handoff} = fixture();
+    materials.recommendations!.skills[0].courses[0].cost = 0;
+    materials.recommendations!.skills[0].books[0].cost = 23000;
+    const result = reviewPlan(proposal, [proposal], {}, materials, handoff, 'SQL');
+    expect(result.plan).toMatchObject({cost: 0, costUnknown: false});
+  });
   it('과제를 해제하면 합계에서만 제외하고 카드에는 재선택할 활동을 남긴다', () => {
     const {materials, proposal, handoff} = fixture(); proposal.selectedIds = ['c', 'b'];
     const result = reviewPlan(proposal, [proposal], {}, materials, handoff, 'SQL');

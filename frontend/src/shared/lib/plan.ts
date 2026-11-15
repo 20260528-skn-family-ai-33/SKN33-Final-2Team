@@ -18,6 +18,19 @@ export function planWeeklyHours(handoffHours?: number | null, optionHours?: numb
 }
 
 type PlanResource = Pick<Resource, 'hours' | 'cost' | 'estimated' | 'timeNote' | 'type'> & { kind?: Resource['kind'] };
+/** 도서는 가격을 받지 않기로 해서 합계·미확인 판단에서 뺀다(서버 course_levels.book_cost와 같은 기준) */
+const isBookLike = (r: Pick<PlanResource, 'type' | 'kind'> | null | undefined): boolean => r?.type === 'book' || r?.kind === '도서';
+/** 도서를 뺀 자료 비용. 합계는 아는 값만 더하고, 모르는 강좌·자격이 있으면 unknown */
+function paidCost(ids: string[], lookup: (id: string) => PlanResource | null | undefined): { cost: number; unknown: boolean } {
+  let cost = 0, unknown = false;
+  for (const id of new Set(ids)) {
+    const r = lookup(id);
+    if (isBookLike(r)) continue;
+    if (!r || r.cost == null) unknown = true;
+    else cost += r.cost;
+  }
+  return { cost, unknown };
+}
 export function buildPlan(def: OptionDef, prm: Partial<PlanParams>, goal: string,
   lookup: (id: string | null | undefined) => PlanResource | null = resOf): PlanContent {
   const p: PlanParams = { start: 1, hours: 4, format: 'mixed', patch: {}, ...prm };
@@ -62,8 +75,7 @@ export function buildPlan(def: OptionDef, prm: Partial<PlanParams>, goal: string
   });
   const weeks = def.materialSchedule?.length ? studyWeeks : Math.max(1, Math.ceil(cum / p.hours));
   const resIds = [...new Set(acts.map((a) => a.res).filter(Boolean) as string[])];
-  const cost = resIds.reduce((s, r) => s + (lookup(r)?.cost || 0), 0);
-  const costUnknown = resIds.some((r) => !lookup(r) || (lookup(r)?.type !== 'book' && lookup(r)?.kind !== '도서' && lookup(r)?.cost == null));
+  const { cost, unknown: costUnknown } = paidCost(resIds, lookup);
   return applyMaterialSchedule({
     displayTitle: def.displayTitle,
     opt: def.id,
@@ -168,9 +180,15 @@ export const costSuffix = (r: Resource | null | undefined): string => {
   const text = costText(r);
   return text ? ` · ${text}` : '';
 };
-/** 저장된 계획의 '비용 미확인' 표시. 도서 때문에 저장된 미확인 값은 무시한다(자료 목록을 아직 못 불러오면 저장값 유지) */
-export const hasUnknownCost = (pl: Pick<PlanContent, 'costUnknown'> & { acts?: Pick<Activity, 'res'>[] }): boolean =>
-  !!pl.costUnknown && (!pl.acts || pl.acts.some((a) => a.res && !isBookActivity(a) && resOf(a.res)?.cost == null));
+/** 저장된 계획의 '비용 미확인' 표시. 도서만 미확인 원인이었다고 확인될 때만 지운다:
+    도서를 뺀 자료의 현재 가격이 모두 확인되고, 그 합계가 저장된 합계와 같아야 한다.
+    확정 뒤 강좌 가격이 새로 등록돼 합계가 달라졌거나 자료 목록을 아직 못 불러오면 저장값을 유지한다 */
+export const hasUnknownCost = (pl: Pick<PlanContent, 'costUnknown' | 'cost'> & { acts?: Pick<Activity, 'res'>[] }): boolean => {
+  if (!pl.costUnknown) return false;
+  if (!pl.acts) return true;
+  const now = paidCost(pl.acts.flatMap((a) => (a.res ? [a.res] : [])), resOf);
+  return now.unknown || now.cost !== pl.cost;
+};
 
 export function actMeta(a: Pick<Activity, 'task' | 'res'>): string {
   if (a.task) return '직접 수행 과제';

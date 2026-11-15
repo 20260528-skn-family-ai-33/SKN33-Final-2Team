@@ -57,10 +57,22 @@ describe('buildPlan', () => {
   });
 
   it('도서 때문에 저장된 확인 필요 표시는 무시하고, 강좌 때문이면 유지한다', () => {
-    expect(hasUnknownCost({ costUnknown: true, acts: [{ res: 'r-book' }, { res: 'r-course' }] })).toBe(false);
-    expect(hasUnknownCost({ costUnknown: true, acts: [{ res: 'r-book' }, { res: 'r-course-unknown' }] })).toBe(true);
-    expect(hasUnknownCost({ costUnknown: true })).toBe(true);
-    expect(hasUnknownCost({ costUnknown: false, acts: [{ res: 'r-course-unknown' }] })).toBe(false);
+    expect(hasUnknownCost({ costUnknown: true, cost: 0, acts: [{ res: 'r-book' }, { res: 'r-course' }] })).toBe(false);
+    expect(hasUnknownCost({ costUnknown: true, cost: 0, acts: [{ res: 'r-book' }, { res: 'r-course-unknown' }] })).toBe(true);
+    expect(hasUnknownCost({ costUnknown: true, cost: 0 })).toBe(true);
+    expect(hasUnknownCost({ costUnknown: false, cost: 0, acts: [{ res: 'r-course-unknown' }] })).toBe(false);
+  });
+
+  it('확정 뒤 강좌 가격이 새로 등록돼 저장 합계와 다르면 확인 필요 표시를 유지한다(무료로 보이지 않게)', () => {
+    mergeRes({ 'r-course-later': { id: 'r-course-later', title: '나중에 가격 등록', provider: '외부', kind: '강좌', hours: 1, cost: 48000 } });
+    // 확정 당시 가격 미확인이라 합계 0원·미확인으로 저장된 계획
+    expect(hasUnknownCost({ costUnknown: true, cost: 0, acts: [{ res: 'r-course-later' }, { res: 'r-book' }] })).toBe(true);
+    expect(hasUnknownCost({ costUnknown: true, cost: 48000, acts: [{ res: 'r-course-later' }, { res: 'r-book' }] })).toBe(false);
+  });
+
+  it('합계에 도서 가격을 더하지 않는다', () => {
+    const priced = (id: string | null | undefined) => (id === 'r-book' ? { type: 'book' as const, hours: null, cost: 23000 } : resOf(id));
+    expect(buildPlan(def, { hours: 4 }, '목표', priced).cost).toBe(0);
   });
 
   it('도서는 비용 문구를 표시하지 않고 구분점도 붙이지 않는다', () => {
