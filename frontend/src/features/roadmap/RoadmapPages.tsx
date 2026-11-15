@@ -12,7 +12,7 @@ import { paths } from '@/app/paths';
 import { SkillMap } from '@/features/skillmap/SkillMap';
 import { RoadmapResources, RoadmapActivityList } from './RoadmapLearning';
 import { useGo } from '@/shared/hooks/useGo';
-import { count, isPlanComplete } from '@/shared/lib/plan';
+import { count, hasUnknownCost, isPlanComplete } from '@/shared/lib/plan';
 import { monthDay, planStart, startsLater } from '@/features/home/ganttCalc';
 import { commentSkillNames, currentWeekSkillNames } from './roadmapLearningData';
 import { useCatalog } from '@/shared/state/catalog';
@@ -138,7 +138,7 @@ function RoadLi({ R }: { R: PlanRecord }) {
               <dt>예상 비용</dt>
               <dd>
                 {won(pl.cost)}
-                {pl.costUnknown ? ' + 미확인 비용' : ''}
+                {hasUnknownCost(pl) ? ' + 미확인 비용' : ''}
               </dd>
             </div>
           </dl>

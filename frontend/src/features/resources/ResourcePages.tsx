@@ -8,7 +8,7 @@ import { paths } from '@/app/paths';
 import { resourceTime } from '@/shared/lib/resourceTime';
 import { courseDifficulty, courseDifficultyLevel } from '@/shared/lib/courseDifficulty';
 import { resourceSource } from '@/shared/lib/resourceSource';
-import { costText, stageName } from '@/shared/lib/plan';
+import { costSuffix, costText, stageName } from '@/shared/lib/plan';
 import { searchTerm } from '@/shared/lib/search';
 import { cause } from '@/shared/state/ai';
 import { mergeRes, resourceDetailQuery, useRes } from '@/shared/state/catalog';
@@ -71,9 +71,9 @@ export function ResKv({ r, showCurriculum = false }: { r: Resource; showCurricul
         <Est r={r} k="stage" /> · {r.format || '-'}
         <Est r={r} k="format" />
       </dd>
-      <dt>시간·비용</dt>
+      <dt>{costText(r) ? '시간·비용' : '시간'}</dt>
       <dd>
-        <span title={r.timeNote || undefined}>{resourceTime(r)}</span> · {costText(r)}
+        <span title={r.timeNote || undefined}>{resourceTime(r)}</span>{costSuffix(r)}
         {r.timeNote ? <><br /><span className="small muted">{r.timeNote}</span></> : null}
         {r.note ? (
           <>
@@ -224,7 +224,7 @@ export function ResourcesPage() {
                   <span className="grow">
                     <b>{r.title}</b>
                     <small className="muted" style={{ display: 'block', fontWeight: 400, fontSize: 13 }}>
-                      {r.kind} · {resourceSource(r)}{r.type === 'course' && ` · ${courseDifficulty(r)}`} · <span title={r.timeNote || undefined}>{resourceTime(r)}</span> · {costText(r)}
+                      {r.kind} · {resourceSource(r)}{r.type === 'course' && ` · ${courseDifficulty(r)}`} · <span title={r.timeNote || undefined}>{resourceTime(r)}</span>{costSuffix(r)}
                     </small>
                   </span>
                   {r.platform !== '사내교육' && (r.real ? <span className="tag line">실제 자료</span> : <span className="tag dash">가상</span>)}
@@ -248,8 +248,8 @@ export function ResourcesPage() {
         <p className="small muted">{total}건</p>
       )}
       <Note>
-        강좌는 제공처의 영상·학습 시간을 사용해요. 총시간을 확보하지 못한 강좌는 공개 커리큘럼 기준의 ‘계획 예상’ 시간을 일정에 사용하며 상세 화면에 근거를 표시해요. 관리자 화면에서 조정할 수 있어요. 도서 가격·응시료·K-MOOC 수강료는 확인이
-        필요해요.
+        강좌는 제공처의 영상·학습 시간을 사용해요. 총시간을 확보하지 못한 강좌는 공개 커리큘럼 기준의 ‘계획 예상’ 시간을 일정에 사용하며 상세 화면에 근거를 표시해요. 관리자 화면에서 조정할 수 있어요. 응시료·K-MOOC 수강료는 확인이 필요해요. 도서는
+        가격을 표시하지 않아요.
       </Note>
     </Page>
   );

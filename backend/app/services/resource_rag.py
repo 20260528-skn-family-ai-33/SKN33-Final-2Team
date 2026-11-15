@@ -80,7 +80,8 @@ def search_vectors(resource_type, ids, vector, limit, free_only, *, read=None):
     # 스킬·종류·사용 가능 여부는 ids에 반영하고, 최신 0원 조건도 LIMIT 이전에 적용한다.
     if not ids:return []
     read = read or db.all_
-    return read("""SELECT e.resource_id, m.cost_won AS current_cost,
+    # 도서는 가격을 받지 않아 0원으로 본다(course_levels.book_cost와 같은 기준).
+    return read("""SELECT e.resource_id, CASE WHEN e.resource_type='books' THEN 0 ELSE m.cost_won END AS current_cost,
             1-(e.embedding <=> CAST(:query AS vector)) AS similarity
         FROM public.learning_resource_embeddings e
         JOIN growpath_bge_meta.inputs p ON p.kind=e.resource_type AND p.source_id=e.resource_id
@@ -90,7 +91,7 @@ def search_vectors(resource_type, ids, vector, limit, free_only, *, read=None):
         WHERE e.resource_type=:kind AND e.resource_id=ANY(:ids)
             AND e.embedding_model=:model AND e.dimensions=:dims AND e.embedding IS NOT NULL
             AND e.input_version='db-resource-fields-and-skill-links/v1'
-            AND (NOT :free_only OR m.cost_won=0)
+            AND (NOT :free_only OR e.resource_type='books' OR m.cost_won=0)
         ORDER BY e.embedding <=> CAST(:query AS vector), e.resource_id LIMIT :limit""",
         query=json.dumps(vector,allow_nan=False),kind=resource_type,ids=ids,model=MODEL,dims=DIMENSIONS,
         revision=embeddings.PROVENANCE['model_revision'],limit=limit,free_only=free_only)

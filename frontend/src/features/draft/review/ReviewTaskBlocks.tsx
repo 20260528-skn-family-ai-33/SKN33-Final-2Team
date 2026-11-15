@@ -21,7 +21,7 @@ const priceOf = (resource: ReviewResource): string => resource.cost == null ? '�
 function MaterialRow({ resource, kind, activity }: { resource: ReviewResource; kind: 'course' | 'book'; activity?: Act }) {
   const meta = [
     resource.provider || '출처 미확인',
-    priceOf(resource),
+    kind === 'book' ? null : priceOf(resource),
     kind === 'course' && resource.difficulty ? courseDifficulty(resource) : null,
     kind === 'book' ? '일정에 넣지 않아요' : activity ? activityTime({ ...activity, res: activity.res ?? null }).text : null,
   ].filter(Boolean).join(' · ');

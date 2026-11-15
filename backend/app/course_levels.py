@@ -55,6 +55,11 @@ def is_free(cost) -> bool:
     return cost == 0 and not isinstance(cost, bool)
 
 
+def book_cost(resource_type: str | None, cost):
+    """도서 가격은 수집·표시하지 않기로 해서 비용 합계와 0원 조건에서 0원으로 본다."""
+    return 0 if resource_type == 'book' else cost
+
+
 def nonfree_course(record: dict) -> bool:
     return record.get('type') == 'course' and not is_free(record.get('cost'))
 

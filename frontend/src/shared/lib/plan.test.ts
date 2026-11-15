@@ -1,8 +1,8 @@
 /* 로드맵 계산: 주당 시간으로 주차를 나누는 규칙(서버도 같은 규칙으로 저장한다)과 비용 합계 */
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { OptionDef } from '@/api/types/draft';
-import { mergeRes } from '@/shared/state/catalog';
-import { buildPlan, count, isPlanComplete, nextAct, range } from './plan';
+import { mergeRes, resOf } from '@/shared/state/catalog';
+import { buildPlan, costSuffix, costText, count, hasUnknownCost, isPlanComplete, nextAct, range } from './plan';
 
 const def: OptionDef = {
   id: 'A1',
@@ -23,6 +23,7 @@ beforeAll(() => {
     'r-course': { id: 'r-course', title: '입문', provider: 'K-MOOC', kind: '강좌', hours: 6, cost: 0 },
     // 시간·비용을 모르는 자료: 시간은 2시간으로 보고 비용은 '확인 필요'
     'r-book': { id: 'r-book', title: '책', provider: '출판사', kind: '도서', hours: null, cost: null },
+    'r-course-unknown': { id: 'r-course-unknown', title: '가격 모름', provider: '외부', kind: '강좌', hours: 1, cost: null },
   });
 });
 
@@ -44,10 +45,29 @@ describe('buildPlan', () => {
     expect(pl.acts[0].wFrom).toBe(1);
   });
 
-  it('비용은 아는 값만 더하고, 모르는 자료가 있으면 확인 필요로 표시한다', () => {
+  it('도서는 가격을 보지 않아 0원으로 계산하고 확인 필요로 표시하지 않는다', () => {
     const pl = buildPlan(def, { hours: 4 }, '목표');
     expect(pl.cost).toBe(0);
+    expect(pl.costUnknown).toBe(false);
+  });
+
+  it('가격을 모르는 강좌가 있으면 확인 필요로 표시한다', () => {
+    const pl = buildPlan({ ...def, acts: [...def.acts, { id: 'a4', stage: 3, title: '가격 모르는 강좌', res: 'r-course-unknown' }] }, { hours: 4 }, '목표');
     expect(pl.costUnknown).toBe(true);
+  });
+
+  it('도서 때문에 저장된 확인 필요 표시는 무시하고, 강좌 때문이면 유지한다', () => {
+    expect(hasUnknownCost({ costUnknown: true, acts: [{ res: 'r-book' }, { res: 'r-course' }] })).toBe(false);
+    expect(hasUnknownCost({ costUnknown: true, acts: [{ res: 'r-book' }, { res: 'r-course-unknown' }] })).toBe(true);
+    expect(hasUnknownCost({ costUnknown: true })).toBe(true);
+    expect(hasUnknownCost({ costUnknown: false, acts: [{ res: 'r-course-unknown' }] })).toBe(false);
+  });
+
+  it('도서는 비용 문구를 표시하지 않고 구분점도 붙이지 않는다', () => {
+    expect(costText(resOf('r-book'))).toBe('');
+    expect(costSuffix(resOf('r-book'))).toBe('');
+    expect(costSuffix(resOf('r-course'))).toBe(' · 무료');
+    expect(costText(resOf('r-course-unknown'))).toBe('비용 확인 필요');
   });
 
   it('과제는 자료가 없으므로 과제 표시와 에이전트가 고른 스킬을 남긴다', () => {

@@ -28,11 +28,13 @@ describe('검토 선택과 확정 계획의 시간 기준', () => {
   it('카탈로그 전역 캐시 없이 현재 자료로 상단·카드를 함께 계산하고 원본을 보존한다', () => {
     const {materials, proposal, handoff} = fixture(), original = structuredClone(proposal);
     const result = reviewPlan(proposal, [proposal], {}, materials, handoff, 'SQL');
-    expect(result.plan).toMatchObject({weeks: 3, materialHours: 13.5, taskHours: 8, totalH: 21.5, cost: 1000, costUnknown: true});
+    expect(result.plan).toMatchObject({weeks: 3, materialHours: 13.5, taskHours: 8, totalH: 21.5, cost: 1000, costUnknown: false});
     expect(result.acts.find(act => act.res === 'book')).toMatchObject({hours: 10, catalogHours: 10});
     const card = renderToStaticMarkup(createElement(ReviewTaskBlocks, {...blocks, materials, acts: result.acts, selectedIds: proposal.selectedIds, busy: false}));
     const stats = renderToStaticMarkup(createElement(Stats, {pl: result.plan}));
     expect(card).toContain('일정에 넣지 않아요'); expect(card).not.toContain('계획 10시간');
+    // 도서는 가격을 표시하지 않고, 강좌 가격은 그대로 보인다
+    expect(card).not.toContain('가격 확인 필요'); expect(card).toContain('1,000원');
     expect(stats).toContain('강좌 시간 기준 · 13시간 30분'); expect(stats).not.toContain('과제 별도'); expect(proposal).toEqual(original);
   });
   it('과제를 해제하면 합계에서만 제외하고 카드에는 재선택할 활동을 남긴다', () => {

@@ -24,7 +24,7 @@ export function ReviewResourceCard({ resource, kind, activity, anchor, progress,
                 <ResourceImage image={resource.image} type={kind === '도서' ? 'book' : 'course'} alt={`${resource.title} 표지`} />
               </a> : <ResourceImage image={resource.image} type={kind === '도서' ? 'book' : 'course'} alt={`${resource.title} 표지`} />}
               <div><span className="small muted"><span className="review-kind-badge">{kind}</span> · {resource.provider || '출처 미확인'}{kind === '강좌' && resource.difficulty && ` · ${courseDifficulty(resource)}`}</span><h4>{onOpenResource ? <button type="button" className="review-resource-title" aria-label={`${resource.title} 실행 기록 열기`} onClick={() => onOpenResource()}>{resource.title}</button> : resource.title}</h4>
-                <span className="small muted">{resource.cost == null ? '가격 미확인' : resource.cost === 0 ? '무료' : `${resource.cost.toLocaleString()}원`}</span>
+                {kind === '강좌' && <span className="small muted">{resource.cost == null ? '가격 미확인' : resource.cost === 0 ? '무료' : `${resource.cost.toLocaleString()}원`}</span>}
                 {kind === '도서' ? <div className="small muted">일정 산정 제외</div> : activity && <div className="small muted" title={activityTime(activity).title}>{activityTime(activity).text}</div>}
                 {activity && progress?.[activity.id]?.memo && <p className="small muted">메모 · {progress[activity.id].memo}</p>}
                 {resource.url && <a href={resource.url} target="_blank" rel="noreferrer" className="review-material-link">{resource.provider === '사내교육' ? '사내교육 안내 보기' : '바로가기'} ↗</a>}
@@ -74,7 +74,7 @@ export function ReviewSkillBlocks({ materials, acts, busy, readOnly = false, onS
     const open = onOpenResource && !busy ? () => onOpenResource(owning[0], resource.id) : undefined;
     const meta = [
       resource.provider || '출처 미확인',
-      resource.cost == null ? '가격 확인 필요' : resource.cost === 0 ? '무료' : `${resource.cost.toLocaleString('ko-KR')}원`,
+      kind === 'book' ? null : resource.cost == null ? '가격 확인 필요' : resource.cost === 0 ? '무료' : `${resource.cost.toLocaleString('ko-KR')}원`,
       kind === 'course' && resource.difficulty ? courseDifficulty(resource) : null,
       kind === 'book' ? '일정에 넣지 않아요' : activity ? activityTime(activity).text : null,
     ].filter(Boolean).join(' · ');
