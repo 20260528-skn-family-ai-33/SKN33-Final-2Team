@@ -176,7 +176,7 @@ function ScopedDeliverableSelection({ ref, onReadyChange, onBusyChange, onPlanCh
   }
   const skillsWithTasks = Object.keys(alternatives);
   const chosenCount = skillsWithTasks.filter(skill => alternatives[skill].some(item => proposal?.selectedIds.includes(item.task.id))).length;
-  return <section className="step-sec" aria-label="산출물 과제 고르기">
+  return <section className="step-sec" data-tour="tasks" aria-label="산출물 과제 고르기">
     <header className="step-sec-head">
       <span className="step-num">2</span>
       <div>

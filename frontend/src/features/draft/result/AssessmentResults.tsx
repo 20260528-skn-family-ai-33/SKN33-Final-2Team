@@ -23,7 +23,7 @@ export function AssessmentResults() {
 function ResultSummary({ survey }: { survey: Stored }) {
   const summary = assessmentSummary(survey, survey.answers);
   return (
-    <section className="card result-summary" aria-label="역량 테스트 결과 요약">
+    <section className="card result-summary" data-tour="result-summary" aria-label="역량 테스트 결과 요약">
       <h2>한눈에 보기</h2>
       {summary.quizTotal ? <p className="result-summary-lead">퀴즈 <b>{summary.quizTotal}문항 중 {summary.quizCorrect}문항</b>을 맞혔어요.</p> : null}
       <ul>

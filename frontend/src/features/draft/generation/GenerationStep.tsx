@@ -130,7 +130,7 @@ function GenProgress({ d, done }: { d: DraftDoc; done: boolean }) {
   }, [done]);
   const sec = Math.max(0, Math.floor((now - start) / 1000));
   return (
-    <div className={`gen-progress${done ? ' done' : ''}`}>
+    <div className={`gen-progress${done ? ' done' : ''}`} data-tour="gen-wait">
       <div className="gen-progress-head">
         <b role="status" aria-live="polite">{done ? `${sts.length}안 모두 작성 완료` : `${sts.length}안 중 ${ok}안 작성 완료`}</b>
         {!done && <span className="small muted" aria-hidden="true">기다린 시간 {Math.floor(sec / 60)}:{String(sec % 60).padStart(2, '0')}</span>}
@@ -172,7 +172,7 @@ export function GenerationStep() {
   }, []);
   const g = r ? genState(r.rows) : { running: true, ok: 0, fail: 0 };
   const rows = (
-    <div className="agents">
+    <div className="agents" data-tour="gen-rows">
       {D.optionOrder.map((id) => (
         <GenRowView key={id} d={d} id={id} />
       ))}
@@ -250,7 +250,7 @@ export function GenerationStep() {
               <Icon name="left" />
               이전
             </button>
-            <button className="btn pri" disabled={!done} onClick={() => go(paths.newOptions)}>
+            <button className="btn pri" data-tour="gen-next" disabled={!done} onClick={() => go(paths.newOptions)}>
               세 코스 비교하기
             </button>
           </>

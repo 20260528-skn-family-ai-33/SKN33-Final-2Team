@@ -1,8 +1,11 @@
 """인증·내 정보·AI 모델·시연 도구 (API-01~08, 10~13)."""
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import ProgrammingError
 
 from .. import db, llm, provider_keys, provider_policy, regulation_embeddings
 from ..agents import runtime as rt
@@ -14,6 +17,7 @@ from ..services import demo, goals, profile
 from . import job_response
 
 r = APIRouter(prefix='/api/v1')
+logger = logging.getLogger(__name__)
 
 
 @r.get('/console/capabilities')
@@ -30,11 +34,21 @@ def _settings(employee_id: int, selection: tuple[str, str | None] | None = None)
             'reasoning': (s.get('reasoning') or {}) if policy == 'employee' else ({policy: level} if level else {})}
 
 
+def _tutorial_answered(employee_id: int) -> bool:
+    """새 로드맵 작성 튜토리얼을 볼지 묻는 팝업에 답했는지(#277). 값이 NULL 이거나 설정 행이 없으면 아직 답하지 않은 계정이다.
+    열이 없는 DB(migrate_tutorial_prompt.sql 미적용)에서는 로그인까지 막지 않도록 답한 것으로 보고 팝업을 띄우지 않는다"""
+    try:
+        return db.val('SELECT tutorial_answered_at FROM app_ext.user_settings WHERE employee_id = :e', e=employee_id) is not None
+    except ProgrammingError:
+        logger.warning('tutorial_answered_at 열을 읽지 못해 튜토리얼을 띄우지 않음: backend/db/migrate_tutorial_prompt.sql 적용 필요')
+        return True
+
+
 def _me(a: Account) -> dict:
     if a.type == 'admin':
         return {'accountType': 'admin', 'admin': {'id': a.id, 'name': a.name}}
     v = profile.view(a.id)
-    return {'accountType': 'employee', 'user': v, **_settings(a.id)}
+    return {'accountType': 'employee', 'user': v, **_settings(a.id), 'tutorialAnswered': _tutorial_answered(a.id)}
 
 
 @r.post('/auth/login')
@@ -71,6 +85,16 @@ def api_accounts():
 @r.get('/me')
 def api_me(a: Account = Depends(require_account)):
     return _me(a)
+
+
+@r.put('/me/tutorial')
+def api_tutorial_answered(a: Account = Depends(require_employee)):
+    """튜토리얼 팝업에 답함(따라가기·건너뛰기 구분 없음). 처음 답한 시각을 남기고 다시 불러도 바꾸지 않는다"""
+    with db.tx() as t:
+        t.run("""INSERT INTO app_ext.user_settings(employee_id, tutorial_answered_at) VALUES(:e, now())
+                 ON CONFLICT (employee_id) DO UPDATE
+                   SET tutorial_answered_at = COALESCE(app_ext.user_settings.tutorial_answered_at, EXCLUDED.tutorial_answered_at)""", e=a.id)
+    return {'tutorialAnswered': True}
 
 
 @r.get('/me/profile')

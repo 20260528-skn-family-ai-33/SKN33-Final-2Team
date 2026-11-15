@@ -42,14 +42,14 @@ export function DetailsStep() {
               이전
             </button>
             {!ready ? <p className="actions-why" role="status">학습할 스킬 제안이 끝나고 하나 이상 선택하면 다음으로 넘어갈 수 있어요.</p> : null}
-            <button className="btn pri" disabled={!ready} onClick={() => { go(paths.newDetailsCheck); }}>
+            <button className="btn pri" data-tour="details-next" disabled={!ready} onClick={() => { go(paths.newDetailsCheck); }}>
               다음: {stepLabel('check')}
             </button>
           </>
         }
       >
         <DownstreamNotice />
-        <div className="card">
+        <div className="card" data-tour="conditions">
           <DetailsForm path="draft.prefs" learningConditionsOnly />
         </div>
         <InputSkills />
@@ -122,6 +122,7 @@ export function DetailsCheck() {
             </button>
             <button
               className="btn pri"
+              data-tour="check-next"
               disabled={summaryBusy || editingSummary}
               onClick={() => {
                 updateWs((s) => void (s.draft.detailsOk = true));
@@ -134,7 +135,7 @@ export function DetailsCheck() {
         }
       >
         <DownstreamNotice />
-        <div className="card input-confirm-box">
+        <div className="card input-confirm-box" data-tour="check">
         <section className="card check-goal" aria-labelledby="checkGoalTitle"><h2 id="checkGoalTitle">학습 목표</h2><p>{d.goal}</p></section>
         <details className="card check-goal check-project">
           <summary><span>프로젝트 요약</span><span className="check-project-more">더보기</span><span className="check-project-less">접기</span></summary>

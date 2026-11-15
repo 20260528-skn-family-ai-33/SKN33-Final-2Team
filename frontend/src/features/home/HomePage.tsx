@@ -74,7 +74,7 @@ function DraftBox() {
       </p>
       <Stepper cur={k} />
       <div className="actions" style={{ marginTop: 6 }}>
-        <button className="btn line" onClick={() => go(p)}>
+        <button className="btn line" data-tour="start" onClick={() => go(p)}>
           이어서 작성하기
         </button>
       </div>
@@ -263,7 +263,7 @@ export function HomePage() {
         <h1 className="t lg">어떤 역량을 키우고 싶나요?</h1>
         <p className="lead">목표와 학습 여건을 적고 역량 테스트에 답하면, 방식이 다른 로드맵 3안을 만들어 드려요.</p>
         <div className="actions">
-          <button className="btn pri" onClick={() => go(paths.newGoal)}>
+          <button className="btn pri" data-tour="start" onClick={() => go(paths.newGoal)}>
             새 로드맵 작성
           </button>
         </div>

@@ -8,6 +8,7 @@ import { AssistantHost } from '@/features/assistant/AssistantHost';
 import { DraftNavGuard } from '@/features/draft/stale';
 import { StartModeNavGuard } from '@/features/draft/startModeSheet';
 import { DemoTools } from '@/features/demo/DemoTools';
+import { TourHost } from '@/features/tutorial/TourHost';
 import { canClearHiddenDemoSettings, checkStatus, connFor, PROV, useAi, useAiMode } from '@/shared/state/ai';
 import { boot, isSup, meOf, useSession } from '@/shared/state/session';
 import { SheetHost, ToastHost } from '@/shared/ui/SheetHost';
@@ -174,6 +175,7 @@ export function AppShell() {
       {booted && acct?.accountType === 'employee' ? <AssistantHost /> : null}
       {booted && acct && !admin ? <DraftNavGuard /> : null}
       {booted && acct && !admin ? <StartModeNavGuard /> : null}
+      {booted && acct?.accountType === 'employee' ? <TourHost /> : null}
       <BrowserConsole />
       <SheetHost />
       <ToastHost />

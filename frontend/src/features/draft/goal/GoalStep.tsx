@@ -342,7 +342,7 @@ export function GoalStep() {
         foot={
           <>
             {!ok ? <p className="actions-why" role="status">{busy ? '기획서를 읽고 있어요. 다 읽으면 다음으로 넘어갈 수 있어요.' : '목표를 4자 이상 적거나 목표 후보를 골라 주세요.'}</p> : null}
-            <button className="btn pri" disabled={!ok} onClick={proceed}>
+            <button className="btn pri" data-tour="goal-next" disabled={!ok} onClick={proceed}>
               다음: {stepLabel('details')}
             </button>
           </>
@@ -350,14 +350,14 @@ export function GoalStep() {
       >
         <DownstreamNotice />
         <div className="card">
-          <div className="field">
+          <div className="field" data-tour="goal-input">
             <label>키우고 싶은 역량</label>
             <BText path="draft.goal" id="goalText" maxLength={300} ariaLabel="키우고 싶은 역량" placeholder={firstGoal || '목표 후보를 불러오거나 직접 작성해 주세요.'} />
             <p className="small muted">입력하지 않으면 첫 번째 목표 후보로 진행해요. 직접 작성하면 입력한 내용을 사용해요.</p>
             <GoalSuggestions />
           </div>
           <hr className="hr" />
-          <div className="field">
+          <div className="field" data-tour="doc">
             <label>
               적용할 프로젝트 기획서 <span className="muted small">선택</span>
             </label>

@@ -6,7 +6,7 @@ import { Icon } from './Icon';
 import { paths } from '@/app/paths';
 
 
-export function NavLink({ to, active, icon, label, dot }: { to: string; active: boolean; icon: string; label: ReactNode; dot?: boolean }) {
+export function NavLink({ to, active, icon, label, dot, tour }: { to: string; active: boolean; icon: string; label: ReactNode; dot?: boolean; tour?: string }) {
   const go = useGo();
   // 메뉴를 접으면 글자는 화면에서만 숨기므로(읽기 프로그램은 그대로 읽음), 마우스를 올리면 이름이 보이게 한다
   const collapsed = useSideMenu((s) => s.collapsed);
@@ -15,6 +15,7 @@ export function NavLink({ to, active, icon, label, dot }: { to: string; active: 
       href={to}
       className={active ? 'on' : ''}
       title={collapsed && typeof label === 'string' ? label : undefined}
+      data-tour={tour}
       onClick={(e) => {
         e.preventDefault();
         go(to);
