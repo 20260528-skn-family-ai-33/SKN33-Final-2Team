@@ -11,7 +11,7 @@ import { Icon } from '@/shared/ui/Icon';
 import { draftActive, recs, useWs, ws } from '@/shared/state/workspace';
 import { afterReveal } from '@/skins/afterReveal';
 import { holeOf, placeAway, placeNote, type Box, type NotePlace } from './spot';
-import { isTourEnd, stepForPath, TOUR_STEPS, type TourStep } from './steps';
+import { isTourEnd, screenCount, screenNo, stepForPath, TOUR_STEPS, type TourStep } from './steps';
 import { answerIntro, closeHere, nextStep, resetTour, startTour, stopTour, tourInProgress, useTour } from './tourStore';
 import './tour.css';
 
@@ -231,7 +231,6 @@ function Overlay({ spot, noteRef, pathname }: { spot: Spot; noteRef: React.RefOb
   const { hole, note } = spot;
   const away: Box = { x: Math.round(vw / 2), y: note.side === 'up' ? -40 : vh + 40, w: 0, h: 0 };
   const lit = entered ? hole || away : { x: 0, y: 0, w: vw, h: vh };
-  const total = TOUR_STEPS.length;
   return (
     <div className={`tour${moving ? ' is-moving' : ''}${spot.waiting ? ' is-waiting' : ''}`} data-side={note.side} data-end={note.end ? '' : undefined}>
       {/* 바깥 누름 막기: 구멍 둘레 네 면(구멍 안은 그대로 누를 수 있다). 대상이 화면 밖이면 전체를 막는다 */}
@@ -253,7 +252,7 @@ function Overlay({ spot, noteRef, pathname }: { spot: Spot; noteRef: React.RefOb
           <path d="M17 20 28 6l11 14" />
         </svg>
         <p className="tour-count">
-          <b>{String(spot.index + 1).padStart(2, '0')}</b> / {total}
+          <b>{screenNo(spot.index)}</b> / {screenCount}
         </p>
         <p className="tour-text" key={spot.key}>
           {spot.waiting ? <span className="sp" aria-hidden="true" /> : null}

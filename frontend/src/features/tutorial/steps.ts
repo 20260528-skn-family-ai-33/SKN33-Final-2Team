@@ -115,5 +115,10 @@ export function stepForPath(index: number, pathname: string): number {
   return cur && cur.path === TOUR_STEPS[first].path ? index : first;
 }
 
+/** 사용자에게 보이는 진행 숫자: 단계가 아니라 화면 단위로 센다(한 화면의 안내 여러 개는 같은 번호) */
+const SCREENS: string[] = [...new Set(TOUR_STEPS.map((s) => s.screen))];
+export const screenCount = SCREENS.length;
+export const screenNo = (index: number): number => SCREENS.indexOf(TOUR_STEPS[index]?.screen ?? '') + 1;
+
 /** 로드맵을 확정한 직후의 화면이면 튜토리얼을 끝낸다 */
 export const isTourEnd = (pathname: string): boolean => /^\/roadmaps\/[^/]+\/confirmed$/.test(pathname);

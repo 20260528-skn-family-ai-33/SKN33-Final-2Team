@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { paths } from '@/app/paths';
 import { STEPS } from '@/features/draft/model';
 import { holeOf, placeAway, placeNote } from './spot';
-import { firstStepFor, isTourEnd, stepForPath, TOUR_STEPS } from './steps';
+import { firstStepFor, isTourEnd, screenCount, screenNo, stepForPath, TOUR_STEPS } from './steps';
 
 const at = (id: string): number => TOUR_STEPS.findIndex((s) => s.id === id);
 
@@ -16,6 +16,18 @@ describe('튜토리얼 단계 정의', () => {
 
   it('작성 흐름의 모든 단계 화면에 안내가 하나 이상 있다', () => {
     for (const [, , path] of STEPS) expect(TOUR_STEPS.some((s) => s.path === path)).toBe(true);
+  });
+
+  it('보이는 진행 숫자는 화면 단위다: 같은 화면의 안내는 같은 번호, 화면이 바뀌면 1씩 늘어 끝 번호로 끝난다', () => {
+    expect(screenCount).toBe(new Set(TOUR_STEPS.map((s) => s.screen)).size);
+    expect(screenCount).toBeLessThan(TOUR_STEPS.length);
+    expect(screenNo(0)).toBe(1);
+    expect(screenNo(TOUR_STEPS.length - 1)).toBe(screenCount);
+    TOUR_STEPS.forEach((s, i) => {
+      if (!i) return;
+      const same = TOUR_STEPS[i - 1].screen === s.screen;
+      expect(screenNo(i) - screenNo(i - 1)).toBe(same ? 0 : 1);
+    });
   });
 
   it("말풍선의 '다음'을 여는 대상은 같은 화면의 단계 대상이다", () => {
