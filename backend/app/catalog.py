@@ -107,7 +107,7 @@ def _load() -> dict:
         items[r['resource_key']] = dict({
             'id': r['resource_key'], 'type': t, 'title': title, 'provider': provider or '', 'kind': KIND[t],
             'format': m['format'] or '', 'hours': float(m['hours']) if m['hours'] is not None else None,
-            'cost': m['cost_won'], 'stage': m['stage'], 'real': bool(m['is_real']), 'skills': [s for s in sk if s],
+            'cost': course_levels.book_cost(t, m['cost_won']), 'stage': m['stage'], 'real': bool(m['is_real']), 'skills': [s for s in sk if s],
             'audience': m['audience'] or '', 'prereq': m['prereq'] or '', 'content': catalog_evidence.content_text(m['content'] or content),
             'note': m['note'] or ('단계·형식 등은 규칙으로 정한 계획값이에요' if {'format', 'stage'} & set(est) else ''),
             'url': url or '', 'image': image, 'source': m['source_label'] or source, 'checked': _date(m['checked_on']) or checked,

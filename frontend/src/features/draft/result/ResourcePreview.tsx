@@ -99,7 +99,7 @@ function PreviewPanel({ resource, kind, label, anchor, onDismiss }: Props & { la
     kind === 'book' && data?.author ? bookCredits(data.author) : null,
     kind === 'course' && (data?.difficulty || resource.difficulty) ? courseDifficulty(data ?? resource) : null,
     kind === 'course' && hours && hours > 0 ? hrs(hours) + ((data?.timeStatus ?? resource.timeStatus) === 'estimated' ? ' (추정)' : '') : null,
-    cost == null ? null : cost === 0 ? '무료' : `${cost.toLocaleString('ko-KR')}원`,
+    kind === 'book' || cost == null ? null : cost === 0 ? '무료' : `${cost.toLocaleString('ko-KR')}원`,
   ].filter(Boolean);
   // 포털은 카드 아래의 React 트리에 있으므로 패널 안 조작은 카드 선택으로 전달하지 않는다.
   function dismiss() { dialog.current?.close(); onDismiss(); }

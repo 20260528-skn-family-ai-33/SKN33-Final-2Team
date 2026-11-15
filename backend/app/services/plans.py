@@ -101,6 +101,12 @@ def _base_rows(employee_id: int, roadmap_id: str | None = None) -> list[dict]:
             return []
     return db.all_("""SELECT r.roadmap_id, r.project_id, r.content, r.created_at, r.diagnostic_round_id,
                          p.status::text AS status,
+                         (SELECT jsonb_object_agg(s.details->>'res', jsonb_build_array(
+                                     EXISTS (SELECT 1 FROM public.roadmap_step_resources sr
+                                             WHERE sr.step_id = s.step_id AND sr.isbn IS NOT NULL),
+                                     s.estimated_cost))
+                          FROM public.roadmap_steps s
+                          WHERE s.roadmap_id = r.roadmap_id AND s.details->>'res' IS NOT NULL) AS step_prices,
                          p.employee_id, m.version, coalesce(m.done_at, CASE WHEN p.status = 'COMPLETED' THEN report.created_at END) AS done_at, m.archived_at, m.resumed_at
                       FROM public.roadmaps r JOIN public.projects p ON p.project_id = r.project_id
                       LEFT JOIN app_ext.roadmap_meta m ON m.roadmap_id = r.roadmap_id
@@ -236,6 +242,32 @@ def _revision(roadmap_id: str) -> dict | None:
                      WHERE roadmap_id = CAST(:r AS uuid) AND status IN ('running', 'ready', 'failed') ORDER BY created_at DESC LIMIT 1""", r=roadmap_id)
 
 
+def _display_book_cost(plan: dict, step_prices: dict | None, skills: list) -> None:
+    """조회용 사본에서만, 당시 자료 가격이 저장 합계와 맞으면 도서분을 뺀다."""
+    if not plan.get('cost') and not plan.get('costUnknown'):
+        return
+    ids = {act['res'] for act in plan.get('acts', []) if act.get('res')}
+    prices = step_prices
+    if not prices:
+        # 이전 버전은 현재 활동 표를 공유하지 않고 그 버전에 저장된 추천 가격만 쓴다.
+        prices = {item['id']: (kind == 'books', item['cost'])
+                  for skill in skills for kind in ('courses', 'books')
+                  for item in skill.get(kind, []) if 'cost' in item}
+    if not ids or not ids.issubset(prices):
+        return
+    selected = [prices[key] for key in ids]
+    if not any(book for book, _ in selected):
+        return
+    all_costs = [cost for _, cost in selected]
+    if any(cost is not None and type(cost) not in (int, float) for cost in all_costs):
+        return
+    if (sum(cost or 0 for cost in all_costs), None in all_costs) != (plan.get('cost'), plan.get('costUnknown')):
+        return
+    nonbook_costs = [cost for book, cost in selected if not book]
+    plan['cost'] = sum(cost or 0 for cost in nonbook_costs)
+    plan['costUnknown'] = any(cost is None for cost in nonbook_costs)
+
+
 def record(row: dict, for_mgr: bool = False) -> dict:
     rid = str(row['roadmap_id'])
     plan = dict(row['content'], rid=rid)
@@ -247,6 +279,8 @@ def record(row: dict, for_mgr: bool = False) -> dict:
         definition = snapshot.get('def') or {}
         report = definition.get('learningReport') or {}
         recs = report.get('recommendations') or {}
+        current = snapshot is plan or (plan.get('version') is not None and snapshot.get('version') == plan['version'])
+        _display_book_cost(snapshot, row.get('step_prices') if current else None, recs.get('skills') or [])
         if recs.get('skills'):
             skills = [dict(skill, books=catalog.refresh_book_links(skill.get('books') or []),
                            courses=catalog.refresh_course_levels(skill.get('courses') or [])) for skill in recs['skills']]

@@ -41,7 +41,8 @@ export function usePrepareMaterials() {
   },[id,generation,optionsKey]);
 }
 function ResourceCard({ resource, kind, checked, disabled, preload = false, onChange }: { resource: Resource; kind: 'course' | 'book'; checked: boolean; disabled?: boolean; preload?: boolean; onChange: () => void }) {
-  const price = resource.cost == null ? '가격 미확인' : resource.cost === 0 ? '무료' : `${resource.cost.toLocaleString('ko-KR')}원`;
+  // 도서는 가격을 받지 않기로 해서 표시하지 않는다
+  const price = kind === 'book' ? '' : resource.cost == null ? ' · 가격 미확인' : resource.cost === 0 ? ' · 무료' : ` · ${resource.cost.toLocaleString('ko-KR')}원`;
   return <article className={`v2-resource ${checked ? 'v2-resource-selected' : ''}`} role={kind === 'course' ? 'radio' : 'checkbox'} aria-checked={checked} aria-disabled={disabled} aria-label={resource.title} tabIndex={disabled ? -1 : 0}
     onClick={event => { if (!disabled && !(event.target as HTMLElement).closest('a,button,input,label')) onChange(); }}
     onKeyDown={event => { if (event.target === event.currentTarget && !disabled && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onChange(); } }}>
@@ -51,7 +52,7 @@ function ResourceCard({ resource, kind, checked, disabled, preload = false, onCh
       <span><b title={resource.title}>{resource.title}</b>{resource.aiRecommended && <span className="tag acc">AI 추천</span>}
         {resource.candidateKind === 'supplemental' && <span className="tag">보충 강좌</span>}</span>
     </label>
-    <div className="v2-resource-meta"><span>{resource.provider || '출처 미확인'} · {price}</span>
+    <div className="v2-resource-meta"><span>{resource.provider || '출처 미확인'}{price}</span>
     {kind === 'course' && resource.difficulty && <span>{courseDifficulty(resource)}</span>}
     <span>{kind === 'book' ? '일정 산정 제외' : resource.hours && resource.hours > 0 && resource.timeStatus !== 'unknown' ? `${hrs(resource.hours)}${resource.timeStatus === 'estimated' || resource.estimated?.includes('hours') ? ' (추정)' : ''}` : '시간 미확인 · 일정 1주 가정'}</span></div>
     {kind === 'course' && <UnverifiedTargets topics={resource.unverifiedTargetTopics} />}</div>
@@ -225,7 +226,6 @@ function ResultSelection({ editorRef, onChoicesChanged, locked = false, courseId
           <details className="material-kind material-kind-books" open={sectionOpen?.books??true} onToggle={event=>{if(sectionOpen&&event.currentTarget.open!==sectionOpen.books)onSectionToggle?.('books',event.currentTarget.open);}}><summary><span>도서</span>
             {showModelCounts && <ModelCandidateRatio counts={skill.modelBookCounts} />}
             <small>선택 {selected.books.length} / 최대 3권</small><span className="material-kind-chevron" aria-hidden="true">⌄</span></summary>
-          {zeroBudget && skill.books.some(book => book.cost !== 0) && <p className="small muted">유료 도서를 선택하면 예산 0원을 초과해요. 가격 미확인 도서는 선택 전에 금액을 확인해 주세요.</p>}
           {skill.books.length > 0 && <div className="v2-resource-grid">{skill.books.map(resource => <ResourceCard key={resource.id} resource={resource} kind="book" checked={selected.books.includes(resource.id)} disabled={locked || busy || excluded || (!selected.books.includes(resource.id) && selected.books.length >= 3)} onChange={() => selectBook(skill.name, resource.id)} />)}</div>}
           <MaterialReason kind="도서" diagnostic={skill.bookDiagnostic} hasOptions={skill.books.length > 0}
             fallback={hasLegacyBookCandidates ? '도서 후보는 있지만 이번 추천에서는 선정되지 않았어요.' : '이 스킬에 추천할 도서가 없어요.'} />

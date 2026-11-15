@@ -1,6 +1,6 @@
 """무료 강좌 조건을 확정하는 트랜잭션에서 최신 가격을 잠그고 검증한다."""
 from . import db
-from .course_levels import zero_budget
+from .course_levels import book_cost, zero_budget
 from .errors import ApiError
 
 
@@ -39,6 +39,7 @@ def validate_free_plan(t: db.Tx, plan: dict, *, budget=None, previous: dict | No
             raise ApiError(409, 'ZERO_BUDGET_PRICE_CHANGED',
                            '예산 0원으로 선택할 수 없는 자료가 있어요. ' +
                            ('무료 강좌로 수정안을 다시 요청해 주세요.' if previous is not None else '최신 무료 강좌로 다시 선택해 주세요.'))
-    # 강좌 0원 조건을 검증하고 도서는 최신 가격을 합산한다. 미확인 도서 가격은 별도 표시한다.
-    plan['cost'] = sum(prices[key]['cost_won'] or 0 for key in keys) if keys else 0
-    plan['costUnknown'] = any(prices[key]['cost_won'] is None for key in keys) if keys else False
+    # 강좌 0원 조건을 검증하고 최신 가격을 합산한다. 도서는 가격을 받지 않아 0원으로 본다.
+    costs = [book_cost(prices[key].get('resource_type'), prices[key]['cost_won']) for key in keys]
+    plan['cost'] = sum(cost or 0 for cost in costs)
+    plan['costUnknown'] = any(cost is None for cost in costs)

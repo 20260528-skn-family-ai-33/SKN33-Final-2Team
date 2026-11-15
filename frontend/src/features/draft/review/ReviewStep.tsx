@@ -9,6 +9,7 @@ import { addDays, followingStart, md, monthDay, planWeeks, today0 } from '@/feat
 import { SkillMap } from '@/features/skillmap/SkillMap';
 import { useGo } from '@/shared/hooks/useGo';
 import { hrs } from '@/shared/lib/format';
+import { planCostText } from '@/shared/lib/plan';
 import { recs, useWs } from '@/shared/state/workspace';
 import { Icon } from '@/shared/ui/Icon';
 import { Page, Stats } from '@/shared/ui/parts';
@@ -94,7 +95,6 @@ export function ReviewStep() {
   const weeks = reviewPlan ? planWeeks(reviewPlan) : null;
   const rows = reviewPlan ? reviewSchedule(reviewPlan) : [];
   const taskCount = reviewPlan ? reviewPlan.acts.filter(act => !act.res).length : 0;
-  const costText = (cost: number, unknown: boolean) => cost === 0 ? (unknown ? '가격 확인 필요' : '무료') : `${cost.toLocaleString('ko-KR')}원${unknown ? '+' : ''}`;
   /* 계산을 기다리는 동안에는 값 자리에 '계산 중…'을 적는다(점이 움직여 멈춘 화면으로 보이지 않는다 · #227). 실패하면 '—'.
      아래 설명 줄은 비워 두되 줄 높이는 남겨, 값이 들어와도 칸 높이가 그대로다 */
   const waiting = reviewError ? '—' : <Wait>계산 중…</Wait>;
@@ -131,7 +131,7 @@ export function ReviewStep() {
             </div>
             <div>
               <dt>예상 비용</dt>
-              <dd><b>{reviewPlan ? costText(reviewPlan.cost, reviewPlan.costUnknown) : waiting}</b>
+              <dd><b>{reviewPlan ? planCostText(reviewPlan) : waiting}</b>
                 <span>{reviewPlan?.costUnknown ? '일부 자료는 가격 확인 필요' : ' '}</span></dd>
             </div>
           </dl>
@@ -184,7 +184,7 @@ export function ReviewStep() {
           <div className="step-bar-sum" aria-live="polite">
             <b>{name || courseName}</b>
             {block ? <span className="step-bar-wait">{block}</span>
-              : reviewPlan && weeks != null ? <><span>{weeks}주</span><span>주 {reviewPlan.hours}시간</span><span>{costText(reviewPlan.cost, reviewPlan.costUnknown)}</span><span>과제 {taskCount}개</span></>
+              : reviewPlan && weeks != null ? <><span>{weeks}주</span><span>주 {reviewPlan.hours}시간</span><span>{planCostText(reviewPlan)}</span><span>과제 {taskCount}개</span></>
               : null}
           </div>
           <div className="step-bar-btns">

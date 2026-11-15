@@ -17,7 +17,20 @@ export function planWeeklyHours(handoffHours?: number | null, optionHours?: numb
   return handoffHours || optionHours || D.autoHours;
 }
 
-type PlanResource = Pick<Resource, 'hours' | 'cost' | 'estimated' | 'timeNote' | 'type'>;
+type PlanResource = Pick<Resource, 'hours' | 'cost' | 'estimated' | 'timeNote' | 'type'> & { kind?: Resource['kind'] };
+/** 도서는 가격을 받지 않기로 해서 합계·미확인 판단에서 뺀다(서버 course_levels.book_cost와 같은 기준) */
+const isBookLike = (r: Pick<PlanResource, 'type' | 'kind'> | null | undefined): boolean => r?.type === 'book' || r?.kind === '도서';
+/** 도서를 뺀 자료 비용. 합계는 아는 값만 더하고, 모르는 강좌·자격이 있으면 unknown */
+function paidCost(ids: string[], lookup: (id: string) => PlanResource | null | undefined): { cost: number; unknown: boolean } {
+  let cost = 0, unknown = false;
+  for (const id of new Set(ids)) {
+    const r = lookup(id);
+    if (isBookLike(r)) continue;
+    if (!r || r.cost == null) unknown = true;
+    else cost += r.cost;
+  }
+  return { cost, unknown };
+}
 export function buildPlan(def: OptionDef, prm: Partial<PlanParams>, goal: string,
   lookup: (id: string | null | undefined) => PlanResource | null = resOf): PlanContent {
   const p: PlanParams = { start: 1, hours: 4, format: 'mixed', patch: {}, ...prm };
@@ -62,8 +75,7 @@ export function buildPlan(def: OptionDef, prm: Partial<PlanParams>, goal: string
   });
   const weeks = def.materialSchedule?.length ? studyWeeks : Math.max(1, Math.ceil(cum / p.hours));
   const resIds = [...new Set(acts.map((a) => a.res).filter(Boolean) as string[])];
-  const cost = resIds.reduce((s, r) => s + (lookup(r)?.cost || 0), 0);
-  const costUnknown = resIds.some((r) => !lookup(r) || lookup(r)?.cost == null);
+  const { cost, unknown: costUnknown } = paidCost(resIds, lookup);
   return applyMaterialSchedule({
     displayTitle: def.displayTitle,
     opt: def.id,
@@ -160,12 +172,22 @@ export function diff(a: PlanContent, b: PlanContent, pd?: Pick<PendingRevision, 
   return ch;
 }
 
+/** 도서는 가격을 받지 않기로 해서 비용 문구를 표시하지 않는다(서버도 0원으로 계산) */
 export const costText = (r: Resource | null | undefined): string =>
-  !r ? '' : r.cost == null ? (r.kind === '자격' ? '응시료 확인 필요' : r.kind === '도서' ? '가격 확인 필요' : '비용 확인 필요') : r.cost ? won(r.cost) : '무료';
+  !r || isBookResource(r) ? '' : r.cost == null ? (r.kind === '자격' ? '응시료 확인 필요' : '비용 확인 필요') : r.cost ? won(r.cost) : '무료';
+/** 메타 줄 끝에 붙이는 ' · 비용'. 표시할 비용이 없으면 구분점도 붙이지 않는다 */
+export const costSuffix = (r: Resource | null | undefined): string => {
+  const text = costText(r);
+  return text ? ` · ${text}` : '';
+};
+export function planCostText({ cost, costUnknown }: Pick<PlanContent, 'cost' | 'costUnknown'>): string {
+  if (!cost) return costUnknown ? '가격 확인 필요' : '무료';
+  return won(cost) + (costUnknown ? '+' : '');
+}
 
 export function actMeta(a: Pick<Activity, 'task' | 'res'>): string {
   if (a.task) return '직접 수행 과제';
   const r = resOf(a.res);
   if (!r) return '등록 자료 (정보를 불러오지 못했어요)';
-  return `${r.kind} · ${resourceSource(r)}${r.real || r.platform === '사내교육' ? '' : ' · 가상'} · ${costText(r)}`;
+  return `${r.kind} · ${resourceSource(r)}${r.real || r.platform === '사내교육' ? '' : ' · 가상'}${costSuffix(r)}`;
 }

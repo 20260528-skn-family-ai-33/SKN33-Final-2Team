@@ -9,6 +9,8 @@ import { ReviewTaskBlocks } from './ReviewTaskBlocks';
 const noop = () => {};
 const blocks = { options: {}, onToggle: noop, onPick: noop, onPropose: noop, onChangeMaterials: noop };
 import { Stats } from '@/shared/ui/parts';
+import { planCostText } from '@/shared/lib/plan';
+import { mergeRes } from '@/shared/state/catalog';
 
 function fixture() {
   const materials: ReviewMaterials = { recommendations: { skills: [{ name: 'SQL',
@@ -28,12 +30,31 @@ describe('검토 선택과 확정 계획의 시간 기준', () => {
   it('카탈로그 전역 캐시 없이 현재 자료로 상단·카드를 함께 계산하고 원본을 보존한다', () => {
     const {materials, proposal, handoff} = fixture(), original = structuredClone(proposal);
     const result = reviewPlan(proposal, [proposal], {}, materials, handoff, 'SQL');
-    expect(result.plan).toMatchObject({weeks: 3, materialHours: 13.5, taskHours: 8, totalH: 21.5, cost: 1000, costUnknown: true});
+    expect(result.plan).toMatchObject({weeks: 3, materialHours: 13.5, taskHours: 8, totalH: 21.5, cost: 1000, costUnknown: false});
     expect(result.acts.find(act => act.res === 'book')).toMatchObject({hours: 10, catalogHours: 10});
     const card = renderToStaticMarkup(createElement(ReviewTaskBlocks, {...blocks, materials, acts: result.acts, selectedIds: proposal.selectedIds, busy: false}));
     const stats = renderToStaticMarkup(createElement(Stats, {pl: result.plan}));
     expect(card).toContain('일정에 넣지 않아요'); expect(card).not.toContain('계획 10시간');
+    // 도서는 가격을 표시하지 않고, 강좌 가격은 그대로 보인다
+    expect(card).not.toContain('가격 확인 필요'); expect(card).toContain('1,000원');
     expect(stats).toContain('강좌 시간 기준 · 13시간 30분'); expect(stats).not.toContain('과제 별도'); expect(proposal).toEqual(original);
+  });
+  it('저장된 추천에 도서 가격이 남아 있어도 합계에 더하지 않는다', () => {
+    const {materials, proposal, handoff} = fixture();
+    materials.recommendations!.skills[0].courses[0].cost = 0;
+    materials.recommendations!.skills[0].books[0].cost = 23000;
+    const result = reviewPlan(proposal, [proposal], {}, materials, handoff, 'SQL');
+    expect(result.plan).toMatchObject({cost: 0, costUnknown: false});
+  });
+  it('현재 카탈로그가 무료여도 검토 중인 강좌의 가격을 모르면 카드와 합계에 함께 표시한다', () => {
+    const {materials, proposal, handoff} = fixture();
+    materials.recommendations!.skills[0].courses[0].cost = null;
+    mergeRes({ course: { id: 'course', title: 'SQL course', kind: '강좌', provider: '교육원', cost: 0 } });
+    const {plan, acts} = reviewPlan(proposal, [proposal], {}, materials, handoff, 'SQL');
+    const card = renderToStaticMarkup(createElement(ReviewTaskBlocks, {...blocks, materials, acts, selectedIds: proposal.selectedIds, busy: false}));
+    expect(card).toContain('가격 확인 필요');
+    expect(planCostText(plan)).toBe('가격 확인 필요');
+    expect(renderToStaticMarkup(createElement(Stats, {pl: plan}))).toContain('일부 비용 확인 필요');
   });
   it('과제를 해제하면 합계에서만 제외하고 카드에는 재선택할 활동을 남긴다', () => {
     const {materials, proposal, handoff} = fixture(); proposal.selectedIds = ['c', 'b'];

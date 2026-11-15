@@ -6,7 +6,7 @@ import { catalogApi } from '@/api/endpoints/catalog';
 import { resourceTime } from '@/shared/lib/resourceTime';
 import { courseDifficulty } from '@/shared/lib/courseDifficulty';
 import { resourceSource } from '@/shared/lib/resourceSource';
-import { costText } from '@/shared/lib/plan';
+import { costSuffix } from '@/shared/lib/plan';
 import { pickerTerm, searchTerm } from '@/shared/lib/search';
 import { cause } from '@/shared/state/ai';
 import { useAt } from '@/shared/state/bind';
@@ -63,7 +63,7 @@ export function ResPicker({ path, stage, exclude }: { path: string; stage?: numb
                 <Thumb r={x} />
                 <span className="tx">
                   {x ? x.title : id}
-                  <small>{x ? `${x.stage || '-'}단계 · ${x.kind}${x.difficulty ? ' · ' + courseDifficulty(x) : ''} · ${resourceSource(x)} · ${resourceTime(x)} · ${costText(x)}` : ''}</small>
+                  <small>{x ? `${x.stage || '-'}단계 · ${x.kind}${x.difficulty ? ' · ' + courseDifficulty(x) : ''} · ${resourceSource(x)} · ${resourceTime(x)}${costSuffix(x)}` : ''}</small>
                 </span>
                 <span className="ck">
                   <Icon name="check" />
@@ -119,7 +119,7 @@ export function ResPicker({ path, stage, exclude }: { path: string; stage?: numb
                     {x.title}
                     <small>
                       {x.stage || '-'}단계
-                      <Est r={x} k="stage" /> · {x.kind}{x.difficulty && ` · ${courseDifficulty(x)}`} · {resourceSource(x)} · {resourceTime(x)} · {costText(x)}
+                      <Est r={x} k="stage" /> · {x.kind}{x.difficulty && ` · ${courseDifficulty(x)}`} · {resourceSource(x)} · {resourceTime(x)}{costSuffix(x)}
                     </small>
                   </span>
                   <span className="ck">
