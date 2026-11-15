@@ -119,14 +119,13 @@ describe('홈 이번 주차 활동의 완료 강조', () => {
   };
   const render = (R: PlanRecord) => renderToStaticMarkup(<MemoryRouter><StageCard R={R} /></MemoryRouter>);
 
-  it('접힌 보기에서는 이번 주 색 없이, 모든 활동을 마친 묶음만 완료색과 완료 표시를 붙인다', () => {
+  it('접힌 보기에서도 이번 주 묶음은 이번 주 색, 모든 활동을 마친 묶음은 완료색과 완료 표시를 붙인다', () => {
     const acts = [sqlCourse, sqlTask, act('py-now', 'Python', null, 2, 2)];
     const html = render(record(acts, { 'sql-course': { status: 'done' }, 'sql-task': { status: 'done' } }));
     expect(groupClass(html, 'SQL')).toBe('home-skill-group is-week-done');
-    expect(groupClass(html, 'Python')).toBe('home-skill-group');
+    expect(groupClass(html, 'Python')).toBe('home-skill-group is-current-week');
     expect(html).toContain('<span class="tag done">완료</span>');
-    expect(html).not.toContain('is-current-week');
-    expect(html).not.toContain('<span class="tag week">');
+    expect(html).toContain('<span class="tag week">이번 주</span>');
   });
 
   it('완료한 활동 줄은 이번 주 색이 아닌 완료 표시를 쓴다', () => {

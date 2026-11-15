@@ -21,7 +21,7 @@ class BrowserConsoleTests(unittest.TestCase):
                    'x-growpath-input': '131072', 'x-growpath-output': '32768'}
         self.assertEqual(console.from_headers(headers, True), console.BrowserOptions(False, None, 900, 131072, 32768))
         self.assertEqual(console.from_headers(headers, False), console.BrowserOptions(picker=False))
-        self.assertEqual(console.from_headers({**headers, 'x-growpath-demo': 'on'}, False).timeout, 900)
+        self.assertEqual(console.from_headers({**headers, 'x-growpath-demo': 'on'}, False, allow_enable=True).timeout, 900)
         self.assertIsNone(console.from_headers({**headers, 'x-growpath-demo': 'invalid'}, False).timeout)
         self.assertIsNone(console.from_headers(dict(headers, **{'x-growpath-demo': 'off'}), True).timeout)
         for field, value in [('input', '0'), ('input', '131073'), ('output', '32769'), ('timeout', '901'), ('timeout', '1.5')]:
@@ -69,9 +69,9 @@ class BrowserConsoleTests(unittest.TestCase):
         from app.routers import account
 
         client = TestClient(main.app)
-        config = replace(main.S, demo_mode=True, beta_account_picker=True)
+        config = replace(main.S, demo_mode=True, beta_account_picker=True, browser_overrides=False)
         with patch.object(main, 'S', config), patch.object(account, 'S', config), patch.object(account.profile, 'accounts', return_value=[]):
-            self.assertEqual(client.get('/api/v1/console/capabilities').json(), {'demo': True, 'picker': True, 'browserOverrides': True})
+            self.assertEqual(client.get('/api/v1/console/capabilities').json(), {'demo': True, 'picker': True, 'browserOverrides': False})
             self.assertEqual(client.get('/api/v1/demo/accounts', headers={'X-GrowPath-Picker': 'off'}).status_code, 404)
             self.assertEqual(client.get('/api/v1/demo/accounts').status_code, 200)
             response = client.get('/api/v1/console/capabilities', headers={'X-GrowPath-Output': '0'})
@@ -84,7 +84,7 @@ class BrowserConsoleTests(unittest.TestCase):
         from app import auth, main
         from app.routers import account
 
-        config = replace(main.S, demo_mode=False, beta_account_picker=False)
+        config = replace(main.S, demo_mode=False, beta_account_picker=False, browser_overrides=True)
         client = TestClient(main.app, base_url='http://testserver/api/v1/')
         picker = {'X-GrowPath-Picker': 'on'}
         demo = {'X-GrowPath-Demo': 'on'}
@@ -103,6 +103,34 @@ class BrowserConsoleTests(unittest.TestCase):
                     self.assertEqual(client.get('ai/log', headers=demo).json(), {'log': []})
                     logs.assert_called_once_with(1)
                     self.assertEqual(client.get('ai/log/7', headers=demo).status_code, 404)
+
+    def test_locked_deployment_ignores_saved_beta_settings(self):
+        from dataclasses import replace
+        from fastapi.testclient import TestClient
+        from app import main
+        from app.routers import account
+
+        config = replace(main.S, demo_mode=False, beta_account_picker=False, browser_overrides=False)
+        headers = {'x-growpath-picker': 'on', 'x-growpath-demo': 'on', 'x-growpath-timeout': '900',
+                   'x-growpath-input': '4096', 'x-growpath-output': '512',
+                   'x-growpath-ollama-url': 'https://qa.proxy.runpod.net', 'x-growpath-ollama-key': 'fixture'}
+        self.assertEqual(console.from_headers(headers, False), console.BrowserOptions())
+        with patch.object(main, 'S', config), patch.object(account, 'S', config), patch.object(account.profile, 'accounts') as accounts:
+            client = TestClient(main.app, base_url='http://testserver/api/v1/')
+            self.assertEqual(client.get('console/capabilities').json(), {'demo': False, 'picker': False, 'browserOverrides': False})
+            self.assertEqual(client.get('demo/accounts', headers=headers).status_code, 404)
+            self.assertEqual(client.get('ai/log', headers=headers).status_code, 404)
+            accounts.assert_not_called()
+
+    def test_override_permission_requires_explicit_on(self):
+        from app import config
+        name = 'GP5_BROWSER_OVERRIDES'
+        with patch.dict(os.environ, {}, clear=True), patch.dict(config._FILE, {}, clear=True):
+            self.assertFalse(config._explicit_on(name))
+            config._FILE[name] = 'on'
+            for value, allowed in [('', False), ('off', False), ('true', False), (' ON ', True)]:
+                with self.subTest(value=value), patch.dict(os.environ, {name: value}):
+                    self.assertEqual(config._explicit_on(name), allowed)
 
     def test_job_preserves_originating_request_only(self):
         settings = console.BrowserOptions(timeout=180, input_tokens=8192, output_tokens=2048,

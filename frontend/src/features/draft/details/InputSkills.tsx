@@ -13,6 +13,7 @@ import { loadSkills, summaryStage } from './skillRequest';
 import { MAX_SKILLS, canIncludeSkill, overSkillLimit, reorderSkills } from './skillOrder';
 import { Icon } from '@/shared/ui/Icon';
 import { Skeleton } from '@/shared/ui/Skeleton';
+import { Wait } from '@/shared/ui/Wait';
 import './inputSkills.css';
 export function InputSkills(){
   const draft=useWs(s=>s.draft),owner=useWs(s=>s.owner);
@@ -104,7 +105,7 @@ export function InputSkills(){
   return <section className="card input-skills" aria-labelledby="inputSkillsTitle">
     <header className="input-skills-header">
       <div><h2 id="inputSkillsTitle">학습할 스킬과 순서</h2><p className="small muted">목표·프로젝트 요약·내 정보를 바탕으로 자동 제안해요.</p></div>
-      <button type="button" className="btn line small input-skills-retry" disabled={busy||stage!=='ready'||fixed.length>=MAX_SKILLS} onClick={()=>setAttempt(value=>value+1)}>{busy?<span className="sp input-skills-spinner" aria-hidden="true"/>:<Icon name="retry"/>}<span role="status">{busy?'제안 중…':'다시 제안받기'}</span></button>
+      <button type="button" className="btn line small input-skills-retry" disabled={busy||stage!=='ready'||fixed.length>=MAX_SKILLS} onClick={()=>setAttempt(value=>value+1)}>{busy?<span className="sp input-skills-spinner" aria-hidden="true"/>:<Icon name="retry"/>}<span role="status"><Wait>{busy?'제안 중…':'다시 제안받기'}</Wait></span></button>
     </header>
     {stage==='reading'&&<div className="loading" role="status"><span className="sp" aria-hidden="true"/><span>프로젝트 요약 생성 중… 완료되면 스킬을 자동으로 제안해요.</span></div>}
     {((busy&&stage==='ready')||stage==='reading')&&!(ready&&available.length>0)&&<ol className="input-skills-list input-skills-initial" aria-hidden="true">{Array.from({ length: MAX_SKILLS }, (_, index) => <li className="input-skill-placeholder" key={index}><Skeleton kind="rows" count={1}/></li>)}</ol>}

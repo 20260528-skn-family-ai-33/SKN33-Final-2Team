@@ -16,6 +16,7 @@ import { Icon } from '@/shared/ui/Icon';
 import { OpsBox } from '@/shared/ui/parts';
 import { ask, clearLog, closeAssistant, openAssistant, pick, retry, setInput, stop, useAssistant, type Msg } from './assistantStore';
 import { answerStatus } from './answerStatus';
+import { Wait } from '@/shared/ui/Wait';
 
 const SUGS = ['교육비 지원을 받을 수 있나요?', '통근버스 시간표는 어디서 봐요?', '승진 기준이 궁금해요', '근무성적평정은 언제 하나요?', '수자원공사는 어떤 일을 하나요?', '회의실 예약은 어디서 하나요?'];
 /** 대화 기록이 이만큼 길어지면 '새 대화'를 권한다. */
@@ -322,7 +323,7 @@ function Bubble({ m, i }: { m: Msg; i: number }) {
           </p>
         </div>
       ) : (
-        <div className="plain muted wait">등록된 자료에서 근거를 찾아 답변하고 있어요…</div>
+        <div className="plain muted wait"><Wait>등록된 자료에서 근거를 찾아 답변하고 있어요…</Wait></div>
       )}
     </div>
   );

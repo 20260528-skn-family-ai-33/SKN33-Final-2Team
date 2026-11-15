@@ -47,6 +47,18 @@ describe('에이전트 동작 기록', () => {
     expect(html).toContain('실제 모델을 부르지 않았어요');
   });
 
+  it('실패 단계·추적 ID·단계별 결과와 모델 호출 위치를 함께 보여 준다', () => {
+    const html = renderToStaticMarkup(<AgentLogBody detail={{
+      ...base, traceId: 'trace-test', failedStage: { id: '4.contract', label: '4단계 · 답변 필드·출처 검증' },
+      stages: [{ id: '1.classify', label: '질문 분류', status: 'ok', ms: 2 },
+        { id: '4.contract', label: '답변 필드 검증', status: 'failed', ms: 1, errorType: 'LlmError' }],
+      calls: [{ role: 'regulation', model: 'qwen', stageId: '4-2.generate', ms: 100,
+        system: '지시', images: 0, output: '{"summary":"원문"}', messages: [] }],
+    }} />);
+    for (const text of ['실패 단계', '답변 필드·출처 검증', 'trace-test', '단계별 실행 로그',
+      '질문 분류', 'failed', 'LlmError', '호출 단계 · 4-2.generate', '원문']) expect(html).toContain(text);
+  });
+
   it('목록은 요약과 모델 호출 수만 보여 주고 전문은 펼칠 때 받는다', () => {
     const entries: AgentLogEntry[] = [{ ...base, employee: '시험 직원', by: '관리자', callCount: 3 }, { ...base, id: 2, callCount: 1 }];
     const html = renderToStaticMarkup(<AgentLogList entries={entries} />);

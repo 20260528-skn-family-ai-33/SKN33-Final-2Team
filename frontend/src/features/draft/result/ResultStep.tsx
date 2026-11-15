@@ -23,6 +23,7 @@ import { useGo } from '@/shared/hooks/useGo';
 import { useWs } from '@/shared/state/workspace';
 import { Page } from '@/shared/ui/parts';
 import { Skeleton } from '@/shared/ui/Skeleton';
+import { Wait } from '@/shared/ui/Wait';
 import { Stepper } from '../Stepper';
 import { stepLabel } from '../model';
 import { genStart, startEdit, ResultEdit } from './legacyResult';
@@ -201,7 +202,7 @@ function ResultSelection({ editorRef, onChoicesChanged, locked = false, courseId
     <div className="v2-skill-summary"><h2>도서·강좌 선택</h2>
       <div><b aria-live="polite">자료 학습 예상 기간 {total === null ? `주차 산정 필요${missingCount ? ` (${missingCount}개)` : ''}` : `${total}주`}</b>
         {Object.values(estimates).some(row => row.unknownCourses?.length) ? <span className="small muted">시간 미확인 강좌는 각 1주로 가정</span> : Object.values(estimates).some(row => row.estimatedCourses?.length) && <span className="small muted">추정 시간 포함</span>}
-        {estimating && <span className="small muted" role="status"><span className="sp" aria-hidden="true" /> 주차 계산 중…</span>}</div>
+        {estimating && <span className="small muted" role="status"><span className="sp" aria-hidden="true" /> <Wait>주차 계산 중…</Wait></span>}</div>
     </div>
     {!courseId && <MaterialBasis />}
     {result?.recommendations && <OutdatedRecommendations outdated={result.recommendations.outdated} courseId={courseId} />}

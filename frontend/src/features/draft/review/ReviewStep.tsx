@@ -13,6 +13,7 @@ import { recs, useWs } from '@/shared/state/workspace';
 import { Icon } from '@/shared/ui/Icon';
 import { Page, Stats } from '@/shared/ui/parts';
 import { Skeleton } from '@/shared/ui/Skeleton';
+import { Wait } from '@/shared/ui/Wait';
 import { StagesView } from '@/shared/ui/StagesView';
 import { confirmReview } from './confirmReview';
 import { Stepper } from '../Stepper';
@@ -94,9 +95,10 @@ export function ReviewStep() {
   const rows = reviewPlan ? reviewSchedule(reviewPlan) : [];
   const taskCount = reviewPlan ? reviewPlan.acts.filter(act => !act.res).length : 0;
   const costText = (cost: number, unknown: boolean) => cost === 0 ? (unknown ? '가격 확인 필요' : '무료') : `${cost.toLocaleString('ko-KR')}원${unknown ? '+' : ''}`;
-  /* 계산을 기다리는 동안에는 값 자리에 뼈대를 그린다(높이는 값이 들어왔을 때와 같다). 실패하면 글로 알린다 */
-  const waiting = reviewError ? '—' : <span className="skel rv-skel-num" aria-hidden="true" />;
-  const waitingSub = reviewError ? ' ' : <span className="skel rv-skel-sub" aria-hidden="true" />;
+  /* 계산을 기다리는 동안에는 값 자리에 '계산 중…'을 적는다(점이 움직여 멈춘 화면으로 보이지 않는다 · #227). 실패하면 '—'.
+     아래 설명 줄은 비워 두되 줄 높이는 남겨, 값이 들어와도 칸 높이가 그대로다 */
+  const waiting = reviewError ? '—' : <Wait>계산 중…</Wait>;
+  const waitingSub = ' ';
   const skillCount = Math.min(3, Math.max(1, selectedSkills || 2));
   /* 확정할 수 없는 이유는 버튼 옆에 미리 적는다 */
   const block = reviewError ? '검토 내용을 불러오지 못했어요. 아래에서 다시 불러와 주세요'

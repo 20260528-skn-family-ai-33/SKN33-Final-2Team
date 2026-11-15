@@ -105,7 +105,8 @@ function CommandDialog({ close }: { close: () => void }) {
     const label = { picker: '로그인 직원 고르기', demo: '시연 도구와 개인 모델 설정' }[field];
     for (const enabled of [true, false]) {
       add(field + (enabled ? ' on' : ' off'), toggleNames[field] + (enabled ? '켜기' : '끄기'), `이 브라우저에서 ${label}를 ${enabled ? '켭니다' : '끕니다'}.`, () => {
-        if (enabled && caps && !caps.browserOverrides && !caps[field]) return '현재 서버 버전은 이 설정의 전환을 지원하지 않습니다.';
+        if (enabled && !caps) return '서버 설정을 확인한 뒤 다시 시도해 주세요.';
+        if (enabled && caps && !caps.browserOverrides && !caps[field]) return '이 배포에서는 브라우저에서 이 기능을 켤 수 없어요.';
         return change(label, field, enabled);
       });
     }

@@ -1,0 +1,12 @@
+/* 대기 문구의 점 세 개(shared/ui/Wait.tsx). 0.6초 안에 끝나는 대기에서는 움직이지 않는다 */
+.wait-dots { display: inline-block; white-space: nowrap; }
+.wait-dots i { display: inline-block; font-style: normal; animation: wait-dot 1.2s ease-in-out .6s infinite; }
+.wait-dots i:nth-child(2) { animation-delay: .75s; }
+.wait-dots i:nth-child(3) { animation-delay: .9s; }
+@keyframes wait-dot {
+  0%, 50%, 100% { transform: translateY(0); }
+  25% { transform: translateY(-.32em); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wait-dots i { animation: none; }
+}

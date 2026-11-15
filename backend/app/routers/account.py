@@ -18,7 +18,7 @@ r = APIRouter(prefix='/api/v1')
 
 @r.get('/console/capabilities')
 def console_capabilities():
-    return {'picker': S.beta_account_picker, 'demo': S.demo_mode, 'browserOverrides': True}
+    return {'picker': S.beta_account_picker, 'demo': S.demo_mode, 'browserOverrides': S.browser_overrides}
 
 
 def _settings(employee_id: int, selection: tuple[str, str | None] | None = None) -> dict:
@@ -236,7 +236,7 @@ def api_log(a: Account = Depends(require_account)):
     employee 는 그 호출이 누구의 일이었는지, by 는 관리자 화면에서 시작했는지.
     입력·출력·모델 호출 전문은 길어서 목록에는 넣지 않고 펼칠 때 /ai/log/{id} 로 받는다(callCount 는 모델 호출 수)"""
     entries = rt.logs(a.id) if a.type == 'employee' and not S.demo_mode else rt.all_logs()
-    return {'log': [dict({k: v for k, v in e.items() if k not in ('input', 'output', 'calls')}, callCount=len(e.get('calls') or []))
+    return {'log': [dict({k: v for k, v in e.items() if k not in ('input', 'output', 'calls', 'stages')}, callCount=len(e.get('calls') or []))
                     for e in _named_logs(entries)]}
 
 

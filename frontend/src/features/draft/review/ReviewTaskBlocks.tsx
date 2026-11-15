@@ -6,6 +6,7 @@ import { courseDifficulty } from '@/shared/lib/courseDifficulty';
 import { Icon } from '@/shared/ui/Icon';
 import { ResourceImage } from '@/shared/ui/ResourceImage';
 import { Skeleton } from '@/shared/ui/Skeleton';
+import { Wait } from '@/shared/ui/Wait';
 import { TaskDescription } from '@/shared/ui/TaskDescription';
 import { durationLabel } from '../result/skillOrder';
 import type { ReviewMaterials, ReviewResource } from './ReviewSkillBlocks';
@@ -97,7 +98,7 @@ export function ReviewTaskBlocks({ materials, acts, options, selectedIds, busy, 
                 <h4>산출물 과제</h4>
                 <span>{multi ? '제안받은 과제 중 하나를 골라 주세요' : ''}</span>
                 <button type="button" className="btn sm line" aria-busy={proposing} disabled={busy || proposeDisabled} onClick={() => onPropose(name)}>
-                  {proposing ? <><span className="sp" aria-hidden="true" /><span role="status">제안받는 중…</span></> : <><Icon name="retry" /> {list.length ? '다른 과제 제안받기' : '과제 제안받기'}</>}
+                  {proposing ? <><span className="sp" aria-hidden="true" /><span role="status"><Wait>제안받는 중…</Wait></span></> : <><Icon name="retry" /> {list.length ? '다른 과제 제안받기' : '과제 제안받기'}</>}
                 </button>
               </div>
               {list.length ? (

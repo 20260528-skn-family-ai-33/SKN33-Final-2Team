@@ -129,6 +129,19 @@ class AgentLogApiTests(unittest.TestCase):
             self.assertEqual(rt.log_entry(5), {'id': 5})
             self.assertIsNone(rt.log_entry(4))
 
+    def test_failed_stage_and_trace_are_in_list_and_full_steps_in_detail(self):
+        self.entry.update(traceId='trace-test', failedStage={'id': '4.contract', 'label': '답변 필드 검증'},
+                          stages=[{'id': '4.contract', 'label': '답변 필드 검증', 'status': 'failed', 'ms': 2}])
+        with patch.object(rt, 'all_logs', return_value=[self.entry]):
+            [row] = self.client.get('/api/v1/ai/log').json()['log']
+        self.assertNotIn('stages', row)
+        self.assertEqual(row['failedStage']['id'], '4.contract')
+        self.assertEqual(row['traceId'], 'trace-test')
+        with patch.object(rt, 'log_entry', return_value=self.entry):
+            detail = self.client.get('/api/v1/ai/log/3').json()
+        self.assertEqual(detail['stages'], self.entry['stages'])
+        self.assertEqual(detail['traceId'], 'trace-test')
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -72,7 +72,7 @@ docker build -f frontend/Dockerfile -t growpath-web .
 curl -s -o /dev/null -H "Accept-Encoding: gzip" -w "%{size_download} %header{content-encoding}\n" http://localhost:8816/assets/<index-해시>.js
 ```
 
-시연 모드의 기본값은 `off`입니다. 콘솔 설정이 없는 브라우저에서 처음부터 표시하려면 빌드의 `VITE_DEMO_TOOLS`와 백엔드의 `GP5_DEMO_MODE`를 모두 `on`으로 설정합니다. 두 값이 `off`여도 콘솔의 `demo on`으로 이 브라우저에서 즉시 켤 수 있습니다.
+시연 모드의 기본값은 `off`입니다. 콘솔 설정이 없는 브라우저에서 처음부터 표시하려면 빌드의 `VITE_DEMO_TOOLS`와 백엔드의 `GP5_DEMO_MODE`를 모두 `on`으로 설정합니다. 백엔드가 `GP5_BROWSER_OVERRIDES=on`을 명시한 테스트 배포에서는 두 기본값이 `off`여도 콘솔의 `demo on`으로 이 브라우저에서 즉시 켤 수 있습니다.
 
 ### 브라우저 테스트 콘솔
 
@@ -80,7 +80,7 @@ curl -s -o /dev/null -H "Accept-Encoding: gzip" -w "%{size_download} %header{con
 
 | 명령 예시 | 동작 |
 | --- | --- |
-| `picker on`, `picker off`, `demo on`, `demo off` | 로그인 전 테스트 계정 선택기와 시연 모드를 각각 켜고 끕니다. 이 브라우저에서 저장한 값이 배포 기본값보다 우선합니다. 시연 모드는 시연 버튼·명령과 개인 모델 설정에 적용됩니다. |
+| `picker on`, `picker off`, `demo on`, `demo off` | 로그인 전 테스트 계정 선택기와 시연 모드를 각각 켜고 끕니다. 서버에서 꺼 둔 기능은 전환을 허용한 테스트 배포에서만 켤 수 있습니다. 시연 모드는 시연 버튼·명령과 개인 모델 설정에 적용됩니다. |
 | `runpod url`, `runpod key` | RunPod 연결 설정을 열어 `OLLAMA_BASE_URL`과 `OLLAMA_API_KEY`를 입력합니다. 주소는 RunPod HTTPS 프록시 또는 공개 IPv4와 TCP 포트를 지원합니다. API 키는 가려진 입력란에 넣습니다. |
 | `runpod default` | 브라우저의 RunPod 주소와 키만 지우고 서버 기본 연결을 복원합니다. |
 | `timeout 180` | 이후 모델 호출 한 번의 대기 한도를 초 단위로 설정합니다(1~900). |

@@ -86,11 +86,11 @@
 
 `GP5_BETA_ACCOUNT_PICKER`는 직원 선택기의 배포 기본값이며 시연 모드와 독립적입니다. 요청에서 선택기가 꺼져 있으면 DB 조회 전에 `404 / NOT_FOUND`를 반환합니다.
 
-브라우저의 `X-GrowPath-Picker`와 `X-GrowPath-Demo` 헤더는 각각 `on` 또는 `off`로 해당 요청의 기본값을 덮어씁니다. 헤더가 없거나 인식할 수 없으면 서버 기본값을 사용합니다. 시연이 켜진 요청에서는 `X-GrowPath-Timeout`(1~900초), `X-GrowPath-Input`(1~131072토큰), `X-GrowPath-Output`(1~32768토큰)을 모델 호출과 해당 요청이 시작한 작업에 적용합니다. 범위 밖의 값은 `422 / INVALID_CONSOLE_OPTION`입니다. `X-GrowPath-Ollama-Url`과 `X-GrowPath-Ollama-Key`는 해당 요청의 Ollama 주소와 Bearer 키입니다. 주소만 지정하면 해당 Pod에 인증 없이 연결하며 두 헤더가 모두 없으면 공용 연결을 사용합니다.
+브라우저의 `X-GrowPath-Picker`와 `X-GrowPath-Demo` 헤더는 각각 해당 요청에 적용됩니다. `off`는 항상 허용하고, `on`으로 서버에서 끈 기능을 켜려면 배포 설정 `GP5_BROWSER_OVERRIDES=on`이 필요합니다. 미설정·빈 값·알 수 없는 값은 허용하지 않습니다. 헤더가 없거나 인식할 수 없으면 서버 기본값을 사용합니다. 시연이 켜진 요청에서는 `X-GrowPath-Timeout`(1~900초), `X-GrowPath-Input`(1~131072토큰), `X-GrowPath-Output`(1~32768토큰)을 모델 호출과 해당 요청이 시작한 작업에 적용합니다. 범위 밖의 값은 `422 / INVALID_CONSOLE_OPTION`입니다. `X-GrowPath-Ollama-Url`과 `X-GrowPath-Ollama-Key`는 해당 요청의 Ollama 주소와 Bearer 키입니다. 주소만 지정하면 해당 Pod에 인증 없이 연결하며 두 헤더가 모두 없으면 공용 연결을 사용합니다.
 
 현재 요청의 시연 모드가 off이면 시연 전용 초기화·단계 이동·설정·AI 로그 API는 인증·조회 전에 `404 / NOT_FOUND`를 반환합니다. 내 정보 응답과 실행 컨텍스트는 저장된 가데이터·실패 시연 설정을 무시하며 DB 원본은 보존합니다.
 
-`GET /ai/providers`의 `demoMode`는 해당 요청에 적용된 시연 상태입니다. 브라우저에 콘솔 설정이 없으면 기존 서버·화면 기본값을 따릅니다. `demo on/off`를 저장하면 이후 요청과 화면이 해당 값을 사용합니다.
+`GET /ai/providers`의 `demoMode`는 해당 요청에 적용된 시연 상태입니다. 브라우저에 콘솔 설정이 없으면 기존 서버·화면 기본값을 따릅니다. 화면과 이후 요청에는 서버가 허용한 값만 적용합니다.
 
 시연 설정 저장은 서버가 성공 응답을 보낸 뒤에만 화면에 반영합니다. 가데이터·실패 시연 저장은 같은 큐에서 요청하고, 실패 시 기존값을 유지합니다. 이전 로그인 회차의 응답은 버리며 시연 응답으로 제공자·추론값을 덮지 않습니다.
 
@@ -172,11 +172,11 @@
 
 실제 모델과 가데이터 모두 `apply`·`more`·`missing`을 반환하지 않습니다. 실제 모델은 확인된 내용과 적용 조건, 부족한 근거를 최대 두 문장의 `summary`로 작성하도록 지시받습니다. 회사·사내 생활의 출처는 `knowledgeSources`에서 제공합니다. 가데이터는 추천 질문의 예시를 `meta.mode=mock`으로 반환합니다. 화면에는 ‘시연용 가데이터’를 표시합니다.
 
-`answer.topic`(선택)은 `regulation|company|life`, `answer.evidenceStatus`(선택)는 `found|partial|not_found|refused`예요. 규정·회사·생활 DB 답변은 `meta.classification.label` 옆에 ‘근거 확인’ 또는 ‘근거 확인 불가’를 표시해요. `partial`도 인용 조항이나 문서가 있으면 ‘근거 확인’으로 표시하고, 확인하지 못한 부분은 본문에서 설명해요. 제공 금지 거절은 ‘답변 불가’, 범위 밖은 ‘범위 밖’, 연결·검증 실패는 ‘오류’라는 단일 결과 라벨이에요. 오류는 LLM 출력 상태가 아니에요. 규정은 `found→level=ok`, `partial→unclear`, `not_found→none`, `refused→refused`예요. 규정의 적용 대상은 검색한 원문에서 확인해요. 회사는 `kind=general, source=work`, 생활은 `kind=general, source=intranet`이고 거절·자료 부족은 `knowledgeSources=[]`예요.
+`answer.topic`(선택)은 `regulation|company|life`, `answer.evidenceStatus`(선택)는 `found|partial|not_found|no_match|refused`예요. `not_found`는 검색 자료 없음, `no_match`는 자료가 있으나 질문을 뒷받침하지 못함을 뜻해요. 두 상태는 바꾸지 않고 전달하며 화면에서는 기존 ‘근거 확인 불가’ 표시를 함께 사용해요. 별도의 ‘근거 불일치’ 라벨은 추가하지 않아요. 규정·회사·생활 DB 답변은 `meta.classification.label` 옆에 ‘근거 확인’ 또는 ‘근거 확인 불가’를 표시해요. `partial`도 인용 조항이나 문서가 있으면 ‘근거 확인’으로 표시하고, 확인하지 못한 부분은 본문에서 설명해요. 제공 금지 거절은 ‘답변 불가’, 범위 밖은 ‘범위 밖’, 연결·검증 실패는 ‘오류’라는 단일 결과 라벨이에요. 오류는 LLM 출력 상태가 아니에요. 규정은 `found→level=ok`, `partial→unclear`, `not_found/no_match→none`, `refused→refused`예요. 규정의 적용 대상은 검색한 원문에서 확인해요. 회사는 `kind=general, source=work`, 생활은 `kind=general, source=intranet`이고 거절·자료 부족은 `knowledgeSources=[]`예요.
 
 사내 생활은 `knowledge.documents.category=사내 생활안내`의 DB 원문을 검색해요. 회사·생활 답변은 실제 인용한 자료만 `knowledgeSources[]`로 반환하고 기존 출처 필드에 `excerpt`(원문 발췌)를 추가해요. 규정·회사·생활 모두 ‘근거 보기’에서 원문·출처를 확인해요. 생활 자료의 가상 여부(`isVirtual`)·제약(`sourceLimits`), 문서 위치·시점·해시·잘림 여부를 유지해요. DB 결과가 없을 때 고정 메뉴로 대체하지 않으며 `intranet[]` 메뉴 표시는 이전 응답 호환용으로 남아요. 범위 밖은 검색·LLM 호출이 없어요.
 
-규정·회사 검색 결과가 없어도 모델에 빈 근거 목록으로 제공 금지 요청 여부를 확인해요. 빈 근거로 `found`·`partial` 답변을 만드는 것은 허용하지 않아요.
+규정·회사·생활 검색 결과가 없어도 모델에 빈 근거 목록으로 제공 금지 요청 여부를 확인해요. 빈 근거에서는 모델이 `refused` 또는 `not_found`를 반환하며 `sourceIds=[]`예요. 자료가 있으면 `refused`, `no_match`, `partial`, `found`를 반환해요. 서버가 `not_found`와 `no_match`를 서로 변환하지 않으며, 세 필드 `status/summary/sourceIds` 중 `summary`는 모든 상태에서 비어 있으면 안 돼요.
 
 `history`의 요청 형식은 그대로예요. 화면은 답변을 받은 최근 5턴을 보내고, 서버는 그중 후속 질문과 이어진 질문 원문 및 답변 본문(`a.summary`)을 턴별로 사용해요. 예전 메뉴형 생활 안내에 본문이 없으면 화면에 표시했던 메뉴 정보를 사용해요. 이전 답변의 `kind`·`level`·실제 출처 ID는 모델 대화에 넣지 않아요. 규정 이름 없이 조항 번호를 물으면 서버는 직전 `basis`로 규정을 찾아 직접 요청한 조항을 우선 전달해요. 조항 참조 단계에서만 직전 규정을 사용했다면 `meta.classification.usedHistory=false`일 수 있어요.
 

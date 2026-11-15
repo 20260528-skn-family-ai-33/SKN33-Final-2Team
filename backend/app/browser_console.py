@@ -40,9 +40,12 @@ def runpod_url(value: str) -> str:
     raise ValueError('RunPod HTTPS 프록시 또는 공개 IPv4와 TCP 포트를 입력해 주세요.')
 
 
-def from_headers(headers, demo_default: bool) -> BrowserOptions:
+def from_headers(headers, demo_default: bool, *, allow_enable: bool = False) -> BrowserOptions:
     def toggle(name: str) -> bool | None:
-        return {'on': True, 'off': False}.get(headers.get(name))
+        value = headers.get(name)
+        if value == 'off':
+            return False
+        return True if value == 'on' and allow_enable else None
 
     demo = toggle('x-growpath-demo')
     enabled = demo_default if demo is None else demo
