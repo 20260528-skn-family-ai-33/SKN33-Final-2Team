@@ -86,7 +86,7 @@
 
 `GP5_BETA_ACCOUNT_PICKER`는 직원 선택기의 배포 기본값이며 시연 모드와 독립적입니다. 요청에서 선택기가 꺼져 있으면 DB 조회 전에 `404 / NOT_FOUND`를 반환합니다.
 
-브라우저의 `X-GrowPath-Picker`와 `X-GrowPath-Demo` 헤더는 각각 해당 요청에 적용됩니다. `off`는 항상 허용하고, `on`으로 서버에서 끈 기능을 켜려면 배포 설정 `GP5_BROWSER_OVERRIDES=on`이 필요합니다. 미설정·빈 값·알 수 없는 값은 허용하지 않습니다. 헤더가 없거나 인식할 수 없으면 서버 기본값을 사용합니다. 시연이 켜진 요청에서는 `X-GrowPath-Timeout`(1~900초), `X-GrowPath-Input`(1~131072토큰), `X-GrowPath-Output`(1~32768토큰)을 모델 호출과 해당 요청이 시작한 작업에 적용합니다. 범위 밖의 값은 `422 / INVALID_CONSOLE_OPTION`입니다. `X-GrowPath-Ollama-Url`과 `X-GrowPath-Ollama-Key`는 해당 요청의 Ollama 주소와 Bearer 키입니다. 주소만 지정하면 해당 Pod에 인증 없이 연결하며 두 헤더가 모두 없으면 공용 연결을 사용합니다.
+브라우저의 `X-GrowPath-Picker`와 `X-GrowPath-Demo` 헤더는 각각 해당 요청에 적용됩니다. `off`는 항상 허용합니다. 서버에서 끈 기능을 `on`으로 켤 수 있는지는 `GP5_CONSOLE_OVERRIDES`로 정합니다. 기본값은 `on`이고 명시적인 `off`·빈 값·알 수 없는 값은 전환을 차단합니다. 헤더가 없거나 인식할 수 없으면 서버 기본값을 사용합니다. 시연이 켜진 요청에서는 `X-GrowPath-Timeout`(1~900초), `X-GrowPath-Input`(1~131072토큰), `X-GrowPath-Output`(1~32768토큰)을 모델 호출과 해당 요청이 시작한 작업에 적용합니다. 범위 밖의 값은 `422 / INVALID_CONSOLE_OPTION`입니다. `X-GrowPath-Ollama-Url`과 `X-GrowPath-Ollama-Key`는 해당 요청의 Ollama 주소와 Bearer 키입니다. 주소만 지정하면 해당 Pod에 인증 없이 연결하며 두 헤더가 모두 없으면 공용 연결을 사용합니다.
 
 현재 요청의 시연 모드가 off이면 시연 전용 초기화·단계 이동·설정·AI 로그 API는 인증·조회 전에 `404 / NOT_FOUND`를 반환합니다. 내 정보 응답과 실행 컨텍스트는 저장된 가데이터·실패 시연 설정을 무시하며 DB 원본은 보존합니다.
 

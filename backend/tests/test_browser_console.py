@@ -79,17 +79,19 @@ class BrowserConsoleTests(unittest.TestCase):
             self.assertEqual(response.json()['error']['code'], 'INVALID_CONSOLE_OPTION')
 
     def test_console_commands_override_off_defaults_independently(self):
-        from dataclasses import replace
         from fastapi.testclient import TestClient
         from app import auth, main
+        from app import config as app_config
         from app.routers import account
 
-        config = replace(main.S, demo_mode=False, beta_account_picker=False, browser_overrides=True)
+        with patch.dict(os.environ, {}, clear=True), patch.dict(app_config._FILE, {}, clear=True):
+            config = app_config.load()
         client = TestClient(main.app, base_url='http://testserver/api/v1/')
         picker = {'X-GrowPath-Picker': 'on'}
         demo = {'X-GrowPath-Demo': 'on'}
         with patch.object(main, 'S', config), patch.object(account, 'S', config), \
              patch.object(account.profile, 'accounts', return_value=[{'code': 'TEST01'}]) as accounts:
+            self.assertEqual(client.get('console/capabilities').json(), {'demo': False, 'picker': False, 'browserOverrides': True})
             self.assertEqual(client.get('demo/accounts', headers=demo).status_code, 404)
             self.assertEqual(client.get('demo/accounts', headers=picker).json()['accounts'], [{'code': 'TEST01'}])
             self.assertEqual(client.get('demo/accounts').status_code, 404)
@@ -105,12 +107,13 @@ class BrowserConsoleTests(unittest.TestCase):
                     self.assertEqual(client.get('ai/log/7', headers=demo).status_code, 404)
 
     def test_locked_deployment_ignores_saved_beta_settings(self):
-        from dataclasses import replace
         from fastapi.testclient import TestClient
         from app import main
+        from app import config as app_config
         from app.routers import account
 
-        config = replace(main.S, demo_mode=False, beta_account_picker=False, browser_overrides=False)
+        with patch.dict(os.environ, {'GP5_CONSOLE_OVERRIDES': 'off'}, clear=True), patch.dict(app_config._FILE, {}, clear=True):
+            config = app_config.load()
         headers = {'x-growpath-picker': 'on', 'x-growpath-demo': 'on', 'x-growpath-timeout': '900',
                    'x-growpath-input': '4096', 'x-growpath-output': '512',
                    'x-growpath-ollama-url': 'https://qa.proxy.runpod.net', 'x-growpath-ollama-key': 'fixture'}
@@ -122,15 +125,19 @@ class BrowserConsoleTests(unittest.TestCase):
             self.assertEqual(client.get('ai/log', headers=headers).status_code, 404)
             accounts.assert_not_called()
 
-    def test_override_permission_requires_explicit_on(self):
+    def test_console_override_config_accepts_previous_name_and_honors_explicit_values(self):
         from app import config
-        name = 'GP5_BROWSER_OVERRIDES'
-        with patch.dict(os.environ, {}, clear=True), patch.dict(config._FILE, {}, clear=True):
-            self.assertFalse(config._explicit_on(name))
-            config._FILE[name] = 'on'
-            for value, allowed in [('', False), ('off', False), ('true', False), (' ON ', True)]:
-                with self.subTest(value=value), patch.dict(os.environ, {name: value}):
-                    self.assertEqual(config._explicit_on(name), allowed)
+        name = 'GP5_CONSOLE_OVERRIDES'
+        old = 'GP5_BROWSER_OVERRIDES'
+        for environment, file_values, allowed in [
+            ({}, {}, True), ({}, {name: 'off'}, False), ({name: ' ON '}, {}, True),
+            ({name: ''}, {name: 'on'}, False), ({name: 'invalid'}, {}, False),
+            ({}, {old: 'off'}, False), ({old: 'off'}, {name: 'on'}, False),
+            ({name: 'off', old: 'on'}, {}, False), ({}, {name: 'on', old: 'off'}, True),
+        ]:
+            with self.subTest(environment=environment, file_values=file_values), \
+                 patch.dict(os.environ, environment, clear=True), patch.dict(config._FILE, file_values, clear=True):
+                self.assertEqual(config.load().browser_overrides, allowed)
 
     def test_job_preserves_originating_request_only(self):
         settings = console.BrowserOptions(timeout=180, input_tokens=8192, output_tokens=2048,
