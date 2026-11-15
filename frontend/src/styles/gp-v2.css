@@ -745,6 +745,16 @@ a.me .me-go { width: 16px; height: 16px; flex: none; color: var(--ink-4); }
 /* 크게 보기는 그림이 칸보다 커지므로 넓은 화면에서는 칸 높이를 묶고 안에서 밀어 본다(#227) */
 @media (min-width: 901px) { .sm-wrap.sm-big { max-height: 80vh; overflow-y: auto; } }
 .sm-svg { display: block; margin: 0 auto; -webkit-user-select: none; user-select: none; }
+/* 퍼져 나가기(SkillMap.tsx): 화면에 들어오기 전(sm-wait)에는 그림을 숨겨 두고, 들어오면(sm-go) 가운데 점부터 차례로 나타난다.
+   점은 가운데 쪽으로 조금 당겨진 자리(--sm-dx·--sm-dy)에서 제자리로 나오고, 시작 시각(--sm-d)은 가운데에서 먼 점일수록 늦다.
+   끝 모양은 적지 않아 점마다 원래 투명도(다루지 않는 스킬의 흐림 등)로 돌아간다 */
+.sm-wait .sm-svg { visibility: hidden; }
+@keyframes sm-spread { from { opacity: 0; translate: var(--sm-dx, 0) var(--sm-dy, 0); } }
+@keyframes sm-fade { from { opacity: 0; } }
+@media (prefers-reduced-motion: no-preference) {
+  .sm-go .sm-n { animation: sm-spread .6s cubic-bezier(.2, .8, .2, 1) var(--sm-d, 0ms) backwards; }
+  .sm-go .sm-e { animation: sm-fade .45s ease-out var(--sm-d, 0ms) backwards; }
+}
 .sm-e { stroke: #CFCFC8; stroke-width: 1.4; }
 .sm-e.on { stroke: var(--accent); stroke-width: 2.4; }
 .sm-n { cursor: pointer; }
