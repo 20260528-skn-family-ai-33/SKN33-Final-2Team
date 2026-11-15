@@ -9,14 +9,14 @@
 /* 요약 띠 */
 .cmp-summary{margin-block:12px}
 .cmp-summary-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,270px),1fr));gap:22px 36px}
-.cmp-block h3{margin:0 0 10px;font-size:14px;font-weight:650}
+.cmp-block h3{margin:0 0 10px;font-size:14px;font-weight: 700}
 .cmp-sub{margin:12px 0 6px;font-size:12px;line-height:1.6;color:var(--ink-3)}
 .cmp-block h3+.cmp-sub{margin-top:0}
 .cmp-note{margin:16px 0 0;padding-top:12px;border-top:1px dashed var(--line);font-size:11px;line-height:1.7;color:var(--ink-3)}
 
 .cmp-meter-row{display:grid;grid-template-columns:28px minmax(0,1fr) 92px;gap:10px;align-items:center;min-height:26px;font-size:12px;color:var(--ink-3)}
-.cmp-meter-track{height:8px;border-radius:4px;background:var(--cmp-track);overflow:hidden}
-.cmp-meter-fill{display:block;height:100%;border-radius:4px}
+.cmp-meter-track{height:8px;border-radius: var(--rad-1);background:var(--cmp-track);overflow:hidden}
+.cmp-meter-fill{display:block;height:100%;border-radius: var(--rad-1)}
 .cmp-meter-fill.pre{background:var(--cmp-pre)}
 .cmp-meter-fill.post{background:var(--cmp-post)}
 .cmp-meter-value{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -26,7 +26,7 @@
 
 /* 변화 띠: 칸 너비가 문항 수에 비례한다 */
 .cmp-band{display:flex;gap:2px;height:14px}
-.cmp-seg{min-width:6px;border-radius:2px}
+.cmp-seg{min-width:6px;border-radius: var(--rad-1)}
 .cmp-seg:first-child{border-top-left-radius:4px;border-bottom-left-radius:4px}
 .cmp-seg:last-child{border-top-right-radius:4px;border-bottom-right-radius:4px}
 .cmp-fill.gained,.cmp-fill.up{background:var(--cmp-post)}
@@ -38,7 +38,7 @@
 .cmp-legend li{display:inline-flex;align-items:center;gap:6px}
 .cmp-legend b{font-variant-numeric:tabular-nums;color:var(--ink)}
 .cmp-legend small{font-size:11px;color:var(--ink-3)}
-.cmp-swatch{width:12px;height:12px;border-radius:3px;flex-shrink:0}
+.cmp-swatch{width:12px;height:12px;border-radius: var(--rad-1);flex-shrink:0}
 
 /* 스킬별 점 격자: 점 하나 = 문항 하나, 같은 자리 = 같은 개념 */
 .cmp-dots{display:inline-flex;flex-wrap:wrap;align-items:center;gap:5px}
@@ -46,9 +46,9 @@
 .cmp-dot.wrong{border:1.5px solid var(--cmp-ring)}
 .cmp-dot.pre.correct{background:var(--cmp-pre)}
 .cmp-dot.post.correct{background:var(--cmp-post)}
-.cmp-dot.none{height:2px;border-radius:1px;background:var(--cmp-ring)}
+.cmp-dot.none{height:2px;border-radius: var(--rad-1);background:var(--cmp-ring)}
 
-.cmp-grid{margin:0;padding:0;list-style:none;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.cmp-grid{margin:0;padding:0;list-style:none;border:1px solid var(--line);border-radius: var(--rad-3);overflow:hidden}
 .cmp-grid-head,.cmp-grid-row{display:grid;grid-template-columns:minmax(0,1fr) 128px 128px;gap:12px;align-items:center;padding:10px 16px}
 .cmp-grid-head{font-size:11px;color:var(--ink-3);background:color-mix(in srgb,var(--line) 18%,transparent)}
 .cmp-grid-row{min-height:44px;border-top:1px solid var(--line)}
@@ -74,7 +74,7 @@
 .cmp-track-pre{fill:var(--cmp-surface);stroke:var(--cmp-pre);stroke-width:2}
 .cmp-track-post{fill:var(--cmp-post)}
 .cmp-dumbbell-value{font-size:12px;font-variant-numeric:tabular-nums;color:var(--ink-2);white-space:nowrap}
-.cmp-dumbbell-value b{font-weight:650;color:var(--ink)}
+.cmp-dumbbell-value b{font-weight: 700;color:var(--ink)}
 .cmp-legend-ring{box-sizing:border-box;width:12px;height:12px;border:2px solid var(--cmp-pre);border-radius:50%;flex-shrink:0}
 .cmp-legend-dot{width:12px;height:12px;border-radius:50%;background:var(--cmp-post);flex-shrink:0}
 
