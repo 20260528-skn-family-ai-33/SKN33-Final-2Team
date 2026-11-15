@@ -253,10 +253,11 @@ class RouteTests(unittest.TestCase):
 
 
 class AcceptRevisionTests(unittest.TestCase):
-    def accept(self, current):
-        pending = {'to': {'opt': 'A1', 'name': '계획', 'tagline': '요약', 'acts': []}, 'label': '주당 시간 변경', 'prefsTo': {}, 'handoff': {}}
+    def accept(self, current, *, proposed_acts=(), done_ids=()):
+        pending = {'to': {'opt': 'A1', 'name': '계획', 'tagline': '요약', 'acts': list(proposed_acts)}, 'label': '주당 시간 변경', 'prefsTo': {}, 'handoff': {}}
         t = Mock()
         t.one.side_effect = [{'result': pending, 'status': 'ready'}, {'baseline_content': {}}]
+        t.all.return_value = [{'activity_id': aid} for aid in done_ids]
         owned = {'roadmap_id': RID, 'content': dict(current, opt='A1', version=1)}
         with patch.object(plans.db, 'tx', side_effect=lambda: tx_of(t)), patch.object(plans.db, 'J', side_effect=lambda x: x), \
                 patch.object(plans, '_owned', return_value=owned), patch.object(plans, 'validate_free_plan'), \
@@ -269,6 +270,21 @@ class AcceptRevisionTests(unittest.TestCase):
 
     def test_roadmap_without_a_scheduled_start_stays_without_one(self):
         self.assertNotIn('startDate', self.accept({}))
+
+    def test_scheduled_revision_preserves_a_completed_activity(self):
+        activity = {'id': 'course-1', 'title': '기초 강좌'}
+        current = {'startDate': '2026-12-02', 'acts': [activity]}
+        saved = self.accept(current, proposed_acts=[activity.copy()], done_ids=['course-1'])
+        self.assertEqual(saved['startDate'], current['startDate'])
+        self.assertEqual(saved['acts'], [activity])
+
+    def test_revision_rejects_removing_or_changing_a_completed_activity(self):
+        activity = {'id': 'course-1', 'title': '기초 강좌'}
+        for proposal in ([], [dict(activity, title='다른 강좌')]):
+            with self.subTest(proposal=proposal):
+                with self.assertRaises(ApiError) as caught:
+                    self.accept({'acts': [activity]}, proposed_acts=proposal, done_ids=['course-1'])
+                self.assertEqual((caught.exception.status, caught.exception.code), (409, 'REVISION_CHANGED'))
 
 
 if __name__ == '__main__':

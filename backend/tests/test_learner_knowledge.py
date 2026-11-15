@@ -35,9 +35,11 @@ class LearnerKnowledgeTests(unittest.TestCase):
     def test_skill_model_receives_knowledge_and_hr(self):
         project={'goal':'API 구현','learnerKnowledge':self.knowledge,'hrContext':hr_context(self.person)}
         model=Mock(return_value={'skills':[{'name':'Python','reason':'비동기 적용 필요','application':'비동기 API 구현'}]})
-        select_skills(project,['Python'],model)
-        system,payload=model.call_args.args
-        self.assertIn('설치·문법 입문·기초 따라하기의 기본 재추천 금지',system)
+        selection = select_skills(project, ['Python'], model)
+        system, payload = model.call_args.args
+        self.assertIn('보유 기술도 목표에 적합하면 후보 유지', system)
+        self.assertIn('Python', payload['availableSkills'])
+        self.assertTrue(selection['skills'][0]['learned'])
         self.assertEqual(payload['learnerKnowledge'],self.knowledge)
         self.assertEqual(payload['hrContext']['grade'],'대리')
     def test_resource_model_and_rag_share_knowledge(self):
