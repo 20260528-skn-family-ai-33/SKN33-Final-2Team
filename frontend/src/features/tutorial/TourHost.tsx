@@ -40,10 +40,11 @@ function resolve(step: TourStep): { el: HTMLElement; els: HTMLElement[]; waiting
   return { el: wait, els: [wait, ...also], waiting: true };
 }
 
-/** 화면 위쪽에 붙어 있는 띠·상단 메뉴 아래 첫 자리(테마 변수에서 읽는다) */
+/** 화면 위쪽에 붙어 있는 띠·상단 메뉴 아래 첫 자리(테마 변수에서 읽는다).
+    상단 메뉴가 없는 좌측 메뉴 모드에서도 오른쪽 위 '튜토리얼 끝내기' 단추(띠 아래 14px, 높이 36px)와 겹치지 않을 만큼은 띄운다 */
 const headTop = (): number => {
   const css = getComputedStyle(document.documentElement);
-  return (parseFloat(css.getPropertyValue('--rib-h')) || 0) + (parseFloat(css.getPropertyValue('--nav-h')) || 0) + 20;
+  return (parseFloat(css.getPropertyValue('--rib-h')) || 0) + Math.max((parseFloat(css.getPropertyValue('--nav-h')) || 0) + 20, 70);
 };
 
 /** 화면 아래에 붙어 있는 요약 줄(.step-bar)이 있으면 그 위까지가 보이는 자리다(대상이 그 줄 안에 있으면 화면 끝까지) */
