@@ -101,7 +101,7 @@ docker compose up -d backend
 
 기존 베타 DB의 해시 보존이 로그인 가능 여부나 새 배포 승인을 뜻하지는 않아요. NULL·잘못된 해시·비밀번호 미상 계정은 배포 전에 확인해야 하며, 새 배포의 비밀번호 전달·로그인 확인 담당자와 완료 여부는 현재 미정이에요.
 
-BGE 설치기는 관리자 생성·직원 비밀번호 초기화·보충 자료 적재를 실행하지 않아요. 이전 `--reset-team-passwords`, `--keep-team-passwords`, `--supplement-only`는 DB 검사 전에 거절해요. [BGE 설치기의 계정 보존](../README.md#bge-설치기의-계정-보존)을 참고하세요. 일반 앱 업데이트는 [DB 복원·보충을 제외하는 절차](../README.md#기존-설치의-설정-변경과-업데이트)로 세 이미지(`backend`·`backend-setup`·`frontend`)를 빌드하고, 검사기 실행 없이 API·화면만 `up --no-deps`로 다시 만들어요.
+BGE 설치기는 관리자 생성·직원 비밀번호 초기화·보충 자료 적재를 실행하지 않아요. 이전 `--reset-team-passwords`, `--keep-team-passwords`, `--supplement-only`는 DB 검사 전에 거절해요. [BGE 설치기의 계정 보존](../docs/development-setup.md#bge-설치기의-계정-보존)을 참고하세요. 일반 앱 업데이트는 [DB 복원·보충을 제외하는 절차](../docs/development-setup.md#기존-설치의-설정-변경과-업데이트)로 세 이미지(`backend`·`backend-setup`·`frontend`)를 빌드하고, 검사기 실행 없이 API·화면만 `up --no-deps`로 다시 만들어요.
 
 챗봇 파인튜닝 모델(`growpath-regulation-4b` · `qwen35-4b-diagnosis-agent` · `role=regulation`)은 `options.num_gpu=-1`로 Ollama 실행 서버의 GPU·VRAM에 맞춰 자동 선택해요. 사용할 GPU가 없으면 서버가 CPU로 실행하며, 모델에 저장된 CPU 강제 설정도 요청 값으로 덮어써요. GPU 드라이버·컨테이너 장치 노출은 **모델 실행 서버**에서 준비해야 해요. 실제 사용 여부는 서버의 `ollama ps` 또는 `/api/ps`의 `size_vram`으로 확인해요. [Ollama GPU 문서](https://docs.ollama.com/gpu), [자동 선택 옵션 원본](https://github.com/ollama/ollama/blob/main/api/types.go)을 참고해요.
 
