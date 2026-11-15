@@ -10,7 +10,8 @@
      원본은 글이 적어 사진 위에 바로 쓰지만, 이 서비스는 표·목록이 빽빽해 사진 위에서는 읽기 어렵다
      → 사진은 머리와 맨 아래 띠에만 두고, 내용 상자는 비치지 않는 어두운 바탕으로 했다.
    - 시차: 머리 사진이 본문보다 느리게 올라간다(원본과 같은 감속 곡선). 맨 아래 띠는 사진이 창에 고정된 채 띠만 지나간다.
-   - 상단 메뉴: 맨 위에서는 사진이 비치는 검은 막(.45), 80px 넘게 내려가면 비치지 않는 바탕. 원본의 흐림(blur)은 쓰지 않는다
+   - 상단 메뉴: 맨 위에서는 머리 사진 위에 얹힌 검은 막(.45 · 이때 뒤에 있는 것은 사진뿐이다), 40px 넘게 내려가면(본문이 메뉴 밑으로
+     들어가기 전) 비치지 않는 바탕. 띠와 로그인 상자는 늘 비치지 않는 바탕. 원본의 흐림(blur)은 쓰지 않는다
      (내용 뒤로 사진이 흐리게 비치면 글자가 묻힌다)
    - Oswald 제목·메뉴 · Source Sans 3 본문. 원본의 대문자·넓은 자간은 로고(영문)에만 남겼다
      (한글에는 대문자가 없고, 자간을 벌리면 음절이 흩어져 읽기 어렵다)
@@ -108,13 +109,12 @@
   .v2-survey section, .v2-survey fieldset { border-radius: 0; }
   .v2-survey button { border-radius: 0; }
 
-  /* ── 상단 띠(AI 모델 고르기): 메뉴와 함께 내려가면 짙어진다 ── */
+  /* ── 상단 띠(AI 모델 고르기): 사진이 비치지 않는 바탕 ── */
   .ribbon {
     padding: 0 max(20px, calc((100% - var(--tm-wrap)) / 2));
-    background-color: rgba(8, 8, 8, .72); color: var(--tm-w70); border-bottom: 1px solid rgba(255, 255, 255, .08);
-    font-size: 12px; transition: background-color .2s ease;
+    background-color: #0B0B0B; color: var(--tm-w70); border-bottom: 1px solid rgba(255, 255, 255, .08);
+    font-size: 12px;
   }
-  &[data-tm612-scrolled] .ribbon { background-color: #0B0B0B; }
   .ribbon .mode { background: var(--tm-w12); color: #fff; font-family: var(--tm-head); letter-spacing: 1.5px; text-transform: uppercase; }
   .api-picker-button { padding: 5px 12px; font-size: 12px; font-family: var(--tm-head); letter-spacing: 1.5px; text-transform: uppercase; }
   body.auth .ribbon { display: none; }
@@ -415,12 +415,12 @@
   .ls-no { color: #111; }
   .ls-go { font-family: var(--tm-head); font-size: 13px; font-weight: 600; letter-spacing: 0; color: #fff; }
 
-  /* ── 로그인: 빌딩 사진 위에 놓인 상자. 입력 상자는 거의 비치지 않게, 소개는 사진이 조금 비치게 ── */
+  /* ── 로그인: 빌딩 사진 위에 놓인 상자. 두 상자 모두 사진이 비치지 않는 바탕 ── */
   body.auth .app { min-height: 100vh; }
   body.auth .main { min-height: 100vh; display: flex; align-items: center; padding-bottom: 56px; }
   body.auth .view { width: 100%; }
-  .login-card { border: 1px solid var(--tm-w20); background-color: rgba(14, 14, 14, .9); }
-  .login-side { background: rgba(14, 14, 14, .9); border: 1px solid var(--tm-w20); color: #fff; }
+  .login-card { border: 1px solid var(--tm-w20); background-color: var(--bg); }
+  .login-side { background: var(--bg); border: 1px solid var(--tm-w20); color: #fff; }
   .login-side::after { display: none; }
   .login-side h2 { font-family: var(--tm-head); font-weight: 600; letter-spacing: -.015em; }
   .login-side > p, .login-side .small { color: var(--tm-w90); }
