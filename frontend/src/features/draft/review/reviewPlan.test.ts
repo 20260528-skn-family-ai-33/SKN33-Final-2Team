@@ -9,6 +9,8 @@ import { ReviewTaskBlocks } from './ReviewTaskBlocks';
 const noop = () => {};
 const blocks = { options: {}, onToggle: noop, onPick: noop, onPropose: noop, onChangeMaterials: noop };
 import { Stats } from '@/shared/ui/parts';
+import { planCostText } from '@/shared/lib/plan';
+import { mergeRes } from '@/shared/state/catalog';
 
 function fixture() {
   const materials: ReviewMaterials = { recommendations: { skills: [{ name: 'SQL',
@@ -43,6 +45,16 @@ describe('검토 선택과 확정 계획의 시간 기준', () => {
     materials.recommendations!.skills[0].books[0].cost = 23000;
     const result = reviewPlan(proposal, [proposal], {}, materials, handoff, 'SQL');
     expect(result.plan).toMatchObject({cost: 0, costUnknown: false});
+  });
+  it('현재 카탈로그가 무료여도 검토 중인 강좌의 가격을 모르면 카드와 합계에 함께 표시한다', () => {
+    const {materials, proposal, handoff} = fixture();
+    materials.recommendations!.skills[0].courses[0].cost = null;
+    mergeRes({ course: { id: 'course', title: 'SQL course', kind: '강좌', provider: '교육원', cost: 0 } });
+    const {plan, acts} = reviewPlan(proposal, [proposal], {}, materials, handoff, 'SQL');
+    const card = renderToStaticMarkup(createElement(ReviewTaskBlocks, {...blocks, materials, acts, selectedIds: proposal.selectedIds, busy: false}));
+    expect(card).toContain('가격 확인 필요');
+    expect(planCostText(plan)).toBe('가격 확인 필요');
+    expect(renderToStaticMarkup(createElement(Stats, {pl: plan}))).toContain('일부 비용 확인 필요');
   });
   it('과제를 해제하면 합계에서만 제외하고 카드에는 재선택할 활동을 남긴다', () => {
     const {materials, proposal, handoff} = fixture(); proposal.selectedIds = ['c', 'b'];

@@ -1,7 +1,9 @@
 import unittest
-from unittest.mock import Mock
+from copy import deepcopy
+from unittest.mock import Mock, patch
 from app.free_track import validate_free_plan
 from app.errors import ApiError
+from app.services import plans
 
 class FreeBookPolicyTests(unittest.TestCase):
  def check(self,rows):
@@ -47,3 +49,42 @@ class FreeBookPolicyTests(unittest.TestCase):
        validate_free_plan(t, plan, budget='0')
       self.assertEqual(error.exception.code, 'ZERO_BUDGET_PRICE_CHANGED')
      self.assertIn('FOR SHARE', t.all.call_args.args[0])
+
+
+class ConfirmedBookCostTests(unittest.TestCase):
+    def read(self, plan, steps, versions=()):
+        original = deepcopy(plan)
+        row = dict(roadmap_id='r', content=plan, step_prices=steps, status='IN_PROGRESS',
+                   created_at=None, done_at=None, archived_at=None, resumed_at=None)
+        with patch.object(plans.db, 'all_', side_effect=[[{'plan': v} for v in versions], []]), \
+             patch.object(plans, '_comments', return_value=[]), patch.object(plans.catalog, 'items', return_value={}):
+            result = plans.record(row, for_mgr=True)
+        self.assertEqual(plan, original)
+        return result
+
+    def test_current_and_previous_versions_use_their_own_selected_prices(self):
+        acts = [{'res': 'course'}, {'res': 'book_1'}, {'res': 'book_1'}]
+        current = dict(version=2, acts=acts, cost=23000, costUnknown=False)
+        offers = {'courses': [{'id': 'course', 'cost': 4000}],
+                  'books': [{'id': 'book_1', 'cost': 10000}, {'id': 'unused', 'cost': 9000}]}
+        previous = {'version': 1, 'acts': acts, 'cost': 14000, 'costUnknown': False,
+                    'def': {'learningReport': {'recommendations': {'skills': [offers]}}}}
+        result = self.read(current, {'course': [False, 0], 'book_1': [True, 23000]}, [previous, current])
+        self.assertEqual((result['plan']['cost'], result['plan']['costUnknown']), (0, False))
+        self.assertEqual([p['cost'] for p in result['versions']], [4000, 0])
+        self.assertEqual(previous['cost'], 14000)
+
+    def test_preserves_unknown_course_and_exam_prices_and_unverifiable_totals(self):
+        cases = [
+            ({'course': [False, 0], 'book': [True, None]}, (0, True), (0, False)),
+            ({'course': [False, None], 'book': [True, 23000]}, (23000, True), (0, True)),
+            ({'exam': [False, None], 'book': [True, None]}, (0, True), (0, True)),
+            ({'course': [False, 48000]}, (0, True), (0, True)),
+            ({'course': [False, 1000], 'book': [True, 23000]}, (1000, False), (1000, False)),
+            ({'book': [True, 23000]}, (5000, True), (5000, True)),
+        ]
+        for prices, saved, expected in cases:
+            with self.subTest(prices=prices, saved=saved):
+                plan = dict(acts=[{'res': key} for key in prices], cost=saved[0], costUnknown=saved[1])
+                result = self.read(plan, prices)['plan']
+                self.assertEqual((result['cost'], result['costUnknown']), expected)

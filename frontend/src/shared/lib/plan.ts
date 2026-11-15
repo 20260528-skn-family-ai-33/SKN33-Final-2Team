@@ -180,15 +180,10 @@ export const costSuffix = (r: Resource | null | undefined): string => {
   const text = costText(r);
   return text ? ` · ${text}` : '';
 };
-/** 저장된 계획의 '비용 미확인' 표시. 도서만 미확인 원인이었다고 확인될 때만 지운다:
-    도서를 뺀 자료의 현재 가격이 모두 확인되고, 그 합계가 저장된 합계와 같아야 한다.
-    확정 뒤 강좌 가격이 새로 등록돼 합계가 달라졌거나 자료 목록을 아직 못 불러오면 저장값을 유지한다 */
-export const hasUnknownCost = (pl: Pick<PlanContent, 'costUnknown' | 'cost'> & { acts?: Pick<Activity, 'res'>[] }): boolean => {
-  if (!pl.costUnknown) return false;
-  if (!pl.acts) return true;
-  const now = paidCost(pl.acts.flatMap((a) => (a.res ? [a.res] : [])), resOf);
-  return now.unknown || now.cost !== pl.cost;
-};
+export function planCostText({ cost, costUnknown }: Pick<PlanContent, 'cost' | 'costUnknown'>): string {
+  if (!cost) return costUnknown ? '가격 확인 필요' : '무료';
+  return won(cost) + (costUnknown ? '+' : '');
+}
 
 export function actMeta(a: Pick<Activity, 'task' | 'res'>): string {
   if (a.task) return '직접 수행 과제';

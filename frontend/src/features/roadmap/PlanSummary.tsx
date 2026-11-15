@@ -3,7 +3,7 @@ import type { PlanRecord } from '@/api/types/plan';
 import '@/features/draft/review/reviewStep.css';
 import { addDays, md, planStart, planWeeks, weekNow } from '@/features/home/ganttCalc';
 import { hrs } from '@/shared/lib/format';
-import { count, hasUnknownCost } from '@/shared/lib/plan';
+import { count, planCostText } from '@/shared/lib/plan';
 import { useClockRefresh } from '@/shared/state/demoClock';
 
 export function PlanSummary({ R }: { R: PlanRecord }) {
@@ -13,8 +13,6 @@ export function PlanSummary({ R }: { R: PlanRecord }) {
   const start = planStart(R);
   const week = weekNow(R);
   const progress = count(pl, R.progress);
-  const unknown = hasUnknownCost(pl);
-  const cost = pl.cost === 0 ? (unknown ? '가격 확인 필요' : '무료') : `${pl.cost.toLocaleString('ko-KR')}원${unknown ? '+' : ''}`;
   const now = R.status !== 'active' ? '' : week < 1 ? ' · 시작 전' : week <= weeks ? ` · 지금 ${week}주차` : ' · 기간 지남';
   return (
     <section className="card rv-summary" aria-label="로드맵 요약">
@@ -38,7 +36,7 @@ export function PlanSummary({ R }: { R: PlanRecord }) {
         </div>
         <div>
           <dt>예상 비용</dt>
-          <dd><b>{cost}</b><span>{unknown ? '일부 자료는 가격 확인 필요' : ' '}</span></dd>
+          <dd><b>{planCostText(pl)}</b><span>{pl.costUnknown ? '일부 자료는 가격 확인 필요' : ' '}</span></dd>
         </div>
       </dl>
     </section>

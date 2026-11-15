@@ -5,7 +5,6 @@ import type { Resource } from '@/api/types/catalog';
 import type { Activity, PlanContent } from '@/api/types/plan';
 import { ai, connFor, PROV, type Cause, type ModelRole } from '@/shared/state/ai';
 import { resOf } from '@/shared/state/catalog';
-import { hasUnknownCost } from '@/shared/lib/plan';
 import { useGo } from '@/shared/hooks/useGo';
 import { Icon } from './Icon';
 import { ResourceImage } from './ResourceImage';
@@ -173,7 +172,7 @@ export const CostB = ({ c, unk }: { c: number; unk?: boolean }) => (
   </>
 );
 
-export const Stats = ({ pl, bare, periodLabel = pl.durationBasis === 'materials-only' ? '자료 학습 예상 기간' : '기간', periodWeeks }: { pl: Pick<PlanContent, 'weeks' | 'hours' | 'cost' | 'costUnknown' | 'materialHours' | 'taskHours' | 'otherMaterialHours' | 'totalHUnknown' | 'durationBasis'> & { acts?: PlanContent['acts'] }; bare?: boolean; periodLabel?: string; periodWeeks?: number | null }) => (
+export const Stats = ({ pl, bare, periodLabel = pl.durationBasis === 'materials-only' ? '자료 학습 예상 기간' : '기간', periodWeeks }: { pl: Pick<PlanContent, 'weeks' | 'hours' | 'cost' | 'costUnknown' | 'materialHours' | 'taskHours' | 'otherMaterialHours' | 'totalHUnknown' | 'durationBasis'>; bare?: boolean; periodLabel?: string; periodWeeks?: number | null }) => (
   <><div className={`stats ${bare ? 'bare' : ''}`}>
     <div>
       <small>{periodLabel}</small>
@@ -190,9 +189,9 @@ export const Stats = ({ pl, bare, periodLabel = pl.durationBasis === 'materials-
       </b>
     </div>
     <div>
-      <small>예상 비용{hasUnknownCost(pl) ? ' · 일부 비용 확인 필요' : ''}</small>
+      <small>예상 비용{pl.costUnknown ? ' · 일부 비용 확인 필요' : ''}</small>
       <b>
-        <CostB c={pl.cost} unk={hasUnknownCost(pl)} />
+        <CostB c={pl.cost} unk={pl.costUnknown} />
       </b>
     </div>
   </div>
