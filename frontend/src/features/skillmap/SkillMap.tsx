@@ -2,7 +2,7 @@
    생활코딩 WEBn 지식 지도(seomal)처럼 점과 화살표로 그린다. 로드맵에 없는 스킬은 따로 표시하지 않는다(10/23 사용자 결정)
    그리는 틀(MapBox)은 내 스킬 지도(MySkillMap · 누적)와 함께 쓴다. 점과 화살표를 어떤 모양으로 그릴지는 쓰는 쪽이 MapView 로 정한다 */
 import { useQuery } from '@tanstack/react-query';
-import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { catalogApi } from '@/api/endpoints/catalog';
 import type { SkillMapData } from '@/api/types/catalog';
 import type { PlanContent } from '@/api/types/plan';
@@ -12,6 +12,7 @@ import { Note } from '@/shared/ui/parts';
 import { ApiError } from '@/api/client';
 import { matchingCertificates } from '@/features/roadmap/roadmapLearningData';
 import { useMe } from '@/shared/state/session';
+import { afterReveal } from '@/skins/afterReveal';
 import { actWeek, canvasMeasure, coverOf, edgeEnds, place, relOf, weeksOf, type Cover, type Layout } from './layout';
 
 let layoutCache: { d: SkillMapData; m: Layout } | null = null;
@@ -55,6 +56,17 @@ export interface MapView {
   info: (close: () => void) => ReactNode;
   notes?: ReactNode;
 }
+
+/* 퍼져 나가기: 지도가 화면에 들어올 때 한 번, 가운데 점부터 가장자리 점 순서로 나타난다(모양은 gp-v2.css 의 sm-spread).
+   점마다 가운데에서 떨어진 거리에 비례해 늦게 시작하고, 가운데 쪽으로 조금 당겨진 자리에서 제자리로 나온다 */
+const SPREAD_MS = 900; // 가운데 점과 가장 먼 점의 시작 시각 차이
+const SPREAD_PULL = 0.16; // 시작 자리: 가운데 쪽으로 이만큼(거리의 비율) 당긴다
+const spreadVars = (x: number, y: number, cx: number, cy: number, far: number, lag = 0): CSSProperties =>
+  ({
+    '--sm-d': `${Math.round((Math.hypot(x - cx, y - cy) / far) * SPREAD_MS + lag)}ms`,
+    '--sm-dx': `${((cx - x) * SPREAD_PULL).toFixed(1)}px`,
+    '--sm-dy': `${((cy - y) * SPREAD_PULL).toFixed(1)}px`,
+  }) as CSSProperties;
 
 const InfoSlot = ({ render, close }: { render: MapView['info']; close: () => void }) => <>{render(close)}</>;
 
@@ -111,6 +123,12 @@ function Svg({ data, view, picked, onPick, big, zoom }: { data: SkillMapData; vi
     return { look, tagT, tagW: tagT ? tw(tagT, 10, 700) + 12 : 0 };
   });
   const x1 = m.nodes.reduce((v, n, i) => (looks[i].tagT ? Math.max(v, n.x + n.r + 5 + looks[i].tagW) : v), -1e9);
+  // 퍼져 나가기의 가운데: 점들이 놓인 범위의 한가운데
+  const xs = m.nodes.map((n) => n.x);
+  const ys = m.nodes.map((n) => n.y);
+  const cx = xs.length ? (Math.min(...xs) + Math.max(...xs)) / 2 : 0;
+  const cy = ys.length ? (Math.min(...ys) + Math.max(...ys)) / 2 : 0;
+  const far = Math.max(1, ...m.nodes.map((n) => Math.hypot(n.x - cx, n.y - cy)));
   const nodes = m.nodes.map((n, i) => {
     const { look, tagT, tagW } = looks[i];
     const y0 = n.r + 15;
@@ -119,6 +137,7 @@ function Svg({ data, view, picked, onPick, big, zoom }: { data: SkillMapData; vi
         key={n.id}
         className={`sm-n ${look.cls}${picked === n.id ? ' pick' : ''}`}
         transform={`translate(${n.x.toFixed(1)},${n.y.toFixed(1)})`}
+        style={spreadVars(n.x, n.y, cx, cy, far)}
         role="button"
         tabIndex={0}
         aria-pressed={picked === n.id}
@@ -201,6 +220,8 @@ function Svg({ data, view, picked, onPick, big, zoom }: { data: SkillMapData; vi
               key={i}
               className={`sm-e${edge ? ` ${edge}` : ''}`}
               markerEnd={`url(#sm-${edge ? 'on' : 'g'})`}
+              /* 화살표는 이어 주는 두 점이 나온 뒤에 나타난다 */
+              style={spreadVars((p.x1 + p.x2) / 2, (p.y1 + p.y2) / 2, cx, cy, far, 260)}
               x1={p.x1.toFixed(1)}
               y1={p.y1.toFixed(1)}
               x2={p.x2.toFixed(1)}
@@ -222,8 +243,30 @@ export function MapBox({ id, title, viewKey, build, wheelZoom = false }: { id: s
   const [zoom, setZoom] = useState(1);
   const wrapRef = useRef<HTMLDivElement>(null);
   const keepScroll = useRef(false);
+  // 지도가 화면에 들어온 뒤에 퍼져 나가기를 시작한다(화면 아래쪽에 있을 때 안 보이는 곳에서 끝나 버리지 않게).
+  // 테마의 나타나기(덩어리가 떠오르기)와 겹치면 묻혀서 안 보이므로, 지도가 든 덩어리가 떠오른 뒤에 시작한다
+  const [seen, setSeen] = useState(typeof IntersectionObserver === 'undefined');
   const pid = picked.key === viewKey ? picked.id : null;
   const data = q.data;
+
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    if (seen || !wrap) return;
+    let stopWaiting = (): void => {};
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((e) => e.isIntersecting)) return;
+        io.disconnect();
+        stopWaiting = afterReveal(wrap, () => setSeen(true));
+      },
+      { threshold: 0.15 },
+    );
+    io.observe(wrap);
+    return () => {
+      io.disconnect();
+      stopWaiting();
+    };
+  }, [data, seen]);
 
   useLayoutEffect(() => {
     const wrap = wrapRef.current;
@@ -311,7 +354,7 @@ export function MapBox({ id, title, viewKey, build, wheelZoom = false }: { id: s
       <p className="small muted sm-sum">{view.sum}</p>
       <div className="card flat sm-card">
         <div className="sm-key">{view.keys}</div>
-        <div className={`sm-wrap${big ? ' sm-big' : ''}`} ref={wrapRef} title={wheelZoom ? 'Ctrl + 스크롤로 확대·축소' : undefined}>
+        <div className={`sm-wrap${big ? ' sm-big' : ''} ${seen ? 'sm-go' : 'sm-wait'}`} ref={wrapRef} title={wheelZoom ? 'Ctrl + 스크롤로 확대·축소' : undefined}>
           <Svg data={data} view={view} picked={pid} onPick={pick} big={big} zoom={zoom} />
         </div>
         <div className="sm-info" aria-live="polite">
