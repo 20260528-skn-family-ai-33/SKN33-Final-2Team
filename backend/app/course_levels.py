@@ -55,6 +55,10 @@ def is_free(cost) -> bool:
     return cost == 0 and not isinstance(cost, bool)
 
 
+def nonfree_course(record: dict) -> bool:
+    return record.get('type') == 'course' and not is_free(record.get('cost'))
+
+
 def eligible(record: dict, track: str | None) -> bool:
     """관련성 검사와 별개인 코스별 가격·난이도 조건. 난이도는 강좌 단위로 적용한다."""
     if track == 'A1':

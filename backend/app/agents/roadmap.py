@@ -19,7 +19,7 @@ import re
 import hashlib
 from uuid import uuid4
 
-from .. import catalog, catalog_budget, catalog_candidates, db, llm, roadmap_input, track_policy
+from .. import catalog, catalog_budget, catalog_candidates, course_levels, db, llm, roadmap_input, track_policy
 from . import runtime as rt
 from .roadmap_schema import compact_plan_guidance, fixed_plan_schema, initial_activity_limit
 from .demo import D, TEMPLATES, TEMPLATES_ALT, course_name, domain_of
@@ -183,13 +183,15 @@ def keep_ids(d: dict, base: dict, ver: int) -> dict:
     return d
 
 
-def _alt_same(rid: str, used: set, fmt: str | None, *, free_only: bool = False) -> str | None:
+def _alt_same(rid: str, used: set, fmt: str | None, *, free_only: bool = False, zero_budget: bool = False) -> str | None:
     r = _res(rid)
     if not r:
         return None
     for k, x in sorted(_cat().items(), key=lambda kv: kv[1]['title']):
+        if zero_budget and (course_levels.nonfree_course(x) or (r.get('type') == 'course' and x.get('type') != 'course')):
+            continue
         if k != rid and k not in used and x['usable'] and x['kind'] != '자격' and x['stage'] == r['stage'] and (not fmt or x['format'] == fmt) \
-                and set(x['skills']) & set(r['skills']) and (not free_only or x.get('type') == 'book' or x.get('cost') == 0):
+                and set(x['skills']) & set(r['skills']) and (not free_only or x.get('type') == 'book' or course_levels.is_free(x.get('cost'))):
             return k
     return None
 
@@ -318,7 +320,7 @@ def _mock_regen(inp: dict) -> dict:
 
 
 def _catalog_payload(pid: str, payload: dict, system: str = '', extra_ids: list | None = None,
-                     context_limit: int = catalog_budget.DEFAULT_CONTEXT) -> dict:
+                     context_limit: int = catalog_budget.DEFAULT_CONTEXT, free_courses_only: bool = False) -> dict:
     payload = copy.deepcopy(payload)
     handoff = payload['handoff']
     # 확정 스킬의 단일 기준. 검색·검증용 원본 필드는 서버에 보존한다.
@@ -338,7 +340,7 @@ def _catalog_payload(pid: str, payload: dict, system: str = '', extra_ids: list 
         required.append(cert)
     try:
         selection = catalog.roadmap_selection(texts, pid, skill_names=roadmap_input.skill_reference(handoff),
-                                             required=required, hints=handoff.get('resourceHints'),
+                                             required=required, hints=handoff.get('resourceHints'), free_courses_only=free_courses_only,
                                              **({'preserve_skills': True} if handoff.get('selectedSkillsFixed') else {}))
         roadmap_input.synchronize_skills(handoff, selection.skills)
         from app.learner_knowledge import exclusion,from_profile
@@ -583,6 +585,7 @@ def option(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
 # ── 수정안 (확정한 로드맵) ──
 def _mock_revise(inp: dict) -> dict:
     plan, h, c, pid = inp['plan'], inp['handoff'], inp['changes'], inp['pid']
+    zero_budget = course_levels.zero_budget(h['prefs'].get('budgetWon'))
     start, notes, done = h['startStage'], [], []
     base = {'tagline': plan['tagline'], 'reason': (plan.get('def') or {}).get('reason', ''), 'pros': (plan.get('def') or {}).get('pros', []), 'cons': (plan.get('def') or {}).get('cons', [])}
     if c.get('perspective'):
@@ -610,14 +613,17 @@ def _mock_revise(inp: dict) -> dict:
             continue
         hint = c.get('replaceHint') or ''
         fmt = '영상' if '영상' in hint else '문서' if re.search(r'(문서|도서|읽)', hint) else None
-        alt = (_alt_same(a['res'], used(), fmt, free_only=pid == 'A1') or _alt_same(a['res'], used(), None, free_only=pid == 'A1')) if a.get('res') else None
+        alt = _alt_same(a['res'], used(), fmt, free_only=pid == 'A1', zero_budget=zero_budget) if a.get('res') else None
+        if a.get('res') and fmt and not alt:
+            alt = _alt_same(a['res'], used(), None, free_only=pid == 'A1', zero_budget=zero_budget)
         if alt:
             a['res'], a['title'] = alt, f"{_res(alt)['title']} 학습"
         elif not a.get('res'):
             a['title'] = re.sub(r' \(다른 방식\)$', '', a['title']) + ' (다른 방식)'
             a['how'] = '같은 목표를 다른 방식으로 진행해요.'
         else:
-            notes.append(f"「{x['title']}」을 바꿀 비슷한 등록 자료가 없어 그대로 뒀어요.")
+            alternative = '무료 강좌' if zero_budget and (_res(a['res']) or {}).get('type') == 'course' else '등록 자료'
+            notes.append(f"「{x['title']}」을 대신할 {alternative}가 없어 기존 활동을 유지했어요.")
     if c.get('replaceActs'):
         done.append(f"활동 {len(c['replaceActs'])}개 바꾸기")
     for rid in c.get('addResources') or []:
@@ -636,7 +642,7 @@ def _mock_revise(inp: dict) -> dict:
             for a in acts:
                 rr = _res(a.get('res'))
                 if not a.get('done') and rr and rr['kind'] != '자격' and rr['format'] != f:
-                    alt = _alt_same(a['res'], used(), f, free_only=pid == 'A1')
+                    alt = _alt_same(a['res'], used(), f, free_only=pid == 'A1', zero_budget=zero_budget)
                     if alt:
                         a['res'], a['title'] = alt, f"{_res(alt)['title']} 학습"
                         n += 1
@@ -651,10 +657,11 @@ def _mock_revise(inp: dict) -> dict:
         if cert and _res(cert):
             acts.append({'stage': 4, 'title': f"{_res(cert)['title']} 준비", 'res': cert})
         done.append(f"자격증 {c['certification']}")
-    if c.get('budgetWon') is not None and h['prefs'].get('budgetWon') is not None:
+    budget_limit = 0 if zero_budget else h['prefs'].get('budgetWon')
+    if c.get('budgetWon') is not None and budget_limit is not None:
         cost = lambda: sum((_res(r) or {}).get('cost') or 0 for r in used())  # noqa: E731
         cut = 0
-        while cost() > h['prefs']['budgetWon']:
+        while cost() > budget_limit:
             paid = sorted([a for a in acts if not a.get('done') and a.get('res') and (_res(a['res'])['cost'] or 0) > 0 and _res(a['res'])['kind'] != '자격'],
                           key=lambda a: -_res(a['res'])['cost'])
             if not paid:
@@ -719,6 +726,22 @@ REV_SYS = """너는 GrowPath '로드맵 계획 에이전트'의 관점별 하위
 JSON 형식(형식만 보여 주는 예): {{"summary":"...","notes":[],"displayTitle":"사내 규정 RAG 챗봇 구축","tagline":"...","reason":"...","pros":["..."],"cons":["..."],"weeklyHours":4,"acts":[{{"key":"current의 key 또는 null","stage":2,"title":"...","res":"자료 id","hours":5,"how":"..."}},{{"key":"current의 key 또는 null","stage":3,"title":"...","res":null,"hours":6,"how":"...","skills":["skillTags의 이름"]}}]}}"""
 
 
+def _check_revision_course_prices(activities: list[dict], previous: list[dict]) -> None:
+    # keep_ids와 같이 원본 key를 먼저 연결하고, key가 빠진 유지 활동은 같은 스킬·자료로 한 번만 연결한다.
+    remaining = {a['id']: a for a in previous if a.get('res')}
+    for activity in sorted(activities, key=lambda a: not a.get('key')):
+        rid = activity.get('res')
+        if not rid or not course_levels.nonfree_course(_res(rid) or {}):
+            continue
+        key = activity.get('key')
+        if not key:
+            key = next((aid for aid, old in remaining.items()
+                        if old['res'] == rid and old.get('skill') == activity.get('skill')), None)
+        old = remaining.pop(key, None)
+        if not old or old['res'] != rid or (old.get('skill') and activity.get('skill') and old['skill'] != activity['skill']):
+            raise llm.LlmError('예산 0원 수정안에 유료·가격 미확인 강좌를 새로 추가하거나 교체할 수 없어요.')
+
+
 def _drop_gone_keys(o: dict, changes: dict) -> dict:
     """뺀 활동·바꾼 활동의 key 는 다른 활동이 이어받지 못하게 지운다(그 활동의 완료 기록이 엉뚱한 활동으로 옮겨 가지 않게)"""
     gone = {x.get('key') for x in (changes.get('removeActs') or []) + (changes.get('replaceActs') or [])}
@@ -760,6 +783,7 @@ def revise(ctx: rt.Ctx, inp: dict, sim: str | None = None) -> dict:
     """inp: pid, handoff, changes, request, fromComment, plan{opt,name,tagline,def,hours,start,acts[{id,stage,title,res,hours,how,done}]}"""
     pid, pl = inp['pid'], inp['plan']
     inp = dict(inp, handoff=roadmap_input.cap_skills(inp['handoff']))
+    zero_budget = course_levels.zero_budget((inp['handoff'].get('prefs') or {}).get('budgetWon'))
     skill_targets = _revision_skill_targets(pl, inp['handoff'])[:track_policy.MAX_SKILLS]
     course_changed = pid != pl['opt']
     report = (pl.get('def') or {}).get('learningReport') or {}
@@ -824,9 +848,11 @@ Crash는 최소 기능판으로 범위를 좁히되 핵심 기능의 안전성·
             current['skillOrder'] = list(target_names)
             if not integrated_revision:
                 system += '\n각 활동에 소속 skill을 skillOrder 중 정확히 하나로 반환한다. 유지 활동은 key와 skill을 보존한다. 추가·교체 활동도 실제 소속을 명시한다. 과제의 skills 태그 목록과 단일 소속 skill은 구분한다.'
+        if zero_budget:
+            system += '\n예산 0원: 추가·교체 강좌는 catalog의 0원 강좌만 사용한다. 적합한 무료 대안이 없으면 기존 활동과 key를 유지하고 notes에 이유를 적는다. 기존 유료 강좌는 다른 활동에 배정하지 않는다.'
         payload = _catalog_payload(pid, {'current': current, 'skillTargets': fresh_inputs if refresh_targets else current['learningSkills'], 'handoff': handoff, 'changes': inp['changes'],
                                         'request': inp.get('request'), 'skillTags': catalog.skill_names()}, system, extra_ids,
-                                   rt.S.ollama_num_ctx if ctx.mode == 'ollama' else catalog_budget.DEFAULT_CONTEXT)
+                                   rt.S.ollama_num_ctx if ctx.mode == 'ollama' else catalog_budget.DEFAULT_CONTEXT, zero_budget)
         r = rt.llm_json(ctx, system, payload, role='roadmap')
         _validate_learning_acts(r,inp['handoff'])
         o = finish_option(pid, r, ctx.mode, keep_key=True, preserve_learning_skills=False)
@@ -837,7 +863,10 @@ Crash는 최소 기능판으로 범위를 좁히되 핵심 기능의 안전성·
     from app.services.material_plan import rebuild_revision
     def checked(callback):
         def run(data):
-            result = _drop_gone_keys(callback(data), inp['changes'])
+            result = callback(data)
+            if zero_budget:
+                _check_revision_course_prices(result['acts'], pl['acts'])
+            result = _drop_gone_keys(result, inp['changes'])
             if refresh_targets and not result.get('learningSkills'):
                 raise llm.LlmError('코스 전환에는 새 학습 기준을 생성할 수 있는 AI 모델이 필요해요. 기존 계획은 유지됩니다.')
             result = rebuild_revision(result, pl, inp['handoff'])

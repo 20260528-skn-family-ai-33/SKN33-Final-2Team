@@ -377,8 +377,10 @@ def roadmap_skills(texts: list[str], skill_names: list[str] | None = None, *, pr
 
 def roadmap_selection(texts: list[str], track: str, *, skill_names: list[str] | None = None,
                       required: list[str] | None = None, hints: list[str] | None = None,
-                      preserve_skills: bool = False) -> catalog_candidates.Selection:
-    return catalog_candidates.select(items(), roadmap_skills(texts, skill_names, preserve_skills=preserve_skills), texts, track, required, hints, preserve_skills=preserve_skills)
+                      preserve_skills: bool = False, free_courses_only: bool = False) -> catalog_candidates.Selection:
+    skills = roadmap_skills(texts, skill_names, preserve_skills=preserve_skills)
+    return catalog_candidates.select(items(), skills, texts, track, required, hints,
+                                     preserve_skills=preserve_skills, free_courses_only=free_courses_only)
 
 
 def cert_groups() -> list[dict]:

@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 
 from .catalog_evidence import content_text
 from .english_patterns import english_token as _en
-from . import track_policy
+from . import course_levels, track_policy
 
 PER_SKILL = 20
 MAX_SKILLS = track_policy.MAX_SKILLS
@@ -227,14 +227,20 @@ def track_fit(x: dict, terms: list[re.Pattern], track: str, topics: list[re.Patt
 
 
 def select(records: dict[str, dict], skills: list[str], texts: list[str], track: str,
-           required: list[str] | None = None, hints: list[str] | None = None, *, preserve_skills: bool = False) -> Selection:
+           required: list[str] | None = None, hints: list[str] | None = None, *, preserve_skills: bool = False,
+           free_courses_only: bool = False) -> Selection:
     if track not in ('A1', 'A2', 'A3'):
         raise ValueError('알 수 없는 로드맵 관점입니다.')
     skills = list(dict.fromkeys(skills))[:track_policy.FAST_SKILLS if track == 'A2' and not preserve_skills else MAX_SKILLS]
     index, terms = cached_index(records), query_terms(texts)
     topics = depth_terms(texts)
     required = list(dict.fromkeys(k for k in required or [] if k))
-    excluded = [k for k in required if k in records and track == 'A1' and records[k].get('type') != 'book' and records[k].get('cost') != 0]
+    def excluded_price(record: dict) -> bool:
+        if track == 'A1':
+            return record.get('type') != 'book' and not course_levels.is_free(record.get('cost'))
+        return free_courses_only and course_levels.nonfree_course(record)
+
+    excluded = [k for k in required if k in records and excluded_price(records[k])]
     required = [k for k in required if k not in excluded]
     unavailable = [k for k in required if k not in records or not records[k].get('usable')]
     if unavailable:
@@ -248,7 +254,7 @@ def select(records: dict[str, dict], skills: list[str], texts: list[str], track:
         r = x['record']
         if not r.get('usable') or r.get('type') == 'cert' or not x['skills'].intersection(skills):
             continue
-        if track == 'A1' and r.get('type') != 'book' and r.get('cost') != 0:
+        if excluded_price(r):
             continue
         learning_outline = x['outline'] if track == 'A1' else x['own_outline']
         relevance = 3 * matches(r['title'].casefold(), terms) + 2 * min(5, matches(learning_outline, terms)) + min(3, matches(x['description'], terms))
