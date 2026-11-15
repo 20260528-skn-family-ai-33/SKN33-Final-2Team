@@ -3,7 +3,8 @@
    화면 코드(React)는 건드리지 않고, 바깥에서 CSS 변수와 data- 속성만 붙인다. 모양은 전부 skin.css 에 있다.
 
    1) 시차 배경: 스크롤 위치를 --tm612-py 로 넘긴다. 사진 층이 그 값만큼 느리게 따라오고, 원본과 같은 감속 곡선으로 미끄러진다.
-   2) 메뉴: 80px 넘게 내려가면 <html data-tm612-scrolled> (원본의 .scrolled)
+   2) 메뉴: 40px 넘게 내려가면 <html data-tm612-scrolled> (원본의 .scrolled · 원본은 80px).
+      본문 위 여백이 56px 라, 본문이 메뉴 밑으로 들어가기 전에 메뉴 바탕이 불투명해지도록 40px 로 당겼다
    원본의 세 번째 움직임인 나타나기(.reveal → .visible)는 다른 테마도 함께 쓰도록 skins/reveal.ts 로 옮겼다(index.ts 의 reveal: true).
    '움직임 줄이기' 설정이면 시차를 끈다(원본처럼 768px 이하에서도 끈다). */
 
@@ -14,13 +15,14 @@ const on = (): boolean => root.dataset.skin === SKIN;
 
 /* ── 1) 시차 배경 · 2) 메뉴 ── */
 const PARALLAX = 0.45; // 사진은 본문의 45% 속도로 올라간다
+const SOLID_AFTER = 40; // 이만큼 내려가면 메뉴 바탕이 불투명해진다(skin.css 의 본문 위 여백 56px 보다 작아야 한다)
 let ticking = false;
 
 function update(): void {
   ticking = false;
   if (!on()) return;
   const y = window.scrollY;
-  root.toggleAttribute('data-tm612-scrolled', y > 80);
+  root.toggleAttribute('data-tm612-scrolled', y > SOLID_AFTER);
   const still = reduce.matches || window.innerWidth <= 768;
   const shift = still ? 0 : -Math.min(y, window.innerHeight * 1.5) * PARALLAX;
   root.style.setProperty('--tm612-py', `${shift.toFixed(1)}px`);

@@ -1,8 +1,8 @@
-.gt-view-controls{display:flex;align-items:center;gap:5px;margin-left:auto;flex-wrap:wrap}.gt-view-controls button{height:30px;min-height:0;padding:4px 10px;border:1px solid var(--line-2,#d4ded9);border-radius:6px;background:var(--surface,#fff);font-size:12.5px;line-height:20px;color:inherit;cursor:pointer}.gt-view-controls button:disabled{opacity:.45;cursor:default}.gt-view-controls>span{min-width:34px;text-align:center;font-size:11px;font-variant-numeric:tabular-nums}.gt-scroll.gt-pan{cursor:grab;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}.gt-pan .gt-l{cursor:grab}.gt-pan button:not(:disabled){cursor:pointer}.gt-pan.is-dragging,.gt-pan.is-dragging *{cursor:grabbing!important;user-select:none}.gt-pan:focus-visible{outline:2px solid var(--accent,#16816d);outline-offset:3px}.gt-pan .gt-h{position:sticky;top:0;z-index:4;background:var(--surface,#fff)}
+.gt-view-controls{display:flex;align-items:center;gap:5px;margin-left:auto;flex-wrap:wrap}.gt-view-controls button{height:30px;min-height:0;padding:4px 10px;border:1px solid var(--line-2,#d4ded9);border-radius: var(--rad-1);background:var(--surface,#fff);font-size: 13px;line-height:20px;color:inherit;cursor:pointer}.gt-view-controls button:disabled{opacity:.45;cursor:default}.gt-view-controls>span{min-width:34px;text-align:center;font-size:11px;font-variant-numeric:tabular-nums}.gt-scroll.gt-pan{cursor:grab;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}.gt-pan .gt-l{cursor:grab}.gt-pan button:not(:disabled){cursor:pointer}.gt-pan.is-dragging,.gt-pan.is-dragging *{cursor:grabbing!important;user-select:none}.gt-pan:focus-visible{outline:2px solid var(--accent,#16816d);outline-offset:3px}.gt-pan .gt-h{position:sticky;top:0;z-index:4;background:var(--surface,#fff)}
 
 .gt-task-submit{padding:0;border:1px solid var(--accent,#16816d);cursor:pointer}.gt-task-submit:focus-visible{outline:2px solid var(--accent,#16816d);outline-offset:2px}
 
-.gt-materials-open{padding:0;border:0;cursor:pointer}.gt-a .gt-name small{font-size:10px;font-weight:400;color:var(--ink-4,#758078)}
+.gt-materials-open{padding:0;border:0;cursor:pointer}.gt-a .gt-name small{font-size: 11px;font-weight:400;color:var(--ink-4,#758078)}
 
 /* 주 경계는 배경·일 격자 위, 막대·이름 아래에 표시한다. */
 .gt-body{isolation:isolate}
@@ -16,7 +16,7 @@
 /* 가로 이동해도 그래프가 고정된 이름 영역을 침범하지 않게 자른다. */
 .gt-pan .gt-row>.gt-tl,.gt-pan .gt-h>.gt-tl,.gt-pan .gt-grid,.gt-pan .gt-week-boundaries{clip-path:inset(0 0 0 var(--gt-scroll-left,0px))}
 
-.gt-shared-note{position:absolute;left:8px;top:8px;font-size:10px;color:var(--ink-3,#68776f)}
+.gt-shared-note{position:absolute;left:8px;top:8px;font-size: 11px;color:var(--ink-3,#68776f)}
 
 /* 일·주 단위 전환(#224): 눌린 쪽을 테마 강조색으로 */
 .gt-unit{display:inline-flex}

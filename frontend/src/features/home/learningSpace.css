@@ -4,7 +4,7 @@
    .ls-card:nth-child(1~3) .ls-art 의 background-image 를 자기 그림으로 바꾼다 */
 .ls { margin-top: 52px; }
 .ls-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin-bottom: 22px; }
-.ls-t { margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -.02em; color: var(--ink); }
+.ls-t { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -.02em; color: var(--ink); }
 .ls-sub { font-size: 15px; color: var(--ink-3); }
 .ls-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
 
@@ -16,11 +16,11 @@
 .ls-card:hover { border-color: var(--accent-line); box-shadow: 0 14px 34px rgba(20, 40, 50, .08); transform: translateY(-2px); }
 .ls-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .ls-h { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-.ls-h h3 { margin: 0; font-size: 19px; line-height: 1.4; font-weight: 800; letter-spacing: -.02em; color: var(--ink); }
+.ls-h h3 { margin: 0; font-size: 20px; line-height: 1.4; font-weight: 700; letter-spacing: -.02em; color: var(--ink); }
 /* 카드 번호 색: 남색 · 적갈색 · 보라 (테마에서 --ls-c 로 바꿀 수 있다) */
 .ls-no {
-  flex: none; padding: 3px 9px; border-radius: 8px; background: var(--ls-c); color: #fff;
-  font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums;
+  flex: none; padding: 3px 9px; border-radius: var(--rad-2); background: var(--ls-c); color: #fff;
+  font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums;
 }
 .ls-card:nth-child(1) { --ls-c: #1F4E6B; }
 .ls-card:nth-child(2) { --ls-c: #B9644A; }
@@ -37,7 +37,7 @@
 .ls-card:nth-child(2) .ls-art { background-image: url('./img/space-resources.png'); }
 .ls-card:nth-child(3) .ls-art { background-image: url('./img/space-growth.png'); }
 
-.ls-go { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 14.5px; font-weight: 700; color: var(--accent-ink); }
+.ls-go { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 15px; font-weight: 700; color: var(--accent-ink); }
 .ls-go svg { width: 20px; height: 20px; transition: transform .2s; }
 .ls-card:hover .ls-go svg { transform: translateX(3px); }
 
