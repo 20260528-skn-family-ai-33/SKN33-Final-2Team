@@ -1,7 +1,90 @@
 import unittest
 from copy import deepcopy
+from unittest.mock import Mock
 from app.errors import ApiError
 from app.services.post_quiz import validate,comparison,public_assessment
+from app.services.post_quiz import generate
+
+
+class DuplicateQuizRewriteTests(unittest.TestCase):
+    def setUp(self):
+        groups = []
+        self.original = []
+        for group in range(1, 4):
+            skill = f'스킬 {group}'
+            quizzes = []
+            for index in range(1, 4):
+                key = f's{group}_quizzes_{index}'
+                q = dict(id=key, skill=skill, q=f'사전 질문 {key}', options=list('abcde'),
+                         answer=0, explain='정답 근거', concept=key, questionType='적용', difficulty='중')
+                quizzes.append(q)
+            groups.append({'skill': skill, 'quizzes': quizzes})
+            self.original.extend(quizzes)
+        self.plan = {'goal': '테스트', 'assess': {'v2': {'survey': {'groups': groups}}}}
+        self.initial = [dict(q, q=f'새 질문 {q["id"]}') for q in self.original]
+        self.targets = [4, 7, 8]
+        for i in self.targets:
+            self.initial[i]['q'] = self.original[i]['q']
+        self.replacements = [dict(self.initial[i], q=f'새 사례 {i}') for i in self.targets]
+
+    def test_only_duplicates_are_requested_and_saved_in_original_order(self):
+        model = Mock(side_effect=[{'quizzes': self.initial[::-1]}, {'quizzes': self.replacements[::-1]}])
+        survey = generate(self.plan, model, structured_rewrites=True)
+        self.assertEqual(model.call_count, 2)
+        self.assertEqual(model.call_args_list[0].kwargs, {})
+        retry = model.call_args.args[1]
+        self.assertEqual(retry['preQuizzes'], [self.original[i] for i in self.targets])
+        self.assertEqual(retry['previousQuestions'], {q['id']: q['q'] for q in retry['preQuizzes']})
+        schema = model.call_args.kwargs['response_schema']['properties']['quizzes']
+        self.assertEqual((schema['minItems'], schema['maxItems']), (3, 3))
+        self.assertEqual([row['properties']['id']['const'] for row in schema['prefixItems']],
+                         [q['id'] for q in retry['preQuizzes']])
+        expected = self.initial.copy()
+        for i, replacement in zip(self.targets, self.replacements):
+            expected[i] = replacement
+        self.assertEqual(survey['questionCount'], 9)
+        self.assertEqual([q for group in survey['groups'] for q in group['quizzes']], expected)
+
+    def test_repair_that_copies_a_kept_question_only_retries_the_remaining_id(self):
+        bad = dict(self.replacements[0], q=self.initial[1]['q'].upper() + ' ')
+        model = Mock(side_effect=[{'quizzes': self.initial}, {'quizzes': [bad, *self.replacements[1:]]},
+                                  {'quizzes': [self.replacements[0]]}])
+        result = generate(self.plan, model)
+        self.assertEqual(model.call_args.args[1]['preQuizzes'], [self.original[4]])
+        self.assertEqual(result['questionCount'], 9)
+
+    def test_repeated_failure_is_bounded_and_never_regenerates_valid_rows(self):
+        bad = [self.initial[i] for i in self.targets]
+        model = Mock(side_effect=[{'quizzes': self.initial}, {'quizzes': bad}, {'quizzes': bad}])
+        with self.assertRaisesRegex(ApiError, '반복된 문제'):
+            generate(self.plan, model)
+        self.assertEqual(model.call_count, 3)
+        for attempt in model.call_args_list[1:]:
+            self.assertEqual(attempt.args[1]['preQuizzes'], [self.original[i] for i in self.targets])
+
+    def test_fallback_only_receives_duplicates_and_cannot_replace_a_kept_row(self):
+        primary = Mock(return_value={'quizzes': self.initial})
+        fallback = Mock(return_value={'quizzes': [self.initial[0], *self.replacements[1:]]})
+        with self.assertRaisesRegex(ApiError, '문항 연결'):
+            generate(self.plan, primary, fallback)
+        primary.assert_called_once()
+        fallback.assert_called_once()
+        self.assertEqual(fallback.call_args.args[1]['preQuizzes'], [self.original[i] for i in self.targets])
+
+    def test_invalid_answer_is_not_treated_as_a_duplicate(self):
+        self.initial[0]['answer'] = True
+        model = Mock(return_value={'quizzes': self.initial})
+        with self.assertRaisesRegex(ApiError, '정답 근거'):
+            generate(self.plan, model)
+        model.assert_called_once()
+
+    def test_missing_or_repeated_replacement_ids_fail_without_a_partial_result(self):
+        for bad in (self.replacements[:2], [self.replacements[0], *self.replacements[:2]]):
+            with self.subTest(ids=[row['id'] for row in bad]):
+                model = Mock(side_effect=[{'quizzes': self.initial}, {'quizzes': bad}])
+                with self.assertRaises(ApiError):
+                    generate(self.plan, model)
+                self.assertEqual(model.call_count, 2)
 
 class PostQuizTests(unittest.TestCase):
     def test_parallel_quiz_preserves_measurement_and_original_survey(self):

@@ -343,10 +343,13 @@ def llm_json(ctx: Ctx, system: str, inp, role: str = 'default', images: list | N
 def model(ctx: Ctx, agent: str, task: str, role: str | None = None):
     """run() 밖에서 모델을 바로 부르는 곳에 넘기는 함수 (system, payload) → dict.
     호출마다 '에이전트 동작 보기'에 agent·task 이름으로 남는다. 호출 인자는 llm_json 과 같다"""
-    def call(system: str, payload):
+    def call(system: str, payload, *, response_schema: dict | None = None):
         label = _label.set((agent, task))
         try:
-            return llm_json(ctx, system, payload, **({'role': role} if role else {}))
+            options = {'role': role} if role else {}
+            if response_schema is not None:
+                options['response_schema'] = response_schema
+            return llm_json(ctx, system, payload, **options)
         finally:
             _label.reset(label)
     return call
