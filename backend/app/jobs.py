@@ -15,10 +15,11 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable
 
 from . import db
+from .config import S
 from .errors import AgentError, ApiError, cause
 
 logger = logging.getLogger(__name__)
-POOL = ThreadPoolExecutor(max_workers=8, thread_name_prefix='gp5-job')
+POOL = ThreadPoolExecutor(max_workers=S.job_workers, thread_name_prefix='gp5-job')
 WAIT_MAX_S = 15
 
 

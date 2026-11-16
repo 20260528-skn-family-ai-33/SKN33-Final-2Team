@@ -76,11 +76,15 @@ nginx -v
 
 ### 2-3. Ollama 켜기 (Pod 안에서만 열림)
 
+A100 80GB 한 장에서 `growpath-27b`만 미리 올리고 세 명의 로드맵 요청이 9개 슬롯에서 동시에 처리되는 것을 확인했어요. 병렬 수 9에서 27B와 규정용 4B의 동시 GPU 적재는 미검증이에요. 두 모델을 함께 쓸 때는 2-5에서 `ollama ps`로 둘 다 `100% GPU`인지 확인해요.
+
+메모리가 작은 GPU에서는 기존 병렬 수 3으로 시작해요. 이미 실행 중인 Ollama에 적용하려면 진행 중인 요청이 끝난 뒤 기존 `ollama serve`를 종료하고 이 블록으로 다시 시작해요.
+
 ```bash
 mkdir -p /workspace/ollama-models
 export OLLAMA_HOST=127.0.0.1:11435
 export OLLAMA_MODELS=/workspace/ollama-models
-export OLLAMA_NUM_PARALLEL=3
+export OLLAMA_NUM_PARALLEL=9
 export OLLAMA_MAX_LOADED_MODELS=2
 export OLLAMA_KEEP_ALIVE=30m
 export OLLAMA_CONTEXT_LENGTH=20480
@@ -101,7 +105,7 @@ grep -m1 "inference compute" /workspace/ollama.log
 | --- | --- |
 | `OLLAMA_HOST=127.0.0.1:11435` | Ollama를 Pod 안에서만 열어요. 바깥 요청은 2-6의 nginx(11434)가 키를 확인한 뒤 넘겨줘요. |
 | `OLLAMA_MODELS=/workspace/ollama-models` | 모델을 볼륨에 둬서 Stop했다 켜도 다시 받지 않게 해요. |
-| `OLLAMA_NUM_PARALLEL=3` | 로드맵 3안(A1·A2·A3) 요청 세 개를 차례대로가 아니라 동시에 처리해요. 모델마다 따로 적용돼서 문맥용 메모리도 모델마다 그만큼 잡혀요. |
+| `OLLAMA_NUM_PARALLEL=9` | 한 모델이 동시에 처리할 수 있는 요청 수예요. 로드맵은 한 사람당 Free·Crash·Challenge 세 건을 요청해요. 슬롯을 늘리면 모델별 문맥 메모리 사용량도 늘어요. |
 | `OLLAMA_MAX_LOADED_MODELS=2` | 27b와 4b를 GPU에 함께 올려 둬요. Ollama 기본값(GPU 하나에 3개)으로도 되지만 이 구성을 분명히 하려고 적어요. 메모리가 모자라면 이 값과 관계없이 한 모델을 내려요(2-5에서 확인). |
 | `OLLAMA_KEEP_ALIVE=30m` | 요청이 없어도 30분 동안 모델을 GPU에 올려 둬요(기본 5분). 두 모델에 각각 적용돼요. |
 | `OLLAMA_CONTEXT_LENGTH=20480` | 앱이 보내는 문맥 길이(`OLLAMA_NUM_CTX` · `.env.example` 기본 20480)와 맞춰요. 다르면 앱의 첫 호출 때 모델을 다시 불러와요. 앱은 두 모델에 같은 길이를 보내요. 20480은 로드맵 입력 11000 + 출력 7000 + 여유 1024 토큰을 담는 길이예요(#67 · `backend/app/catalog_budget.py`). 16384로 두면 로드맵 입력 상한이 8360 토큰으로 줄어요. |
@@ -240,7 +244,7 @@ grep "template selection" /workspace/ollama.log | tail -n 2
 - ✅ 마지막 줄(Ollama 기록)에 두 모델의 `selected=renderer_parser`가 보여요. `selected=none`이면 채팅 형식 없이 돌고 있는 거라 2-4 '채팅 형식 붙이기'를 다시 해요.
 - ✅ `ollama ps`에 **두 줄**이 보이고, 두 줄 모두 PROCESSOR가 `100% GPU`, CONTEXT가 `20480`이에요.
 - ❌ CONTEXT가 `16384` 등 다른 값이면 2-3의 `OLLAMA_CONTEXT_LENGTH`가 빠졌거나 예전 값이에요. 2-3을 다시 하고(`pkill -f "ollama serve"` 뒤) 이 블록을 다시 실행해요.
-- ❌ 한 줄만 보이면(먼저 올린 27b가 사라짐) 두 모델이 GPU 하나에 같이 들어가지 않는 거예요. 이대로 쓰면 진단·로드맵과 도우미를 오갈 때마다 모델을 다시 불러와서 호출이 1분 넘게 걸릴 수 있어요. 더 큰 GPU로 다시 배포해요. `OLLAMA_NUM_PARALLEL`을 줄이면 문맥용 메모리가 줄지만 로드맵 3안을 차례로 처리해서 느려져요.
+- ❌ 먼저 올린 27b가 사라지면 두 모델을 번갈아 불러오는 시간이 생겨요. 2-3에서 `OLLAMA_NUM_PARALLEL=3`으로 낮춰 다시 시작한 뒤 두 모델이 함께 들어가는지 확인해요. 병렬 수 3에서는 로드맵 요청 세 건까지 한꺼번에 처리하고, 나머지는 슬롯이 빌 때까지 기다려요.
 - ❌ PROCESSOR에 CPU가 섞여 있으면(예: `20%/80% CPU/GPU`) GPU 메모리가 부족한 거예요. 더 큰 GPU로 다시 배포해요.
 
 ### 2-6. 키 만들고 nginx 켜기 (다시 실행해도 안전)
@@ -330,8 +334,10 @@ OLLAMA_VISION_MODEL=
 OLLAMA_TIMEOUT=600
 OLLAMA_NUM_CTX=20480
 OLLAMA_KEEP_ALIVE=30m
+GP5_JOB_WORKERS=9
 ```
 
+- `GP5_JOB_WORKERS`는 백엔드 프로세스 하나가 모든 백그라운드 작업에 공유하는 워커 수예요. 생략하면 9이고, 기존 설정은 8이에요. 변경한 값은 백엔드를 다시 띄울 때 적용돼요. Pod의 Ollama 병렬 수는 2-3에서 따로 설정해요.
 - ✅ `OLLAMA_NUM_CTX`가 Pod의 `OLLAMA_CONTEXT_LENGTH`(2-3)와 같은 20480이에요.
 - ✅ 예전 `.env`를 그대로 쓰고 있다면 `OLLAMA_NUM_CTX=16384`, `OLLAMA_TIMEOUT=300`이 남아 있지 않은지 봐요. 둘 다 위 값으로 바꿔요(16384면 로드맵 입력이 줄고 Pod와 달라 모델을 다시 불러와요 · 300이면 긴 작업이 Pod보다 먼저 끊겨요).
 - ✅ 주소가 `https`가 아니라 `http://`로 시작해요(TCP로 직접 붙으면 HTTPS가 없어요).
@@ -422,6 +428,17 @@ rm /workspace/ollama_key.txt
 - **생각 모드:** RunPod-Ollama는 진단·로드맵·규정 모든 호출에 늘 `think: false`를 보내요(2026-11-12 · `think`를 빼면 qwen3.8은 모델 기본값으로 켜지므로 끔을 명시해요). `.env`나 화면(직원·관리자)으로 바꾸지 않고, 예전 `OLLAMA_THINK` 줄과 예전에 저장된 추론 단계는 읽지 않아요. OpenAI `gpt-6-luna`는 화면에서 고르지 않았고 `OPENAI_REASONING_EFFORT`도 비어 있으면 `reasoning_effort`를 보내지 않아 기본값(medium)으로 추론이 켜진 채예요. 두 모드의 결과를 비교할 때는 이 차이를 함께 적어요. 팀원 백엔드에는 아직 이 설정이 없어요.
 - **도우미가 '근거 확인 불가'라고 할 때:** 먼저 질문 분류와 검색된 조항을 확인해요. RunPod-Ollama·OpenAI 모드는 같은 벡터 검색을 사용해요. 현재 실제 모델 모드는 사용자 요청에 따라 되묻기·선택지를 생성하지 않으며, RoBERTa가 질문 유형을 정하고 답변 모델은 근거 상태·요약·출처만 생성해요. 규정·회사 답변은 ‘근거 확인 / 근거 일부 확인 / 근거 확인 불가 / 답변 불가’로 구분하며, 답변 불가는 제공 금지 요청의 거절이에요. 숫자·출처 검증 실패는 별도의 오류로 표시해요. 2026-10-26의 `REG_SYS` 되묻기 확대는 과거 변경 이력으로, 현재 동작이 아니에요. 자세한 기준은 [챗봇 질문 분류 안내](classification.md#답변-상태와-오류-2026-11-03-사용자-요청-반영)를 참고해요.
 - **CPU 100%:** 모델이 GPU에 다 올라가 있어도 토큰마다 다음 토큰 고르기와 JSON 형식 검사(`format: json`)는 CPU가 해요. 요청 여러 개를 동시에 처리하면 RunPod 화면의 CPU가 100%까지 차는데, 고장은 아니에요. GPU를 바꿔도 CPU 표시는 비슷하고, 빨라지는 건 답 만드는 속도예요.
+
+## 로드맵 3명 동시 생성 실측 (2026-11-16)
+
+A100-SXM4 80GB 한 장에서 Ollama 0.40.16의 `growpath-27b`를 미리 올리고, 동일한 세 계정 입력으로 설정별 한 번씩 측정했어요(문맥 20480, 추론 끔). 세 사람이 동시에 요청한 시점부터 마지막 사람의 Chrome에 Free·Crash·Challenge가 모두 표시될 때까지 쟀어요.
+
+| Pod의 모델당 병렬 수 | 백엔드 프로세스당 워커 | 첫 안 저장 확인 | 마지막 사람의 3안 표시 | 로드맵 첫 시도 저장 성공 | 후속 자료 추천 작업 성공 |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 3 | 8 | 81초 | 4분 40초 | 9/9 | 8/9 |
+| 9 | 9 | 138초 | 4분 19초 | 9/9 | 9/9 |
+
+한 사람의 세 안이 저장되면 코스별 자료 추천이 시작돼요. 두 설정 모두 추천 작업 일부가 다른 사람의 로드맵 생성과 겹쳤고, Chrome에 세 안이 보인 뒤에도 추천은 계속됐어요. 병렬 3·워커 8에서 실패한 1건은 계정 C의 Crash 자료 추천이에요. 스킬별 추천 결과 수가 기대값과 달라 `AI_ERROR`로 끝났어요.
 
 ## 확인 범위 (2026-10-26)
 

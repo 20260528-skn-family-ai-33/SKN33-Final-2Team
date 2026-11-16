@@ -65,6 +65,7 @@ class Settings:
     db_timezone: str
     host: str
     port: int
+    job_workers: int
     demo_mode: bool
     browser_overrides: bool
     console_provider_employees: frozenset[str]
@@ -151,11 +152,18 @@ def load() -> Settings:
         raise ValueError('OPENAI_ROADMAP_TIMEOUT은 1~600 사이의 정수(초)여야 해요') from exc
     if not 1 <= roadmap_timeout <= 600:
         raise ValueError('OPENAI_ROADMAP_TIMEOUT은 1~600 사이의 정수(초)여야 해요')
+    try:
+        job_workers = int(env('GP5_JOB_WORKERS', '9'))
+    except ValueError as exc:
+        raise ValueError('GP5_JOB_WORKERS는 1 이상의 정수여야 해요') from exc
+    if job_workers < 1:
+        raise ValueError('GP5_JOB_WORKERS는 1 이상의 정수여야 해요')
     return Settings(
         database_url=env('DATABASE_URL') or _local_db_url(),
         db_timezone=env('GP5_DB_TIMEZONE', 'Asia/Seoul'),
         host=env('GP5_HOST', '127.0.0.1'),
         port=int(env('GP5_PORT', '8785')),
+        job_workers=job_workers,
         # 공개 저장소라 기본값을 두지 않는다(팀 database/RESTORE.md: 공용 기본 비밀번호 없음 · 2026-10-26). 비우면 시연 비밀번호를 쓰는 준비 단계를 건너뛴다
         demo_mode=_explicit_on('GP5_DEMO_MODE'),
         browser_overrides=_explicit_on('GP5_CONSOLE_OVERRIDES', 'GP5_BROWSER_OVERRIDES', default=True),
