@@ -106,21 +106,40 @@ class LifespanWarmupTests(unittest.IsolatedAsyncioTestCase):
         from app import main
         loop_thread = threading.get_ident()
         threads = []
+
+        def classify(question):
+            self.assertTrue(question.strip())
+            threads.append(threading.get_ident())
+            return {'ms': 12}
+
         with patch.object(main.jobs, 'mark_lost', return_value=0), \
-                patch.object(catalog, 'warmup_roadmap', side_effect=lambda: threads.append(threading.get_ident())):
+                patch.object(catalog, 'warmup_roadmap', side_effect=lambda: threads.append(threading.get_ident())), \
+                patch.object(main.question_classifier, 'classify', side_effect=classify) as classifier:
             async with main.lifespan(main.app):
-                self.assertEqual(len(threads), 1)
-                self.assertNotEqual(threads[0], loop_thread)
+                classifier.assert_called_once()
+                self.assertEqual(len(threads), 2)
+                self.assertNotIn(loop_thread, threads)
 
     async def test_failed_optional_warmup_is_logged_and_does_not_hide_error(self):
         from app import main
         with patch.object(main.jobs, 'mark_lost', return_value=0), \
                 patch.object(catalog, 'warmup_roadmap', side_effect=ValueError('검증 파일 누락')), \
+                patch.object(main.question_classifier, 'classify', return_value={'ms': 1}) as classifier, \
                 self.assertLogs(main.logger, level='ERROR') as log:
             async with main.lifespan(main.app):
-                pass
+                classifier.assert_called_once()
         self.assertIn('사전 로딩 실패', log.output[0])
         self.assertIn('검증 파일 누락', log.output[0])
+
+    async def test_classifier_warmup_failure_allows_startup(self):
+        from app import main
+        with patch.object(main.jobs, 'mark_lost', return_value=0), \
+                patch.object(catalog, 'warmup_roadmap'), \
+                patch.object(main.question_classifier, 'classify', side_effect=OSError('모델 파일 누락')), \
+                self.assertLogs(main.logger, level='ERROR') as log:
+            async with main.lifespan(main.app):
+                self.assertIn('질문 분류기 예열 실패', log.output[0])
+                self.assertIn('모델 파일 누락', log.output[0])
 
 
 class CompactRoadmapInputTests(unittest.TestCase):

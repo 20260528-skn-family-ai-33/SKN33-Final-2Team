@@ -4,7 +4,7 @@
 
 | 파일 | 역할 | 실행 시점 |
 | --- | --- | --- |
-| [`app/question_classifier.py`](app/question_classifier.py) | `.pt` 모델·토크나이저 로딩과 질문 4분류 | 실제 모드에서 챗봇 질문 처리 시 |
+| [`app/question_classifier.py`](app/question_classifier.py) | `.pt` 모델·토크나이저 로딩과 질문 4분류 | 백엔드 시작 시 예열, 실제 모드에서 챗봇 질문 처리 시 |
 | [`app/knowledge.py`](app/knowledge.py) | 회사 정보·사내 생활 범주별 DB 원문·벡터 검색 | 회사·생활 질문 처리 시 |
 | [`app/agents/regulation.py`](app/agents/regulation.py) | 분류별 검색·출처/숫자 검증·API 응답 구성 | 챗봇 질문 처리 시 |
 | [`app/agents/grounded_answer.py`](app/agents/grounded_answer.py) | 질문 재분류 없이 근거 상태·요약·인용 생성 | 규정·회사·생활안내 답변 시 |

@@ -4,6 +4,9 @@ from unittest.mock import AsyncMock, patch
 
 
 class PromptWorkerLifespanTests(IsolatedAsyncioTestCase):
+    def setUp(self):
+        self.enterContext(patch('app.question_classifier.classify', return_value={'ms': 1}))
+
     async def test_disabled_worker_does_not_schedule_or_load_cases(self):
         from app.main import lifespan, app
         with patch('app.jobs.mark_lost', return_value=0), patch('app.catalog.warmup_roadmap'), patch.dict('os.environ', {'PROMPT_IMPROVEMENT_ENABLED': '0'}), patch('app.services.prompt_evaluation_replay.load_cases') as load, patch('app.services.prompt_improvement_worker.serve', new_callable=AsyncMock) as serve:

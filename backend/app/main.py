@@ -18,14 +18,14 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
-from . import browser_console, catalog, jobs
+from . import browser_console, catalog, jobs, question_classifier
 from .config import ROOT, S
 from .errors import ApiError, api_error_handler
 from .routers import account, notifications, team, work, preassessment
 from .version import read_project_version
 
 WEB = ROOT / 'web'
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('uvicorn.error.startup')
 
 
 @asynccontextmanager
@@ -44,6 +44,12 @@ async def lifespan(_: FastAPI):
         logger.exception('로드맵 사전 로딩 실패: 로드맵 요청 시 다시 확인합니다.')
     else:
         logger.info('로드맵 사전 로딩 완료: %.0fms', (time.perf_counter() - started) * 1000)
+    try:
+        prediction = await run_in_threadpool(question_classifier.classify, '연차휴가는 어떻게 신청하나요?')
+    except Exception:
+        logger.exception('챗봇 질문 분류기 예열 실패. 첫 질문에서 다시 분류를 시도합니다.')
+    else:
+        logger.info('챗봇 질문 분류기 예열 완료: %dms', prediction['ms'])
     prompt_task = None
     if os.environ.get('PROMPT_IMPROVEMENT_ENABLED', '0') == '1':
         from .services.prompt_evaluation_replay import load_cases
