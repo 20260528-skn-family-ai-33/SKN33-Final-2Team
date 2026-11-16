@@ -7,33 +7,50 @@
   border-bottom: 1px solid var(--line);
   padding: 0.125rem 0 0.375rem;
 }
-.feedback-controls { display: flex; flex-wrap: wrap; gap: 0.375rem; align-items: center; }
+.feedback-controls { display: flex; flex-wrap: wrap; gap: 0.375rem; align-items: center; margin: 0; }
 .feedback-reasons { grid-column: 1 / -1; }
 .feedback-note { display: grid; gap: 0.25rem; }
-.feedback-note textarea { width: 100%; min-height: 3.5rem; resize: vertical; }
+.feedback-note .textarea { min-height: 3.5rem; }
+.feedback-popup .feedback-note .input { padding: 7px 10px; font-size: 14px; }
 .feedback-submit { justify-self: end; }
 @media (max-width: 560px) {
   .feedback-skill { grid-template-columns: minmax(0, 1fr); }
 }
-.feedback-form .feedback-choice {
+
+/* 고르는 버튼(좋아요 · 보완 필요 · 보완 이유): 높이를 맞추고 누를 때 줄어드는 효과는 뺀다 */
+.feedback-choice.btn {
   box-sizing: border-box;
   height: 2rem;
   min-height: 2rem;
   padding-block: 0;
   transform: none;
 }
-.feedback-form .feedback-choice[aria-pressed="true"] {
-  background: var(--accent-soft2);
+/* 테마의 테두리 버튼 마우스 효과(라이트: 검정 반전 · 다크: 흰색 반전)는 쓰지 않는다. 라이트에서는 고른 주황 버튼이 검게 바뀌고,
+   다크에서는 마우스만 올려도 고른 것처럼 보였다 → 칩처럼 강조색 테두리 + 옅은 바탕만 쓰고,
+   고른 버튼은 강조색 바탕 + 그 위 글자색(--accent-on · 다크는 강조색이 흰색이라 검은 글자) */
+:root .feedback-controls .feedback-choice.btn.line:hover:not(:disabled) {
+  background: var(--accent-soft);
   border-color: var(--accent);
   color: var(--accent-ink);
 }
+:root .feedback-controls .feedback-choice.btn.line[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-on);
+}
+:root .feedback-controls .feedback-choice.btn.line[aria-pressed="true"]:hover:not(:disabled) {
+  background: var(--accent-ink);
+  border-color: var(--accent-ink);
+  color: var(--accent-on);
+}
+
 .feedback-summary-row { border-bottom: 1px solid var(--line); padding-block: 0.25rem; overflow-wrap: anywhere; }
 .feedback-summary-row .tag { margin-inline-start: 0.375rem; }
-.feedback-controls { margin: 0; }
 .feedback-form .feedback-skill > .feedback-controls { justify-self: end; }
-.feedback-form .feedback-choice, .feedback-popup .feedback-choice { height: 2rem; min-height: 2rem; padding-block: 0; transform: none; }
-.feedback-choice.btn[aria-pressed="true"] { background: var(--accent-soft2); border-color: var(--accent); color: var(--accent-ink); }
-.review-skill-block summary .feedback-trigger {
+
+/* 스킬 머리의 '피드백'(부서장) · '코멘트 보기'(직원) 단추. 글자 링크 모양을 쓰지만 테두리 단추로 보이게 하고,
+   테마의 글자 링크 색(라이트: 회색 · 다크: 밑줄)이 덮지 않게 한 단계 더 구체적으로 적는다 */
+:root .review-skill-block summary .feedback-trigger.link {
   align-self: center;
   display: inline-flex;
   align-items: center;
@@ -44,14 +61,19 @@
   border-radius: var(--rad-2, 0.375rem);
   background: var(--surface);
   color: var(--accent-ink);
+  text-decoration: none;
   white-space: nowrap;
 }
-.review-skill-block summary .feedback-trigger:hover,
-.review-skill-block summary .feedback-trigger[aria-expanded="true"] { background: var(--accent-soft2); }
-.feedback-trigger[aria-expanded="true"] { background: var(--accent-soft2); }
+:root .review-skill-block summary .feedback-trigger.link:hover,
+:root .review-skill-block summary .feedback-trigger.link[aria-expanded="true"] {
+  background: var(--accent-soft2);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
 .feedback-summary-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0.5rem; }
 .feedback-summary-content { grid-column: 1; grid-row: 1; }
-.feedback-summary-row .feedback-remove {
+/* 지우기(×): 다크 모드 글자 링크의 밑줄이 붙어 '×' 아래 줄이 생겼다 */
+:root .feedback-summary-row .feedback-remove.link.quiet {
   grid-column: 2;
   grid-row: 1;
   display: grid;
@@ -61,7 +83,9 @@
   font-size: 1.4rem;
   line-height: 1;
   color: var(--ink-3, #737373);
+  text-decoration: none;
 }
+:root .feedback-summary-row .feedback-remove.link.quiet:hover { color: var(--ink); }
 .feedback-popup.card {
   margin-block-start: 0.5rem;
   padding: 0.625rem 0.75rem;
@@ -69,6 +93,8 @@
   background: var(--surface);
 }
 .feedback-popup .feedback-skill { border-bottom: 0; padding: 0; }
+/* 보낸 스킬 피드백 고치기: 보낼 때와 같은 단추를 코멘트 상자 안에 그대로 둔다 */
+.cm-edit .feedback-skill { border-bottom: 0; padding: 0; margin-block-end: 12px; }
 .feedback-popup .feedback-reasons { gap: 0.375rem; }
 @media (min-width: 1050px) {
   .review-skill-block:has(> .feedback-popup) { position: relative; overflow: visible; z-index: 2; }
@@ -83,11 +109,7 @@
 }
 
 .feedback-popup .feedback-skill > b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.feedback-skill .feedback-controls .feedback-choice.btn[aria-pressed="true"] {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-on, #fff);
-}.feedback-reasons > .feedback-controls {
+.feedback-reasons > .feedback-controls {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }

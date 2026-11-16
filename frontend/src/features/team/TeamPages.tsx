@@ -14,7 +14,7 @@ import { paths } from '@/app/paths';
 import { ReportBody } from '@/features/report/ReportBody';
 import { HeadReportTasks } from '@/features/report/ReportTasks';
 import { MemberRoadView } from './MemberRoadView';
-import { CmItem, CmTag, cmMine, feedbackReasons, selectedFeedbackReasons } from '@/features/roadmap/comments';
+import { CmItem, CmTag, cmMine, feedbackReasons, isFreeComment, isSkillFeedback, selectedFeedbackReasons } from '@/features/roadmap/comments';
 import { D } from '@/shared/constants/data';
 import { useGo } from '@/shared/hooks/useGo';
 import { failToast } from '@/shared/lib/fail';
@@ -372,7 +372,10 @@ function MgrCmItem({ uid, pid, c, live }: { uid: string; pid: string; c: Comment
         }
       />
     );
-  const ok = !!(m && hasComment(m) && cmChanged(m));
+  // 고치는 칸은 보낼 때와 같은 모양으로: 스킬 피드백은 '좋아요 · 보완 필요'(+ 이유 · 메모), 전체 코멘트는 글 칸 하나, 예전 세 칸 코멘트만 세 칸
+  const kind = isSkillFeedback(c) ? 'skill' : isFreeComment(c) ? 'free' : 'fields';
+  const filled = !!m && (kind === 'skill' ? m.fit === 'good' || m.fit === 'partial' : kind === 'free' ? !!m.free?.trim() : hasComment(m));
+  const ok = !!m && filled && cmChanged(m);
   const save = async (btn: HTMLButtonElement) => {
     if (!m || !ok) return;
     btn.disabled = true;
@@ -403,7 +406,16 @@ function MgrCmItem({ uid, pid, c, live }: { uid: string; pid: string; c: Comment
         </span>
         <CmTag c={c} mgr />
       </div>
-      <CommentFields k={key} nm="-e" />
+      {kind === 'skill' && c.skill ? (
+        <SkillFeedback draftKey={key} skill={c.skill} />
+      ) : kind === 'free' ? (
+        <div className="field">
+          <label>전체 코멘트</label>
+          <BText path={`mgr.${key}.free`} className="textarea sm" placeholder="계획 조정에 도움이 될 의견" />
+        </div>
+      ) : (
+        <CommentFields k={key} nm="-e" />
+      )}
       <p className="small muted" style={{ margin: 0 }}>
         {c.status === 'read' ? '직원이 확인한 코멘트예요. 저장하면 직원에게 다시 ‘새 코멘트’로 알려요.' : '직원이 아직 확인하지 않은 코멘트예요. 저장하면 고친 내용으로 보여요.'} 고치기 전 내용은
         남지 않고 ‘수정됨’과 날짜만 보여요.
@@ -467,8 +479,8 @@ function ManagerCommentHistory({ uid, R, comments }: { uid: string; R: PlanRecor
   })}</>;
 }
 
-function SkillFeedback({ uid, R, skill }: { uid: string; R: PlanRecord; skill: string }) {
-  const key = mk(mk(uid, R.id), skill);
+/** 스킬 하나의 '좋아요 · 보완 필요'(+ 보완 이유 · 메모). draftKey: 새로 쓰는 칸은 (직원 · 로드맵 · 스킬), 보낸 코멘트를 고칠 때는 그 코멘트의 칸 */
+function SkillFeedback({ draftKey: key, skill }: { draftKey: string; skill: string }) {
   const draft = useWs(state => state.mgr[key]);
   const reasons = selectedFeedbackReasons(draft?.fitText);
   function change(fields: Partial<MgrDraft>) {
@@ -489,7 +501,7 @@ function SkillFeedback({ uid, R, skill }: { uid: string; R: PlanRecord; skill: s
         {!reasons.length && <span className="small muted">보완 이유 · 선택</span>}
       </div>
       <label className="feedback-note">스킬 메모 · 선택
-        <input value={draft.free || ''} onChange={event => change({ free: event.target.value })} />
+        <input className="input" value={draft.free || ''} onChange={event => change({ free: event.target.value })} />
       </label>
     </div>}
   </div>;
@@ -502,7 +514,7 @@ function FeedbackForm({ uid, R, summary = false }: { uid: string; R: PlanRecord;
     <div className="sec-h"><h2 className="st">{summary ? '피드백 요약' : '로드맵 피드백'}</h2></div>
     <div className="card feedback-form">
       {commentSkillNames(R.plan).map(skill => {
-        if (!summary) return <SkillFeedback key={skill} uid={uid} R={R} skill={skill} />;
+        if (!summary) return <SkillFeedback key={skill} draftKey={mk(key, skill)} skill={skill} />;
         const draft = drafts[mk(key, skill)];
         if (draft?.fit !== 'good' && draft?.fit !== 'partial') return null;
         return <div key={skill} className="feedback-summary-row">
@@ -516,7 +528,7 @@ function FeedbackForm({ uid, R, summary = false }: { uid: string; R: PlanRecord;
         </div>;
       })}
       <label className="feedback-note"><b>전체 코멘트 <span className="small muted">· 선택</span></b>
-        <textarea value={drafts[key]?.free || ''} onChange={event => {
+        <textarea className="textarea sm" value={drafts[key]?.free || ''} onChange={event => {
           const free = event.target.value;
           updateWs(state => { state.mgr[key] = { ...state.mgr[key], free }; });
         }} />
@@ -580,7 +592,7 @@ export function MemberRoadPage() {
       <MemberRoadView R={R} skillAction={live ? feedbackButton : undefined}
         skillFooter={pl.def.learningReport ? skill => activeSkill === skill
           ? <aside className="feedback-popup card" aria-label="스킬 피드백">
-              <SkillFeedback uid={uid} R={R} skill={skill} />
+              <SkillFeedback draftKey={mk(mk(uid, R.id), skill)} skill={skill} />
             </aside> : null : undefined} />
       {reps.length ? (
         <div className="sec">

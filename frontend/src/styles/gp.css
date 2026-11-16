@@ -6,6 +6,8 @@
   --accent-soft: color-mix(in srgb, var(--accent) 7%, #fff);
   --accent-soft2: color-mix(in srgb, var(--accent) 13%, #fff);
   --accent-line: color-mix(in srgb, var(--accent) 32%, #fff);
+  /* 강조색 바탕 위 글자. 다크 모드(612)는 강조색이 흰색이라 검은 글자로 바꾼다(skins/tm612/skin.css) */
+  --accent-on: #fff;
 
   --bg: #F5F5F2;
   --surface: #FFFFFF;
@@ -609,7 +611,9 @@ details.more[open] > summary { margin-bottom: 12px; }
 
 /* 소속 직원 계획(#96): 확인 전 로드맵·보고서가 있는 직원 강조, 줄 끝 '보기 >' 를 눈에 띄게, 기록 없는 직원은 접어 둔다 */
 .team-row.has-unseen { background: var(--accent-soft, transparent); box-shadow: inset 3px 0 0 var(--accent); }
-.tag.team-new { background: var(--accent); color: #fff; font-weight: 700; }
+/* 마우스를 올려도 강조 바탕을 지운 회색(목록 공통 마우스 효과)으로 바뀌지 않고 한 단계 진해진다 */
+button.team-row.has-unseen:hover { background: var(--accent-soft2); }
+.tag.team-new { background: var(--accent); color: var(--accent-on); font-weight: 700; }
 /* 표시가 여러 개여도 좁은 화면에서 줄을 넘지 않게 */
 .li .end:has(.team-go) { flex-wrap: wrap; justify-content: flex-end; white-space: normal; }
 .team-go {
@@ -626,7 +630,7 @@ details.more[open] > summary { margin-bottom: 12px; }
   white-space: nowrap;
 }
 .team-go svg.i { width: 15px; height: 15px; }
-.li:hover .team-go { background: var(--accent); border-color: var(--accent); color: #fff; }
+.li:hover .team-go { background: var(--accent); border-color: var(--accent); color: var(--accent-on); }
 .team-empty { margin-top: 14px; }
 .team-empty > summary { cursor: pointer; padding: 10px 2px; color: var(--ink-2, #474A4F); font-size: 14px; }
 .team-empty > summary b { color: var(--ink, #18191B); }
@@ -715,7 +719,7 @@ details.more[open] > summary { margin-bottom: 12px; }
   padding: 2px 5px;
   border-radius: 99px;
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-on);
   font-size: 11px;
   line-height: 1;
   text-align: center;
