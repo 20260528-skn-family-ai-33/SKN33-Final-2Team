@@ -22,8 +22,9 @@ export interface TourStep {
   focus?: string;
   /** 아직 안내할 수 없을 때(AI 가 만드는 중 · 버튼이 꺼져 있음) 대신 비출 곳과 기다리라는 문구.
       busy 가 있으면 그 선택자에 맞는 요소(만드는 중 표시)가 있을 때만 기다리라고 한다 — 실패해서 멈춘 화면을 '만드는 중'이라 하지 않게.
-      also 에 맞는 요소들은 비추는 자리에 함께 넣는다 */
-  wait?: { targets: string[]; text: string; busy?: string; also?: string };
+      also 에 맞는 요소들은 비추는 자리에 함께 넣는다.
+      slowText 는 걸리는 시간을 적은 문구의 RunPod-Ollama 판(로컬 모델은 훨씬 오래 걸린다) */
+  wait?: { targets: string[]; text: string; slowText?: string; busy?: string; also?: string };
   /** 대상 안에서 이 선택자에 맞는 것을 누르면 '다음'을 누른 것과 같다 */
   pick?: string;
   /** 안내 글을 비춘 자리의 오른쪽 끝에 맞춘다(왼쪽 아래에 가리면 안 되는 내용이 있을 때) */
@@ -72,13 +73,13 @@ export const TOUR_STEPS: TourStep[] = [
   {
     // 기다리는 동안에는 진행 막대와 그 아래 코스별 작성 상황까지 함께 비춘다
     id: 'gen', path: paths.newGen, screen: '로드맵 3안 작성', targets: ['gen-next'], text: '3안이 준비됐어요.', advance: 'click', alignEnd: true,
-    wait: { targets: ['gen-wait'], text: 'AI가 방식이 다른 로드맵 3안을 만들고 있어요. 1~2분쯤 걸려요.', also: '[data-tour="gen-rows"] > .agent' },
+    wait: { targets: ['gen-wait'], text: 'AI가 방식이 다른 로드맵 3안을 만들고 있어요. 1~2분쯤 걸려요.', slowText: 'AI가 방식이 다른 로드맵 3안을 만들고 있어요. 최대 10분까지 걸릴 수 있어요.', also: '[data-tour="gen-rows"] > .agent' },
   },
 
   { id: 'courses', path: paths.newOptions, screen: '로드맵·자료 선택', targets: ['courses'], text: '코스 하나를 골라요.', advance: 'auto', done: '[data-tour="courses"] .opt-course.is-on' },
   {
     id: 'materials', path: paths.newOptions, screen: '로드맵·자료 선택', targets: ['materials'], text: '고른 코스의 강좌와 도서예요. 바꿀 수 있어요.', advance: 'next',
-    when: ON('options-next'), wait: { targets: ['materials'], text: 'AI가 고른 코스에 맞는 강좌와 도서를 찾고 있어요. 1~2분쯤 걸릴 수 있어요.', busy: '.step-bar-wait' },
+    when: ON('options-next'), wait: { targets: ['materials'], text: 'AI가 고른 코스에 맞는 강좌와 도서를 찾고 있어요. 1~2분쯤 걸릴 수 있어요.', slowText: 'AI가 고른 코스에 맞는 강좌와 도서를 찾고 있어요. 최대 10분까지 걸릴 수 있어요.', busy: '.step-bar-wait' },
   },
   {
     id: 'options-next', path: paths.newOptions, screen: '로드맵·자료 선택', targets: ['options-next'], text: '자료를 정했으면 검토로 넘어가요.', advance: 'click',
@@ -87,7 +88,7 @@ export const TOUR_STEPS: TourStep[] = [
 
   {
     id: 'summary', path: paths.newReview, screen: '검토·확정', targets: ['summary'], text: '전체 기간과 학습 시간이에요.', advance: 'next',
-    when: ON('confirm'), wait: { targets: ['summary'], text: 'AI가 고른 자료로 일정과 과제를 만들고 있어요. 30초에서 1분쯤 걸려요.', busy: '.rv-status' },
+    when: ON('confirm'), wait: { targets: ['summary'], text: 'AI가 고른 자료로 일정과 과제를 만들고 있어요. 30초에서 1분쯤 걸려요.', slowText: 'AI가 고른 자료로 일정과 과제를 만들고 있어요. 최대 10분까지 걸릴 수 있어요.', busy: '.rv-status' },
   },
   { id: 'schedule', path: paths.newReview, screen: '검토·확정', targets: ['schedule'], text: '주차마다 할 일이에요.', advance: 'next', when: ON('confirm') },
   { id: 'tasks', path: paths.newReview, screen: '검토·확정', targets: ['tasks'], text: '스킬마다 해 볼 과제예요. 다른 과제로 바꿀 수 있어요.', advance: 'next', when: ON('confirm'), focus: '.rv-skill' },
@@ -114,6 +115,9 @@ export function stepForPath(index: number, pathname: string): number {
   const cur = TOUR_STEPS[index];
   return cur && cur.path === TOUR_STEPS[first].path ? index : first;
 }
+
+/** 기다리는 동안의 문구. slow 는 AI 모드가 RunPod-Ollama 일 때 */
+export const waitText = (step: TourStep, slow: boolean): string => (slow && step.wait?.slowText) || step.wait?.text || step.text;
 
 /** 사용자에게 보이는 진행 숫자: 단계가 아니라 화면 단위로 센다(한 화면의 안내 여러 개는 같은 번호) */
 const SCREENS: string[] = [...new Set(TOUR_STEPS.map((s) => s.screen))];
