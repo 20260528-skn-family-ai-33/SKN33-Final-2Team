@@ -295,8 +295,9 @@ function UseCard() {
             <button
               className="link"
               onClick={() => {
-                startTour();
+                // 홈으로 옮긴 뒤에 시작한다(지금 화면의 메뉴를 먼저 비췄다가 홈으로 건너뛰지 않게)
                 go(paths.home);
+                startTour();
               }}
             >
               다시 보기 <Icon name="right" />

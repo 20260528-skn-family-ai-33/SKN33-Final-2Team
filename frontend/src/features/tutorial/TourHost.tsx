@@ -50,10 +50,12 @@ const headTop = (): number => {
 };
 
 /** 스크롤해도 화면 위에 붙어 있는 띠·상단 메뉴의 아래 끝(실제 자리에서 잰다). 비춘 자리는 이 아래에서만 연다.
-    좌측 메뉴 모드의 메뉴처럼 화면 높이를 다 쓰는 것은 위에 붙은 띠가 아니므로 뺀다 */
-const coverTop = (vh: number): number => {
+    좌측 메뉴 모드의 메뉴처럼 화면 높이를 다 쓰는 것은 위에 붙은 띠가 아니므로 빼고,
+    대상이 그 띠 안에 있으면(상단 메뉴의 '새 로드맵 작성') 그 띠는 자르는 기준에서 뺀다 */
+const coverTop = (target: Element, vh: number): number => {
   let bottom = 0;
   for (const el of document.querySelectorAll('.ribbon, .side')) {
+    if (el.contains(target)) continue;
     const pos = getComputedStyle(el).position;
     if (pos !== 'sticky' && pos !== 'fixed') continue;
     const r = el.getBoundingClientRect();
@@ -137,7 +139,7 @@ function useSpot(step: TourStep, index: number, noteRef: React.RefObject<HTMLEle
         return { top, bottom, left: Math.min(...rs.map((x) => x.left)), right: Math.max(...rs.map((x) => x.right)), height: bottom - top };
       };
       // 비춘 자리는 위에 붙은 띠·상단 메뉴와 아래 요약 줄 사이에서만 연다(스크롤로 그 밑에 들어간 부분은 덮어 둔다)
-      const top = coverTop(vh);
+      const top = coverTop(el, vh);
       const floor = floorOf(el, vh);
       const boxOf = (): Box | null => {
         const r = rectOf();
@@ -373,5 +375,6 @@ export function TourHost() {
   if (intro) return pathname === paths.home ? <Intro /> : null;
   if (finished) return <Finish />;
   const step = active && closedAt !== pathname && stepForPath(index, pathname) === index ? TOUR_STEPS[index] : null;
-  return step ? <Guide step={step} index={index} pathname={pathname} /> : null;
+  // 화면마다 새로 비춘다: 여러 화면에 걸친 시작 단계가 앞 화면에서 잡은 자리·나타나기 상태를 다음 화면으로 끌고 가지 않게
+  return step ? <Guide key={pathname} step={step} index={index} pathname={pathname} /> : null;
 }
