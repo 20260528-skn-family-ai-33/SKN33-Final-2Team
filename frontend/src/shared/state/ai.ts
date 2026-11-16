@@ -37,20 +37,23 @@ export interface Conn {
 }
 
 interface AiState {
-  status: { checked: boolean; server?: boolean; policy?: ProviderPolicy; demoMode?: boolean; docLibs: Record<string, boolean>; providers: Record<string, ProviderInfo> };
+  status: { checked: boolean; server?: boolean; policy?: ProviderPolicy; fixedProvider?: ServerProvider; consoleProviderAllowed?: boolean; modelSelectEnabled?: boolean; demoMode?: boolean; docLibs: Record<string, boolean>; providers: Record<string, ProviderInfo> };
   settings: UserSettings;
   conn: Conn;
 }
 
 export const useAi = create<AiState>(() => ({
   status: { checked: false, demoMode: false, providers: {}, docLibs: {} },
-  settings: { aiProvider: 'ollama', demoMock: false, failSim: {}, reasoning: {} },
+  settings: { aiProvider: 'openai', demoMock: false, failSim: {}, reasoning: {} },
   conn: { state: 'idle', provider: '', at: 0 },
 }));
 
 const g = () => useAi.getState();
+export const canSelectModel = ({ status }: AiState): boolean =>
+  !status.policy || status.policy === 'employee' || status.modelSelectEnabled === true;
 const prov = (p: string, s: AiState = g()): Partial<ProviderInfo> => s.status.providers[toSrv(p)] || {};
-const choiceOf = (s: AiState): UiProvider => toUi(s.status.policy && s.status.policy !== 'employee' ? s.status.policy : s.settings.aiProvider || 'ollama');
+const choiceOf = (s: AiState): UiProvider => toUi(s.status.policy && s.status.policy !== 'employee'
+  ? s.status.fixedProvider ?? s.status.policy : s.settings.aiProvider || 'openai');
 const modeOf = (s: AiState): Mode => {
   const choice = choiceOf(s);
   return s.settings.demoMock ? 'mock' : prov(choice, s).available ? choice : 'off';
@@ -108,23 +111,27 @@ export function canClearHiddenDemoSettings({ status, settings }: AiState): boole
 }
 
 let statusRequest = 0;
-export async function checkStatus({ reconnectRunpod = false } = {}): Promise<void> {
+export async function checkStatus({ reconnectRunpod = false, accountChanged = false } = {}): Promise<void> {
   const request = ++statusRequest;
   const session = signInSeq();
-  useAi.setState((s) => ({ status: { ...s.status, demoMode: false } }));
+  useAi.setState((s) => ({ status: { ...s.status, demoMode: false,
+    ...(accountChanged && { consoleProviderAllowed: false, modelSelectEnabled: false }) } }));
   try {
     const j = await aiApi.providers();
     if (request !== statusRequest || session !== signInSeq()) return;
     useAi.setState((s) => ({
       settings: { ...s.settings, aiProvider: j.current,
         reasoning: (j.policy && j.policy !== 'employee') || j.policy !== s.status.policy ? j.employeeReasoning ?? s.settings.reasoning : s.settings.reasoning },
-      status: { checked: true, server: true, policy: j.policy ?? 'employee', demoMode: j.demoMode === true,
+      status: { checked: true, server: true, policy: j.policy ?? 'employee',
+        fixedProvider: j.policy && j.policy !== 'employee' ? j.current : undefined,
+        consoleProviderAllowed: j.consoleProviderAllowed === true,
+        modelSelectEnabled: j.consoleProviderAllowed === true && j.modelSelectEnabled === true, demoMode: j.demoMode === true,
         docLibs: j.docLibs || {}, providers: Object.fromEntries(j.providers.map((p) => [p.id, p])) },
     }));
     if (reconnectRunpod && ai.mode() === 'ollama') await ping();
   } catch {
     if (request !== statusRequest || session !== signInSeq()) return;
-    useAi.setState((s) => ({ status: { ...s.status, checked: true, server: false, demoMode: false } }));
+    useAi.setState((s) => ({ status: { ...s.status, checked: true, server: false, demoMode: false, consoleProviderAllowed: false, modelSelectEnabled: false } }));
   }
 }
 
@@ -143,11 +150,29 @@ export function applySettings(s: Partial<UserSettings> | null | undefined): void
 export async function setChoice(p: UiProvider): Promise<void> {
   const seq = signInSeq();
   try {
+    const { policy } = g().status;
+    if (policy && policy !== 'employee') {
+      await aiApi.setConsoleProvider(toSrv(p));
+      if (seq === signInSeq()) await checkStatus();
+      return;
+    }
     const saved = await aiApi.setProvider(toSrv(p));
     if (seq === signInSeq()) useAi.setState((s) => ({ settings: { ...s.settings, aiProvider: saved.provider } }));
   } catch (error) {
-    if (seq === signInSeq() && error instanceof ApiError && error.code === 'PROVIDER_MANAGED') await checkStatus();
+    if (seq === signInSeq() && error instanceof ApiError && [403, 409].includes(error.status)) await checkStatus();
     throw error;
+  }
+}
+
+export async function setModelSelectEnabled(enabled: boolean): Promise<void> {
+  const seq = signInSeq();
+  const before = ai.choice();
+  await aiApi.setModelSelectEnabled(enabled);
+  if (seq !== signInSeq()) return;
+  await checkStatus();
+  if (seq === signInSeq() && before !== ai.choice()) {
+    resetConn();
+    if (ai.live()) void ping();
   }
 }
 
@@ -312,7 +337,7 @@ export function userTodo(kind?: string): string[] {
   if (kind === 'docbig') return ['15MB 이하로 줄여 다시 골라 주세요.', '기획서 없이 목표만으로 진행해도 돼요.'];
   if (/^doc/.test(kind || '')) return ['DOCX·PPTX·HWPX·PDF·TXT 중 하나로 저장해 다시 골라 주세요.', '기획서 없이 목표만으로 진행해도 돼요.'];
   const other = ai.choice() === 'api' ? 'ollama' : 'api';
-  const canSwitch = (!g().status.policy || g().status.policy === 'employee') && ai.available(other);
+  const canSwitch = canSelectModel(g()) && ai.available(other);
   if (kind === 'off')
     return ['서버 연결과 모델 설정을 확인해 주세요.', '자동 대체하지 않아요. 연결한 뒤 다시 시도해 주세요.'].concat(
       canSwitch ? [`화면 위 ‘AI 모델’에서 ${PROV[other]}를 골라 볼 수도 있어요.`] : [],

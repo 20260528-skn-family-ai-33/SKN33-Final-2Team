@@ -9,8 +9,8 @@ from sqlalchemy.exc import ProgrammingError
 
 from .. import db, llm, provider_keys, provider_policy, regulation_embeddings
 from ..agents import runtime as rt
-from ..auth import COOKIE, Account, end_session, hash_password, login, require_account, require_employee, start_session, verify_password
-from ..browser_console import demo_enabled, options as browser_options
+from ..auth import COOKIE, Account, end_session, hash_password, login, provider_cookie, require_account, require_employee, start_session, verify_password
+from ..browser_console import demo_enabled, options as browser_options, provider_allowed
 from ..config import OLLAMA_THINK, S, level_ok
 from ..errors import ApiError, provider_label, unavailable_reason
 from ..services import demo, goals, profile
@@ -26,7 +26,7 @@ def console_capabilities():
 
 
 def _settings(employee_id: int, selection: tuple[str, str | None] | None = None) -> dict:
-    policy, level = selection or provider_policy.selection()
+    policy, level = provider_policy.for_employee(employee_id, selection or provider_policy.selection())
     s = db.one('SELECT ai_provider, demo_mock, fail_sim, reasoning FROM app_ext.user_settings WHERE employee_id = :e', e=employee_id) or {}
     # 이 요청에서 시연을 끄면 DB에 남아 있는 시연 옵션도 화면에 적용하지 않는다.
     return {'aiProvider': provider_policy.resolve(policy, s.get('ai_provider')), 'demoMock': demo_enabled(S.demo_mode) and bool(s.get('demo_mock')),
@@ -173,7 +173,9 @@ def api_providers(a: Account = Depends(require_account)):
     settings = _settings(a.id, (policy, level)) if a.type == 'employee' else {}
     connection = provider_keys.runpod(S) if a.type == 'admin' else llm.ollama_connection()
     return {'current': settings.get('aiProvider') or provider_policy.resolve(policy, None),
-            'policy': policy, 'employeeReasoning': settings.get('reasoning', {}), 'demoMode': demo_enabled(S.demo_mode), 'providers': [
+            'policy': policy, 'consoleProviderAllowed': a.type == 'employee' and provider_allowed(a.id),
+            'modelSelectEnabled': policy != 'employee' and browser_options.get().model_selection is not None,
+            'employeeReasoning': settings.get('reasoning', {}), 'demoMode': demo_enabled(S.demo_mode), 'providers': [
         {'id': 'ollama', 'label': 'RunPod-Ollama', 'available': bool(connection.url), 'reason': '' if connection.url else unavailable_reason('ollama'), 'target': connection.target if connection.url else '',
          'models': dict({r: llm.model_name('ollama', r) for r in ('default', 'roadmap', 'regulation', 'vision')}, embed=regulation_embeddings.model()),
          'timeout': S.ollama_timeout,
@@ -206,6 +208,29 @@ def api_set_provider(body: dict, a: Account = Depends(require_employee)):
     return {'provider': p}
 
 
+@r.put('/me/console-provider', status_code=204)
+def api_console_provider(body: dict, a: Account = Depends(require_employee)):
+    if not provider_allowed(a.id):
+        raise ApiError(403, 'CONSOLE_PROVIDER_DISABLED', '이 계정에는 콘솔 모델 전환이 허용되지 않았어요')
+    response = Response(status_code=204)
+    name = provider_cookie(a.id)
+    toggle = body.keys() == {'enabled'} and isinstance(body['enabled'], bool)
+    pick = body.keys() == {'provider'} and body['provider'] in ('openai', 'ollama')
+    if not (toggle or pick):
+        raise ApiError(422, 'BAD_PROVIDER', '선택 박스의 켜짐 여부 또는 사용할 AI 모델을 보내 주세요')
+    if toggle and not body['enabled']:
+        response.delete_cookie(name, path='/api/v1')
+        return response
+    if provider_policy.current() == 'employee':
+        raise ApiError(409, 'EMPLOYEE_SELECTION_ACTIVE', '직원별 선택 중에는 AI 모델 메뉴에서 바꿔 주세요')
+    enabled = browser_options.get().model_selection is not None
+    if pick and not enabled:
+        raise ApiError(409, 'MODEL_SELECT_OFF', '콘솔에서 model_select on으로 AI 모델 선택을 켜 주세요')
+    if pick or not enabled:
+        response.set_cookie(name, body['provider'] if pick else 'on', path='/api/v1', httponly=True, samesite='lax')
+    return response
+
+
 @r.put('/me/reasoning')
 def api_set_reasoning(body: dict, a: Account = Depends(require_employee)):
     """모드별 추론 정도. level 이 null 이면 .env 기본값을 따른다. OpenAI 는 .env 의 OPENAI_REASONING_LEVELS 안에서만 받는다.
@@ -231,12 +256,19 @@ def api_set_reasoning(body: dict, a: Account = Depends(require_employee)):
 
 
 @r.get('/ai/status')
-def api_status(provider: str = 'ollama', a: Account = Depends(require_account)):
+def api_status(provider: str | None = None, a: Account = Depends(require_account)):
     """연결 확인(API-12 · 토큰을 쓰지 않음). 화면은 쉬운 말만, 원인·조치·원문은 운영자용"""
+    if a.type == 'employee':
+        selected = provider_policy.selection()
+        effective, _ = provider_policy.for_employee(a.id, selected)
+        if provider is None:
+            provider = _settings(a.id, selected)['aiProvider'] if effective == 'employee' else effective
+        if provider in ('ollama', 'openai') and effective not in ('employee', provider):
+            raise ApiError(409, 'PROVIDER_MANAGED', '현재 적용된 모델의 연결만 확인할 수 있어요')
+    elif provider is None:
+        provider = 'ollama'
     if provider not in ('ollama', 'openai'):
         raise ApiError(400, 'BAD_PROVIDER', '사용할 AI 제공자를 선택해 주세요')
-    if a.type == 'employee' and provider_policy.current() not in ('employee', provider):
-        raise ApiError(409, 'PROVIDER_MANAGED', '관리자가 지정한 모델의 연결만 확인할 수 있어요')
     try:
         if a.type == 'admin' and provider == 'ollama':
             return llm.ping('ollama', connection=provider_keys.runpod(S))

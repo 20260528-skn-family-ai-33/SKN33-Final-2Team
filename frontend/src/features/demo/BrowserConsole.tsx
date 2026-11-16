@@ -3,7 +3,7 @@ import { http } from '@/api/client';
 import { accountApi } from '@/api/endpoints/account';
 import { useLocation } from 'react-router';
 import { activeRunpodSettings, browserDemoEnabled, consoleEnabled, limits, storeOptions, useBrowserOptions, type BrowserOptions, type ConsoleDefaults } from '@/shared/lib/browserOptions';
-import { ai, applySettings, checkStatus, resetConn, useAi } from '@/shared/state/ai';
+import { ai, applySettings, checkStatus, resetConn, setModelSelectEnabled, useAi } from '@/shared/state/ai';
 import { loadDemoAccounts, signInSeq, useSession } from '@/shared/state/session';
 import { useConsoleActions, type ConsoleAction } from './consoleActions';
 import { RunpodSettings } from './RunpodSettings';
@@ -75,6 +75,8 @@ function CommandDialog({ close }: { close: () => void }) {
   const options = useBrowserOptions(s => s.options);
   const screenActions = useConsoleActions(s => s.actions);
   const employee = useSession(s => s.account?.accountType === 'employee');
+  const providerAllowed = useAi(s => s.status.consoleProviderAllowed === true);
+  const fixedPolicy = useAi(s => s.status.policy && s.status.policy !== 'employee');
   useEffect(() => {
     const element = dialog.current!;
     element.showModal();
@@ -101,6 +103,15 @@ function CommandDialog({ close }: { close: () => void }) {
     return `${label} · ${value === undefined ? '기본값' : toggleText(value)}`;
   }
   add('status', '설정보기', '현재 설정 보기 · 테스트 기능, 모델 제한, RunPod 연결', () => '');
+  if (employee && providerAllowed && fixedPolicy) {
+    for (const enabled of [true, false]) {
+      add('model_select ' + (enabled ? 'on' : 'off'), '모델선택' + (enabled ? '켜기' : '끄기'),
+        enabled ? '상단 AI 모델 선택 박스를 켭니다.' : '선택 박스를 끄고 관리자 지정 모델로 돌아갑니다.', async () => {
+        await setModelSelectEnabled(enabled);
+        return '이 브라우저의 AI 모델 선택 · ' + toggleText(enabled);
+      });
+    }
+  }
   for (const field of ['picker', 'demo'] as const) {
     const label = { picker: '로그인 직원 고르기', demo: '시연 도구와 개인 모델 설정' }[field];
     for (const enabled of [true, false]) {
@@ -139,7 +150,11 @@ function CommandDialog({ close }: { close: () => void }) {
     storeOptions(next);
     return 'RunPod 기본값을 복원했습니다.';
   });
-  add('reset', '전체초기화', '이 브라우저에 저장한 콘솔 설정을 모두 지웁니다.', () => { storeOptions({}); return '브라우저 기본값을 복원했습니다.'; });
+  add('reset', '전체초기화', '이 브라우저에 저장한 콘솔 설정을 모두 지웁니다.', async () => {
+    if (employee && providerAllowed) await setModelSelectEnabled(false);
+    storeOptions({});
+    return '브라우저 기본값을 복원했습니다.';
+  });
   add('help', '도움말', '사용할 수 있는 명령과 설명을 봅니다.', () => commands.map(c => c.name + '  ' + c.description).join('\n'));
   const matches = commands.filter(c => normalize(c.name).startsWith(prefix) || c.alias.startsWith(prefix));
   const current = matches.find(c => c.name === selected) ?? matches.find(c => normalize(c.name) === prefix || c.alias === prefix) ?? (prefix ? matches[0] : undefined);

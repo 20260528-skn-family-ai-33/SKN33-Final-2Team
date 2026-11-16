@@ -85,7 +85,7 @@ def context(employee_id: int, me: dict | None = None) -> Ctx:
     # 시연 API를 차단한 뒤에도 저장된 옵션이 실제 모델 호출을 바꾸지 않게 한다.
     demo = demo_enabled(S.demo_mode) and bool(s.get('demo_mock'))
     fail_sim = (s.get('fail_sim') or {}) if demo_enabled(S.demo_mode) else {}
-    policy, level = provider_policy.selection()
+    policy, level = provider_policy.for_employee(employee_id, provider_policy.selection())
     reasoning = (s.get('reasoning') or {}) if policy == 'employee' else ({policy: level} if level else {})
     return Ctx(employee_id, provider_policy.resolve(policy, s.get('ai_provider')), demo, fail_sim, me or {},
                reasoning=reasoning, provider_managed=policy != 'employee')

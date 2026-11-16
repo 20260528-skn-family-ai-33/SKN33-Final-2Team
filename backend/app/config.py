@@ -67,6 +67,7 @@ class Settings:
     port: int
     demo_mode: bool
     browser_overrides: bool
+    console_provider_employees: frozenset[str]
     beta_account_picker: bool
     employee_ai_selection: bool
     demo_password: str
@@ -158,6 +159,9 @@ def load() -> Settings:
         # 공개 저장소라 기본값을 두지 않는다(팀 database/RESTORE.md: 공용 기본 비밀번호 없음 · 2026-10-26). 비우면 시연 비밀번호를 쓰는 준비 단계를 건너뛴다
         demo_mode=_explicit_on('GP5_DEMO_MODE'),
         browser_overrides=_explicit_on('GP5_CONSOLE_OVERRIDES', 'GP5_BROWSER_OVERRIDES', default=True),
+        console_provider_employees=frozenset(v.strip() for v in os.environ.get(
+            'GP5_CONSOLE_PROVIDER_EMPLOYEE_IDS', _FILE.get('GP5_CONSOLE_PROVIDER_EMPLOYEE_IDS', '')
+        ).split(',') if v.strip()),
         employee_ai_selection=env('GP5_EMPLOYEE_AI_SELECTION', 'on').strip().lower() == 'on',
         beta_account_picker=env('GP5_BETA_ACCOUNT_PICKER', 'off').lower() == 'on',
         demo_password=env('GP5_DEMO_PASSWORD'),

@@ -2,7 +2,7 @@
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-from . import llm, provider_keys
+from . import browser_console, llm, provider_keys
 from .config import S, level_ok
 from .errors import ApiError, unavailable_reason
 
@@ -50,7 +50,17 @@ def current() -> str:
 
 
 def resolve(policy: str, employee_provider: str | None) -> str:
-    return (employee_provider or 'ollama') if policy == 'employee' else policy
+    return (employee_provider or 'openai') if policy == 'employee' else policy
+
+
+def for_employee(employee_id: int, selected: tuple[str, str | None]) -> tuple[str, str | None]:
+    policy, level = selected
+    selection = browser_console.options.get().model_selection
+    if policy != 'employee' and selection and selection[0] == employee_id:
+        provider = selection[1]
+        if provider and provider != policy:
+            return provider, None
+    return policy, level
 
 
 def save(mode: str, level: str | None = None) -> None:
