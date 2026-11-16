@@ -55,10 +55,15 @@ class TeamMembersTests(unittest.TestCase):
         with patch.object(plans.db, 'all_', q):
             plans._member_counts([2])
         sql = ' '.join(q.call_args.args[0].split())
-        for part in ("p.status = 'IN_PROGRESS'", "p.status IN ('COMPLETED', 'ARCHIVED')", "r.content ? 'acts' AND r.content ? 'opt'",
-                     "g.report_content ? 'gained'", "coalesce(m.status, 'new') = 'new'", "m.fit IS DISTINCT FROM '__deleted__'"):
+        for part in ("p.status = 'IN_PROGRESS' AS active", "p.status IN ('IN_PROGRESS', 'COMPLETED', 'ARCHIVED')", "r.content ? 'acts' AND r.content ? 'opt'",
+                     "g.report_content ? 'gained'", "coalesce(cm.status, 'new') = 'new'", "cm.fit IS DISTINCT FROM '__deleted__'"):
             self.assertIn(part, sql)
         self.assertNotIn('post_checks', sql)
+        # 직원마다 도는 상관 하위 쿼리 대신 직원 단위로 묶어 센 뒤 빈 값은 0으로 채운다(PR #295 리뷰)
+        self.assertNotIn('p.employee_id = e.id', sql)
+        self.assertEqual(sql.count('GROUP BY'), 3)
+        for name in ('plan_n.active', 'plan_n.past', 'report_n.reports', 'unread_n.unread'):
+            self.assertIn(f'coalesce({name}, 0)', sql)
 
 
 class AccountOfTests(unittest.TestCase):

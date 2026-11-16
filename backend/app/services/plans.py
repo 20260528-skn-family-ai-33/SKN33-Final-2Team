@@ -1279,20 +1279,27 @@ def _member_counts(member_ids: list[int]) -> dict[int, dict]:
     """소속 직원 목록의 수 세기(#290). records()·reports()와 같은 조건으로 직원 전체를 한 번에 센다."""
     if not member_ids:
         return {}
-    rows = db.all_("""SELECT e.id AS employee_id,
-                             (SELECT count(*) FROM public.roadmaps r JOIN public.projects p ON p.project_id = r.project_id
-                               WHERE p.employee_id = e.id AND p.status = 'IN_PROGRESS' AND r.content ? 'acts' AND r.content ? 'opt') AS active,
-                             (SELECT count(*) FROM public.roadmaps r JOIN public.projects p ON p.project_id = r.project_id
-                               WHERE p.employee_id = e.id AND p.status IN ('COMPLETED', 'ARCHIVED') AND r.content ? 'acts' AND r.content ? 'opt') AS past,
-                             (SELECT count(*) FROM public.growth_reports g JOIN public.projects p ON p.project_id = g.project_id
-                               WHERE p.employee_id = e.id AND g.report_content ? 'gained') AS reports,
-                             (SELECT count(*) FROM public.roadmap_comments c
-                               JOIN public.employees author ON author.employee_id = c.author_employee_id
-                               JOIN public.roadmaps r ON r.roadmap_id = c.roadmap_id JOIN public.projects p ON p.project_id = r.project_id
-                               LEFT JOIN app_ext.comment_meta m ON m.comment_id = c.comment_id
-                               WHERE p.employee_id = e.id AND p.status = 'IN_PROGRESS' AND r.content ? 'acts' AND r.content ? 'opt'
-                                 AND coalesce(m.status, 'new') = 'new' AND m.fit IS DISTINCT FROM '__deleted__') AS unread
-                      FROM unnest(CAST(:ids AS bigint[])) AS e(id)""", ids=member_ids)
+    # 직원마다 하위 쿼리를 돌리지 않고 종류별로 직원 단위 집계를 한 뒤 붙인다. 따로 세서 붙이므로 보고서·코멘트 수가 서로 곱해지지 않는다
+    rows = db.all_("""WITH m AS (SELECT DISTINCT unnest(CAST(:ids AS bigint[])) AS employee_id),
+                      plan AS (SELECT p.employee_id, r.roadmap_id, p.status = 'IN_PROGRESS' AS active
+                                 FROM public.roadmaps r JOIN public.projects p ON p.project_id = r.project_id
+                                WHERE p.employee_id IN (SELECT employee_id FROM m) AND p.status IN ('IN_PROGRESS', 'COMPLETED', 'ARCHIVED')
+                                  AND r.content ? 'acts' AND r.content ? 'opt'),
+                      plan_n AS (SELECT employee_id, count(*) FILTER (WHERE active) AS active, count(*) FILTER (WHERE NOT active) AS past
+                                   FROM plan GROUP BY employee_id),
+                      report_n AS (SELECT p.employee_id, count(*) AS reports
+                                     FROM public.growth_reports g JOIN public.projects p ON p.project_id = g.project_id
+                                    WHERE p.employee_id IN (SELECT employee_id FROM m) AND g.report_content ? 'gained' GROUP BY p.employee_id),
+                      unread_n AS (SELECT plan.employee_id, count(*) AS unread
+                                     FROM plan JOIN public.roadmap_comments c ON c.roadmap_id = plan.roadmap_id
+                                     JOIN public.employees author ON author.employee_id = c.author_employee_id
+                                     LEFT JOIN app_ext.comment_meta cm ON cm.comment_id = c.comment_id
+                                    WHERE plan.active AND coalesce(cm.status, 'new') = 'new' AND cm.fit IS DISTINCT FROM '__deleted__'
+                                    GROUP BY plan.employee_id)
+                      SELECT m.employee_id, coalesce(plan_n.active, 0) AS active, coalesce(plan_n.past, 0) AS past,
+                             coalesce(report_n.reports, 0) AS reports, coalesce(unread_n.unread, 0) AS unread
+                        FROM m LEFT JOIN plan_n USING (employee_id) LEFT JOIN report_n USING (employee_id) LEFT JOIN unread_n USING (employee_id)""",
+                   ids=member_ids)
     return {r['employee_id']: r for r in rows}
 
 
