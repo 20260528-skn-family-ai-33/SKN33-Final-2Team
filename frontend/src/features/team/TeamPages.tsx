@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import './feedback.css';
+import { useEffect, useState } from 'react';
 import { commentSkillNames } from '@/features/roadmap/roadmapLearningData';
 import { trackName } from '@/shared/constants/data';
 /* 부서장 (API-55~59 · 5차 gp-parts.js m-list·m-plan·m-road·m-report·m-done)
@@ -13,13 +14,12 @@ import { paths } from '@/app/paths';
 import { ReportBody } from '@/features/report/ReportBody';
 import { HeadReportTasks } from '@/features/report/ReportTasks';
 import { MemberRoadView } from './MemberRoadView';
-import { CmItem, CmTag, cmMine } from '@/features/roadmap/comments';
+import { CmItem, CmTag, cmMine, feedbackReasons, selectedFeedbackReasons } from '@/features/roadmap/comments';
 import { D } from '@/shared/constants/data';
 import { useGo } from '@/shared/hooks/useGo';
 import { failToast } from '@/shared/lib/fail';
-import { canUseDemo } from '@/shared/lib/demoAccess';
 import { count } from '@/shared/lib/plan';
-import { cause, useAi } from '@/shared/state/ai';
+import { cause } from '@/shared/state/ai';
 import { setAt, useAt } from '@/shared/state/bind';
 import { meLine, useMe } from '@/shared/state/session';
 import { toast } from '@/shared/state/ui';
@@ -340,7 +340,7 @@ function MgrCmItem({ uid, pid, c, live }: { uid: string; pid: string; c: Comment
         c={c}
         mgr
         foot={
-          <div className="actions cm-act">
+          <div className="actions cm-act feedback-history-actions">
             <button
               className="btn line sm"
               onClick={() =>
@@ -428,9 +428,10 @@ function CommentSendButton({ uid, R }: { uid: string; R: PlanRecord }) {
   const entries = [undefined, ...commentSkillNames(R.plan)].flatMap(skill => {
     const draftKey = skill ? mk(key, skill) : key;
     const draft = drafts[draftKey];
-    if (!draft || !hasComment(draft)) return [];
-    return [{ draftKey, draft, body: { skill, fit: draft.fit || '', fitText: draft.fitText || '',
-      level: draft.level || '', levelText: draft.levelText || '', free: draft.free || '' } }];
+    if (!draft || (skill ? draft.fit !== 'good' && draft.fit !== 'partial' : !draft.free?.trim())) return [];
+    return [{ draftKey, draft, body: { skill, fit: skill ? draft.fit || '' : '',
+      fitText: skill && draft.fit === 'partial' ? draft.fitText || '' : '',
+      level: '', levelText: '', free: !skill || draft.fit === 'partial' ? draft.free?.trim() || '' : '' } }];
   });
 
   async function send() {
@@ -453,7 +454,7 @@ function CommentSendButton({ uid, R }: { uid: string; R: PlanRecord }) {
   }
 
   return <button type="button" className="btn pri" disabled={sending || !entries.length}
-    onClick={() => void send()}>{sending ? '보내는 중…' : '코멘트 보내기'}</button>;
+    onClick={() => void send()}>{sending ? '보내는 중…' : '피드백 보내기'}</button>;
 }
 
 function ManagerCommentHistory({ uid, R, comments }: { uid: string; R: PlanRecord; comments: Comment[] }) {
@@ -466,41 +467,87 @@ function ManagerCommentHistory({ uid, R, comments }: { uid: string; R: PlanRecor
   })}</>;
 }
 
-function scrollToComment(element: HTMLElement | null) {
-  if (!element) return;
-  element.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+function SkillFeedback({ uid, R, skill }: { uid: string; R: PlanRecord; skill: string }) {
+  const key = mk(mk(uid, R.id), skill);
+  const draft = useWs(state => state.mgr[key]);
+  const reasons = selectedFeedbackReasons(draft?.fitText);
+  function change(fields: Partial<MgrDraft>) {
+    updateWs(state => { state.mgr[key] = { ...state.mgr[key], ...fields }; });
+  }
+  return <div className="feedback-skill" role="group" aria-label={skill}>
+    <b>{skill}</b>
+    <div className="feedback-controls">
+      {([['good', '좋아요'], ['partial', '보완 필요']] as const).map(([fit, label]) =>
+        <button key={fit} type="button" className="btn line sm feedback-choice" aria-pressed={draft?.fit === fit}
+          onClick={() => change({ fit: draft?.fit === fit ? '' : fit, fitText: '', free: '' })}>{label}</button>)}
+    </div>
+    {draft?.fit === 'partial' && <div className="feedback-reasons stack">
+      <div className="feedback-controls" role="group" aria-label="보완 이유">
+        {Object.keys(feedbackReasons).map(reason => <button key={reason} type="button"
+          className="btn line sm feedback-choice" aria-pressed={reasons.includes(reason)}
+          onClick={() => change({ fitText: (reasons.includes(reason) ? reasons.filter(value => value !== reason) : [...reasons, reason]).join(' / ') })}>{reason}</button>)}
+        {!reasons.length && <span className="small muted">보완 이유 · 선택</span>}
+      </div>
+      <label className="feedback-note">스킬 메모 · 선택
+        <input value={draft.free || ''} onChange={event => change({ free: event.target.value })} />
+      </label>
+    </div>}
+  </div>;
 }
 
-function SkillComments({ uid, R, skill, showSkill = false, inline = false }: { uid: string; R: PlanRecord; skill: string; showSkill?: boolean; inline?: boolean }) {
-  const draftKey = mk(mk(uid, R.id), skill);
-  const comments = (R.comments || []).filter(comment => comment.skill === skill).reverse();
-  const live = R.status === 'active';
-  if (!live && !comments.length) return null;
-
-  const body = <>
-    <ManagerCommentHistory uid={uid} R={R} comments={comments} />
-    {live && <CommentFields k={draftKey} nm={draftKey} />}
-  </>;
-  if (inline) return <section ref={scrollToComment} className="sec" aria-label={skill + ' 코멘트'}>
-    <div className="sec-h"><h3 className="st">스킬 코멘트</h3></div>
-    {body}
+function FeedbackForm({ uid, R, summary = false }: { uid: string; R: PlanRecord; summary?: boolean }) {
+  const key = mk(uid, R.id);
+  const drafts = useWs(state => state.mgr);
+  return <section className="sec" aria-label={summary ? '피드백 요약' : '로드맵 피드백'}>
+    <div className="sec-h"><h2 className="st">{summary ? '피드백 요약' : '로드맵 피드백'}</h2></div>
+    <div className="card feedback-form">
+      {commentSkillNames(R.plan).map(skill => {
+        if (!summary) return <SkillFeedback key={skill} uid={uid} R={R} skill={skill} />;
+        const draft = drafts[mk(key, skill)];
+        if (draft?.fit !== 'good' && draft?.fit !== 'partial') return null;
+        return <div key={skill} className="feedback-summary-row">
+          <button type="button" className="link quiet small feedback-remove" aria-label={skill + ' 피드백 삭제'}
+            onClick={() => updateWs(state => { delete state.mgr[mk(key, skill)]; })}>×</button>
+          <div className="feedback-summary-content"><b>{skill}</b> <span className={draft.fit === 'good' ? 'tag ok' : 'tag acc'}>{draft.fit === 'good' ? '좋아요' : '보완 필요'}</span>
+          {draft.fit === 'partial' && <>
+            {(selectedFeedbackReasons(draft.fitText).length ? selectedFeedbackReasons(draft.fitText) : ['이유 없음']).map(reason => <span className="tag line" key={reason}>{reason}</span>)}
+            {draft.free?.trim() && <div>{draft.free.trim()}</div>}
+          </>}</div>
+        </div>;
+      })}
+      <label className="feedback-note"><b>전체 코멘트 <span className="small muted">· 선택</span></b>
+        <textarea value={drafts[key]?.free || ''} onChange={event => {
+          const free = event.target.value;
+          updateWs(state => { state.mgr[key] = { ...state.mgr[key], free }; });
+        }} />
+      </label>
+      <div className="feedback-submit"><CommentSendButton uid={uid} R={R} /></div>
+    </div>
   </section>;
-  return <details className="card" onToggle={event => {
-    if (event.currentTarget.open) scrollToComment(event.currentTarget);
-  }}>
-    <summary style={{ display: 'flex', justifyContent: showSkill ? 'space-between' : 'flex-end' }}>{showSkill && <span>{skill}</span>}<span className="btn line sm" aria-label={`${skill} 코멘트`}>코멘트</span></summary>
-    {body}
-  </details>;
 }
 
 export function MemberRoadPage() {
-  const demoTools = useAi(s => canUseDemo(s.status.demoMode));
-  const [openComment, setOpenComment] = useState<{ planId: string; skill: string } | null>(null);
-  const [adjustmentPlanId, setAdjustmentPlanId] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{ planId: string; skill: string } | null>(null);
+  useEffect(() => {
+    if (!feedback) return;
+    function dismissOutside(event: PointerEvent) {
+      if (event.target instanceof Element && !event.target.closest('.feedback-popup, .feedback-trigger')) {
+        setFeedback(null);
+      }
+    }
+    function dismissOnEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') setFeedback(null);
+    }
+    document.addEventListener('pointerdown', dismissOutside);
+    document.addEventListener('keydown', dismissOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', dismissOutside);
+      document.removeEventListener('keydown', dismissOnEscape);
+    };
+  }, [feedback]);
   const { pid = '' } = useParams();
   const { uid, member: e, gone, teamLoading, team } = useMemberGate();
   const q = useMemberState(uid, !gone && !teamLoading && !!e);
-  const key = mk(uid, pid);
   if (team.isError && !e) return <Page back={paths.team} title="직원 정보를 불러오지 못했어요"><button className="btn line" onClick={() => void team.refetch()}>다시 시도</button></Page>;
   if (gone) return <Navigate to={paths.team} replace />;
   if (teamLoading || !e) return <Loading text="서버에서 불러오는 중…" />;
@@ -510,8 +557,16 @@ export function MemberRoadPage() {
   if (!R) return q.isFetching ? <Loading text="서버에서 소속 직원의 기록을 불러오는 중…" /> : <Navigate to={paths.member(uid)} replace />;
   const pl = R.plan;
   const live = R.status === 'active';
-  const adjustmentOpen = adjustmentPlanId === R.id;
   const cs = (R.comments || []).slice().reverse();
+  const activeSkill = live && feedback?.planId === R.id && commentSkillNames(pl).includes(feedback.skill) ? feedback.skill : null;
+  const feedbackButton = (skill: string) => <button type="button" className="link quiet small feedback-trigger"
+    aria-expanded={activeSkill === skill} onClick={event => {
+      event.preventDefault();
+      event.stopPropagation();
+      const card = event.currentTarget.closest('details');
+      if (card && activeSkill !== skill) card.open = true;
+      setFeedback(activeSkill === skill ? null : { planId: R.id, skill });
+    }}>피드백</button>;
   const reps = q.data.reports.filter((r) => r.planId === R.id);
   return (
     <Page
@@ -522,24 +577,11 @@ export function MemberRoadPage() {
 
     >
       {/* 직원의 '내 로드맵'과 같은 구성(#96) — 읽기 전용 */}
-      <MemberRoadView R={R}
-        skillAction={skill => {
-          if (!live && !cs.some(comment => comment.skill === skill)) return null;
-          const open = openComment?.planId === R.id && openComment.skill === skill;
-          return <button type="button" className="link quiet small" aria-label={skill + ' 코멘트'} aria-expanded={open}
-            onClick={event => {
-              event.preventDefault();
-              event.stopPropagation();
-              const card = event.currentTarget.closest('details');
-              if (!open && card) card.open = true;
-              setOpenComment(open ? null : { planId: R.id, skill });
-            }}>코멘트</button>;
-        }}
-        skillFooter={skill => !pl.def.learningReport
-          ? <SkillComments uid={uid} R={R} skill={skill} showSkill />
-          : openComment?.planId === R.id && openComment.skill === skill
-            ? <SkillComments uid={uid} R={R} skill={skill} inline /> : null}
-      />
+      <MemberRoadView R={R} skillAction={live ? feedbackButton : undefined}
+        skillFooter={pl.def.learningReport ? skill => activeSkill === skill
+          ? <aside className="feedback-popup card" aria-label="스킬 피드백">
+              <SkillFeedback uid={uid} R={R} skill={skill} />
+            </aside> : null : undefined} />
       {reps.length ? (
         <div className="sec">
           <div className="sec-h">
@@ -563,36 +605,9 @@ export function MemberRoadPage() {
           </div>
         </div>
       ) : null}
-      {live && <div className="actions">
-        <button type="button" className="btn line" aria-expanded={adjustmentOpen}
-          onClick={() => setAdjustmentPlanId(adjustmentOpen ? null : R.id)}>계획 조정 의견</button>
-      </div>}
-      {live && adjustmentOpen ? (
-        <section ref={scrollToComment} className="sec" aria-label="계획 조정 의견">
-          <div className="sec-h">
-            <h2 className="st">계획 조정 의견</h2>
-            {demoTools && <button
-              className="link quiet"
-              onClick={() => {
-                const c = D.commentSample;
-                updateWs((s) => void (s.mgr[key] = { ...(s.mgr[key] || {}), fit: c.fit, fitText: c.fitText, level: c.level, levelText: c.levelText, free: c.free }));
-              }}
-            >
-              시연용 예시 문장
-            </button>}
-          </div>
-          <div className="card">
-            <CommentFields k={key} />
-          </div>
-          <Note>
-            새 코멘트는 앞서 보낸 코멘트를 덮어쓰지 않고 쌓여요. 직원이 로드맵에 반영하기 전까지 수정하거나 삭제할 수 있어요.
-            직원이 확인했는지, 몇 번째 버전에 반영했는지 여기서 볼 수 있어요. 직원이 반영을 요청해 수정안을 확정해야 로드맵이 바뀌어요.
-          </Note>
-        </section>
-      ) : !live ? (
-        <Note>직원이 {R.status === 'done' ? '마친' : '보관한'} 로드맵이에요. 코멘트는 진행 중인 로드맵에만 보낼 수 있어요.</Note>
-      ) : null}
-      {live && <div className="actions"><CommentSendButton uid={uid} R={R} /></div>}
+      {live ? <FeedbackForm uid={uid} R={R} summary={Boolean(pl.def.learningReport)} /> : (
+        <Note>피드백은 진행 중인 로드맵에만 보낼 수 있어요.</Note>
+      )}
     </Page>
   );
 }
@@ -612,20 +627,13 @@ export function MemberReportPage() {
   return (
     <Page back={R ? paths.memberPlan(uid, R.id) : paths.member(uid)} eyebrow={`${who(e)} · 결과 보고서 · ${trackName(r.opt)} v${r.version} · ${r.createdAt}`} title="학습 결과 보고서" lead={r.goal}>
       <ReportBody r={r} />
-      {R && (() => {
-        const skills = commentSkillNames(R.plan)
-          .filter(skill => R.status === 'active' || R.comments?.some(comment => comment.skill === skill));
-        return skills.length > 0 && <section className="sec">
-          <div className="sec-h"><h2 className="st">스킬별 코멘트</h2></div>
-          <div className="stack">{skills.map(skill => <SkillComments key={skill} uid={uid} R={R} skill={skill} showSkill />)}</div>
-        </section>;
-      })()}
+      {R?.comments?.length ? <ManagerCommentHistory uid={uid} R={R} comments={R.comments} /> : null}
+      {R?.status === 'active' && <FeedbackForm uid={uid} R={R} />}
       <Note>
         {e.name} 님의 결과 보고서예요. 보고서 내용은 읽기만 할 수 있어요.
       </Note>
       {/* 같은 화면을 재사용해 다른 보고서로 옮겨도 쓰던 과제가 넘어가지 않게 로드맵별로 분리한다(PR #140 리뷰) */}
       <HeadReportTasks key={r.planId} planId={r.planId} memberName={e.name} />
-      {R?.status === 'active' && <div className="actions"><CommentSendButton uid={uid} R={R} /></div>}
     </Page>
   );
 }
