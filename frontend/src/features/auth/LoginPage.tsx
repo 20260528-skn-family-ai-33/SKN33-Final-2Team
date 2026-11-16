@@ -9,7 +9,6 @@ import { ai, cause, ping } from '@/shared/state/ai';
 import { me, setAccount, useSession } from '@/shared/state/session';
 import { toast } from '@/shared/state/ui';
 import { Icon } from '@/shared/ui/Icon';
-import { Note } from '@/shared/ui/parts';
 import { AppVersion } from '@/shared/ui/AppVersion';
 import { LoginFlow } from './LoginFlow';
 
@@ -78,14 +77,14 @@ export function LoginPage() {
   return (
     <div className="login-wrap">
       <section className="login-card" aria-labelledby="lgTitle">
+        {/* 서비스 라벨은 2026-11-17 우측 블록에서 옮겨 왔다(예전 '한국수자원공사 임직원 로그인 · 시연용' 꼬리표와 제목 아래 안내 문구는 뺐다) */}
         <span className="tag acc">
-          <Icon name="lock" />
-          한국수자원공사 임직원 로그인 · 시연용
+          <Icon name="spark" />
+          개발·운영 직원 AI 역량 성장지원
         </span>
         <h1 className="t lg" id="lgTitle">
           다시 오신 걸 환영해요
         </h1>
-        <p className="lead">AI 활용·개발 역량 성장 로드맵을 이어서 만들어 보세요.</p>
         <form id="loginForm" noValidate onSubmit={submit}>
           {accts.length > 0 && <div className="field lg-pick">
             <label htmlFor="lgPick">
@@ -147,8 +146,16 @@ export function LoginPage() {
                 value={pw}
                 onChange={(e) => setPw(e.target.value)}
               />
-              <button type="button" className="eye" aria-label={showPw ? '비밀번호 숨기기' : '비밀번호 보기'} onClick={() => setShowPw(!showPw)}>
-                <Icon name="eye" />
+              {/* 보이는 중에는 빗금 친 눈 · 눌린 모양(aria-pressed)으로 지금 상태를 구분한다 */}
+              <button
+                type="button"
+                className="eye"
+                aria-label={showPw ? '비밀번호 숨기기' : '비밀번호 보기'}
+                aria-pressed={showPw}
+                title={showPw ? '비밀번호 숨기기' : '비밀번호 보기'}
+                onClick={() => setShowPw(!showPw)}
+              >
+                <Icon name={showPw ? 'eyeOff' : 'eye'} />
               </button>
             </div>
           </div>
@@ -173,10 +180,6 @@ export function LoginPage() {
             로그인 <Icon name="arrow" />
           </button>
         </form>
-        <Note>
-          관리자에게 받은 초기 비밀번호로 로그인해 주세요. 관리자 화면은 관리자 전용 계정으로 들어가요.
-          다른 계정으로 바꾸려면 로그아웃한 뒤 다시 로그인해 주세요.
-        </Note>
         <AppVersion />
       </section>
       <LoginFlow />

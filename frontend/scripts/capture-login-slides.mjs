@@ -66,9 +66,9 @@ const SHOTS = [
   { id: 'report', path: '@report', top: '.rpt-viz:has(.rpt-radar) ~ .rpt-viz:has(.rpt-radar)', width: 720, align: 'center', hide: '.rpt-viz:has(.rpt-radar):has(~ .rpt-viz .rpt-radar)' },
 ];
 
-/* 그림에 들어가면 안 되는 떠 있는 것들(도우미 버튼 · 테마 상자 · 알림 · 튜토리얼)과 움직임 */
+/* 그림에 들어가면 안 되는 떠 있는 것들(도우미 버튼 · 알림 · 튜토리얼)과 움직임 */
 const HIDE_CSS = `
-  .fab, .skin-pick, .toast, [class^="tour-"], [class*=" tour-"] { display: none !important; }
+  .fab, .toast, [class^="tour-"], [class*=" tour-"] { display: none !important; }
   *, *::before, *::after { animation: none !important; transition: none !important; caret-color: transparent !important; }
   html { scroll-behavior: auto !important; }
 `;

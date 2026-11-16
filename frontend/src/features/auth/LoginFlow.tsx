@@ -4,10 +4,12 @@
    그림 속 글자가 보이도록 그림을 블록 폭만큼 크게 두려고 양옆 화살표 버튼은 두지 않는다.
    가만히 두면 4초마다 저절로 넘어간다. 직접 넘기면 멈췄다가, 10초 동안 조작이 없으면 다음 장으로 넘어가고 다시 4초마다 넘어간다.
    마우스를 올려 두기만 한 것은 조작으로 치지 않는다(버튼을 누른 자리에 마우스를 둔 채로도 다시 넘어가야 하므로).
-   그림을 끄는 동안 · 탭이 가려진 동안 · 움직임 줄이기 설정에서는 넘어가지 않는다 */
+   그림을 끄는 동안 · 탭이 가려진 동안 · 움직임 줄이기 설정에서는 넘어가지 않는다.
+   제목 첫 줄 오른쪽 끝(그림의 오른쪽 모서리)에 라이트·다크 모드 버튼을 둔다(2026-11-17 · skins/ThemeControls).
+   예전 맨 위의 서비스 라벨('개발·운영 직원 AI 역량 성장지원')은 왼쪽 로그인 상자로 옮겼다 */
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
-import { Icon } from '@/shared/ui/Icon';
 import { DEFAULT_SKIN } from '@/skins/pick';
+import { ThemeToggle } from '@/skins/ThemeControls';
 import { LOGIN_SLIDES, slideSrc } from './loginSlides';
 
 const AUTO_MS = 4000;
@@ -16,7 +18,7 @@ const RESUME_MS = 10000;
 /** 이만큼(px) 넘게 끌어야 다음 장으로 넘긴다. 그보다 짧으면 제자리로 돌아온다 */
 const DRAG_MIN = 40;
 
-/* 지금 테마: 로그인 화면의 '화면 테마' 상자로 바꾸면 <html data-skin> 이 바뀐다 → 그 테마로 찍은 그림으로 바꾼다 */
+/* 지금 테마: 로그인 화면의 라이트·다크 모드 버튼으로 바꾸면 <html data-skin> 이 바뀐다 → 그 테마로 찍은 그림으로 바꾼다 */
 function watchSkin(onChange: () => void): () => void {
   const o = new MutationObserver(onChange);
   o.observe(document.documentElement, { attributes: true, attributeFilter: ['data-skin'] });
@@ -94,16 +96,13 @@ export function LoginFlow() {
 
   return (
     <aside className="login-side">
-      <div className="lf-head">
-        <span className="pill">
-          <Icon name="spark" />
-          개발·운영 직원 AI 역량 성장지원
-        </span>
+      <div className="lf-head lf-top">
         <h2>
           AI가 추천하는,
           <br />
           나에게 최적화된 성장 로드맵
         </h2>
+        <ThemeToggle />
       </div>
       <div className="lf" role="group" aria-roledescription="carousel" aria-label="서비스 화면 미리 보기" onKeyDown={onKey}>
         <div
