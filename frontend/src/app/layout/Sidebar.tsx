@@ -1,17 +1,17 @@
-/* 좌측 메뉴 (5차 gp-core.js sidebar · aiBox) — 직원 화면 공통 */
+/* 메뉴 (5차 gp-core.js sidebar · aiBox) — 직원 화면 공통. 테마가 상단 메뉴로 그린다(2026-11-17 좌측 메뉴는 뺐다) */
 import { newIdToPath, paths } from '@/app/paths';
 import { useState } from 'react';
 import { NotificationBell } from '@/features/notifications/NotificationBell';
 import { useGo } from '@/shared/hooks/useGo';
 import { ai, canClearHiddenDemoSettings, canSelectModel, clearDemoSettings, levelLabel, ping, PROV, resetConn, setChoice, setReasoning, useAi, useAiMode, type UiProvider } from '@/shared/state/ai';
-import { logoutAndReset } from '@/features/auth/actions';
 import { isSup, meLine, useMe } from '@/shared/state/session';
 import { toast } from '@/shared/state/ui';
 import { draftActive, newComments, recs, useWs } from '@/shared/state/workspace';
 import { failToast } from '@/shared/lib/fail';
 import { AimStatus } from '@/shared/ui/conn';
 import { Icon } from '@/shared/ui/Icon';
-import { Brand, NavLink, SideToggle } from '@/shared/ui/sideParts';
+import { AppVersion } from '@/shared/ui/AppVersion';
+import { Brand, LogoutButton, NavLink, ViewTools } from '@/shared/ui/sideParts';
 
 export function AiBox() {
   const { choice } = useAiMode();
@@ -127,51 +127,54 @@ export function Sidebar({ active }: { active: string }) {
   const keyOf = (to: string, key?: string) => key || ({ [paths.home]: 'home', [paths.roadmaps]: 'roadmap', [paths.checks]: 'checks' } as Record<string, string>)[to];
   return (
     <>
-      <Brand />
-      <a
-        className={`me ${active === 'me' ? 'on' : ''}`}
-        href={paths.me}
-        aria-label={`내 정보 보기 · ${me.name}`}
-        title="내 정보 보기"
-        onClick={(e) => {
-          e.preventDefault();
-          go(paths.me);
-        }}
-      >
-        <span className="avatar">
-          <Icon name="user" />
-        </span>
-        <div className="grow">
-          <b>
-            {me.name}
-            {sup ? <span className="me-sup">부서장</span> : null}
-          </b>
-          <small>{meLine(me)}</small>
-        </div>
-        <Icon name="right" cls="me-go" />
-      </a>
-      <nav className="nav" aria-label="주 메뉴">
-        {items.map(([to, l, ic, dot, key]) => (
-          <NavLink key={l} to={to} active={active === keyOf(to, key)} icon={ic} label={l} dot={!!dot} tour={key === 'new' ? 'start-nav' : undefined} />
-        ))}
-      </nav>
-      {sup ? (
-        <nav className="nav nav-appx nav-sup" aria-label="부서장">
-          <span className="lbl">부서장</span>
-          <NavLink to={paths.team} active={active === 'm-list'} icon="users" label="소속 직원 계획" />
+      <div className="nav-l">
+        <Brand />
+        <AppVersion />
+      </div>
+      <div className="nav-c">
+        <nav className="nav" aria-label="주 메뉴">
+          {items.map(([to, l, ic, dot, key]) => (
+            <NavLink key={l} to={to} active={active === keyOf(to, key)} icon={ic} label={l} dot={!!dot} tour={key === 'new' ? 'start-nav' : undefined} />
+          ))}
         </nav>
-      ) : null}
-      <nav className="nav nav-appx" aria-label="부록">
-        <span className="lbl">부록</span>
-        <NavLink to={paths.resources} active={active === 'resources'} icon="book" label="학습 자료" />
-      </nav>
-      <div className="side-foot">
+        {sup ? (
+          <nav className="nav nav-appx nav-sup" aria-label="부서장">
+            <span className="lbl">부서장</span>
+            <NavLink to={paths.team} active={active === 'm-list'} icon="users" label="소속 직원 계획" />
+          </nav>
+        ) : null}
+        <nav className="nav nav-appx" aria-label="부록">
+          <span className="lbl">부록</span>
+          <NavLink to={paths.resources} active={active === 'resources'} icon="book" label="학습 자료" />
+        </nav>
+      </div>
+      <div className="nav-r">
+        <ViewTools />
         <NotificationBell />
-        <button className="btn ghost sm logout" aria-label="로그아웃" onClick={() => void logoutAndReset(go)}>
-          <Icon name="logout" />
-          <span className="lbl">로그아웃</span>
-        </button>
-        <SideToggle />
+        <span className="nav-sep" aria-hidden="true" />
+        <a
+          className={`me ${active === 'me' ? 'on' : ''}`}
+          href={paths.me}
+          aria-label={`내 정보 보기 · ${me.name}`}
+          title="내 정보 보기"
+          onClick={(e) => {
+            e.preventDefault();
+            go(paths.me);
+          }}
+        >
+          <span className="avatar">
+            <Icon name="user" />
+          </span>
+          <div className="grow">
+            <b>
+              {me.name}
+              {sup ? <span className="me-sup">부서장</span> : null}
+            </b>
+            <small>{meLine(me)}</small>
+          </div>
+          <Icon name="right" cls="me-go" />
+        </a>
+        <LogoutButton />
       </div>
     </>
   );

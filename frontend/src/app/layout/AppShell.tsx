@@ -13,7 +13,6 @@ import { canClearHiddenDemoSettings, canSelectModel, checkStatus, connFor, PROV,
 import { boot, isSup, meOf, useSession } from '@/shared/state/session';
 import { SheetHost, ToastHost } from '@/shared/ui/SheetHost';
 import { Loading } from '@/shared/ui/parts';
-import { AppVersion } from '@/shared/ui/AppVersion';
 import { AiBox, Sidebar } from './Sidebar';
 
 export interface ScreenHandle {
@@ -164,7 +163,6 @@ export function AppShell() {
       <div className="app">
         <aside className="side" id="side">
           {booted && acct ? admin ? <AdminSide /> : <Sidebar active={h.nav || ''} /> : null}
-          {booted && acct ? <AppVersion /> : null}
         </aside>
         <main className="main">
           <div id="view" className={`view ${width}`}>

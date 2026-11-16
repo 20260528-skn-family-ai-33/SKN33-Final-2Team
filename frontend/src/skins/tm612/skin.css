@@ -1,7 +1,7 @@
-/* 화면 테마 tm612 · templatemo 612 Parallax Starter
+/* 화면 테마 tm612 · templatemo 612 Parallax Starter — 다크 모드(skins/pick.ts MODE_SKIN)
    원본: https://templatemo.com/tm-612-parallax-starter — 무료 · 상업/비상업 사용 허용. 사진도 템플릿에 들어 있던 것(Unsplash).
    전부 :root[data-skin="tm612"] 안에 적어 이 테마를 고른 때만 적용된다(@keyframes 만 규칙상 맨 바깥에 두고 이름에 tm612- 를 붙였다).
-   메뉴 위치가 다른 두 버전: 상단 메뉴(&:not([data-nav="side"])) · 좌측 메뉴(&[data-nav="side"]).
+   메뉴는 상단 메뉴 하나다(좌측 메뉴 버전은 2026-11-17 앱에서 뺐다).
    움직임은 motion.ts 가 CSS 변수(--tm612-py · --tm612-o)와 data- 속성(data-tm612-scrolled)만 붙이고, 모양은 전부 여기에 있다.
    나타나기는 다른 테마와 함께 쓰는 skins/reveal.ts · reveal.css 가 맡는다(index.ts 의 reveal: true).
 
@@ -131,120 +131,53 @@
   .api-picker-button { padding: 5px 12px; font-size: 12px; font-family: var(--tm-head); letter-spacing: 1.5px; text-transform: uppercase; }
   body.auth .ribbon { display: none; }
 
-  /* 상단 메뉴가 있으면 관리자 고치기 창은 그 아래에서 시작(좌측 메뉴 버전은 --nav-h: 0) */
+  /* 상단 메뉴가 있으니 관리자 고치기 창은 그 아래에서 시작 */
   .adm-panel { top: calc(var(--rib-h) + var(--nav-h) + 12px); border-radius: 0; }
   @media (max-width: 1100px) { .adm-panel { top: calc(var(--rib-h) + var(--nav-h)); border-radius: 0; } }
 
-  /* ── 상단 메뉴 버전(기본): 템플릿의 반투명 흐림 메뉴 ── */
-  &:not([data-nav="side"]) {
-    @media (min-width: 901px) {
-      & { scroll-padding-top: calc(var(--rib-h) + var(--nav-h) + 12px); }
-      .app { display: block; }
-      .side {
-        position: sticky; top: var(--rib-h); z-index: 39;
-        height: var(--nav-h); min-height: var(--nav-h); overflow: visible;
-        flex-direction: row; flex-wrap: nowrap; align-items: center; gap: 0 12px;
-        padding: 0 max(30px, calc((100% - var(--tm-wrap)) / 2));
-        border: 0; background-color: rgba(0, 0, 0, .45); color: #fff;
-        transition: background-color .2s ease, box-shadow .2s ease;
-      }
-      &[data-tm612-scrolled] .side { background-color: #0B0B0B; box-shadow: 0 1px 0 rgba(255, 255, 255, .08); }
-      .side:empty { display: none; }
-      .side .brand { order: 0; margin-right: 0; padding: 0; font-family: var(--tm-head); font-size: 22px; font-weight: 600; letter-spacing: 4px; text-transform: uppercase; }
-      .side .brand .logo { display: none; }
-      /* 버전: 메뉴 아래 한 줄을 따로 쓰지 않고 로고 옆에 작게 */
-      .app .side > .app-version {
-        order: 0; flex: 0 0 auto; margin: 4px auto 0 0; padding: 0; text-align: left;
-        font-size: 11px; letter-spacing: .5px; color: var(--tm-w40); white-space: nowrap;
-      }
-      .side > .app-version .app-version-name { display: none; }
-      .side .nav { order: 1; flex-direction: row; align-items: stretch; gap: 0; }
-      .side .nav a {
-        position: relative; height: var(--nav-h); padding: 0 13px; border-radius: 0; background: transparent; white-space: nowrap;
-        color: rgba(255, 255, 255, .8); font-family: var(--tm-head); font-size: 14px; font-weight: 500; letter-spacing: 0;
-        transition: color .15s ease;
-      }
-      .side .nav a svg { display: none; }
-      .side .nav a:hover, .side .nav a.on { background: transparent; color: #fff; }
-      /* 현재 메뉴: 글자 아래 흰 줄이 가운데서 펼쳐진다 */
-      .side .nav a::after {
-        content: ''; position: absolute; left: 13px; right: 13px; bottom: 17px; height: 2px; background: #fff;
-        transform: scaleX(0); transition: transform .2s var(--tm-ease);
-      }
-      .side .nav a:hover::after { transform: scaleX(.45); }
-      .side .nav a.on::after { transform: scaleX(1); }
-      .side .nav a .dot { margin: 0 0 12px 3px; }
-      .side .nav-appx { order: 2; display: flex; align-items: center; margin: 0; padding: 0; border: 0; }
-      .side .nav-appx::before { content: ''; width: 1px; height: 18px; margin: 0 4px; background: var(--tm-w20); }
-      .side .nav-appx .lbl { display: none; }
-      .side .me { order: 3; margin: 0 0 0 6px; padding: 4px 12px 4px 4px; gap: 8px; border: 1px solid var(--tm-w20); border-radius: 0; background: transparent; transition: border-color .15s ease; }
-      .side .me .avatar { width: 30px; height: 30px; font-size: 11px; border-radius: 0; background: #fff; color: #111; }
-      .side .me small, .side .me .me-go { display: none; }
-      .side .me b { font-size: 13px; white-space: nowrap; }
-      .side a.me:hover, .side a.me.on { box-shadow: none; border-color: #fff; }
-      .side .side-foot { order: 4; margin: 0; padding: 0; display: flex; align-items: center; gap: 6px; }
-      .side .side-foot .foot-lbl { display: none; }
-      .side .logout { height: 34px; padding: 0 10px; color: var(--tm-w70); }
-      .side .logout:hover { background: transparent; color: #fff; }
-      .side .logout .lbl { display: none; }
-      /* 시연 도구: 메뉴 줄에는 버튼만, 펼치면 메뉴 아래 오른쪽에 떠 있는 창(자리는 비워 두어 메뉴가 밀리지 않게) */
-      .side .demo { order: -1; color: inherit; }
-      .side .demo > summary {
-        width: 96px; height: 34px; justify-content: center; padding: 0 8px; border: 1px dashed var(--tm-w40); border-radius: 0;
-        font-size: 12px; font-weight: 600; white-space: nowrap; color: var(--tm-w70);
-      }
-      .side .demo > summary:hover { border-color: #fff; color: #fff; }
-      .side .side-foot:has(> .demo[open]) { padding-left: 102px; }
-      .side .demo[open] {
-        position: fixed; z-index: 45; top: calc(var(--rib-h) + var(--nav-h) + 10px);
-        right: max(20px, calc((100% - var(--tm-wrap)) / 2));
-        width: 300px; max-height: calc(100vh - var(--rib-h) - var(--nav-h) - 32px); overflow-y: auto;
-        padding: 0 16px 16px; border: 1px solid var(--line); border-radius: 0; background: var(--surface); color: var(--ink-3); box-shadow: var(--shadow-pop);
-      }
-      .side .demo[open] > summary {
-        width: auto; height: 46px; margin: 0 -16px 12px; padding: 0 16px; justify-content: flex-start;
-        border: 0; border-bottom: 1px solid var(--line); border-radius: 0; color: var(--ink);
-      }
-      .side .demo[open] .foot-lbl { display: block; font-weight: 600; }
+  /* ── 상단 메뉴: 템플릿의 반투명 흐림 메뉴 ── */
+  /* 세 칸 배치·오른쪽 버튼 크기는 shared/ui/topNav.css */
+  @media (min-width: 901px) {
+    .side {
+      background-color: rgba(0, 0, 0, .45); color: #fff;
+      transition: background-color .2s ease, box-shadow .2s ease;
     }
-    /* 좁은 데스크톱: 메뉴가 넘치지 않게 조금 줄인다 */
-    @media (min-width: 901px) and (max-width: 1240px) {
-      --nav-h: 64px;
-      .side { padding-inline: 20px; }
-      .side .brand { font-size: 18px; letter-spacing: 3px; }
-      .side > .app-version { display: none; }
-      .side .brand { margin-right: auto; }
-      .side .nav a { padding: 0 8px; font-size: 13px; letter-spacing: 0; }
-      .side .nav a::after { left: 8px; right: 8px; bottom: 15px; }
-      .side .me { padding: 3px; }
-      .side .me .grow { display: none; }
+    &[data-tm612-scrolled] .side { background-color: #0B0B0B; box-shadow: 0 1px 0 rgba(255, 255, 255, .08); }
+    .side .brand { padding: 0; font-family: var(--tm-head); font-size: 22px; font-weight: 600; letter-spacing: 4px; text-transform: uppercase; }
+    .side .brand .logo { display: none; }
+    .side .nav a {
+      height: var(--nav-h); padding: 0 var(--nav-pad); border-radius: 0; background: transparent; white-space: nowrap;
+      color: rgba(255, 255, 255, .8); font-family: var(--tm-head); font-size: 14px; font-weight: 500; letter-spacing: 0;
+      transition: color .15s ease;
     }
+    .side .nav a:hover, .side .nav a.on { background: transparent; color: #fff; }
+    .side .nav a .dot { margin: 0 0 12px 3px; }
+    .side .me .avatar { border-radius: 0; background: #fff; color: #111; }
+    .side .nav-r .foot-lbl { display: none; }
+    /* 시연 도구(관리자): 메뉴 줄에는 버튼만, 펼치면 메뉴 아래 오른쪽에 떠 있는 창(버튼 자리는 topNav.css 가 비워 둔다) */
+    .side .demo { color: inherit; }
+    .side .demo > summary {
+      width: 96px; height: 34px; justify-content: center; padding: 0 8px; border: 1px dashed var(--tm-w40); border-radius: 0;
+      font-size: 12px; font-weight: 600; white-space: nowrap; color: var(--tm-w70);
+    }
+    .side .demo > summary:hover { border-color: #fff; color: #fff; }
+    .side .demo[open] {
+      position: fixed; z-index: 45; top: calc(var(--rib-h) + var(--nav-h) + 10px);
+      right: max(20px, calc((100% - var(--tm-wrap)) / 2));
+      width: 300px; max-height: calc(100vh - var(--rib-h) - var(--nav-h) - 32px); overflow-y: auto;
+      padding: 0 16px 16px; border: 1px solid var(--line); border-radius: 0; background: var(--surface); color: var(--ink-3); box-shadow: var(--shadow-pop);
+    }
+    .side .demo[open] > summary {
+      width: auto; height: 46px; margin: 0 -16px 12px; padding: 0 16px; justify-content: flex-start;
+      border: 0; border-bottom: 1px solid var(--line); border-radius: 0; color: var(--ink);
+    }
+    .side .demo[open] .foot-lbl { display: block; font-weight: 600; }
   }
-
-  /* ── 좌측 메뉴 버전(data-nav="side"): 사진 위 반투명 검은 흐림 메뉴, 현재 메뉴는 왼쪽 흰 줄 ── */
-  &[data-nav="side"] {
-    --nav-h: 0px;
-    @media (min-width: 901px) {
-      --side-w: 248px;
-      .side { background: rgba(8, 8, 8, .92); border-right: 1px solid var(--tm-w12); color: #fff; }
-      .side .brand { font-family: var(--tm-head); font-size: 20px; font-weight: 600; letter-spacing: 4px; text-transform: uppercase; }
-      .side .brand .logo { border-radius: 0; background: #fff; color: #111; }
-      .side .me { border: 1px solid var(--tm-w20); border-radius: 0; background: transparent; }
-      .side .me small, .side .me .me-go { color: var(--tm-w70); }
-      .side .me .avatar { border-radius: 0; background: #fff; color: #111; }
-      .side a.me:hover, .side a.me.on { box-shadow: none; border-color: #fff; }
-      .side .nav a { border-radius: 0; color: rgba(255, 255, 255, .8); font-family: var(--tm-head); font-size: 15px; font-weight: 500; letter-spacing: 0; transition: color .15s, background .15s; }
-      .side .nav a:hover { background: rgba(255, 255, 255, .08); color: #fff; }
-      .side .nav a.on { background: rgba(255, 255, 255, .12); color: #fff; box-shadow: inset 2px 0 0 #fff; }
-      .side .nav-appx { border-top-color: var(--tm-w12); }
-      .side .nav-appx .lbl, .side .foot-lbl { color: var(--tm-w40); }
-      .side .logout { color: var(--tm-w70); }
-      .side .logout:hover { background: rgba(255, 255, 255, .08); color: #fff; }
-      .side .demo { color: var(--tm-w70); }
-      .side .demo[open] { padding: 10px 12px 12px; border: 1px solid var(--line); border-radius: 0; background: var(--surface); color: var(--ink-3); }
-      .side .demo[open] summary { color: var(--ink-2); }
-      .side .demo[open] .foot-lbl { color: var(--ink-4); }
-    }
+  /* 좁은 데스크톱: 메뉴가 넘치지 않게 조금 줄인다 */
+  @media (min-width: 901px) and (max-width: 1240px) {
+    --nav-h: 64px;
+    .side .brand { font-size: 18px; letter-spacing: 3px; }
+    .side .nav a { font-size: 13px; letter-spacing: 0; }
   }
 
   /* ── 어두운 바탕: 원래 CSS 가 흰색을 직접 적은 상자들(606·512 와 같은 보정) ── */
@@ -434,22 +367,23 @@
   .ls-no { color: #111; }
   .ls-go { font-family: var(--tm-head); font-size: 13px; font-weight: 600; letter-spacing: 0; color: #fff; }
 
-  /* ── 로그인: 빌딩 사진 위에 놓인 상자. 두 상자 모두 사진이 비치지 않는 바탕 ── */
-  body.auth .app { min-height: 100vh; }
-  body.auth .main { min-height: 100vh; display: flex; align-items: center; padding-bottom: 56px; }
-  body.auth .view { width: 100%; }
-  .login-card { border: 1px solid var(--tm-w20); background-color: var(--bg); }
-  .login-side { background: var(--bg); border: 1px solid var(--tm-w20); color: #fff; }
+  /* ── 로그인: 화면을 좌우 두 면으로(공통 배치는 gp-v2.css). 왼쪽은 사진이 비치지 않는 어두운 면,
+     오른쪽은 빌딩 사진(body.auth::before)이 그대로 보이는 면 — 원본 첫 구간처럼 사진 위에 큰 제목. 그림은 자기 바탕이 있어 사진이 비치지 않는다 ── */
+  body.auth .main { min-height: 100vh; padding: 0; }
+  .login-card { border: 0; border-right: 1px solid var(--tm-w12); border-radius: 0; background-color: var(--bg); }
+  .login-card .t.lg { font-size: 38px; }
+  .login-brand .logo { display: none; }
+  .login-brand b { font-family: var(--tm-head); font-size: 20px; font-weight: 600; letter-spacing: 4px; text-transform: uppercase; color: #fff; }
+  .login-brand-sub { margin-left: 0; border-left-color: var(--tm-w20); color: var(--tm-w70); }
+  .login-side { border: 0; border-radius: 0; background: transparent; color: #fff; }
   .login-side::after { display: none; }
-  .login-side h2 { font-family: var(--tm-head); font-weight: 600; letter-spacing: -.015em; }
-  .login-side > p, .login-side .small { color: var(--tm-w90); }
-  .login-side .pill { border: 1px solid var(--tm-w40); background: transparent; color: #fff; font-family: var(--tm-head); letter-spacing: 0; }
+  .login-side h2 { font-family: var(--tm-head); font-weight: 600; letter-spacing: -.015em; text-shadow: 0 1px 16px rgba(0, 0, 0, .6); }
   .feat { border-color: var(--tm-w20); background: rgba(0, 0, 0, .35); }
   .feat .ico { background: #fff; color: #111; }
   .feat small { color: var(--tm-w70); }
   .demo-acc button { background: rgba(255, 255, 255, .06); border-color: var(--tm-w20); }
 
-  /* ── 좁은 화면(900px 이하): 두 버전 모두 원래의 한 줄 메뉴 배치에 색만 ── */
+  /* ── 좁은 화면(900px 이하): 원래의 한 줄 메뉴 배치에 색만 ── */
   @media (max-width: 900px) {
     .side { border-bottom: 0; background: #0B0B0B; color: #fff; }
     .side .brand { font-family: var(--tm-head); letter-spacing: 3px; text-transform: uppercase; }
@@ -463,7 +397,6 @@
     .t { font-size: 26px; }
     .t.lg { font-size: 30px; }
     .hero { padding: 40px 20px; }
-    body.auth .main { padding: 24px 16px; }
     .adm-panel { top: var(--rib-h); }
   }
 

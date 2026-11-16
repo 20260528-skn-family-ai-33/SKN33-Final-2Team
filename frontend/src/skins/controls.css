@@ -1,0 +1,21 @@
+/* 화면 모드·본문 폭 버튼(ThemeControls.tsx). 색은 놓인 자리의 글자색(currentColor)에서 만든다 → 464 흰 메뉴 · 612 검은 메뉴 ·
+   로그인 우측 블록 어디서나 같은 규칙으로 읽힌다. 모서리는 테마의 작은 모서리(--r-md · 464 2px · 612 0)를 따른다.
+   상단 메뉴 안에서의 크기(36px)·여백은 shared/ui/topNav.css 가 정한다 */
+.theme-tg, .width-tg {
+  display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: var(--r-md, 6px);
+  background: transparent; color: inherit; cursor: pointer; opacity: .75;
+  transition: background-color .15s ease, opacity .15s ease;
+}
+.theme-tg:hover, .width-tg:hover { opacity: 1; background: color-mix(in srgb, currentColor 10%, transparent); }
+.theme-tg:focus-visible, .width-tg:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
+.theme-tg svg, .width-tg svg { width: 18px; height: 18px; }
+
+/* 상단 메뉴 오른쪽 끝 묶음(알림 앞) */
+.view-tools { display: flex; align-items: center; gap: 4px; }
+/* 좁은 화면에서는 본문 폭 차이가 없어(width.css 는 이보다 넓은 폭만 바꾼다) 본문 폭 버튼을 숨긴다 */
+@media (max-width: 900px) {
+  .width-tg { display: none; }
+}
+
+/* 로그인 화면: 왼쪽 면 로고 줄의 오른쪽 끝 */
+.login-brand .theme-tg { margin-left: auto; flex: none; }

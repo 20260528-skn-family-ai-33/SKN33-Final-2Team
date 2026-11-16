@@ -1,0 +1,109 @@
+/* 상단 메뉴 배치(sideParts.tsx · 2026-11-17) — 테마와 상관없는 자리·크기만 여기에 두고, 색·글꼴·높이(--nav-h)는 테마(skin.css)가 정한다.
+   세 칸: 왼쪽 로고·버전 | 가운데 주 메뉴 | 오른쪽 화면 도구 · 알림 · 구분선 · 계정 · 로그아웃.
+   오른쪽 버튼은 상용 서비스 상단바처럼 테두리 없는 같은 크기(36px) 아이콘 버튼으로 맞추고, 글자는 계정 이름만 남긴다
+   (이름은 aria-label · title 로 읽힌다). 색은 메뉴 글자색(currentColor)에서 만들어 밝은 · 어두운 메뉴 어디서나 같은 규칙으로 읽힌다.
+   테마 규칙(:root[data-skin] …)보다 앞서도록 오른쪽 칸 규칙은 :root .side 로 시작한다 */
+
+/* 주 메뉴 글자 좌우 여백(테마의 .side .nav a 가 쓴다 · 현재 메뉴 줄도 이만큼 들여 글자 폭에 맞춘다) */
+:root { --nav-pad: 13px; }
+@media (min-width: 901px) and (max-width: 1240px) { :root { --nav-pad: 9px; } }
+
+/* ── 넓은 화면: 가운데 정렬 3칸. 양쪽 칸이 같은 폭(1fr)을 나눠 가져 주 메뉴가 화면 가운데에 온다 ── */
+@media (min-width: 901px) {
+  :root { scroll-padding-top: calc(var(--rib-h) + var(--nav-h) + 12px); }
+  .app { display: block; }
+  :root .side {
+    position: sticky; top: var(--rib-h); z-index: 39;
+    display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; column-gap: 24px;
+    height: var(--nav-h); min-height: 0; overflow: visible;
+    /* 좌우 끝을 본문(.main 좌우 여백 40px · 본문 폭 1240px)의 끝에 맞춘다 */
+    padding: 0 max(40px, calc((100% - var(--tm-wrap, 1240px)) / 2));
+    border: 0;
+  }
+  .side:empty { display: none; }
+  .nav-l { justify-self: start; display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .nav-c { justify-self: center; display: flex; align-items: stretch; height: 100%; }
+  .nav-r { justify-self: end; }
+  :root .side .nav { flex-direction: row; align-items: stretch; gap: 0; }
+  :root .side .nav a { position: relative; }
+  :root .side .nav a svg { display: none; }
+  /* 현재 메뉴 표시: 두 테마 모두 같은 모양 — 메뉴 줄 아래 끝의 2px 줄(글자 폭만큼, 테마 강조색).
+     마우스를 올리면 가운데서 조금 펼쳐지고, 현재 메뉴는 다 펼쳐진다 */
+  :root .side .nav a::after {
+    content: ''; position: absolute; left: var(--nav-pad); right: var(--nav-pad); bottom: 0; height: 2px;
+    background: var(--accent); transform: scaleX(0); transition: transform .2s cubic-bezier(.22, 1, .36, 1);
+  }
+  :root .side .nav a:hover::after { transform: scaleX(.45); }
+  :root .side .nav a.on::after { transform: scaleX(1); }
+  :root .side .nav-appx { display: flex; align-items: center; margin: 0; padding: 0; border: 0; }
+  .side .nav-appx::before { content: ''; width: 1px; height: 16px; margin: 0 6px; background: currentColor; opacity: .2; }
+  .side .nav-appx .lbl { display: none; }
+}
+
+/* ── 로고 옆 버전: 작게, 흐리게. 'GrowPath' 는 로고와 겹쳐 뺀다 ── */
+.nav-l .app-version { margin: 3px 0 0; padding: 0; font-size: 11px; letter-spacing: .3px; white-space: nowrap; opacity: .5; }
+.nav-l .app-version .app-version-name { display: none; }
+
+/* ── 오른쪽 칸 ── */
+.nav-r { display: flex; align-items: center; gap: 4px; }
+:root .side .nav-r .width-tg,
+:root .side .nav-r .theme-tg,
+:root .side .nav-r .notif-button,
+:root .side .nav-r .logout {
+  position: relative; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; margin: 0;
+  border: 0; border-radius: var(--r-md, 8px); background: transparent; box-shadow: none;
+  color: inherit; opacity: .72; letter-spacing: 0; text-transform: none;
+  transition: background-color .15s ease, opacity .15s ease;
+}
+:root .side .nav-r .width-tg:hover,
+:root .side .nav-r .theme-tg:hover,
+:root .side .nav-r .notif-button:hover,
+:root .side .nav-r .notif-button[aria-expanded="true"],
+:root .side .nav-r .logout:hover { opacity: 1; background: color-mix(in srgb, currentColor 10%, transparent); color: inherit; }
+:root .side .nav-r :is(.width-tg, .theme-tg, .notif-button, .logout) svg { width: 18px; height: 18px; }
+.side .nav-r .notif { margin: 0; }
+.side .nav-r .notif-l { display: none; }
+/* 읽지 않은 알림 수: 종 아이콘 오른쪽 위 작은 표시 */
+:root .side .nav-r .notif-count {
+  position: absolute; top: 3px; right: 1px; min-width: 16px; padding: 2px 4px;
+  font-size: 10px; font-weight: 700; line-height: 1; letter-spacing: 0; pointer-events: none;
+}
+
+/* 화면 도구 · 알림과 계정 사이 구분선 */
+.nav-sep { width: 1px; height: 20px; margin: 0 8px; background: currentColor; opacity: .18; }
+
+/* 계정: 테두리 없는 아바타 + 이름. 마우스를 올리면 옅은 바탕(아바타 색은 테마가 정한다) */
+:root .side .nav-r .me {
+  margin: 0; padding: 3px 10px 3px 3px; gap: 8px; height: 36px;
+  border: 0; border-radius: var(--r-md, 8px); background: transparent; box-shadow: none; color: inherit;
+  transition: background-color .15s ease;
+}
+:root .side .nav-r a.me:hover, :root .side .nav-r a.me.on { background: color-mix(in srgb, currentColor 8%, transparent); border: 0; box-shadow: none; }
+:root .side .nav-r .me .avatar { width: 30px; height: 30px; font-size: 11px; }
+:root .side .nav-r .me .avatar svg { width: 16px; height: 16px; }
+:root .side .nav-r .me small, :root .side .nav-r .me .me-go { display: none; }
+:root .side .nav-r .me b { display: flex; align-items: center; gap: 6px; font-size: 13px; white-space: nowrap; }
+
+/* 시연 도구(관리자): 펼치면 메뉴 아래에 떠 있는 창이 되므로 버튼 자리를 비워 두어 오른쪽 칸이 밀리지 않게 한다 */
+.nav-r:has(> .demo[open]) { padding-left: 102px; }
+
+/* 좁은 데스크톱: 계정 이름을 접고 아바타만 */
+@media (min-width: 901px) and (max-width: 1240px) {
+  :root .side .nav-r .me { padding: 3px; }
+  :root .side .nav-r .me .grow { display: none; }
+  .nav-l .app-version { display: none; }
+}
+
+/* ── 좁은 화면(900px 이하): 한 줄에 로고 · 오른쪽 칸, 다음 줄에 주 메뉴(가로로 밀어 보기) ── */
+@media (max-width: 900px) {
+  .nav-l { order: 1; }
+  .nav-r { order: 2; margin-left: auto; }
+  .nav-c { order: 3; flex: 1 1 100%; display: flex; overflow-x: auto; }
+  .nav-c .nav { flex: none; order: 0; overflow: visible; }
+  .nav-l .app-version { display: none; }
+  .nav-sep { display: none; }
+  /* 계정은 원래 좁은 화면 규칙(gp-v2.css a.me order: 1)에서 맨 뒤로 갔다 → 넓은 화면과 같이 로그아웃 앞에 */
+  :root .side .nav-r .me { order: 0; }
+  /* 좁은 화면은 본문 폭 차이가 없어 본문 폭 버튼을 숨긴다(skins/width.css 는 이보다 넓은 폭만 바꾼다) */
+  :root .side .nav-r .width-tg { display: none; }
+}

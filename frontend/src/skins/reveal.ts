@@ -14,9 +14,10 @@ const on = (): boolean => root.hasAttribute('data-reveal');
 
 const RV = 'rv'; // data-rv: wait(숨김) → in(떠오르는 중) → done
 /* 자기 상자가 없는 묶음: 통째로가 아니라 안의 덩어리를 하나씩 나타낸다 */
-const WRAPPERS = '.sec, .hp, .ls, .ls-grid, .me-page, .check-plan-groups';
+const WRAPPERS = '.sec, .hp, .ls, .ls-grid, .me-page, .check-plan-groups, .login-wrap, .login-card, .login-side';
 /* 떠 있는 것·잠깐 보이는 것은 나타내기 대상에서 뺀다 */
-const SKIP = '.ov, .sheet, .regp, .adm-panel, .toast, .fab, .chatbar, .gt-tip, .loading, [hidden]';
+/* 로그인 화면은 스크롤이 없어(2026-11-17) 맨 아래 60px 안에 놓인 버전 표시가 스크롤을 기다리며 영영 숨어 있었다 → 바로 보인다 */
+const SKIP = '.ov, .sheet, .regp, .adm-panel, .toast, .fab, .chatbar, .gt-tip, .loading, [hidden], .login-card > .app-version';
 const FRESH_MS = 8000;
 const STEP_MS = 70;
 const DURATION_MS = 800;

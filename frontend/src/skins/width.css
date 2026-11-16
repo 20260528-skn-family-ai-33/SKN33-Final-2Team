@@ -1,4 +1,4 @@
-/* 이전 본문 폭(<html data-width="narrow"> · 비교 브랜치 전용) — 본문 폭을 5차 원래 값 580(기본) · 760(wide) · 980px(xwide)으로 되돌린다.
+/* 이전 본문 폭(<html data-width="narrow"> · 상단 메뉴의 본문 폭 버튼 · skins/ThemeControls) — 본문 폭을 5차 원래 값 580(기본) · 760(wide) · 980px(xwide)으로 되돌린다.
    기본(넓은 본문 폭)은 gp.css 의 1240px 이다. 로그인(.view.login)·관리자 데이터 화면(.view.adm-ds)은 원래부터 따로 정한 폭이라 그대로 둔다.
    홈 '나의 학습 공간' 카드 3장은 줄어든 본문 폭 안에서 한 줄을 지킨다(넓은 화면에서만 · 좁은 화면은 원래대로 한 장씩) */
 :root[data-width="narrow"] {

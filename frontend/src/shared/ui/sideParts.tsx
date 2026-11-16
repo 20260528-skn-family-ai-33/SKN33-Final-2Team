@@ -1,20 +1,21 @@
-/* 좌측 메뉴 조각 — 직원 메뉴(app/layout/Sidebar)와 관리자 메뉴(features/admin/AdminSide)가 함께 쓴다 */
+/* 메뉴 조각 — 직원 메뉴(app/layout/Sidebar)와 관리자 메뉴(features/admin/AdminSide)가 함께 쓴다.
+   상단 메뉴 한 가지다(2026-11-17 좌측 메뉴 · 메뉴 접기를 뺐다). 세 칸으로 나눈다(배치는 topNav.css):
+   .nav-l 로고·버전 | .nav-c 주 메뉴(가운데) | .nav-r 화면 도구 · 알림 · 계정 · 로그아웃 */
 import type { ReactNode } from 'react';
 import { useGo } from '@/shared/hooks/useGo';
-import { toggleSideMenu, useSideMenu } from '@/shared/state/sideMenu';
+import { ThemeToggle, WidthToggle } from '@/skins/ThemeControls';
+import { logoutAndReset } from '@/features/auth/actions';
 import { Icon } from './Icon';
+import './topNav.css';
 import { paths } from '@/app/paths';
 
 
 export function NavLink({ to, active, icon, label, dot, tour }: { to: string; active: boolean; icon: string; label: ReactNode; dot?: boolean; tour?: string }) {
   const go = useGo();
-  // 메뉴를 접으면 글자는 화면에서만 숨기므로(읽기 프로그램은 그대로 읽음), 마우스를 올리면 이름이 보이게 한다
-  const collapsed = useSideMenu((s) => s.collapsed);
   return (
     <a
       href={to}
       className={active ? 'on' : ''}
-      title={collapsed && typeof label === 'string' ? label : undefined}
       data-tour={tour}
       onClick={(e) => {
         e.preventDefault();
@@ -28,23 +29,23 @@ export function NavLink({ to, active, icon, label, dot, tour }: { to: string; ac
   );
 }
 
-/** 좌측 메뉴 접기·펼치기. 넓은 화면의 좌측 메뉴에서만 보인다(상단 메뉴 테마·좁은 화면에서는 숨김 · styles/gp.css) */
-export function SideToggle() {
-  const collapsed = useSideMenu((s) => s.collapsed);
-  const label = collapsed ? '메뉴 펼치기' : '메뉴 접기';
+/** 로그아웃: 메뉴 맨 오른쪽의 아이콘 버튼(이름은 aria-label · title 로) */
+export function LogoutButton() {
+  const go = useGo();
   return (
-    <button
-      type="button"
-      className="side-toggle"
-      aria-label={label}
-      aria-expanded={!collapsed}
-      aria-controls="side"
-      title={collapsed ? label : undefined}
-      onClick={toggleSideMenu}
-    >
-      <Icon name={collapsed ? 'right' : 'left'} />
-      <span className="lbl">{label}</span>
+    <button type="button" className="logout" aria-label="로그아웃" title="로그아웃" onClick={() => void logoutAndReset(go)}>
+      <Icon name="logout" />
     </button>
+  );
+}
+
+/** 메뉴 오른쪽 끝의 화면 도구: 본문 폭 · 라이트·다크 모드(예전 왼쪽 아래 '화면 테마' 상자를 대신한다 · skins/ThemeControls) */
+export function ViewTools() {
+  return (
+    <div className="view-tools">
+      <WidthToggle />
+      <ThemeToggle />
+    </div>
   );
 }
 

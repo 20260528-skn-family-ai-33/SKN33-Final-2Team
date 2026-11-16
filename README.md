@@ -204,7 +204,7 @@ scripts/           빈 DB의 최초 백업 복원 스크립트
 docker-compose.yml DB·초기 준비·API·화면 실행 구성
 ```
 
-현재 화면에는 templatemo 기반 **비교용 테마 7종**(464 Ultra Profile·486 New Event·503 Newline·557 Grad School·590 Topic Listing·606 String Master·612 Parallax Starter)이 연결돼 있습니다. 기본값은 `tm612`(612 Parallax Starter)·상단 메뉴·넓은 본문이며(브라우저에는 직접 고르거나 `?skin=`으로 연 값만 기억합니다), 화면 왼쪽 아래의 테마 선택 도구(접힌 채 시작)를 펼쳐 테마·메뉴 위치·본문 폭을 바꿀 수 있습니다(로그인 화면에서는 테마만). 테마별 원본 출처는 `frontend/src/skins/<id>/index.ts`에 기록합니다.
+화면 테마는 templatemo 기반 두 가지입니다. **라이트 모드**는 `tm464`(464 Ultra Profile), **다크 모드**는 `tm612`(612 Parallax Starter)이고 기본값은 다크 모드·넓은 본문입니다. 로그인 화면은 우측 블록 오른쪽 위, 로그인 뒤에는 상단 메뉴 오른쪽의 해·달 버튼으로 모드를 바꾸고, 그 옆 버튼으로 본문 폭(넓게·이전 폭)을 바꿉니다. 메뉴는 상단 메뉴 하나입니다. 브라우저에는 버튼으로 바꾸거나 `?skin=`으로 연 값만 기억합니다. 테마별 원본 출처는 `frontend/src/skins/<id>/index.ts`에 기록합니다.
 
 ## 9. 산출물
 
