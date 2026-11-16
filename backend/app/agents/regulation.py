@@ -165,8 +165,24 @@ def miss_label(m: str) -> str:
 
 
 def nums_ok(txt: str, basis: list, extra=None) -> bool:
-    """하위 호환용 (숫자 후처리 차단은 LLM 프롬프트 제어로 일원화하여 항상 통과)"""
+    src = re.sub(r'(\d),(?=\d{3})', r'\1', re.sub(r'\s+', '', ' '.join((regstore.article(i) or {}).get('text', '') for i in basis)))
+    ok = set(extra or [])
+    txt = re.sub(r'(\d),(?=\d{3})', r'\1', str(txt))
+    for m in NUM_RE.finditer(txt):
+        n = m.group(1)
+        if n in ok:
+            continue
+        if not re.search(r'(?<![\d.])' + re.escape(n) + r'(?![\d])', src):
+            return False
     return True
+
+
+def ctx_nums(context: dict | None, question: str | None = None) -> set[str]:
+    """사용자 상황(직급·진행 중인 로드맵의 주당 시간·비용 등)이나 질문에 있는 숫자는 조항 원문에 없어도 답에 써도 된다(예: '5급인 문시우 님은', 질문의 '3일 출장')"""
+    text = json.dumps(context or {}, ensure_ascii=False)
+    if question:
+        text += f' {question}'
+    return set(re.findall(r'\d+(?:\.\d+)?', re.sub(r'(\d),(?=\d{3})', r'\1', text)))
 
 
 def hr_stated(q: str, ids: list) -> bool:
@@ -629,6 +645,8 @@ def format_regulation_response(ctx: rt.Ctx, inp: dict, ids: list[str], result: d
         raise llm.LlmError('답변 형식 오류: 규정 답변의 요약 또는 출처가 비어 있어요')
     if not all(isinstance(value, str) and value in ids and regstore.article(value) is not None for value in basis):
         raise llm.LlmError('답변 형식 오류: 이번 검색 자료에 없는 규정 출처가 포함됐어요')
+    if not nums_ok(summary, basis, ctx_nums(inp.get('context') or {}, inp.get('question'))):
+        raise llm.LlmError('답변 형식 오류: 규정 답변의 숫자가 인용 조항에 없어요')
 
     # 3) 일부 확인: 확인된 내용·한계와 인용을 그대로 전달한다.
     if status == 'partial':
@@ -696,7 +714,19 @@ def format_knowledge_response(ctx: rt.Ctx, inp: dict, topic: str, sources: list[
     if result['status'] == 'no_match':
         return _no_evidence(topic, note=result['summary'], status='no_match')
 
-    # 3) 출처 메타데이터(provenance) 구성 및 최종 응답 반환
+    # 3) 인용 자료 및 질문·맥락에 없는 숫자 환각 검증
+    hits = inp.get('_knowledge_hits') or []
+    by_id = {hit['chunk_id']: hit for hit in hits}
+    selected = [by_id[value] for value in result['sourceIds']]
+    summary = result['summary']
+    passed_sources = {source['id']: source for source in sources}
+    cited_text = ' '.join(' '.join(str(passed_sources[hit['chunk_id']].get(key) or '') for key in ('text', 'document', 'asOf')) for hit in selected)
+    allowed_numbers = set(re.findall(r'\d+(?:\.\d+)?', re.sub(r'(\d),(?=\d{3})', r'\1', cited_text)))
+    allowed_numbers |= ctx_nums(inp.get('context') or {}, inp.get('question'))
+    if any(match.group(1) not in allowed_numbers for match in NUM_RE.finditer(re.sub(r'(\d),(?=\d{3})', r'\1', summary))):
+        raise llm.LlmError(f'답변 형식 오류: {title} 답변의 숫자가 인용 자료에 없어요')
+
+    # 4) 출처 메타데이터(provenance) 구성 및 최종 응답 반환
     hits = inp.get('_knowledge_hits') or []
     by_id = {hit['chunk_id']: hit for hit in hits}
     selected = [by_id[value] for value in result['sourceIds']]

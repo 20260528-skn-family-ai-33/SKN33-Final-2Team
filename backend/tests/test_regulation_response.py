@@ -99,13 +99,11 @@ class RegulationResponseTest(unittest.TestCase):
             with self.subTest(result=result), self.assertRaisesRegex(LlmError, '근거 확인 상태'):
                 reg.format_regulation_response(self.ctx, self.inp, [], result)
 
-    def test_summary_with_numbers_not_blocked_by_post_processing(self):
+    def test_unsupported_numbers_remain_errors_for_partial_and_found(self):
         self.article.update(text='지원 한도는 10만원이다.')
         for status in ('partial', 'found'):
-            with self.subTest(status=status):
-                result = self.format(status, '지원 한도는 20만원이에요.')
-                self.assertEqual(result['evidenceStatus'], status)
-                self.assertEqual(result['summary'], '지원 한도는 20만원이에요.')
+            with self.subTest(status=status), self.assertRaisesRegex(LlmError, '숫자'):
+                self.format(status, '지원 한도는 20만원이에요.')
 
     def test_user_context_and_question_numbers_allowed(self):
         self.inp['context'] = {'grade': 5}
@@ -114,6 +112,51 @@ class RegulationResponseTest(unittest.TestCase):
             with self.subTest(status=status):
                 result = self.format(status, '5급 직원의 3일 출장 여비는 해당 규정을 확인해 주세요.')
                 self.assertEqual(result['evidenceStatus'], status)
+
+
+class KnowledgeResponseTest(unittest.TestCase):
+    def setUp(self):
+        self.ctx = rt.Ctx(1)
+        self.inp = {'question': '지원 한도는?', 'context': {},
+                    '_knowledge_hits': [{
+                        'chunk_id': 'k-1',
+                        'document_id': 'doc-1',
+                        'document_title': '복지 안내',
+                        'chunk_text': '지원 한도는 10만원이다.',
+                        'chunk_text_sha256': 'sha256_dummy',
+                        'is_virtual': False,
+                        'metadata': {'location': '사내포털', 'as_of': '2025년', 'source_limits': None,
+                                     'source_url': None, 'source_file_sha256': None},
+                    }]}
+        self.sources = [{
+            'id': 'k-1',
+            'document': '복지 안내',
+            'location': '사내포털',
+            'asOf': '2025년',
+            'sourceLimits': None,
+            'isVirtual': False,
+            'text': '지원 한도는 10만원이다.',
+            'textTruncated': False,
+        }]
+
+    def format(self, topic, status, summary):
+        result = {'status': status, 'summary': summary, 'sourceIds': ['k-1']}
+        return reg.format_knowledge_response(self.ctx, self.inp, topic, self.sources, result)
+
+    def test_unsupported_numbers_remain_errors_for_company_and_life(self):
+        for topic in ('company', 'life'):
+            for status in ('partial', 'found'):
+                with self.subTest(topic=topic, status=status), self.assertRaisesRegex(LlmError, '숫자'):
+                    self.format(topic, status, '지원 한도는 20만원이에요.')
+
+    def test_user_context_and_question_numbers_allowed(self):
+        self.inp['context'] = {'grade': 5}
+        self.inp['question'] = '3일 출장 여비는 어떻게 되나요?'
+        for topic in ('company', 'life'):
+            for status in ('partial', 'found'):
+                with self.subTest(topic=topic, status=status):
+                    result = self.format(topic, status, '5급 직원의 3일 출장 여비는 10만원이에요.')
+                    self.assertEqual(result['evidenceStatus'], status)
 
 
 if __name__ == '__main__':
