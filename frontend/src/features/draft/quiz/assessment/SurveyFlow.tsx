@@ -32,14 +32,20 @@ export function SurveyFlow({ onRetry, ref, survey, initialAnswers = {}, initialC
   const questions = survey.groups.flatMap(g => g[phase]);
   const answered = questions.filter(q => Object.hasOwn(answers, q.id)).length;
   const totalAnswered = survey.groups.flatMap(g => [...g.surveys, ...g.quizzes]).filter(q => Object.hasOwn(answers, q.id)).length;
-  function showMissing(message: string) {
-    setMarked(true); setError(message);
-    requestAnimationFrame(() => document.querySelector('.v2-survey fieldset.is-missing')?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+  /* 빠뜨린 문항은 빨간 테두리로만 알린다. 안내 문구 없이 화면 순서상 가장 위의 빠진 문항으로 옮긴다 */
+  function showMissing() {
+    setMarked(true); setError('');
+    requestAnimationFrame(() => {
+      const first = document.querySelector<HTMLFieldSetElement>('.v2-survey fieldset.is-missing');
+      if (!first) return;
+      first.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      first.querySelector<HTMLInputElement>('input[type="radio"]')?.focus({ preventScroll: true });
+    });
   }
   function navigate(target: Phase) {
     if (saving) return;
     if (!review && target === 'quizzes' && !complete(survey, answers, 'surveys')) {
-      showMissing('설문에 아직 답하지 않은 문항이 있어요. 표시한 문항에 답한 뒤 퀴즈로 이동해 주세요.');
+      showMissing();
       return;
     }
     setMarked(false);
@@ -48,7 +54,7 @@ export function SurveyFlow({ onRetry, ref, survey, initialAnswers = {}, initialC
   async function next() {
     if (saving) return;
     if (!complete(survey, answers, phase)) {
-      showMissing(`아직 답하지 않은 문항이 ${questions.length - answered}개 있어요. 표시한 문항에 답해 주세요.`);
+      showMissing();
       return;
     }
     setMarked(false);
@@ -79,7 +85,7 @@ export function SurveyFlow({ onRetry, ref, survey, initialAnswers = {}, initialC
             const outcome=review&&phase==='quizzes'&&typeof q.answer==='number'&&Object.hasOwn(answers,q.id)?answers[q.id]===q.answer?'correct':'wrong':null;
             const missing=marked&&!review&&!Object.hasOwn(answers,q.id);
             return <fieldset key={q.id} disabled={saving || review} className={missing?'is-missing':undefined} data-tour={!review&&index===0&&group===survey.groups[0]?'quiz-first':undefined}>
-            <legend>{review&&phase==='quizzes'?<><span className={`quiz-result-number${outcome?' '+outcome:''}`}>{index+1}{outcome?` · ${outcome==='correct'?'정답':'오답'}`:''}</span> {q.q}</>:<>{index + 1}. {phase === 'surveys' ? q.text : q.q}{missing&&<span className="missing-tag">답을 골라 주세요</span>}</>}</legend>
+            <legend>{review&&phase==='quizzes'?<><span className={`quiz-result-number${outcome?' '+outcome:''}`}>{index+1}{outcome?` · ${outcome==='correct'?'정답':'오답'}`:''}</span> {q.q}</>:<>{index + 1}. {phase === 'surveys' ? q.text : q.q}</>}</legend>
             <div className={phase === 'surveys' ? 'scale' : 'choices'}>
               {(phase === 'surveys' ? scale : q.options ?? []).map((label, i) => {
                 const value = phase === 'surveys' ? i + 1 : i;
