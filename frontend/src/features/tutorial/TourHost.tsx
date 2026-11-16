@@ -13,7 +13,7 @@ import { Icon } from '@/shared/ui/Icon';
 import { draftActive, recs, useWs, ws } from '@/shared/state/workspace';
 import { afterReveal } from '@/skins/afterReveal';
 import { cutOf, holeOf, placeAway, placeNote, type Box, type NotePlace } from './spot';
-import { isTourEnd, screenCount, screenNo, stepForPath, waitText, TOUR_STEPS, type TourStep } from './steps';
+import { isTourEnd, pickReady, screenCount, screenNo, stepForPath, waitText, TOUR_STEPS, type TourStep } from './steps';
 import { answerIntro, closeHere, finishTour, nextStep, resetTour, startTour, stopTour, tourInProgress, useTour } from './tourStore';
 import './tour.css';
 
@@ -199,7 +199,7 @@ function usePick(step: TourStep): void {
     let used = false;
     const onClick = (e: MouseEvent): void => {
       const t = e.target instanceof Element ? e.target.closest(pick) : null;
-      if (used || !t || !t.closest(within)) return;
+      if (used || !t || !t.closest(within) || !pickReady(step, (q) => !!document.querySelector(q))) return;
       used = true;
       // 화면이 그 누름을 먼저 처리한 뒤에 넘어간다
       window.setTimeout(() => {

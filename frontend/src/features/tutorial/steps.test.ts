@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { paths } from '@/app/paths';
 import { STEPS } from '@/features/draft/model';
 import { cutOf, holeOf, placeAway, placeNote } from './spot';
-import { firstStepFor, isTourEnd, screenCount, screenNo, stepForPath, TOUR_STEPS, waitText } from './steps';
+import { firstStepFor, isTourEnd, pickReady, screenCount, screenNo, stepForPath, TOUR_STEPS, waitText } from './steps';
 
 const at = (id: string): number => TOUR_STEPS.findIndex((s) => s.id === id);
 
@@ -97,6 +97,10 @@ describe('기다리는 안내', () => {
     // 퀴즈 단계에 들어서면 설문 안내는 지난 것으로 보고, 퀴즈 안내는 그때부터만 보인다(설문을 답하는 동안 가리지 않음)
     expect(quiz.done).toBe(items.when);
     expect(items.wait?.targets).toEqual(['quiz-gen-wait']);
+    // 설문을 답하는 동안 같은 첫 문항 자리에서 고른 답은 퀴즈 안내를 넘기지 않는다
+    expect(pickReady(items, () => false)).toBe(false);
+    expect(pickReady(items, (q) => q === items.when)).toBe(true);
+    expect(pickReady(quiz, () => false)).toBe(true);
   });
 
   it('고르면 넘어가는 단계에도 직접 넘어갈 단추가 있다', () => {

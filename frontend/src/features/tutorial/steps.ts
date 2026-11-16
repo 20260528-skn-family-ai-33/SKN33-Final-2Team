@@ -125,6 +125,10 @@ export function stepForPath(index: number, pathname: string): number {
   return cur && cur.path === TOUR_STEPS[first].path ? index : first;
 }
 
+/** 대상 안에서 골라 넘어가는 것은 그 단계를 안내할 수 있을 때(when 이 맞을 때)만이다.
+    퀴즈 안내는 설문과 같은 첫 문항 자리를 쓰므로, 설문을 답하는 동안 고른 답이 퀴즈 안내를 넘기지 않게 한다 */
+export const pickReady = (step: TourStep, has: (selector: string) => boolean): boolean => !step.when || has(step.when);
+
 /** 기다리는 동안의 문구. slow 는 AI 모드가 RunPod-Ollama 일 때 */
 export const waitText = (step: TourStep, slow: boolean): string => (slow && step.wait?.slowText) || step.wait?.text || step.text;
 
