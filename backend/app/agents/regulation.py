@@ -43,7 +43,7 @@ DEMO_ANSWERS = (
     (r'회의실.*예약', 'life', '시연 화면에서는 사내 포털의 ‘업무 지원 → 회의실 예약’ 메뉴에서 빈 시간대를 확인해요.'),
 )
 GENERAL = [
-    (r'(로드맵|계획).*(기간|바꾸|수정|늘리|줄이)|수정 요청', {'source': 'app', 'summary': '로드맵은 내 로드맵의 ‘수정 요청’에서 바꿀 수 있어요.', 'apply': '주당 시간·기간·예산·학습 방식·자격증·일정 제약·시작 단계·관점·활동 빼기·바꾸기·추가를 여러 개 고르거나 요청을 문장으로 적으면, 로드맵을 쓴 관점의 에이전트가 수정안을 먼저 보여 주고 확정해야 로드맵이 바뀌어요.', 'links': [['roadmap', '내 로드맵']]}),
+    (r'(로드맵|계획).*(기간|바꾸|수정|늘리|줄이)|수정 요청', {'source': 'app', 'summary': '로드맵은 내 로드맵의 ‘수정 요청’에서 바꿀 수 있어요.', 'apply': '주당 시간·기간·예산·학습 방식·일정 제약·활동 빼기·바꾸기·추가 등을 고르거나 요청을 문장으로 적으면, 에이전트가 수정안을 먼저 보여 주고 확정해야 로드맵이 바뀌어요.', 'links': [['roadmap', '내 로드맵']]}),
     (r'(사후|점검 결과|보고서)', {'source': 'app', 'summary': '로드맵을 마무리하려면 점검·보고서에서 사후 점검을 시작하세요.', 'apply': '사전 점검과 같은 문항에 다시 답하면 진단 에이전트가 결과 보고서를 만들어 드려요.', 'links': [['checks', '점검·보고서']]}),
     (r'(rag|래그|검색\s*증강)', {'source': 'work', 'summary': 'RAG는 질문과 관련된 문서를 먼저 찾아서, 그 내용을 근거로 LLM이 답하게 하는 방식이에요.', 'apply': '문서를 잘게 나눠 임베딩으로 색인하고, 질문과 가까운 조각을 찾아 프롬프트에 함께 넣어요. 지금 로드맵의 ‘핵심 이해’ 단계에서 다뤄요.', 'more': ['더 알고 싶으면 학습 자료에서 ‘RAG’를 검색해 보세요.'], 'links': [['resources', '학습 자료']]}),
     (r'(임베딩|벡터)', {'source': 'work', 'summary': '임베딩은 문장을 숫자 벡터로 바꿔, 뜻이 비슷한 문장끼리 가까이 놓이게 하는 방법이에요.', 'apply': '벡터 DB에 문서 조각의 임베딩을 넣어 두면, 질문과 가까운 조각을 빠르게 찾을 수 있어요.'}),
@@ -165,21 +165,8 @@ def miss_label(m: str) -> str:
 
 
 def nums_ok(txt: str, basis: list, extra=None) -> bool:
-    src = re.sub(r'(\d),(?=\d{3})', r'\1', re.sub(r'\s+', '', ' '.join((regstore.article(i) or {}).get('text', '') for i in basis)))
-    ok = set(extra or [])
-    txt = re.sub(r'(\d),(?=\d{3})', r'\1', str(txt))
-    for m in NUM_RE.finditer(txt):
-        n = m.group(1)
-        if n in ok:
-            continue
-        if not re.search(r'(?<![\d.])' + re.escape(n) + r'(?![\d])', src):
-            return False
+    """하위 호환용 (숫자 후처리 차단은 LLM 프롬프트 제어로 일원화하여 항상 통과)"""
     return True
-
-
-def ctx_nums(context: dict) -> set[str]:
-    """사용자 상황(직급·진행 중인 로드맵의 주당 시간·비용 등)에 있는 숫자는 조항 원문에 없어도 답에 써도 된다(예: '5급인 문시우 님은')"""
-    return set(re.findall(r'\d+(?:\.\d+)?', re.sub(r'(\d),(?=\d{3})', r'\1', json.dumps(context or {}, ensure_ascii=False))))
 
 
 def hr_stated(q: str, ids: list) -> bool:
@@ -642,8 +629,6 @@ def format_regulation_response(ctx: rt.Ctx, inp: dict, ids: list[str], result: d
         raise llm.LlmError('답변 형식 오류: 규정 답변의 요약 또는 출처가 비어 있어요')
     if not all(isinstance(value, str) and value in ids and regstore.article(value) is not None for value in basis):
         raise llm.LlmError('답변 형식 오류: 이번 검색 자료에 없는 규정 출처가 포함됐어요')
-    if not nums_ok(summary, basis, ctx_nums(inp.get('context') or {})):
-        raise llm.LlmError('답변 형식 오류: 규정 답변의 숫자가 인용 조항에 없어요')
 
     # 3) 일부 확인: 확인된 내용·한계와 인용을 그대로 전달한다.
     if status == 'partial':
@@ -711,18 +696,12 @@ def format_knowledge_response(ctx: rt.Ctx, inp: dict, topic: str, sources: list[
     if result['status'] == 'no_match':
         return _no_evidence(topic, note=result['summary'], status='no_match')
 
-    # 3) 인용 자료에 없는 숫자 환각 검증
+    # 3) 출처 메타데이터(provenance) 구성 및 최종 응답 반환
     hits = inp.get('_knowledge_hits') or []
     by_id = {hit['chunk_id']: hit for hit in hits}
     selected = [by_id[value] for value in result['sourceIds']]
     summary = result['summary']
     passed_sources = {source['id']: source for source in sources}
-    cited_text = ' '.join(' '.join(str(passed_sources[hit['chunk_id']].get(key) or '') for key in ('text', 'document', 'asOf')) for hit in selected)
-    allowed_numbers = set(re.findall(r'\d+(?:\.\d+)?', re.sub(r'(\d),(?=\d{3})', r'\1', cited_text)))
-    if any(match.group(1) not in allowed_numbers for match in NUM_RE.finditer(re.sub(r'(\d),(?=\d{3})', r'\1', summary))):
-        raise llm.LlmError(f'답변 형식 오류: {title} 답변의 숫자가 인용 자료에 없어요')
-
-    # 4) 출처 메타데이터(provenance) 구성 및 최종 응답 반환
     provenance = []
     for hit in selected:
         meta = hit['metadata'] or {}

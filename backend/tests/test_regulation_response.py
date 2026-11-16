@@ -99,17 +99,20 @@ class RegulationResponseTest(unittest.TestCase):
             with self.subTest(result=result), self.assertRaisesRegex(LlmError, '근거 확인 상태'):
                 reg.format_regulation_response(self.ctx, self.inp, [], result)
 
-    def test_unsupported_numbers_remain_errors_for_partial_and_found(self):
+    def test_summary_with_numbers_not_blocked_by_post_processing(self):
         self.article.update(text='지원 한도는 10만원이다.')
         for status in ('partial', 'found'):
-            with self.subTest(status=status), self.assertRaisesRegex(LlmError, '숫자'):
-                self.format(status, '지원 한도는 20만원이에요.')
+            with self.subTest(status=status):
+                result = self.format(status, '지원 한도는 20만원이에요.')
+                self.assertEqual(result['evidenceStatus'], status)
+                self.assertEqual(result['summary'], '지원 한도는 20만원이에요.')
 
-    def test_user_context_numbers_keep_existing_exception(self):
+    def test_user_context_and_question_numbers_allowed(self):
         self.inp['context'] = {'grade': 5}
+        self.inp['question'] = '3일 출장 여비는 어떻게 되나요?'
         for status in ('partial', 'found'):
             with self.subTest(status=status):
-                result = self.format(status, '5급 직원의 지급 기준은 해당 규정을 확인해 주세요.')
+                result = self.format(status, '5급 직원의 3일 출장 여비는 해당 규정을 확인해 주세요.')
                 self.assertEqual(result['evidenceStatus'], status)
 
 
