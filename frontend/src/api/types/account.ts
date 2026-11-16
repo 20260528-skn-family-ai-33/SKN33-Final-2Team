@@ -77,7 +77,8 @@ export interface UserSettings {
 export type ReasoningPicks = Partial<Record<ServerProvider, string>>;
 
 export type Account =
-  | ({ accountType: 'employee'; user: User } & UserSettings)
+  /** tutorialAnswered: 새 로드맵 작성 튜토리얼을 볼지 묻는 팝업에 답했는지(#277) */
+  | ({ accountType: 'employee'; user: User; tutorialAnswered: boolean } & UserSettings)
   | { accountType: 'admin'; admin: { id: number; name: string } };
 
 export interface DemoAccount {

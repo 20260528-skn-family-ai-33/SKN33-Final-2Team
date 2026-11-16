@@ -111,7 +111,7 @@ export function ReviewStep() {
       <Stepper cur="review" busy={submitting} />
       <Page eyebrow={[courseName, focus, version ? `버전 ${version}` : ''].filter(Boolean).join(' · ')}
         title="이대로 시작할까요?">
-        <section className="card rv-summary" aria-label="로드맵 요약">
+        <section className="card rv-summary" data-tour="summary" aria-label="로드맵 요약">
           {name ? <><span className="rv-label">로드맵 이름</span><h2>{name}</h2></> : null}
           <p className="rv-goal">{pl?.goal || goal}</p>
           <dl className="rv-stats">
@@ -137,7 +137,7 @@ export function ReviewStep() {
           </dl>
         </section>
 
-        <section className="step-sec" aria-label="주차별 일정">
+        <section className="step-sec" data-tour="schedule" aria-label="주차별 일정">
           <header className="step-sec-head">
             <span className="step-num">1</span>
             <div>
@@ -189,7 +189,7 @@ export function ReviewStep() {
           </div>
           <div className="step-bar-btns">
             {back}
-            <button type="button" className="btn pri" disabled={busy || submitting || !ready} onClick={() => void submit()}>이대로 확정하기</button>
+            <button type="button" className="btn pri" data-tour="confirm" disabled={busy || submitting || !ready} onClick={() => void submit()}>이대로 확정하기</button>
           </div>
         </div>
       </Page>

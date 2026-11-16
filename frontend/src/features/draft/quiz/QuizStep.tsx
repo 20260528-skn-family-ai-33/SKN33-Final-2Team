@@ -114,6 +114,6 @@ export function QuizStep() {
             }
             throw e;
           } finally { setSaving(false); }
-        }} /> : <><div className="loading" role="status" aria-live="polite"><span className="sp" aria-hidden="true" /><span>프로젝트와 희망 역량에 맞춰 스킬·문항을 준비하고 있어요.</span></div><Skeleton kind="quiz" /></>}
+        }} /> : <><div className="loading" data-tour="quiz-wait" role="status" aria-live="polite"><span className="sp" aria-hidden="true" /><span>프로젝트와 희망 역량에 맞춰 스킬·문항을 준비하고 있어요.</span></div><Skeleton kind="quiz" /></>}
   </Page></>;
 }

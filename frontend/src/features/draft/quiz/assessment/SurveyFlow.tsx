@@ -64,7 +64,7 @@ export function SurveyFlow({ onRetry, ref, survey, initialAnswers = {}, initialC
   if (finished && !review) return <div className="v2-survey"><h2>역량 테스트를 완료했어요.</h2><p>설문과 퀴즈 응답이 저장되었습니다.</p>{onContinue && <button className="primary" onClick={onContinue}>다음: 테스트 결과</button>}</div>;
   const quizPending = phase === 'quizzes' && (survey.quizStatus === 'pending' || (!questions.length && survey.quizStatus !== 'failed'));
   const quizFailed = phase === 'quizzes' && survey.quizStatus === 'failed';
-  return <div className={`v2-survey${review?' v2-survey-review':''}`}>
+  return <div className={`v2-survey${review?' v2-survey-review':''}`} data-tour={review?'result-review':undefined}>
     <nav aria-label="역량 테스트 순서"><button type="button" disabled={saving} aria-current={phase === 'surveys' ? 'step' : undefined} onClick={() => navigate('surveys')}>1. 설문</button>
       <button type="button" disabled={saving} aria-current={phase === 'quizzes' ? 'step' : undefined} onClick={() => navigate('quizzes')}>2. 퀴즈</button></nav>
     {quizPending ? <><div className="loading" role="status" aria-live="polite"><span className="sp" aria-hidden="true" /><span>퀴즈를 준비하고 있어요.</span></div><Skeleton kind="quiz" /></>
@@ -78,7 +78,7 @@ export function SurveyFlow({ onRetry, ref, survey, initialAnswers = {}, initialC
           {group[phase].map((q, index) => {
             const outcome=review&&phase==='quizzes'&&typeof q.answer==='number'&&Object.hasOwn(answers,q.id)?answers[q.id]===q.answer?'correct':'wrong':null;
             const missing=marked&&!review&&!Object.hasOwn(answers,q.id);
-            return <fieldset key={q.id} disabled={saving || review} className={missing?'is-missing':undefined}>
+            return <fieldset key={q.id} disabled={saving || review} className={missing?'is-missing':undefined} data-tour={!review&&index===0&&group===survey.groups[0]?'quiz-first':undefined}>
             <legend>{review&&phase==='quizzes'?<><span className={`quiz-result-number${outcome?' '+outcome:''}`}>{index+1}{outcome?` · ${outcome==='correct'?'정답':'오답'}`:''}</span> {q.q}</>:<>{index + 1}. {phase === 'surveys' ? q.text : q.q}{missing&&<span className="missing-tag">답을 골라 주세요</span>}</>}</legend>
             <div className={phase === 'surveys' ? 'scale' : 'choices'}>
               {(phase === 'surveys' ? scale : q.options ?? []).map((label, i) => {

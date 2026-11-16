@@ -9,6 +9,7 @@ import type { User } from '@/api/types/account';
 import { newIdToPath, paths } from '@/app/paths';
 import { dropGoals } from '@/features/draft/goal/goalStore';
 import { MySkillMap } from '@/features/skillmap/MySkillMap';
+import { startTour } from '@/features/tutorial/tourStore';
 import { useGo } from '@/shared/hooks/useGo';
 import { failToast } from '@/shared/lib/fail';
 import { cause } from '@/shared/state/ai';
@@ -284,6 +285,21 @@ function UseCard() {
             <b>목표 후보 제안</b> · 저장한 정보로 목표 후보 3개를 준비해요.{' '}
             <button className="link" onClick={() => go(newIdToPath(lastNew))}>
               새 로드맵 작성 <Icon name="right" />
+            </button>
+          </span>
+        </div>
+        <div className="row top">
+          <Icon name="map" />
+          <span>
+            <b>새 로드맵 작성 안내</b>{' '}
+            <button
+              className="link"
+              onClick={() => {
+                startTour();
+                go(paths.home);
+              }}
+            >
+              다시 보기 <Icon name="right" />
             </button>
           </span>
         </div>

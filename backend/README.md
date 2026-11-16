@@ -651,14 +651,16 @@ DROP TABLE app_ext.report_tasks;
 COMMIT;
 ```
 
-### 처음 접속 튜토리얼 팝업용 열 (#236, 2026-11-12)
+### 처음 접속 튜토리얼 팝업 (#236 · #277)
 
-처음 접속한 계정에게 튜토리얼을 볼지 묻는 팝업을 한 번만 띄우기 위한 열만 미리 둔다. 팝업·튜토리얼과 이 열을 읽고 쓰는 API는 아직 없다.
+처음 접속한 계정에게 새 로드맵 작성 튜토리얼을 따라갈지 묻는 팝업을 한 번만 띄운다. 화면은 `frontend/src/features/tutorial/`(단계 정의는 `steps.ts`)에 있다.
 
 - 저장: `app_ext.user_settings.tutorial_answered_at`(timestamptz). 팝업에 답한 시각이며 진행·건너뛰기를 구분하지 않는다.
-- 판정: 값이 `NULL`이거나 설정 행이 없으면 아직 답하지 않은 계정이다. 기존 계정의 값은 채우지 않으므로 기존 계정도 답하기 전까지는 대상이다.
+- 판정: 값이 `NULL`이거나 설정 행이 없으면 아직 답하지 않은 계정이다. 화면은 그중 로드맵과 작성 중 초안이 모두 없는 직원 계정에게만 팝업을 띄운다.
+- 읽기: `GET /api/v1/me` 의 `tutorialAnswered`(직원 계정만). 열이 없는 DB에서는 로그인을 막지 않도록 `true`로 답하고 경고 로그를 남긴다.
+- 쓰기: `PUT /api/v1/me/tutorial`. 처음 답한 시각을 남기고 다시 불러도 바꾸지 않는다. 내 정보의 '다시 보기'는 이 값을 바꾸지 않는다.
 
-**DB 적용(이 열을 읽는 앱을 올리기 전에 DB마다 한 번):** 저장소 루트에서 실행한다. 다시 실행해도 결과는 같다. 지금 앱은 이 열을 읽지 않아 적용 전후 모두 그대로 동작한다.
+**DB 적용(DB마다 한 번):** 저장소 루트에서 실행한다. 다시 실행해도 결과는 같다. 적용하지 않은 DB에서는 팝업이 뜨지 않고 답한 시각 기록(`PUT /me/tutorial`)이 실패한다.
 
 ```bash
 docker compose exec -T db sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < backend/db/migrate_tutorial_prompt.sql

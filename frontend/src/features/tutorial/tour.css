@@ -1,0 +1,99 @@
+/* 새 로드맵 작성 튜토리얼 (#277) — 색은 테마 변수에서, 모서리는 공통 --rad 단계에서 가져온다.
+   가운데 창(.ov, 50)보다 아래·도우미 창(45)보다 위에 둔다. 가운데 창이 열리면 튜토리얼은 그리지 않는다 */
+.tour {
+  /* 덮는 색: 테마 바탕을 조금 섞은 검정(밝은 테마에서도 어둡게 덮는다). 글자는 그 위에 놓이므로 테마 바탕을 조금 섞은 흰색 */
+  --tour-dim: color-mix(in srgb, color-mix(in srgb, var(--bg) 12%, #000) 80%, transparent);
+  --tour-ink: color-mix(in srgb, var(--bg) 6%, #fff);
+  --tour-ink-2: color-mix(in srgb, var(--tour-ink) 70%, transparent);
+  /* 테두리·화살표 색: 테마 강조색. 어두운 강조색(590 의 남색)은 덮은 면 위에서 안 보이므로 밝기만 끌어올린다 */
+  --tour-accent: var(--accent);
+  --tour-ease: cubic-bezier(.2, .8, .2, 1);
+  position: fixed; inset: 0; z-index: 48; pointer-events: none;
+}
+@supports (color: oklch(from red l c h)) {
+  .tour { --tour-accent: oklch(from var(--accent) max(l, .8) c h); }
+}
+.tour-block { position: fixed; pointer-events: auto; }
+
+/* 비춘 자리: 굵은 테두리 + 바깥으로 퍼지는 고리 + 화면 나머지를 덮는 그림자 */
+.tour-hole {
+  position: fixed; border-radius: var(--rad-2); pointer-events: none;
+  box-shadow: 0 0 0 3px var(--tour-accent), 0 0 0 200vmax var(--tour-dim);
+}
+.tour-hole::after {
+  content: ''; position: absolute; inset: -3px; border-radius: inherit;
+  animation: tour-pulse 1.8s var(--tour-ease) infinite;
+}
+/* 기다리는 동안에는 누를 것이 없으므로 퍼지는 고리를 멈춘다 */
+.tour.is-waiting .tour-hole::after { animation: none; }
+/* 처음 좁혀 들어올 때와 다음 대상으로 옮겨 갈 때만 움직인다(스크롤을 따라갈 때는 바로) */
+.tour.is-moving .tour-hole { transition: left .42s var(--tour-ease), top .42s var(--tour-ease), width .42s var(--tour-ease), height .42s var(--tour-ease); }
+.tour.is-moving .tour-note { transition: left .42s var(--tour-ease), top .42s var(--tour-ease); }
+
+/* 안내 글: 상자 없이 덮은 자리에 크게 쓴다 */
+.tour-note {
+  position: fixed; width: min(340px, calc(100vw - 32px)); pointer-events: auto;
+  color: var(--tour-ink); word-break: keep-all; overflow-wrap: anywhere;
+  /* 글자 뒤로 화면 내용이 비치지 않게, 테두리 없이 덮는 색만 한 겹 더 번지게 깐다 */
+  background: var(--tour-dim); box-shadow: 0 0 22px 18px var(--tour-dim);
+  animation: tour-in .24s var(--tour-ease);
+}
+.tour-count { margin: 0; font-size: 13px; font-weight: 600; color: var(--tour-ink-2); font-variant-numeric: tabular-nums; }
+.tour-count b { color: var(--tour-ink); }
+.tour-text {
+  margin: 6px 0 0; font-size: 22px; line-height: 1.45; font-weight: 700; letter-spacing: -.01em; text-wrap: balance;
+  text-shadow: 0 0 14px var(--tour-dim); animation: tour-in .24s var(--tour-ease);
+}
+.tour-text .sp {
+  display: inline-block; width: 18px; height: 18px; margin-right: 10px; vertical-align: -2px;
+  border: 2.5px solid var(--tour-ink-2); border-top-color: var(--tour-accent); border-radius: 50%; animation: spin .8s linear infinite;
+}
+.tour-acts { display: flex; align-items: center; gap: 18px; min-height: 36px; margin-top: 14px; }
+.tour-link {
+  padding: 8px 0; border: 0; background: none; font-size: 14px; font-weight: 600; color: var(--tour-ink-2);
+  text-decoration: underline; text-underline-offset: 4px; cursor: pointer;
+}
+/* 끝내기: 화면 오른쪽 위 구석 */
+.tour-quit {
+  position: fixed; top: calc(var(--rib-h) + 14px); right: 20px; display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px;
+  border: 1px solid var(--tour-ink-2); border-radius: var(--rad-2); background: var(--tour-dim); pointer-events: auto;
+  font-size: 13px; font-weight: 600; color: var(--tour-ink); cursor: pointer; animation: tour-in .24s var(--tour-ease);
+}
+.tour-quit svg { width: 14px; height: 14px; }
+.tour-link:focus-visible, .tour-quit:focus-visible { outline: 2px solid var(--tour-accent); outline-offset: 3px; }
+@media (hover: hover) {
+  .tour-link:hover { color: var(--tour-ink); }
+  .tour-quit:hover { border-color: var(--tour-ink); }
+}
+
+/* 화살표: 안내 글에서 비춘 자리를 가리킨다. 길이는 spot.ts 의 GAP(60px)에 맞춘 56px */
+.tour-arrow {
+  position: absolute; width: 56px; height: 56px; fill: none; stroke: var(--tour-accent); stroke-width: 2.5; stroke-linecap: square;
+  stroke-dasharray: 60; animation: tour-draw .32s var(--tour-ease);
+}
+[data-side="below"] .tour-arrow { left: 0; bottom: calc(100% + 2px); }
+[data-side="above"] .tour-arrow { left: 0; top: calc(100% + 2px); rotate: 180deg; }
+[data-end] .tour-arrow { left: auto; right: 0; }
+[data-side="right"] .tour-arrow { right: calc(100% + 2px); top: 0; rotate: -90deg; }
+[data-side="left"] .tour-arrow { left: calc(100% + 2px); top: 0; rotate: 90deg; }
+[data-side="up"] .tour-arrow { left: calc(50% - 28px); bottom: calc(100% + 8px); }
+[data-side="down"] .tour-arrow { left: calc(50% - 28px); top: calc(100% + 8px); rotate: 180deg; }
+[data-side="up"] .tour-note, [data-side="down"] .tour-note { text-align: center; }
+[data-side="up"] .tour-acts, [data-side="down"] .tour-acts { justify-content: center; }
+/* 놓을 곳이 없어 비춘 자리 위에 겹칠 때만 덮는 색을 깔아 읽히게 한다 */
+[data-side="dock"] .tour-arrow, [data-side="under"] .tour-arrow, [data-side="over"] .tour-arrow { display: none; }
+[data-side="dock"] .tour-note { padding: 16px 20px; border-radius: var(--rad-3); box-shadow: none; }
+
+.tour-intro .sheet { width: min(440px, 100%); }
+.tour-intro .sheet-h { border-bottom: 0; }
+
+@keyframes tour-in { from { opacity: 0; } }
+@keyframes tour-draw { from { stroke-dashoffset: 60; } }
+@keyframes tour-pulse {
+  from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--tour-accent) 75%, transparent); }
+  to { box-shadow: 0 0 0 16px transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tour-note, .tour-text, .tour-arrow, .tour-quit, .tour-hole::after { animation: none; }
+  .tour.is-moving .tour-hole, .tour.is-moving .tour-note { transition: none; }
+}

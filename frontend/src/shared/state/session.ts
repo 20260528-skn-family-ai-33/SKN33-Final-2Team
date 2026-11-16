@@ -106,6 +106,12 @@ export async function logout(flush: () => Promise<void>): Promise<void> {
   await loadDemoAccounts();
 }
 
+/** 튜토리얼 팝업에 답한 것으로 표시한다(서버 기록은 부른 쪽이 따로 요청) */
+export function setTutorialAnswered(): void {
+  const a = useSession.getState().account;
+  if (a && a.accountType === 'employee') useSession.setState({ account: { ...a, tutorialAnswered: true } });
+}
+
 /** 내 정보 저장 응답(서버가 다시 만든 직원 보기)으로 계정 정보를 바꾼다 */
 export function setMeView(view: User): void {
   const a = useSession.getState().account;

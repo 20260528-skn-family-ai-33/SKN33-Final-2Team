@@ -102,7 +102,7 @@ export function InputSkills(){
   function move(source:string,target:string){if(busy)return;const next=reorderSkills(selected,source,target);if(next!==selected){if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches){for(const card of list.current?.querySelectorAll<HTMLElement>('[data-skill]')||[])positions.current.set(card.dataset.skill||'',card.getBoundingClientRect().top);}save(next);}}
   const excluded=available.filter(row=>!selected.some(item=>item.name===row.name));
   const canInclude=canIncludeSkill(selected),over=overSkillLimit(selected);
-  return <section className="card input-skills" aria-labelledby="inputSkillsTitle">
+  return <section className="card input-skills" data-tour="skills-box" aria-labelledby="inputSkillsTitle">
     <header className="input-skills-header">
       <div><h2 id="inputSkillsTitle">학습할 스킬과 순서</h2><p className="small muted">목표·프로젝트 요약·내 정보를 바탕으로 자동 제안해요.</p></div>
       <button type="button" className="btn line small input-skills-retry" disabled={busy||stage!=='ready'||fixed.length>=MAX_SKILLS} onClick={()=>setAttempt(value=>value+1)}>{busy?<span className="sp input-skills-spinner" aria-hidden="true"/>:<Icon name="retry"/>}<span role="status"><Wait>{busy?'제안 중…':'다시 제안받기'}</Wait></span></button>
@@ -114,7 +114,7 @@ export function InputSkills(){
     {goalOnly&&summaryStage(draft)==='missing'&&<p className="small muted">첨부 파일은 유지하며, 기획서 요약 없이 목표와 내 정보를 바탕으로 제안합니다.</p>}
     {ready&&available.length>0&&<>
       <div className="input-skills-meta"><span>선택 <b>{selected.length}</b>개 · 제안 {available.length-excluded.length}개</span><span>카드를 드래그하거나 화살표로 순서를 바꿔 주세요.</span></div>
-      <ol ref={list} className="input-skills-list" aria-label="선택한 스킬과 학습 순서">
+      <ol ref={list} className="input-skills-list" data-tour="skills" aria-label="선택한 스킬과 학습 순서">
         {selected.map((row,index)=>busy && !draft.fixedSkillNames?.includes(row.name) ? <li key={row.name} className="input-skill-placeholder" style={{ minHeight: loadingHeights.get(row.name) }}><Skeleton kind="rows" count={1}/></li> : <li key={row.name} data-skill={row.name} className={`input-skill-card${dragging===row.name?' is-dragging':''}${dropTarget===row.name&&dragging!==row.name?' is-drop-target':''}`} draggable={!busy}
           onDragStart={event=>{if(busy){event.preventDefault();return;}setDragging(row.name);event.dataTransfer.effectAllowed='move';event.dataTransfer.setData('text/plain',row.name);}}
           onDragOver={event=>{if(dragging&&!busy){event.preventDefault();event.dataTransfer.dropEffect='move';setDropTarget(row.name);}}}

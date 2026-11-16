@@ -151,7 +151,7 @@ export function Sidebar({ active }: { active: string }) {
       </a>
       <nav className="nav" aria-label="주 메뉴">
         {items.map(([to, l, ic, dot, key]) => (
-          <NavLink key={l} to={to} active={active === keyOf(to, key)} icon={ic} label={l} dot={!!dot} />
+          <NavLink key={l} to={to} active={active === keyOf(to, key)} icon={ic} label={l} dot={!!dot} tour={key === 'new' ? 'start-nav' : undefined} />
         ))}
       </nav>
       {sup ? (

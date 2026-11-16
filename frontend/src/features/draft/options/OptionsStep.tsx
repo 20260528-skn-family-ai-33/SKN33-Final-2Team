@@ -446,14 +446,14 @@ export function OptionsStep() {
               <h2>코스 고르기</h2>
             </div>
           </header>
-          <div className="opt-courses" role="radiogroup" aria-label="로드맵 코스">
+          <div className="opt-courses" data-tour="courses" role="radiogroup" aria-label="로드맵 코스">
             {D.optionOrder.map(id => {
               const p = ps.find(plan => plan.opt === id);
               return p ? courseCard(p) : missingCard(id);
             })}
           </div>
         </section>
-        <section className="step-sec" aria-label="학습 자료 고르기">
+        <section className="step-sec" data-tour="materials" aria-label="학습 자료 고르기">
           <header className="step-sec-head">
             <span className="step-num">2</span>
             <div>
@@ -494,7 +494,7 @@ export function OptionsStep() {
               <Icon name="left" />
               이전
             </button>
-            <button type="button" className="btn pri" disabled={selecting || !!block} onClick={next}>
+            <button type="button" className="btn pri" data-tour="options-next" disabled={selecting || !!block} onClick={next}>
               다음: {reviewLabel}
             </button>
           </div>

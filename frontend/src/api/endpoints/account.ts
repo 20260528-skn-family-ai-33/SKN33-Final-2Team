@@ -19,6 +19,8 @@ export const accountApi = {
   goals: () => http.get<GoalSuggestions>('/me/goal-suggestions'),
   goalsEnsure: () => http.post<GoalSuggestions>('/me/goal-suggestions/ensure'),
   goalsRegenerate: () => http.post<Partial<JobStarted> & Partial<GoalSuggestions>>('/me/goal-suggestions/regenerate'),
+  /** 튜토리얼 팝업에 답함(따라가기·건너뛰기 구분 없음) */
+  tutorialAnswered: () => http.put<{ tutorialAnswered: boolean }>('/me/tutorial'),
   workspace: () => http.get<Workspace>('/me/workspace'),
 };
 
