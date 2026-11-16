@@ -219,7 +219,7 @@ def view(employee_id: int, rows: list[dict] | None = None, *, t: db.Tx | None = 
         'supervisor': bool(r['is_department_head']), 'empGroup': r['employee_group'], 'status': r['employment_status'] or '재직',
         'accountStatus': r['account_status'] or 'active', 'validFrom': str(r['valid_from']) if r['valid_from'] else None, 'changeReason': r['change_reason'],
         'gradeSince': str(r['grade_since']) if r['grade_since'] else None,
-        'supGroup': {'name': r['dept'], 'id': str(r['department_id'])} if r['is_department_head'] and r['department_id'] else None,
+        'supGroup': sup_group(r),
         'members': [_ref(x) for x in ms], 'planGroup': {'name': r['dept'], 'id': str(sup['department_id'])} if sup else None,
         'mySupervisor': _ref(sup) if sup else None,
         'profile': {k: src.get(k) for k in ('workDesc', 'expStatus', 'expSummary', 'devYears', 'inputStatus')} if has_profile else None,
@@ -236,6 +236,17 @@ TEAM_FIELDS = ('id', 'code', 'name', 'role', 'dept', 'parentDept', 'grade', 'pos
 
 def team_view(v: dict) -> dict:
     return {**{k: v.get(k) for k in TEAM_FIELDS}, 'supervisor': bool(v.get('supervisor') and v.get('members'))}
+
+
+def sup_group(r: dict) -> dict | None:
+    return {'name': r['dept'], 'id': str(r['department_id'])} if r['is_department_head'] and r['department_id'] else None
+
+
+def team_row(r: dict, rows: list[dict]) -> dict:
+    """team_view(view(...))와 같은 값. 공개 항목은 직원 행에만 있어 본인 입력·학력 조회 없이 만든다(#290)"""
+    return {'id': str(r['employee_id']), 'code': r['employee_number'] or '', 'name': r['name'], 'role': 'employee',
+            'dept': r['dept'], 'parentDept': r['parent_dept'], 'grade': _grade(r['grade']), 'position': r['position'],
+            'supervisor': bool(r['is_department_head'] and members_of(r, rows))}
 
 
 def accounts() -> list[dict]:
