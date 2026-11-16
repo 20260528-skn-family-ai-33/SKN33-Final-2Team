@@ -82,7 +82,7 @@ CREATE TABLE IF NOT EXISTS app_ext.employee_transfers (
 -- AI 모델 모드(API-11)와 시연 도구(가데이터로 보기·생성 실패 시연). 에이전트가 서버에서 돌기 때문에 서버에 둔다
 CREATE TABLE IF NOT EXISTS app_ext.user_settings (
   employee_id integer PRIMARY KEY REFERENCES public.employees(employee_id) ON DELETE CASCADE,
-  ai_provider text NOT NULL DEFAULT 'ollama' CHECK (ai_provider IN ('ollama', 'openai')),
+  ai_provider text NOT NULL DEFAULT 'openai' CHECK (ai_provider IN ('ollama', 'openai')),
   demo_mock boolean NOT NULL DEFAULT false,
   fail_sim jsonb NOT NULL DEFAULT '{}'::jsonb,
   updated_at timestamptz NOT NULL DEFAULT now()

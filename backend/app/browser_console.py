@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from ipaddress import IPv4Address
 import re
 
+from .config import S
+
 
 @dataclass(frozen=True)
 class BrowserOptions:
@@ -14,9 +16,15 @@ class BrowserOptions:
     output_tokens: int | None = None
     ollama_url: str | None = None
     ollama_key: str | None = field(default=None, repr=False)
+    # (직원 ID, 직접 고른 모델). 선택 박스만 연 상태에서는 모델이 None이다.
+    model_selection: tuple[int, str | None] | None = None
 
 
 options = ContextVar('browser_options', default=BrowserOptions())
+
+
+def provider_allowed(employee_id: int) -> bool:
+    return S.browser_overrides and str(employee_id) in S.console_provider_employees
 
 
 def demo_enabled(default: bool) -> bool:

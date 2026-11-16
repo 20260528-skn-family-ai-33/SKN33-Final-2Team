@@ -9,7 +9,7 @@ import { DraftNavGuard } from '@/features/draft/stale';
 import { StartModeNavGuard } from '@/features/draft/startModeSheet';
 import { DemoTools } from '@/features/demo/DemoTools';
 import { TourHost } from '@/features/tutorial/TourHost';
-import { canClearHiddenDemoSettings, checkStatus, connFor, PROV, useAi, useAiMode } from '@/shared/state/ai';
+import { canClearHiddenDemoSettings, canSelectModel, checkStatus, connFor, PROV, useAi, useAiMode } from '@/shared/state/ai';
 import { boot, isSup, meOf, useSession } from '@/shared/state/session';
 import { SheetHost, ToastHost } from '@/shared/ui/SheetHost';
 import { Loading } from '@/shared/ui/parts';
@@ -39,7 +39,7 @@ function ModeChip() {
   const { mode, choice, checked, conn } = useAiMode();
   const server = useAi((s) => s.status.server);
   const hiddenDemo = useAi(canClearHiddenDemoSettings);
-  const policy = useAi((s) => s.status.policy);
+  const canSelect = useAi(canSelectModel);
   useEffect(() => {
     if (acct?.accountType !== 'employee') return;
     const refresh = () => { void checkStatus(); };
@@ -93,7 +93,7 @@ function ModeChip() {
       <button
         type="button"
         className={`api-picker-button ${color}`}
-        aria-label={`${label} · ${status}. ${policy && policy !== 'employee' ? '적용 모델 정보' : 'AI 모델 선택'}`}
+        aria-label={`${label} · ${status}. ${canSelect ? 'AI 모델 선택' : '적용 모델 정보'}`}
         aria-expanded={open}
         aria-controls="api-picker-panel"
         title={status}

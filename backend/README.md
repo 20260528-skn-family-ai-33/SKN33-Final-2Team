@@ -22,6 +22,10 @@
 
 베타 기본값은 ‘직원별 선택’이다. 관리자 고정을 해제하면 기존 직원별 설정이 다시 적용된다. 베타 종료 시 관리자가 사용할 제공자를 먼저 저장한 뒤 `GP5_EMPLOYEE_AI_SELECTION=off`로 백엔드를 재생성한다. 고정한 제공자가 없으면 관리자 화면에 Ollama 자동 적용 안내가 뜬다. 사용할 모델을 저장하면 안내가 사라진다. 저장 파일 형식이 손상되면 새 모델 호출을 차단한다. 관리자가 같은 화면에서 모델을 다시 선택하고 저장하면 복구된다.
 
+직원별 선택 모드에서 모델을 저장하지 않은 직원은 OpenAI API로 시작한다. 기존 DB에는 배포 전에 [기본값 마이그레이션](db/migrate_employee_provider_default.sql)을 한 번 적용한다. 기존 행의 값은 보존한다. 이전 DB 기본값으로 저장된 Ollama와 직접 선택한 Ollama는 구별할 수 없다. DB 기본값 복구는 `ALTER TABLE app_ext.user_settings ALTER COLUMN ai_provider SET DEFAULT 'ollama';`이다.
+
+고정 모델 테스트를 맡은 직원의 `employee_id`를 배포 환경의 `GP5_CONSOLE_PROVIDER_EMPLOYEE_IDS`에 쉼표로 지정하고 백엔드를 재시작한다. 빈 목록이 기본이며 `GP5_CONSOLE_OVERRIDES=off`이면 목록도 비활성화된다. 허용된 직원은 모델이 고정된 동안 Ctrl+Alt+K에서 `model_select on`을 실행한 뒤 상단 AI 모델 선택 박스에서 모델을 고른다. 켜기만 하면 관리자 지정 모델을 계속 사용한다. 선택은 현재 브라우저 세션에 적용되고 `model_select off`로 관리자 지정 모델로 복귀한다. 모델 호출에는 서버에 설정한 해당 제공자의 키와 모델이 쓰인다. RunPod 개인 연결을 별도로 설정한 브라우저는 기존 시연 연결 규칙을 따른다.
+
 제공자 이름은 백엔드 영속 볼륨의 `var/ai-provider`에 저장한다. 서버 인스턴스가 여러 개면 같은 `GP5_VAR_DIR` 볼륨을 공유해야 한다. DB 백업에 이 파일은 포함되지 않는다.
 
 화면 개발에 필요한 API를 로컬에서 띄우기 위한 **5차 목업 백엔드 사본**이에요. 팀원 백엔드가 준비되면 `docker-compose.yml`의 `backend` 서비스(또는 `frontend/.env.local`의 `API_PROXY_TARGET`)만 바꿔 끼워요. 2026-10-29 사용자 요청으로 이 사본의 챗봇에 로컬 RoBERTa 질문 분류를 연결했어요. 팀원 백엔드에도 반영됐다는 뜻은 아니에요.

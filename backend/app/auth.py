@@ -8,14 +8,15 @@ from __future__ import annotations
 
 import hashlib
 import secrets
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
-from fastapi import Request, Response
+from fastapi import Depends, Request, Response
+from starlette.concurrency import run_in_threadpool
 
-from . import db
+from . import browser_console, db
 from .config import env
 from .errors import ApiError
 
@@ -87,22 +88,30 @@ def account_of(request: Request) -> Account | None:
         return Account('employee', e['employee_id'], e['name'])
 
 
-def require_account(request: Request) -> Account:
-    a = account_of(request)
+def provider_cookie(employee_id: int) -> str:
+    return f'{COOKIE}_provider_{employee_id}'
+
+
+async def require_account(request: Request) -> Account:
+    a = await run_in_threadpool(account_of, request)
     if not a:
         raise ApiError(401, 'AUTH_REQUIRED', '로그인이 필요해요')
+    if a.type == 'employee' and browser_console.provider_allowed(a.id):
+        provider = request.cookies.get(provider_cookie(a.id))
+        if provider in ('on', 'openai', 'ollama'):
+            # 비동기 요청 문맥에서 설정해야 동기 라우터와 이 요청이 시작한 작업 스레드에 함께 전달된다.
+            opts = browser_console.options
+            opts.set(replace(opts.get(), model_selection=(a.id, None if provider == 'on' else provider)))
     return a
 
 
-def require_employee(request: Request) -> Account:
-    a = require_account(request)
+async def require_employee(a: Account = Depends(require_account)) -> Account:
     if a.type != 'employee':
         raise ApiError(403, 'EMPLOYEE_ONLY', '직원 계정으로 로그인해야 쓸 수 있어요')
     return a
 
 
-def require_admin(request: Request) -> Account:
-    a = require_account(request)
+async def require_admin(a: Account = Depends(require_account)) -> Account:
     if a.type != 'admin':
         raise ApiError(403, 'ADMIN_ONLY', '관리자 계정으로 로그인해야 쓸 수 있어요')
     return a

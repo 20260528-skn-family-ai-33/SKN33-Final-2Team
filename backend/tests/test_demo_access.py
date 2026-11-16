@@ -168,7 +168,7 @@ class DemoAccessTests(unittest.TestCase):
                  patch.object(rt, 'S', replace(rt.S, demo_mode=enabled)), \
                  patch.object(account.db, 'one', return_value=None):
                 self.assertEqual(account._settings(1), {
-                    'aiProvider': 'ollama', 'demoMock': False, 'failSim': {}, 'reasoning': {}})
+                    'aiProvider': 'openai', 'demoMock': False, 'failSim': {}, 'reasoning': {}})
                 ctx = rt.context(1, {})
                 self.assertFalse(ctx.demo)
                 self.assertEqual(ctx.fail_sim, {})

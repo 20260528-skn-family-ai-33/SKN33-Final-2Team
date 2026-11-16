@@ -141,7 +141,8 @@ class BrowserConsoleTests(unittest.TestCase):
 
     def test_job_preserves_originating_request_only(self):
         settings = console.BrowserOptions(timeout=180, input_tokens=8192, output_tokens=2048,
-                                          ollama_url='https://example-11434.proxy.runpod.net', ollama_key='job-fixture')
+                                          ollama_url='https://example-11434.proxy.runpod.net', ollama_key='job-fixture',
+                                          model_selection=(1, 'openai'))
         callback = Mock(side_effect=lambda ctx: self.assertEqual(console.options.get(), settings))
         with patch.object(jobs.db, 'tx'), patch.object(jobs.POOL, 'submit') as submit:
             token = console.options.set(settings)

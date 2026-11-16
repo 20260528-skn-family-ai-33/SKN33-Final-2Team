@@ -3,15 +3,54 @@
    추론 정도: 모드별 고를 수 있는 단계·기본값 순서·저장과 실패 때 되돌리기 · 규정 에이전트 모델은 고르지 않음 (#28) */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/api/client';
-import { aiApi, type ProviderInfo } from '@/api/endpoints/account';
+import { aiApi, type ProviderInfo, type ProvidersResponse } from '@/api/endpoints/account';
 import type { ReasoningPicks } from '@/api/types/account';
-import { ai, applySettings, cause, checkStatus, errText, levelLabel, setReasoning, useAi } from './ai';
+import { ai, applySettings, canSelectModel, cause, checkStatus, errText, levelLabel, setChoice, setReasoning, useAi } from './ai';
 
 const useOllama = (models: ProviderInfo['models']) =>
   useAi.setState({
     status: { checked: true, docLibs: {}, providers: { ollama: { id: 'ollama', label: 'RunPod-Ollama', available: true, reason: '', models } } },
     settings: { aiProvider: 'ollama', demoMock: false, failSim: {}, reasoning: {} },
   });
+
+it('직원 선택의 초기값은 OpenAI이며 고정 정책에서는 서버가 확인한 브라우저 모델을 표시한다', async () => {
+  expect(useAi.getInitialState().settings.aiProvider).toBe('openai');
+  const providers = vi.spyOn(aiApi, 'providers').mockResolvedValue({
+    current: 'openai', policy: 'ollama', consoleProviderAllowed: true, providers: [], docLibs: {},
+  });
+  try {
+    await checkStatus();
+    applySettings({ aiProvider: 'ollama' });
+    expect(ai.choice()).toBe('api');
+    expect(useAi.getState().status.policy).toBe('ollama');
+    expect(useAi.getState().status.consoleProviderAllowed).toBe(true);
+  } finally { providers.mockRestore(); }
+});
+
+it('허용 계정도 선택 박스를 켜야 고를 수 있고, 고정 정책의 선택은 브라우저에만 저장한다', async () => {
+  const response: ProvidersResponse = { current: 'ollama', policy: 'ollama', consoleProviderAllowed: true, providers: [], docLibs: {} };
+  const providers = vi.spyOn(aiApi, 'providers');
+  const personal = vi.spyOn(aiApi, 'setProvider').mockResolvedValue({ provider: 'openai' });
+  const browser = vi.spyOn(aiApi, 'setConsoleProvider').mockResolvedValue(null);
+  try {
+    providers.mockResolvedValue(response);
+    await checkStatus();
+    expect(canSelectModel(useAi.getState())).toBe(false);
+    providers.mockResolvedValue({ ...response, modelSelectEnabled: true });
+    await checkStatus();
+    expect(canSelectModel(useAi.getState())).toBe(true);
+    expect(ai.choice()).toBe('ollama');
+    providers.mockResolvedValue({ ...response, modelSelectEnabled: true, current: 'openai' });
+    await setChoice('api');
+    expect(browser).toHaveBeenCalledWith('openai');
+    expect(personal).not.toHaveBeenCalled();
+    expect(ai.choice()).toBe('api');
+    providers.mockResolvedValue({ ...response, policy: 'employee' });
+    await checkStatus();
+    await setChoice('api');
+    expect(personal).toHaveBeenCalledWith('openai');
+  } finally { vi.restoreAllMocks(); }
+});
 
 describe('서버 시연 허용 상태', () => {
   afterEach(() => vi.restoreAllMocks());

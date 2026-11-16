@@ -42,6 +42,8 @@ export interface ProviderInfo {
 export interface ProvidersResponse {
   current: ServerProvider;
   policy?: ProviderPolicy;
+  consoleProviderAllowed?: boolean;
+  modelSelectEnabled?: boolean;
   employeeReasoning?: ReasoningPicks;
   /** 서버가 이 요청에 적용한 시연 상태. 구버전 응답에서 누락되면 화면에서 숨긴다. */
   demoMode?: boolean;
@@ -109,6 +111,8 @@ export interface AgentLogDetail extends Omit<AgentLogEntry, 'callCount'> {
 export const aiApi = {
   providers: () => http.get<ProvidersResponse>('/ai/providers'),
   setProvider: (provider: ServerProvider) => http.put<{ provider: ServerProvider }>('/me/ai-provider', { provider }),
+  setConsoleProvider: (provider: ServerProvider) => http.put<null>('/me/console-provider', { provider }),
+  setModelSelectEnabled: (enabled: boolean) => http.put<null>('/me/console-provider', { enabled }),
   setReasoning: (provider: ServerProvider, level: string | null) => http.put<{ reasoning: ReasoningPicks }>('/me/reasoning', { provider, level }),
   status: (provider: ServerProvider) => http.get<AiStatusResponse>(`/ai/status?provider=${enc(provider)}`),
   log: () => http.get<{ log: AgentLogEntry[] }>('/ai/log'),

@@ -41,9 +41,9 @@ export const signInSeq = (): number => signIn;
 export async function setAccount(acct: Account | null): Promise<void> {
   signIn += 1;
   useSession.setState({ account: acct });
-  if (acct) await Promise.all([checkStatus(), loadCerts(), loadRegSets()]);
+  if (acct?.accountType === 'employee') applySettings(acct);
+  if (acct) await Promise.all([checkStatus({ accountChanged: true }), loadCerts(), loadRegSets()]);
   if (acct && acct.accountType === 'employee') {
-    applySettings(acct);
     await loadWorkspace();
   } else {
     useWs.setState(freshWs(acct && acct.accountType === 'admin' ? 'admin-' + acct.admin.id : null), true);

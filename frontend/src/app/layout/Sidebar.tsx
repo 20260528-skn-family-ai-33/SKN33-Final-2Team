@@ -3,7 +3,7 @@ import { newIdToPath, paths } from '@/app/paths';
 import { useState } from 'react';
 import { NotificationBell } from '@/features/notifications/NotificationBell';
 import { useGo } from '@/shared/hooks/useGo';
-import { ai, canClearHiddenDemoSettings, clearDemoSettings, levelLabel, ping, PROV, resetConn, setChoice, setReasoning, useAi, useAiMode, type UiProvider } from '@/shared/state/ai';
+import { ai, canClearHiddenDemoSettings, canSelectModel, clearDemoSettings, levelLabel, ping, PROV, resetConn, setChoice, setReasoning, useAi, useAiMode, type UiProvider } from '@/shared/state/ai';
 import { logoutAndReset } from '@/features/auth/actions';
 import { isSup, meLine, useMe } from '@/shared/state/session';
 import { toast } from '@/shared/state/ui';
@@ -32,7 +32,8 @@ export function AiBox() {
     }
   }
   // 모델 상태(사용 가능 여부)·추론 정도는 ai.* 로 읽으므로, 바뀌면 다시 그리도록 구독만 한다(연결 확인 결과는 useAiMode 의 conn)
-  const policy = useAi((s) => s.status.policy);
+  const canSelect = useAi(canSelectModel);
+  const managed = useAi((s) => Boolean(s.status.policy && s.status.policy !== 'employee'));
   useAi((s) => s.settings.reasoning);
   const pick = (p: UiProvider) => {
     setChoice(p)
@@ -67,7 +68,7 @@ export function AiBox() {
     return (
       <div className="aim-effort">
         <label htmlFor={id}>추론 정도</label>
-        <select id={id} value={mine && levels.includes(mine) ? mine : ''} onChange={(e) => pickLevel(p, e.target.value || null)}>
+        <select id={id} disabled={managed} value={mine && levels.includes(mine) ? mine : ''} onChange={(e) => pickLevel(p, e.target.value || null)}>
           <option value="">기본값 · {def ? levelLabel(def) : '모델 기본'}</option>
           {levels.map((l) => (
             <option key={l} value={l}>
@@ -88,10 +89,10 @@ export function AiBox() {
     </label>
   );
   return (
-    <div className="aim" role={policy && policy !== 'employee' ? 'group' : 'radiogroup'} aria-label="AI 모델">
+    <div className="aim" role={canSelect ? 'radiogroup' : 'group'} aria-label="AI 모델">
       <span className="lbl">AI 모델</span>
-      {policy && policy !== 'employee' ? (
-        <p>관리자 지정 · {PROV[policy]} · {policy === 'openai' ? ai.openaiModel() : ai.ollamaInfo().model} · 추론 {policy === 'openai' ? levelLabel(ai.reasoning('api') || '기본값') : '없음'}</p>
+      {!canSelect ? (
+        <p>관리자 지정 · {PROV[choice]} · {choice === 'api' ? ai.openaiModel() : ai.ollamaInfo().model} · 추론 {choice === 'api' ? levelLabel(ai.reasoning('api') || '기본값') : '없음'}</p>
       ) : <>
         {opt('ollama', 'RunPod-Ollama', '로컬 LLM·sLLM')}
         {effort('ollama')}

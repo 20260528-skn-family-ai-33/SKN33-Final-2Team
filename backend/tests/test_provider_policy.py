@@ -12,7 +12,7 @@ from unittest.mock import patch
 from urllib.error import HTTPError
 
 os.environ.setdefault('DATABASE_URL', 'postgresql+psycopg://test:test@127.0.0.1:1/test')
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 
 from app import auth, browser_console, errors, llm, provider_keys, provider_policy
@@ -209,7 +209,7 @@ class ProviderPolicyTests(unittest.TestCase):
                 self.assertEqual(result.json()['mode'], policy)
                 self.assertEqual(start.call_args.args, (7, 'admin-pick'))
                 self.assertEqual(start.call_args.kwargs['approved_model']['provider'],
-                                 'ollama' if policy == 'employee' else policy)
+                                 'openai' if policy == 'employee' else policy)
                 start.reset_mock()
             self.assertEqual(self.client.post(path, json={'expectedPolicy': 'ollama'}).status_code, 409)
             start.assert_not_called()
@@ -227,6 +227,76 @@ class ProviderPolicyTests(unittest.TestCase):
             self.save('employee')
             restored = employee_settings()
             self.assertEqual((restored['current'], restored['employeeReasoning']), ('ollama', {'ollama': 'low'}))
+
+    def test_unset_employee_defaults_to_openai_and_saved_value_survives(self):
+        self.identity.return_value = auth.Account('employee', 1, 'test')
+        for saved, expected in [(None, 'openai'), ({'ai_provider': 'ollama'}, 'ollama')]:
+            with self.subTest(saved=saved), patch.object(runtime.db, 'one', return_value=saved):
+                self.assertEqual(self.client.get('/api/v1/ai/providers').json()['current'], expected)
+                self.assertEqual(runtime.context(1, {}).provider, expected)
+
+    def test_fixed_model_console_is_bound_to_allowed_employee_and_browser(self):
+        settings = replace(self.settings, browser_overrides=True, console_provider_employees=frozenset({'1'}))
+        self.enterContext(patch.object(browser_console, 'S', settings))
+        other_browser = self.enterContext(TestClient(self.client.app))
+        select = '/api/v1/me/console-provider'
+        providers = '/api/v1/ai/providers'
+
+        @self.client.app.get('/api/v1/test/context')
+        def context(a=Depends(auth.require_employee)):
+            return [runtime.context(e, {}).provider for e in (a.id, 99)]
+
+        self.assertEqual(self.save('ollama').status_code, 200)
+        self.assertEqual(self.client.put(select, json={'enabled': True}).status_code, 403)
+        self.identity.return_value = auth.Account('employee', 1, 'test')
+        state = self.client.get(providers).json()
+        self.assertTrue(state['consoleProviderAllowed'])
+        self.assertFalse(state['modelSelectEnabled'])
+        self.assertEqual(self.client.put(select, json={'provider': 'invalid'}).status_code, 422)
+        self.assertEqual(self.client.put(select, json={'enabled': 'on'}).status_code, 422)
+        self.assertEqual(self.client.put(select, json={'provider': 'openai'}).status_code, 409)
+        self.assertEqual(self.client.put(select, json={'enabled': True}).status_code, 204)
+        state = self.client.get(providers).json()
+        self.assertTrue(state['modelSelectEnabled'])
+        self.assertEqual(state['current'], 'ollama')
+        self.assertEqual(self.client.put(select, json={'provider': 'openai'}).status_code, 204)
+        self.assertEqual(self.client.put(select, json={'enabled': True}).status_code, 204)
+        self.assertEqual(self.client.get('/api/v1/test/context').json(), ['openai', 'ollama'])
+        state = self.client.get(providers).json()
+        self.assertEqual((state['policy'], state['current']), ('ollama', 'openai'))
+        self.assertEqual(other_browser.get(providers).json()['current'], 'ollama')
+        self.assertFalse(other_browser.get(providers).json()['modelSelectEnabled'])
+        with patch.object(llm, 'ping', return_value={'ok': True}) as ping:
+            self.assertEqual(self.client.get('/api/v1/ai/status?provider=openai').status_code, 200)
+            ping.assert_called_once_with('openai')
+        self.assertEqual(self.client.put('/api/v1/me/ai-provider', json={'provider': 'openai'}).status_code, 409)
+        with patch.object(browser_console, 'S', replace(settings, browser_overrides=False)):
+            self.assertEqual(self.client.get(providers).json()['current'], 'ollama')
+            self.assertEqual(self.client.put(select, json={'provider': 'openai'}).status_code, 403)
+        self.identity.return_value = auth.Account('employee', 2, 'other')
+        self.client.cookies.set(auth.provider_cookie(2), 'openai')
+        self.assertFalse(self.client.get(providers).json()['consoleProviderAllowed'])
+        self.assertFalse(self.client.get(providers).json()['modelSelectEnabled'])
+        self.assertEqual(self.client.get('/api/v1/test/context').json(), ['ollama', 'ollama'])
+        self.assertEqual(self.client.put(select, json={'provider': 'openai'}).status_code, 403)
+        self.identity.return_value = auth.Account('employee', 1, 'test')
+        self.assertEqual(self.client.put(select, json={'enabled': False}).status_code, 204)
+        self.assertEqual(self.client.get(providers).json()['current'], 'ollama')
+        self.assertFalse(self.client.get(providers).json()['modelSelectEnabled'])
+        self.assertEqual(self.client.put(select, json={'provider': 'openai'}).status_code, 409)
+        self.identity.return_value = auth.Account('admin', 1, 'test')
+        self.assertEqual(self.save('employee').status_code, 200)
+        self.identity.return_value = auth.Account('employee', 1, 'test')
+        self.assertEqual(self.client.put(select, json={'provider': 'ollama'}).status_code, 409)
+        self.assertEqual(self.client.put(select, json={'enabled': True}).status_code, 409)
+        # 직원 선택 자체를 끈 배포에서도 허용 계정은 자동 고정 모델을 브라우저에서만 바꿀 수 있다.
+        with patch.object(provider_policy, 'S', replace(settings, employee_ai_selection=False)):
+            self.assertEqual(self.client.put(select, json={'enabled': True}).status_code, 204)
+            self.assertEqual(self.client.put(select, json={'provider': 'openai'}).status_code, 204)
+            self.assertEqual(self.client.get(providers).json()['current'], 'openai')
+            self.assertEqual(other_browser.get(providers).json()['current'], 'ollama')
+        self.identity.return_value = None
+        self.assertEqual(self.client.put(select, json={'provider': 'openai'}).status_code, 401)
 
     def test_queued_and_recovered_bulk_use_the_selection_at_confirmation(self):
         from types import SimpleNamespace
