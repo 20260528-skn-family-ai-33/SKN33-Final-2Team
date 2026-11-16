@@ -642,14 +642,6 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
     inp = {'pid': ch['pid'], 'handoff': handoff,
            'changes': ch['c'], 'request': req or None, 'fromComment': rev.get('fromComment') or False,
            'plan': {k: base.get(k) for k in ('opt', 'name', 'tagline', 'def', 'hours', 'start')} | {'acts': [dict(a, done=a['id'] in done) for a in base['acts']]}}
-    if retry:
-        rev_id = str(retry['revision_id'])
-    else:
-        with db.tx() as t:
-            t.run("UPDATE app_ext.roadmap_revisions SET status = 'discarded', updated_at = now() WHERE roadmap_id = :r AND status IN ('running', 'ready', 'failed')", r=row['roadmap_id'])
-            rev_id = str(t.val("INSERT INTO app_ext.roadmap_revisions(roadmap_id, request, status) VALUES(:r, :q, 'running') RETURNING revision_id",
-                               r=row['roadmap_id'], q=db.J(dict(rev, key=body.get('key')))))
-
     def work(job: jobs.JobCtx):
         ctx = rt.context(employee_id)
         try:
@@ -714,11 +706,24 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
                   p=db.J(pd), i=rev_id)
         return {'revisionId': rev_id, 'noChanges': _revision_content(base) == _revision_content(to) and (base.get('prefs') or {}) == ch['raw']}
     work._resume = {'operation':'plans.revise_start','kwargs':{'employee_id':employee_id,'roadmap_id':roadmap_id,'body':body}}
-    jid = jobs.start('revision', employee_id, roadmap_id, work)
-    if retry:
-        return {'revisionId': rev_id, 'jobId': jid}
     with db.tx() as t:
-        t.run('UPDATE app_ext.roadmap_revisions SET job_id = CAST(:j AS uuid) WHERE revision_id = CAST(:i AS uuid)', j=jid, i=rev_id)
+        status = t.val('SELECT status::text FROM public.projects WHERE project_id = :p FOR UPDATE', p=row['project_id'])
+        if STATUS.get(status) != 'active':
+            raise ApiError(409, 'NOT_ACTIVE', '진행 중인 로드맵만 고칠 수 있어요')
+        if t.val("SELECT 1 FROM app_ext.jobs WHERE kind = 'revision' AND ref = :r AND status = 'running' LIMIT 1", r=roadmap_id):
+            raise ApiError(409, 'REVISION_BUSY', '수정안을 작성 중이에요. 완료 후 다시 요청해 주세요.')
+        if retry:
+            rev_id = str(retry['revision_id'])
+        else:
+            t.run("UPDATE app_ext.roadmap_revisions SET status = 'discarded', updated_at = now() WHERE roadmap_id = :r AND status IN ('running', 'ready', 'failed')", r=row['roadmap_id'])
+            rev_id = str(t.val("INSERT INTO app_ext.roadmap_revisions(roadmap_id, request, status) VALUES(:r, :q, 'running') RETURNING revision_id",
+                               r=row['roadmap_id'], q=db.J(dict(rev, key=body.get('key')))))
+
+        def attach_job(jid: str) -> None:
+            if not retry:
+                t.run('UPDATE app_ext.roadmap_revisions SET job_id = CAST(:j AS uuid) WHERE revision_id = CAST(:i AS uuid)', j=jid, i=rev_id)
+
+        jid = jobs.start('revision', employee_id, roadmap_id, work, before_start=attach_job, transaction=t)
     return {'revisionId': rev_id, 'jobId': jid}
 
 
