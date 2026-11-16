@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 import uuid
 from datetime import date, timedelta
 
@@ -365,18 +366,74 @@ def resources_of(recs: dict, reps: list | None = None) -> dict:
     return catalog.resources_for(keys)
 
 
+_FILE_ID_RE = re.compile(r'^[0-9a-f]{32}$')
+_WORKSPACE_QUIZ_PREPARED: set[tuple[int, str, int | None]] = set()
+
+
+def _validate_attachment(raw) -> dict | None:
+    """진행 기록·사후 점검 첨부 메타데이터(fileId·name·size) 형식을 검증한다."""
+    if raw is None:
+        return None
+    if not isinstance(raw, dict) or set(raw) != {'fileId', 'name', 'size'}:
+        raise ApiError(422, 'ATTACHMENT_INVALID', '첨부 파일 정보를 확인해 주세요.')
+    file_id = raw.get('fileId')
+    name = raw.get('name')
+    size = raw.get('size')
+    if (not isinstance(file_id, str) or not _FILE_ID_RE.fullmatch(file_id)
+            or not isinstance(name, str) or not 1 <= len(name.strip()) <= 255
+            or any(ch in name for ch in ('\x00', '\r', '\n'))
+            or type(size) is not int or not 0 <= size <= 15_000_000):
+        raise ApiError(422, 'ATTACHMENT_INVALID', '첨부 파일 정보를 확인해 주세요.')
+    return {'fileId': file_id, 'name': name.strip(), 'size': size}
+
+
+def _validate_post_score(value) -> int:
+    """사후 점검 설문 응답 점수가 1~5 정수 범위인지 검증한다."""
+    if isinstance(value, bool):
+        raise ApiError(422, 'POST_ANSWERS_INVALID', '사후 점검 점수는 1~5점이어야 해요.')
+    text = str(value).strip()
+    if text not in {'1', '2', '3', '4', '5'}:
+        raise ApiError(422, 'POST_ANSWERS_INVALID', '사후 점검 점수는 1~5점이어야 해요.')
+    return int(text)
+
+
+def _validate_goal_self(value) -> int | None:
+    """목표 달성도 선택값이 D['goalSelf'] 범위 내 정수인지 검증한다."""
+    if value in (None, ''):
+        return None
+    if isinstance(value, bool):
+        raise ApiError(422, 'POST_GOAL_SELF_INVALID', '목표 달성 응답을 확인해 주세요.')
+    text = str(value).strip()
+    if not text.isdigit():
+        raise ApiError(422, 'POST_GOAL_SELF_INVALID', '목표 달성 응답을 확인해 주세요.')
+    idx = int(text)
+    if not 1 <= idx <= len(D['goalSelf']):
+        raise ApiError(422, 'POST_GOAL_SELF_INVALID', '목표 달성 응답을 확인해 주세요.')
+    return idx
+
+
 def workspace(employee_id: int) -> dict:
     recs = records(employee_id)
-    from .post_quiz import prepare as prepare_post_quiz
+    from .post_quiz import prepare as prepare_post_quiz, questions as post_quiz_questions
     for r in recs.values():
-        if r.get('status') == 'active' and not (r.get('post') or {}).get('quizSurvey'):
-            prepare_post_quiz(employee_id, r['id'], r['plan'])
+        post = r.get('post') or {}
+        plan = r.get('plan') or {}
+        key = (employee_id, str(r.get('id') or ''), plan.get('version'))
+        if (r.get('status') == 'active'
+                and not post.get('quizSurvey')
+                and not post.get('submitted')
+                and not post.get('running')
+                and post_quiz_questions(plan)
+                and key not in _WORKSPACE_QUIZ_PREPARED):
+            if prepare_post_quiz(employee_id, r['id'], r['plan']) is not None:
+                _WORKSPACE_QUIZ_PREPARED.add(key)
     reps = reports(employee_id)
     return {'plans': recs, 'reports': reps, 'res': resources_of(recs), 'reg': {'articles': {}, 'regs': {}}}
 
 
 # ── 진행 기록 (API-38) ──
 def save_progress(employee_id: int, roadmap_id: str, act_id: str, body: dict) -> dict:
+    validated_file = _validate_attachment(body['file']) if 'file' in body else None
     row = _owned(employee_id, roadmap_id)
     if STATUS.get(row['status']) != 'active':
         raise ApiError(409, 'NOT_ACTIVE', '진행 중인 로드맵만 기록할 수 있어요')
@@ -412,7 +469,7 @@ def save_progress(employee_id: int, roadmap_id: str, act_id: str, body: dict) ->
             # Share status only; other skills keep their own notes and attachments.
             own = target == act_id
             memo = body['memo'] if own and 'memo' in body and body['memo'] is not None else old.get('memo')
-            att = body['file'] if own and 'file' in body else old.get('attachment')
+            att = validated_file if own and 'file' in body else old.get('attachment')
             t.run("""INSERT INTO app_ext.activity_progress(roadmap_id, activity_id, status, memo, attachment) VALUES(CAST(:r AS uuid), :a, :s, :m, :f)
                      ON CONFLICT (roadmap_id, activity_id) DO UPDATE SET status = EXCLUDED.status, memo = EXCLUDED.memo, attachment = EXCLUDED.attachment, updated_at = now()""",
                   r=roadmap_id, a=target, s=st, m=memo or '', f=db.J(att) if att else None)
@@ -1039,6 +1096,14 @@ def edit_comment(head_id: int, member_id: int, roadmap_id: str, comment_id: str,
 
 # ── 사후 점검·결과 보고서 (API-48~52) ──
 def save_post(employee_id: int, roadmap_id: str, body: dict) -> dict:
+    if 'answers' in body and body['answers'] is not None and not isinstance(body['answers'], dict):
+        raise ApiError(422, 'POST_ANSWERS_INVALID', '사후 점검 응답을 확인해 주세요.')
+    raw_answers = body.get('answers') or {}
+    for v in raw_answers.values():
+        if v not in (None, ''):
+            _validate_post_score(v)
+    goal_self_val = _validate_goal_self(body.get('goalSelf'))
+    validated_file = _validate_attachment(body['file']) if 'file' in body else None
     row = _owned(employee_id, roadmap_id)
     if STATUS.get(row['status']) != 'active':
         raise ApiError(409, 'NOT_ACTIVE', '진행 중인 로드맵만 사후 점검할 수 있어요')
@@ -1067,17 +1132,17 @@ def save_post(employee_id: int, roadmap_id: str, body: dict) -> dict:
                                                   VALUES(:p, :d, 'POST', :s, :q, :o, :n) RETURNING question_id""",
                                                p=row['project_id'], d=row['diagnostic_round_id'], s=q['skill'], q=q['question'], o=db.J(q['options']), n=q['sequence_no'])
         for i, q in enumerate(qs, 1):
-            v = (body.get('answers') or {}).get(q['id'])
+            v = raw_answers.get(q['id'])
             if i not in post:
                 continue
-            if v:
+            if v not in (None, ''):
+                score = _validate_post_score(v)
                 t.run("""INSERT INTO public.assessment_responses(project_id, question_id, assessment_type, selected_option, score) VALUES(:p, :q, 'POST', :o, :s)
                          ON CONFLICT (project_id, question_id) DO UPDATE SET selected_option = EXCLUDED.selected_option, score = EXCLUDED.score, answered_at = now()""",
-                      p=row['project_id'], q=post[i], o=labels.get(str(v), str(v)), s=int(v))
-        gs = body.get('goalSelf')
+                      p=row['project_id'], q=post[i], o=labels.get(str(score), str(score)), s=score)
         t.run("""INSERT INTO app_ext.post_checks(roadmap_id, goal_self, attachment) VALUES(:r, :g, :a)
                  ON CONFLICT (roadmap_id) DO UPDATE SET goal_self = EXCLUDED.goal_self, attachment = coalesce(EXCLUDED.attachment, app_ext.post_checks.attachment), updated_at = now()""",
-              r=row['roadmap_id'], g=int(gs) if str(gs or '').isdigit() else None, a=db.J(body['file']) if body.get('file') else None)
+              r=row['roadmap_id'], g=goal_self_val, a=db.J(validated_file) if validated_file else None)
         if quiz_answers is not None and not stored.get('v2Submitted'):
             t.run("UPDATE app_ext.post_checks SET deep = coalesce(deep, '{}'::jsonb) || jsonb_build_object('v2Answers', CAST(:answers AS jsonb)), updated_at = now() WHERE roadmap_id = :r",answers=db.J(quiz_answers),r=row['roadmap_id'])
         if 'clearFail' in body:
@@ -1141,6 +1206,11 @@ def report_start(employee_id: int, roadmap_id: str) -> str:
     A = pl['assess']
     if not all(post['answers'].get(q['id']) for q in A['questions']) or not post['goalSelf']:
         raise ApiError(409, 'POST_INCOMPLETE', '사후 점검 문항과 목표 달성에 모두 답해 주세요')
+    for q in A['questions']:
+        _validate_post_score(post['answers'].get(q['id']))
+    goal_idx = _validate_goal_self(post['goalSelf'])
+    if goal_idx is None:
+        raise ApiError(409, 'POST_INCOMPLETE', '사후 점검 문항과 목표 달성에 모두 답해 주세요')
     from .post_quiz import validate as validate_quiz, comparison as quiz_comparison, report_details
     from .post_quiz import with_survey,questions
     stored=(db.one('SELECT deep FROM app_ext.post_checks WHERE roadmap_id = :r',r=row['roadmap_id']) or {}).get('deep') or {}
@@ -1154,7 +1224,7 @@ def report_start(employee_id: int, roadmap_id: str) -> str:
     execution_snapshot=capture(dict(pl,acts=tracked),prog)
     done = [a for a in tracked if (prog.get(a['id']) or {}).get('status') == 'done']
     rest = [a for a in tracked if (prog.get(a['id']) or {}).get('status') != 'done']
-    goal_self = D['goalSelf'][int(post['goalSelf']) - 1] if post['goalSelf'] else ''
+    goal_self = D['goalSelf'][goal_idx - 1]
     deep_inp = _report_deep(row, A)
     with db.tx() as t:
         if t.one('SELECT 1 FROM public.growth_reports g JOIN app_ext.report_meta m ON m.report_id = g.report_id WHERE g.roadmap_id = :r AND m.confirmed', r=row['roadmap_id']):
