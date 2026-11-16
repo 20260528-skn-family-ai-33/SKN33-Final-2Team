@@ -1,12 +1,10 @@
-import { plansApi } from '@/api/endpoints/plans';
-import { failToast } from '@/shared/lib/fail';
-import { CmItem, prepareCommentRevision } from './comments';
 import { ReviewSkillBlocks, type ReviewMaterials } from '@/features/draft/review/ReviewSkillBlocks';
+import { CmItem, CommentRevisionButton, ConfirmComments } from './comments';
 import { openRecord } from './RecordSheet';
 import { trackName, trackTrait } from '@/shared/constants/data';
 import { PlanSummary } from './PlanSummary';
 /* 내 로드맵: 목록(진행 중 · 지난 로드맵) → 로드맵 하나 · 확정 완료 화면 (5차 scr.roadmap · scr.confirmed) */
-import { Navigate, useParams } from 'react-router';
+import { Navigate, useLocation, useParams } from 'react-router';
 import type { PlanRecord } from '@/api/types/plan';
 import { paths } from '@/app/paths';
 import { SkillMap } from '@/features/skillmap/SkillMap';
@@ -14,17 +12,17 @@ import { RoadmapResources, RoadmapActivityList } from './RoadmapLearning';
 import { useGo } from '@/shared/hooks/useGo';
 import { count, isPlanComplete } from '@/shared/lib/plan';
 import { monthDay, planStart, startsLater } from '@/features/home/ganttCalc';
-import { commentSkillNames, currentWeekSkillNames } from './roadmapLearningData';
+import { currentWeekSkillNames } from './roadmapLearningData';
 import { useCatalog } from '@/shared/state/catalog';
 import { useClockRefresh } from '@/shared/state/demoClock';
 import { useMe } from '@/shared/state/session';
 import { closeSheet, openSheet } from '@/shared/state/ui';
-import { newComments, planReports, recs, updateWs, useWs } from '@/shared/state/workspace';
+import { newComments, planReports, recs, useWs } from '@/shared/state/workspace';
 import { Icon } from '@/shared/ui/Icon';
 import { Note, Page, Stats } from '@/shared/ui/parts';
 import { Alerts, NoPlan, openPreAnswers, openVersions, PlanGate, postStart } from './parts';
-import { archivePlan, confirmReviseComment, resumePlan, revise, startRevise } from './planActions';
-import { useState } from 'react';
+import { archivePlan, resumePlan, startRevise } from './planActions';
+import { useEffect, useState } from 'react';
 import { won } from '@/shared/lib/format';
 
 function commentCounts(comments: NonNullable<PlanRecord['comments']>) {
@@ -33,26 +31,7 @@ function commentCounts(comments: NonNullable<PlanRecord['comments']>) {
   return <span title={`${received} · 삭제된 코멘트 ${deleted}개`}>{received}</span>;
 }
 
-async function markSkillCommentsRead(planId: string, comments: PlanRecord['comments']) {
-  for (const comment of comments || []) {
-    if (comment.deleted || comment.status !== 'new') continue;
-    try {
-      const response = await plansApi.commentRead(planId, comment.id);
-      const updated = response.plan.comments?.find(item => item.id === comment.id);
-      if (!updated) continue;
-      updateWs(state => {
-        const current = state.plans[planId]?.comments?.find(item => item.id === comment.id);
-        if (current?.status === 'new' && current.stamp === updated.stamp) {
-          current.status = updated.status;
-          current.readAt = updated.readAt;
-        }
-      });
-    } catch (error) {
-      failToast(error, '코멘트 확인 상태를 저장하지 못했어요');
-      return;
-    }
-  }
-}
+
 
 function RoadLi({ R }: { R: PlanRecord }) {
   useClockRefresh();
@@ -96,8 +75,8 @@ function RoadLi({ R }: { R: PlanRecord }) {
               <span className="roadmap-info-badge">
                 {confirmedDate || '날짜 미확인'}
               </span>
-
               <span className={`roadmap-info-badge${statusTone}`}>{statusText}</span>
+              {n > 0 && <span className="tag acc">새 코멘트 {n}</span>}
             </span>
             <small>
               {trackName(pl.opt, pl.name)} · 활동 {c.done}/{c.t} 완료
@@ -117,11 +96,6 @@ function RoadLi({ R }: { R: PlanRecord }) {
         </button>
       </div>
 
-      {n ? (
-          <div className="roadmap-preview-tags">
-            <span className="tag acc">새 코멘트 {n}</span>
-          </div>
-      ) : null}
 
       <div id={detailId} hidden={!open}>
         <div className="roadmap-preview-body">
@@ -269,6 +243,16 @@ function openArchive(go: ReturnType<typeof useGo>, R: PlanRecord): void {
 
 /** 진행 중이면 기록할 수 있고, 마쳤거나 보관한 로드맵은 읽기 전용(활동·완료·메모·버전·보고서·받은 코멘트) */
 function RoadView({ R }: { R: PlanRecord }) {
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (!hash.startsWith('#skill-')) return;
+    let id: string;
+    try { id = decodeURIComponent(hash.slice(1)); } catch { return; }
+    const target = document.getElementById(id);
+    const card = target?.closest('details');
+    if (card) card.open = true;
+    target?.scrollIntoView({ block: 'center' });
+  }, [hash, R.id]);
   useClockRefresh();
   const resources = useCatalog(state => state.res);
   const go = useGo();
@@ -277,6 +261,22 @@ function RoadView({ R }: { R: PlanRecord }) {
   const pl = R.plan;
   const live = R.status === 'active';
   const cs = R.comments || [];
+  const [commentSkill, setCommentSkill] = useState<string | null>(null);
+  useEffect(() => {
+    if (!commentSkill) return;
+    const closeOutside = (event: PointerEvent) => {
+      if (event.target instanceof Element && !event.target.closest('.received-comment-popup, .received-comment-trigger')) setCommentSkill(null);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setCommentSkill(null);
+    };
+    document.addEventListener('pointerdown', closeOutside);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOutside);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [commentSkill]);
   const cmBtn = cs.length ? (
     <button className="btn ghost sm" onClick={() => go(paths.comments(R.id))}>
       <Icon name="chat" />
@@ -317,24 +317,6 @@ function RoadView({ R }: { R: PlanRecord }) {
       {cmBtn}
     </>
   );
-  const skillRevisionAction = (skill: string) => {
-    const comment = R.comments?.slice().reverse().find(item => item.skill === skill && !item.deleted && item.status !== 'applied');
-    if (!live || !comment) {
-      const applied = R.comments?.some(item => item.skill === skill && !item.deleted && item.status === 'applied');
-      return applied ? <span className="tag ok">수정 완료</span> : null;
-    }
-    return <button type="button" className="link quiet small" aria-label={skill + ' 수정 요청'}
-      onClick={event => {
-        event.preventDefault();
-        event.stopPropagation();
-        confirmReviseComment(R, skill, () => {
-          if (prepareCommentRevision(R.id, comment)) {
-            go(paths.revise(R.id));
-            void revise(R.id);
-          }
-        });
-      }}>수정 요청</button>;
-  };
   return (
     <Page
       back={paths.roadmaps}
@@ -353,28 +335,38 @@ function RoadView({ R }: { R: PlanRecord }) {
           {R.status === 'done' ? '마친 로드맵이에요. 기록은 읽기만 할 수 있어요.' : '보관한 로드맵이에요. 기록은 읽기만 할 수 있고, ‘다시 진행하기’를 누르면 이어서 기록할 수 있어요.'}
         </Note>
       )}
+      {cs.length > 0 && <div className="actions">
+        <button className="btn line sm" onClick={() => go(paths.comments(R.id))}>받은 코멘트 보기</button>
+      </div>}
       {pl.def.learningReport ? <PlanSummary R={R} /> : <Stats pl={pl} periodLabel="기간" />}
       <RoadmapResources R={R} />
       {pl.def.learningReport ? <ReviewSkillBlocks confirmed materials={pl.def.learningReport as ReviewMaterials}
         acts={pl.acts.filter((act): act is typeof act & { skill: string; how: string; hours: number } => !!act.skill).map(act => ({ ...act, how: act.how || '' }))}
         selectedIds={pl.acts.map(act => act.id)} progress={R.progress} busy={!live}
         currentSkillNames={currentWeekSkillNames(R, resources)}
-        skillAction={skillRevisionAction}
-        skillFooter={skill => {
-          const comments = (R.comments || []).filter(c => c.skill === skill);
-          return comments.length > 0 && <details className="card" onToggle={event => { if (event.currentTarget.open) void markSkillCommentsRead(R.id, comments); }}><summary>{commentCounts(comments)}</summary>
-            {comments.map(c => <CmItem key={c.id} c={c} />)}
-          </details>;
-        }}
+        skillAction={skill => <span id={'skill-' + skill}>
+          {cs.some(comment => comment.skill === skill && !comment.deleted) && (
+            <button type="button" className="link quiet small feedback-trigger received-comment-trigger" aria-expanded={commentSkill === skill} onClick={event => {
+              event.preventDefault();
+              event.stopPropagation();
+              const card = event.currentTarget.closest('details');
+              if (card && commentSkill !== skill) card.open = true;
+              setCommentSkill(commentSkill === skill ? null : skill);
+            }}>코멘트 보기</button>
+          )}
+        </span>}
+        skillFooter={skill => commentSkill === skill ? (
+          <aside className="feedback-popup card received-comment-popup" aria-label={skill + ' 받은 코멘트'}>
+            {cs.filter(comment => comment.skill === skill && !comment.deleted).map(comment => (
+              <CmItem key={comment.id} c={comment} foot={<div className="actions cm-act" style={{ justifyContent: 'flex-end' }}>
+                <CommentRevisionButton R={R} c={comment} />
+                <ConfirmComments R={R} commentId={comment.id} />
+              </div>} />
+            ))}
+          </aside>
+        ) : null}
         onOpenResource={(skill, resourceId) => { const activity = pl.acts.find(act => act.skill === skill && act.res === resourceId) || pl.acts.find(act => act.res === resourceId); if (activity) openRecord(R.id, activity.id); }}
         onSubmit={name => { const task = pl.acts.find(act => act.skill === name && !act.res); if (task) openRecord(R.id, task.id); }} /> : <SkillMap pl={pl} /> }
-      {!pl.def.learningReport && commentSkillNames(pl).map(skill => {
-        const comments = (R.comments || []).filter(c => c.skill === skill);
-        return comments.length > 0 && <details className="card" key={skill} onToggle={event => { if (event.currentTarget.open) void markSkillCommentsRead(R.id, comments); }}>
-          <summary>{skill} · {commentCounts(comments)} {skillRevisionAction(skill)}</summary>
-          {comments.map(c => <CmItem key={c.id} c={c} />)}
-        </details>;
-      })}
       <RoadmapActivityList R={R} skipSkillCardDuplicates />
       {reps.length ? (
         <div className="sec">

@@ -1,3 +1,4 @@
+import { paths } from '@/app/paths';
 /* 완료 알림(#82) — 상단 띠의 알림 버튼과 목록 창. 직원 계정(부서장 포함)에서만 보인다.
    30초마다(창이 보일 때만)·화면을 옮길 때·창을 열 때 새로 받는다. 누르면 읽음으로 바꾸고 그 로드맵·보고서 화면으로 간다.
    부서장(#96): 내 알림을 위, 소속 직원 알림을 아래에 나눠 두고, 소속 직원 알림은 직원별 한 줄로 묶는다.
@@ -172,6 +173,13 @@ export function NotificationBell() {
     if (isOtherDraft(n, ws().draftId)) {
       toast('이 알림의 로드맵은 지금 작성 중인 로드맵이 아니에요');
       return;
+    }
+    if (n.kind === 'job' && n.jobKind === 'revision' && n.planId) {
+      const record = ws().plans[n.planId];
+      if (record && (record.status !== 'active' || (!record.revision && !record.pending))) {
+        go(paths.roadmap(n.planId));
+        return;
+      }
     }
     go(notificationTarget(n));
   };

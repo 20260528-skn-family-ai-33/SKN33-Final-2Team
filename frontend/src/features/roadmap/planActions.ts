@@ -158,7 +158,7 @@ export function revOk(R: PlanRecord | null | undefined, settingsOnly = false): b
 export async function revise(pid: string, settingsOnly = false): Promise<void> {
   const R = ws().plans[pid];
   const r = R && R.rev;
-  if (!r || r.running || (settingsOnly && !revOk(R, true))) return;
+  if (!r || r.running || busyPlan(R) || (settingsOnly && !revOk(R, true))) return;
   const request = settingsOnly ? { ...r, on: Object.fromEntries(REV_ITEMS.filter(([, , group]) => group === "cond").map(([k]) => [k, r.on[k]])), note: "학습 여건만 조정하고 기존 활동은 모두 그대로 유지해 주세요." } : r;
   const key = revKey(request);
   updateWs((s) => {
@@ -480,7 +480,7 @@ export function startRevise(go: Go, pid: string): void {
   if (!R || R.status !== 'active') return;
   const integrated = !!R.plan.def.learningReport;
   const resume =
-    R.revision?.status === 'running' ||
+    R.rev?.running || busyPlan(R) ||
     (integrated && !!R.pending && !R.rev?.fromComment);
 
   const proceed = (doneSkills: string[] = [], remainingSkills: string[] = []) => {
