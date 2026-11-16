@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { paths } from '@/app/paths';
 import { STEPS } from '@/features/draft/model';
-import { holeOf, placeAway, placeNote } from './spot';
-import { firstStepFor, isTourEnd, screenCount, screenNo, stepForPath, TOUR_STEPS, waitText } from './steps';
+import { cutOf, holeOf, placeAway, placeNote } from './spot';
+import { firstStepFor, isTourEnd, pickReady, screenCount, screenNo, stepForPath, TOUR_STEPS, waitText } from './steps';
 
 const at = (id: string): number => TOUR_STEPS.findIndex((s) => s.id === id);
 
@@ -30,9 +30,11 @@ describe('튜토리얼 단계 정의', () => {
     });
   });
 
-  it('걸리는 시간을 적은 대기 문구는 RunPod-Ollama 에서 모두 최대 10분으로 바뀌고, 나머지 문구는 그대로다', () => {
-    const timed = TOUR_STEPS.filter((s) => s.wait && /\d+(초|분)/.test(s.wait.text));
-    expect(timed.map((s) => s.id)).toEqual(['gen', 'materials', 'summary']);
+  it('AI 가 새로 만드는 구간의 대기 문구는 RunPod-Ollama 에서 모두 최대 10분으로 바뀌고, 나머지 문구는 그대로다', () => {
+    const timed = TOUR_STEPS.filter((s) => s.wait?.slowText);
+    expect(timed.map((s) => s.id)).toEqual(['quiz', 'quiz-items', 'gen', 'materials', 'summary']);
+    // 걸리는 시간을 적은 문구는 모두 RunPod-Ollama 판이 있다
+    for (const s of TOUR_STEPS.filter((x) => x.wait && /\d+(초|분)/.test(x.wait.text))) expect(timed).toContain(s);
     for (const s of timed) {
       expect(waitText(s, false)).toBe(s.wait?.text);
       expect(waitText(s, true)).toContain('최대 10분');
@@ -80,11 +82,25 @@ describe('주소로 단계 정하기', () => {
 
 describe('기다리는 안내', () => {
   it('AI 가 만드는 구간에는 기다리라는 문구와 비출 곳이 있다', () => {
-    for (const id of ['skills', 'quiz', 'gen', 'materials', 'summary']) {
+    for (const id of ['skills', 'quiz', 'quiz-items', 'gen', 'materials', 'summary']) {
       const s = TOUR_STEPS[at(id)];
       expect(s.wait?.targets.length).toBeGreaterThan(0);
       expect(s.wait?.text).toMatch(/AI가/);
     }
+  });
+
+  it('설문을 마치고 퀴즈로 넘어오면 퀴즈 안내로 이어지고, 퀴즈를 만드는 동안 그 자리를 비춘다', () => {
+    const quiz = TOUR_STEPS[at('quiz')];
+    const items = TOUR_STEPS[at('quiz-items')];
+    expect(at('quiz-items')).toBe(at('quiz') + 1);
+    expect(items.path).toBe(paths.newQuiz);
+    // 퀴즈 단계에 들어서면 설문 안내는 지난 것으로 보고, 퀴즈 안내는 그때부터만 보인다(설문을 답하는 동안 가리지 않음)
+    expect(quiz.done).toBe(items.when);
+    expect(items.wait?.targets).toEqual(['quiz-gen-wait']);
+    // 설문을 답하는 동안 같은 첫 문항 자리에서 고른 답은 퀴즈 안내를 넘기지 않는다
+    expect(pickReady(items, () => false)).toBe(false);
+    expect(pickReady(items, (q) => q === items.when)).toBe(true);
+    expect(pickReady(quiz, () => false)).toBe(true);
   });
 
   it('고르면 넘어가는 단계에도 직접 넘어갈 단추가 있다', () => {
@@ -109,6 +125,18 @@ describe('비출 자리와 안내 글 자리', () => {
     expect(holeOf({ x: -50, y: -400, w: 2000, h: 3000 }, VW, VH)).toEqual({ x: 0, y: 0, w: VW, h: VH });
   });
 
+  it('위에 붙은 상단 메뉴·아래 요약 줄 밑으로 들어간 부분은 비추지 않고, 잘린 쪽을 알려 준다', () => {
+    const rect = { x: 100, y: 60, w: 300, h: 200 };
+    const hole = holeOf(rect, VW, 700, 108);
+    expect(hole).toEqual({ x: 92, y: 108, w: 316, h: 160 });
+    expect(cutOf(rect, hole!)).toBe('top');
+    const tall = { x: 100, y: 60, w: 300, h: 900 };
+    expect(cutOf(tall, holeOf(tall, VW, 700, 108)!)).toBe('top bottom');
+    expect(cutOf({ x: 100, y: 200, w: 300, h: 40 }, holeOf({ x: 100, y: 200, w: 300, h: 40 }, VW, 700, 108)!)).toBe('');
+    // 상단 메뉴 밑으로 다 들어가면 화면 밖과 같다
+    expect(holeOf({ x: 100, y: 20, w: 300, h: 60 }, VW, VH, 108)).toBeNull();
+  });
+
   it('화면 밖 대상은 비추지 않는다', () => {
     expect(holeOf({ x: 100, y: 900, w: 300, h: 40 }, VW, VH)).toBeNull();
     expect(holeOf({ x: 100, y: -200, w: 300, h: 40 }, VW, VH)).toBeNull();
@@ -119,6 +147,13 @@ describe('비출 자리와 안내 글 자리', () => {
     expect(placeNote({ x: 1200, y: 700, w: 70, h: 60 }, VW, VH, 300, 150)).toEqual({ side: 'above', end: false, x: 964, y: 490 });
     expect(placeNote({ x: 40, y: 20, w: 500, h: 770 }, VW, VH, 300, 150).side).toBe('right');
     expect(placeNote({ x: 700, y: 20, w: 570, h: 770 }, VW, VH, 300, 150).side).toBe('left');
+  });
+
+  it('안내 글은 상단 메뉴 자리에 놓지 않는다', () => {
+    // 상단 메뉴가 없으면 위에 놓을 수 있는 자리라도, 메뉴 아래 끝(128) 위로는 올리지 않는다
+    expect(placeNote({ x: 100, y: 300, w: 400, h: 480 }, VW, VH, 300, 150).side).toBe('above');
+    expect(placeNote({ x: 100, y: 300, w: 400, h: 480 }, VW, VH, 300, 150, false, 128).side).toBe('right');
+    expect(placeNote({ x: 100, y: 130, w: 1100, h: 640 }, VW, VH, 300, 150, false, 128).y).toBeGreaterThanOrEqual(128);
   });
 
   it('오른쪽 끝에 맞추면 비춘 자리의 오른쪽 아래에 놓인다', () => {
