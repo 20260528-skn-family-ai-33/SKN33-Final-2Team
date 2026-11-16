@@ -7,8 +7,24 @@ from unittest.mock import Mock, MagicMock, patch
 
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
+from app import config
 from app.errors import ApiError
 from app.services import generation_lock as locks, generation_job
+
+
+class JobWorkerSettingsTests(TestCase):
+    def test_default_and_override(self):
+        with patch.dict('os.environ', {}, clear=True), patch.dict(config._FILE, {}, clear=True):
+            self.assertEqual(config.load().job_workers, 9)
+            for limit in (1, 8):
+                with self.subTest(limit=limit), patch.dict('os.environ', GP5_JOB_WORKERS=str(limit)):
+                    self.assertEqual(config.load().job_workers, limit)
+
+    def test_rejects_invalid_limits(self):
+        for value in ('0', '-1', '1.5', 'nine'):
+            with self.subTest(value=value), patch.dict('os.environ', GP5_JOB_WORKERS=value):
+                with self.assertRaisesRegex(ValueError, 'GP5_JOB_WORKERS'):
+                    config.load()
 
 
 class MemorySessions:
