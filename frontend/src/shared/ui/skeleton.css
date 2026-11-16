@@ -9,8 +9,18 @@
 .skel.skel-btn{height:26px;border-radius: var(--rad-2)}
 .skel-choices{display:grid;gap:8px;margin-top:6px}
 .skel.skel-choice{height:40px;border-radius: var(--rad-3)}
-.skel-grid{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}
-.skel.skel-thumb{height:84px;border-radius: var(--rad-2)}
+/* materials: 넓으면 강좌·도서 두 열(실제 .opt-materials 와 같게), 좁은 비교 열에서는 위아래로 쌓인다 */
+.skel-materials{gap:14px}
+.skel-material{gap:0;padding:20px}
+.skel-material-head{display:grid;grid-template-columns:30px minmax(0,1fr) 64px;align-items:center;gap:10px;padding-bottom:14px;margin-bottom:14px;border-bottom:1px solid var(--line,#e6e5e0)}
+.skel.skel-order{width:30px;height:30px;border-radius:var(--rad-2)}
+.skel.skel-weeks{height:12px}
+.skel-material-kinds{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:16px 24px}
+.skel-material-kind{display:grid;gap:8px;align-content:start}
+.skel.skel-kind{width:72px;margin-bottom:6px}
+.skel-material-row{grid-template-columns:52px minmax(0,1fr) 44px;align-items:center;gap:16px;padding:10px 12px}
+.skel.skel-cover{width:52px;height:64px;border-radius:4px}
+.skel.skel-link{height:11px}
 .skel-columns{gap:12px}
 .skel-column{align-content:start}
 .skel-block{display:grid;gap:7px;margin-top:6px;padding-top:12px;border-top:1px dashed var(--line,#e6e5e0)}
