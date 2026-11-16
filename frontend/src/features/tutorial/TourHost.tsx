@@ -5,13 +5,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router';
 import { paths } from '@/app/paths';
+import { ai } from '@/shared/state/ai';
 import { meOf, useSession } from '@/shared/state/session';
 import { useUi } from '@/shared/state/ui';
 import { Icon } from '@/shared/ui/Icon';
 import { draftActive, recs, useWs, ws } from '@/shared/state/workspace';
 import { afterReveal } from '@/skins/afterReveal';
 import { holeOf, placeAway, placeNote, type Box, type NotePlace } from './spot';
-import { isTourEnd, screenCount, screenNo, stepForPath, TOUR_STEPS, type TourStep } from './steps';
+import { isTourEnd, screenCount, screenNo, stepForPath, waitText, TOUR_STEPS, type TourStep } from './steps';
 import { answerIntro, closeHere, nextStep, resetTour, startTour, stopTour, tourInProgress, useTour } from './tourStore';
 import './tour.css';
 
@@ -146,7 +147,7 @@ function useSpot(step: TourStep, index: number, noteRef: React.RefObject<HTMLEle
       return {
         key: `${step.id}:${found.waiting ? 'wait' : 'go'}`,
         index,
-        text: found.waiting && step.wait ? step.wait.text : step.text,
+        text: found.waiting ? waitText(step, ai.mode() === 'ollama') : step.text,
         waiting: found.waiting,
         next: !found.waiting && step.advance === 'next',
         open: !step.gate || (!!gate && canPress(gate)),

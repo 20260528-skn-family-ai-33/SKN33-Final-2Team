@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { paths } from '@/app/paths';
 import { STEPS } from '@/features/draft/model';
 import { holeOf, placeAway, placeNote } from './spot';
-import { firstStepFor, isTourEnd, screenCount, screenNo, stepForPath, TOUR_STEPS } from './steps';
+import { firstStepFor, isTourEnd, screenCount, screenNo, stepForPath, TOUR_STEPS, waitText } from './steps';
 
 const at = (id: string): number => TOUR_STEPS.findIndex((s) => s.id === id);
 
@@ -28,6 +28,17 @@ describe('튜토리얼 단계 정의', () => {
       const same = TOUR_STEPS[i - 1].screen === s.screen;
       expect(screenNo(i) - screenNo(i - 1)).toBe(same ? 0 : 1);
     });
+  });
+
+  it('걸리는 시간을 적은 대기 문구는 RunPod-Ollama 에서 모두 최대 10분으로 바뀌고, 나머지 문구는 그대로다', () => {
+    const timed = TOUR_STEPS.filter((s) => s.wait && /\d+(초|분)/.test(s.wait.text));
+    expect(timed.map((s) => s.id)).toEqual(['gen', 'materials', 'summary']);
+    for (const s of timed) {
+      expect(waitText(s, false)).toBe(s.wait?.text);
+      expect(waitText(s, true)).toContain('최대 10분');
+      expect(waitText(s, true).match(/\d+(초|분)/g)).toEqual(['10분']);
+    }
+    for (const s of TOUR_STEPS.filter((x) => x.wait && !timed.includes(x))) expect(waitText(s, true)).toBe(s.wait?.text);
   });
 
   it("말풍선의 '다음'을 여는 대상은 같은 화면의 단계 대상이다", () => {
