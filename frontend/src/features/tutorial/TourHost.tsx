@@ -1,7 +1,8 @@
 /* 새 로드맵 작성 튜토리얼 (#277) — 화면을 어둡게 덮고 지금 볼 곳만 비운 뒤, 덮은 자리에 큰 글자와 화살표로 안내한다.
    AI 가 만드는 동안에는 만들어지는 자리를 비추고 기다리라고 알린다. 대상이 화면 밖으로 나가도 덮은 채로 그쪽을 가리킨다.
    자리는 대상 덩어리의 나타나기(skins/reveal)가 끝난 뒤에 잡고, 그 뒤로는 화면이 그려질 때마다 대상을 따라간다.
-   '잠깐 숨기기'는 이 화면에서만 안내를 치우고(다음 화면에서 다시 이음), '튜토리얼 끝내기'는 튜토리얼을 끝낸다 */
+   '잠깐 숨기기'는 이 화면에서만 안내를 치우고(다음 화면에서 다시 이음), '튜토리얼 끝내기'는 튜토리얼을 끝낸다.
+   확정까지 따라오면 확정 화면 위에 튜토리얼이 끝났다는 안내를 띄운다 */
 import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router';
 import { paths } from '@/app/paths';
@@ -11,9 +12,9 @@ import { useUi } from '@/shared/state/ui';
 import { Icon } from '@/shared/ui/Icon';
 import { draftActive, recs, useWs, ws } from '@/shared/state/workspace';
 import { afterReveal } from '@/skins/afterReveal';
-import { holeOf, placeAway, placeNote, type Box, type NotePlace } from './spot';
+import { cutOf, holeOf, placeAway, placeNote, type Box, type NotePlace } from './spot';
 import { isTourEnd, screenCount, screenNo, stepForPath, waitText, TOUR_STEPS, type TourStep } from './steps';
-import { answerIntro, closeHere, nextStep, resetTour, startTour, stopTour, tourInProgress, useTour } from './tourStore';
+import { answerIntro, closeHere, finishTour, nextStep, resetTour, startTour, stopTour, tourInProgress, useTour } from './tourStore';
 import './tour.css';
 
 const NOTE_W = 340;
@@ -48,6 +49,19 @@ const headTop = (): number => {
   return (parseFloat(css.getPropertyValue('--rib-h')) || 0) + Math.max((parseFloat(css.getPropertyValue('--nav-h')) || 0) + 20, 70);
 };
 
+/** 스크롤해도 화면 위에 붙어 있는 띠·상단 메뉴의 아래 끝(실제 자리에서 잰다). 비춘 자리는 이 아래에서만 연다.
+    좌측 메뉴 모드의 메뉴처럼 화면 높이를 다 쓰는 것은 위에 붙은 띠가 아니므로 뺀다 */
+const coverTop = (vh: number): number => {
+  let bottom = 0;
+  for (const el of document.querySelectorAll('.ribbon, .side')) {
+    const pos = getComputedStyle(el).position;
+    if (pos !== 'sticky' && pos !== 'fixed') continue;
+    const r = el.getBoundingClientRect();
+    if (r.height && r.height < vh / 3 && r.top <= bottom + 1) bottom = Math.max(bottom, r.bottom);
+  }
+  return Math.round(bottom);
+};
+
 /** 화면 아래에 붙어 있는 요약 줄(.step-bar)이 있으면 그 위까지가 보이는 자리다(대상이 그 줄 안에 있으면 화면 끝까지) */
 const floorOf = (el: Element, vh: number): number => {
   const bar = document.querySelector('.step-bar');
@@ -67,6 +81,8 @@ interface Spot {
   open: boolean;
   /** 대상이 화면 밖으로 나가면 null(덮은 채로 그쪽을 가리킨다) */
   hole: Box | null;
+  /** 상단 메뉴·아래 요약 줄에 걸려 잘린 쪽('top'·'bottom') */
+  cut: string;
   note: NotePlace;
 }
 
@@ -120,9 +136,12 @@ function useSpot(step: TourStep, index: number, noteRef: React.RefObject<HTMLEle
         const bottom = Math.max(...rs.map((x) => x.bottom));
         return { top, bottom, left: Math.min(...rs.map((x) => x.left)), right: Math.max(...rs.map((x) => x.right)), height: bottom - top };
       };
+      // 비춘 자리는 위에 붙은 띠·상단 메뉴와 아래 요약 줄 사이에서만 연다(스크롤로 그 밑에 들어간 부분은 덮어 둔다)
+      const top = coverTop(vh);
+      const floor = floorOf(el, vh);
       const boxOf = (): Box | null => {
         const r = rectOf();
-        return holeOf({ x: r.left, y: r.top, w: r.right - r.left, h: r.height }, vw, vh);
+        return holeOf({ x: r.left, y: r.top, w: r.right - r.left, h: r.height }, vw, floor, top);
       };
       // 대상을 한 번씩만 옮긴다: 작은 대상은 가운데로, 큰 영역은 상단 메뉴 바로 아래로.
       const bring = (): void => {
@@ -140,9 +159,10 @@ function useSpot(step: TourStep, index: number, noteRef: React.RefObject<HTMLEle
         // 나타나기가 끝난 자리에서: 잘려 있거나 안내 글 놓을 자리가 없으면 맞춘다
         fitted = true;
         const box = boxOf();
-        if (r.top < headTop() || r.bottom > floorOf(el, vh) || !box || placeNote(box, vw, vh, noteW, noteH).side === 'dock') bring();
+        if (r.top < headTop() || r.bottom > floor || !box || placeNote(box, vw, vh, noteW, noteH, false, headTop()).side === 'dock') bring();
       }
       const hole = boxOf();
+      const whole = rectOf();
       const gate = step.gate ? find(step.gate) : null;
       return {
         key: `${step.id}:${found.waiting ? 'wait' : 'go'}`,
@@ -152,8 +172,9 @@ function useSpot(step: TourStep, index: number, noteRef: React.RefObject<HTMLEle
         next: !found.waiting && step.advance === 'next',
         open: !step.gate || (!!gate && canPress(gate)),
         hole,
-        // 사용자가 스크롤해 대상이 화면 밖으로 나가면 덮은 채로 그쪽을 가리킨다
-        note: hole ? placeNote(hole, vw, vh, noteW, noteH, step.alignEnd) : placeAway(rectOf().bottom <= vh / 2, vw, vh, noteW, noteH),
+        cut: hole ? cutOf({ x: whole.left, y: whole.top, w: whole.right - whole.left, h: whole.height }, hole) : '',
+        // 사용자가 스크롤해 대상이 화면 밖(상단 메뉴 밑 포함)으로 나가면 덮은 채로 그쪽을 가리킨다
+        note: hole ? placeNote(hole, vw, vh, noteW, noteH, step.alignEnd, headTop()) : placeAway(whole.bottom <= vh / 2, vw, vh, noteW, noteH),
       };
     };
     const tick = (): void => {
@@ -213,6 +234,39 @@ function Intro() {
   );
 }
 
+/** 끝까지 따라왔을 때: 화면을 덮은 채 가운데에 끝났다는 것을 크게 알리고, 닫으면 확정 화면을 쓰게 한다 */
+function Finish() {
+  const close = (): void => useTour.setState({ finished: false });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') close();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+  return (
+    <div className="tour tour-finish">
+      <div className="tour-block" style={{ inset: 0 }} onClick={close} />
+      <section className="tour-done" role="dialog" aria-modal="true" aria-labelledby="tourDoneTitle">
+        <svg className="tour-done-mark" viewBox="0 0 64 64" aria-hidden="true">
+          <circle cx="32" cy="32" r="29" />
+          <path d="M19 33l9 9 17-19" />
+        </svg>
+        <p className="tour-count">
+          <b>{screenCount}</b> / {screenCount}
+        </p>
+        <h2 id="tourDoneTitle" className="tour-done-title">
+          튜토리얼을 마쳤어요
+        </h2>
+        <p className="tour-done-sub">내 정보에서 다시 볼 수 있어요.</p>
+        <button type="button" className="btn pri" autoFocus onClick={close}>
+          확인
+        </button>
+      </section>
+    </div>
+  );
+}
+
 function Overlay({ spot, noteRef, pathname }: { spot: Spot; noteRef: React.RefObject<HTMLElement | null>; pathname: string }) {
   const vw = document.documentElement.clientWidth;
   const vh = window.innerHeight;
@@ -246,7 +300,7 @@ function Overlay({ spot, noteRef, pathname }: { spot: Spot; noteRef: React.RefOb
         <div className="tour-block" style={{ inset: 0 }} />
       )}
       {/* 비춘 자리: 테두리와, 바깥을 덮는 어두운 그림자 */}
-      <div className="tour-hole" style={{ left: lit.x, top: lit.y, width: lit.w, height: lit.h }} />
+      <div className="tour-hole" data-cut={entered && hole && spot.cut ? spot.cut : undefined} style={{ left: lit.x, top: lit.y, width: lit.w, height: lit.h }} />
       <aside ref={noteRef} className="tour-note" role="dialog" aria-label="새 로드맵 작성 안내" aria-live="polite" style={{ left: note.x, top: note.y }}>
         <svg className="tour-arrow" viewBox="0 0 56 56" aria-hidden="true" key={`${spot.key}:${note.side}`}>
           <path d="M28 54V7" />
@@ -291,7 +345,7 @@ export function TourHost() {
   const answered = useSession((s) => (s.account?.accountType === 'employee' ? s.account.tutorialAnswered : true));
   const { pathname } = useLocation();
   const sheetOpen = useUi((s) => !!s.sheet);
-  const { intro, active, index, closedAt } = useTour();
+  const { intro, active, index, closedAt, finished } = useTour();
   const owner = useWs((s) => s.owner);
   const uid = user?.id;
 
@@ -311,12 +365,13 @@ export function TourHost() {
   // 화면이 바뀌면 그 화면의 단계로 맞추고, 닫아 둔 안내를 다시 잇는다
   useEffect(() => {
     if (!active) return;
-    if (isTourEnd(pathname)) stopTour();
+    if (isTourEnd(pathname)) finishTour();
     else useTour.setState((s) => ({ index: stepForPath(s.index, pathname), closedAt: s.closedAt === pathname ? s.closedAt : null }));
   }, [active, pathname]);
 
   if (sheetOpen) return null;
   if (intro) return pathname === paths.home ? <Intro /> : null;
+  if (finished) return <Finish />;
   const step = active && closedAt !== pathname && stepForPath(index, pathname) === index ? TOUR_STEPS[index] : null;
   return step ? <Guide step={step} index={index} pathname={pathname} /> : null;
 }

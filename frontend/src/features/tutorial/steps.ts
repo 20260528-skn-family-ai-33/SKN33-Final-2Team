@@ -36,6 +36,8 @@ export interface TourStep {
 const ON = (name: string): string => `[data-tour="${name}"]:not(:disabled)`;
 /* 버튼은 저장하는 잠깐 동안에도 꺼진다. 그때를 'AI 가 만드는 중'으로 안내하지 않도록, 기다리라는 안내는 화면의 만드는 중 표시가 있을 때만 한다 */
 const SKILLS_BUSY = '[data-tour="skills-box"] :is(.input-skills-initial, .loading, .input-skills-spinner)';
+/* 역량 테스트에서 설문을 마치고 퀴즈로 넘어온 뒤(퀴즈는 설문을 내보낸 뒤 따로 만든다) */
+const QUIZ_PHASE = '.v2-survey[data-phase="quizzes"]:not(.v2-survey-review)';
 
 export const TOUR_STEPS: TourStep[] = [
   { id: 'start', path: null, screen: '홈', targets: ['start', 'start-nav'], text: '여기서 시작해요.', advance: 'click' },
@@ -63,7 +65,14 @@ export const TOUR_STEPS: TourStep[] = [
 
   {
     id: 'quiz', path: paths.newQuiz, screen: '역량 테스트', targets: ['quiz-first'], text: '문항마다 하나씩 골라요. 설문 다음에 퀴즈가 이어져요.', advance: 'next', pick: 'input[type="radio"]',
-    wait: { targets: ['quiz-wait'], text: 'AI가 내 목표에 맞는 문항을 만들고 있어요. 잠시만 기다려 주세요.' },
+    done: QUIZ_PHASE,
+    wait: { targets: ['quiz-wait'], text: 'AI가 내 목표에 맞는 문항을 만들고 있어요. 잠시만 기다려 주세요.', slowText: 'AI가 내 목표에 맞는 문항을 만들고 있어요. 최대 10분까지 걸릴 수 있어요.' },
+  },
+  {
+    // 설문을 답하는 동안에는 비추지 않고, 퀴즈로 넘어와 아직 만드는 중이면 그 자리를 비추며 기다리게 한다
+    id: 'quiz-items', path: paths.newQuiz, screen: '역량 테스트', targets: ['quiz-first'], text: '퀴즈가 준비됐어요. 문항마다 답을 하나 골라요.', advance: 'next', pick: 'input[type="radio"]',
+    when: QUIZ_PHASE,
+    wait: { targets: ['quiz-gen-wait'], text: 'AI가 퀴즈 문항을 만들고 있어요. 잠시만 기다려 주세요.', slowText: 'AI가 퀴즈 문항을 만들고 있어요. 최대 10분까지 걸릴 수 있어요.' },
   },
 
   { id: 'result', path: paths.newResult, screen: '테스트 결과', targets: ['result-summary'], text: '역량 테스트 결과예요.', advance: 'next' },

@@ -70,10 +70,10 @@ export function SurveyFlow({ onRetry, ref, survey, initialAnswers = {}, initialC
   if (finished && !review) return <div className="v2-survey"><h2>역량 테스트를 완료했어요.</h2><p>설문과 퀴즈 응답이 저장되었습니다.</p>{onContinue && <button className="primary" onClick={onContinue}>다음: 테스트 결과</button>}</div>;
   const quizPending = phase === 'quizzes' && (survey.quizStatus === 'pending' || (!questions.length && survey.quizStatus !== 'failed'));
   const quizFailed = phase === 'quizzes' && survey.quizStatus === 'failed';
-  return <div className={`v2-survey${review?' v2-survey-review':''}`} data-tour={review?'result-review':undefined}>
+  return <div className={`v2-survey${review?' v2-survey-review':''}`} data-tour={review?'result-review':undefined} data-phase={phase}>
     <nav aria-label="역량 테스트 순서"><button type="button" disabled={saving} aria-current={phase === 'surveys' ? 'step' : undefined} onClick={() => navigate('surveys')}>1. 설문</button>
       <button type="button" disabled={saving} aria-current={phase === 'quizzes' ? 'step' : undefined} onClick={() => navigate('quizzes')}>2. 퀴즈</button></nav>
-    {quizPending ? <><div className="loading" role="status" aria-live="polite"><span className="sp" aria-hidden="true" /><span>퀴즈를 준비하고 있어요.</span></div><Skeleton kind="quiz" /></>
+    {quizPending ? <><div className="loading" data-tour="quiz-gen-wait" role="status" aria-live="polite"><span className="sp" aria-hidden="true" /><span>퀴즈를 준비하고 있어요.</span></div><Skeleton kind="quiz" /></>
       : quizFailed ? <div className="card"><p role="alert">퀴즈 준비를 완료하지 못했어요. 설문 응답은 유지됩니다.</p><div className="actions"><button type="button" className="btn pri" onClick={onRetry}>퀴즈 다시 준비</button></div></div>
       : <>
         <h2>{review ? phase === 'surveys' ? '설문에서 고른 답' : '퀴즈 정답과 해설' : phase === 'surveys' ? '지금의 나를 살펴볼까요?' : '배울 내용을 확인해 볼까요?'}</h2>

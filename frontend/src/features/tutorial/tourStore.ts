@@ -13,9 +13,11 @@ interface TourState {
   index: number;
   /** '잠깐 숨기기'를 누른 화면 주소: 그 화면에서는 안내를 그리지 않고, 다른 화면으로 가면 다시 잇는다 */
   closedAt: string | null;
+  /** 마지막 단계(확정)까지 따라와 끝난 직후: 끝났다는 안내를 닫을 때까지 보여 준다 */
+  finished: boolean;
 }
 
-const IDLE: TourState = { intro: false, active: false, index: 0, closedAt: null };
+const IDLE: TourState = { intro: false, active: false, index: 0, closedAt: null, finished: false };
 export const useTour = create<TourState>(() => IDLE);
 
 const KEY = (id: string | number) => 'growpath.tour.' + id;
@@ -40,6 +42,12 @@ export function startTour(): void {
 export function stopTour(): void {
   remember(false);
   useTour.setState(IDLE);
+}
+
+/** 끝까지 따라왔을 때: 튜토리얼을 끝내고(새로 고쳐도 다시 잇지 않음) 끝났다는 안내를 띄운다 */
+export function finishTour(): void {
+  remember(false);
+  useTour.setState({ ...IDLE, finished: true });
 }
 
 /** 화면만 내려놓기(로그아웃 등): 진행 중 표시는 남겨 다음 로그인에서 잇는다 */
