@@ -11,18 +11,7 @@ import { toast } from '@/shared/state/ui';
 import { Icon } from '@/shared/ui/Icon';
 import { Note } from '@/shared/ui/parts';
 import { AppVersion } from '@/shared/ui/AppVersion';
-
-const Feat = ({ ic, t, d }: { ic: string; t: string; d: string }) => (
-  <div className="feat">
-    <span className="ico">
-      <Icon name={ic} />
-    </span>
-    <span>
-      <b>{t}</b>
-      <small>{d}</small>
-    </span>
-  </div>
-);
+import { LoginFlow } from './LoginFlow';
 
 function deptGroups(accts: DemoAccount[]) {
   const out: { dept: string; list: DemoAccount[] }[] = [];
@@ -190,26 +179,7 @@ export function LoginPage() {
         </Note>
         <AppVersion />
       </section>
-      <aside className="login-side">
-        <span className="pill">
-          <Icon name="spark" />
-          개발·운영 직원 AI 역량 성장지원
-        </span>
-        <h2>
-          목표만 적으면,
-          <br />
-          나에게 맞는 로드맵 3안을
-        </h2>
-        <p>목표와 학습 여건을 적고 짧은 점검에 답하면, 관점이 다른 로드맵 3안을 비교해 고를 수 있어요.</p>
-        <div className="feats">
-          <Feat ic="edit" t="학습 여건은 간단한 입력으로" d="학습 방식·자격증·시간·기간·예산을 적거나, 비워 두면 알아서 정해요." />
-          <Feat ic="map" t="관점별 로드맵 3안" d="비용·시간·업무 적용 관점의 에이전트가 동시에 쓰고, 마음에 들지 않는 안은 그 안만 다시 만들어요." />
-          <Feat ic="chat" t="사내 생활 도우미" d="업무·사내 생활 질문에 답하고, 규정 질문은 기관 규정 원문의 근거 조항과 함께 답해요." />
-        </div>
-        <p className="small" style={{ marginTop: 'auto', opacity: 0.82 }}>
-          부서장은 자기 부서 직원이 확정한 로드맵·진행 상태·결과 보고서를 보고 코멘트만 남겨요.
-        </p>
-      </aside>
+      <LoginFlow />
     </div>
   );
 }
