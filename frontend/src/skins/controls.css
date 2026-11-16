@@ -17,11 +17,5 @@
   .width-tg { display: none; }
 }
 
-/* 로그인 화면 우측 블록: 제목 첫 줄 오른쪽 끝(그림의 오른쪽 모서리)에 두고, 첫 줄 글자 높이의 가운데쯤에 맞춘다.
-   옅은 바탕을 깔아 버튼인 것이 보이게 한다 */
-.lf-top { flex-direction: row; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.lf-top .theme-tg {
-  flex: none; width: 38px; height: 38px; margin-top: 8px; /* 제목 위 여백 6px + 첫 줄(약 40~45px) 가운데 */
-  opacity: 1; background: color-mix(in srgb, currentColor 12%, transparent);
-}
-.lf-top .theme-tg:hover { background: color-mix(in srgb, currentColor 20%, transparent); }
+/* 로그인 화면: 왼쪽 면 로고 줄의 오른쪽 끝 */
+.login-brand .theme-tg { margin-left: auto; flex: none; }

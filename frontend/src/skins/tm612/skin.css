@@ -367,17 +367,17 @@
   .ls-no { color: #111; }
   .ls-go { font-family: var(--tm-head); font-size: 13px; font-weight: 600; letter-spacing: 0; color: #fff; }
 
-  /* ── 로그인: 빌딩 사진 위에 놓인 상자. 두 상자 모두 사진이 비치지 않는 바탕 ── */
-  body.auth .app { min-height: 100vh; }
-  /* 로그인 화면은 한 화면에 들어오게 위아래 여백을 줄인다(2026-11-17) */
-  body.auth .main { min-height: 100vh; display: flex; align-items: center; padding: 24px 40px; }
-  body.auth .view { width: 100%; }
-  .login-card { border: 1px solid var(--tm-w20); background-color: var(--bg); }
-  .login-side { background: var(--bg); border: 1px solid var(--tm-w20); color: #fff; }
+  /* ── 로그인: 화면을 좌우 두 면으로(공통 배치는 gp-v2.css). 왼쪽은 사진이 비치지 않는 어두운 면,
+     오른쪽은 빌딩 사진(body.auth::before)이 그대로 보이는 면 — 원본 첫 구간처럼 사진 위에 큰 제목. 그림은 자기 바탕이 있어 사진이 비치지 않는다 ── */
+  body.auth .main { min-height: 100vh; padding: 0; }
+  .login-card { border: 0; border-right: 1px solid var(--tm-w12); border-radius: 0; background-color: var(--bg); }
+  .login-card .t.lg { font-size: 38px; }
+  .login-brand .logo { display: none; }
+  .login-brand b { font-family: var(--tm-head); font-size: 20px; font-weight: 600; letter-spacing: 4px; text-transform: uppercase; color: #fff; }
+  .login-brand-sub { margin-left: 0; border-left-color: var(--tm-w20); color: var(--tm-w70); }
+  .login-side { border: 0; border-radius: 0; background: transparent; color: #fff; }
   .login-side::after { display: none; }
-  .login-side h2 { font-family: var(--tm-head); font-weight: 600; letter-spacing: -.015em; }
-  .login-side > p, .login-side .small { color: var(--tm-w90); }
-  .login-side .pill { border: 1px solid var(--tm-w40); background: transparent; color: #fff; font-family: var(--tm-head); letter-spacing: 0; }
+  .login-side h2 { font-family: var(--tm-head); font-weight: 600; letter-spacing: -.015em; text-shadow: 0 1px 16px rgba(0, 0, 0, .6); }
   .feat { border-color: var(--tm-w20); background: rgba(0, 0, 0, .35); }
   .feat .ico { background: #fff; color: #111; }
   .feat small { color: var(--tm-w70); }
@@ -397,7 +397,6 @@
     .t { font-size: 26px; }
     .t.lg { font-size: 30px; }
     .hero { padding: 40px 20px; }
-    body.auth .main { padding: 24px 16px; }
     .adm-panel { top: var(--rib-h); }
   }
 
