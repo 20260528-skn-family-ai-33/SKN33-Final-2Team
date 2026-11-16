@@ -1275,24 +1275,47 @@ def confirm_report(employee_id: int, report_id: str) -> dict:
 
 
 # ── 부서장 (API-55~59) ──
+def _member_counts(member_ids: list[int]) -> dict[int, dict]:
+    """소속 직원 목록의 수 세기(#290). records()·reports()와 같은 조건으로 직원 전체를 한 번에 센다."""
+    if not member_ids:
+        return {}
+    # 직원마다 하위 쿼리를 돌리지 않고 종류별로 직원 단위 집계를 한 뒤 붙인다. 따로 세서 붙이므로 보고서·코멘트 수가 서로 곱해지지 않는다
+    rows = db.all_("""WITH m AS (SELECT DISTINCT unnest(CAST(:ids AS bigint[])) AS employee_id),
+                      plan AS (SELECT p.employee_id, r.roadmap_id, p.status = 'IN_PROGRESS' AS active
+                                 FROM public.roadmaps r JOIN public.projects p ON p.project_id = r.project_id
+                                WHERE p.employee_id IN (SELECT employee_id FROM m) AND p.status IN ('IN_PROGRESS', 'COMPLETED', 'ARCHIVED')
+                                  AND r.content ? 'acts' AND r.content ? 'opt'),
+                      plan_n AS (SELECT employee_id, count(*) FILTER (WHERE active) AS active, count(*) FILTER (WHERE NOT active) AS past
+                                   FROM plan GROUP BY employee_id),
+                      report_n AS (SELECT p.employee_id, count(*) AS reports
+                                     FROM public.growth_reports g JOIN public.projects p ON p.project_id = g.project_id
+                                    WHERE p.employee_id IN (SELECT employee_id FROM m) AND g.report_content ? 'gained' GROUP BY p.employee_id),
+                      unread_n AS (SELECT plan.employee_id, count(*) AS unread
+                                     FROM plan JOIN public.roadmap_comments c ON c.roadmap_id = plan.roadmap_id
+                                     JOIN public.employees author ON author.employee_id = c.author_employee_id
+                                     LEFT JOIN app_ext.comment_meta cm ON cm.comment_id = c.comment_id
+                                    WHERE plan.active AND coalesce(cm.status, 'new') = 'new' AND cm.fit IS DISTINCT FROM '__deleted__'
+                                    GROUP BY plan.employee_id)
+                      SELECT m.employee_id, coalesce(plan_n.active, 0) AS active, coalesce(plan_n.past, 0) AS past,
+                             coalesce(report_n.reports, 0) AS reports, coalesce(unread_n.unread, 0) AS unread
+                        FROM m LEFT JOIN plan_n USING (employee_id) LEFT JOIN report_n USING (employee_id) LEFT JOIN unread_n USING (employee_id)""",
+                   ids=member_ids)
+    return {r['employee_id']: r for r in rows}
+
+
 def team_members(head_id: int) -> dict:
-    me = profile.view(head_id)
-    ids = profile.member_ids(head_id)
     rows = profile._rows()
+    me = next((r for r in rows if r['employee_id'] == head_id), None)
+    members = profile.members_of(me, rows) if me else []
     unseen = NT.unseen_counts(head_id)  # 부서장이 아직 읽지 않은 그 직원의 로드맵·보고서 알림(#96)
+    counts = _member_counts([r['employee_id'] for r in members])
     out = []
-    for r in rows:
-        if r['employee_id'] not in ids:
-            continue
-        v = profile.view(r['employee_id'], rows)
-        recs = records(r['employee_id'], for_mgr=True)
-        reps = reports(r['employee_id'])
-        act = [x for x in recs.values() if x['status'] == 'active']
+    for r in members:
+        n = counts.get(r['employee_id'], {})
         u = unseen.get(r['employee_id'], {})
-        out.append({'user': profile.team_view(v), 'activePlans': len(act), 'pastPlans': len(recs) - len(act), 'reports': len(reps),
-                    'unreadComments': sum(1 for x in act for c in x['comments'] if c['status'] == 'new'),
-                    'unseenPlans': u.get('plans', 0), 'unseenReports': u.get('reports', 0)})
-    return {'group': me.get('supGroup'), 'members': out}
+        out.append({'user': profile.team_row(r, rows), 'activePlans': n.get('active', 0), 'pastPlans': n.get('past', 0), 'reports': n.get('reports', 0),
+                    'unreadComments': n.get('unread', 0), 'unseenPlans': u.get('plans', 0), 'unseenReports': u.get('reports', 0)})
+    return {'group': profile.sup_group(me) if me else None, 'members': out}
 
 
 def member_state(head_id: int, member_id: int) -> dict:

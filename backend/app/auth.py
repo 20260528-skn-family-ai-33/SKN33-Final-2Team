@@ -24,6 +24,7 @@ from .errors import ApiError
 COOKIE = env('GP5_SESSION_COOKIE', 'gp5_session')
 _ph = PasswordHasher()
 KEEP_DAYS, SHORT_HOURS = 30, 12
+SEEN_REFRESH_MINUTES = 5
 
 
 def hash_password(pw: str) -> str:
@@ -74,10 +75,16 @@ def account_of(request: Request) -> Account | None:
     token = request.cookies.get(COOKIE)
     if not token:
         return None
+    h = _digest(token)
     with db.tx() as t:
-        s = t.one('UPDATE app_ext.sessions SET last_seen_at = now() WHERE token_hash = :h AND expires_at > now() RETURNING account_type, account_id', h=_digest(token))
+        s = t.one(f"""SELECT account_type, account_id, last_seen_at < now() - interval '{SEEN_REFRESH_MINUTES} minutes' AS stale
+                      FROM app_ext.sessions WHERE token_hash = :h AND expires_at > now()""", h=h)
         if not s:
             return None
+        # 작업 상태 확인처럼 짧은 간격의 요청마다 쓰지 않도록, 마지막 확인 시각은 일정 시간이 지났을 때만 고친다(#290)
+        if s['stale']:
+            t.run(f"""UPDATE app_ext.sessions SET last_seen_at = now()
+                      WHERE token_hash = :h AND last_seen_at < now() - interval '{SEEN_REFRESH_MINUTES} minutes'""", h=h)
         if s['account_type'] == 'admin':
             a = t.one('SELECT admin_id, name FROM app_ext.admin_accounts WHERE admin_id = :i AND is_active', i=s['account_id'])
             return Account('admin', a['admin_id'], a['name']) if a else None

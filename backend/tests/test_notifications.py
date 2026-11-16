@@ -444,14 +444,13 @@ class TeamUnseenTests(unittest.TestCase):
     """소속 직원 목록·직원 기록 응답에 확인 전 수와 대상 id 가 실리는지(#96)"""
 
     def test_team_members_carry_unseen_counts(self):
-        rows = [{'employee_id': 8}, {'employee_id': 9}, {'employee_id': 10}]
+        rows = [{'employee_id': 7, 'department_id': 1, 'is_department_head': True}, {'employee_id': 8, 'department_id': 1, 'is_department_head': False},
+                {'employee_id': 9, 'department_id': 1, 'is_department_head': False}, {'employee_id': 10, 'department_id': 2, 'is_department_head': False}]
         with ExitStack() as stack:
-            stack.enter_context(patch.object(plans.profile, 'view', side_effect=lambda i, *_: {'id': i, 'supGroup': None}))
-            stack.enter_context(patch.object(plans.profile, 'member_ids', return_value={8, 9}))
             stack.enter_context(patch.object(plans.profile, '_rows', return_value=rows))
-            stack.enter_context(patch.object(plans.profile, 'team_view', side_effect=lambda v: {'id': str(v['id'])}))
-            stack.enter_context(patch.object(plans, 'records', return_value={}))
-            stack.enter_context(patch.object(plans, 'reports', return_value=[]))
+            stack.enter_context(patch.object(plans.profile, 'team_row', side_effect=lambda r, _: {'id': str(r['employee_id'])}))
+            stack.enter_context(patch.object(plans.profile, 'sup_group', return_value=None))
+            stack.enter_context(patch.object(plans, '_member_counts', return_value={}))
             stack.enter_context(patch.object(NT, 'unseen_counts', return_value={8: {'plans': 1, 'reports': 2}}))
             out = plans.team_members(7)
         got = {m['user']['id']: (m['unseenPlans'], m['unseenReports']) for m in out['members']}
