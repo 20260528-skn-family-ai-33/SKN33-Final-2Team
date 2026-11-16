@@ -9,7 +9,6 @@
 .v2-survey-review .scale label.selected{color:var(--accent-ink);background:var(--accent-soft);border-color:var(--accent)}
 
 /* 빠뜨린 문항 표시와 완료 전 안내(#224) */
-.v2-survey fieldset.is-missing{border-color:var(--danger,#C2362F);box-shadow:0 0 0 2px color-mix(in srgb,var(--danger,#C2362F) 22%,transparent);scroll-margin:120px}
-.v2-survey .missing-tag{display:inline-block;margin-left:8px;padding:1px 7px;border-radius: var(--rad-1);background:color-mix(in srgb,var(--danger,#C2362F) 12%,transparent);color:var(--danger,#C2362F);font-size:12px;font-weight:600}
+.v2-survey fieldset.is-missing{border-color:var(--danger,#C2362F);scroll-margin:120px}
 .v2-survey .finish-note{margin:16px 0 8px;text-align:right;font-size:13px}
 .v2-survey-review .answer-label{font-size:12px}
