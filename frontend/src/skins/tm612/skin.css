@@ -28,6 +28,7 @@
   --accent-soft2: rgba(255, 255, 255, .14);
   --accent-line: rgba(255, 255, 255, .4);
   --tm-on-accent: #111111;
+  --accent-on: var(--tm-on-accent);
   --tm-wrap: 1240px;
   --nav-h: 70px;
   --tm-w90: rgba(255, 255, 255, .9);
@@ -253,6 +254,12 @@
   /* 꼬리표는 주 버튼처럼 흰 바탕에 어두운 글자 */
   .tag.week { background: var(--week); color: var(--tm-on-accent); box-shadow: none; }
   .tag.done { background: var(--done-soft); color: var(--done-ink); }
+  /* 위 .tag 규칙이 색 꼬리표(acc · ok · warn · team-new)보다 우선해 모두 같은 회색이 되었다 → 다시 적는다.
+     부서장 피드백의 '좋아요'(ok)와 '보완 필요'(acc), 코멘트의 '확인 전'·'새 코멘트'(acc), 직원 목록의 '새 로드맵'(team-new)이 구분되지 않았다 */
+  .tag.acc { background: var(--accent-soft2); color: var(--accent-ink); box-shadow: inset 0 0 0 1px var(--accent-line); }
+  .tag.ok { background: var(--ok-soft); color: var(--ok); }
+  .tag.warn { background: var(--warn-soft); color: var(--warn); }
+  .tag.team-new { background: var(--accent); color: var(--tm-on-accent); }
   .cmp thead th { background: var(--surface-2); }
   .btn.ghost { color: var(--ink-2); }
   .btn.ghost:hover { background: rgba(255, 255, 255, .08); color: #fff; }
@@ -304,6 +311,9 @@
   .card.flat, .docbox, .gsug, .basis .art, .ef-sub, .lg-pick, .ops-b, .agent .detail, .reg-long { background: var(--surface-2); }
   .card.tap, .opt, .gs-it, .pstrip div, .li { transition: border-color .15s ease, background-color .15s ease; }
   .card.tap:hover, .opt:hover, .pstrip div:hover { border-color: #fff; background-color: #1F1F1F; box-shadow: none; }
+  /* 목록 줄(소속 직원 · 직원 로드맵 · 보고서): 공통 마우스 효과(--surface-2)는 이 테마에서 상자보다 어두워 눌러도 되는 줄로 보이지 않는다 → 카드처럼 밝힌다.
+     확인 전 강조 줄은 gp.css 가 강조 바탕을 한 단계 진하게 한다 */
+  .list button.li:not(.has-unseen):hover, .list a.li:hover { background-color: #1F1F1F; }
   .pstrip div { padding: 14px; }
   .pstrip div b { color: #fff; }
 

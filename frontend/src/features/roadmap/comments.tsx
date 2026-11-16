@@ -69,6 +69,20 @@ export function selectedFeedbackReasons(value = '') {
   return value.split(' / ').filter(reason => Object.hasOwn(feedbackReasons, reason));
 }
 
+type CommentFieldsOf = Pick<Comment, 'skill' | 'fit' | 'fitText' | 'level' | 'levelText' | 'free'>;
+
+/** 스킬별 '좋아요 · 보완 필요' 피드백(부서장 로드맵 화면의 피드백 창으로 보낸 것): 보완 이유 단추로 고른 값만 있어야 같은 모양으로 보이고 고칠 수 있다 */
+export function isSkillFeedback(c: CommentFieldsOf): boolean {
+  const reasons = selectedFeedbackReasons(c.fitText);
+  return !!c.skill && c.level === 'none' && !c.levelText
+    && ((c.fit === 'good' && !c.fitText) || (c.fit === 'partial' && reasons.join(' / ') === c.fitText));
+}
+
+/** 스킬 없이 글만 보낸 전체 코멘트 */
+export function isFreeComment(c: CommentFieldsOf): boolean {
+  return !c.skill && !!c.free && c.fit === 'none' && c.level === 'none' && !c.fitText && !c.levelText;
+}
+
 export function CmItem({ c, foot, mgr }: { c: Comment; foot?: ReactNode; mgr?: boolean }) {
   const reasons = selectedFeedbackReasons(c.fitText);
   return (
@@ -81,14 +95,12 @@ export function CmItem({ c, foot, mgr }: { c: Comment; foot?: ReactNode; mgr?: b
         </span>
         {c.deleted ? <span className="tag line">삭제된 코멘트</span> : <CmTag c={c} mgr={mgr} />}
       </div>
-      {!c.deleted && (c.skill && c.level === 'none' && !c.levelText
-        && ((c.fit === 'good' && !c.fitText) || (c.fit === 'partial' && reasons.join(' / ') === c.fitText))
+      {!c.deleted && (isSkillFeedback(c)
         ? <div><span className={c.fit === 'good' ? 'tag ok' : 'tag acc'}>{c.fit === 'good' ? '좋아요' : '보완 필요'}</span>
           {c.fit === 'partial' && <> {reasons.map(reason => <span className="tag line" key={reason}>{reason}</span>)}
             {c.free ? <p>{c.free}</p> : reasons.map(reason => <p key={reason}>{feedbackReasons[reason]}</p>)}</>}
         </div>
-        : !c.skill && c.free && c.fit === 'none' && c.level === 'none' && !c.fitText && !c.levelText
-          ? <p>{c.free}</p> : <CommentView c={c} />)}
+        : isFreeComment(c) ? <p>{c.free}</p> : <CommentView c={c} />)}
       {!c.deleted && foot}
     </div>
   );
