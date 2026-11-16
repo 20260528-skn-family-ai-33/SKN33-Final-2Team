@@ -334,24 +334,19 @@ body.auth .main { padding: 40px 32px 60px; }
 .login-side .pill { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 99px; background: rgba(255, 255, 255, .15); font-size: 13px; font-weight: 600; }
 .login-side .pill svg { width: 15px; height: 15px; }
 .login-side h2 { margin: 6px 0 0; font-size: 30px; line-height: 1.32; letter-spacing: -.03em; }
-/* 라벨·제목은 그림의 왼쪽 모서리에 맞춘다: 그림 묶음과 같은 폭으로 가운데 두고 화살표 버튼과 그 틈만큼 들여 쓴다 */
-.login-side { --lf-arrow: 40px; --lf-gap: 12px; }
-.lf-head { display: flex; flex-direction: column; align-items: flex-start; gap: 18px; width: 100%; max-width: 720px; margin: 0 auto; padding-left: calc(var(--lf-arrow) + var(--lf-gap)); }
-/* 이전 버튼 · 그림 · 다음 버튼 한 줄, 그 아래 그림 폭에 맞춘 눈금과 문구. 남는 높이의 가운데에 둔다 */
-.lf { border-radius: inherit; display: grid; grid-template-columns: var(--lf-arrow) minmax(0, 1fr) var(--lf-arrow); align-items: center; gap: 6px var(--lf-gap); width: 100%; max-width: 720px; margin: auto; }
-/* 모서리는 블록의 것을 그대로(테마마다 블록 모서리를 따로 정한다) */
-.lf-arrow { display: grid; place-items: center; width: var(--lf-arrow); height: var(--lf-arrow); padding: 0; border: 1px solid color-mix(in srgb, currentColor 32%, transparent); border-radius: inherit; background: none; color: inherit; cursor: pointer; }
-.lf-arrow:hover { background: color-mix(in srgb, currentColor 14%, transparent); }
-.lf-arrow:active { background: color-mix(in srgb, currentColor 24%, transparent); }
-.lf-arrow:focus-visible, .lf-shot:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
-.lf-arrow svg { width: 18px; height: 18px; }
-.lf-shot { aspect-ratio: 4 / 3; overflow: hidden; border: 1px solid color-mix(in srgb, currentColor 24%, transparent); border-radius: inherit; background: var(--bg); cursor: grab; touch-action: pan-y; user-select: none; }
+/* 라벨·제목과 그림 묶음은 같은 폭으로 가운데 두어 왼쪽 모서리가 맞는다 */
+.lf-head { display: flex; flex-direction: column; align-items: flex-start; gap: 18px; width: 100%; max-width: 720px; margin: 0 auto; }
+/* 그림, 그 아래 눈금과 문구. 그림 속 글자가 보이도록 블록 폭을 다 쓴다. 남는 높이의 가운데에 둔다.
+   모서리는 블록의 것을 그대로(테마마다 블록 모서리를 따로 정한다) */
+.lf { border-radius: inherit; display: grid; gap: 6px; width: 100%; max-width: 720px; margin: auto; }
+.lf-shot:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.lf-shot { aspect-ratio: 4 / 3; overflow: hidden; border: 1px solid color-mix(in srgb, currentColor 24%, transparent); border-radius: inherit; background: var(--bg); cursor: zoom-in; touch-action: pan-y; user-select: none; }
 .lf-shot.is-drag { cursor: grabbing; }
 .lf-track { display: flex; height: 100%; transition: transform .28s cubic-bezier(.16, 1, .3, 1); }
 .lf-shot.is-drag .lf-track { transition: none; }
 .lf-track > * { flex: 0 0 100%; min-width: 0; height: 100%; }
 .lf-track img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top center; pointer-events: none; }
-.lf-rule { grid-column: 2; position: relative; display: flex; margin: 0; padding: 0; list-style: none; }
+.lf-rule { position: relative; display: flex; margin: 0; padding: 0; list-style: none; }
 .lf-rule li:not(.lf-mark) { flex: 1; }
 .lf-rule button { position: relative; display: block; width: 100%; height: 28px; padding: 0; border: 0; background: none; color: inherit; cursor: pointer; }
 .lf-rule button::before { content: ''; position: absolute; top: 50%; left: 0; right: 0; border-top: 1px solid currentColor; opacity: .32; }
@@ -361,8 +356,17 @@ body.auth .main { padding: 40px 32px 60px; }
 /* 지금 몇 번째 장인지 가리키는 눈금 하나가 선을 따라 옮겨 간다 */
 .lf-mark { position: absolute; top: calc(50% - 1px); left: 0; width: calc(100% / var(--lf-n)); height: 3px; background: currentColor; transform: translateX(calc(var(--lf-i) * 100%)); transition: transform .28s cubic-bezier(.16, 1, .3, 1); pointer-events: none; }
 @media (prefers-reduced-motion: reduce) { .lf-track, .lf-mark { transition: none; } }
+/* 크게 보기: 화면 가득 어두운 바탕 위에 그림 한 장과 닫기 버튼만 둔다. 닫기 버튼은 그림을 가리지 않게 그림 위쪽 바깥에 둔다 */
+.lf-big { width: fit-content; max-width: none; max-height: none; padding: 0; border: 0; background: none; color: #fff; overflow: visible; }
+.lf-big::backdrop { background: rgba(0, 0, 0, .82); }
+.lf-big[open] { display: grid; justify-items: end; gap: 10px; }
+.lf-big img { display: block; width: auto; height: auto; max-width: min(1600px, 94vw); max-height: calc(100vh - 110px); border: 1px solid rgba(255, 255, 255, .24); border-radius: var(--rad-2); background: var(--bg); }
+.lf-big-x { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 1px solid rgba(255, 255, 255, .4); border-radius: var(--rad-2); background: none; color: inherit; cursor: pointer; }
+.lf-big-x:hover { background: rgba(255, 255, 255, .16); }
+.lf-big-x:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.lf-big-x svg { width: 18px; height: 18px; }
 /* 설명 문구 한 줄. 좁은 폭에서 두 줄이 되어도 블록 높이가 바뀌지 않게 두 줄 자리를 잡아 둔다 */
-.lf-cap { grid-column: 2; min-height: calc(16px * 1.6 * 2); margin: 0; font-size: 16px; line-height: 1.6; }
+.lf-cap { min-height: calc(16px * 1.6 * 2); margin: 0; font-size: 16px; line-height: 1.6; }
 .side-foot .logout { justify-content: flex-start; padding: 0 6px; color: var(--ink-3); }
 .side-foot .logout svg { width: 16px; height: 16px; }
 @media (max-width: 900px) {
@@ -371,7 +375,6 @@ body.auth .main { padding: 40px 32px 60px; }
   .login-card { padding: 26px 20px; }
   .login-side { padding: 28px 16px; }
   .login-side h2 { font-size: 26px; }
-  .login-side { --lf-arrow: 36px; --lf-gap: 8px; }
   .demo-acc { grid-template-columns: 1fr; }
   .side-foot .logout .lbl { display: none; }
   .side-foot .logout { padding: 0 8px; }

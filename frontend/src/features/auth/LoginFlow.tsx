@@ -1,6 +1,8 @@
 /* 로그인 화면 우측 블록: 라벨·제목 아래에 서비스 화면 그림을 넘겨 보여 준다 (#282).
    그림 위에는 글자를 올리지 않고, 설명 문구 한 줄을 그림 아래에 둔다.
-   넘기는 방법은 양옆 화살표 · 그림 끌기 · 아래 눈금(몇 번째 장인지도 보여 준다) · 좌우 화살표 키.
+   넘기는 방법은 그림 끌기 · 아래 눈금(몇 번째 장인지도 보여 준다) · 좌우 화살표 키.
+   그림을 누르면 화면 가득 크게 띄운다(그림 속 글자를 읽을 수 있게). 크게 보는 동안에는 저절로 넘어가지 않는다.
+   그림 속 글자가 보이도록 그림을 블록 폭만큼 크게 두려고 양옆 화살표 버튼은 두지 않는다.
    가만히 두면 4초마다 저절로 넘어간다. 직접 넘기면 멈췄다가, 10초 동안 조작이 없으면 다음 장으로 넘어가고 다시 4초마다 넘어간다.
    마우스를 올려 두기만 한 것은 조작으로 치지 않는다(버튼을 누른 자리에 마우스를 둔 채로도 다시 넘어가야 하므로).
    그림을 끄는 동안 · 탭이 가려진 동안 · 움직임 줄이기 설정에서는 넘어가지 않는다 */
@@ -14,6 +16,8 @@ const AUTO_MS = 4000;
 const RESUME_MS = 10000;
 /** 이만큼(px) 넘게 끌어야 다음 장으로 넘긴다. 그보다 짧으면 제자리로 돌아온다 */
 const DRAG_MIN = 40;
+/** 이보다 덜 움직였으면 끈 것이 아니라 누른 것으로 본다 → 크게 보기 */
+const TAP_MAX = 5;
 
 /* 지금 테마: 로그인 화면의 '화면 테마' 상자로 바꾸면 <html data-skin> 이 바뀐다 → 그 테마로 찍은 그림으로 바꾼다 */
 function watchSkin(onChange: () => void): () => void {
@@ -31,13 +35,16 @@ export function LoginFlow() {
   /** 끄는 중이면 끈 거리(px), 아니면 null */
   const [drag, setDrag] = useState<number | null>(null);
   const dragFrom = useRef(0);
+  /** 크게 보기가 열려 있는지 */
+  const [zoom, setZoom] = useState(false);
+  const big = useRef<HTMLDialogElement>(null);
   const count = LOGIN_SLIDES.length;
 
   /** 쉬는 시간이 끝나 다시 넘기기 시작하는 참인지(그때는 4초를 더 기다리지 않고 바로 한 장 넘긴다) */
   const resumed = useRef(false);
   const dragging = drag !== null;
   useEffect(() => {
-    if (!auto || dragging || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (!auto || dragging || zoom || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const next = (): void => {
       if (!document.hidden) setAt((n) => (n + 1) % count);
     };
@@ -47,25 +54,53 @@ export function LoginFlow() {
     }
     const t = window.setInterval(next, AUTO_MS);
     return () => window.clearInterval(t);
-  }, [auto, dragging, count]);
+  }, [auto, dragging, zoom, count]);
 
   // 직접 넘길 때마다 쉬는 시간을 처음부터 다시 센다
   const resume = useRef(0);
   useEffect(() => () => window.clearTimeout(resume.current), []);
-  const pick = (n: number): void => {
+  const rest = (): void => {
     setAuto(false);
     window.clearTimeout(resume.current);
     resume.current = window.setTimeout(() => {
       resumed.current = true;
       setAuto(true);
     }, RESUME_MS);
+  };
+  const pick = (n: number): void => {
+    rest();
     setAt((n + count) % count);
   };
   const onKey = (e: KeyboardEvent<HTMLElement>): void => {
+    // 그림에 초점을 둔 채 Enter·Space 를 누르면 크게 본다(눈금 버튼에서는 버튼의 원래 동작)
+    if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget.querySelector('.lf-shot')) {
+      e.preventDefault();
+      setZoom(true);
+      return;
+    }
     const move = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
     if (!move) return;
     e.preventDefault();
     pick(at + move);
+  };
+
+  /* 크게 보기: 브라우저의 모달(<dialog>)로 띄워 Esc·초점 가두기·닫은 뒤 초점 되돌리기를 그대로 쓴다.
+     닫으면 조작한 것으로 보고 쉬는 시간을 처음부터 센다 */
+  useEffect(() => {
+    const d = big.current;
+    if (!d) return;
+    if (zoom && !d.open) d.showModal();
+    if (!zoom && d.open) d.close();
+  }, [zoom]);
+  const closeZoom = (): void => {
+    setZoom(false);
+    rest();
+  };
+  const onZoomKey = (e: KeyboardEvent<HTMLDialogElement>): void => {
+    const move = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+    if (!move) return;
+    e.preventDefault();
+    setAt((n) => (n + move + count) % count);
   };
 
   const onDown = (e: PointerEvent<HTMLDivElement>): void => {
@@ -80,6 +115,7 @@ export function LoginFlow() {
   const onUp = (): void => {
     if (drag === null) return;
     if (Math.abs(drag) >= DRAG_MIN) pick(at + (drag < 0 ? 1 : -1));
+    else if (Math.abs(drag) <= TAP_MAX) setZoom(true);
     setDrag(null);
   };
 
@@ -102,11 +138,11 @@ export function LoginFlow() {
         </h2>
       </div>
       <div className="lf" role="group" aria-roledescription="carousel" aria-label="서비스 화면 미리 보기" onKeyDown={onKey}>
-        <button type="button" className="lf-arrow" aria-label="이전 화면" onClick={() => pick(at - 1)}>
-          <Icon name="left" />
-        </button>
         <div
           className={`lf-shot${drag !== null ? ' is-drag' : ''}`}
+          tabIndex={0}
+          role="button"
+          aria-label={`${at + 1} / ${count} · ${LOGIN_SLIDES[at].name}. 누르면 크게 봐요. 좌우 화살표 키로 넘겨요`}
           onPointerDown={onDown}
           onPointerMove={onMove}
           onPointerUp={onUp}
@@ -118,16 +154,13 @@ export function LoginFlow() {
               return (
                 <div key={s.id} aria-hidden={n !== at}>
                   {near(n) && src && !failed.includes(src) ? (
-                    <img src={src} alt={`${s.name} 화면`} width={1280} height={960} draggable={false} onLoad={() => setWarm(true)} onError={() => setFailed((f) => [...f, src])} />
+                    <img src={src} alt={`${s.name} 화면`} width={1600} height={1200} draggable={false} onLoad={() => setWarm(true)} onError={() => setFailed((f) => [...f, src])} />
                   ) : null}
                 </div>
               );
             })}
           </div>
         </div>
-        <button type="button" className="lf-arrow" aria-label="다음 화면" onClick={() => pick(at + 1)}>
-          <Icon name="right" />
-        </button>
         <ol className="lf-rule" style={{ '--lf-n': count, '--lf-i': at } as CSSProperties}>
           {LOGIN_SLIDES.map((s, n) => (
             <li key={s.id}>
@@ -140,6 +173,26 @@ export function LoginFlow() {
           {LOGIN_SLIDES[at].text}
         </p>
       </div>
+      <dialog
+        className="lf-big"
+        ref={big}
+        aria-label={`${LOGIN_SLIDES[at].name} 화면 크게 보기`}
+        onClose={closeZoom}
+        onKeyDown={onZoomKey}
+        onClick={(e) => {
+          // 그림 바깥(어두운 바탕)을 누르면 닫는다
+          if (e.target === e.currentTarget) e.currentTarget.close();
+        }}
+      >
+        {zoom ? (
+          <>
+            <button type="button" className="lf-big-x" aria-label="크게 보기 닫기" onClick={() => big.current?.close()}>
+              <Icon name="x" />
+            </button>
+            <img src={slideSrc(skin, LOGIN_SLIDES[at].id)} alt={`${LOGIN_SLIDES[at].name} 화면`} width={1600} height={1200} />
+          </>
+        ) : null}
+      </dialog>
     </aside>
   );
 }
