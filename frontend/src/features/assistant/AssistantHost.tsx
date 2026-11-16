@@ -15,7 +15,6 @@ import { toast } from '@/shared/state/ui';
 import { Icon } from '@/shared/ui/Icon';
 import { OpsBox } from '@/shared/ui/parts';
 import { ask, clearLog, closeAssistant, openAssistant, pick, retry, setInput, stop, useAssistant, type Msg } from './assistantStore';
-import { answerStatus } from './answerStatus';
 import { Wait } from '@/shared/ui/Wait';
 
 const SUGS = ['교육비 지원을 받을 수 있나요?', '통근버스 시간표는 어디서 봐요?', '승진 기준이 궁금해요', '근무성적평정은 언제 하나요?', '수자원공사는 어떤 일을 하나요?', '회의실 예약은 어디서 하나요?'];
@@ -70,7 +69,6 @@ export function RegCard({ a, mlLabel: _mlLabel, demo }: { a: AssistantAnswer; ml
   const go = useGo();
   useCatalog((s) => s.articles);
   const { summary } = a;
-  const [statusLabel, statusStyle] = answerStatus(a);
   if (demo && a.kind !== 'out')
     return (
       <div className="ans">
@@ -84,20 +82,12 @@ export function RegCard({ a, mlLabel: _mlLabel, demo }: { a: AssistantAnswer; ml
   if (a.evidenceStatus === 'refused' || a.level === 'refused')
     return (
       <div className="ans">
-        <div className="who">
-          <Icon name="chat" />
-          사내 생활 도우미 <span className={`tag ${statusStyle}`}>{statusLabel}</span>
-        </div>
         <p className="sum">{summary}</p>
       </div>
     );
   if (a.kind === 'out')
     return (
       <div className="ans">
-        <div className="who">
-          <Icon name="chat" />
-          사내 생활 도우미 <span className={`tag ${statusStyle}`}>{statusLabel}</span>
-        </div>
         <p className="sum">업무·사내 생활과 관련 없는 질문이라 답하지 않아요.</p>
         <p className="small muted">규정, 수자원공사 정보, 사내 생활(사내 홈페이지 안내)에 대해 물어봐 주세요.</p>
       </div>
@@ -105,10 +95,6 @@ export function RegCard({ a, mlLabel: _mlLabel, demo }: { a: AssistantAnswer; ml
   if (a.kind === 'clarify')
     return (
       <div className="ans">
-        <div className="who">
-          <Icon name="chat" />
-          사내 생활 도우미 <span className={`tag ${statusStyle}`}>{statusLabel}</span>
-        </div>
         <p className="sum">{a.question}</p>
         {a.options && a.options.length ? (
           <div className="clar">
