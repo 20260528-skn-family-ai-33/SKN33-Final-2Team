@@ -22,7 +22,9 @@
 
 베타 기본값은 ‘직원별 선택’이다. 관리자 고정을 해제하면 기존 직원별 설정이 다시 적용된다. 베타 종료 시 관리자가 사용할 제공자를 먼저 저장한 뒤 `GP5_EMPLOYEE_AI_SELECTION=off`로 백엔드를 재생성한다. 고정한 제공자가 없으면 관리자 화면에 Ollama 자동 적용 안내가 뜬다. 사용할 모델을 저장하면 안내가 사라진다. 저장 파일 형식이 손상되면 새 모델 호출을 차단한다. 관리자가 같은 화면에서 모델을 다시 선택하고 저장하면 복구된다.
 
-직원별 선택 모드에서 모델을 저장하지 않은 직원은 OpenAI API로 시작한다. 기존 DB에는 배포 전에 [기본값 마이그레이션](db/migrate_employee_provider_default.sql)을 한 번 적용한다. 기존 행의 값은 보존한다. 이전 DB 기본값으로 저장된 Ollama와 직접 선택한 Ollama는 구별할 수 없다. DB 기본값 복구는 `ALTER TABLE app_ext.user_settings ALTER COLUMN ai_provider SET DEFAULT 'ollama';`이다.
+직원별 선택 모드는 이번 배포부터 기존 직원과 신규 직원 모두 OpenAI API로 시작한다. 배포 전에 기존 DB에 [직원 모델 초기화 SQL](db/migrate_reset_employee_providers.sql)을 실행한다. 이전 기본값 변경 SQL만 적용한 DB에도 이 파일을 실행한다. 첫 실행에서 자동 저장됐거나 직접 선택한 `ollama` 값을 모두 `openai`로 바꾼다. 이후 직원이 다시 선택한 RunPod는 같은 SQL을 재실행해도 유지된다. 새 DB는 초기 스키마에서 이관을 완료한 상태로 시작한다.
+
+복구 시 새 행의 기본값은 `ALTER TABLE app_ext.user_settings ALTER COLUMN ai_provider SET DEFAULT 'ollama';`로 되돌릴 수 있다. 기존 직원별 선택까지 복구하려면 배포 전 백업의 `employee_id`와 `ai_provider`를 기준으로 복원한다.
 
 고정 모델 테스트를 맡은 직원의 `employee_id`를 배포 환경의 `GP5_CONSOLE_PROVIDER_EMPLOYEE_IDS`에 쉼표로 지정하고 백엔드를 재시작한다. 빈 목록이 기본이며 `GP5_CONSOLE_OVERRIDES=off`이면 목록도 비활성화된다. 허용된 직원은 모델이 고정된 동안 Ctrl+Alt+K에서 `model_select on`을 실행한 뒤 상단 AI 모델 선택 박스에서 모델을 고른다. 켜기만 하면 관리자 지정 모델을 계속 사용한다. 선택은 현재 브라우저 세션에 적용되고 `model_select off`로 관리자 지정 모델로 복귀한다. 모델 호출에는 서버에 설정한 해당 제공자의 키와 모델이 쓰인다. RunPod 개인 연결을 별도로 설정한 브라우저는 기존 시연 연결 규칙을 따른다.
 

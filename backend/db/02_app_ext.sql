@@ -79,6 +79,14 @@ CREATE TABLE IF NOT EXISTS app_ext.employee_transfers (
 );
 
 -- ── 사용자 설정 ──
+CREATE TABLE IF NOT EXISTS app_ext.data_migrations (
+  name text PRIMARY KEY
+);
+-- 새 DB에서는 첫날부터 OpenAI가 기본이다. 이후 직원이 고른 RunPod는 배포 이관 대상이 아니다.
+INSERT INTO app_ext.data_migrations (name)
+SELECT '296_reset_employee_providers' WHERE to_regclass('app_ext.user_settings') IS NULL
+ON CONFLICT (name) DO NOTHING;
+
 -- AI 모델 모드(API-11)와 시연 도구(가데이터로 보기·생성 실패 시연). 에이전트가 서버에서 돌기 때문에 서버에 둔다
 CREATE TABLE IF NOT EXISTS app_ext.user_settings (
   employee_id integer PRIMARY KEY REFERENCES public.employees(employee_id) ON DELETE CASCADE,
