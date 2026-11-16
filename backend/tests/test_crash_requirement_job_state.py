@@ -18,7 +18,7 @@ class CrashRequirementJobStateTests(unittest.TestCase):
         self.enterContext(patch.object(drafts.jobs, 'start', side_effect=self.start))
         self.enterContext(patch.object(drafts.rt, 'context', return_value=Mock(fail_sim={})))
 
-    def start(self, kind, employee, ref, work, *, before_start=None):
+    def start(self, kind, employee, ref, work, *, before_start=None, transaction=None):
         if before_start:
             before_start(self.job.job_id)
         self.work = work
@@ -67,7 +67,9 @@ class CrashRequirementJobStateTests(unittest.TestCase):
                 original = {'goal': 'API 구현', 'details': {'etc': 'Django 필수', 'goalType': 'api'},
                             'userNotes': ['Django 필수']}
                 base = {'handoff': deepcopy(original), 'opt': 'A2', 'start': 1, 'acts': [], 'prefs': {'etc': 'Django 필수'}}
-                row = {'roadmap_id': 'rid', 'status': 'IN_PROGRESS', 'content': base}
+                row = {'roadmap_id': 'rid', 'project_id': 'pid', 'status': 'IN_PROGRESS', 'content': base}
+                # 확정 전 다시 읽는 프로젝트 상태, 실행 중인 수정 작업 없음, 새 수정안 id (#284)
+                self.tx.val.side_effect = ['IN_PROGRESS', None, 'rev']
                 actual = {}
                 def revise(ctx, inp, **kwargs):
                     actual.update(inp)
