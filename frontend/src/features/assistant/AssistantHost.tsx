@@ -54,13 +54,10 @@ function regulationSummary(summary: string, arts: Article[]): string {
 
 function EvidenceDetails({ children }: { children: ReactNode }) {
   return (
-    <>
-      <p className="small muted">자세한 근거는 아래 ‘근거 보기’에서 확인해 주세요.</p>
-      <details>
-        <summary><Icon name="right" />근거 보기</summary>
-        <div className="basis">{children}</div>
-      </details>
-    </>
+    <details>
+      <summary><Icon name="right" />근거 보기</summary>
+      <div className="basis">{children}</div>
+    </details>
   );
 }
 /** 받침에 맞는 조사 (은/는) */
@@ -69,17 +66,7 @@ const eun = (w: string) => {
   return c >= 0xac00 && c <= 0xd7a3 ? ((c - 0xac00) % 28 ? '은' : '는') : '은(는)';
 };
 
-function AnswerLabels({ mlLabel, label, style }: { mlLabel?: string; label: string; style: string }) {
-  if (!mlLabel) return <span className={`tag ${style}`}>{label}</span>;
-  return (
-    <span className="answer-tags">
-      <span className="tag line" title="ML 질문 분류">{mlLabel}</span>
-      <span className={`tag ${style}`} title="LLM 근거 상태">{label}</span>
-    </span>
-  );
-}
-
-export function RegCard({ a, mlLabel, demo }: { a: AssistantAnswer; mlLabel?: string; demo?: boolean }) {
+export function RegCard({ a, mlLabel: _mlLabel, demo }: { a: AssistantAnswer; mlLabel?: string; demo?: boolean }) {
   const go = useGo();
   useCatalog((s) => s.articles);
   const { summary } = a;
@@ -139,11 +126,6 @@ export function RegCard({ a, mlLabel, demo }: { a: AssistantAnswer; mlLabel?: st
     const refs = (a.ref || []).map(article).filter(Boolean) as Article[];
     return (
       <div className="ans">
-        <div className="who">
-          <Icon name="scale" />
-          규정 에이전트 <AnswerLabels mlLabel={mlLabel} label={statusLabel} style={statusStyle} />
-        </div>
-        <h4>답변 요약</h4>
         <p className="sum">{summary}</p>
         {refs.length ? (
           <details>
@@ -169,10 +151,6 @@ export function RegCard({ a, mlLabel, demo }: { a: AssistantAnswer; mlLabel?: st
   if (a.kind === 'regulation' && a.level === 'none')
     return (
       <div className="ans">
-        <div className="who">
-          <Icon name="scale" />
-          규정 에이전트 <AnswerLabels mlLabel={mlLabel} label={statusLabel} style={statusStyle} />
-        </div>
         <p className="sum">{summary || `등록된 ${setLabel()}에 이 내용이 명시돼 있지 않아 답하지 않아요.`}</p>
         <p>인사 제도에 관한 내용은 인사 담당 부서(인재경영실)에 문의해 주세요.</p>
         <p className="src">등록된 규정 원문에 있는 내용에만 답해요. 짐작이나 다른 기관 사례로 답하지 않아요.</p>
@@ -183,13 +161,8 @@ export function RegCard({ a, mlLabel, demo }: { a: AssistantAnswer; mlLabel?: st
     const items = (a.intranet || []).map((id) => D.intranet.find((x) => x.id === id)).filter(Boolean) as typeof D.intranet;
     return (
       <div className="ans">
-        <div className="who">
-          <Icon name="chat" />
-          사내 생활 도우미 <AnswerLabels mlLabel={mlLabel} label={statusLabel} style={statusStyle} />
-        </div>
         {items.length ? (
           <>
-            <h4>답변 요약</h4>
             <p className="sum">
               {items[0].title}
               {eun(items[0].title)} 사내 홈페이지(가상) › {items[0].menu}에서 확인할 수 있어요.
@@ -223,11 +196,6 @@ export function RegCard({ a, mlLabel, demo }: { a: AssistantAnswer; mlLabel?: st
     const answerSummary = sources.length ? withoutSourceFooter(summary) : summary;
     return (
       <div className="ans">
-        <div className="who">
-          <Icon name="chat" />
-          사내 생활 도우미 <AnswerLabels mlLabel={mlLabel} label={statusLabel} style={statusStyle} />
-        </div>
-        <h4>답변 요약</h4>
         <p className="sum">{answerSummary}</p>
         {links.length ? (
           <p className="go">
@@ -267,11 +235,6 @@ export function RegCard({ a, mlLabel, demo }: { a: AssistantAnswer; mlLabel?: st
   const base = arts.find((x) => x.no === '제3조' && regOf(x.reg)?.name === '실무직 관리규정') || null;
   return (
     <div className="ans">
-      <div className="who">
-        <Icon name="scale" />
-        규정 에이전트 <AnswerLabels mlLabel={mlLabel} label={statusLabel} style={statusStyle} />
-      </div>
-      <h4>답변 요약</h4>
       <p className="sum">{regulationSummary(summary, arts)}</p>
       {arts.length ? (
         <EvidenceDetails>
@@ -379,15 +342,35 @@ export function AssistantHost() {
   const st = useAssistant();
   const logRef = useRef<HTMLDivElement>(null);
   const inRef = useRef<HTMLInputElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
+  const fabRef = useRef<HTMLButtonElement>(null);
+
   /* 말풍선이 늘거나 안내 줄이 생기면 마지막 말풍선이 가려지지 않게 아래로 맞춘다 */
   useEffect(() => {
     const b = logRef.current;
     if (b) b.scrollTop = b.scrollHeight;
   }, [st.log, st.hint, st.open]);
+
+  /* 패널 바깥을 클릭하면 챗봇 창을 닫는다(#228) */
+  useEffect(() => {
+    if (!st.open) return;
+    const handleOutsideClick = (e: PointerEvent) => {
+      const panel = panelRef.current;
+      const fab = fabRef.current;
+      if (!panel) return;
+      if (e.target instanceof Node && !panel.contains(e.target) && !fab?.contains(e.target)) {
+        closeAssistant();
+      }
+    };
+    document.addEventListener('pointerdown', handleOutsideClick);
+    return () => document.removeEventListener('pointerdown', handleOutsideClick);
+  }, [st.open]);
+
   const turns = st.log.filter((m) => !m.me && m.a).length;
   return (
     <>
       <button
+        ref={fabRef}
         className={`fab${st.fresh ? ' new' : ''}`}
         id="regFab"
         aria-label="사내 생활 도우미 열기"
@@ -400,7 +383,7 @@ export function AssistantHost() {
       >
         <Icon name="chat" />
       </button>
-      <section className="regp" id="regPanel" hidden={!st.open} aria-label="사내 생활 도우미">
+      <section ref={panelRef} className="regp" id="regPanel" hidden={!st.open} aria-label="사내 생활 도우미">
         <div className="sheet-h">
           <span className="avatar">
             <Icon name="chat" />
@@ -447,10 +430,7 @@ export function AssistantHost() {
         </div>
         <div className="chat-b" id="regLog" aria-live="polite" ref={logRef}>
           <div className="msg bot">
-            <div className="plain">
-              규정·수자원공사 정보·사내 생활에 대해 물어보세요. 등록된 DB 자료에서 근거를 찾아 답해요.
-              범위 밖 질문에는 답하지 않아요. 앞 이야기에 이어서 물어봐도 돼요.
-            </div>
+            <div className="plain">규정이나 회사 생활에 대해 편하게 물어보세요.</div>
           </div>
           {st.log.map((m, i) => (
             <Bubble key={i} m={m} i={i} />

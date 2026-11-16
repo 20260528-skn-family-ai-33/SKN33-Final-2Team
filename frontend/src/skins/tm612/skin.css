@@ -115,7 +115,7 @@
   .list, .stage, .opt, .tblwrap, .roadmap-preview, .check-plan-group, .connbox, .cm-item, .gsug, .docbox, .cause,
   .sheet, .regp, .login-card, .login-side, .loading, .stats, .agent, .diff .d, .alert, .callout, .ck-list, .rec-res, .pstrip div,
   .api-picker-panel, .cp-pop, .feat, .ls-card, .card { border-radius: 0; }
-  .btn, .btn.sm, .back, .fab, .toast { border-radius: 0; }
+  .btn, .btn.sm, .back, .toast { border-radius: 0; }
   .input, .textarea, .cp-btn { border-radius: 0; }
   .tag, .ls-no, .ribbon .mode, .api-picker-button, .login-side .pill { border-radius: 0; }
   .v2-survey section, .v2-survey fieldset { border-radius: 0; }
