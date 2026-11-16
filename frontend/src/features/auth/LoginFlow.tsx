@@ -83,8 +83,10 @@ export function LoginFlow() {
     setDrag(null);
   };
 
-  /* 지금 장과 양옆 장만 받아 둔다(넘길 때 빈 틀이 보이지 않게). 나머지는 그 장에 가까워질 때 받는다 */
-  const near = (n: number): boolean => [0, 1, count - 1].includes((n - at + count) % count);
+  /* 처음에는 지금 장과 양옆 장만 받고, 첫 그림이 뜬 뒤에 나머지를 받는다(로그인 화면이 뜨는 것을 늦추지 않게).
+     나머지도 받아 두어야 끝에서 처음으로 돌아가거나 눈금으로 여러 장을 건너뛸 때 지나가는 장이 빈 틀로 보이지 않는다 */
+  const [warm, setWarm] = useState(false);
+  const near = (n: number): boolean => warm || [0, 1, count - 1].includes((n - at + count) % count);
 
   return (
     <aside className="login-side">
@@ -116,7 +118,7 @@ export function LoginFlow() {
               return (
                 <div key={s.id} aria-hidden={n !== at}>
                   {near(n) && src && !failed.includes(src) ? (
-                    <img src={src} alt={`${s.name} 화면`} width={1280} height={960} draggable={false} onError={() => setFailed((f) => [...f, src])} />
+                    <img src={src} alt={`${s.name} 화면`} width={1280} height={960} draggable={false} onLoad={() => setWarm(true)} onError={() => setFailed((f) => [...f, src])} />
                   ) : null}
                 </div>
               );
