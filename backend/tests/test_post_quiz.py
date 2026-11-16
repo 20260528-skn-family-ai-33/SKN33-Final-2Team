@@ -100,3 +100,97 @@ class PostQuizTests(unittest.TestCase):
                 self.assertEqual(plans.save_post(1, 'r1', {'answers': {}, 'quizAnswers': {'q': '0'}, 'goalSelf': '1'}), {'post': True})
                 self.assertEqual(plans.save_post(1, 'r1', {'answers': {}, 'goalSelf': '1'}), {'post': True})
 
+    def test_save_post_and_report_start_reject_invalid_scores_and_goal_self(self):
+        from unittest.mock import MagicMock, patch
+        from app.services import plans
+        plan = {'assess': {'questions': [{'id': 'q1'}]}}
+        row = {'roadmap_id': 'r1', 'status': 'IN_PROGRESS', 'project_id': 1, 'diagnostic_round_id': 1, 'content': plan}
+        with patch.object(plans, '_owned', return_value=row):
+            for bad_answers in ('not-dict', {'q1': 'abc'}, {'q1': '0'}, {'q1': '6'}, {'q1': 99}, {'q1': True}):
+                with self.subTest(bad_answers=bad_answers), self.assertRaises(ApiError) as err:
+                    plans.save_post(1, 'r1', {'answers': bad_answers, 'goalSelf': '1'})
+                self.assertEqual(err.exception.status, 422)
+                self.assertEqual(err.exception.code, 'POST_ANSWERS_INVALID')
+            for bad_goal in ('0', '99', 'abc', True, 1.5):
+                with self.subTest(bad_goal=bad_goal), self.assertRaises(ApiError) as err:
+                    plans.save_post(1, 'r1', {'answers': {'q1': '3'}, 'goalSelf': bad_goal})
+                self.assertEqual(err.exception.status, 422)
+                self.assertEqual(err.exception.code, 'POST_GOAL_SELF_INVALID')
+            for bad_goal in ('0', '99', 'abc', True):
+                with patch.object(plans, 'record', return_value={'plan': plan, 'post': {'answers': {'q1': '3'}, 'goalSelf': bad_goal}}):
+                    with self.subTest(report_goal=bad_goal), self.assertRaises(ApiError) as err:
+                        plans.report_start(1, 'r1')
+                    self.assertEqual(err.exception.status, 422)
+                    self.assertEqual(err.exception.code, 'POST_GOAL_SELF_INVALID')
+            with patch.object(plans, 'record', return_value={'plan': plan, 'post': {'answers': {'q1': '9'}, 'goalSelf': '1'}}):
+                with self.assertRaises(ApiError) as err:
+                    plans.report_start(1, 'r1')
+                self.assertEqual(err.exception.status, 422)
+                self.assertEqual(err.exception.code, 'POST_ANSWERS_INVALID')
+
+    def test_save_progress_and_save_post_validate_attachment_metadata(self):
+        from contextlib import nullcontext
+        from unittest.mock import MagicMock, patch
+        from app.services import plans
+        bad_files = [
+            'bad',
+            {'name': 'a.pdf'},
+            {'fileId': 'short', 'name': 'a.pdf', 'size': 10},
+            {'fileId': 'a' * 32, 'name': ' ', 'size': 10},
+            {'fileId': 'a' * 32, 'name': 'a\npdf', 'size': 10},
+            {'fileId': 'a' * 32, 'name': 'a.pdf', 'size': -1},
+            {'fileId': 'a' * 32, 'name': 'a.pdf', 'size': 15_000_001},
+            {'fileId': 'a' * 32, 'name': 'a.pdf', 'size': True},
+            {'fileId': 'a' * 32, 'name': 'a.pdf', 'size': 10, 'extra': 1},
+        ]
+        for bad in bad_files:
+            with self.subTest(progress_bad=bad), self.assertRaises(ApiError) as err:
+                plans.save_progress(1, 'r1', 'act1', {'status': 'doing', 'file': bad})
+            self.assertEqual(err.exception.status, 422)
+            self.assertEqual(err.exception.code, 'ATTACHMENT_INVALID')
+            with self.subTest(post_bad=bad), self.assertRaises(ApiError) as err:
+                plans.save_post(1, 'r1', {'answers': {}, 'goalSelf': '1', 'file': bad})
+            self.assertEqual(err.exception.status, 422)
+            self.assertEqual(err.exception.code, 'ATTACHMENT_INVALID')
+
+        valid_file = {'fileId': 'a' * 32, 'name': ' result.pdf ', 'size': 1024}
+        progress_row = {'roadmap_id': 'r1', 'project_id': 1, 'status': 'IN_PROGRESS', 'content': {'acts': [{'id': 'act1', 'res': None}]}}
+        for file_payload, expected_f in ((valid_file, {'fileId': 'a' * 32, 'name': 'result.pdf', 'size': 1024}), (None, None)):
+            tx = MagicMock()
+            tx.one.side_effect = [{'content': progress_row['content']}, {'memo': '', 'attachment': None}]
+            tx.val.return_value = 'IN_PROGRESS'
+            with patch.object(plans, '_owned', return_value=progress_row), patch.object(plans, 'record', return_value={'ok': True}), patch.object(plans.db, 'tx', return_value=nullcontext(tx)), patch.object(plans.db, 'J', side_effect=lambda x: x):
+                self.assertEqual(plans.save_progress(1, 'r1', 'act1', {'status': 'done', 'file': file_payload}), {'ok': True})
+            insert = next(c.kwargs for c in tx.run.call_args_list if 'INSERT INTO app_ext.activity_progress' in c.args[0])
+            self.assertEqual(insert['f'], expected_f)
+
+        post_row = {'roadmap_id': 'r1', 'status': 'IN_PROGRESS', 'project_id': 1, 'diagnostic_round_id': 1, 'content': {'assess': {'questions': []}}}
+        for file_payload, expected_a in ((valid_file, {'fileId': 'a' * 32, 'name': 'result.pdf', 'size': 1024}), (None, None)):
+            tx = MagicMock()
+            tx.all.return_value = []
+            with patch.object(plans, '_owned', return_value=post_row), patch.object(plans, 'record', return_value={'post': True}), patch.object(plans.db, 'one', return_value={'running': False, 'deep': {}}), patch.object(plans.db, 'J', side_effect=lambda x: x), patch.object(plans.db, 'tx', return_value=nullcontext(tx)):
+                self.assertEqual(plans.save_post(1, 'r1', {'answers': {}, 'goalSelf': '2', 'file': file_payload}), {'post': True})
+            insert = next(c.kwargs for c in tx.run.call_args_list if 'INSERT INTO app_ext.post_checks' in c.args[0])
+            self.assertEqual(insert['a'], expected_a)
+            self.assertEqual(insert['g'], 2)
+
+    def test_workspace_prepares_post_quiz_only_once_for_eligible_active_plan(self):
+        from unittest.mock import patch
+        from app.services import plans, post_quiz
+        eligible_plan = {'version': 1, 'assess': {'v2': {'survey': {'groups': [{'skill': 'S', 'quizzes': [{'id': 'q'}]}]}}}}
+        legacy_plan = {'version': 1, 'assess': {'questions': []}}
+        plans._WORKSPACE_QUIZ_PREPARED.clear()
+        try:
+            records = {
+                'eligible': {'id': 'eligible', 'status': 'active', 'plan': eligible_plan, 'versions': [eligible_plan], 'post': {'quizSurvey': None, 'submitted': False, 'running': False}},
+                'submitted': {'id': 'submitted', 'status': 'active', 'plan': eligible_plan, 'versions': [eligible_plan], 'post': {'quizSurvey': None, 'submitted': True, 'running': False}},
+                'legacy': {'id': 'legacy', 'status': 'active', 'plan': legacy_plan, 'versions': [legacy_plan], 'post': {'quizSurvey': None, 'submitted': False, 'running': False}},
+            }
+            with patch.object(plans, 'records', return_value=records), patch.object(plans, 'reports', return_value=[]), patch.object(plans, 'resources_of', return_value={}), patch.object(post_quiz, 'prepare', return_value='job-1') as prep:
+                plans.workspace(1)
+                plans.workspace(1)
+                prep.assert_called_once_with(1, 'eligible', eligible_plan)
+        finally:
+            plans._WORKSPACE_QUIZ_PREPARED.clear()
+
+
