@@ -24,9 +24,7 @@ describe('사내 생활 DB 근거 카드', () => {
         summary: '개인학습도 학습시간에 포함돼요 (「인재개발규정」 제7조 제2항). 세부 기준(승인 절차 포함)은 따로 확인해 주세요.\n\n출처: 인재개발규정 제7조 제2항' });
       const html = renderToStaticMarkup(createElement(MemoryRouter, null, createElement(RegCard, { a })));
       const [summary, details] = html.split('<details>');
-      expect(summary).toContain('>근거 확인</span>');
       expect(summary).toContain('개인학습도 학습시간에 포함돼요. 세부 기준(승인 절차 포함)은 따로 확인해 주세요.');
-      expect(summary).toContain('아래 ‘근거 보기’에서 확인해 주세요.');
       expect(summary).not.toContain('인재개발규정');
       expect(details).toContain('제7조 제2항');
       expect(details).toContain('세부적인 인정기준 및 절차는 따로 정한다.');
@@ -55,7 +53,6 @@ describe('사내 생활 DB 근거 카드', () => {
     for (const text of ['식당 위치는 생활 안내', '근거 보기', '교육원 생활 안내', '가상 안내 자료',
       '시연용 가상 자료', '식당 위치를 확인하는 메뉴 안내']) expect(html).toContain(text);
     expect(html).not.toContain('맞는 메뉴를 찾지 못했어요');
-    expect(html).toContain('title="LLM 근거 상태">근거 확인</span>');
   });
 
   it('DB 근거가 없으면 빈 메뉴 대신 자료 부족을 알린다', () => {
@@ -65,11 +62,11 @@ describe('사내 생활 DB 근거 카드', () => {
     expect(html).not.toContain('<summary>');
   });
 
-  it('답변 카드에 ML 분류와 LLM 근거 상태를 나란히 표시한다', () => {
+  it('답변 카드에 ML 분류와 LLM 근거 상태를 노출하지 않는다', () => {
     const a = makeAnswer({ evidenceStatus: 'partial', knowledgeSources: [] });
     const html = renderToStaticMarkup(createElement(MemoryRouter, null, createElement(RegCard, { a, mlLabel: '사내 생활안내' })));
-    expect(html).toContain('title="ML 질문 분류">사내 생활안내</span>');
-    expect(html).toContain('title="LLM 근거 상태">근거 확인 불가</span>');
+    expect(html).not.toContain('title="ML 질문 분류"');
+    expect(html).not.toContain('title="LLM 근거 상태"');
   });
 
   it('회사 정보도 근거 보기에서 DB 원문과 위치를 표시한다', () => {
