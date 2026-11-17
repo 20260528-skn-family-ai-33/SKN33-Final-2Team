@@ -34,10 +34,13 @@ profile.education·department·parentDepartment·grade·position·jobFamily·job
 
 [선택지·정답]
 중복 없는 선택지 5개·정답 1개, answer는 0~4 정수, explain은 정답 근거.
-선택지의 동일 문장 형태·유사 길이 유지, 최장 선택지 길이는 최단의 1.5배 이하. 정답만 가장 길거나 자세한 구성 금지.
+1~5번 모든 선택지는 중간에 잘리지 않은 완결된 문장·구절과 동일한 어미 형태로 작성한다. 길이를 맞추려고 정답이나 보기의 뒷부분·어미·괄호를 자르거나 말줄임표(..., …)로 생략하는 것을 절대 금지한다. 정답만 유독 길거나 자세하게 쓰지 않고 오답도 구체적으로 작성해 비슷한 분량을 유지한다.
 오답은 실제 오해 또는 다른 상황에서 타당한 방법으로 구성, 터무니없는 오답 금지.
 무조건·반드시·절대·항상·오직·전혀·결코 등 극단 표현 및 '모두 맞다/틀리다' 사용 금지. 정답에만 질문 낱말 반복 금지.
 답 위치 편향 감소를 위한 서버의 선택지 섞기 처리.
+
+[용어 표기 원칙]
+설명과 문장은 자연스러운 한국어로 작성하되, skills.name의 영문 스킬명과 고유명사(Python, SQL, FastAPI, Docker, RAG, API, JSON, DataFrame, LLM 등)뿐 아니라 실무·기술 문서에서 영문 그대로 널리 쓰이는 범용 기술·개념 단어(예: rerank, embedding, chunking, token, prompt, fine-tuning, pipeline, indexing, schema, payload, endpoint, async, batch, vector, context, fallback, cache 등)는 굳이 '재랭크·재순위화'처럼 억지로 한글로 번역하거나 음차·혼용하지 말고 공식 영문 표기 그대로 통일해 사용한다.
 
 [출력 계약]
 JSON: {"groups":[{"skill":"입력 스킬 이름","title":"업무 데이터를 다뤄볼까요",
@@ -65,6 +68,24 @@ def _text(value: Any, label: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise SurveyError(f'{label}이 비어 있거나 형식이 올바르지 않습니다.')
     return value.strip()
+
+
+def is_truncated_option(text: str) -> bool:
+    stripped = text.strip()
+    if stripped.endswith(('...', '…', '..', ',', ':', ';', '(', '[', '{', '（')):
+        return True
+    return (
+        stripped.count('(') > stripped.count(')')
+        or stripped.count('[') > stripped.count(']')
+        or stripped.count('（') > stripped.count('）')
+        or stripped.count('{') > stripped.count('}')
+    )
+
+
+def _validate_complete_option(text: str) -> str:
+    if is_truncated_option(text):
+        raise SurveyError('선택지 문장이 잘려 있습니다.')
+    return text
 
 
 def generate_survey(project: dict[str, Any], selection: dict[str, Any], profile: dict[str, Any],
@@ -137,7 +158,7 @@ def generate_survey(project: dict[str, Any], selection: dict[str, Any], profile:
                 options = row.get('options')
                 if not isinstance(options, list) or len(options) != 5:
                     raise SurveyError('퀴즈 선택지는 5개여야 합니다.')
-                options = [_text(option, '선택지') for option in options]
+                options = [_validate_complete_option(_text(option, '선택지')) for option in options]
                 if len({''.join(option.split()).casefold() for option in options}) != 5:
                     raise SurveyError('퀴즈 선택지가 중복되었습니다.')
                 answer = row.get('answer')

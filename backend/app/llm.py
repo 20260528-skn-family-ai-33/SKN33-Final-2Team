@@ -172,7 +172,7 @@ def chat(provider: str, messages: list, role: str = 'default', json_mode: bool =
             payload['format'] = response_schema if response_schema is not None else 'json'
         if S.ollama_num_ctx:
             payload['options'] = {'num_ctx': S.ollama_num_ctx}
-        if role in ('roadmap', 'resources'):
+        if role in ('roadmap', 'resources', 'quiz', 'assessment'):
             from .catalog_budget import OUTPUT_RESERVE, DEFAULT_CONTEXT
             payload.setdefault('options', {})['num_predict'] = OUTPUT_RESERVE
             payload['options'].setdefault('num_ctx', DEFAULT_CONTEXT)

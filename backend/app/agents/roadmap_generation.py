@@ -35,6 +35,7 @@ how는 해요체 2문장: 자료·도구·데이터로 수행할 일 / 남는 �
 직접 과제는 res=null 및 skillTags 정확 이름의 실제 수행 skills 1~3개(중요도 순), 자료 활동은 res=catalog.id이며 skills 생략.
 displayTitle은 목표·계획 기반 한국어 명사형 30자 이내, 요청 표현·원문 밖 내용 제외. tagline 약 40자 한 줄, reason 관점별 편성 이유 1~2문장, pros·cons 각각 1~3개, scope는 결과물·제외 범위 한 줄. 설명 문장은 해요체. 코스별(Free·Crash·Challenge) 고유 특성이 reason과 pros에 명확히 차별화되어야 하며, 다른 코스와 중복되거나 판에 박힌 문장을 생성하지 않는다.
 출력 전 실습별 결과물·완료 기준·skills, gaps 반영, 예산·주당 시간·무료 조건 점검.
+설명과 문장은 자연스러운 한국어로 쓰되, 영문 스킬명·고유명사(Python, SQL, FastAPI, Docker, RAG, API, JSON, DataFrame, LLM 등)뿐 아니라 실무·기술 문서에서 영문 그대로 널리 쓰이는 범용 기술·개념 단어(예: rerank, embedding, chunking, token, prompt, fine-tuning, pipeline, indexing, schema, payload, endpoint, async, batch, vector, context, fallback, cache 등)는 굳이 '재랭크·재순위화'처럼 억지로 한글로 번역하거나 음차·혼용하지 말고 공식 영문 표기 그대로 통일해 사용한다.
 JSON 형식 예: {schema}
 """
 

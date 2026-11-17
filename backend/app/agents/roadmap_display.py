@@ -10,6 +10,7 @@ GUIDANCE = MARKER + '''
 자료 학습 예상 기간은 고유 강좌 ID별 시간을 한 번 합산하고 고유 도서 ID별 1주를 더한 뒤 주당 시간으로 전체 올림한다.
 도서 카탈로그 시간은 참고값이며 계획에는 현재 주당 학습시간만큼 1주를 배정한다. 실제 독서시간이 확인되었다고 말하지 않는다.
 산출물 과제 시간은 자료 학습 예상 기간에서 제외하며 별도로 표시한다. 희망 기간 상한은 새로 적용하지 않는다.
+영문 스킬 태그명과 고유명사(Python, SQL, FastAPI, Docker, RAG, API, JSON, DataFrame, LLM 등)뿐 아니라 실무·기술 문서에서 영문 그대로 널리 쓰이는 범용 기술·개념 단어(예: rerank, embedding, chunking, token, prompt, fine-tuning, pipeline, indexing, schema, payload, endpoint, async, batch, vector, context, fallback, cache 등)는 굳이 '재랭크·재순위화'처럼 억지로 한글로 번역하거나 음차·혼용하지 말고 공식 영문 표기 그대로 통일해 쓴다.
 '''
 
 

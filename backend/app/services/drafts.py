@@ -1007,30 +1007,32 @@ def confirm(employee_id: int, draft_id: str, start_mode: str | None = None) -> d
         g = d['gen']
         _sync(g)
         assessment = w.get('v2Survey')
-        final_handoff = copy.deepcopy(d['handoff'])
+        final_handoff = copy.deepcopy(d.get('handoff') or {})
         if assessment:
             from app.services.activity_selection import context as activity_context, current_record, selection_option
             assessment, _ = activity_context(t, employee_id, draft_id)
             proposal = current_record(assessment, d)
             o = selection_option(assessment, d, (proposal or {}).get('selectedIds') or [])
             if assessment.get('skillSelectionKey'):
-                names=list(assessment['skillOrder'])
+                names=list(assessment.get('skillOrder') or [])
                 final_handoff.update(focus=names,skillNames=names,skillOrder=names,
-                    skillDetails=copy.deepcopy(assessment['selection']['skills']),
-                    skillMaterials=copy.deepcopy(assessment['resourceChoices']),
-                    excludedSkills=[name for name in d['handoff'].get('skillNames',[]) if name not in names])
+                    skillDetails=copy.deepcopy((assessment.get('selection') or {}).get('skills') or []),
+                    skillMaterials=copy.deepcopy(assessment.get('resourceChoices') or {}),
+                    excludedSkills=[name for name in (d.get('handoff') or {}).get('skillNames',[]) if name not in names])
         else:
             o = g['options'][d['chosen']]
-        plan = RM.build_plan(o, RM.params_of(d['handoff'], o), d['goal'])
+        plan = RM.build_plan(o, RM.params_of(d.get('handoff') or {}, o), d['goal'])
         validate_free_plan(t, plan, budget=(d.get('prefs') or {}).get('budget'))
         if assessment:
-            questions = [dict(q, skill=group['skill'], area=group['skill']) for group in assessment['survey']['groups'] for q in group['surveys']]
-            answers = {q['id']: str(assessment['answers'][q['id']]) for q in questions}
-            capture = dict(d, quiz={'questions': questions, 'domain': ' · '.join(final_handoff['focus'])}, answers=answers)
+            survey_groups = (assessment.get('survey') or {}).get('groups') or []
+            raw_answers = assessment.get('answers') or {}
+            questions = [dict(q, skill=group['skill'], area=group['skill']) for group in survey_groups for q in group.get('surveys', [])]
+            answers = {q['id']: str(raw_answers.get(q['id'], 3)) for q in questions if q.get('id')}
+            capture = dict(d, quiz={'questions': questions, 'domain': ' · '.join(final_handoff.get('focus') or [])}, answers=answers)
             _save_questions(t, draft_id, capture)
             _save_answers(t, draft_id, capture)
             assess = {'questions': questions, 'answers': answers, 'domain': capture['quiz']['domain'],
-                'v2': {'survey': copy.deepcopy(assessment['survey']), 'answers': copy.deepcopy(assessment['answers'])}}
+                'v2': {'survey': copy.deepcopy(assessment.get('survey') or {}), 'answers': copy.deepcopy(raw_answers)}}
         else:
             assess = {'questions': d['quiz']['questions'], 'answers': dict(d['answers']), 'domain': d['quiz']['domain']}
         if not assessment and deep_on(d) and (d.get('diag') or {}).get('deep'):

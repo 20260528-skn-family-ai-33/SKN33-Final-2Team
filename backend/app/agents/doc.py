@@ -32,6 +32,7 @@ constraints: 보안·예산·인력 등 명시적 제약·허용 조건·예외.
 [근거·출력]
 제공된 기획서 정보만 사용, 창작·추측·goal에 맞춘 사실 왜곡 금지. 입력에 없는 항목은 "기획서에 없음" 표기. 누락 여부 판단 범위는 제공된 입력.
 출력 전 전체 입력과 대조하여 항목별 사실·수치·조건·예외·포함/제외 범위의 누락 및 중복 통합에 따른 의미 변경 점검.
+한국어로 정리하되 영문 고유명사(Python, SQL, FastAPI, Docker, RAG, API, JSON 등)와 실무·기술 문서에서 영문 그대로 널리 쓰이는 범용 기술·개념 단어(예: rerank, embedding, chunking, token, prompt, fine-tuning, pipeline, indexing, schema, payload, endpoint, async, batch, vector, context, fallback, cache 등)는 굳이 '재랭크·재순위화'처럼 억지로 한글로 번역하거나 음차·혼용하지 말고 공식 영문 표기 그대로 유지한다.
 JSON 형식: {"purpose":"...","data":"...","tech":"...","schedule":"...","constraints":"..."}"""
 DOC_FIELDS = [('purpose', '목적'), ('data', '다룰 데이터'), ('tech', '기술·도구'), ('schedule', '일정'), ('constraints', '제약')]
 

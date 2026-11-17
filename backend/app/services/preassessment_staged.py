@@ -45,14 +45,23 @@ def generate_for(employee_id, project_id):
                 raise ApiError(409,'SURVEY_INPUT_CHANGED','생성 중 입력이 변경됐어요. 다시 준비해 주세요.')
         def generate(phase):
             task='역량 테스트 설문 문항 생성' if phase=='surveys' else '역량 테스트 퀴즈 문항 생성'
-            try:
-                return api.generate_survey(project,selection,personal,api.runtime.model(ctx,'진단 에이전트',task,role='quiz'),require_measurement=True,phase=phase,max_skills=limit)
-            except Exception:
-                if ctx.provider == 'openai' and llm.effective_openai_reasoning('quiz', ctx.reasoning.get('openai')) in ('high', 'xhigh'):
-                    from dataclasses import replace
-                    fallback_ctx = replace(ctx, reasoning={**ctx.reasoning, 'openai': 'medium'})
-                    return api.generate_survey(project,selection,personal,api.runtime.model(fallback_ctx,'진단 에이전트',task,role='quiz'),require_measurement=True,phase=phase,max_skills=limit)
-                raise
+            for attempt in range(2):
+                try:
+                    return api.generate_survey(project,selection,personal,api.runtime.model(ctx,'진단 에이전트',task,role='quiz'),require_measurement=True,phase=phase,max_skills=limit)
+                except (api.SurveyError, llm.LlmError):
+                    if attempt == 0:
+                        continue
+                    if getattr(ctx, 'provider', None) == 'openai' and llm.effective_openai_reasoning('quiz', ctx.reasoning.get('openai')) in ('high', 'xhigh'):
+                        from dataclasses import replace
+                        fallback_ctx = replace(ctx, reasoning={**ctx.reasoning, 'openai': 'medium'})
+                        return api.generate_survey(project,selection,personal,api.runtime.model(fallback_ctx,'진단 에이전트',task,role='quiz'),require_measurement=True,phase=phase,max_skills=limit)
+                    raise
+                except Exception:
+                    if getattr(ctx, 'provider', None) == 'openai' and llm.effective_openai_reasoning('quiz', ctx.reasoning.get('openai')) in ('high', 'xhigh'):
+                        from dataclasses import replace
+                        fallback_ctx = replace(ctx, reasoning={**ctx.reasoning, 'openai': 'medium'})
+                        return api.generate_survey(project,selection,personal,api.runtime.model(fallback_ctx,'진단 에이전트',task,role='quiz'),require_measurement=True,phase=phase,max_skills=limit)
+                    raise
         if not same:
             partial=pooled_surveys(project,selection,personal,limit)
             if partial is None:partial=generate('surveys')

@@ -276,4 +276,11 @@ class PostQuizTests(unittest.TestCase):
         finally:
             plans._WORKSPACE_QUIZ_PREPARED.clear()
 
+    def test_post_quiz_rejects_truncated_option(self):
+        group = {'skill': 'Python', 'quizzes': [{'id': 'q1', 'q': '사전 질문', 'options': ['a', 'b', 'c', 'd', 'e'], 'answer': 0, 'explain': '해설', 'concept': 'c', 'questionType': '적용', 'difficulty': '적용'}]}
+        plan = {'goal': 'Python 자동화', 'assess': {'v2': {'survey': {'groups': [group]}}}}
+        bad = {'quizzes': [{'id': 'q1', 'skill': 'Python', 'q': '사후 질문', 'options': ['완전한 보기...', 'b', 'c', 'd', 'e'], 'answer': 0, 'explain': '해설', 'concept': 'c', 'questionType': '적용', 'difficulty': '적용'}]}
+        with self.assertRaisesRegex(ApiError, '잘려'):
+            generate(plan, Mock(return_value=bad))
+
 

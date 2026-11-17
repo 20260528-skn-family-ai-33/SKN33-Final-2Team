@@ -17,6 +17,7 @@ learnerKnowledge.certifications의 동일 자격 재취득·시험 준비 추천
 hrContext는 업무 맥락·예시·필요한 적용 범위의 참고, 직급·학력에 의한 정답·숙련도 단정 금지.
 
 [출력 계약]
+설명 어구는 자연스러운 한국어로 작성하되, 스킬명과 고유명사(Python, SQL, FastAPI, Docker, RAG, API, JSON, DataFrame, LLM 등)뿐 아니라 실무·기술 문서에서 영문 그대로 널리 쓰이는 범용 기술·개념 단어(예: rerank, embedding, chunking, token, prompt, fine-tuning, pipeline, indexing, schema, payload, endpoint, async, batch, vector, context, fallback, cache 등)는 굳이 '재랭크·재순위화'처럼 억지로 한글로 번역하거나 음차·혼용하지 말고 공식 영문 표기 그대로 통일해 사용한다.
 JSON: {"skillSummaries":{"스킬명":["명사형 요약 1","명사형 요약 2","명사형 요약 3"]}}"""
 
 CHALLENGE="""
@@ -44,6 +45,19 @@ def current(saved,draft):
 
 def generate(saved,draft,model, *, source=None):
     active,payload=activities.learning_context(saved,draft)
-    raw=model(instructions(draft['chosen']),payload)
-    summaries=activities.validate_summaries(raw.get('skillSummaries') if isinstance(raw,dict) else None, active, normalize=source == 'ollama')
-    return {'key':activities.fingerprint(saved,draft),'summaries':summaries}
+    system=instructions(draft['chosen'])
+    attempts=3 if source=='ollama' else 1
+    last_error=None
+    for attempt in range(attempts):
+        prompt=system if attempt==0 else f'{system}\n[검증 실패 후 재시도] skillOrder의 모든 스킬에 1~3줄의 명사형 역량 요약을 빠짐없이 작성해 JSON으로 반환한다.'
+        raw=activities._answer(model(prompt,payload))
+        if source=='ollama' and isinstance(raw,dict) and 'skillSummaries' not in raw and set(raw)>=set(active):
+            raw_summaries=raw
+        else:
+            raw_summaries=raw.get('skillSummaries') if isinstance(raw,dict) else None
+        try:
+            summaries=activities.validate_summaries(raw_summaries, active, normalize=source == 'ollama')
+            return {'key':activities.fingerprint(saved,draft),'summaries':summaries}
+        except ApiError as error:
+            last_error=error
+    raise last_error

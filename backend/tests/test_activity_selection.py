@@ -222,3 +222,68 @@ class ActivityTests(unittest.TestCase):
        patch('app.services.activity_selection.RM.finish_option', side_effect=lambda pid, raw, source: {**raw, 'acts': [dict(a, id=str(i)) for i, a in enumerate(raw['acts'])]}):
    p = propose(self.saved, self.draft, lambda *_: {'answer': {'acts': self.acts, 'skillSummaries': {'S': ['이해', '적용', '검증']}}, 'type': 'agent'}, 'test')
   self.assertEqual(p['selectedIds'], ['0', '1'])
+
+ def test_single_skill_reproposal_scopes_learning_skills_versions_and_keeps_summaries(self):
+  from app.services import activity_selection as activities
+  saved = deepcopy(self.saved)
+  saved['skillOrder'] = ['S', 'T']
+  saved['resourceChoices']['T'] = {'course': 'c2', 'books': []}
+  saved['selection'] = {'skills': [{'name': 'S', 'targetOutcome': 'S 목표'}, {'name': 'T', 'targetOutcome': 'T 목표'}]}
+  draft = deepcopy(self.draft)
+  draft['gen']['options']['A2']['learningSkills'] = [{'name': 'S'}, {'name': 'T'}]
+  key = activities.fingerprint(saved, draft)
+  first = {
+   'id': 'v1', 'key': key,
+   'option': {'id': 'A2', 'acts': [
+    {'id': 's-mat', 'skill': 'S', 'stage': 2, 'res': 'c', 'title': '자료', 'hours': 2, 'how': '학습'},
+    {'id': 's-task-1', 'skill': 'S', 'stage': 3, 'res': None, 'title': '기존 과제 1', 'hours': 2, 'how': '설명 1'},
+    {'id': 't-task', 'skill': 'T', 'stage': 3, 'res': None, 'title': 'T 과제', 'hours': 2, 'how': '설명 T'},
+   ]},
+   'skillSummaries': {'S': ['S 요약 1', 'S 요약 2', 'S 요약 3'], 'T': ['T 요약 1', 'T 요약 2', 'T 요약 3']},
+   'selectedIds': ['s-mat', 's-task-1', 't-task'],
+   'skillProposalIds': {'S': 'v1', 'T': 'v1'},
+  }
+  saved['activityProposal'] = first
+  seen_payload = {}
+  def generate(system, payload):
+   seen_payload.update(deepcopy(payload))
+   return {'acts': [{'skill': 'S', 'stage': 3, 'res': None, 'title': '새 과제 2', 'hours': 3, 'how': '새 방법'}]}
+  with patch('app.services.activity_selection.catalog.items', return_value={'c': {'id': 'c', 'title': '자료', 'cost': 0}}), \
+       patch('app.services.activity_selection.RM.finish_option', side_effect=lambda pid, raw, source: {**raw, 'acts': [dict(a, id=f'gen-{i}') for i, a in enumerate(raw['acts'])]}):
+   result = activities.repropose_skill(saved, draft, 'S', generate, 'test')
+  self.assertEqual(seen_payload['skillOrder'], ['S'])
+  self.assertEqual([row['name'] for row in seen_payload['course']['learningSkills']], ['S'])
+  self.assertEqual([a['id'] for a in seen_payload['previousProposals'][0]['acts']], ['s-mat', 's-task-1'])
+  self.assertEqual(result['skillSummaries'], first['skillSummaries'])
+  self.assertEqual(result['skillProposalIds']['S'], result['id'])
+  self.assertEqual(result['skillProposalIds']['T'], 'v1')
+  self.assertEqual(result['changedSkill'], 'S')
+  self.assertEqual([a['skill'] for a in result['option']['acts']], ['S', 'S', 'T'])
+  self.assertEqual(next(a for a in result['option']['acts'] if a['skill'] == 'S' and not a.get('res'))['title'], '새 과제 2')
+
+ def test_validate_repropose_skill_rejects_missing_or_invalid_skill(self):
+  from app.services import activity_selection as activities
+  with self.assertRaises(ApiError) as missing_err:
+   activities.validate_repropose_skill(self.saved, self.draft, 'S')
+  self.assertEqual(missing_err.exception.code, 'ACTIVITIES_REQUIRED')
+  saved = deepcopy(self.saved)
+  saved['resourceChoices']['OFF'] = {'course': 'c', 'books': [], 'enabled': False}
+  saved['skillOrder'].append('OFF')
+  base = self.propose()
+  base['key'] = activities.fingerprint(saved, self.draft)
+  saved['activityProposal'] = base
+  for bad in ('', '   ', 'unknown', 'OFF'):
+   with self.subTest(bad=bad), self.assertRaises(ApiError) as bad_err:
+    activities.validate_repropose_skill(saved, self.draft, bad)
+   self.assertEqual(bad_err.exception.code, 'SKILL_REQUIRED')
+
+ def test_material_plan_report_handles_missing_choice_without_key_error(self):
+  from app.services import material_plan
+  saved = {
+   'recommendations': {'skills': [{'name': 'S', 'courses': [{'id': 'c'}], 'books': []}]},
+   'resourceChoices': {},
+   'skillOrder': ['S'],
+  }
+  out = material_plan.report(saved, {})
+  self.assertEqual(out['recommendations']['skills'][0]['courses'], [])
+  self.assertEqual(out['skillOrder'], ['S'])

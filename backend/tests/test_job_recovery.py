@@ -80,3 +80,24 @@ class RecoveryTests(TestCase):
             sql=t.run.call_args.args[0]
             self.assertIn('recoveryFailed',sql)
             self.assertNotIn('redirectJobId',sql)
+
+    def test_queued_generation_maps_llm_error_to_agent_error(self):
+        from app import llm
+        from app.auth import Account
+        from app.errors import AgentError
+        from app.services.generation_job import queued_generation
+        from starlette.requests import Request
+        @queued_generation(reference_prefix='outcomes:')
+        def endpoint(project_id:str,a:Account):
+            raise llm.LlmError('모델 응답이 JSON 형식이 아니에요')
+        req=Request({'type':'http','headers':[(b'prefer',b'respond-async')]})
+        captured={}
+        def fake_start(employee,ref,work):
+            captured['work']=work
+            return 'job-1'
+        with patch.object(generation_job,'start_shared',side_effect=fake_start):
+            res=endpoint('p1',a=Account('employee',1,'test'),generation_request=req)
+        self.assertEqual(res.status_code,202)
+        with self.assertRaises(AgentError) as caught:
+            captured['work'](None)
+        self.assertEqual(caught.exception.info['code'],'AI_BAD_OUTPUT')
