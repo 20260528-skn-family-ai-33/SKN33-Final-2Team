@@ -28,6 +28,8 @@ export interface AppNotification {
   commentId: string | null;
   /** kind 가 task(부서장이 낸 과제)·task_result(직원이 제출한 결과)일 때만 */
   taskId: string | null;
+  /** kind 가 job(jobKind: revision)일 때 해당 수정안 ID */
+  revisionId?: string | null;
   /** kind 가 job 일 때만 */
   jobKind: NotificationJobKind | null;
   jobStatus: 'done' | 'failed' | null;

@@ -33,3 +33,56 @@ class ReviewCourseReuseTests(TestCase):
         with patch.object(api.db,'tx',side_effect=lambda:nullcontext(Mock())), patch.object(api,'generation_guard',side_effect=lambda *args:nullcontext()), patch.object(activities,'context',side_effect=context), patch.object(activities,'current_record',return_value=None), patch.object(api.runtime,'context',return_value=SimpleNamespace(live=True,mode='test')), patch.object(activities,'propose',return_value={'key':'old'}), patch.object(activities,'fingerprint',return_value='changed'), patch.object(drafts,'_mutate',side_effect=mutate), patch.object(activities,'append_proposal') as append:
             with self.assertRaises(ApiError) as error:api.propose_activities.__wrapped__('p',SimpleNamespace(id=1),course='A1')
         self.assertEqual(error.exception.code,'ACTIVITIES_CHANGED');append.assert_not_called()
+
+    def test_skill_query_routes_to_single_skill_repropose_and_rejects_invalid_before_model(self):
+        saved = deepcopy(self.saved)
+        saved['skillOrder'] = ['SQL', 'Disabled']
+        saved['resourceChoices'] = {'SQL': {'course': 'c1', 'books': [], 'enabled': True}, 'Disabled': {'course': 'c2', 'books': [], 'enabled': False}}
+        def context(*args, course=None):
+            return deepcopy(saved), dict(self.draft, chosen=course or self.draft['chosen'])
+        with patch.object(api.db, 'tx', side_effect=lambda: nullcontext(Mock())), \
+             patch.object(api, 'generation_guard', side_effect=lambda *args: nullcontext()), \
+             patch.object(activities, 'context', side_effect=context), \
+             patch.object(activities, 'current_record', return_value=None), \
+             patch.object(api.runtime, 'context') as rt_ctx:
+            with self.assertRaises(ApiError) as no_initial:
+                api.propose_activities.__wrapped__('p', SimpleNamespace(id=1), skill='SQL', course='A2')
+            self.assertEqual(no_initial.exception.code, 'ACTIVITIES_REQUIRED')
+            rt_ctx.assert_not_called()
+
+        for bad_skill in ('', '   ', 'Missing', 'Disabled'):
+            with self.subTest(bad_skill=bad_skill), \
+                 patch.object(api.db, 'tx', side_effect=lambda: nullcontext(Mock())), \
+                 patch.object(api, 'generation_guard', side_effect=lambda *args: nullcontext()), \
+                 patch.object(activities, 'context', side_effect=context), \
+                 patch.object(activities, 'current_record', return_value={'key': 'k', 'option': {'acts': []}}), \
+                 patch.object(api.runtime, 'context') as rt_ctx:
+                with self.assertRaises(ApiError) as err:
+                    api.propose_activities.__wrapped__('p', SimpleNamespace(id=1), skill=bad_skill, course='A2')
+                self.assertEqual(err.exception.code, 'SKILL_REQUIRED')
+                rt_ctx.assert_not_called()
+
+        existing = {'id': 'rev-0', 'key': 'k', 'option': {'acts': []}}
+        def mutate(employee, project, save):
+            state = {'v2Survey': {}}
+            save(Mock(), state)
+            return state
+        with patch.object(api.db, 'tx', side_effect=lambda: nullcontext(Mock())), \
+             patch.object(api, 'generation_guard', side_effect=lambda *args: nullcontext()), \
+             patch.object(activities, 'context', side_effect=context), \
+             patch.object(activities, 'current_record', return_value=existing), \
+             patch.object(activities, 'fingerprint', return_value='k'), \
+             patch.object(api.runtime, 'context', return_value=SimpleNamespace(live=True, mode='test')), \
+             patch.object(api.runtime, 'model', return_value=Mock()), \
+             patch.object(activities, 'repropose_skill', return_value={'id': 'rev-1', 'key': 'k', 'changedSkill': 'SQL'}) as repropose, \
+             patch.object(activities, 'propose') as propose_all, \
+             patch.object(drafts, '_mutate', side_effect=mutate), \
+             patch.object(activities, 'append_proposal'), \
+             patch('app.services.course_recommendations.merge_scope', return_value={}), \
+             patch('app.services.course_recommendations.scope_view', return_value={}), \
+             patch.object(activities, 'view', return_value={'proposal': {'id': 'rev-1'}}):
+            out = api.propose_activities.__wrapped__('p', SimpleNamespace(id=1), skill=' SQL ', course='A2')
+        self.assertEqual(out['proposal']['id'], 'rev-1')
+        repropose.assert_called_once()
+        self.assertEqual(repropose.call_args.args[2], 'SQL')
+        propose_all.assert_not_called()
