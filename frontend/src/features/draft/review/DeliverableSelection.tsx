@@ -9,39 +9,10 @@ import { reviewTasks } from './reviewTasks';
 import { flush, takeDraft } from '../draftSync';
 import { Skeleton } from '@/shared/ui/Skeleton';
 import { reviewPlan, reviewTaskDisplay, type ReviewActivity as Activity, type ReviewProposal as Proposal, type ReviewPlanState } from './reviewPlan';
+import { initializeReview, readExisting, reviewPath, type ProposalResponse } from './reviewInitial';
 
-type ProposalResponse = { proposal: Proposal | null; versions: Proposal[] };
 // Clear reusable results and detach pending flights on logout/account change.
 useWs.subscribe((state, previous) => { if (state.owner !== previous.owner) reviewTasks.clear(); });
-type ReviewBundle = { body: ProposalResponse; resources: ReviewMaterials; summaries?: Record<string, string[]> };
-function reviewPath(id: string, route: string, course: string, extra = '') {
-  return `/api/v2/drafts/${id}/${route}?course=${encodeURIComponent(course)}${extra}`;
-}
-async function initializeReview(id: string, course: string, scope: string): Promise<ReviewBundle> {
-  // Rejoining a scope while its explicit regeneration runs must await that version.
-  await reviewTasks.waitForChanges(scope);
-  return reviewTasks.run(scope, 'initial', async () => {
-    await flush();
-    if (reviewScope(ws()) !== scope) throw new Error('검토 입력이 변경됐어요.');
-    const [existing, resources] = await Promise.all([
-      request<ProposalResponse>(reviewPath(id, 'activities', course)),
-      request<ReviewMaterials>(reviewPath(id, 'recommendations', course)),
-    ]);
-    let body = existing;
-    if (!body.proposal) {
-      if (reviewScope(ws()) !== scope) throw new Error('검토 입력이 변경됐어요.');
-      body = await request<ProposalResponse>(reviewPath(id, 'activities', course), {method: 'POST'});
-    }
-    if (!body.proposal) throw new Error('산출물 제안을 확인하지 못했어요. 다시 시도해 주세요.');
-    let summaries: Record<string, string[]> | undefined;
-    if (!body.proposal.skillSummaries) {
-      // Do not start additional model work for a scope the user has left.
-      if (reviewScope(ws()) !== scope) throw new Error('검토 입력이 변경됐어요.');
-      summaries = (await request<{summaries: Record<string, string[]>}>(reviewPath(id, 'learning-outcomes', course), {method: 'POST'})).summaries;
-    }
-    return {body, resources, summaries};
-  });
-}
 
 export type DeliverableSelectionHandle = { save: () => Promise<boolean> };
 type SelectionProps = {
@@ -83,18 +54,17 @@ function ScopedDeliverableSelection({ ref, onReadyChange, onBusyChange, onPlanCh
   }
   useEffect(() => {
     if (!id) return;
-    let active = true;
-    // Existing materials and proposals are readable before any missing AI work finishes.
-    void Promise.all([
-      request<ReviewMaterials>(reviewPath(id,'recommendations',course || '')),
-      request<ProposalResponse>(reviewPath(id,'activities',course || '')),
-    ]).then(([resources,existing])=>{
-      if(!active||reviewScope(ws())!==scope)return;
+    let active = true, settled = false;
+    // 기존 자료·제안은 AI 작업을 기다리지 않고 먼저 보여 준다. 준비 흐름과 같은 읽기를 함께 써서 GET 은 각 1회(#288),
+    // 준비 결과가 먼저 반영됐으면(다시 들어와 기억한 선택을 되살린 경우) 늦게 온 읽기로 덮어쓰지 않는다
+    void reviewTasks.waitForChanges(scope).then(() => readExisting(id, course || '', scope)).then(({body: existing, resources}) => {
+      if (!active || settled || reviewScope(ws()) !== scope) return;
       setMaterials(resources);
-      if(existing.proposal){setVersions(existing.versions);setChosen(existing.proposal.id);setSkillPicks(existing.proposal.skillProposalIds||{});}
-    }).catch(()=>{});
+      if (existing.proposal) { setVersions(existing.versions); setChosen(existing.proposal.id); setSkillPicks(existing.proposal.skillProposalIds || {}); }
+    }).catch(() => {});
     void initializeReview(id, course || '', scope).then(({body, resources, summaries}) => {
       if (!active || reviewScope(ws()) !== scope) return;
+      settled = true;
       const picks = reviewTasks.recall<{versions: Proposal[]; chosen: string; skillPicks: Record<string, string>}>(scope, 'picks');
       const reusable = picks && body.versions.some(row => row.id === picks.chosen);
       setVersions(reusable ? picks.versions : body.versions); setChosen(reusable ? picks.chosen : body.proposal?.id || ''); setSkillPicks(reusable ? picks.skillPicks : body.proposal?.skillProposalIds || {}); setMaterials(resources);
