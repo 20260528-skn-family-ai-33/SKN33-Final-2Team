@@ -1,11 +1,15 @@
-.resource-filters, .resource-pagination, .resource-pagination form {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-.resource-filters { margin-bottom: 16px; }
-.resource-filters > div { display: flex; align-items: center; gap: 6px; }
-.resource-filters select.input, .resource-pagination input.input { width: auto; }
-.resource-pagination { margin: 16px 0; }
-.resource-pagination input.input { width: 6em; }
+/* 종류 칩과 같은 줄에 사이트·정렬 선택을 두고, 높이를 칩(38px)에 맞춘다 */
+.resource-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-bottom: 12px; }
+.resource-toolbar .chips { flex: 1 1 auto; }
+.resource-selects { display: flex; flex-wrap: wrap; gap: 8px; }
+.resource-selects select.input { width: auto; height: 38px; padding: 0 34px 0 12px; font-size: 14px; background-position: right 12px center; }
+
+/* 페이지 이동: 관리자 데이터 화면의 화살표 버튼과 같은 작은 버튼(36px)으로 맞춘다 */
+.resource-pager { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px 20px; margin: 20px 0 8px; }
+.resource-pager-nums { display: flex; align-items: center; gap: 4px; }
+.resource-pager-nums .btn.sm { min-width: 36px; padding: 0 8px; }
+.resource-pager-nums .btn svg { width: 15px; height: 15px; }
+.resource-pager-gap { padding: 0 2px; color: var(--ink-4); }
+.resource-pager-jump { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-3); }
+.resource-pager-jump .input { width: 64px; height: 36px; padding: 0 8px; font-size: 14px; text-align: center; -moz-appearance: textfield; appearance: textfield; }
+.resource-pager-jump .input::-webkit-outer-spin-button, .resource-pager-jump .input::-webkit-inner-spin-button { margin: 0; -webkit-appearance: none; }

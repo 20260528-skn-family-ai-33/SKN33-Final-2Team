@@ -172,30 +172,28 @@ export function ResourcesPage() {
       title="학습 자료"
       lead="로드맵에 쓰는 등록 강좌·도서·자격증 중 추천 가능한 자료예요. 강좌별 출처·학습 시간·공개 목차를 확인할 수 있어요. 직접 수행하는 실습 과제는 여기 없어요."
     >
-      <div className="chips" style={{ marginBottom: 12 }}>
-        {kinds.map((k) => (
-          <button
-            key={k}
-            className={`chip ${kind === k ? 'on' : ''}`}
-            aria-pressed={kind === k}
-            onClick={() => { if (k !== kind) update({ kind: k === '전체' ? '' : k, platform: '', page: '' }); }}
-          >
-            {kindLabel(k)}
-          </button>
-        ))}
-      </div>
-      <div className="resource-filters">
-        {kind === '강좌' && <div>
-          <label htmlFor="resource-platform">강좌 사이트</label>
-          <select id="resource-platform" className="input" value={platform} onChange={(e) => update({ platform: e.target.value, page: '' })}>
-            <option value="">모든 사이트</option>
-            {platform && !sites.includes(platform) && <option value={platform}>{platformLabel(platform)}</option>}
-            {sites.map((site) => <option key={site} value={site}>{platformLabel(site)}</option>)}
-          </select>
-        </div>}
-        <div>
-          <label htmlFor="resource-sort">정렬</label>
-          <select id="resource-sort" className="input" value={sort} onChange={(e) => update({ sort: e.target.value === 'default' ? '' : e.target.value, page: '' })}>
+      <div className="resource-toolbar">
+        <div className="chips">
+          {kinds.map((k) => (
+            <button
+              key={k}
+              className={`chip ${kind === k ? 'on' : ''}`}
+              aria-pressed={kind === k}
+              onClick={() => { if (k !== kind) update({ kind: k === '전체' ? '' : k, platform: '', page: '' }); }}
+            >
+              {kindLabel(k)}
+            </button>
+          ))}
+        </div>
+        <div className="resource-selects">
+          {kind === '강좌' && (
+            <select className="input" aria-label="강좌 사이트" value={platform} onChange={(e) => update({ platform: e.target.value, page: '' })}>
+              <option value="">모든 강좌 사이트</option>
+              {platform && !sites.includes(platform) && <option value={platform}>{platformLabel(platform)}</option>}
+              {sites.map((site) => <option key={site} value={site}>{platformLabel(site)}</option>)}
+            </select>
+          )}
+          <select className="input" aria-label="정렬" value={sort} onChange={(e) => update({ sort: e.target.value === 'default' ? '' : e.target.value, page: '' })}>
             <option value="default">기본순</option>
             <option value="title_asc">제목 오름차순</option>
             <option value="title_desc">제목 내림차순</option>
@@ -237,7 +235,6 @@ export function ResourcesPage() {
           </button>
         </p>
       ) : null}
-      <ResourcePagination {...pagination} label="목록 위 페이지 이동" />
       <div style={{ minHeight: "65vh" }} aria-busy={searching}>
         {shown && !shown.items.length && !err ? (
           <p className="muted">맞는 자료가 없어요. 검색어나 필터를 바꿔 주세요.</p>
@@ -262,7 +259,7 @@ export function ResourcesPage() {
           ))}
         </div>
       </div>
-      <ResourcePagination {...pagination} label="목록 아래 페이지 이동" />
+      <ResourcePagination {...pagination} label="페이지 이동" />
       <Note>
         강좌는 제공처의 영상·학습 시간을 사용해요. 총시간을 확보하지 못한 강좌는 공개 커리큘럼 기준의 ‘계획 예상’ 시간을 일정에 사용하며 상세 화면에 근거를 표시해요. 관리자 화면에서 조정할 수 있어요. 응시료·K-MOOC 수강료는 확인이 필요해요. 도서는
         가격을 표시하지 않아요.
