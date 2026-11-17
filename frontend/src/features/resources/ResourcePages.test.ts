@@ -1,10 +1,37 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { expect, it } from 'vitest';
-import { ResKv } from './ResourcePages';
+import { ResKv, ResourcesPage } from './ResourcePages';
+import { ResourcePagination } from './ResourcePagination';
 import { resourceImageUrl } from '@/shared/lib/resourceImageUrl';
 import type { Resource } from '@/api/types/catalog';
+
+it('여러 페이지의 첫·현재·마지막 번호와 직접 이동을 제공하고 한 페이지면 숨긴다', () => {
+  const props = { page: 50, pages: 100, disabled: false, label: '페이지 이동', onChange: () => {} };
+  const html = renderToStaticMarkup(createElement(ResourcePagination, props));
+  expect(html).toContain('aria-label="1페이지"');
+  expect(html).toContain('aria-label="50페이지" aria-current="page"');
+  expect(html).toContain('aria-label="100페이지"');
+  expect(html).not.toContain('aria-label="20페이지"');
+  expect(html).toContain('max="100"');
+  expect(renderToStaticMarkup(createElement(ResourcePagination, { ...props, page: 1, pages: 1 }))).toBe('');
+});
+
+it('기존 자격 종류의 목록·탭·건수에 자격증을 표시한다', () => {
+  const client = new QueryClient();
+  client.setQueryData(['resource-browser', '자격', '', '', 'default', 1], {
+    kind: '자격', term: '', page: 1, total: 1,
+    items: [{ id: 'cert_test', title: '예시 시험', provider: '시험기관', type: 'cert', kind: '자격' }],
+  });
+  const html = renderToStaticMarkup(createElement(QueryClientProvider, { client },
+    createElement(MemoryRouter, { initialEntries: ['/resources?kind=자격'] }, createElement(ResourcesPage))));
+  expect(html).toContain('aria-pressed="true">자격증</button>');
+  expect(html).toContain('자격증 1건');
+  expect(html).toContain('자격증 · 시험기관');
+  expect(html).not.toContain('강좌 사이트');
+});
 
 it.each([
   ['UPPER_INTERMEDIATE', false, '목차 검토로 중상 확정', '중상'],

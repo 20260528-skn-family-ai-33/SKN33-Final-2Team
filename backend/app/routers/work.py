@@ -6,6 +6,7 @@ from app.services.generation_job import queued_generation
 import json
 import time
 import uuid
+from typing import Literal
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -389,8 +390,11 @@ def api_certs(a: Account = Depends(require_account)):
 
 
 @r.get('/resources')
-def api_resources(kind: str = '', q: str = '', stage: int = 0, exclude: str = '', limit: int = 30, offset: int = 0, certs: int = 1, a: Account = Depends(require_account)):
-    return catalog.search(kind, q, stage, [x for x in exclude.split(',') if x], max(1, min(100, limit)), max(0, offset), bool(certs))
+def api_resources(kind: str = '', q: str = '', stage: int = 0, exclude: str = '', limit: int = 30, offset: int = 0,
+                  certs: int = 1, a: Account = Depends(require_account), platform: str = '',
+                  sort: Literal['default', 'title_asc', 'title_desc'] = 'default'):
+    return catalog.search(kind, q, stage, [x for x in exclude.split(',') if x], max(1, min(100, limit)),
+                          max(0, offset), bool(certs), platform=platform.strip(), sort=sort)
 
 
 @r.post('/resources/lookup')

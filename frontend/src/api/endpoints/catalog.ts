@@ -1,9 +1,11 @@
 /* 학습 자료·자격증·규정·스킬 지도 (API-22, 53, 54 · 스킬 지도는 설계서 밖 추가 10/23) */
 import { enc, http } from '../client';
-import type { CertGroup, RegBundle, RegSets, Resource, ResourceMap, ResourceSearch, SkillMapData } from '../types/catalog';
+import type { CertGroup, RegBundle, RegSets, Resource, ResourceMap, ResourceSearch, ResourceSort, SkillMapData } from '../types/catalog';
 
 export interface ResourceQuery {
   kind?: string;
+  platform?: string;
+  sort?: ResourceSort;
   q?: string;
   stage?: number | string;
   exclude?: string;

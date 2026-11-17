@@ -1,0 +1,11 @@
+.resource-filters, .resource-pagination, .resource-pagination form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.resource-filters { margin-bottom: 16px; }
+.resource-filters > div { display: flex; align-items: center; gap: 6px; }
+.resource-filters select.input, .resource-pagination input.input { width: auto; }
+.resource-pagination { margin: 16px 0; }
+.resource-pagination input.input { width: 6em; }
