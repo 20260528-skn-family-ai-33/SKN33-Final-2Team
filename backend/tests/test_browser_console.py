@@ -19,29 +19,29 @@ class BrowserConsoleTests(unittest.TestCase):
     def test_limits_follow_effective_demo_setting(self):
         headers = {'x-growpath-picker': 'off', 'x-growpath-timeout': '900',
                    'x-growpath-input': '131072', 'x-growpath-output': '32768'}
-        self.assertEqual(console.from_headers(headers, True), console.BrowserOptions(False, None, 900, 131072, 32768))
+        self.assertEqual(console.from_headers(headers, True, allow_overrides=True), console.BrowserOptions(False, None, 900, 131072, 32768))
         self.assertEqual(console.from_headers(headers, False), console.BrowserOptions(picker=False))
-        self.assertEqual(console.from_headers({**headers, 'x-growpath-demo': 'on'}, False, allow_enable=True).timeout, 900)
+        self.assertEqual(console.from_headers({**headers, 'x-growpath-demo': 'on'}, False, allow_overrides=True).timeout, 900)
         self.assertIsNone(console.from_headers({**headers, 'x-growpath-demo': 'invalid'}, False).timeout)
-        self.assertIsNone(console.from_headers(dict(headers, **{'x-growpath-demo': 'off'}), True).timeout)
+        self.assertIsNone(console.from_headers(dict(headers, **{'x-growpath-demo': 'off'}), True, allow_overrides=True).timeout)
         for field, value in [('input', '0'), ('input', '131073'), ('output', '32769'), ('timeout', '901'), ('timeout', '1.5')]:
             with self.subTest(field=field, value=value), self.assertRaises(ValueError):
-                console.from_headers({'x-growpath-' + field: value}, True)
+                console.from_headers({'x-growpath-' + field: value}, True, allow_overrides=True)
 
     def test_runpod_address_and_key_validation(self):
         url = 'https://example-11434.proxy.runpod.net'
         headers = {'x-growpath-ollama-url': url + '/', 'x-growpath-ollama-key': 'fixture-key'}
-        settings = console.from_headers(headers, True)
+        settings = console.from_headers(headers, True, allow_overrides=True)
         self.assertEqual((settings.ollama_url, settings.ollama_key), (url, 'fixture-key'))
         self.assertNotIn('fixture-key', repr(settings))
         self.assertEqual(console.runpod_url('http://1.1.1.1:18123'), 'http://1.1.1.1:18123')
         self.assertIsNone(console.from_headers(headers, False).ollama_key)
-        self.assertIsNone(console.from_headers({**headers, 'x-growpath-demo': 'off'}, True).ollama_url)
+        self.assertIsNone(console.from_headers({**headers, 'x-growpath-demo': 'off'}, True, allow_overrides=True).ollama_url)
         for invalid in ('http://127.0.0.1:8080', url + '/test', url + '.example.org', 'http://1.1.1.1:65536'):
             with self.subTest(invalid=invalid), self.assertRaises(ValueError):
                 console.runpod_url(invalid)
         with self.assertRaises(ValueError):
-            console.from_headers({'x-growpath-ollama-key': 'invalid key'}, True)
+            console.from_headers({'x-growpath-ollama-key': 'invalid key'}, True, allow_overrides=True)
 
     def test_runpod_transport_isolated_from_default_credentials(self):
         url = 'https://example-11434.proxy.runpod.net'
@@ -69,9 +69,9 @@ class BrowserConsoleTests(unittest.TestCase):
         from app.routers import account
 
         client = TestClient(main.app)
-        config = replace(main.S, demo_mode=True, beta_account_picker=True, browser_overrides=False)
+        config = replace(main.S, demo_mode=True, beta_account_picker=True, browser_overrides=True)
         with patch.object(main, 'S', config), patch.object(account, 'S', config), patch.object(account.profile, 'accounts', return_value=[]):
-            self.assertEqual(client.get('/api/v1/console/capabilities').json(), {'demo': True, 'picker': True, 'browserOverrides': False})
+            self.assertEqual(client.get('/api/v1/console/capabilities').json(), {'demo': True, 'picker': True, 'browserOverrides': True})
             self.assertEqual(client.get('/api/v1/demo/accounts', headers={'X-GrowPath-Picker': 'off'}).status_code, 404)
             self.assertEqual(client.get('/api/v1/demo/accounts').status_code, 200)
             response = client.get('/api/v1/console/capabilities', headers={'X-GrowPath-Output': '0'})
@@ -84,7 +84,7 @@ class BrowserConsoleTests(unittest.TestCase):
         from app import config as app_config
         from app.routers import account
 
-        with patch.dict(os.environ, {}, clear=True), patch.dict(app_config._FILE, {}, clear=True):
+        with patch.dict(os.environ, {'GP5_CONSOLE_OVERRIDES': 'on'}, clear=True), patch.dict(app_config._FILE, {}, clear=True):
             config = app_config.load()
         client = TestClient(main.app, base_url='http://testserver/api/v1/')
         picker = {'X-GrowPath-Picker': 'on'}
@@ -112,12 +112,13 @@ class BrowserConsoleTests(unittest.TestCase):
         from app import config as app_config
         from app.routers import account
 
-        with patch.dict(os.environ, {'GP5_CONSOLE_OVERRIDES': 'off'}, clear=True), patch.dict(app_config._FILE, {}, clear=True):
+        with patch.dict(os.environ, {}, clear=True), patch.dict(app_config._FILE, {}, clear=True):
             config = app_config.load()
         headers = {'x-growpath-picker': 'on', 'x-growpath-demo': 'on', 'x-growpath-timeout': '900',
                    'x-growpath-input': '4096', 'x-growpath-output': '512',
                    'x-growpath-ollama-url': 'https://qa.proxy.runpod.net', 'x-growpath-ollama-key': 'fixture'}
-        self.assertEqual(console.from_headers(headers, False), console.BrowserOptions())
+        for demo_default in (False, True):
+            self.assertEqual(console.from_headers(headers, demo_default, allow_overrides=False), console.BrowserOptions())
         with patch.object(main, 'S', config), patch.object(account, 'S', config), patch.object(account.profile, 'accounts') as accounts:
             client = TestClient(main.app, base_url='http://testserver/api/v1/')
             self.assertEqual(client.get('console/capabilities').json(), {'demo': False, 'picker': False, 'browserOverrides': False})
@@ -130,9 +131,9 @@ class BrowserConsoleTests(unittest.TestCase):
         name = 'GP5_CONSOLE_OVERRIDES'
         old = 'GP5_BROWSER_OVERRIDES'
         for environment, file_values, allowed in [
-            ({}, {}, True), ({}, {name: 'off'}, False), ({name: ' ON '}, {}, True),
+            ({}, {}, False), ({}, {name: 'off'}, False), ({name: ' ON '}, {}, True),
             ({name: ''}, {name: 'on'}, False), ({name: 'invalid'}, {}, False),
-            ({}, {old: 'off'}, False), ({old: 'off'}, {name: 'on'}, False),
+            ({}, {old: 'on'}, True), ({}, {old: 'off'}, False), ({old: 'off'}, {name: 'on'}, False),
             ({name: 'off', old: 'on'}, {}, False), ({}, {name: 'on', old: 'off'}, True),
         ]:
             with self.subTest(environment=environment, file_values=file_values), \

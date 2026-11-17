@@ -4,7 +4,7 @@
 
 관리자 설정 응답의 `policyStatus`는 정상 시 `active`, 직원별 선택을 끄고 모델을 지정하지 않아 Ollama가 적용된 경우 `default_ollama`다. 설정 파일 형식이 잘못되면 관리자 조회는 `200`과 `{policy: null, level: null, policyStatus: "invalid", ...}`를 반환해 화면에서 새 설정을 저장할 수 있다. 이때 새 모델 실행과 목표 후보 일괄 재생성은 `503 BAD_PROVIDER_POLICY`로 중단된다.
 
-관리자 데이터 관리 화면은 `GET /api/v1/admin/ai-provider`로 현재 정책, 직원별 선택 허용 여부, 서버에 등록한 모델 이름·키 등록 여부·설정 가능 여부를 조회한다. 저장은 `PUT /api/v1/admin/ai-provider`에 `{"policy":"openai"}`, `{"policy":"ollama"}` 또는 베타의 `{"policy":"employee"}`를 보낸다. 고정 모델을 저장할 때 `level`에 지원하는 추론 단계나 `null`(서버 기본값)을 함께 보낸다. 직원별 선택과 `ollama`는 단계를 지정할 수 없다(`ollama`에 단계를 보내면 `422 / BAD_REASONING` · RunPod-Ollama는 늘 추론 없이 부름 · #229). 직원·부서장으로 관리자 API를 사용하면 403, 환경 설정이 빠진 제공자를 저장하면 409를 반환한다. 기본 키는 서버 .env에서 읽는다. 관리자는 `PUT /admin/ai-provider/{provider}/key`에 `{"key":"새 키"}`를 보내 등록하고, `DELETE`로 해제한다. 응답에는 키 원문 없이 `keySource`(env/admin/none), `hasDefaultKey`, `keyConfigured`가 포함된다. 연결 확인은 기존 `GET /api/v1/ai/status?provider=...`를 쓴다.
+관리자 데이터 관리 화면은 `GET /api/v1/admin/ai-provider`로 현재 정책, 직원별 선택 허용 여부, 서버에 등록한 모델 이름·키 등록 여부·설정 가능 여부를 조회한다. 저장은 `PUT /api/v1/admin/ai-provider`에 `{"policy":"openai"}`, `{"policy":"ollama"}` 또는 직원별 선택의 `{"policy":"employee"}`를 보낸다. 고정 모델을 저장할 때 `level`에 지원하는 추론 단계나 `null`(서버 기본값)을 함께 보낸다. 직원별 선택과 `ollama`는 단계를 지정할 수 없다(`ollama`에 단계를 보내면 `422 / BAD_REASONING` · RunPod-Ollama는 늘 추론 없이 부름 · #229). 직원·부서장으로 관리자 API를 사용하면 403, 환경 설정이 빠진 제공자를 저장하면 409를 반환한다. 기본 키는 서버 .env에서 읽는다. 관리자는 `PUT /admin/ai-provider/{provider}/key`에 `{"key":"새 키"}`를 보내 등록하고, `DELETE`로 해제한다. 응답에는 키 원문 없이 `keySource`(env/admin/none), `hasDefaultKey`, `keyConfigured`가 포함된다. 연결 확인은 기존 `GET /api/v1/ai/status?provider=...`를 쓴다.
 
 관리자가 제공자를 고정하면 직원·부서장에게는 해당 모델을 표시하고 제공자·추론 설정 변경 요청은 409를 반환한다. 직원별 선택으로 돌아가면 저장된 개인 선택을 다시 사용한다. 직원 화면은 로그인·새로고침·창 복귀·모델 정보 열기 때 유효한 정책을 읽는다.
 
@@ -90,7 +90,7 @@
 
 `GP5_BETA_ACCOUNT_PICKER`는 직원 선택기의 배포 기본값이며 시연 모드와 독립적입니다. 요청에서 선택기가 꺼져 있으면 DB 조회 전에 `404 / NOT_FOUND`를 반환합니다.
 
-브라우저의 `X-GrowPath-Picker`와 `X-GrowPath-Demo` 헤더는 각각 해당 요청에 적용됩니다. `off`는 항상 허용합니다. 서버에서 끈 기능을 `on`으로 켤 수 있는지는 `GP5_CONSOLE_OVERRIDES`로 정합니다. 기본값은 `on`이고 명시적인 `off`·빈 값·알 수 없는 값은 전환을 차단합니다. 헤더가 없거나 인식할 수 없으면 서버 기본값을 사용합니다. 시연이 켜진 요청에서는 `X-GrowPath-Timeout`(1~900초), `X-GrowPath-Input`(1~131072토큰), `X-GrowPath-Output`(1~32768토큰)을 모델 호출과 해당 요청이 시작한 작업에 적용합니다. 범위 밖의 값은 `422 / INVALID_CONSOLE_OPTION`입니다. `X-GrowPath-Ollama-Url`과 `X-GrowPath-Ollama-Key`는 해당 요청의 Ollama 주소와 Bearer 키입니다. 주소만 지정하면 해당 Pod에 인증 없이 연결하며 두 헤더가 모두 없으면 공용 연결을 사용합니다.
+브라우저의 `X-GrowPath-Picker`와 `X-GrowPath-Demo` 헤더는 각각 해당 요청에 적용됩니다. `off`는 항상 허용합니다. 서버에서 끈 기능을 `on`으로 켤 수 있는지는 `GP5_CONSOLE_OVERRIDES`로 정합니다. 기본값은 `off`입니다. `on`을 명시해야 단축키와 브라우저 설정을 사용할 수 있습니다. 헤더가 없거나 인식할 수 없으면 서버 기본값을 사용합니다. 콘솔이 허용되고 시연이 켜진 요청에서는 `X-GrowPath-Timeout`(1~900초), `X-GrowPath-Input`(1~131072토큰), `X-GrowPath-Output`(1~32768토큰)을 모델 호출과 해당 요청이 시작한 작업에 적용합니다. 범위 밖의 값은 `422 / INVALID_CONSOLE_OPTION`입니다. `X-GrowPath-Ollama-Url`과 `X-GrowPath-Ollama-Key`는 해당 요청의 Ollama 주소와 Bearer 키입니다. 주소만 지정하면 해당 Pod에 인증 없이 연결하며 두 헤더가 모두 없으면 공용 연결을 사용합니다.
 
 현재 요청의 시연 모드가 off이면 시연 전용 초기화·단계 이동·설정·AI 로그 API는 인증·조회 전에 `404 / NOT_FOUND`를 반환합니다. 내 정보 응답과 실행 컨텍스트는 저장된 가데이터·실패 시연 설정을 무시하며 DB 원본은 보존합니다.
 
@@ -168,7 +168,7 @@
 
 ### 사내 생활 도우미 — `assistant.ts`
 
-챗봇은 관리자가 지정한 제공자를 사용합니다. 베타의 직원별 선택에서는 로그인한 직원의 AI 설정을 따릅니다. 직원 ID는 작업 소유권과 호출 기록에 사용합니다. 모델에는 빈 사용자 상황을 전달하고, 규정 원문의 적용 대상과 질문·앞 대화에 적힌 조건을 사용합니다. 브라우저 대화는 직원별로 분리합니다.
+챗봇은 관리자가 지정한 제공자를 사용합니다. 직원별 선택에서는 로그인한 직원의 AI 설정을 따릅니다. 직원 ID는 작업 소유권과 호출 기록에 사용합니다. 모델에는 빈 사용자 상황을 전달하고, 규정 원문의 적용 대상과 질문·앞 대화에 적힌 조건을 사용합니다. 브라우저 대화는 직원별로 분리합니다.
 
 수자원공사 정보로 분류되면 `knowledge.documents`·`knowledge.chunks`의 같은 범주·실제 자료만 벡터 검색해 답변 모델에 전달해요. 회사 답변은 `kind=general`, `source=work`이고 `summary`에 출처가 덧붙어요. 선택 필드 `answer.knowledgeSources[]`는 `{chunkId, documentId, documentTitle, sourceUrl, location, asOf, sourceLimits, isVirtual, textSha256, sourceFileSha256, textTruncated}`이며, 실제 인용한 검색 결과만 들어가요. `basis`는 규정 조항 전용으로 유지해요. 회사 자료에 맞는 근거가 없으면 `knowledgeSources=[]`와 확인 불가 안내예요. 다른 범주·가상 자료·없는 인용 ID·근거 없는 숫자는 허용하지 않아요.
 

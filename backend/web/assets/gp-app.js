@@ -1334,7 +1334,7 @@
         <h1 class="t lg" id="lgTitle">다시 오신 걸 환영해요</h1>
         <p class="lead">AI 활용·개발 역량 성장 로드맵을 이어서 만들어 보세요.</p>
         <form id="loginForm" novalidate>
-          <div class="field lg-pick" ${GP.ACCTS.length ? '' : 'hidden'}><label for="lgPick">직원 고르기 <span class="muted small">베타용 · 고르면 사번을 채워요</span></label>
+          <div class="field lg-pick" ${GP.ACCTS.length ? '' : 'hidden'}><label for="lgPick">직원 고르기 <span class="muted small">고르면 사번을 채워요</span></label>
             <select class="input" id="lgPick"><option value="">팀 DB 직원 ${GP.ACCTS.length}명 중 고르기</option>${deptGroups().map(g => `<optgroup label="${esc(g.dept)}">${g.list.map(e => `<option value="${esc(e.code)}">${esc(e.name)}${e.supervisor ? ' (부서장)' : ''}${e.team ? ` · ${esc(e.dept)}` : ''}</option>`).join('')}</optgroup>`).join('')}
               ${GP.DEMO && GP.DEMO.adminLogin ? `<optgroup label="관리자"><option value="${esc(GP.DEMO.adminLogin)}">관리자 전용 계정 (${esc(GP.DEMO.adminLogin)})</option></optgroup>` : ''}</select></div>
           <div class="field"><label for="lgId">사번 또는 관리자 아이디</label><input class="input" id="lgId" maxlength="40" autocomplete="username" placeholder="8자리 사번 (예: 20200001)"></div>

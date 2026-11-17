@@ -1,6 +1,6 @@
 # frontend — GrowPath 화면 (React + Vite + TypeScript)
 
-5차 화면 목업을 모양·문구·CSS 그대로 React로 옮긴 화면이에요.
+직원·부서장·관리자가 사용하는 GrowPath 웹 앱입니다. Vite 개발 서버와 배포용 nginx는 `/api` 요청을 FastAPI로 전달합니다.
 
 - 구조와 코드 규칙: [docs/구조_설명.md](docs/구조_설명.md)
 - 화면이 백엔드에 기대하는 것: [docs/API_계약.md](docs/API_계약.md)
@@ -52,11 +52,13 @@ PR을 올리면 GitHub Actions(`.github/workflows/frontend-ci.yml`)가 같은 �
 
 자료 선택 화면은 로그인한 상태에서 `/new/options`의 **스킬별 자료 비교**에서 확인해요. 백엔드 없이 점검하려면 개발 서버의 [자료 선택 미리보기](http://localhost:5185/docs/material-relevance-preview.html)를 열어요. 두 스킬 탭에서 진단, 자료가 없는 응답의 기존 안내, 저장된 강좌 예시를 확인할 수 있어요. 주소에 `?state=pending` 또는 `?state=error`를 붙이면 기존 준비 중·조회 오류 화면도 확인할 수 있어요. 미리보기는 실제 자료 비교 컴포넌트에 고정 응답을 전달해요.
 
-## 프로젝트 버전
+## 로그인 화면
 
 로그인 화면 우측 블록은 라벨·제목 아래에 서비스 화면 그림 7장(테스트 정답 확인, 3안 생성 중, 로드맵 3안 비교, 주차별 일정, 전체 일정표, 내 스킬 지도, 결과 보고서의 사전·사후 비교)을 넘겨 보여 줘요. 그림은 화면 전체가 아니라 장면마다 필요한 부분만 잘라 찍은 것이에요(글자가 읽히게). 그림 목록과 그림 아래 설명 문구는 `src/features/auth/loginSlides.ts`, 그림은 테마마다 `src/features/auth/slides/<테마>/`에 있어요. 화면이 바뀌면 운영 DB가 아닌 시험용 서버에서 `GP_URL=<화면 주소> GP_ID=<사번> GP_PW=<비밀번호> node scripts/capture-login-slides.mjs <그림 이름…>`으로 다시 찍어요. 그림마다 필요한 계정 상태가 달라 계정별로 나눠 실행하고, 필요한 상태와 그림 이름은 스크립트 머리말에 적혀 있어요. 3안 생성 중 화면은 역량 테스트를 제출한 뒤 40~60초 동안만 찍을 수 있어서, 브라우저를 미리 띄워 두는 방법을 스크립트 머리말에 적어 뒀어요. 이 PC의 Edge를 창 없이 띄우므로 추가 설치는 없어요.
 
-프로젝트 버전은 저장소 루트의 [VERSION](../VERSION)에서만 관리해요. Vite가 시작·빌드 때 읽어 화면에 넣으며, 파일이 없거나 숫자 세 자리 `X.Y.Z` 형식이 아니면 실패해요. 로그인 화면과 직원·부서장·관리자 메뉴 하단에 `GrowPath v버전 · Beta`를 표시해요. `Beta`는 현재 서비스 단계 표시예요. 버전을 바꾼 뒤 개발 서버를 재시작하거나 배포 화면을 다시 빌드해야 해요.
+## 프로젝트 버전
+
+루트 [VERSION](../VERSION)을 Vite 시작·빌드 시 읽어 로그인 화면과 상단 메뉴에 `vX.Y.Z`로 표시합니다. 파일이 없거나 버전 형식이 잘못되면 빌드가 실패합니다. 버전 변경 후 개발 서버를 재시작하거나 배포 화면을 다시 빌드하세요.
 
 이 프런트 패키지는 배포하지 않는 private 패키지라 별도 `package.json` 버전을 두지 않아요. 화면 숫자는 `VERSION`을 사용해요. 배포 규칙은 [최상위 README](../README.md#프로젝트-버전과-배포-기록)를 따라요.
 
@@ -74,11 +76,11 @@ docker build -f frontend/Dockerfile -t growpath-web .
 curl -s -o /dev/null -H "Accept-Encoding: gzip" -w "%{size_download} %header{content-encoding}\n" http://localhost:8816/assets/<index-해시>.js
 ```
 
-시연 모드의 기본값은 `off`입니다. 콘솔 설정이 없는 브라우저에서 처음부터 표시하려면 빌드의 `VITE_DEMO_TOOLS`와 백엔드의 `GP5_DEMO_MODE`를 모두 `on`으로 설정합니다. 콘솔 전환은 기본 허용이므로 두 값이 `off`여도 `demo on`으로 이 브라우저에서 시연을 켤 수 있습니다. 배포에서 전환을 막으려면 백엔드에 `GP5_CONSOLE_OVERRIDES=off`를 설정하세요.
+정식 배포에서는 시연 도구와 테스트 콘솔이 꺼져 있습니다. 테스트 환경에서 시연 도구를 기본 표시하려면 빌드의 `VITE_DEMO_TOOLS`와 서버의 `GP5_DEMO_MODE`를 `on`으로 설정합니다.
 
 ### 브라우저 테스트 콘솔
 
-`Ctrl+Alt+K`로 열고 명령을 입력하면 아래에 후보와 설명이 표시됩니다. 방향키로 후보를 고르고 `Tab`으로 자동완성합니다. 예를 들어 `tim`을 입력하고 `Tab`을 누르면 `timeout`과 뒤의 공백이 채워집니다. 원하는 초를 입력한 뒤 `Enter` 또는 `Tab`을 누르면 실행됩니다. 결과에서 `Esc`를 누르면 목록으로 돌아가고, 목록에서 다시 누르면 콘솔이 닫힙니다.
+서버에서 `GP5_CONSOLE_OVERRIDES=on`을 설정한 테스트 환경에서 `Ctrl+Alt+K`로 열고 명령을 입력하면 아래에 후보와 설명이 표시됩니다. 방향키로 후보를 고르고 `Tab`으로 자동완성합니다. 예를 들어 `tim`을 입력하고 `Tab`을 누르면 `timeout`과 뒤의 공백이 채워집니다. 원하는 초를 입력한 뒤 `Enter` 또는 `Tab`을 누르면 실행됩니다. 결과에서 `Esc`를 누르면 목록으로 돌아가고, 목록에서 다시 누르면 콘솔이 닫힙니다.
 
 | 명령 예시 | 동작 |
 | --- | --- |

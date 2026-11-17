@@ -21,14 +21,21 @@ function read(): BrowserOptions {
   } catch { return {}; }
 }
 
-export const useBrowserOptions = create<{ options: BrowserOptions }>(() => ({ options: read() }));
+export const useBrowserOptions = create<{ options: BrowserOptions; defaults?: ConsoleDefaults }>(() => ({ options: {} }));
+
+export function applyConsoleDefaults(defaults?: ConsoleDefaults) {
+  useBrowserOptions.setState({ defaults, options: defaults?.browserOverrides === true ? read() : {} });
+}
 export function storeOptions(options: BrowserOptions) {
+  if (!useBrowserOptions.getState().defaults?.browserOverrides) return;
   if (Object.keys(options).length) localStorage.setItem(key, JSON.stringify(options));
   else localStorage.removeItem(key);
   useBrowserOptions.setState({ options });
 }
 if (typeof window !== 'undefined' && window.addEventListener) window.addEventListener('storage', event => {
-  if (event.key === key || event.key === null) useBrowserOptions.setState({ options: read() });
+  if ((event.key === key || event.key === null) && useBrowserOptions.getState().defaults?.browserOverrides) {
+    useBrowserOptions.setState({ options: read() });
+  }
 });
 
 export function browserDemoEnabled(options: BrowserOptions): boolean {

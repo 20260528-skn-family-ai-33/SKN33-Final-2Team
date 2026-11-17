@@ -26,6 +26,7 @@
 - 새 작업 브랜치는 최신 `main`에서 시작한다. 기존 작업 중에는 무조건 브랜치를 전환하거나 pull하지 않는다. 안전하게 전환한 뒤 `git pull --ff-only origin main`으로 동기화한다.
 - 팀 브랜치 형식은 `종류/이슈번호-짧은-설명`이다. 예: `feat/12-document-upload`, `hotfix/34-run-crash`. 실행 환경이 접두사를 요구하면 그 제약을 따르되 실제 이슈 번호와 목적을 유지한다. 번호를 만들어 내지 않는다.
 - 커밋·PR 제목은 `type: 변경 내용 (#이슈번호)`를 쓴다. 기본 type은 `feat`, `fix`, `docs`, `refactor`, `test`, `chore`다.
+- 1.0.0 이후 변경은 별도의 버전 요청이 없어도 PR당 루트 `VERSION`을 한 번 올린다. 커밋 전 최신 `origin/main`을 가져오고 저장소 루트에서 `node scripts/bump-version.mjs`를 실행한다. 기본 증분은 패치(`1.0.0` → `1.0.1`)이며 사용자가 지정한 상위 릴리스 번호는 보존한다. 같은 PR의 리뷰 수정은 중복 증분하지 않는다. 병합 전 `main`의 버전이 앞서거나 같아졌으면 다시 실행하고 최종 버전을 검증한다. 화면과 API는 루트 `VERSION`만 읽는다.
 - 예외: 오타·링크 수정, 단순 산출물 업데이트, 이미 합의된 내용이나 확인된 현황의 문서 간 동기화는 이슈 없이 PR만 올릴 수 있다. 브랜치는 `docs/짧은-설명`, 커밋·PR 제목은 `docs: 변경 내용`으로 쓴다. 기능·코드·공통 계약 변경이 함께 포함되면 이슈를 기준으로 진행한다. 커밋·푸시 승인과 PR 승인 규칙은 그대로 적용한다.
 - 커밋과 푸시 전에 변경 파일·주요 내용·검증 결과·대상 원격 저장소와 브랜치를 요약하고 사용자에게 명시적인 승인을 받는다. 승인받기 전에는 커밋·푸시를 실행하지 않는다. 사용자가 해당 변경의 커밋과 푸시를 함께 승인한 경우 그 범위에서는 재확인하지 않는다. 변경 범위나 대상이 달라지면 다시 확인한다. 커밋·푸시 승인은 PR 병합 승인으로 간주하지 않는다.
 - PR은 기본적으로 리뷰 가능한 일반 PR로 생성한다. 미완성 작업의 방향이나 인터페이스를 미리 공유할 때만 Draft를 사용한다. 원격 작업 권한이나 연결이 없으면 PR 본문 초안을 제공하고 미등록임을 밝힌다.
@@ -66,7 +67,7 @@
 
 - `database/`는 전달된 DB 기반 코드를 등록한 영역이다. 실행·외부 자료는 `database/README.md`와 `database/RESTORE.md`, 원본·이관 해시는 `database/import-manifest.json`을 따른다. Python 3.12 가상환경에서 의존성 설치 후 `database/`를 작업 경로로 두고 `python -m unittest tests.test_db_deployment tests.test_catalog_expansion tests.test_regulation_vectors tests.test_import_package -v`로 외부 연결 없는 검사를 실행한다. `tests.test_canonical_database`는 실제 복원 DB가 필요하므로 단위 검사와 분리한다. 이 검사를 목업 통합·실 DB 권한·검색 품질 검증으로 확대하지 않는다. 적용된 마이그레이션은 바이트·해시를 보존한다.
 
-- `frontend/`는 React + Vite + TypeScript 화면이다. 실행·검사 방법은 `frontend/README.md`를 따른다. `frontend/`를 작업 경로로 `npm ci` 뒤 `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`로 검사하고(PR마다 GitHub Actions `frontend`가 같은 순서로 실행), 실제 화면 흐름은 브라우저에서 별도로 확인한다. `backend/`는 5차 FastAPI 백엔드(팀 백엔드 준비 전 참고용)이며 원본과 다른 곳은 `backend/README.md`를 따른다. DB·백엔드·화면은 저장소 맨 위 `docker compose`로 함께 실행하고(README '11. 개발 환경 실행'), 파이썬 문법은 `python -m py_compile`로 확인한다.
+- `frontend/`는 React + Vite + TypeScript 화면이다. 실행·검사 방법은 `frontend/README.md`를 따른다. `frontend/`를 작업 경로로 `npm ci` 뒤 `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`로 검사하고(PR마다 GitHub Actions `frontend`가 같은 순서로 실행), 실제 화면 흐름은 브라우저에서 별도로 확인한다. `backend/`는 FastAPI 업무 서비스이며 설정과 검사 방법은 `backend/README.md`를 따른다. DB·백엔드·화면은 저장소 맨 위 `docker compose`로 함께 실행하고(README '11. 개발 환경 실행'), 파이썬 문법은 `python -m py_compile`로 확인한다.
 
 - 실제 저장소의 README, 패키지 설정, CI에서 검사 명령을 확인한다. 존재하지 않는 경로나 도구를 가정해 실행하지 않는다.
 - 전체 검색은 `backend/README.md`의 '공유 BGE-M3 DB 연결 (#124)'을 따른다. 기존 OpenAI DB를 보존하고 별도 `growpath_bge_m3`의 canonical 테이블을 읽는다. `database/src/shared/bge_model.json`의 공식 고정 revision·CLS·L2·1024차원만 사용하며 CPU 추론·정규화 기본은 FP32다. 규정 입력은 원래 context_path+빈 줄+chunk_text 계약을 확인하고, 강좌·도서도 BGE 질문 임베딩을 사용한다. 이전 임베딩 제공자 선택·small 클라이언트·sidecar·구형 백업 복원 경로는 제거한 상태를 유지한다. 공유 BGE DB에 이전 보충·설치기를 적용하지 않는다. 적용된 마이그레이션은 보존한다. 단위 검사는 `backend/`의 전체 unittest와 `test_shared_bge_database.py`, 실제 복원 DB 검증은 `tools/verify_bge_database.py --server`·`tools/check_bge_search.py`로 구분한다.

@@ -44,6 +44,8 @@ describe('로그인 베타 직원 목록', () => {
     // 로그인 버튼 아래 안내 문단은 뺐다(2026-11-17). 비밀번호 안내는 '비밀번호 찾기' 버튼이 알림으로 보여 준다
     expect(html).not.toContain('관리자 화면은 관리자 전용 계정으로 들어가요');
     expect(html).toContain('비밀번호 찾기');
+    expect(html).toContain(`GrowPath v${__APP_VERSION__}`);
+    expect(html).not.toMatch(/beta|베타/i);
     // 서비스 라벨은 로그인 상자로 옮기고, 예전 꼬리표와 제목 아래 안내 문구는 뺐다
     expect(html).toContain('개발·운영 직원 AI 역량 성장지원');
     expect(html).not.toContain('한국수자원공사 임직원 로그인');
@@ -53,7 +55,7 @@ describe('로그인 베타 직원 목록', () => {
     state.demo = { accounts: [{ code: 'TEST001', name: '테스트 직원', dept: '테스트 부서' }] };
     const html = renderToStaticMarkup(<LoginPage />);
     expect(html).toContain('직원 고르기');
-    expect(html).toContain('베타용 · 고르면 사번을 채워요');
+    expect(html).toContain('고르면 사번을 채워요');
     expect(html).toContain('TEST001');
     expect(html).toMatch(/<input[^>]*id="lgPw"[^>]*value=""/);
   });

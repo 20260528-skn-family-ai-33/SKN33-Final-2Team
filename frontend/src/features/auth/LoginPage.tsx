@@ -102,7 +102,7 @@ export function LoginPage() {
           <form id="loginForm" noValidate onSubmit={submit}>
             {accts.length > 0 && <div className="field lg-pick">
               <label htmlFor="lgPick">
-                직원 고르기 <span className="muted small">베타용 · 고르면 사번을 채워요</span>
+                직원 고르기 <span className="muted small">고르면 사번을 채워요</span>
               </label>
               <select
                 className="input"
