@@ -3,7 +3,8 @@ import { setAt } from '@/shared/state/bind';
 import { planReports, useWs } from '@/shared/state/workspace';
 import '@/features/draft/quiz/assessment/style.css';
 
-export function PostQuiz({ R, disabled, review = false }: { R: PlanRecord; disabled: boolean; review?: boolean }) {
+/** marked: 넘어가려다 막혔을 때 답하지 않은 문항에 빨간 테두리를 둔다 */
+export function PostQuiz({ R, disabled, review = false, marked = false }: { R: PlanRecord; disabled: boolean; review?: boolean; marked?: boolean }) {
   const details = useWs((s) => planReports(s, R)[0]?.postQuizDetails);
   const detailMap = new Map((details || []).map((d) => [d.id, d]));
   const groups = R.post.quizSurvey?.groups || [];
@@ -20,7 +21,8 @@ export function PostQuiz({ R, disabled, review = false }: { R: PlanRecord; disab
       const ans = R.post.quizAnswers?.[q.id] ?? (detail?.selectedIndex !== undefined ? String(detail.selectedIndex) : undefined);
       const hasAnswer = answer >= 0;
       const outcome = review && hasAnswer && ans !== undefined ? (Number(ans) === answer ? 'correct' : 'wrong') : null;
-      return <fieldset key={q.id} disabled={disabled}>
+      const missing = marked && !review && !Object.hasOwn(R.post.quizAnswers || {}, q.id);
+      return <fieldset key={q.id} disabled={disabled} className={missing ? 'is-missing' : undefined}>
         <legend>{review ? <><span className={`quiz-result-number${outcome ? ' ' + outcome : ''}`}>{index + 1}{outcome ? ` · ${outcome === 'correct' ? '정답' : '오답'}` : ''}</span> {q.q || q.text}</> : <>{index + 1}. {q.q || q.text}</>}</legend>
         <div className="choices">{q.options?.map((option, value) => {
           const chosen = ans === String(value);
