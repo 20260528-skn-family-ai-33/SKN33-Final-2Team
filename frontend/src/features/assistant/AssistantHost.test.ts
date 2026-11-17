@@ -80,12 +80,13 @@ describe('사내 생활 DB 근거 카드', () => {
     for (const text of ['근거 보기', '회사 소개', 'PDF 3쪽', '2025년 자료', '수자원 관리 업무를 수행한다.']) expect(html).toContain(text);
   });
 
-  it('범위 밖과 제공 금지 거절은 단일 결과 라벨로 표시한다', () => {
+  it('범위 밖과 제공 금지 거절에서 상태 라벨을 노출하지 않는다', () => {
     for (const a of [makeAnswer({ kind: 'out' }), makeAnswer({ evidenceStatus: 'refused', knowledgeSources: [] })]) {
       const html = renderToStaticMarkup(createElement(MemoryRouter, null, createElement(RegCard, { a, mlLabel: '범위 밖' })));
       expect(html).not.toContain('title="ML 질문 분류"');
       expect(html).not.toContain('title="LLM 근거 상태"');
-      expect(html).toContain('>답변 불가</span>');
+      expect(html).not.toContain('답변 불가');
+      expect(html).not.toContain('사내 생활 도우미');
     }
   });
 });
