@@ -896,6 +896,11 @@ a.me .me-go { width: 16px; height: 16px; flex: none; color: var(--ink-4); }
 .dq-opt:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 .dq-opt.dk { color: var(--ink-3); }
 .dq-essay { margin-top: 12px; }
+/* 빠뜨린 문항(사후 점검 · #298): 문구 없이 빨간 테두리만. 테마의 상자 테두리보다 앞서도록 html:root 를 붙인다 */
+html:root .qrow.is-missing { padding-inline: 12px; border: 1px solid var(--danger); border-radius: var(--rad-3); }
+html:root .dq.is-missing { border: 1px solid var(--danger); }
+html:root .card.is-missing { border-color: var(--danger); }
+.qrow.is-missing, .dq.is-missing, .card.is-missing { scroll-margin: 120px; }
 .dq-essay textarea { min-height: 84px; }
 .deep-ans { margin-top: 12px; }
 .deep-ans summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; cursor: pointer; }

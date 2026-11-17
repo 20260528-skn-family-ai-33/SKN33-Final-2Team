@@ -9,10 +9,10 @@ import { setAt, useAt } from '@/shared/state/bind';
 import { BText } from '@/shared/ui/bound';
 import { Icon } from '@/shared/ui/Icon';
 
-export function LikRow({ q, path, pre }: { q: QuizQuestion; path: string; pre?: string }) {
+export function LikRow({ q, path, pre, missing = false }: { q: QuizQuestion; path: string; pre?: string; missing?: boolean }) {
   const cur = String(useAt<string>(`${path}.${q.id}`) || '');
   return (
-    <div className="qrow">
+    <div className={`qrow${missing ? ' is-missing' : ''}`}>
       <p>
         {q.text}
         {pre ? <small className="muted">사전 응답: {ansLabel(pre)}</small> : null}
@@ -30,7 +30,7 @@ export function LikRow({ q, path, pre }: { q: QuizQuestion; path: string; pre?: 
   );
 }
 
-export function McqRow({ id, m, path }: { id: string; m: DeepQuiz['mcq'][string]; path: string }) {
+export function McqRow({ id, m, path, missing = false }: { id: string; m: DeepQuiz['mcq'][string]; path: string; missing?: boolean }) {
   const cur = String(useAt<string>(`${path}.${id}`) || '');
   const opt = (v: string, t: string) => (
     <label className={`dq-opt${v === 'dk' ? ' dk' : ''}`} key={v}>
@@ -39,7 +39,7 @@ export function McqRow({ id, m, path }: { id: string; m: DeepQuiz['mcq'][string]
     </label>
   );
   return (
-    <div className="dq">
+    <div className={`dq${missing ? ' is-missing' : ''}`}>
       <p className="dq-q">
         <span className="dq-tag">심화 · 객관식</span>
         {m.q}
@@ -69,7 +69,8 @@ export interface DeepPaths {
   essay: string;
 }
 
-export function QuizBody({ questions, path, preMap, dq }: { questions: QuizQuestion[]; path: string; preMap?: Record<string, string> | null; dq?: DeepPaths | null }) {
+/** missing: 빠뜨린 문항 표시(자가 진단은 문항 id, 심화 객관식은 `dq:문항 id`) */
+export function QuizBody({ questions, path, preMap, dq, missing }: { questions: QuizQuestion[]; path: string; preMap?: Record<string, string> | null; dq?: DeepPaths | null; missing?: ReadonlySet<string> }) {
   const areas = [...new Set(questions.map((q) => q.area))];
   return (
     <>
@@ -80,8 +81,8 @@ export function QuizBody({ questions, path, preMap, dq }: { questions: QuizQuest
             .filter((q) => q.area === a)
             .map((q) => (
               <Fragment key={q.id}>
-                <LikRow q={q} path={path} pre={preMap ? preMap[q.id] : undefined} />
-                {dq && dq.quiz.mcq[q.id] ? <McqRow id={q.id} m={dq.quiz.mcq[q.id]} path={dq.mcq} /> : null}
+                <LikRow q={q} path={path} pre={preMap ? preMap[q.id] : undefined} missing={missing?.has(q.id)} />
+                {dq && dq.quiz.mcq[q.id] ? <McqRow id={q.id} m={dq.quiz.mcq[q.id]} path={dq.mcq} missing={missing?.has(`dq:${q.id}`)} /> : null}
               </Fragment>
             ))}
           {dq ? dq.quiz.essays.filter((e) => e.area === a).map((e) => <EssayBox key={e.id} e={e} path={dq.essay} />) : null}
