@@ -1,4 +1,4 @@
-# GrowPath FastAPI 백엔드
+# backend — 5차 FastAPI 백엔드 사본 (참고·로컬 실행용)
 
 ## 챗봇 단계별 오류 추적 (#228)
 
@@ -20,24 +20,24 @@
 
 규정 PDF를 운영팀에 전달할 때는 프로젝트 루트에서 `docker compose cp backend:/srv/growpath/var/uploads/regulations ./regulation-pdfs`로 업로드된 PDF 폴더만 복사한다. `var/` 또는 `uploads` 볼륨 전체를 공유하면 `provider-keys/`의 키 원문도 전달된다.
 
-직원별 선택이 허용된 설치에서 공용 모델을 지정하지 않으면 ‘직원별 선택’을 사용한다. 관리자 고정을 해제하면 기존 직원별 설정이 다시 적용된다. 직원별 선택을 차단하려면 관리자가 사용할 제공자를 먼저 저장한 뒤 `GP5_EMPLOYEE_AI_SELECTION=off`로 백엔드를 재생성한다. 고정한 제공자가 없으면 관리자 화면에 Ollama 자동 적용 안내가 뜬다. 사용할 모델을 저장하면 안내가 사라진다. 저장 파일 형식이 손상되면 새 모델 호출을 차단한다. 관리자가 같은 화면에서 모델을 다시 선택하고 저장하면 복구된다.
+베타 기본값은 ‘직원별 선택’이다. 관리자 고정을 해제하면 기존 직원별 설정이 다시 적용된다. 베타 종료 시 관리자가 사용할 제공자를 먼저 저장한 뒤 `GP5_EMPLOYEE_AI_SELECTION=off`로 백엔드를 재생성한다. 고정한 제공자가 없으면 관리자 화면에 Ollama 자동 적용 안내가 뜬다. 사용할 모델을 저장하면 안내가 사라진다. 저장 파일 형식이 손상되면 새 모델 호출을 차단한다. 관리자가 같은 화면에서 모델을 다시 선택하고 저장하면 복구된다.
 
 직원별 선택 모드는 이번 배포부터 기존 직원과 신규 직원 모두 OpenAI API로 시작한다. 배포 전에 기존 DB에 [직원 모델 초기화 SQL](db/migrate_reset_employee_providers.sql)을 실행한다. 이전 기본값 변경 SQL만 적용한 DB에도 이 파일을 실행한다. 첫 실행에서 자동 저장됐거나 직접 선택한 `ollama` 값을 모두 `openai`로 바꾼다. 이후 직원이 다시 선택한 RunPod는 같은 SQL을 재실행해도 유지된다. 새 DB는 초기 스키마에서 이관을 완료한 상태로 시작한다.
 
 복구 시 새 행의 기본값은 `ALTER TABLE app_ext.user_settings ALTER COLUMN ai_provider SET DEFAULT 'ollama';`로 되돌릴 수 있다. 기존 직원별 선택까지 복구하려면 배포 전 백업의 `employee_id`와 `ai_provider`를 기준으로 복원한다.
 
-고정 모델 테스트를 맡은 직원의 `employee_id`를 배포 환경의 `GP5_CONSOLE_PROVIDER_EMPLOYEE_IDS`에 쉼표로 지정하고 백엔드를 재시작한다. 콘솔과 목록은 기본적으로 꺼져 있다. 테스트 환경에서 `GP5_CONSOLE_OVERRIDES=on`을 명시해야 목록이 적용된다. 허용된 직원은 모델이 고정된 동안 Ctrl+Alt+K에서 `model_select on`을 실행한 뒤 상단 AI 모델 선택 박스에서 모델을 고른다. 켜기만 하면 관리자 지정 모델을 계속 사용한다. 선택은 현재 브라우저 세션에 적용되고 `model_select off`로 관리자 지정 모델로 복귀한다. 모델 호출에는 서버에 설정한 해당 제공자의 키와 모델이 쓰인다. RunPod 개인 연결을 별도로 설정한 브라우저는 기존 시연 연결 규칙을 따른다.
+고정 모델 테스트를 맡은 직원의 `employee_id`를 배포 환경의 `GP5_CONSOLE_PROVIDER_EMPLOYEE_IDS`에 쉼표로 지정하고 백엔드를 재시작한다. 빈 목록이 기본이며 `GP5_CONSOLE_OVERRIDES=off`이면 목록도 비활성화된다. 허용된 직원은 모델이 고정된 동안 Ctrl+Alt+K에서 `model_select on`을 실행한 뒤 상단 AI 모델 선택 박스에서 모델을 고른다. 켜기만 하면 관리자 지정 모델을 계속 사용한다. 선택은 현재 브라우저 세션에 적용되고 `model_select off`로 관리자 지정 모델로 복귀한다. 모델 호출에는 서버에 설정한 해당 제공자의 키와 모델이 쓰인다. RunPod 개인 연결을 별도로 설정한 브라우저는 기존 시연 연결 규칙을 따른다.
 
 제공자 이름은 백엔드 영속 볼륨의 `var/ai-provider`에 저장한다. 서버 인스턴스가 여러 개면 같은 `GP5_VAR_DIR` 볼륨을 공유해야 한다. DB 백업에 이 파일은 포함되지 않는다.
 
-Compose의 `backend` 서비스는 직원·부서장·관리자 API를 제공합니다. 아래 변경 이력은 5차 목업에서 현재 서비스까지의 구현 기록입니다.
+화면 개발에 필요한 API를 로컬에서 띄우기 위한 **5차 목업 백엔드 사본**이에요. 팀원 백엔드가 준비되면 `docker-compose.yml`의 `backend` 서비스(또는 `frontend/.env.local`의 `API_PROXY_TARGET`)만 바꿔 끼워요. 2026-10-29 사용자 요청으로 이 사본의 챗봇에 로컬 RoBERTa 질문 분류를 연결했어요. 팀원 백엔드에도 반영됐다는 뜻은 아니에요.
 
 ## 들어 있는 것
 
 | 폴더 | 내용 |
 | --- | --- |
 | `app/` | FastAPI 앱(라우터·서비스·에이전트·관리자 엑셀) |
-| `tools/setup_db.py` | 복원된 공유 BGE DB를 읽기 전용으로 검사하는 스크립트 |
+| `tools/setup_db.py` | 팀 DB 백업 복원 뒤 보조 스키마(app_ext)·보충 자료를 넣는 스크립트 |
 | `db/` | 보조 스키마 SQL |
 | `web/` | 5차 옛 화면(새 React 화면과 나란히 비교하는 용도 · <http://localhost:8815>) |
 
