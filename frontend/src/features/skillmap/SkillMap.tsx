@@ -335,6 +335,8 @@ export function MapBox({ id, title, viewKey, build, wheelZoom = false }: { id: s
   const wrapRef = useRef<HTMLDivElement>(null);
   const infoRef = useRef<HTMLDivElement>(null);
   const keepScroll = useRef(false);
+  // 칩으로 옮겨 가면 누른 칩이 목록에서 사라져 초점이 body 로 빠진다 → 새로 누른 점으로 초점을 옮겨 Esc·Tab 이 이어지게 한다
+  const focusPick = useRef(false);
   // 지도가 화면에 들어온 뒤에 퍼져 나가기를 시작한다(화면 아래쪽에 있을 때 안 보이는 곳에서 끝나 버리지 않게).
   // 테마의 나타나기(덩어리가 떠오르기)와 겹치면 묻혀서 안 보이므로, 지도가 든 덩어리가 떠오른 뒤에 시작한다
   const [seen, setSeen] = useState(typeof IntersectionObserver === 'undefined');
@@ -404,7 +406,10 @@ export function MapBox({ id, title, viewKey, build, wheelZoom = false }: { id: s
 
   // 누른 뒤(설명 칸이 화면 아래에 떠오른 뒤) 누른 점이 가려졌으면 보이게 민다. 칩으로 옮겨 갈 때도 같다
   useEffect(() => {
-    if (pid != null && wrapRef.current) showPicked(wrapRef.current, infoRef.current);
+    if (pid == null || !wrapRef.current) return;
+    if (focusPick.current) wrapRef.current.querySelector<SVGGElement>('.sm-n.pick')?.focus({ preventScroll: true });
+    focusPick.current = false;
+    showPicked(wrapRef.current, infoRef.current);
   }, [pid]);
 
   const head =(n?: React.ReactNode) => (
@@ -444,7 +449,11 @@ export function MapBox({ id, title, viewKey, build, wheelZoom = false }: { id: s
     setPicked({ key: viewKey, id: pid === skillId ? null : skillId });
   };
   const clear = () => setPicked({ key: viewKey, id: null });
-  const ctl: InfoCtl = { close: clear, pick: (skillId) => setPicked({ key: viewKey, id: skillId }) };
+  const ctl: InfoCtl = { close: clear, pick: (skillId) => {
+      focusPick.current = true;
+      setPicked({ key: viewKey, id: skillId });
+    },
+  };
   const view = build(data, pid);
   return (
     <div className="sec" id={id}>
