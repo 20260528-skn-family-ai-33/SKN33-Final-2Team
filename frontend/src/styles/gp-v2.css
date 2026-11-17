@@ -810,6 +810,9 @@ a.me .me-go { width: 16px; height: 16px; flex: none; color: var(--ink-4); }
 .sm-wrap { overflow-x: auto; background: radial-gradient(circle at 1px 1px, #ECECE7 1px, transparent 0) 0 0 / 22px 22px #fff; }
 /* 크게 보기는 그림이 칸보다 커지므로 넓은 화면에서는 칸 높이를 묶고 안에서 밀어 본다(#227) */
 @media (min-width: 901px) { .sm-wrap.sm-big { max-height: 80vh; overflow-y: auto; } }
+/* 지도가 칸보다 크면(크게 보기 · Ctrl + 스크롤 확대) 마우스로 끌어 민다(#324 · dragPan.ts): 빈 곳은 편 손, 끄는 동안은 쥔 손. 점은 누를 수 있어 손가락 그대로 */
+.sm-wrap.sm-pan { cursor: grab; }
+.sm-wrap.sm-drag, .sm-wrap.sm-drag .sm-n { cursor: grabbing; }
 .sm-svg { display: block; margin: 0 auto; -webkit-user-select: none; user-select: none; }
 /* 퍼져 나가기(SkillMap.tsx): 화면에 들어오기 전(sm-wait)에는 그림을 숨겨 두고, 들어오면(sm-go) 가운데 점부터 차례로 나타난다.
    점은 가운데 쪽으로 조금 당겨진 자리(--sm-dx·--sm-dy)에서 제자리로 나오고, 시작 시각(--sm-d)은 가운데에서 먼 점일수록 늦다.
