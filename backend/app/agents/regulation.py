@@ -468,7 +468,7 @@ def classify_label_with_llm(ctx: rt.Ctx, question: str, history: list | None = N
     system = """너는 사내 질문의 유형을 정확하게 분류하는 AI 분류기다.
         사용자의 질문과 이전 대화를 읽고, 다음 4가지 라벨 중 가장 적절한 하나만 JSON으로 응답하라:
         1. '사내 규정': 취업규칙, 인사, 복무, 휴가, 출장, 교육비 지원, 승진, 징계, 퇴직 등 회사 사규·규정 관련 질문
-        2. '사내 생활안내': 구내식당 메뉴 및 운영시간, 통근버스 노선 및 시간표, 사내 복지시설, 회의실 예약 등 사내 생활편의 관련 질문
+        2. '사내 생활안내': 구내식당 위치·메뉴·식단표 및 운영시간, 통근버스 노선 및 시간표, 사내 복지시설, 회의실 예약 등 사내 생활편의 관련 질문
         3. '수자원공사 정보': K-water 회사 소개, 설립 목적, 주요 사업(수자원, 수도, 댐 등), 기관 정보 관련 질문
         4. '범위 밖': 사내 업무 및 생활과 무관한 일반 질문 (주식, 날씨, 연예인, 스포츠, 잡담 등)
 
@@ -487,10 +487,10 @@ def verify_or_reclassify_label_with_llm(ctx: rt.Ctx, question: str, label: str,
                                        confidence: float | None = None,
                                        history: list | None = None) -> str:
     """⭐ [2단계 - RoBERTa 확신도에 따라 라벨 확정 또는 LLM 재분류]
-    1. RoBERTa 확신도가 80%(0.80) 이상이면 1단계 분류 라벨을 그대로 확정한다.
-    2. 확신도가 80% 미만이거나 없으면 classify_label_with_llm을 호출해 재분류한다.
+    1. RoBERTa 확신도가 85%(0.85) 이상이면 1단계 분류 라벨을 그대로 확정한다.
+    2. 확신도가 85% 미만이거나 없으면 classify_label_with_llm을 호출해 재분류한다.
     """
-    if confidence is not None and confidence >= 0.8:
+    if confidence is not None and confidence >= 0.85:
         return label
 
     if ctx.mode in ('ollama', 'openai'):
@@ -765,9 +765,9 @@ def answer_with_pipeline(ctx: rt.Ctx, inp: dict) -> dict:
     # 1단계에서 정규화·결정한 조회 직군을 전달하고 로그인 프로필 원본은 보존한다.
     inp['me'] = dict(me, empGroup=classified['group'])
 
-    # [2단계] RoBERTa 확신도가 80% 미만이거나 없으면 LLM 재분류
+    # [2단계] RoBERTa 확신도가 85% 미만이거나 없으면 LLM 재분류
     with rt.stage(ctx, '2.reclassify', '2단계 · 분류 확인·재분류') as step:
-        step['modelRequired'] = confidence is None or confidence < 0.8
+        step['modelRequired'] = confidence is None or confidence < 0.85
         effective_label = verify_or_reclassify_label_with_llm(ctx, q, label, confidence, follow_history)
         step['labelResult'] = effective_label
 

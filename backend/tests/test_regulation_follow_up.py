@@ -61,7 +61,7 @@ class RegulationFollowUpTest(unittest.TestCase):
         ])
 
     def test_high_confidence_including_threshold_skips_reclassification(self):
-        for confidence in (0.8, 0.9):
+        for confidence in (0.85, 0.9):
             with self.subTest(confidence=confidence):
                 self.classify.return_value = {'label': '사내 규정', 'confidence': confidence}
                 result, model, _ = self.ask('그럼 제9조는?')
@@ -71,7 +71,7 @@ class RegulationFollowUpTest(unittest.TestCase):
 
     def test_low_or_missing_confidence_reclassifies_before_grounded_follow_up(self):
         for provider in ('ollama', 'openai'):
-            for confidence in ({'confidence': 0.79}, {'confidence': 0.0}, {'confidence': None}, {}):
+            for confidence in ({'confidence': 0.84}, {'confidence': 0.0}, {'confidence': None}, {}):
                 with self.subTest(provider=provider, confidence=confidence):
                     self.ctx.provider = provider
                     self.classify.return_value = {'label': '사내 규정', **confidence}
@@ -90,12 +90,23 @@ class RegulationFollowUpTest(unittest.TestCase):
                     self.assertTrue(inp['_classification']['usedHistory'])
 
     def test_reclassified_outside_follow_up_skips_search_and_answer_generation(self):
-        self.classify.return_value = {'label': '사내 규정', 'confidence': 0.79}
+        self.classify.return_value = {'label': '사내 규정', 'confidence': 0.84}
         result, model, _ = self.ask('그 내용을 더 설명해 주세요', reclassified_label='범위 밖')
         self.assertEqual(result['kind'], 'out')
         model.assert_called_once()
         self.assert_summary_history(model)
         self.search.assert_not_called()
+
+    def test_cafeteria_menu_at_80_percent_confidence_reclassifies_to_life_guide(self):
+        """RoBERTa 확신도 80.6%로 범위 밖 판정된 '식단표는?' 질의가 85% 임계치에 의해 2단계 재분류를 거쳐 사내 생활안내로 확정된다."""
+        self.classify.return_value = {'label': '범위 밖', 'confidence': 0.806375}
+        with patch.object(reg.knowledge, 'search_life', return_value=[]):
+            result, model, _ = self.ask('식단표는?', reclassified_label='사내 생활안내', status='not_found')
+        self.assertEqual(model.call_count, 2)
+        classify_call, _ = model.call_args_list
+        self.assertEqual(classify_call.args[2], {'question': '식단표는?'})
+        self.assertEqual(result['topic'], 'life')
+        self.assertEqual(result['evidenceStatus'], 'not_found')
 
     def test_invalid_reclassification_stops_before_search(self):
         self.classify.return_value = {'label': '사내 규정'}
