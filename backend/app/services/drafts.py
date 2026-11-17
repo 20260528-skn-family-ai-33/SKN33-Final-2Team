@@ -1024,15 +1024,20 @@ def confirm(employee_id: int, draft_id: str, start_mode: str | None = None) -> d
         plan = RM.build_plan(o, RM.params_of(d.get('handoff') or {}, o), d['goal'])
         validate_free_plan(t, plan, budget=(d.get('prefs') or {}).get('budget'))
         if assessment:
-            survey_groups = (assessment.get('survey') or {}).get('groups') or []
-            raw_answers = assessment.get('answers') or {}
+            survey_groups = (assessment.get('survey') or {}).get('groups')
+            raw_answers = assessment.get('answers')
+            if not isinstance(survey_groups, list) or not isinstance(raw_answers, dict):
+                raise ApiError(409, 'ASSESSMENT_INCOMPLETE', '사전 점검 답변이 누락됐어요. 점검을 다시 확인해 주세요.')
             questions = [dict(q, skill=group['skill'], area=group['skill']) for group in survey_groups for q in group.get('surveys', [])]
-            answers = {q['id']: str(raw_answers.get(q['id'], 3)) for q in questions if q.get('id')}
+            required_ids = [q.get('id') for group in survey_groups for kind in ('surveys', 'quizzes') for q in group.get(kind, [])]
+            if any(not qid or qid not in raw_answers or raw_answers[qid] is None or (isinstance(raw_answers[qid], str) and not raw_answers[qid].strip()) for qid in required_ids):
+                raise ApiError(409, 'ASSESSMENT_INCOMPLETE', '사전 점검 답변이 누락됐어요. 점검을 다시 확인해 주세요.')
+            answers = {q['id']: str(raw_answers[q['id']]) for q in questions}
             capture = dict(d, quiz={'questions': questions, 'domain': ' · '.join(final_handoff.get('focus') or [])}, answers=answers)
             _save_questions(t, draft_id, capture)
             _save_answers(t, draft_id, capture)
             assess = {'questions': questions, 'answers': answers, 'domain': capture['quiz']['domain'],
-                'v2': {'survey': copy.deepcopy(assessment.get('survey') or {}), 'answers': copy.deepcopy(raw_answers)}}
+                'v2': {'survey': copy.deepcopy(assessment['survey']), 'answers': copy.deepcopy(raw_answers)}}
         else:
             assess = {'questions': d['quiz']['questions'], 'answers': dict(d['answers']), 'domain': d['quiz']['domain']}
         if not assessment and deep_on(d) and (d.get('diag') or {}).get('deep'):
