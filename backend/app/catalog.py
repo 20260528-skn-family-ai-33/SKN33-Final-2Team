@@ -251,16 +251,22 @@ def _word_re(w: str) -> re.Pattern:
 
 
 def search(kind: str = '', q: str = '', stage_min: int = 0, exclude: list | None = None, limit: int = 30, offset: int = 0,
-           include_certs: bool = True) -> dict:
+           include_certs: bool = True, *, platform: str = '', sort: str = 'default') -> dict:
     """학습 자료 목록·고르기 창 (API-53). 추천에 쓰는 자료만, 검색어는 제목·제공처·스킬에서 찾는다.
     검색어가 있으면 제목에 맞는 자료를 먼저 보여 주고, 제목·제공처·종류가 같은 중복 행(팀 DB에 언어별로 따로 있는 모듈 등)은 하나만 보여 준다"""
     ex = set(exclude or [])
     words = [_word_re(w) for w in re.split(r'\s+', (q or '').strip().lower()) if w]
     out = []
+    platforms = set()
     for r in _search_items().values():
         if not r['usable'] or r['id'] in ex or (kind and r['kind'] != kind) or (not include_certs and r['type'] == 'cert'):
             continue
         if stage_min and (r['stage'] or 2) < stage_min:
+            continue
+        site = (r.get('platform') or '').strip()
+        if kind == '강좌' and site:
+            platforms.add(site)
+        if platform and (r['type'] != 'course' or site != platform):
             continue
         score = 0
         if words:
@@ -272,7 +278,7 @@ def search(kind: str = '', q: str = '', stage_min: int = 0, exclude: list | None
         out.append((score, r))
     # 검색 점수 → 강좌·공식 문서 → 도서 → 자격, 같은 종류 안에서는 쉬운 단계·대출 많은 도서·제목 순
     order = {'course': 0, 'doc': 0, 'book': 1, 'cert': 2}
-    out.sort(key=lambda x: (-x[0], order[x[1]['type']], x[1]['stage'] or 2, -(x[1].get('loans') or 0), x[1]['title']))
+    out.sort(key=lambda x: (-x[0], order[x[1]['type']], x[1]['stage'] or 2, -(x[1].get('loans') or 0), x[1]['title'], x[1]['id']))
     seen, uniq = set(), []
     for _, r in out:
         k = (r['title'].strip().lower(), r['provider'], r['kind'])
@@ -280,7 +286,13 @@ def search(kind: str = '', q: str = '', stage_min: int = 0, exclude: list | None
             continue
         seen.add(k)
         uniq.append(r)
-    return {'total': len(uniq), 'items': [_public(r) for r in uniq[offset:offset + limit]]}
+    # 같은 자료의 대표 행을 먼저 확정해야 정렬 방향을 바꿔도 자료 ID가 유지된다.
+    if sort in ('title_asc', 'title_desc'):
+        uniq.sort(key=lambda r: (r['title'].strip().casefold(), r['id']), reverse=sort == 'title_desc')
+    result = {'total': len(uniq), 'items': [_public(r) for r in uniq[offset:offset + limit]]}
+    if kind == '강좌':
+        result['platforms'] = sorted(platforms)
+    return result
 
 
 # ── 에이전트에게 넘길 자료 목록 ──
