@@ -14,6 +14,7 @@ import { ApiError } from '@/api/client';
 import { matchingCertificates } from '@/features/roadmap/roadmapLearningData';
 import { useMe } from '@/shared/state/session';
 import { afterReveal } from '@/skins/afterReveal';
+import { createDragPan, overflowsX, overflowsY } from './dragPan';
 import { actWeek, canvasMeasure, coverOf, edgeEnds, focusOf, place, relOf, revealDelta, weeksOf, type Cover, type Layout } from './layout';
 
 let layoutCache: { d: SkillMapData; m: Layout } | null = null;
@@ -327,6 +328,10 @@ export function MapBox({ id, title, viewKey, build, wheelZoom = false }: { id: s
   const [picked, setPicked] = useState<{ key: string; id: number | null }>({ key: viewKey, id: null });
   const [big, setBig] = useState(bigNow());
   const [zoom, setZoom] = useState(1);
+  // 지도가 칸보다 크면(크게 보기 · Ctrl + 스크롤 확대) 마우스로 끌어 민다(#324). 그때만 손바닥, 끄는 동안은 쥔 손 커서
+  const [canPan, setCanPan] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const [pan] = useState(() => createDragPan(setDragging));
   const wrapRef = useRef<HTMLDivElement>(null);
   const infoRef = useRef<HTMLDivElement>(null);
   const keepScroll = useRef(false);
@@ -366,6 +371,17 @@ export function MapBox({ id, title, viewKey, build, wheelZoom = false }: { id: s
     wrap.addEventListener('wheel', onWheel, { passive: false });
     return () => wrap.removeEventListener('wheel', onWheel);
   }, [data, q.error, wheelZoom]);
+
+  // 크게 보기·확대·창 크기가 바뀌어 지도가 칸을 넘는지 달라지면 커서를 다시 정한다(끌기 자체는 누를 때 dragPan 이 다시 잰다)
+  useLayoutEffect(() => {
+    const wrap = wrapRef.current;
+    const svg = wrap?.querySelector('svg');
+    if (!wrap || !svg) return;
+    const ro = new ResizeObserver(() => setCanPan(overflowsX(wrap) || overflowsY(wrap)));
+    ro.observe(wrap);
+    ro.observe(svg);
+    return () => ro.disconnect();
+  }, [data, big, zoom]);
 
   // 실제 크기로 볼 때(좁은 화면·크게 보기)는 강조한 스킬이 가운데 오게 밀어 둔다
   useLayoutEffect(() => {
@@ -457,7 +473,12 @@ export function MapBox({ id, title, viewKey, build, wheelZoom = false }: { id: s
         }}
       >
         <div className="sm-key">{view.keys}</div>
-        <div className={`sm-wrap${big ? ' sm-big' : ''} ${seen ? 'sm-go' : 'sm-wait'}`} ref={wrapRef} title={wheelZoom ? 'Ctrl + 스크롤로 확대·축소' : undefined}>
+        <div
+          className={`sm-wrap${big ? ' sm-big' : ''}${canPan ? ' sm-pan' : ''}${dragging ? ' sm-drag' : ''} ${seen ? 'sm-go' : 'sm-wait'}`}
+          ref={wrapRef}
+          title={wheelZoom ? 'Ctrl + 스크롤로 확대·축소' : undefined}
+          {...pan}
+        >
           <Svg data={data} view={view} picked={pid} onPick={pick} onClear={clear} big={big} zoom={zoom} />
         </div>
         {/* 스킬을 눌렀을 때만 화면 아래에 붙여 지도 위에 띄운다(지도가 화면보다 길어 맨 아래 설명이 눈에 안 띄어서) */}

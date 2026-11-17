@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { LoginPage } from './LoginPage';
+import { loadLastLoginId } from './lastLoginId';
 
 const state = vi.hoisted(() => ({ demo: { accounts: [] as Array<{ code: string; name: string; dept: string }> } }));
 vi.mock('@/shared/state/session', () => ({
@@ -12,6 +13,26 @@ vi.mock('@/shared/state/ai', () => ({ ai: {}, cause: vi.fn(), ping: vi.fn() }));
 vi.mock('@/shared/state/ui', () => ({ toast: vi.fn() }));
 // 화면 모드 버튼은 불러오기만 해도 <html> 에 테마를 붙여(skins/index.ts) 브라우저가 없는 검사에서는 빈 버튼으로 바꾼다
 vi.mock('@/skins/ThemeControls', () => ({ ThemeToggle: () => null }));
+vi.mock('./lastLoginId', () => ({ loadLastLoginId: vi.fn(() => ''), saveLastLoginId: vi.fn() }));
+
+afterEach(() => vi.mocked(loadLastLoginId).mockReturnValue(''));
+
+describe('마지막 로그인 사번 유지', () => {
+  it('기억한 사번이 있으면 아이디 칸에 채우고 비밀번호 칸에 초점을 둔다', () => {
+    state.demo = { accounts: [] };
+    vi.mocked(loadLastLoginId).mockReturnValue('20200001');
+    const html = renderToStaticMarkup(<LoginPage />);
+    expect(html).toMatch(/<input[^>]*id="lgId"[^>]*value="20200001"/);
+    expect(html).toMatch(/<input[^>]*id="lgPw"[^>]*value=""/);
+    expect(html).toMatch(/<input[^>]*id="lgPw"[^>]*autofocus/i);
+  });
+  it('기억한 사번이 없으면 아이디 칸을 비우고 초점을 옮기지 않는다', () => {
+    state.demo = { accounts: [] };
+    const html = renderToStaticMarkup(<LoginPage />);
+    expect(html).toMatch(/<input[^>]*id="lgId"[^>]*value=""/);
+    expect(html).not.toMatch(/autofocus/i);
+  });
+});
 
 describe('로그인 베타 직원 목록', () => {
   it('베타 직원 선택이 꺼져도 사번 직접 입력과 비밀번호 찾기를 제공한다', () => {

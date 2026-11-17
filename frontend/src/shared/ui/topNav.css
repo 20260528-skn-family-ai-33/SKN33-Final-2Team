@@ -47,6 +47,7 @@
 /* ── 오른쪽 칸 ── */
 .nav-r { display: flex; align-items: center; gap: 4px; }
 :root .side .nav-r .width-tg,
+:root .side .nav-r .contrast-tg,
 :root .side .nav-r .theme-tg,
 :root .side .nav-r .notif-button,
 :root .side .nav-r .logout {
@@ -56,11 +57,13 @@
   transition: background-color .15s ease, opacity .15s ease;
 }
 :root .side .nav-r .width-tg:hover,
+:root .side .nav-r .contrast-tg:hover,
+:root .side .nav-r .contrast-tg[aria-pressed="true"],
 :root .side .nav-r .theme-tg:hover,
 :root .side .nav-r .notif-button:hover,
 :root .side .nav-r .notif-button[aria-expanded="true"],
 :root .side .nav-r .logout:hover { opacity: 1; background: color-mix(in srgb, currentColor 10%, transparent); color: inherit; }
-:root .side .nav-r :is(.width-tg, .theme-tg, .notif-button, .logout) svg { width: 18px; height: 18px; }
+:root .side .nav-r :is(.width-tg, .contrast-tg, .theme-tg, .notif-button, .logout) svg { width: 18px; height: 18px; }
 .side .nav-r .notif { margin: 0; }
 .side .nav-r .notif-l { display: none; }
 /* 읽지 않은 알림 수: 종 아이콘 오른쪽 위 작은 표시 */

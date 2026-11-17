@@ -24,10 +24,11 @@ import { paths } from '@/app/paths';
 import { D } from '@/shared/constants/data';
 import { useGo } from '@/shared/hooks/useGo';
 import { buildPlan, planWeeklyHours } from '@/shared/lib/plan';
-import { cause } from '@/shared/state/ai';
+import { cause, useSlowAi } from '@/shared/state/ai';
 import { setAt } from '@/shared/state/bind';
 import { resOf, useCatalog } from '@/shared/state/catalog';
 import { failToast } from '@/shared/lib/fail';
+import { waitTime } from '@/shared/lib/waitTime';
 import { closeSheet, openSheet, toast } from '@/shared/state/ui';
 import { updateWs, useWs, ws } from '@/shared/state/workspace';
 import { BText } from '@/shared/ui/bound';
@@ -231,6 +232,7 @@ function useRegenToast(): void {
 
 export function OptionsStep() {
   usePrepareMaterials();
+  const slow=useSlowAi();
   const [selecting,setSelecting]=useState(false);
   /* 기본은 고른 코스의 자료만 보여 주고, 원할 때만 세 코스를 나란히 본다(#224) */
   const [compare,setCompare]=useState(false);
@@ -469,7 +471,7 @@ export function OptionsStep() {
           {!chosen && !compare ? <div className="opt-empty">위에서 코스를 먼저 골라 주세요</div> : null}
           {/* 세 코스의 자료 편집기는 늘 떠 있다(기간·금액 계산과 저장을 맡는다). 보기 방식만 바꾼다 */}
           <section id="roadmap-material-comparison" ref={materialPanel} className={compare ? 'roadmap-material-panel full-width-materials' : 'opt-materials'} aria-label={compare ? '스킬별 학습 자료 비교' : '고른 코스의 학습 자료'}>
-            {compare && !comparisonVisible ? <><div className="loading" role="status"><span className="sp" aria-hidden="true" /><span>코스별 자료 제안을 준비하고 있어요. 1~2분쯤 걸릴 수 있어요.</span></div><Skeleton kind="columns" count={ps.length||3}/></> : null}
+            {compare && !comparisonVisible ? <><div className="loading" role="status"><span className="sp" aria-hidden="true" /><span>코스별 자료 제안을 준비하고 있어요. {waitTime('1~2분쯤 걸릴 수 있어요', slow)}.</span></div><Skeleton kind="columns" count={ps.length||3}/></> : null}
             <div hidden={compare && !comparisonVisible}>
               {compare ? <MaterialSkillTabs names={materialNames} active={activeMaterialSkill} onChange={setMaterialSkill} id={materialTabsId} panelId="material-comparison-panel"/> : null}
               <div className={compare ? 'material-course-comparison' : 'opt-material-list'} role={compare ? 'tabpanel' : undefined} id="material-comparison-panel" aria-labelledby={compare ? `${materialTabsId}-tab-${materialNames.indexOf(activeMaterialSkill)}` : undefined}>

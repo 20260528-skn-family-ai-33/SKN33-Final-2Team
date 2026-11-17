@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { choiceToRemember, DEFAULT_SKIN, formatChoice, MODE_SKIN, modeOf, parseChoice, pickChoice } from './pick';
 
 const ids = ['tm464', 'tm612'];
-const plain = (skin: string) => ({ skin, narrow: false });
+const plain = (skin: string) => ({ skin, narrow: false, lowContrast: false });
 
 describe('화면 모드', () => {
   it('라이트는 464 · 다크는 612', () => {
@@ -38,16 +38,22 @@ describe('pickChoice', () => {
   });
   it('예전 좌측 메뉴 꼬리표(:side)는 버리고 테마와 본문 폭은 그대로', () => {
     expect(pickChoice(null, 'tm464:side', ids)).toEqual(plain('tm464'));
-    expect(pickChoice('tm464:side:narrow', null, ids)).toEqual({ skin: 'tm464', narrow: true });
-    expect(pickChoice('tm612:narrow:side', null, ids)).toEqual({ skin: 'tm612', narrow: true });
+    expect(pickChoice('tm464:side:narrow', null, ids)).toEqual({ skin: 'tm464', narrow: true, lowContrast: false });
+    expect(pickChoice('tm612:narrow:side', null, ids)).toEqual({ skin: 'tm612', narrow: true, lowContrast: false });
   });
 });
 
 describe('parseChoice · formatChoice', () => {
   it('글자 ↔ 고른 값이 서로 되돌아간다', () => {
-    for (const v of ['tm464', 'tm464:narrow', 'tm612', 'tm612:narrow']) {
+    for (const v of ['tm464', 'tm464:narrow', 'tm612', 'tm612:narrow', 'tm464:low', 'tm612:low', 'tm612:narrow:low']) {
       expect(formatChoice(parseChoice(v))).toBe(v);
     }
+  });
+  it('저대비 꼬리표(:low)는 테마·본문 폭과 따로 읽고, 적는 순서는 narrow 다음', () => {
+    expect(parseChoice('tm612:low')).toEqual({ skin: 'tm612', narrow: false, lowContrast: true });
+    expect(parseChoice('tm464:low:narrow')).toEqual({ skin: 'tm464', narrow: true, lowContrast: true });
+    expect(formatChoice(parseChoice('tm464:low:narrow'))).toBe('tm464:narrow:low');
+    expect(pickChoice(null, 'tm464:low', ids)).toEqual({ skin: 'tm464', narrow: false, lowContrast: true });
   });
   it('모르는 꼬리표와 예전 :side 는 버린다', () => {
     expect(parseChoice('tm464:wide')).toEqual(plain('tm464'));
@@ -68,5 +74,6 @@ describe('choiceToRemember', () => {
     expect(choiceToRemember('tm464', ids)).toBe('tm464');
     expect(choiceToRemember('tm464:narrow:side', ids)).toBe('tm464:narrow');
     expect(choiceToRemember('tm612:wide', ids)).toBe('tm612');
+    expect(choiceToRemember('tm612:low:side', ids)).toBe('tm612:low');
   });
 });

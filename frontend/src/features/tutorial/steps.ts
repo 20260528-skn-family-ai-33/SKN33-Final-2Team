@@ -2,6 +2,7 @@
    로그인 화면에 넣을 작성 흐름 촬영도 이 순서를 그대로 쓴다(화면 코드를 가져오지 않는 순수 자료).
    대상은 화면 요소에 붙인 data-tour 이름이다. 진행 위치는 지금 주소로 정하므로 새로 고쳐도 그 화면의 첫 단계부터 이어진다 */
 import { paths } from '@/app/paths';
+import { SLOW_WAIT } from '@/shared/lib/waitTime';
 
 export interface TourStep {
   id: string;
@@ -23,7 +24,7 @@ export interface TourStep {
   /** 아직 안내할 수 없을 때(AI 가 만드는 중 · 버튼이 꺼져 있음) 대신 비출 곳과 기다리라는 문구.
       busy 가 있으면 그 선택자에 맞는 요소(만드는 중 표시)가 있을 때만 기다리라고 한다 — 실패해서 멈춘 화면을 '만드는 중'이라 하지 않게.
       also 에 맞는 요소들은 비추는 자리에 함께 넣는다.
-      slowText 는 걸리는 시간을 적은 문구의 RunPod-Ollama 판(로컬 모델은 훨씬 오래 걸린다) */
+      slowText 는 걸리는 시간을 적은 문구의 RunPod-Ollama 판(로컬 모델은 훨씬 오래 걸린다 · 시간은 shared/lib/waitTime 의 SLOW_WAIT) */
   wait?: { targets: string[]; text: string; slowText?: string; busy?: string; also?: string };
   /** 대상 안에서 이 선택자에 맞는 것을 누르면 '다음'을 누른 것과 같다 */
   pick?: string;
@@ -66,13 +67,13 @@ export const TOUR_STEPS: TourStep[] = [
   {
     id: 'quiz', path: paths.newQuiz, screen: '역량 테스트', targets: ['quiz-first'], text: '문항마다 하나씩 골라요. 설문 다음에 퀴즈가 이어져요.', advance: 'next', pick: 'input[type="radio"]',
     done: QUIZ_PHASE,
-    wait: { targets: ['quiz-wait'], text: 'AI가 내 목표에 맞는 문항을 만들고 있어요. 잠시만 기다려 주세요.', slowText: 'AI가 내 목표에 맞는 문항을 만들고 있어요. 최대 10분까지 걸릴 수 있어요.' },
+    wait: { targets: ['quiz-wait'], text: 'AI가 내 목표에 맞는 문항을 만들고 있어요. 잠시만 기다려 주세요.', slowText: `AI가 내 목표에 맞는 문항을 만들고 있어요. ${SLOW_WAIT}.` },
   },
   {
     // 설문을 답하는 동안에는 비추지 않고, 퀴즈로 넘어와 아직 만드는 중이면 그 자리를 비추며 기다리게 한다
     id: 'quiz-items', path: paths.newQuiz, screen: '역량 테스트', targets: ['quiz-first'], text: '퀴즈가 준비됐어요. 문항마다 답을 하나 골라요.', advance: 'next', pick: 'input[type="radio"]',
     when: QUIZ_PHASE,
-    wait: { targets: ['quiz-gen-wait'], text: 'AI가 퀴즈 문항을 만들고 있어요. 잠시만 기다려 주세요.', slowText: 'AI가 퀴즈 문항을 만들고 있어요. 최대 10분까지 걸릴 수 있어요.' },
+    wait: { targets: ['quiz-gen-wait'], text: 'AI가 퀴즈 문항을 만들고 있어요. 잠시만 기다려 주세요.', slowText: `AI가 퀴즈 문항을 만들고 있어요. ${SLOW_WAIT}.` },
   },
 
   { id: 'result', path: paths.newResult, screen: '테스트 결과', targets: ['result-summary'], text: '역량 테스트 결과예요.', advance: 'next' },
@@ -82,13 +83,13 @@ export const TOUR_STEPS: TourStep[] = [
   {
     // 기다리는 동안에는 진행 막대와 그 아래 코스별 작성 상황까지 함께 비춘다
     id: 'gen', path: paths.newGen, screen: '로드맵 3안 작성', targets: ['gen-next'], text: '3안이 준비됐어요.', advance: 'click', alignEnd: true,
-    wait: { targets: ['gen-wait'], text: 'AI가 방식이 다른 로드맵 3안을 만들고 있어요. 1~2분쯤 걸려요.', slowText: 'AI가 방식이 다른 로드맵 3안을 만들고 있어요. 최대 10분까지 걸릴 수 있어요.', also: '[data-tour="gen-rows"] > .agent' },
+    wait: { targets: ['gen-wait'], text: 'AI가 방식이 다른 로드맵 3안을 만들고 있어요. 1~2분쯤 걸려요.', slowText: `AI가 방식이 다른 로드맵 3안을 만들고 있어요. ${SLOW_WAIT}.`, also: '[data-tour="gen-rows"] > .agent' },
   },
 
   { id: 'courses', path: paths.newOptions, screen: '로드맵·자료 선택', targets: ['courses'], text: '코스 하나를 골라요.', advance: 'auto', done: '[data-tour="courses"] .opt-course.is-on' },
   {
     id: 'materials', path: paths.newOptions, screen: '로드맵·자료 선택', targets: ['materials'], text: '고른 코스의 강좌와 도서예요. 바꿀 수 있어요.', advance: 'next',
-    when: ON('options-next'), wait: { targets: ['materials'], text: 'AI가 고른 코스에 맞는 강좌와 도서를 찾고 있어요. 1~2분쯤 걸릴 수 있어요.', slowText: 'AI가 고른 코스에 맞는 강좌와 도서를 찾고 있어요. 최대 10분까지 걸릴 수 있어요.', busy: '.step-bar-wait' },
+    when: ON('options-next'), wait: { targets: ['materials'], text: 'AI가 고른 코스에 맞는 강좌와 도서를 찾고 있어요. 1~2분쯤 걸릴 수 있어요.', slowText: `AI가 고른 코스에 맞는 강좌와 도서를 찾고 있어요. ${SLOW_WAIT}.`, busy: '.step-bar-wait' },
   },
   {
     id: 'options-next', path: paths.newOptions, screen: '로드맵·자료 선택', targets: ['options-next'], text: '자료를 정했으면 검토로 넘어가요.', advance: 'click',
@@ -97,7 +98,7 @@ export const TOUR_STEPS: TourStep[] = [
 
   {
     id: 'summary', path: paths.newReview, screen: '검토·확정', targets: ['summary'], text: '전체 기간과 학습 시간이에요.', advance: 'next',
-    when: ON('confirm'), wait: { targets: ['summary'], text: 'AI가 고른 자료로 일정과 과제를 만들고 있어요. 30초에서 1분쯤 걸려요.', slowText: 'AI가 고른 자료로 일정과 과제를 만들고 있어요. 최대 10분까지 걸릴 수 있어요.', busy: '.rv-status' },
+    when: ON('confirm'), wait: { targets: ['summary'], text: 'AI가 고른 자료로 일정과 과제를 만들고 있어요. 30초에서 1분쯤 걸려요.', slowText: `AI가 고른 자료로 일정과 과제를 만들고 있어요. ${SLOW_WAIT}.`, busy: '.rv-status' },
   },
   { id: 'schedule', path: paths.newReview, screen: '검토·확정', targets: ['schedule'], text: '주차마다 할 일이에요.', advance: 'next', when: ON('confirm') },
   { id: 'tasks', path: paths.newReview, screen: '검토·확정', targets: ['tasks'], text: '스킬마다 해 볼 과제예요. 다른 과제로 바꿀 수 있어요.', advance: 'next', when: ON('confirm'), focus: '.rv-skill' },

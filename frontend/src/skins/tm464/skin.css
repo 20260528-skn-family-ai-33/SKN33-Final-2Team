@@ -275,4 +275,55 @@
     .t.lg { font-size: 27px; }
     .adm-panel { top: var(--rib-h); }
   }
+
+  /* ════════════ 저대비(#322 · <html data-contrast="low"> · 상단 메뉴의 저대비 버튼) ════════════
+     라이트 모드는 글자가 이미 진하지 않아(본문 약 6.3:1) 눈부심은 넓은 흰 면에서 온다 → 흰 바탕·흰 상자를 옅은 회색으로 낮추고,
+     제목 글자는 조금 올리고(약 13:1 → 9.6:1), 낮아진 바탕에서 본문·보조 글자가 묻히지 않게 조금 진하게 했다
+     (상자 바탕 대비: 본문 약 5.8:1 · 보조 약 4.4:1 — 보조는 기본의 약 3.5:1 보다 높다). 강조색은 채도를 조금 눌렀다.
+     :where 로 감싸 위 규칙들과 명시도를 같게 두고, 파일 맨 끝에 있어 같은 선택자를 그대로 다시 적으면 이 묶음이 이긴다.
+     기본 CSS(gp*.css)가 흰색을 직접 적은 상자는 이 묶음 바로 아래 따로 낮춘다 */
+  &:where([data-contrast="low"]) {
+    --accent: #D2592F !important;
+    --accent-soft: color-mix(in srgb, var(--accent) 7%, var(--surface));
+    --accent-soft2: color-mix(in srgb, var(--accent) 13%, var(--surface));
+    --accent-line: color-mix(in srgb, var(--accent) 32%, var(--surface));
+    --tm-dark: #333333;
+    --bg: #E6E6E6; --surface: #EFEFEF; --surface-2: #EAEAEA; --sunk: #E0E0E0; --line: #D6D6D6; --line-2: #C0C0C0;
+    --ink: #3C3C3C; --ink-2: #5C5C5C; --ink-3: #6E6E6E; --ink-4: #969696;
+    --warn-soft: #F3E6D6;
+
+    /* 이 테마가 흰색을 직접 적은 곳 */
+    .ribbon, .login-card, .pstrip div, .btn.pri:hover { background: var(--surface); }
+    @media (min-width: 901px) {
+      .side, .side .demo[open] { background: var(--surface); }
+    }
+    @media (max-width: 900px) {
+      .side { background: var(--surface); }
+    }
+    .bar { background: #DADADA; }
+    .stepper { background: rgba(239, 239, 239, .9); }
+    .seg { background: var(--sunk); }
+  }
+}
+
+/* 저대비 · 기본 CSS(gp*.css)가 흰색을 직접 적은 상자들. 다크 모드(tm612/skin.css '어두운 바탕')가 보정하는 것과 같은 상자다.
+   선택자 전체를 :where 로 감싸 명시도를 기본 CSS 의 그 규칙과 똑같이 맞췄다 — 테마 CSS 가 기본 CSS 뒤에 불러와져(main.tsx)
+   같은 명시도면 이 규칙이 이기고, 선택됨·마우스 올림처럼 더 구체적인 기본 규칙과 이 테마의 규칙은 그대로 이긴다
+   (다크 모드처럼 상태 바탕을 하나씩 다시 적지 않아도 된다) */
+:where(:root[data-skin="tm464"][data-contrast="low"]) {
+  .choice, .scale label, .lik label, .chip, .drop, .back, .list, .stats, .stage, .opt, .tblwrap, .diff .d, .agent, .hero,
+  .chatbar, .sheet, .ans, .connbox, .loading, .logi, .cm-item, .ck-list, .gs-it, .gs-fail, .rg-act, .cp-pop, .cp-back,
+  .regp, .dq-opt, .rthumb.cert, .rthumb.md, .docbox .agent, .cmp th .regen, .cmp th .vnav button, .demo select, .aim-effort select,
+  .stepper .sn, .gt-tg, .api-picker-button, .api-picker-panel, .deep-tg .box, .roadmap-preview, .check-plan-group, .record-sort,
+  .seg button.on, .mini-seg label:has(input:checked), .demo input[type="date"], .next .btn,
+  .gt.all .gt-roadmap-group + .gt-roadmap-group::before {
+    background-color: var(--surface);
+  }
+  /* 전체 일정 제목 칸 · 스킬 지도(바탕 점무늬, 점, 이름 둘레 칠)도 흰색을 직접 적었다 */
+  .gt-card:has(.gt.all) > .sec-h > h2 { background: var(--surface); }
+  .sm-wrap { background: radial-gradient(circle at 1px 1px, var(--line) 1px, transparent 0) 0 0 / 22px 22px var(--surface); }
+  .sm-n .dot { fill: var(--surface); }
+  .sm-n text { stroke: var(--surface); }
+  /* 입력 칸은 상자보다 한 단계 밝게 두어 적는 자리로 보이게 한다 */
+  .input, .textarea, select.input, .cp-btn, .docbox .textarea, .dq-opt::before { background-color: #F6F6F6; }
 }

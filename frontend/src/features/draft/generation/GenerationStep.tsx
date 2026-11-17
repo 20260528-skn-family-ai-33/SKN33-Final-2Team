@@ -9,11 +9,12 @@ import { paths } from '@/app/paths';
 import { D } from '@/shared/constants/data';
 import { useGo } from '@/shared/hooks/useGo';
 import { won } from '@/shared/lib/format';
-import { ai, cause, userText, userTodo } from '@/shared/state/ai';
+import { SLOW_WAIT } from '@/shared/lib/waitTime';
+import { ai, cause, userText, userTodo, useSlowAi } from '@/shared/state/ai';
 import { updateWs, useWs, ws } from '@/shared/state/workspace';
 import { Icon } from '@/shared/ui/Icon';
 import { AgentRow, FailPage, OpsBox, Page, via } from '@/shared/ui/parts';
-import { draftCall, syncGenCur } from '../draftSync';
+import { draftCall, pullDraft, syncGenCur } from '../draftSync';
 import { startEdit, genStart } from '../result/ResultStep';
 import { Stepper } from '../Stepper';
 import { useDraftWatch } from '../useDraftWatch';
@@ -78,6 +79,11 @@ export const curOut = (d: DraftDoc) => (d.gen && d.handoff && d.gen.key === d.ha
 const genState = (rows: NonNullable<DraftDoc['genRun']>['rows']) => {
   const ps = D.optionOrder.map((id) => rows[id] || { st: 'run' });
   return { running: ps.some((x) => x.st === 'run'), ok: ps.filter((x) => x.st === 'ok').length, fail: ps.filter((x) => x.st === 'fail').length };
+};
+/** 지금 입력으로 만든 3안 중 아직 작성 중인 안이 있는지(작성 기록이 없으면 아니다) */
+export const genRunning = (d: DraftDoc): boolean => {
+  const r = curGen(d);
+  return !!r && genState(r.rows).running;
 };
 
 const rowName = (id: string) => `${D.perspectives[id].name}`;
@@ -151,6 +157,7 @@ export function GenerationStep() {
   const d = useWs((s) => s.draft);
   const h = d.handoff;
   const r = curGen(d);
+  const slow = useSlowAi();
   useDraftWatch();
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -164,6 +171,8 @@ export function GenerationStep() {
         return;
       }
       if (!curGen(cur) && !curOut(cur)) void genStart(go);
+      // 다른 화면에 다녀오는 동안 서버가 작성을 끝냈을 수 있어, 떠날 때의 '만드는 중'을 감시 첫 주기(0.9초)까지 두지 않고 바로 다시 읽는다
+      if (genRunning(cur)) void pullDraft();
       syncGenCur();
     }, 0);
     return () => window.clearTimeout(timer);
@@ -240,8 +249,8 @@ export function GenerationStep() {
         lead={
           done
             ? '‘세 코스 비교하기’를 눌러 코스를 고르고 자료를 정해 보세요.'
-            : ai.mode() === 'ollama'
-              ? '방식이 다른 세 코스를 함께 요청했어요. AI 서버 사정에 따라 차례대로 처리돼 시간이 더 걸릴 수 있어요. 다른 화면에 다녀와도 계속 만들어요.'
+            : slow
+              ? `방식이 다른 세 코스를 함께 요청했어요. AI 서버 사정에 따라 차례대로 처리돼 ${SLOW_WAIT}. 다른 화면에 다녀와도 계속 만들어요.`
               : '방식이 다른 세 코스를 동시에 만들고 있어요. 보통 1~2분 걸리고, 다른 화면에 다녀와도 계속 만들어요.'
         }
         foot={

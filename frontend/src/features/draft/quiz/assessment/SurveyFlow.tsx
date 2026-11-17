@@ -1,5 +1,6 @@
 import { useImperativeHandle, useState, type Ref } from 'react';
 import { complete, type Answers, type Phase, type Survey } from './flow';
+import { revealFirstMissing } from '@/shared/lib/missing';
 import { Skeleton } from '@/shared/ui/Skeleton';
 import './style.css';
 
@@ -35,12 +36,7 @@ export function SurveyFlow({ onRetry, ref, survey, initialAnswers = {}, initialC
   /* 빠뜨린 문항은 빨간 테두리로만 알린다. 안내 문구 없이 화면 순서상 가장 위의 빠진 문항으로 옮긴다 */
   function showMissing() {
     setMarked(true); setError('');
-    requestAnimationFrame(() => {
-      const first = document.querySelector<HTMLFieldSetElement>('.v2-survey fieldset.is-missing');
-      if (!first) return;
-      first.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      first.querySelector<HTMLInputElement>('input[type="radio"]')?.focus({ preventScroll: true });
-    });
+    revealFirstMissing('.v2-survey fieldset.is-missing');
   }
   function navigate(target: Phase) {
     if (saving) return;

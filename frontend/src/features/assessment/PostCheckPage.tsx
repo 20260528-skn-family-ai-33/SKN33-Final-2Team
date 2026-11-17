@@ -11,6 +11,7 @@ import { pullPlan } from '@/features/roadmap/planActions';
 import { D } from '@/shared/constants/data';
 import { useGo } from '@/shared/hooks/useGo';
 import { failToast } from '@/shared/lib/fail';
+import { revealFirstMissing } from '@/shared/lib/missing';
 import { count } from '@/shared/lib/plan';
 import { ai, cause, errText } from '@/shared/state/ai';
 import { setAt } from '@/shared/state/bind';
@@ -58,6 +59,18 @@ const postValid = (R: PlanRecord): boolean => {
   const deepOk = !dp || !!(dp.status === 'ready' && dp.quiz && (dp.judge || mcqDone(dp.quiz.mcq, dp.mcq)));
   return !!R.plan.assess && R.plan.assess.questions.every((q) => p.answers[q.id]) && !!p.goalSelf && deepOk && (!R.plan.assess.v2 || !!p.quizSurvey) && (p.quizSurvey?.groups || []).every(group => group.quizzes.every(q => Object.hasOwn(p.quizAnswers || {}, q.id)));
 };
+
+/* 설문 단계에서 답하지 않은 필수 항목: 자가 진단은 문항 id, 심화 객관식은 `dq:문항 id`, 목표 달성도는 `goalSelf` */
+function surveyMissing(R: PlanRecord): Set<string> {
+  const p = R.post;
+  const ids = new Set<string>();
+  for (const q of R.plan.assess?.questions || []) if (!p.answers[q.id]) ids.add(q.id);
+  if (deepOpen(p.deep) && p.deep?.quiz) for (const id of Object.keys(p.deep.quiz.mcq)) if (!(p.deep.mcq || {})[id]) ids.add(`dq:${id}`);
+  if (!p.goalSelf) ids.add('goalSelf');
+  return ids;
+}
+const quizMissing = (R: PlanRecord): boolean =>
+  (R.post.quizSurvey?.groups || []).some(group => group.quizzes.some(q => !Object.hasOwn(R.post.quizAnswers || {}, q.id)));
 
 function PostDeepCard({ R }: { R: PlanRecord }) {
   const dp = R.post.deep;
@@ -112,6 +125,8 @@ function Post({ R }: { R: PlanRecord }) {
   const [quizError, setQuizError] = useState('');
   const [quizAttempt, setQuizAttempt] = useState(0);
   const [phase, setPhase] = useState<'surveys' | 'quizzes'>(() => (pl.assess?.v2 && (R.post.running || R.post.reportId) ? 'quizzes' : 'surveys'));
+  /* 빠뜨린 문항 표시: 넘어가려다 막혔을 때부터 켠다 */
+  const [marked, setMarked] = useState(false);
   const hasQuiz = !!pl.assess?.v2;
   const quizPending = !!pl.assess?.v2 && !R.post.quizSurvey;
   useEffect(() => {
@@ -186,6 +201,29 @@ function Post({ R }: { R: PlanRecord }) {
   const left = activity.t - activity.done;
   const dp = R.post.deep;
   const base = `plans.${R.id}.post`;
+  const missingSurvey = marked && !locked ? surveyMissing(R) : undefined;
+  /* 역량 테스트와 같게: 빠뜨린 문항이 있으면 넘어가지 않고 빨간 테두리만 두고 가장 위 문항으로 옮긴다(#298) */
+  function showMissing(target: 'surveys' | 'quizzes') {
+    setMarked(true);
+    setPhase(target);
+    revealFirstMissing();
+  }
+  function moveTo(target: 'surveys' | 'quizzes') {
+    if (target === 'quizzes' && !locked && surveyMissing(R).size) { showMissing('surveys'); return; }
+    setMarked(false);
+    setPhase(target);
+    window.scrollTo(0, 0);
+  }
+  function submit() {
+    if (surveyMissing(R).size) { showMissing('surveys'); return; }
+    if (quizMissing(R)) { showMissing('quizzes'); return; }
+    if (!postValid(R)) return;
+    setMarked(false);
+    window.scrollTo(0, 0);
+    void makeReport(go, R.id);
+  }
+  // 생성 중인 퀴즈·심화 질문은 답을 빠뜨린 것이 아니므로 그동안은 제출을 막아 둔다
+  const submitBlocked = !pl.assess || quizPending || !!(dp && !dp.judge && !(dp.status === 'ready' && dp.quiz));
   return (
     <Page
       back={paths.checks}
@@ -215,11 +253,11 @@ function Post({ R }: { R: PlanRecord }) {
             </button>
           </>
         ) : hasQuiz && curPhase === 'surveys' ? (
-          <button type="button" className="btn pri" onClick={() => { setPhase('quizzes'); window.scrollTo(0, 0); }}>다음: 퀴즈<Icon name="right" /></button>
+          <button type="button" className="btn pri" onClick={() => moveTo('quizzes')}>다음: 퀴즈<Icon name="right" /></button>
         ) : (
           <>
-          {hasQuiz && <button type="button" className="btn line" onClick={() => { setPhase('surveys'); window.scrollTo(0, 0); }}>이전: 설문</button>}
-          <button className="btn pri" disabled={!postValid(R)} onClick={() => { window.scrollTo(0, 0); void makeReport(go, R.id); }}>
+          {hasQuiz && <button type="button" className="btn line" onClick={() => moveTo('surveys')}>이전: 설문</button>}
+          <button className="btn pri" disabled={submitBlocked} onClick={submit}>
             사후 점검 제출
           </button>
           </>
@@ -227,8 +265,8 @@ function Post({ R }: { R: PlanRecord }) {
       }
     >
       {hasQuiz && <div className="v2-survey"><nav aria-label="사후 점검 순서">
-        <button type="button" disabled={locked} aria-current={curPhase === 'surveys' ? 'step' : undefined} onClick={() => setPhase('surveys')}>1. 설문</button>
-        <button type="button" disabled={locked} aria-current={curPhase === 'quizzes' ? 'step' : undefined} onClick={() => setPhase('quizzes')}>2. 퀴즈</button>
+        <button type="button" disabled={locked} aria-current={curPhase === 'surveys' ? 'step' : undefined} onClick={() => moveTo('surveys')}>1. 설문</button>
+        <button type="button" disabled={locked} aria-current={curPhase === 'quizzes' ? 'step' : undefined} onClick={() => moveTo('quizzes')}>2. 퀴즈</button>
       </nav></div>}
       {left ? <Note>아직 ‘진행 중’인 활동이 {left}개 있어요. 결과 보고서에는 ‘진행 중’으로 남아요. 답한 내용은 서버에 저장되니 활동을 더 한 뒤 이어서 답해도 돼요.</Note> : null}
       {curPhase === 'surveys' && <PostDeepCard R={R} />}
@@ -238,11 +276,12 @@ function Post({ R }: { R: PlanRecord }) {
           path={`${base}.answers`}
           preMap={pl.assess?.answers}
           dq={deepOpen(dp) && dp?.quiz ? { quiz: dp.quiz, mcq: `${base}.deep.mcq`, essay: `${base}.deep.essay` } : null}
+          missing={missingSurvey}
         />}
         {curPhase === 'quizzes' && quizPending && <div className="card" role={quizError ? 'alert' : 'status'}>{quizError ? <><p>{quizError}</p><button className="btn line small" onClick={() => { setQuizError(''); setQuizAttempt(value => value + 1); }}>퀴즈 다시 준비하기</button></> : <><p><span className="sp" /> 사후 퀴즈 생성 중… 같은 개념의 새 문제를 준비하고 있어요.</p><Skeleton kind="quiz" /></>}</div>}
-        {curPhase === 'quizzes' && <PostQuiz R={R} disabled={quizLocked} review={quizLocked} />}
+        {curPhase === 'quizzes' && <PostQuiz R={R} disabled={quizLocked} review={quizLocked} marked={marked} />}
         {curPhase === 'surveys' && <>
-        <div className="card">
+        <div className={`card${missingSurvey?.has('goalSelf') ? ' is-missing' : ''}`}>
           <h2 className="st">처음 목표를 얼마나 이뤘나요?</h2>
           <div className="chips">
             {D.goalSelf.map((l, i) => (
