@@ -101,3 +101,28 @@ class RecoveryTests(TestCase):
         with self.assertRaises(AgentError) as caught:
             captured['work'](None)
         self.assertEqual(caught.exception.info['code'],'AI_BAD_OUTPUT')
+
+    def test_main_exception_handlers_are_async_and_return_502_json(self):
+        import inspect
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+        from app import llm, main
+        from app.errors import AgentError
+        self.assertTrue(inspect.iscoroutinefunction(main.agent_error_handler))
+        self.assertTrue(inspect.iscoroutinefunction(main.llm_error_handler))
+        self.assertIs(main.app.exception_handlers[AgentError], main.agent_error_handler)
+        self.assertIs(main.app.exception_handlers[llm.LlmError], main.llm_error_handler)
+        probe = FastAPI()
+        probe.add_exception_handler(AgentError, main.agent_error_handler)
+        probe.add_exception_handler(llm.LlmError, main.llm_error_handler)
+        @probe.get('/agent-err')
+        def _agent_err():
+            raise AgentError('모델 응답이 JSON 형식이 아니에요')
+        @probe.get('/llm-err')
+        def _llm_err():
+            raise llm.LlmError('모델 응답이 JSON 형식이 아니에요')
+        client = TestClient(probe, raise_server_exceptions=False)
+        for path in ('/agent-err', '/llm-err'):
+            res = client.get(path)
+            self.assertEqual(res.status_code, 502)
+            self.assertEqual(res.json()['error']['code'], 'AI_BAD_OUTPUT')
