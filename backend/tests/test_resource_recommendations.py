@@ -264,6 +264,112 @@ class RecommendationTests(unittest.TestCase):
         with self.assertRaises(RecommendationError):
             recommend_resources(project, selection, items, lambda *_: partial_missing)
 
+    def test_issue_310_crash_extra_prompt_skill_repairs_once_and_preserves_empty_diagnostics(self):
+        from app.agents import resource_instructions
+
+        self.assertNotIn('프로젝트 목표·기획서 요약(없을 수 있음)', resource_instructions.COMMON)
+        self.assertNotIn('프로젝트 목표·기획서 요약(없을 수 있음)', resource_instructions.instructions({'id': 'A2'}))
+
+        s1 = 'RAG & 생성형 AI 에이전트'
+        s2 = '자연어 처리(NLP) & LLM 기초'
+        s3 = 'ETL & 데이터 파이프라인'
+        project = {
+            'goal': 'SECRET_GOAL_TEXT_310 RAG 질의응답과 ETL 파이프라인 구축',
+            'projectSummary': None,
+            'desiredCompetencies': 'RAG 검색·LLM 프롬프트·ETL 적재',
+            'selectedSkills': [s1, s2, s3],
+        }
+        selection = {'skills': [
+            {'name': s1, 'application': 'RAG 검색 증강 에이전트 구현'},
+            {'name': s2, 'application': 'NLP 토큰화 임베딩 프롬프트 엔지니어링 실습'},
+            {'name': s3, 'application': 'ETL 문서 수집 정제 임베딩 색인 파이프라인 구현'},
+        ]}
+        items = {
+            'c1': {'id': 'c1', 'title': 'RAG 에이전트 실습', 'type': 'course', 'usable': True, 'skills': [s1], 'cost': 0,
+                   'hours': 4, 'timeStatus': 'confirmed', 'difficulty': 'INTERMEDIATE',
+                   'content': 'RAG 검색 증강 에이전트 구현 실습',
+                   'curriculum': {'items': [{'title': 'RAG 검색 증강 에이전트 구현'}]}},
+            'c2': {'id': 'c2', 'title': 'NLP LLM 기초', 'type': 'course', 'usable': True, 'skills': [s2], 'cost': 0,
+                   'hours': 6, 'timeStatus': 'confirmed', 'difficulty': 'INTERMEDIATE',
+                   'content': 'NLP 토큰화 임베딩 프롬프트 엔지니어링 실습',
+                   'curriculum': {'items': [{'title': 'NLP 토큰화 임베딩 프롬프트 엔지니어링 실습'}]}},
+            'c3': {'id': 'c3', 'title': 'ETL 파이프라인', 'type': 'course', 'usable': True, 'skills': [s3], 'cost': 0,
+                   'hours': 5, 'timeStatus': 'confirmed', 'difficulty': 'INTERMEDIATE',
+                   'content': 'ETL 문서 수집 정제 임베딩 색인 파이프라인 구현',
+                   'curriculum': {'items': [{'title': 'ETL 문서 수집 정제 임베딩 색인 파이프라인'}]}},
+            'b1': {'id': 'b1', 'title': '도서 1', 'type': 'book', 'usable': True, 'skills': [s1], 'cost': 0, 'content': 'RAG 안내'},
+            'b2': {'id': 'b2', 'title': '도서 2', 'type': 'book', 'usable': True, 'skills': [s1], 'cost': 0, 'content': '에이전트 안내'},
+            'b3': {'id': 'b3', 'title': '도서 3', 'type': 'book', 'usable': True, 'skills': [s2], 'cost': 0, 'content': 'NLP LLM 안내'},
+        }
+        etl_detail = '제공된 ETL 후보들의 목차·설명만으로는 문서 수집·정제·임베딩→색인 파이프라인 실습이 확인되지 않아 근거 부족으로 추천하지 않았습니다.'
+        repaired_skills = [
+            {'name': s1, 'courses': [{'key': 'S1-C1'}], 'books': []},
+            {'name': s2, 'courses': [], 'books': [{'key': 'B3'}],
+             'courseDiagnostic': {'reason': 'longer_for_coverage', 'detail': '기본안 S2-C1은 구체적 실습 단원이 부족해 제외했습니다.'}},
+            {'name': s3, 'courses': [], 'books': [],
+             'courseDiagnostic': {'reason': 'insufficient_evidence', 'detail': etl_detail}},
+        ]
+        bad_with_extra = {'skills': [
+            *copy.deepcopy(repaired_skills),
+            {'name': '프로젝트 목표·기획서 요약(없을 수 있음)', 'courses': [], 'books': []},
+        ]}
+        model = Mock(side_effect=[bad_with_extra, {'skills': repaired_skills}])
+
+        with self.assertLogs('app.agents.resource_recommendations', 'WARNING') as logs:
+            result = recommend_resources(project, selection, items, model, course={'id': 'A2', 'name': 'Crash Course'})
+
+        self.assertEqual(model.call_count, 2)
+        second_system = model.call_args_list[1].args[0]
+        self.assertIn('[출력 스킬 교정]', second_system)
+        for name in (s1, s2, s3):
+            self.assertIn(name, second_system)
+        self.assertTrue(any('expected_count=3 actual_count=4' in m and 'unexpected_count=1' in m for m in logs.output))
+        self.assertTrue(all('SECRET_GOAL_TEXT_310' not in m and '프로젝트 목표·기획서 요약(없을 수 있음)' not in m for m in logs.output))
+
+        self.assertEqual([row['name'] for row in result['skills']], [s1, s2, s3])
+        self.assertEqual(result['skills'][0]['selectedCourse'], 'c1')
+        self.assertEqual(result['skills'][1]['selectedBooks'], ['b3'])
+        self.assertIn('courseDiagnostic', result['skills'][1])
+        self.assertEqual(result['skills'][2]['courses'], [])
+        self.assertEqual(result['skills'][2]['books'], [])
+        self.assertEqual(result['skills'][2]['courseDiagnostic'], {'reason': 'insufficient_evidence', 'detail': etl_detail})
+
+    def test_skill_contract_violations_never_silently_truncate_or_pad_and_stop_after_one_repair(self):
+        project = {'goal': 'SECRET_GOAL_TEXT 분석과 시각화 모델링', 'projectSummary': None, 'desiredCompetencies': None}
+        selection = {'skills': [
+            {'name': '분석', 'application': '데이터 분석'},
+            {'name': '시각화', 'application': '차트 시각화'},
+            {'name': '머신러닝', 'application': '예측 모델링'},
+        ]}
+        items = {
+            'c0': {'id': 'c0', 'title': '통합 강좌', 'type': 'course', 'usable': True, 'skills': ['분석', '시각화', '머신러닝'], 'cost': 0,
+                   'hours': 4, 'timeStatus': 'confirmed', 'difficulty': 'INTERMEDIATE',
+                   'content': '데이터 분석 차트 시각화 예측 모델링 실습',
+                   'curriculum': {'items': [{'title': '데이터 분석 차트 시각화 예측 모델링 실습'}]}},
+        }
+        valid_a = {'name': '분석', 'courses': [{'key': 'S1-C1'}], 'books': []}
+        valid_b = {'name': '시각화', 'courses': [], 'books': []}
+        valid_c = {'name': '머신러닝', 'courses': [], 'books': []}
+        cases = [
+            ('extra_fake', {'skills': [valid_a, valid_b, valid_c, {'name': '프로젝트 목표·기획서 요약(없을 수 있음)', 'courses': [], 'books': []}]}, '스킬별 추천 결과 수가 일치하지 않습니다.'),
+            ('missing_one', {'skills': [valid_a, valid_b]}, '스킬별 추천 결과 수가 일치하지 않습니다.'),
+            ('duplicate_skill', {'skills': [valid_a, copy.deepcopy(valid_a), valid_c]}, '추천 스킬이 입력과 다르거나 중복되었습니다.'),
+            ('mismatched_name', {'skills': [valid_a, valid_b, {'name': '없는스킬', 'courses': [], 'books': []}]}, '추천 스킬이 입력과 다르거나 중복되었습니다.'),
+            ('missing_skills_key', {}, '스킬별 추천 결과 수가 일치하지 않습니다.'),
+            ('non_list_skills', {'skills': 'bad'}, '스킬별 추천 결과 수가 일치하지 않습니다.'),
+            ('non_dict_elements', {'skills': ['분석', '시각화', '머신러닝']}, '추천 스킬이 입력과 다르거나 중복되었습니다.'),
+        ]
+        for label, bad_response, expected_message in cases:
+            with self.subTest(case=label):
+                model = Mock(return_value=bad_response)
+                with self.assertLogs('app.agents.resource_recommendations', 'WARNING') as logs:
+                    with self.assertRaises(RecommendationError) as caught:
+                        recommend_resources(project, selection, items, model, course={'id': 'A2'})
+                self.assertEqual(str(caught.exception), expected_message)
+                self.assertEqual(model.call_count, 2)
+                self.assertEqual(len(logs.output), 2)
+                self.assertTrue(all('SECRET_GOAL_TEXT' not in m for m in logs.output))
+
 
 class PeriodCandidateTests(unittest.TestCase):
     def test_all_courses_keep_long_and_short_candidates_without_mutating_hours(self):

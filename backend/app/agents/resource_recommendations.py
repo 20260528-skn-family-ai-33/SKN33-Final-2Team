@@ -82,6 +82,70 @@ def _no_candidates(kind: str) -> dict:
     return {'reason': 'no_candidates', 'detail': f'조건에 맞는 {kind} 후보가 없습니다.'}
 
 
+def _unwrap_raw(raw: Any) -> Any:
+    """응답이 answer 외피로 감싸진 경우 내부 JSON 객체를 꺼낸다."""
+    if isinstance(raw, dict) and 'skills' not in raw and 'answer' in raw:
+        if isinstance(raw['answer'], dict):
+            return raw['answer']
+        if isinstance(raw['answer'], str):
+            try:
+                return json.loads(raw['answer'])
+            except Exception:
+                pass
+    return raw
+
+
+def _parse_skill_rows(raw: Any, pool_names: list[str], *, attempt: int = 1) -> dict[str, dict]:
+    """모델 응답의 skills 배열이 입력 스킬 목록과 정확히 일치하는지 검증하고 이름별 행을 반환한다."""
+    unwrapped = _unwrap_raw(raw)
+    rows = unwrapped.get('skills') if isinstance(unwrapped, dict) else None
+    if not isinstance(rows, list):
+        logger.warning(
+            '자료 추천 스킬 응답 형식 불일치: attempt=%d expected_count=%d actual_type=%s',
+            attempt, len(pool_names), type(rows).__name__,
+        )
+        raise RecommendationError('스킬별 추천 결과 수가 일치하지 않습니다.')
+    normalized = [deepcopy(r) if isinstance(r, dict) else r for r in rows]
+    all_names_missing = len(normalized) == len(pool_names) and all(
+        isinstance(r, dict) and 'name' not in r and 'skill' not in r for r in normalized
+    )
+    for i, row in enumerate(normalized):
+        if isinstance(row, dict):
+            if 'name' not in row and 'skill' in row and row['skill'] in pool_names:
+                row['name'] = row['skill']
+            elif 'name' not in row and all_names_missing and i < len(pool_names):
+                row['name'] = pool_names[i]
+    expected_set = set(pool_names)
+    actual_names = [r.get('name') if isinstance(r, dict) else None for r in normalized]
+    string_names = [n for n in actual_names if isinstance(n, str)]
+    missing = [name for name in pool_names if name not in string_names]
+    seen_names: set[str] = set()
+    duplicate_skills: list[str] = []
+    for name in string_names:
+        if name in seen_names and name in expected_set and name not in duplicate_skills:
+            duplicate_skills.append(name)
+        seen_names.add(name)
+    unexpected_count = sum(1 for n in actual_names if not isinstance(n, str) or n not in expected_set)
+    if len(normalized) != len(pool_names):
+        logger.warning(
+            '자료 추천 스킬 개수 불일치: attempt=%d expected_count=%d actual_count=%d '
+            'missing_skills=%s duplicate_skills=%s unexpected_count=%d',
+            attempt, len(pool_names), len(normalized), missing, duplicate_skills, unexpected_count,
+        )
+        raise RecommendationError('스킬별 추천 결과 수가 일치하지 않습니다.')
+    by_name: dict[str, dict] = {}
+    for row in normalized:
+        if not isinstance(row, dict) or row.get('name') not in expected_set or row['name'] in by_name:
+            logger.warning(
+                '자료 추천 스킬 목록 불일치: attempt=%d expected_count=%d actual_count=%d '
+                'missing_skills=%s duplicate_skills=%s unexpected_count=%d',
+                attempt, len(pool_names), len(normalized), missing, duplicate_skills, unexpected_count,
+            )
+            raise RecommendationError('추천 스킬이 입력과 다르거나 중복되었습니다.')
+        by_name[row['name']] = row
+    return by_name
+
+
 def _recover_cross_skill_courses(by_name, payload, references, eligibility, generate):
     """다른 스킬에만 허용된 강좌 키는 제외하고, 유효한 선택이 전혀 없는 칸만 한 번 재선택한다."""
     from app.llm import LlmError
@@ -373,31 +437,19 @@ def recommend_resources(project: dict, selection: dict, items: dict[str, dict],
     goal, desired = payload['project']['goal'], payload['project']['desiredCompetencies']
     if isinstance(goal, str) and isinstance(desired, str) and goal.strip() == desired.strip():
         payload['project'].pop('desiredCompetencies')
-    raw = generate(instructions(course), payload)
-    if isinstance(raw, dict) and 'skills' not in raw and 'answer' in raw:
-        if isinstance(raw['answer'], dict):
-            raw = raw['answer']
-        elif isinstance(raw['answer'], str):
-            try:
-                raw = json.loads(raw['answer'])
-            except Exception:
-                pass
-    rows = raw.get('skills') if isinstance(raw, dict) else None
-    if not isinstance(rows, list) or len(rows) != len(pools):
-        raise RecommendationError('스킬별 추천 결과 수가 일치하지 않습니다.')
+    system = instructions(course)
     pool_names = [p['name'] for p in pools]
-    all_names_missing = all(isinstance(r, dict) and 'name' not in r for r in rows)
-    for i, row in enumerate(rows):
-        if isinstance(row, dict):
-            if 'name' not in row and 'skill' in row and row['skill'] in pool_names:
-                row['name'] = row['skill']
-            elif 'name' not in row and all_names_missing and i < len(pools):
-                row['name'] = pools[i]['name']
-    by_name = {}
-    for row in rows:
-        if not isinstance(row, dict) or row.get('name') not in pool_names or row['name'] in by_name:
-            raise RecommendationError('추천 스킬이 입력과 다르거나 중복되었습니다.')
-        by_name[row['name']] = row
+    raw = generate(system, payload)
+    try:
+        by_name = _parse_skill_rows(raw, pool_names, attempt=1)
+    except RecommendationError as err:
+        repair_system = (
+            f"{system}\n[출력 스킬 교정] 이전 응답의 skills 목록이 입력 스킬과 일치하지 않았습니다({err}). "
+            f"반드시 입력 skills의 스킬명 {len(pool_names)}개({json.dumps(pool_names, ensure_ascii=False)})만 "
+            "정확히 한 번씩 같은 순서로 포함하고, 지침 문구나 입력에 없는 스킬을 절대 추가·누락·중복하지 마세요."
+        )
+        raw = generate(repair_system, payload)
+        by_name = _parse_skill_rows(raw, pool_names, attempt=2)
     _recover_cross_skill_courses(by_name, payload, references, course_eligibility, generate)
     candidate_titles = {key: ' '.join(resource_evidence.normalize(provided[kind][rid][1].get('title')).split())
                         for key, (kind, rid) in references.items()}

@@ -1,7 +1,7 @@
 """자료 추천 호출별 통합 지침. 검색·후보·추천 검증 로직은 변경하지 않는다."""
 
 COMMON = """[입력·범위]
-프로젝트 목표·기획서 요약(없을 수 있음)·희망 역량·선정 스킬별 적용 범위·course 방향에 맞는 강좌·도서 추천. 별도 desiredCompetencies 제공 시 희망 역량 반영, 미제공 시 goal 기준. 선정 스킬 추가·삭제 및 설문 수준을 이유로 필요한 스킬 제외 금지.
+입력 project(goal, projectSummary, desiredCompetencies), 선정 skills의 적용 범위, course 방향에 맞는 강좌·도서 추천. 별도 desiredCompetencies 제공 시 희망 역량 반영, 미제공 시 goal 기준. 선정 스킬 추가·삭제 및 설문 수준을 이유로 필요한 스킬 제외 금지.
 
 [후보·추천 계약]
 스킬마다 강좌·도서 각각 최대 3개, 첫 항목이 가장 권하는 AI 추천. 입력의 maxBooks와 실제 후보 수 이내 선정(도서 후보 2권이면 최대 2권). 적합한 만큼만 선정, 부적합 자료로 개수 채우기 금지, 적합 후보 부재 시 빈 배열 허용. 적격 강좌 후보가 존재하는 경우 각 스킬마다 최소 1개 이상의 강좌를 필수 추천하여 강좌 추천 누락을 방지한다.
@@ -31,6 +31,7 @@ hrContext는 업무 맥락·예시·필요한 적용 범위의 참고, 직급·�
 courseDiagnostic 형식: {"reason":"no_candidates|insufficient_evidence|stack_mismatch|scope_gap|longer_for_coverage","detail":"확인 근거·부족한 내용"}
 도서가 빈 추천이면 bookDiagnostic을 추가. 제공 도서가 없을 때만 no_candidates, 제목과 소개로 학습 근거를 확인하기 어려우면 insufficient_evidence, 확인된 내용이 요구 범위와 다르면 scope_gap. 도서는 0권도 유효하다.
 bookDiagnostic 형식: {"reason":"no_candidates|insufficient_evidence|scope_gap","detail":"확인 근거·부족한 내용(1~240자)"}
+출력 skills는 입력 skills의 각 name만 같은 개수·순서로 정확히 1개씩 반환하며, 지침 문구나 입력에 없는 스킬 행을 추가·누락·중복·변경하지 않는다.
 JSON: {"skills":[{"name":"입력 스킬명","courses":[{"key":"S1-C1 형태의 choiceKey"}],"books":[{"key":"B1 형태의 공통 도서 키"}]}]}
 """
 POLICIES = {
