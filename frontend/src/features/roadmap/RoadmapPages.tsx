@@ -394,7 +394,7 @@ function RoadView({ R }: { R: PlanRecord }) {
           </aside>
         ) : null}
         onOpenResource={(skill, resourceId) => { const activity = pl.acts.find(act => act.skill === skill && act.res === resourceId) || pl.acts.find(act => act.res === resourceId); if (activity) openRecord(R.id, activity.id); }}
-        onSubmit={name => { const task = pl.acts.find(act => act.skill === name && !act.res); if (task) openRecord(R.id, task.id); }} /> : <SkillMap pl={pl} /> }
+        onSubmit={name => { const task = pl.acts.find(act => act.skill === name && !act.res); if (task) openRecord(R.id, task.id); }} /> : <SkillMap pl={pl} progress={R.progress} /> }
       <RoadmapActivityList R={R} skipSkillCardDuplicates />
       {reps.length ? (
         <div className="sec">

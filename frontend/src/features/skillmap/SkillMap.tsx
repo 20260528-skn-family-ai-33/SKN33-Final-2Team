@@ -5,7 +5,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { catalogApi } from '@/api/endpoints/catalog';
 import type { SkillMapData } from '@/api/types/catalog';
-import type { PlanContent } from '@/api/types/plan';
+import type { PlanContent, Progress } from '@/api/types/plan';
+import { st } from '@/shared/lib/plan';
 import { resOf, useCatalog } from '@/shared/state/catalog';
 import { Icon } from '@/shared/ui/Icon';
 import { Note } from '@/shared/ui/parts';
@@ -14,7 +15,7 @@ import { matchingCertificates } from '@/features/roadmap/roadmapLearningData';
 import { useMe } from '@/shared/state/session';
 import { afterReveal } from '@/skins/afterReveal';
 import { createDragPan, overflowsX, overflowsY } from './dragPan';
-import { actWeek, canvasMeasure, coverOf, edgeEnds, place, relOf, weeksOf, type Cover, type Layout } from './layout';
+import { actWeek, canvasMeasure, coverOf, edgeEnds, focusOf, place, relOf, revealDelta, weeksOf, type Cover, type Layout } from './layout';
 
 let layoutCache: { d: SkillMapData; m: Layout } | null = null;
 let bigPref: boolean | null = null;
@@ -47,14 +48,18 @@ function starPoints(outer: number): string {
 }
 /** 화살표의 모양. on: 이 로드맵이 양쪽을 다룸 · trail: 지나온 길(뱃지 스킬에서 이어진 화살표) */
 export type EdgeLook = '' | 'on' | 'trail';
+export interface InfoCtl {
+  close: () => void;
+  pick: (id: number) => void;
+}
 export interface MapView {
   label: string;
   sum: ReactNode;
   keys: ReactNode;
   look: (id: number) => NodeLook;
   edge: (from: number, to: number) => EdgeLook;
-  /** 누른 스킬의 설명. close 는 누른 스킬을 푼다 */
-  info: (close: () => void) => ReactNode;
+  /** 누른 스킬의 설명. close 는 누른 스킬을 풀고, pick 은 다른 스킬로 옮긴다 */
+  info: (ctl: InfoCtl) => ReactNode;
   notes?: ReactNode;
 }
 
@@ -69,27 +74,49 @@ const spreadVars = (x: number, y: number, cx: number, cy: number, far: number, l
     '--sm-dy': `${((cy - y) * SPREAD_PULL).toFixed(1)}px`,
   }) as CSSProperties;
 
-const InfoSlot = ({ render, close }: { render: MapView['info']; close: () => void }) => <>{render(close)}</>;
+const InfoSlot = ({ render, ctl }: { render: MapView['info']; ctl: InfoCtl }) => <>{render(ctl)}</>;
 
-function Info({ data, picked, cov, owned, onClose }: { data: SkillMapData; picked: number | null; cov: Cover; owned?: string[]; onClose: () => void }) {
+/** 선수·후속 스킬 칩. 누르면 그 스킬로 옮겨 간다 · strong: 강조할 스킬(이 로드맵이 다루는 스킬 등) */
+export function SkillChips({ data, ids, onPick, strong }: { data: SkillMapData; ids?: number[]; onPick: (id: number) => void; strong?: (id: number) => boolean }) {
+  const list = (ids || []).map((id) => data.skills.find((x) => x.id === id)).filter((x): x is SkillMapData['skills'][number] => x != null);
+  if (!list.length) return <span className="muted">없어요</span>;
+  return (
+    <span className="sm-chips">
+      {list.map((x) => (
+        <button key={x.id} type="button" className={`tag sm-chip${strong?.(x.id) ? ' acc' : ''}`} onClick={() => onPick(x.id)}>
+          {x.name}
+        </button>
+      ))}
+    </span>
+  );
+}
+
+function Info({ data, picked, cov, owned, progress, ctl }: { data: SkillMapData; picked: number | null; cov: Cover; owned?: string[]; progress?: Record<string, Progress>; ctl: InfoCtl }) {
   const certificates = useCatalog(state => state.certById);
   const me = useMe();
   if (picked == null || !data.skills.some((s) => s.id === picked))
     return <p className="small muted">스킬 점을 누르면 이 로드맵에서 몇 주차에 어떤 활동이 다루는지와 선수 관계를 보여 줘요.</p>;
   const s = data.skills.find((x) => x.id === picked)!;
-  const { parents } = relOf(data);
+  const { parents, kids } = relOf(data);
   const certs = matchingCertificates(Object.values(certificates), [s.name], owned ?? me?.certs);
-  const names = (ids?: number[]) =>
-    ids && ids.length ? ids.map((id) => data.skills.find((x) => x.id === id)?.name || '').join(', ') : <span className="muted">없어요</span>;
+  const inPlan = (id: number) => cov.has(id);
   const c = cov.get(picked);
   let here: React.ReactNode = <span className="muted">이 로드맵에는 없어요.</span>;
   if (c) {
-    // 다루는 활동을 주차와 함께. 많으면 앞의 4개만 적고 나머지는 개수로
-    const shown = c.slice(0, 4);
     here = (
       <>
-        <b>{weeksOf(c)}</b> · {shown.map((x) => `${x.a.title}${x.a.wFrom != null ? ` (${actWeek(x.a)})` : ''}`).join(', ')}
-        {c.length > shown.length ? ` 외 ${c.length - shown.length}개` : ''}
+        <b>{weeksOf(c)}</b>
+        <ul className="sm-acts">
+          {c.map((x, i) => (
+            <li key={`${x.a.id}-${i}`}>
+              <span>
+                {x.a.wFrom != null ? `${actWeek(x.a)} · ` : ''}
+                {x.a.title}
+              </span>
+              {progress && st(progress, x.a.id) === 'done' ? <span className="tag done">완료</span> : null}
+            </li>
+          ))}
+        </ul>
       </>
     );
   }
@@ -98,13 +125,19 @@ function Info({ data, picked, cov, owned, onClose }: { data: SkillMapData; picke
       <div className="sm-pick-h">
         <b>{s.name}</b>
         <span className="tag">{s.category}</span>
-        <button className="link quiet" aria-label="설명 닫기" onClick={onClose}>
+        <button className="link quiet" aria-label="설명 닫기" onClick={ctl.close}>
           <Icon name="x" />
         </button>
       </div>
       <dl className="kv sm-kv">
-        <dt>배우게 될 스킬</dt>
-        <dd>{names([...(parents[picked] || []), picked])}</dd>
+        <dt>먼저 배울 스킬</dt>
+        <dd>
+          <SkillChips data={data} ids={parents[picked]} onPick={ctl.pick} strong={inPlan} />
+        </dd>
+        <dt>이어지는 스킬</dt>
+        <dd>
+          <SkillChips data={data} ids={kids[picked]} onPick={ctl.pick} strong={inPlan} />
+        </dd>
         <dt>추천 자격증</dt>
         <dd>{certs.length ? certs.map(cert => cert.name).join(', ') : '일치하는 자격증이 없어요.'}</dd>
         <dt>이 로드맵</dt>
@@ -114,9 +147,14 @@ function Info({ data, picked, cov, owned, onClose }: { data: SkillMapData; picke
   );
 }
 
-function Svg({ data, view, picked, onPick, big, zoom }: { data: SkillMapData; view: MapView; picked: number | null; onPick: (id: number) => void; big: boolean; zoom: number }) {
+/** 빈 곳 클릭으로 볼 누름: 지도를 끌어 민 뒤의 클릭은 풀기로 치지 않는다 */
+const DRAG_PX = 5;
+
+function Svg({ data, view, picked, onPick, onClear, big, zoom }: { data: SkillMapData; view: MapView; picked: number | null; onPick: (id: number) => void; onClear: () => void; big: boolean; zoom: number }) {
   const m = useMemo(() => layoutOf(data), [data]);
   const tw = useMemo(() => canvasMeasure(), []);
+  const focus = useMemo(() => focusOf(data, picked), [data, picked]);
+  const down = useRef<{ x: number; y: number } | null>(null);
   /* 꼬리표: 노드 오른쪽에 붙으므로 그림 너비에 넣는다 */
   const looks = m.nodes.map((n) => {
     const look = view.look(n.id);
@@ -133,10 +171,11 @@ function Svg({ data, view, picked, onPick, big, zoom }: { data: SkillMapData; vi
   const nodes = m.nodes.map((n, i) => {
     const { look, tagT, tagW } = looks[i];
     const y0 = n.r + 15;
+    const isPick = focus != null && picked === n.id;
     return (
       <g
         key={n.id}
-        className={`sm-n ${look.cls}${picked === n.id ? ' pick' : ''}`}
+        className={`sm-n ${look.cls}${isPick ? ' pick' : ''}${focus?.near.has(n.id) ? ' rel' : ''}`}
         transform={`translate(${n.x.toFixed(1)},${n.y.toFixed(1)})`}
         style={spreadVars(n.x, n.y, cx, cy, far)}
         role="button"
@@ -152,6 +191,8 @@ function Svg({ data, view, picked, onPick, big, zoom }: { data: SkillMapData; vi
           }
         }}
       >
+        {/* 누른 점에서 퍼지는 고리: 누를 때 새로 붙어 한두 번만 퍼진다(.sm-n 의 등장 움직임과 겹치지 않게 자식에 둔다) */}
+        {isPick ? <circle className="sm-pulse" r={(n.r + 2).toFixed(1)} aria-hidden="true" /> : null}
         <circle className="dot" r={n.r.toFixed(1)} />
         {look.ring ? <circle className="ring" r={(n.r + 1.5).toFixed(1)} /> : null}
         {look.medal ? (
@@ -188,9 +229,20 @@ function Svg({ data, view, picked, onPick, big, zoom }: { data: SkillMapData; vi
   const pad = 24;
   const W = Math.ceil(b.x1 - b.x0 + pad * 2);
   const H = Math.ceil(b.y1 - b.y0 + pad * 2);
+  const ends = data.prerequisites.map(([a, bb]) => (m.byId[a] && m.byId[bb] ? edgeEnds(m.byId[a], m.byId[bb]) : null));
   return (
     <svg
-      className="sm-svg"
+      className={`sm-svg${focus ? ' has-pick' : ''}`}
+      onPointerDown={(e) => {
+        down.current = { x: e.clientX, y: e.clientY };
+      }}
+      onClick={(e) => {
+        const d = down.current;
+        down.current = null;
+        if (!focus || (e.target as Element).closest('.sm-n')) return;
+        if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > DRAG_PX) return;
+        onClear();
+      }}
       viewBox={`${(b.x0 - pad).toFixed(1)} ${(b.y0 - pad).toFixed(1)} ${W} ${H}`}
       width={W}
       height={H}
@@ -211,16 +263,15 @@ function Svg({ data, view, picked, onPick, big, zoom }: { data: SkillMapData; vi
       </defs>
       <g>
         {data.prerequisites.map(([a, bb], i) => {
-          const A = m.byId[a];
-          const B = m.byId[bb];
-          if (!A || !B) return null;
-          const p = edgeEnds(A, B);
+          const p = ends[i];
+          if (!p) return null;
           const edge = view.edge(a, bb);
+          const rel = focus?.edges[i];
           return (
             <line
               key={i}
-              className={`sm-e${edge ? ` ${edge}` : ''}`}
-              markerEnd={`url(#sm-${edge ? 'on' : 'g'})`}
+              className={`sm-e${edge ? ` ${edge}` : ''}${rel ? ` rel rel-${rel}` : ''}`}
+              markerEnd={`url(#sm-${edge || rel ? 'on' : 'g'})`}
               /* 화살표는 이어 주는 두 점이 나온 뒤에 나타난다 */
               style={spreadVars((p.x1 + p.x2) / 2, (p.y1 + p.y2) / 2, cx, cy, far, 260)}
               x1={p.x1.toFixed(1)}
@@ -231,9 +282,44 @@ function Svg({ data, view, picked, onPick, big, zoom }: { data: SkillMapData; vi
           );
         })}
       </g>
+      {/* 누른 점에 닿는 화살표 위로 흐르는 점선. 원래 선의 순서를 바꾸면 다시 붙으며 등장 움직임이 다시 돌므로, 흐린 선들 위에 따로 덧그린다 */}
+      {focus ? (
+        <g className="sm-flow" aria-hidden="true">
+          {focus.edges.map((rel, i) => {
+            const p = ends[i];
+            if (!rel || !p) return null;
+            return <line key={i} className={`rel-${rel}`} x1={p.x1.toFixed(1)} y1={p.y1.toFixed(1)} x2={p.x2.toFixed(1)} y2={p.y2.toFixed(1)} />;
+          })}
+        </g>
+      ) : null}
       <g>{nodes}</g>
     </svg>
   );
+}
+
+/** 누른 점(아래 이름·분류 글자까지)이 지도 안쪽 스크롤 밖이거나, 창 위쪽 띠·아래에 떠 있는 설명 칸에 가려지면 보이게 민다.
+    지도 안쪽(크게 보기·좁은 화면)을 먼저 밀고, 창은 그만큼 옮겨 갈 자리를 기준으로 민다(부드럽게 밀면 바로 다시 잰 값은 옛 자리라) */
+function showPicked(wrap: HTMLElement, info: HTMLElement | null): void {
+  const el = wrap.querySelector('.sm-n.pick');
+  if (!el) return;
+  const behavior: ScrollBehavior = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+  const r = el.getBoundingClientRect();
+  const w = wrap.getBoundingClientRect();
+  const room = (delta: number, pos: number, max: number) => Math.max(-pos, Math.min(max - pos, delta));
+  const dx = room(revealDelta(r.left, r.right, w.left, w.left + wrap.clientWidth), wrap.scrollLeft, wrap.scrollWidth - wrap.clientWidth);
+  const dy = room(revealDelta(r.top, r.bottom, w.top, w.top + wrap.clientHeight), wrap.scrollTop, wrap.scrollHeight - wrap.clientHeight);
+  if (dx || dy) wrap.scrollBy({ left: dx, top: dy, behavior });
+  // 위쪽: 붙어 있는 띠·상단 메뉴(테마가 scroll-padding-top 으로 알려 준다) · 아래쪽: 설명 칸 위 끝.
+  // 설명 칸은 나타나며 살짝 아래에서 올라오므로 화면 아래에 붙었을 때의 자리(창 높이 - bottom - 높이)와 견줘 작은 쪽을 쓴다
+  const css = getComputedStyle(document.documentElement);
+  const top = parseFloat(css.scrollPaddingTop) || parseFloat(css.getPropertyValue('--rib-h')) || 0;
+  let bottom = window.innerHeight;
+  if (info?.classList.contains('on')) {
+    const stuck = window.innerHeight - (parseFloat(getComputedStyle(info).bottom) || 0) - info.offsetHeight;
+    bottom = Math.min(bottom, info.getBoundingClientRect().top, stuck);
+  }
+  const wy = revealDelta(r.top - dy, r.bottom - dy, top, bottom);
+  if (wy) window.scrollBy({ top: wy, behavior });
 }
 
 /** 스킬 지도 틀: 자료를 불러와 요약·범례·그림·설명·안내를 차례로 놓는다. viewKey 가 바뀌면(다른 로드맵) 누른 스킬은 풀어 둔다 */
@@ -247,7 +333,10 @@ export function MapBox({ id, title, viewKey, build, wheelZoom = false }: { id: s
   const [dragging, setDragging] = useState(false);
   const [pan] = useState(() => createDragPan(setDragging));
   const wrapRef = useRef<HTMLDivElement>(null);
+  const infoRef = useRef<HTMLDivElement>(null);
   const keepScroll = useRef(false);
+  // 칩으로 옮겨 가면 누른 칩이 목록에서 사라져 초점이 body 로 빠진다 → 새로 누른 점으로 초점을 옮겨 Esc·Tab 이 이어지게 한다
+  const focusPick = useRef(false);
   // 지도가 화면에 들어온 뒤에 퍼져 나가기를 시작한다(화면 아래쪽에 있을 때 안 보이는 곳에서 끝나 버리지 않게).
   // 테마의 나타나기(덩어리가 떠오르기)와 겹치면 묻혀서 안 보이므로, 지도가 든 덩어리가 떠오른 뒤에 시작한다
   const [seen, setSeen] = useState(typeof IntersectionObserver === 'undefined');
@@ -315,7 +404,15 @@ export function MapBox({ id, title, viewKey, build, wheelZoom = false }: { id: s
     w.scrollTop = pts.reduce((s, p) => s + p[1], 0) / pts.length - w.clientHeight / 2;
   }, [data, big, viewKey]);
 
-  const head = (n?: React.ReactNode) => (
+  // 누른 뒤(설명 칸이 화면 아래에 떠오른 뒤) 누른 점이 가려졌으면 보이게 민다. 칩으로 옮겨 갈 때도 같다
+  useEffect(() => {
+    if (pid == null || !wrapRef.current) return;
+    if (focusPick.current) wrapRef.current.querySelector<SVGGElement>('.sm-n.pick')?.focus({ preventScroll: true });
+    focusPick.current = false;
+    showPicked(wrapRef.current, infoRef.current);
+  }, [pid]);
+
+  const head =(n?: React.ReactNode) => (
     <div className="sec-h">
       <h2 className="st">{title}</h2>
       {n}
@@ -351,6 +448,12 @@ export function MapBox({ id, title, viewKey, build, wheelZoom = false }: { id: s
     keepScroll.current = true;
     setPicked({ key: viewKey, id: pid === skillId ? null : skillId });
   };
+  const clear = () => setPicked({ key: viewKey, id: null });
+  const ctl: InfoCtl = { close: clear, pick: (skillId) => {
+      focusPick.current = true;
+      setPicked({ key: viewKey, id: skillId });
+    },
+  };
   const view = build(data, pid);
   return (
     <div className="sec" id={id}>
@@ -368,7 +471,16 @@ export function MapBox({ id, title, viewKey, build, wheelZoom = false }: { id: s
         </button>,
       )}
       <p className="small muted sm-sum">{view.sum}</p>
-      <div className="card flat sm-card">
+      {/* Esc 로 풀기: 지도의 점뿐 아니라 설명 칸의 칩에 초점이 있을 때도 듣도록 카드에 둔다 */}
+      <div
+        className="card flat sm-card"
+        onKeyDown={(e) => {
+          if (e.key !== 'Escape' || pid == null) return;
+          e.preventDefault();
+          e.stopPropagation();
+          clear();
+        }}
+      >
         <div className="sm-key">{view.keys}</div>
         <div
           className={`sm-wrap${big ? ' sm-big' : ''}${canPan ? ' sm-pan' : ''}${dragging ? ' sm-drag' : ''} ${seen ? 'sm-go' : 'sm-wait'}`}
@@ -376,10 +488,11 @@ export function MapBox({ id, title, viewKey, build, wheelZoom = false }: { id: s
           title={wheelZoom ? 'Ctrl + 스크롤로 확대·축소' : undefined}
           {...pan}
         >
-          <Svg data={data} view={view} picked={pid} onPick={pick} big={big} zoom={zoom} />
+          <Svg data={data} view={view} picked={pid} onPick={pick} onClear={clear} big={big} zoom={zoom} />
         </div>
-        <div className="sm-info" aria-live="polite">
-          <InfoSlot render={view.info} close={() => pid != null && pick(pid)} />
+        {/* 스킬을 눌렀을 때만 화면 아래에 붙여 지도 위에 띄운다(지도가 화면보다 길어 맨 아래 설명이 눈에 안 띄어서) */}
+        <div className={`sm-info${pid != null && data.skills.some((s) => s.id === pid) ? ' on' : ''}`} aria-live="polite" ref={infoRef}>
+          <InfoSlot render={view.info} ctl={ctl} />
         </div>
       </div>
       {view.notes}
@@ -389,7 +502,8 @@ export function MapBox({ id, title, viewKey, build, wheelZoom = false }: { id: s
 
 /** 검토·확정 = 작성 중 안, 내 로드맵 = 확정한 로드맵 */
 /** owned: 추천 자격증에서 뺄 보유 자격증. 기본은 로그인한 본인 것 · 부서장이 직원 로드맵을 볼 때는 직원 보유 자격증을 받지 않으므로 [] (#96) */
-export function SkillMap({ pl, owned }: { pl: PlanContent; owned?: string[] }) {
+/** progress: 넘기면 활동마다 완료 여부를 함께 적는다(검토·확정 화면은 아직 기록이 없어 넘기지 않는다) */
+export function SkillMap({ pl, owned, progress }: { pl: PlanContent; owned?: string[]; progress?: Record<string, Progress> }) {
   // 자료가 나중에 오면 자료에 붙은 스킬로 다시 그린다
   useCatalog((s) => s.res);
   return (
@@ -429,7 +543,7 @@ export function SkillMap({ pl, owned }: { pl: PlanContent; owned?: string[] }) {
             return { cls: 'cov', tag, aria: ` · 이 로드맵 ${tag}`, ring: true };
           },
           edge: (from, to) => (cov.has(from) && cov.has(to) ? 'on' : ''),
-          info: (close) => <Info data={data} picked={pid} cov={cov} owned={owned} onClose={close} />,
+          info: (ctl) => <Info data={data} picked={pid} cov={cov} owned={owned} progress={progress} ctl={ctl} />,
           notes: (
             <>
               {cov.size ? null : <Note>이 로드맵의 활동에서 팀 DB 스킬을 찾지 못했어요.</Note>}
