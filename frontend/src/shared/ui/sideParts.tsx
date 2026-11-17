@@ -3,7 +3,7 @@
    .nav-l 로고·버전 | .nav-c 주 메뉴(가운데) | .nav-r 화면 도구 · 알림 · 계정 · 로그아웃 */
 import type { ReactNode } from 'react';
 import { useGo } from '@/shared/hooks/useGo';
-import { ThemeToggle, WidthToggle } from '@/skins/ThemeControls';
+import { ContrastToggle, ThemeToggle, WidthToggle } from '@/skins/ThemeControls';
 import { logoutAndReset } from '@/features/auth/actions';
 import { Icon } from './Icon';
 import './topNav.css';
@@ -39,11 +39,12 @@ export function LogoutButton() {
   );
 }
 
-/** 메뉴 오른쪽 끝의 화면 도구: 본문 폭 · 라이트·다크 모드(예전 왼쪽 아래 '화면 테마' 상자를 대신한다 · skins/ThemeControls) */
+/** 메뉴 오른쪽 끝의 화면 도구: 본문 폭 · 저대비 · 라이트·다크 모드(예전 왼쪽 아래 '화면 테마' 상자를 대신한다 · skins/ThemeControls) */
 export function ViewTools() {
   return (
     <div className="view-tools">
       <WidthToggle />
+      <ContrastToggle />
       <ThemeToggle />
     </div>
   );

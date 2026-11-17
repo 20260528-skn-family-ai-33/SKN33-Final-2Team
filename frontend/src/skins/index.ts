@@ -9,8 +9,10 @@
      원래 화면의 CSS(styles/gp*.css)는 두 테마가 그 위에 얹히므로 그대로 둔다.
    - 메뉴는 상단 메뉴 하나다. 좌측 메뉴 버전(data-nav="side")과 메뉴 접기는 2026-11-17 앱에서 뺐다.
    - 본문 폭은 두 가지: 넓은 본문 폭(기본 · gp.css) · 이전 본문 폭(<html data-width="narrow"> · width.css). 테마와 상관없이 고른다.
-   - 바꾸는 곳: 상단 메뉴와 로그인 화면 우측 블록의 해·달 버튼(라이트·다크), 상단 메뉴의 본문 폭 버튼(ThemeControls.tsx).
-     주소 뒤 ?skin=<id>[:narrow] 로도 연다(형식은 pick.ts · 로그인 화면 그림 찍기 스크립트가 쓴다).
+   - 저대비(#322)는 켜고 끄는 값 하나다(<html data-contrast="low">). 라이트·다크 두 모드가 함께 쓴다.
+     색은 테마마다 달라 각 skin.css 맨 끝의 '저대비' 묶음이 정한다.
+   - 바꾸는 곳: 상단 메뉴와 로그인 화면 우측 블록의 해·달 버튼(라이트·다크), 상단 메뉴의 본문 폭 · 저대비 버튼(ThemeControls.tsx).
+     주소 뒤 ?skin=<id>[:narrow][:low] 로도 연다(형식은 pick.ts · 로그인 화면 그림 찍기 스크립트가 쓴다).
      버튼으로 바꾼 값과 ?skin= 으로 연 값만 이 브라우저에 기억한다. 열기만 해서는 기억하지 않으므로
      아무것도 고르지 않은 브라우저는 기본 테마가 바뀌면 따라간다(2026-11-12 #211). */
 import { create } from 'zustand';
@@ -79,7 +81,9 @@ function apply(c: Choice): void {
   else delete root.dataset.reveal;
   if (c.narrow) root.dataset.width = 'narrow';
   else delete root.dataset.width;
-  // 본문 폭만 바꿀 때는 글꼴을 다시 불러오지 않는다(글자가 깜빡이지 않게)
+  if (c.lowContrast) root.dataset.contrast = 'low';
+  else delete root.dataset.contrast;
+  // 본문 폭 · 저대비만 바꿀 때는 글꼴을 다시 불러오지 않는다(글자가 깜빡이지 않게)
   if (!skinChanged) return;
   document.querySelectorAll('link[data-skin-font]').forEach((el) => el.remove());
   for (const href of skin?.fonts || []) {
