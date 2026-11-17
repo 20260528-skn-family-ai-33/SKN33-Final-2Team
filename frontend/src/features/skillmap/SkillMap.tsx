@@ -13,6 +13,7 @@ import { ApiError } from '@/api/client';
 import { matchingCertificates } from '@/features/roadmap/roadmapLearningData';
 import { useMe } from '@/shared/state/session';
 import { afterReveal } from '@/skins/afterReveal';
+import { createDragPan, overflowsX, overflowsY } from './dragPan';
 import { actWeek, canvasMeasure, coverOf, edgeEnds, place, relOf, weeksOf, type Cover, type Layout } from './layout';
 
 let layoutCache: { d: SkillMapData; m: Layout } | null = null;
@@ -241,6 +242,10 @@ export function MapBox({ id, title, viewKey, build, wheelZoom = false }: { id: s
   const [picked, setPicked] = useState<{ key: string; id: number | null }>({ key: viewKey, id: null });
   const [big, setBig] = useState(bigNow());
   const [zoom, setZoom] = useState(1);
+  // 지도가 칸보다 크면(크게 보기 · Ctrl + 스크롤 확대) 마우스로 끌어 민다(#324). 그때만 손바닥, 끄는 동안은 쥔 손 커서
+  const [canPan, setCanPan] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const [pan] = useState(() => createDragPan(setDragging));
   const wrapRef = useRef<HTMLDivElement>(null);
   const keepScroll = useRef(false);
   // 지도가 화면에 들어온 뒤에 퍼져 나가기를 시작한다(화면 아래쪽에 있을 때 안 보이는 곳에서 끝나 버리지 않게).
@@ -279,6 +284,17 @@ export function MapBox({ id, title, viewKey, build, wheelZoom = false }: { id: s
     wrap.addEventListener('wheel', onWheel, { passive: false });
     return () => wrap.removeEventListener('wheel', onWheel);
   }, [data, q.error, wheelZoom]);
+
+  // 크게 보기·확대·창 크기가 바뀌어 지도가 칸을 넘는지 달라지면 커서를 다시 정한다(끌기 자체는 누를 때 dragPan 이 다시 잰다)
+  useLayoutEffect(() => {
+    const wrap = wrapRef.current;
+    const svg = wrap?.querySelector('svg');
+    if (!wrap || !svg) return;
+    const ro = new ResizeObserver(() => setCanPan(overflowsX(wrap) || overflowsY(wrap)));
+    ro.observe(wrap);
+    ro.observe(svg);
+    return () => ro.disconnect();
+  }, [data, big, zoom]);
 
   // 실제 크기로 볼 때(좁은 화면·크게 보기)는 강조한 스킬이 가운데 오게 밀어 둔다
   useLayoutEffect(() => {
@@ -354,7 +370,12 @@ export function MapBox({ id, title, viewKey, build, wheelZoom = false }: { id: s
       <p className="small muted sm-sum">{view.sum}</p>
       <div className="card flat sm-card">
         <div className="sm-key">{view.keys}</div>
-        <div className={`sm-wrap${big ? ' sm-big' : ''} ${seen ? 'sm-go' : 'sm-wait'}`} ref={wrapRef} title={wheelZoom ? 'Ctrl + 스크롤로 확대·축소' : undefined}>
+        <div
+          className={`sm-wrap${big ? ' sm-big' : ''}${canPan ? ' sm-pan' : ''}${dragging ? ' sm-drag' : ''} ${seen ? 'sm-go' : 'sm-wait'}`}
+          ref={wrapRef}
+          title={wheelZoom ? 'Ctrl + 스크롤로 확대·축소' : undefined}
+          {...pan}
+        >
           <Svg data={data} view={view} picked={pid} onPick={pick} big={big} zoom={zoom} />
         </div>
         <div className="sm-info" aria-live="polite">
