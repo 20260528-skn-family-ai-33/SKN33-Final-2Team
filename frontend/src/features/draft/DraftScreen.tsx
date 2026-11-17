@@ -13,14 +13,15 @@ function Remember() {
   return null;
 }
 
-export function DraftScreen({ step, extra, remember = true, children }: { step?: StepKey; extra?: (s: WsState) => string | null; remember?: boolean; children: ReactNode }) {
+/* 3안 생성 화면도 기억한다: 생성 중에 다른 화면에 다녀오면 새 로드맵 탭이 그 앞의 테스트 결과(5단계)가 아니라 생성 화면으로 돌아온다 */
+export function DraftScreen({ step, extra, children }: { step?: StepKey; extra?: (s: WsState) => string | null; children: ReactNode }) {
   // 화면에 들어올 때 한 번만 본다. 주소 직접 입력·뒤로 가기처럼 useGo 를 거치지 않는 진입을 막는 곳이다
   const [mustAsk] = useState(() => needsStartMode(ws()) && !confirmInFlight());
   if (mustAsk) return <StartModeRedirect />;
   const body = <StaleStepGuard>{children}</StaleStepGuard>;
   return (
     <>
-      {remember ? <Remember /> : null}
+      <Remember />
       {step ? (
         <StepGate step={step} extra={extra}>
           {body}
