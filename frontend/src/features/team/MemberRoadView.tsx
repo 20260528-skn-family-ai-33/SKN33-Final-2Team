@@ -37,7 +37,7 @@ export function MemberRoadView({ R, skillAction, skillFooter }: { R: PlanRecord;
         />
       ) : (
         <>
-          <SkillMap pl={pl} owned={[]} />
+          <SkillMap pl={pl} owned={[]} progress={R.progress} />
           {commentSkillNames(pl).map(skill => <div key={skill}>{skillFooter?.(skill)}</div>)}
         </>
       )}

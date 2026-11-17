@@ -1,7 +1,8 @@
 /* 스킬 지도 주차 꼬리표: 같은 스킬을 다루는 활동들의 주차를 이어 붙인다 */
 import { describe, expect, it } from 'vitest';
 import type { Activity } from '@/api/types/plan';
-import { actWeek, edgeEnds, labelSpan, weeksOf } from './layout';
+import type { SkillMapData } from '@/api/types/catalog';
+import { actWeek, edgeEnds, focusOf, labelSpan, revealDelta, weeksOf } from './layout';
 
 const a = (wFrom: number, wTo: number, stage = 1): { a: Activity } => ({ a: { id: `${wFrom}-${wTo}`, stage, title: '', hours: 1, wFrom, wTo } });
 
@@ -18,6 +19,36 @@ describe('weeksOf', () => {
   it('주차가 없는 옛 기록은 단계로 대신한다', () => {
     const old = { a: { id: 'x', stage: 2, title: '', hours: 1 } as unknown as Activity };
     expect(weeksOf([old])).toBe('2단계');
+  });
+});
+
+describe('focusOf', () => {
+  // 1 → 2 → 3, 4 → 2, 5 는 따로
+  const map: SkillMapData = {
+    skills: [1, 2, 3, 4, 5].map((id) => ({ id, name: `s${id}`, category: '', resources: 1 })),
+    prerequisites: [
+      [1, 2],
+      [2, 3],
+      [4, 2],
+      [1, 5],
+    ],
+    unmatched: [],
+    prerequisiteSource: 'draft',
+  };
+  it('바로 앞·뒤 스킬을 이웃으로, 화살표는 들어오는 것과 나가는 것으로 나눈다', () => {
+    const f = focusOf(map, 2)!;
+    expect([...f.near].sort()).toEqual([1, 3, 4]);
+    expect(f.edges).toEqual(['in', 'out', 'in', '']);
+  });
+  it('이어진 스킬이 없으면 이웃도 화살표도 없다', () => {
+    const lone: SkillMapData = { ...map, prerequisites: [[1, 2]] };
+    const f = focusOf(lone, 5)!;
+    expect(f.near.size).toBe(0);
+    expect(f.edges).toEqual(['']);
+  });
+  it('누르지 않았거나 지도에 없는 스킬이면 null', () => {
+    expect(focusOf(map, null)).toBeNull();
+    expect(focusOf(map, 99)).toBeNull();
   });
 });
 
@@ -68,5 +99,23 @@ describe('edgeEnds', () => {
     const p = edgeEnds(node(0, 60), node(0, 0));
     expect(p.y2).toBe(15);
     expect(p.y1).toBe(48);
+  });
+});
+
+describe('revealDelta', () => {
+  // 보이는 칸 [0, 500] · 아래 설명 칸이 400 부터 덮는다고 보면 칸은 [0, 400]
+  it('다 보이면 밀지 않는다(여유 안쪽에 걸쳐도)', () => {
+    expect(revealDelta(100, 160, 0, 400)).toBe(0);
+    expect(revealDelta(340, 395, 0, 400)).toBe(0);
+  });
+  it('아래가 가려지면 가려진 만큼 + 여유만 올린다', () => {
+    expect(revealDelta(380, 440, 0, 400)).toBe(56);
+    expect(revealDelta(380, 440, 0, 400, 0)).toBe(40);
+  });
+  it('위로 벗어나면 그만큼 + 여유 내린다(음수)', () => {
+    expect(revealDelta(-50, 10, 0, 400)).toBe(-66);
+  });
+  it('칸보다 크면 시작 쪽을 맞춘다', () => {
+    expect(revealDelta(100, 600, 0, 400)).toBe(84);
   });
 });

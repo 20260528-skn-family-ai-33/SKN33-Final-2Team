@@ -57,6 +57,20 @@ export function relOf(data: SkillMapData): Rel {
   return { parents, kids };
 }
 
+/** 누른 스킬과 이어진 것. near: 바로 앞(선수)·바로 뒤(후속) 스킬 · edges: data.prerequisites 순서대로 들어오는(in)·나가는(out) 화살표 */
+export interface Focus {
+  near: Set<number>;
+  edges: ('in' | 'out' | '')[];
+}
+export function focusOf(data: SkillMapData, picked: number | null): Focus | null {
+  if (picked == null || !data.skills.some((s) => s.id === picked)) return null;
+  const { parents, kids } = relOf(data);
+  const near = new Set([...(parents[picked] || []), ...(kids[picked] || [])]);
+  near.delete(picked);
+  const edges = data.prerequisites.map(([a, b]) => (b === picked ? 'in' : a === picked ? 'out' : '') as Focus['edges'][number]);
+  return { near, edges };
+}
+
 export type Cover = Map<number, { a: Activity }[]>;
 
 export function coverOf(data: SkillMapData, pl: PlanContent, resOf: (id: string | null | undefined) => Resource | null): Cover {
@@ -249,6 +263,14 @@ export function place(data: SkillMapData, tw: Measure): Layout {
         }
   }
   return { nodes, byId };
+}
+
+/** 한 축에서 [lo, hi] 를 보이는 칸 [viewLo, viewHi] 안에 들이려면 밀어야 할 양(+ 는 내용을 위·왼쪽으로 올린다).
+    다 보이면 0, 벗어났으면 벗어난 쪽에 gap 만큼 여유를 두고 맞춘다. 칸보다 크면 시작 쪽(점이 있는 위)을 맞춘다 */
+export function revealDelta(lo: number, hi: number, viewLo: number, viewHi: number, gap = 16): number {
+  if (lo >= viewLo && hi <= viewHi) return 0;
+  if (lo < viewLo || hi - lo > viewHi - viewLo - 2 * gap) return lo - viewLo - gap;
+  return hi - viewHi + gap;
 }
 
 type NodeBox = Pick<SmNode, 'x' | 'y' | 'r' | 'bw' | 'bh'>;

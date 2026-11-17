@@ -12,9 +12,9 @@ import { Icon } from '@/shared/ui/Icon';
 import { Note } from '@/shared/ui/parts';
 import { earnedSkills, isEarned, LEVEL_TEXT, medalOf, type SkillMark } from './earned';
 import { relOf } from './layout';
-import { MapBox } from './SkillMap';
+import { MapBox, SkillChips, type InfoCtl } from './SkillMap';
 
-function MyInfo({ data, picked, marks, onClose }: { data: SkillMapData; picked: number | null; marks: Map<number, SkillMark>; onClose: () => void }) {
+function MyInfo({ data, picked, marks, ctl }: { data: SkillMapData; picked: number | null; marks: Map<number, SkillMark>; ctl: InfoCtl }) {
   const certificates = useCatalog((state) => state.certById);
   const me = useMe();
   const go = useGo();
@@ -23,8 +23,6 @@ function MyInfo({ data, picked, marks, onClose }: { data: SkillMapData; picked: 
   const { parents, kids } = relOf(data);
   const mark = marks.get(picked);
   const certs = matchingCertificates(Object.values(certificates), [s.name], me?.certs);
-  const names = (ids?: number[]) =>
-    ids && ids.length ? ids.map((id) => data.skills.find((x) => x.id === id)?.name || '').join(', ') : <span className="muted">없어요</span>;
   return (
     <>
       <div className="sm-pick-h">
@@ -32,15 +30,19 @@ function MyInfo({ data, picked, marks, onClose }: { data: SkillMapData; picked: 
         <span className="tag">{s.category}</span>
         <span className={`tag ${mark ? 'acc' : 'line'}`}>{mark ? LEVEL_TEXT[mark.level] : '시작 전'}</span>
         {mark && mark.plans.length > 1 ? <span className="tag line">{mark.plans.length}회 학습</span> : null}
-        <button className="link quiet" aria-label="설명 닫기" onClick={onClose}>
+        <button className="link quiet" aria-label="설명 닫기" onClick={ctl.close}>
           <Icon name="x" />
         </button>
       </div>
       <dl className="kv sm-kv">
         <dt>먼저 배울 스킬</dt>
-        <dd>{names(parents[picked])}</dd>
+        <dd>
+          <SkillChips data={data} ids={parents[picked]} onPick={ctl.pick} />
+        </dd>
         <dt>이어지는 스킬</dt>
-        <dd>{names(kids[picked])}</dd>
+        <dd>
+          <SkillChips data={data} ids={kids[picked]} onPick={ctl.pick} />
+        </dd>
         <dt>추천 자격증</dt>
         <dd>{certs.length ? certs.map((cert) => cert.name).join(', ') : '일치하는 자격증이 없어요.'}</dd>
         <dt>내 로드맵</dt>
@@ -124,7 +126,7 @@ export function MySkillMap() {
             return { cls: 'cov', tag: times > 1 ? `${times}회` : '', aria: ` · ${LEVEL_TEXT[mark.level]}${times > 1 ? ` · ${times}회 학습` : ''}`, ring: !medal, medal };
           },
           edge: (from, to) => (isEarned(marks.get(from)) && marks.has(to) ? 'trail' : ''),
-          info: (close) => <MyInfo data={data} picked={pid} marks={marks} onClose={close} />,
+          info: (ctl) => <MyInfo data={data} picked={pid} marks={marks} ctl={ctl} />,
           notes: (
             <>
               {marks.size ? null : (
