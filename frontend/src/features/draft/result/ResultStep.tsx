@@ -4,7 +4,8 @@ import { courseDifficulty } from '@/shared/lib/courseDifficulty';
 import { materialVersionKey } from './materialVersion';
 import { useConsoleAction } from '@/features/demo/consoleActions';
 import { browserDemoEnabled, useBrowserOptions } from '@/shared/lib/browserOptions';
-import { useAi } from '@/shared/state/ai';
+import { useAi, useSlowAi } from '@/shared/state/ai';
+import { waitTime } from '@/shared/lib/waitTime';
 import { loadRecommendations, recommendationUrl, requestMaterials as request, type ModelCandidateCounts, type Resource, type Result } from './materialRequests';
 import { MaterialReason } from './MaterialReason';
 import { ResourcePreviewButton } from './ResourcePreview';
@@ -92,6 +93,7 @@ function ResultSelection({ editorRef, onChoicesChanged, locked = false, courseId
   const draft = useWs(s => s.draft);
   const browserDemo = useBrowserOptions(s => browserDemoEnabled(s.options));
   const serverDemo = useAi(s => s.status.demoMode);
+  const slow = useSlowAi();
   const showModelCounts = browserDemo && serverDemo === true;
   const course = courseId || draft.chosen;
   const budget = draft.prefs.budget;
@@ -237,7 +239,7 @@ function ResultSelection({ editorRef, onChoicesChanged, locked = false, courseId
           <MaterialReason kind="강좌" diagnostic={skill.courseDiagnostic} hasOptions={courses.length > 0} fallback="프로젝트에 맞는 강좌를 찾지 못했어요." />
           </details>
         </section>;
-      })}{!stacked&&skillFilter&&!materialNames.includes(skillFilter)&&<p className="small muted">이 코스에는 해당 스킬의 추천 자료가 없어요.</p>}</div></> : !error && <><div className="loading" role="status"><span className="sp" aria-hidden="true" />추천 자료를 준비하고 있어요. 1~2분쯤 걸릴 수 있어요.</div><Skeleton kind="materials" count={stacked ? 2 : 1} /></>}
+      })}{!stacked&&skillFilter&&!materialNames.includes(skillFilter)&&<p className="small muted">이 코스에는 해당 스킬의 추천 자료가 없어요.</p>}</div></> : !error && <><div className="loading" role="status"><span className="sp" aria-hidden="true" />추천 자료를 준비하고 있어요. {waitTime('1~2분쯤 걸릴 수 있어요', slow)}.</div><Skeleton kind="materials" count={stacked ? 2 : 1} /></>}
     <style>{`
       .v2-skill-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
       .v2-skill-summary>div,.v2-skill-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
