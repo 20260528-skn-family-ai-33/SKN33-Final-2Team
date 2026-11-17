@@ -1,3 +1,4 @@
+import { ApiError } from '@/api/client';
 import { plansApi } from '@/api/endpoints/plans';
 import { waitJob } from '@/api/jobs';
 import { failToast } from '@/shared/lib/fail';
@@ -485,12 +486,21 @@ function Revise({ R }: { R: PlanRecord }) {
     if (!revisionId || retrying || busy) return;
     setRetrying(skill);
     try {
-      const job = await plansApi.revise(R.id, { retrySkill: skill, revisionId,
-        rev: { on: {}, v: r.v, note: r.note, fromComment: false }, key: revKey(r) });
-      await waitJob(job.jobId);
+      const job = await plansApi.revise(R.id, {
+        retrySkill: skill,
+        revisionId,
+        version: base.version,
+        rev: { on: {}, v: r.v, note: r.note, fromComment: false },
+        key: revKey(r),
+      });
+      const result = await waitJob<{ revisionId?: string; noChanges?: boolean }>(job.jobId);
       await pullPlan(R.id);
+      if (result.noChanges) toast('이전 제안과 달라진 내용이 없어요.');
     } catch (error) {
       failToast(error, '이 스킬의 새 제안을 만들지 못했어요');
+      if ((error instanceof ApiError && error.code === 'REVISION_CHANGED') || (error as { code?: string })?.code === 'REVISION_CHANGED') {
+        await pullPlan(R.id, true);
+      }
     } finally {
       setRetrying(null);
     }

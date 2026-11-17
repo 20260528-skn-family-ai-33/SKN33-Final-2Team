@@ -117,3 +117,30 @@ class StagedPreparationTests(TestCase):
                 self.assertEqual(queued[1][1](None),{})
         finally:
             with material._lock:material._flights.clear()
+
+    def test_staged_quiz_retries_once_on_truncated_option(self):
+        f=fixture.SurveyTests();f.setUp()
+        project={k:v for k,v in f.project.items() if k!='rawText'}
+        project['selectedSkills']=f.selection(2)['skills']
+        memory=SurveyMemory({'goal':project['goal']})
+        @contextmanager
+        def transaction():yield memory
+        surveys=f.result(2)
+        for group in surveys['groups']:group['quizzes']=[]
+        bad_quizzes=f.result(2)
+        for group in bad_quizzes['groups']:
+            group['surveys']=[]
+            for q in group['quizzes']:q.update(concept=q['q'],questionType='오류 원인 판단',difficulty='적용')
+        bad_quizzes['groups'][0]['quizzes'][0]['options'][0]='잘린 보기...'
+        good_quizzes=f.result(2)
+        for group in good_quizzes['groups']:
+            group['surveys']=[]
+            for q in group['quizzes']:q.update(concept=q['q'],questionType='오류 원인 판단',difficulty='적용')
+        calls=[]
+        def model(ctx,system,payload,**kwargs):
+            calls.append(len(calls))
+            return deepcopy(bad_quizzes if len(calls)==1 else good_quizzes)
+        with patch('app.services.preassessment_staged.pooled_surveys',return_value=surveys),patch.object(api.db,'tx',side_effect=transaction),patch.object(api,'project_input',return_value=project),patch.object(api.profile,'view',return_value=f.profile),patch.object(api,'profile_input',side_effect=lambda x:x),patch('app.catalog.skill_names',return_value=['스킬0','스킬1']),patch.object(api.runtime,'context',return_value=SimpleNamespace(live=True,provider='ollama',reasoning={})),patch.object(api.runtime,'llm_json',side_effect=model):
+            final=api.generate_for(1,'p',staged=True)
+        self.assertEqual(len(calls),2)
+        self.assertEqual(final['quizStatus'],'ready')

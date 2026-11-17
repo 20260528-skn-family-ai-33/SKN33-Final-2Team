@@ -160,7 +160,7 @@ class ServiceTests(unittest.TestCase):
 
     def test_inbox_shape(self):
         at = datetime(2026, 11, 4, 9, 30, tzinfo=timezone.utc)
-        empty = {'draft_id': None, 'comment_id': None, 'task_id': None, 'job_kind': None, 'job_status': None}
+        empty = {'draft_id': None, 'comment_id': None, 'task_id': None, 'revision_id': None, 'job_kind': None, 'job_status': None}
         rows = [dict(empty, notification_id=NID, kind='report', audience='head', actor_id=8, actor_name='김직원', roadmap_id=RID,
                      report_id=NID, created_at=at, read_at=None, plan_title='SQL 분석', track='A2'),
                 dict(empty, notification_id=RID, kind='roadmap', audience='self', actor_id=7, actor_name='나', roadmap_id=RID,
@@ -168,21 +168,25 @@ class ServiceTests(unittest.TestCase):
                 dict(empty, notification_id=CID, kind='job', audience='self', actor_id=7, actor_name='나', roadmap_id=None, report_id=None,
                      created_at=at, read_at=None, plan_title='목표', track=None, draft_id=DID, job_kind='options', job_status='failed'),
                 dict(empty, notification_id=CID, kind='comment', audience='member', actor_id=3, actor_name='부서장', roadmap_id=RID, report_id=None,
-                     created_at=at, read_at=None, plan_title='SQL 분석', track='A2', comment_id=CID)]
+                     created_at=at, read_at=None, plan_title='SQL 분석', track='A2', comment_id=CID),
+                dict(empty, notification_id=NID, kind='job', audience='self', actor_id=7, actor_name='나', roadmap_id=RID, report_id=None,
+                     created_at=at, read_at=None, plan_title='SQL 분석', track='A2', job_kind='revision', job_status='done', revision_id='rev-1')]
         with patch.object(NT.db, 'all_', return_value=rows) as q, patch.object(NT.db, 'val', return_value=3):
             out = NT.inbox(7)
         sql = q.call_args.args[0]
         self.assertIn(NT.HEAD_SEES, sql)  # 부서 이동한 직원의 알림은 부서장에게 보이지 않게 거른다
         self.assertIn("n.audience IN ('self', 'member')", sql)
         self.assertIn('LEFT JOIN public.roadmaps r', sql)  # 로드맵 확정 전 작업 알림도 나와야 한다
+        self.assertIn('app_ext.roadmap_revisions', sql)
         self.assertIn("n.created_at > now() - interval '24 hours'", sql)
         self.assertEqual(out['unread'], 3)
         self.assertEqual(out['items'][0], {'id': NID, 'kind': 'report', 'audience': 'head', 'employee': {'id': '8', 'name': '김직원'}, 'planId': RID,
                                            'planTitle': 'SQL 분석', 'track': 'A2', 'reportId': NID, 'draftId': None, 'commentId': None, 'taskId': None,
-                                           'jobKind': None, 'jobStatus': None, 'createdAt': at.isoformat(), 'read': False})
+                                           'revisionId': None, 'jobKind': None, 'jobStatus': None, 'createdAt': at.isoformat(), 'read': False})
         self.assertEqual((out['items'][1]['reportId'], out['items'][1]['read'], out['items'][1]['planTitle']), (None, True, ''))
         self.assertEqual((out['items'][2]['planId'], out['items'][2]['draftId'], out['items'][2]['jobKind'], out['items'][2]['jobStatus']), (None, DID, 'options', 'failed'))
         self.assertEqual((out['items'][3]['audience'], out['items'][3]['commentId'], out['items'][3]['employee']), ('member', CID, {'id': '3', 'name': '부서장'}))
+        self.assertEqual((out['items'][4]['jobKind'], out['items'][4]['revisionId']), ('revision', 'rev-1'))
 
     def test_read_rejects_malformed_and_foreign_ids(self):
         with patch.object(NT.db, 'tx') as tx:

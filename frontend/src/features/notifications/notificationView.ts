@@ -10,10 +10,26 @@ function jobTarget(kind: NotificationJobKind | null, planId: string): string {
   return paths.newOptions;
 }
 
+export interface RevisionTargetState {
+  status?: string;
+  revision?: { id: string } | null;
+  pending?: unknown | null;
+}
+
 /** 누르면 갈 곳: 본인은 내 로드맵·결과 보고서, 부서장은 그 직원의 로드맵·결과 보고서, 코멘트는 받은 코멘트, 작업은 그 작업의 화면 */
-export function notificationTarget(n: AppNotification): string {
+export function notificationTarget(n: AppNotification, record?: RevisionTargetState | null): string {
   const planId = n.planId ?? '';
-  if (n.kind === 'job') return jobTarget(n.jobKind, planId);
+  if (n.kind === 'job') {
+    if (
+      n.jobKind === 'revision' &&
+      planId &&
+      record &&
+      (record.status !== 'active' || (!record.revision && !record.pending) || (!!n.revisionId && record.revision?.id !== n.revisionId))
+    ) {
+      return paths.roadmap(planId);
+    }
+    return jobTarget(n.jobKind, planId);
+  }
   if (n.kind === 'comment') return paths.comments(planId);
   const head = n.audience === 'head';
   if ((n.kind === 'report' || n.kind === 'task' || n.kind === 'task_result') && n.reportId) return head ? paths.memberReport(n.employee.id, n.reportId) : paths.report(n.reportId);

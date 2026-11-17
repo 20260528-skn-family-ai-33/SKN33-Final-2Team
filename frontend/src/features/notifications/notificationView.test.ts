@@ -143,6 +143,14 @@ describe('작업·코멘트 알림 (#96)', () => {
     expect(notificationTarget(job('report', 'failed', 'p1'))).toBe('/roadmaps/p1/post');
   });
 
+  it('수정안 작업 알림은 해당 수정안 ID와 현재 상태를 보고 이동 경로를 정한다 (#287)', () => {
+    const rev = n({ kind: 'job', jobKind: 'revision', jobStatus: 'done', planId: 'p1', draftId: null, revisionId: 'rev-1' });
+    expect(notificationTarget(rev, { status: 'active', revision: { id: 'rev-1' }, pending: {} })).toBe('/roadmaps/p1/revise');
+    expect(notificationTarget(rev, { status: 'active', revision: { id: 'rev-2' }, pending: {} })).toBe('/roadmaps/p1');
+    expect(notificationTarget(rev, { status: 'active', revision: null, pending: null })).toBe('/roadmaps/p1');
+    expect(notificationTarget(rev, { status: 'done', revision: { id: 'rev-1' }, pending: {} })).toBe('/roadmaps/p1');
+  });
+
   it('코멘트 알림은 받은 코멘트 화면으로 간다', () => {
     expect(notificationTarget(comment)).toBe('/roadmaps/p1/comments');
   });

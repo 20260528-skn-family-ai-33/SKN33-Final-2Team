@@ -135,3 +135,117 @@ class RevisionMaterialsTests(TestCase):
                 plans._mix_revision_skills(self.old, proposal, self.handoff, ['SQL'], set())
             self.assertEqual(ctx.exception.status, 422)
             self.assertEqual(ctx.exception.code, 'REVISION_SKILLS_INVALID')
+
+    def test_revise_start_rejects_stale_version_before_and_during_registration(self):
+        from contextlib import nullcontext
+        from unittest.mock import Mock
+        from app.services import plans
+
+        base = deepcopy(self.old)
+        base.update(version=2, prefs={}, handoff={'startStage': 2, 'prefs': {}})
+        row = {'roadmap_id': 'rid', 'project_id': 'pid', 'status': 'IN_PROGRESS', 'content': base}
+        body = {'version': 1, 'rev': {'on': {'hours': True}, 'v': {'hours': 6}, 'note': '시간 조정'}}
+
+        with patch.object(plans, '_owned', return_value=row), \
+             patch.object(plans.jobs, 'start') as start_job:
+            with self.assertRaises(plans.ApiError) as err:
+                plans.revise_start(1, 'rid', body)
+            self.assertEqual((err.exception.status, err.exception.code), (409, 'REVISION_CHANGED'))
+            start_job.assert_not_called()
+
+        tx = Mock()
+        tx.val.side_effect = ['IN_PROGRESS', None]
+        tx.one.return_value = {'content': dict(base, version=3)}
+        body_same_version = {'version': 2, 'rev': {'on': {'hours': True}, 'v': {'hours': 6}, 'note': '시간 조정'}}
+        with patch.object(plans, '_owned', return_value=row), \
+             patch.object(plans.db, 'all_', return_value=[]), \
+             patch.object(plans.db, 'tx', side_effect=lambda: nullcontext(tx)), \
+             patch.object(plans.jobs, 'start') as start_job:
+            with self.assertRaises(plans.ApiError) as err:
+                plans.revise_start(1, 'rid', body_same_version)
+            self.assertEqual((err.exception.status, err.exception.code), (409, 'REVISION_CHANGED'))
+            start_job.assert_not_called()
+
+    def test_multi_course_skill_comment_replaces_undone_course_while_keeping_completed_course(self):
+        from contextlib import nullcontext
+        from unittest.mock import Mock
+        from app.services import plans
+
+        base = {
+            'opt': 'A2', 'goal': 'SQL 목표', 'hours': 4, 'start': 2, 'version': 1, 'prefs': {}, 'handoff': {'startStage': 2, 'prefs': {}},
+            'acts': [
+                {'id': 'done-course', 'skill': 'SQL', 'stage': 2, 'title': 'Course', 'res': 'c1', 'hours': 8, 'how': ''},
+                {'id': 'undone-course', 'skill': 'SQL', 'stage': 2, 'title': 'Added', 'res': 'c2', 'hours': 12, 'how': ''},
+                {'id': 'undone-task', 'skill': 'SQL', 'stage': 3, 'title': 'Task', 'res': None, 'hours': 4, 'how': ''},
+            ],
+            'def': deepcopy(self.old['def']),
+        }
+        row = {'roadmap_id': 'rid', 'project_id': 'pid', 'status': 'IN_PROGRESS', 'content': base}
+        comments = [{'id': 'c-1', 'skill': 'SQL', 'fit': 'partial', 'fitText': '강좌·도서', 'level': 'none', 'levelText': '', 'free': '새 강좌', 'deleted': False, 'status': 'new', 'stamp': 's1'}]
+        captured = {}
+
+        def fake_start(kind, emp, rid, work, *, before_start=None, transaction=None):
+            captured['work'] = work
+            return 'job-1'
+
+        tx = Mock()
+        tx.val.side_effect = ['IN_PROGRESS', None, 'rev-1']
+        tx.one.return_value = {'content': base}
+
+        with patch.object(plans, '_owned', return_value=row), \
+             patch.object(plans, '_comments', return_value=comments), \
+             patch.object(plans.db, 'all_', side_effect=[[{'activity_id': 'done-course'}]]), \
+             patch.object(plans.db, 'tx', side_effect=lambda: nullcontext(tx)), \
+             patch.object(plans.jobs, 'start', side_effect=fake_start), \
+             patch.object(plans.RM, '_res', side_effect=lambda rid: self.resources.get(rid)):
+            res = plans.revise_start(1, 'rid', {'rev': {'fromComment': 'c-1', 'on': {}, 'v': {}, 'note': '보완'}})
+        self.assertEqual(res['revisionId'], 'rev-1')
+
+        # 2개 강좌 모두 완료되고 산출물만 미완료면 강좌는 교체 대상에서 제외되고 산출물만 대상이 된다
+        tx_all_done = Mock()
+        tx_all_done.val.side_effect = ['IN_PROGRESS', None, 'rev-2']
+        tx_all_done.one.return_value = {'content': base}
+        with patch.object(plans, '_owned', return_value=row), \
+             patch.object(plans, '_comments', return_value=comments), \
+             patch.object(plans.db, 'all_', side_effect=[[{'activity_id': 'done-course'}, {'activity_id': 'undone-course'}]]), \
+             patch.object(plans.db, 'tx', side_effect=lambda: nullcontext(tx_all_done)), \
+             patch.object(plans.jobs, 'start', side_effect=fake_start), \
+             patch.object(plans.RM, '_res', side_effect=lambda rid: self.resources.get(rid)), \
+             patch.object(plans.RM, 'revise', return_value={'acts': [
+                 {'skill': 'SQL', 'res': None, 'title': 'Only Task', 'how': '새 과제', 'stage': 3, 'hours': 4},
+             ]}), \
+             patch.object(plans.RM, 'keep_ids', side_effect=lambda out, old, v: {'acts': [dict(a, id=f'keep-{i}') for i, a in enumerate(out['acts'])], 'weeklyHours': 4}), \
+             patch.object(plans.RM, 'build_plan', return_value={'opt': 'A2', 'acts': [], 'hours': 4, 'start': 2, 'weeks': 2, 'cost': 0}), \
+             patch.object(plans.rt, 'context', return_value=Mock()), \
+             patch.object(plans.rt, 'sim_once', return_value=None), \
+             patch('app.services.material_plan.rebuild_revision', side_effect=lambda option, *_: option):
+            plans.revise_start(1, 'rid', {'rev': {'fromComment': 'c-1', 'on': {}, 'v': {}, 'note': '보완'}})
+            captured['work'](Mock())
+        self.assertEqual(tx_all_done.run.call_args.kwargs['p'].obj['skillComment']['targets'], ['undone-task'])
+
+        # 1개 완료 + 1개 미완료인 호출: done-course 는 제외, undone-course 와 undone-task 가 교체 대상
+        seen_inp = {}
+        tx_exec = Mock()
+        tx_exec.val.side_effect = ['IN_PROGRESS', None, 'rev-3']
+        tx_exec.one.return_value = {'content': base}
+        with patch.object(plans, '_owned', return_value=row), \
+             patch.object(plans, '_comments', return_value=comments), \
+             patch.object(plans.db, 'all_', side_effect=[[{'activity_id': 'done-course'}]]), \
+             patch.object(plans.db, 'tx', side_effect=lambda: nullcontext(tx_exec)), \
+             patch.object(plans.jobs, 'start', side_effect=fake_start), \
+             patch.object(plans.RM, '_res', side_effect=lambda rid: self.resources.get(rid)), \
+             patch.object(plans.RM, 'revise', side_effect=lambda ctx, inp, **kw: (seen_inp.update(inp), {'acts': [
+                 {'skill': 'SQL', 'res': 'c3', 'title': 'Replaced', 'how': '', 'stage': 2, 'hours': 4},
+                 {'skill': 'SQL', 'res': None, 'title': 'New Task', 'how': '새 과제', 'stage': 3, 'hours': 4},
+             ]})[1]), \
+             patch.object(plans.RM, 'keep_ids', side_effect=lambda out, old, v: {'acts': [dict(a, id=f'keep-{i}') for i, a in enumerate(out['acts'])], 'weeklyHours': 4}), \
+             patch.object(plans.RM, 'build_plan', return_value={'opt': 'A2', 'acts': [], 'hours': 4, 'start': 2, 'weeks': 2, 'cost': 0}), \
+             patch.object(plans.rt, 'context', return_value=Mock()), \
+             patch.object(plans.rt, 'sim_once', return_value=None), \
+             patch('app.services.material_plan.rebuild_revision', side_effect=lambda option, *_: option):
+            self.resources['c3'] = {'id': 'c3', 'title': 'Replaced', 'type': 'course', 'hours': 4, 'skills': ['SQL'], 'cost': 0}
+            plans.revise_start(1, 'rid', {'rev': {'fromComment': 'c-1', 'on': {}, 'v': {}, 'note': '보완'}})
+            captured['work'](Mock())
+        replace_keys = [row['key'] for row in seen_inp['changes']['replaceActs']]
+        self.assertEqual(replace_keys, ['undone-course', 'undone-task'])
+        self.assertEqual(tx_exec.run.call_args.kwargs['p'].obj['skillComment']['targets'], ['undone-course', 'undone-task'])

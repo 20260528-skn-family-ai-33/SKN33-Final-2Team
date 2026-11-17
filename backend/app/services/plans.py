@@ -608,6 +608,9 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
     if STATUS.get(row['status']) != 'active':
         raise ApiError(409, 'NOT_ACTIVE', '진행 중인 로드맵만 고칠 수 있어요')
     base = row['content']
+    base_version = body.get('version')
+    if base_version is not None and base_version != base.get('version'):
+        raise ApiError(409, 'REVISION_CHANGED', '로드맵이 바뀌었어요. 최신 로드맵을 확인해 주세요.')
     retry_skill = body.get('retrySkill')
     retry = None
     if retry_skill is not None:
@@ -651,20 +654,15 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
     done = {p['activity_id'] for p in db.all_("SELECT activity_id FROM app_ext.activity_progress WHERE roadmap_id = :r AND status = 'done'", r=row['roadmap_id'])}
     targets = {}
     if skill:
-        completed_course = False
         for activity in base['acts']:
-            if activity.get('skill') != skill:
+            if activity.get('skill') != skill or activity['id'] in done:
                 continue
             resource = activity.get('res')
             is_course = bool(resource and (RM._res(resource) or {}).get('type') == 'course')
-            if activity['id'] in done:
-                completed_course = completed_course or is_course
-            elif not resource:
+            if not resource:
                 targets.setdefault('task', activity)
             elif is_course:
                 targets.setdefault('course', activity)
-        if completed_course:
-            targets.pop('course', None)
         if len(targets) == 0:
             raise ApiError(422, 'SKILL_REVISION_TARGET', '이 스킬에 교체할 수 있는 강좌나 산출물이 없어요.')
         ch['c']['replaceActs'] = [{'key': a['id'], 'title': a['title']} for a in targets.values()]
@@ -767,6 +765,12 @@ def revise_start(employee_id: int, roadmap_id: str, body: dict) -> dict:
         status = t.val('SELECT status::text FROM public.projects WHERE project_id = :p FOR UPDATE', p=row['project_id'])
         if STATUS.get(status) != 'active':
             raise ApiError(409, 'NOT_ACTIVE', '진행 중인 로드맵만 고칠 수 있어요')
+        current_row = t.one('SELECT content FROM public.roadmaps WHERE roadmap_id = :r FOR UPDATE', r=row['roadmap_id'])
+        if current_row is None or (isinstance(current_row, dict) and (
+            current_row.get('content') != base
+            or (base_version is not None and (current_row.get('content') or {}).get('version') != base_version)
+        )):
+            raise ApiError(409, 'REVISION_CHANGED', '로드맵이 바뀌었어요. 최신 로드맵을 확인해 주세요.')
         if t.val("SELECT 1 FROM app_ext.jobs WHERE kind = 'revision' AND ref = :r AND status = 'running' LIMIT 1", r=roadmap_id):
             raise ApiError(409, 'REVISION_BUSY', '수정안을 작성 중이에요. 완료 후 다시 요청해 주세요.')
         if retry:

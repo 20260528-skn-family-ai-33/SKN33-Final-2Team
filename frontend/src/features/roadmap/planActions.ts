@@ -1,5 +1,6 @@
 /* 확정한 로드맵 서버 동기화·동작 (5차 gp-parts.js takePlan·pullPlan·saveProgress·revise·acceptRevision·dropRevision, gp-app.js 보관·다시 진행) */
 import { createElement as h, useEffect } from 'react';
+import { ApiError } from '@/api/client';
 import { plansApi } from '@/api/endpoints/plans';
 import type { PlanRecord, PlanResponse, RevForm } from '@/api/types/plan';
 import { paths } from '@/app/paths';
@@ -169,7 +170,12 @@ export async function revise(pid: string, settingsOnly = false): Promise<void> {
     x.pending = null;
   });
   try {
-    await plansApi.revise(pid, { rev: { on: request.on, v: request.v, note: request.note, fromComment: request.fromComment }, key, settingsOnly });
+    await plansApi.revise(pid, {
+      rev: { on: request.on, v: request.v, note: request.note, fromComment: request.fromComment },
+      key,
+      settingsOnly,
+      version: R.plan.version,
+    });
   } catch (err) {
     updateWs((s) => {
       const x = s.plans[pid];
@@ -178,6 +184,10 @@ export async function revise(pid: string, settingsOnly = false): Promise<void> {
         x.rev.fail = { cause: cause(err) };
       }
     });
+    if ((err instanceof ApiError && err.code === 'REVISION_CHANGED') || (err as { code?: string })?.code === 'REVISION_CHANGED') {
+      failToast(err, '로드맵이 바뀌었어요. 최신 로드맵을 확인해 주세요.');
+      await pullPlan(pid, true);
+    }
     return;
   }
   await pullPlan(pid);

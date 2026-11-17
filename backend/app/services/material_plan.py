@@ -18,12 +18,16 @@ def duration_estimates(saved, draft):
 
 def report(saved,summaries):
     rec=deepcopy(saved.get('recommendations') or {'skills':[]})
-    for row in rec['skills']:
-        choice=saved['resourceChoices'][row['name']]
-        row['courses']=[item for item in row['courses'] if item['id']==choice['course']]
-        row['books']=[item for item in row['books'] if item['id'] in choice['books']]
-    return {'recommendations':rec,'choices':deepcopy(saved['resourceChoices']),'skillOrder':list(saved['skillOrder']),
-        'skillDetails':[{'name':name,'application':'','competencySummary':summaries.get(name,[])} for name in saved['skillOrder']],
+    choices=saved.get('resourceChoices') or {}
+    skill_order=list(saved.get('skillOrder') or [])
+    for row in rec.get('skills',[]):
+        choice=choices.get(row.get('name')) or {}
+        selected_course=choice.get('course')
+        selected_books=set(choice.get('books') or [])
+        row['courses']=[item for item in row.get('courses',[]) if item.get('id')==selected_course]
+        row['books']=[item for item in row.get('books',[]) if item.get('id') in selected_books]
+    return {'recommendations':rec,'choices':deepcopy(choices),'skillOrder':skill_order,
+        'skillDetails':[{'name':name,'application':'','competencySummary':summaries.get(name,[])} for name in skill_order],
         'durationEstimates':deepcopy(saved.get('durationEstimates') or {})}
 
 
@@ -31,12 +35,15 @@ def preview(saved,draft):
     chosen=draft.get('chosen');option=deepcopy(((draft.get('gen') or {}).get('options') or {}).get(chosen))
     if not option:return None
     acts=[]
-    names=[name for name in saved.get('skillOrder',[]) if saved['resourceChoices'].get(name,{}).get('enabled',True)]
-    rows={row['name']:row for row in (saved.get('recommendations') or {}).get('skills',[])}
+    choices=saved.get('resourceChoices') or {}
+    names=[name for name in saved.get('skillOrder',[]) if choices.get(name,{}).get('enabled',True)]
+    rows={row['name']:row for row in (saved.get('recommendations') or {}).get('skills',[]) if isinstance(row,dict) and row.get('name')}
     for index,name in enumerate(names):
-        choice=saved['resourceChoices'][name];row=rows[name]
-        for resource in row['courses']+row['books']:
-            if resource['id']!=choice['course'] and resource['id'] not in choice['books']:continue
+        choice=choices.get(name) or {};row=rows.get(name) or {}
+        selected_course=choice.get('course')
+        selected_books=set(choice.get('books') or [])
+        for resource in row.get('courses',[])+row.get('books',[]):
+            if resource['id']!=selected_course and resource['id'] not in selected_books:continue
             acts.append({'id':f"material-{index}-{resource['id']}",'skill':name,'stage':2,'title':resource['title'],'res':resource['id'],'hours':resource.get('hours') or 2,'how':''})
     option['acts']=acts
     estimates=duration_estimates(saved,draft)

@@ -162,7 +162,7 @@
 | 요청 | 쓰는 곳 |
 | --- | --- |
 | `GET /certifications` | 자격증 2단계 고르기 |
-| `GET /resources?kind=&q=&limit=&offset=` · `POST /resources/lookup` · `GET /resources/{id}` | 학습 자료 목록(30개씩)·여러 개 조회 |
+| `GET /resources?kind=&q=&platform=&sort=&limit=&offset=` · `POST /resources/lookup` · `GET /resources/{id}` | 학습 자료 목록(기본 30건)·여러 개 조회·상세. `sort`는 생략 시 기존 기본순, `title_asc`·`title_desc`는 전체 결과의 제목순. `platform`은 강좌 사이트의 원래 값(예: `Inflearn`). 응답의 `total`은 필터·중복 제거 후 전체 건수이며, `kind=강좌`에서는 검색어·선택 사이트와 무관한 사용 가능 사이트 목록 `platforms`도 제공. 화면의 자격증은 기존 `kind=자격`으로 조회. |
 | `GET /regulations/sets` · `POST /regulations/lookup` | 직원 구분별 규정 묶음 · 조항 조회 |
 | `GET /skills/map` | 스킬 지도(설계서 밖 추가 · 10/23) |
 

@@ -27,6 +27,7 @@ hrContext는 업무 맥락·예시·필요한 적용 범위의 참고. 직급·�
 
 [출력 계약]
 각 항목의 name은 DB 태그 이름, reason은 프로젝트의 구체적인 작업·문제 하나와 이 스킬이 필요한 이유를 연결한 짧은 한 문장(권장 45~65자, 줄바꿈 금지). 일반적인 중요성이나 application 반복 금지. application은 프로젝트에서 사용할 부분. reason·application의 비어 있지 않은 내용 필수.
+reason과 application은 자연스러운 한국어로 쓰되, 영문 스킬명과 고유명사(Python, SQL, FastAPI, Docker, RAG, API, JSON, DataFrame, LLM 등)뿐 아니라 실무·기술 문서에서 영문 그대로 널리 쓰이는 범용 기술·개념 단어(예: rerank, embedding, chunking, token, prompt, fine-tuning, pipeline, indexing, schema, payload, endpoint, async, batch, vector, context, fallback, cache 등)는 굳이 '재랭크·재순위화'처럼 억지로 한글로 번역하거나 음차·혼용하지 말고 공식 영문 표기 그대로 통일해 사용한다.
 JSON: {"skills":[{"name":"availableSkills의 이름","reason":"선정 이유","application":"사용할 부분"}]}
 """
 

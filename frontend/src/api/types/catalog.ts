@@ -48,10 +48,12 @@ export interface Resource {
 }
 
 export type ResourceMap = Record<string, Resource>;
+export type ResourceSort = 'default' | 'title_asc' | 'title_desc';
 
 export interface ResourceSearch {
   total: number;
   items: Resource[];
+  platforms?: string[];
 }
 
 export interface Cert {
