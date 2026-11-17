@@ -11,6 +11,7 @@ import { toast } from '@/shared/state/ui';
 import { Icon } from '@/shared/ui/Icon';
 import { AppVersion } from '@/shared/ui/AppVersion';
 import { ThemeToggle } from '@/skins/ThemeControls';
+import { loadLastLoginId, saveLastLoginId } from './lastLoginId';
 import { LoginFlow } from './LoginFlow';
 
 function deptGroups(accts: DemoAccount[]) {
@@ -33,7 +34,9 @@ function deptGroups(accts: DemoAccount[]) {
 export function LoginPage() {
   const demo = useSession((s) => s.demo);
   const accts = demo?.accounts || [];
-  const [code, setCode] = useState('');
+  // 마지막으로 로그인한 사번을 채워 두고, 그때는 바로 비밀번호를 입력하도록 비밀번호 칸에 초점을 둔다
+  const [lastId] = useState(loadLastLoginId);
+  const [code, setCode] = useState(lastId);
   const [pw, setPw] = useState('');
   const [keep, setKeep] = useState(true);
   const [showPw, setShowPw] = useState(false);
@@ -64,6 +67,7 @@ export function LoginPage() {
             : cause(x).user,
       );
     }
+    saveLastLoginId(c);
     try {
       await setAccount(acct);
     } catch (x) {
@@ -150,6 +154,7 @@ export function LoginPage() {
                   className="input"
                   id="lgPw"
                   ref={pwRef}
+                  autoFocus={!!lastId}
                   type={showPw ? 'text' : 'password'}
                   autoComplete="current-password"
                   placeholder="비밀번호를 입력해 주세요"
