@@ -84,15 +84,6 @@ function ScopedDeliverableSelection({ ref, onReadyChange, onBusyChange, onPlanCh
   useEffect(() => {
     if (!id) return;
     let active = true;
-    // Existing materials and proposals are readable before any missing AI work finishes.
-    void Promise.all([
-      request<ReviewMaterials>(reviewPath(id,'recommendations',course || '')),
-      request<ProposalResponse>(reviewPath(id,'activities',course || '')),
-    ]).then(([resources,existing])=>{
-      if(!active||reviewScope(ws())!==scope)return;
-      setMaterials(resources);
-      if(existing.proposal){setVersions(existing.versions);setChosen(existing.proposal.id);setSkillPicks(existing.proposal.skillProposalIds||{});}
-    }).catch(()=>{});
     void initializeReview(id, course || '', scope).then(({body, resources, summaries}) => {
       if (!active || reviewScope(ws()) !== scope) return;
       const picks = reviewTasks.recall<{versions: Proposal[]; chosen: string; skillPicks: Record<string, string>}>(scope, 'picks');

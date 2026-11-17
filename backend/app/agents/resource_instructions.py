@@ -32,6 +32,7 @@ courseDiagnostic 형식: {"reason":"no_candidates|insufficient_evidence|stack_mi
 도서가 빈 추천이면 bookDiagnostic을 추가. 제공 도서가 없을 때만 no_candidates, 제목과 소개로 학습 근거를 확인하기 어려우면 insufficient_evidence, 확인된 내용이 요구 범위와 다르면 scope_gap. 도서는 0권도 유효하다.
 bookDiagnostic 형식: {"reason":"no_candidates|insufficient_evidence|scope_gap","detail":"확인 근거·부족한 내용(1~240자)"}
 출력 skills는 입력 skills의 각 name만 같은 개수·순서로 정확히 1개씩 반환하며, 지침 문구나 입력에 없는 스킬 행을 추가·누락·중복·변경하지 않는다.
+진단 detail 등 한국어 설명에서도 영문 스킬명·고유명사(Python, SQL, FastAPI, Docker, RAG, API, JSON, DataFrame, LLM 등)와 실무·기술 문서에서 영문 그대로 널리 쓰이는 범용 기술·개념 단어(예: rerank, embedding, chunking, token, prompt, fine-tuning, pipeline, indexing, schema, payload, endpoint, async, batch, vector, context, fallback, cache 등)는 굳이 '재랭크·재순위화'처럼 억지로 한글로 번역하거나 음차·혼용하지 말고 공식 영문 표기 그대로 통일해 사용한다.
 JSON: {"skills":[{"name":"입력 스킬명","courses":[{"key":"S1-C1 형태의 choiceKey"}],"books":[{"key":"B1 형태의 공통 도서 키"}]}]}
 """
 POLICIES = {

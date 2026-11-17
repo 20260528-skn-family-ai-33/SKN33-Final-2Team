@@ -3,8 +3,8 @@ from functools import wraps
 from inspect import signature, Parameter
 from fastapi import Request
 from fastapi.responses import JSONResponse
-from app import jobs
-from app.errors import ApiError
+from app import jobs, llm
+from app.errors import AgentError, ApiError
 
 
 def start_shared(employee,reference,work):
@@ -31,6 +31,10 @@ def queued_generation(function=None, *, reference_prefix=''):
         def work(_):
             try:
                 return function(*args, **kwargs)
+            except AgentError:
+                raise
+            except llm.LlmError as error:
+                raise AgentError(str(error)) from error
             except ValueError as error:
                 raise ApiError(422, 'GENERATION_INVALID', str(error)) from error
         from fastapi.encoders import jsonable_encoder

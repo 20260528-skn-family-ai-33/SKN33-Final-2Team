@@ -317,14 +317,16 @@ def propose_activities(project_id: UUID,a: Account=Depends(require_employee),reg
     from app.services import activity_selection as activities
     with db.tx() as t:_, target=activities.context(t,a.id,str(project_id),**({'course':course} if course else {}))
     course=target['chosen']
+    has_skill = skill is not None
     with generation_guard('draft-review', f'{project_id}:{target["chosen"]}'):
         with db.tx() as t:saved,d=activities.context(t,a.id,str(project_id),**({'course':course} if course else {}))
         existing=activities.current_record(saved,d)
-        if existing and not regenerate and not skill:return activities.view(saved,d)
+        if existing and not regenerate and not has_skill:return activities.view(saved,d)
+        target_skill = activities.validate_repropose_skill(saved, d, skill)[1] if has_skill else None
         ctx=runtime.context(a.id)
         if not ctx.live:raise ApiError(503,'MODEL_REQUIRED','실제 모델 연결이 필요해요.')
-        model=runtime.model(ctx,f'로드맵 계획 · {course}','스킬 활동 다시 제안' if skill else '학습 활동 제안',role='roadmap')
-        proposal=activities.repropose_skill(saved,d,skill,model,ctx.mode) if skill else activities.propose(saved,d,model,ctx.mode,previous=activities.versions(saved,d) if regenerate else None)
+        model=runtime.model(ctx,f'로드맵 계획 · {course}','스킬 활동 다시 제안' if has_skill else '학습 활동 제안',role='roadmap')
+        proposal=activities.repropose_skill(saved,d,target_skill,model,ctx.mode) if has_skill else activities.propose(saved,d,model,ctx.mode,previous=activities.versions(saved,d) if regenerate else None)
         def save(t,w):
             current,draft=activities.context(t,a.id,str(project_id),**({'course':course} if course else {}))
             if activities.fingerprint(current,draft)!=proposal['key']:raise ApiError(409,'ACTIVITIES_CHANGED','자료가 변경됐어요. 다시 제안받아 주세요.')

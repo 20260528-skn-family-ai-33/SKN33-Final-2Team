@@ -22,7 +22,7 @@ import { Icon } from '@/shared/ui/Icon';
 import { Note, Page, Stats } from '@/shared/ui/parts';
 import { Alerts, NoPlan, openPreAnswers, openVersions, PlanGate, postStart } from './parts';
 import { archivePlan, resumePlan, startRevise } from './planActions';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { won } from '@/shared/lib/format';
 
 function commentCounts(comments: NonNullable<PlanRecord['comments']>) {
@@ -241,6 +241,24 @@ function openArchive(go: ReturnType<typeof useGo>, R: PlanRecord): void {
   });
 }
 
+export function focusSkillCommentTrigger(skill: string, root: Pick<Document, 'getElementById'> = document): boolean {
+  const trigger = root.getElementById(`skill-${skill}`)?.querySelector<HTMLElement>('.received-comment-trigger');
+  trigger?.focus();
+  return !!trigger;
+}
+
+export function closeSkillCommentOnEscape(
+  event: Pick<KeyboardEvent, 'key'>,
+  skill: string,
+  close: (closedSkill: string) => void,
+  root: Pick<Document, 'getElementById'> = document,
+): boolean {
+  if (event.key !== 'Escape') return false;
+  focusSkillCommentTrigger(skill, root);
+  close(skill);
+  return true;
+}
+
 /** 진행 중이면 기록할 수 있고, 마쳤거나 보관한 로드맵은 읽기 전용(활동·완료·메모·버전·보고서·받은 코멘트) */
 function RoadView({ R }: { R: PlanRecord }) {
   const { hash } = useLocation();
@@ -262,13 +280,23 @@ function RoadView({ R }: { R: PlanRecord }) {
   const live = R.status === 'active';
   const cs = R.comments || [];
   const [commentSkill, setCommentSkill] = useState<string | null>(null);
+  const restoreFocusSkill = useRef<string | null>(null);
+  useEffect(() => {
+    if (commentSkill || !restoreFocusSkill.current) return;
+    const skill = restoreFocusSkill.current;
+    restoreFocusSkill.current = null;
+    focusSkillCommentTrigger(skill);
+  }, [commentSkill]);
   useEffect(() => {
     if (!commentSkill) return;
     const closeOutside = (event: PointerEvent) => {
       if (event.target instanceof Element && !event.target.closest('.received-comment-popup, .received-comment-trigger')) setCommentSkill(null);
     };
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setCommentSkill(null);
+      closeSkillCommentOnEscape(event, commentSkill, (closed) => {
+        restoreFocusSkill.current = closed;
+        setCommentSkill(null);
+      });
     };
     document.addEventListener('pointerdown', closeOutside);
     document.addEventListener('keydown', closeOnEscape);

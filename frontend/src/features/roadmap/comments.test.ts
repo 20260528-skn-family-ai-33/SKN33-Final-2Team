@@ -1,6 +1,7 @@
 /* 부서장 코멘트 모양 판정: 보여 주는 모양(CmItem)과 '보낸 코멘트 고치기' 칸(TeamPages)이 같은 판정을 쓴다 */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { isFreeComment, isSkillFeedback } from './comments';
+import { closeSkillCommentOnEscape, focusSkillCommentTrigger } from './RoadmapPages';
 
 const base = { skill: '', fit: 'none', fitText: '', level: 'none', levelText: '', free: '' };
 
@@ -35,5 +36,27 @@ describe('isFreeComment', () => {
     expect(isFreeComment({ ...base, skill: 'SQL', free: '메모' })).toBe(false);
     expect(isFreeComment({ ...base, fit: 'good', free: '메모' })).toBe(false);
     expect(isFreeComment(base)).toBe(false);
+  });
+});
+
+describe('스킬 코멘트 팝업 Esc 초점 복원 (#287)', () => {
+  it('Esc 키로 팝업을 닫으면 해당 스킬의 코멘트 보기 버튼으로 초점을 돌린다', () => {
+    const focus = vi.fn();
+    const close = vi.fn();
+    const root = {
+      getElementById: (id: string) =>
+        (id === 'skill-SQL'
+          ? { querySelector: (sel: string) => (sel === '.received-comment-trigger' ? ({ focus } as unknown as HTMLElement) : null) }
+          : null) as unknown as HTMLElement | null,
+    };
+
+    expect(closeSkillCommentOnEscape({ key: 'Enter' }, 'SQL', close, root)).toBe(false);
+    expect(focus).not.toHaveBeenCalled();
+    expect(close).not.toHaveBeenCalled();
+
+    expect(closeSkillCommentOnEscape({ key: 'Escape' }, 'SQL', close, root)).toBe(true);
+    expect(focus).toHaveBeenCalledTimes(1);
+    expect(close).toHaveBeenCalledWith('SQL');
+    expect(focusSkillCommentTrigger('Python', root)).toBe(false);
   });
 });

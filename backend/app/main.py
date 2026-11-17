@@ -18,9 +18,9 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
-from . import browser_console, catalog, jobs, question_classifier
+from . import browser_console, catalog, jobs, llm, question_classifier
 from .config import ROOT, S
-from .errors import ApiError, api_error_handler
+from .errors import AgentError, ApiError, api_error_handler
 from .routers import account, notifications, team, work, preassessment
 from .version import read_project_version
 
@@ -83,7 +83,17 @@ async def browser_preferences(request: Request, call_next):
         browser_console.options.reset(token)
 
 
+async def agent_error_handler(req: Request, exc: AgentError) -> JSONResponse:
+    return await api_error_handler(req, exc.api())
+
+
+async def llm_error_handler(req: Request, exc: llm.LlmError) -> JSONResponse:
+    return await api_error_handler(req, AgentError(str(exc)).api())
+
+
 app.add_exception_handler(ApiError, api_error_handler)
+app.add_exception_handler(AgentError, agent_error_handler)
+app.add_exception_handler(llm.LlmError, llm_error_handler)
 app.include_router(account.r)
 app.include_router(work.r)
 app.include_router(team.r)

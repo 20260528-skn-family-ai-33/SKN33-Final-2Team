@@ -50,3 +50,22 @@ class LearningOutcomesTests(unittest.TestCase):
    self.assertEqual('[Challenge 근거]' in system,course=='A3')
    self.assertEqual(out,{'key':key,'summaries':expected})
    self.assertEqual((saved,draft),before)
+
+ def test_ollama_unwraps_normalizes_and_retries_summaries(self):
+  saved,draft,resources=self.setup_data()
+  responses=[
+   {'answer':{'skillSummaries':{' s ':['기초 구성','검색 평가','결과 검증','여분 줄'],'Extra':['무시']}}},
+  ]
+  with patch.object(activity_selection.catalog,'items',return_value=resources):
+   out=learning_outcomes.generate(saved,draft,lambda *_:{**responses[0]},source='ollama')
+  self.assertEqual(out['summaries'],{'S':['기초 구성','검색 평가','결과 검증']})
+
+  calls=[]
+  def flaky(*_):
+   calls.append(1)
+   if len(calls)==1:return {'skillSummaries':{'S':[]}}
+   return {'S':['첫째','둘째','셋째']}
+  with patch.object(activity_selection.catalog,'items',return_value=resources):
+   out=learning_outcomes.generate(saved,draft,flaky,source='ollama')
+  self.assertEqual(len(calls),2)
+  self.assertEqual(out['summaries'],{'S':['첫째','둘째','셋째']})

@@ -105,13 +105,42 @@ def learning_context(saved, draft):
 
 
 def validate_summaries(summaries, active, *, normalize=False):
+    if normalize and isinstance(summaries, list):
+        mapped = {}
+        for row in summaries:
+            if not isinstance(row, dict):
+                continue
+            skill_key = row.get('skill') or row.get('name')
+            lines = (
+                row['summaries'] if 'summaries' in row else
+                row['items'] if 'items' in row else
+                row['lines'] if 'lines' in row else
+                row.get('competencySummary')
+            )
+            if isinstance(skill_key, str) and skill_key.strip():
+                mapped[skill_key.strip()] = lines
+        if mapped:
+            summaries = mapped
     if normalize and isinstance(summaries, dict):
-        keys = [key.strip() for key in summaries]
-        if len(set(keys)) == len(keys):
-            summaries = {
-                key.strip(): [lines] if isinstance(lines, str) else lines
-                for key, lines in summaries.items()
-            }
+        active_list = list(active)
+        active_lookup = {' '.join(name.split()).casefold(): name for name in active_list}
+        normalized = {}
+        for key, lines in summaries.items():
+            if not isinstance(key, str):
+                continue
+            stripped = key.strip()
+            target = (
+                stripped if stripped in active_list else
+                active_lookup.get(' '.join(stripped.split()).casefold())
+            )
+            if target is None or target in normalized:
+                continue
+            items = [lines] if isinstance(lines, str) else lines
+            if isinstance(items, list):
+                items = [line.strip() for line in items if isinstance(line, str) and line.strip()][:3]
+            normalized[target] = items
+        if set(normalized) == set(active_list):
+            summaries = normalized
     if not isinstance(summaries,dict) or set(summaries)!=set(active) or any(
         not isinstance(lines,list) or not 1 <= len(lines) <= 3 or any(not isinstance(line,str) or not line.strip() for line in lines)
         for lines in summaries.values()
@@ -186,9 +215,13 @@ def _read_activities(acts, choices, source, *, requested_skills=None):
     return tasks, materials
 
 
-def _parse_proposal(raw, choices, source):
+def _parse_proposal(raw, choices, source, *, fallback_summaries=None):
     answer = _answer(raw)
-    summaries = validate_summaries(answer.get('skillSummaries'), choices, normalize=source == 'ollama')
+    raw_summaries = answer.get('skillSummaries')
+    if fallback_summaries is not None and not raw_summaries:
+        summaries = validate_summaries(fallback_summaries, choices, normalize=source == 'ollama')
+    else:
+        summaries = validate_summaries(raw_summaries, choices, normalize=source == 'ollama')
     rows = answer.get('acts')
     if source != 'ollama' or not isinstance(rows, list):
         tasks, materials = _read_activities(rows, choices, source)
@@ -220,16 +253,29 @@ def propose(saved, draft, generate, source, *, previous=None):
     if previous:
         payload['previousProposals'] = [{'acts': record['option']['acts']} for record in previous]
     choices = payload['choices']
+    fallback_summaries = None
+    if previous and len(choices) == 1:
+        skill_name = next(iter(choices))
+        prev_summaries = previous[-1].get('skillSummaries') or {}
+        if isinstance(prev_summaries, dict) and skill_name in prev_summaries:
+            try:
+                fallback_summaries = validate_summaries({skill_name: prev_summaries[skill_name]}, choices)
+            except ApiError:
+                fallback_summaries = None
     retried = False
     try:
-        summaries, tasks, material_acts = _parse_proposal(generate(system, payload), choices, source)
+        summaries, tasks, material_acts = _parse_proposal(
+            generate(system, payload), choices, source, fallback_summaries=fallback_summaries,
+        )
     except ApiError as error:
         if source != 'ollama' or error.code != 'ACTIVITIES_INVALID':
             raise
         retried = True
         retry_system = (f'{system}\n[검증 실패 후 재시도] {error.message} '
                         'skillOrder의 각 스킬에 res=null인 산출물 과제 하나와 역량 요약 1~3개를 담은 전체 JSON을 반환한다.')
-        summaries, tasks, material_acts = _parse_proposal(generate(retry_system, payload), choices, source)
+        summaries, tasks, material_acts = _parse_proposal(
+            generate(retry_system, payload), choices, source, fallback_summaries=fallback_summaries,
+        )
 
     missing = [name for name in active if name not in tasks]
     if missing and not retried:
@@ -341,20 +387,51 @@ def save_selection(employee_id,project_id,key,selected,proposal_id_=None,skill_p
     return drafts.present(drafts._mutate(employee_id,project_id,save),project_id)
 
 
-def repropose_skill(saved,draft,skill,generate,source):
-    record=current_record(saved,draft)
-    if not record:raise ApiError(409,'ACTIVITIES_REQUIRED','최초 과제 제안을 먼저 받아 주세요.')
-    if skill not in saved['skillOrder'] or not saved['resourceChoices'][skill].get('enabled',True):
-        raise ApiError(422,'SKILL_REQUIRED','계획에 포함된 스킬을 선택해 주세요.')
-    scoped=deepcopy(saved);scoped['skillOrder']=[skill];scoped['resourceChoices']={skill:deepcopy(saved['resourceChoices'][skill])}
-    old=deepcopy(record);old['option']['acts']=[act for act in old['option']['acts'] if act.get('skill')==skill]
-    replacement=propose(scoped,draft,generate,source,previous=[old])
-    tasks=[dict(act,id=f"task-{uuid4()}") for act in replacement['option']['acts'] if not act.get('res')]
-    result=deepcopy(record);result['id']=str(uuid4());result['key']=fingerprint(saved,draft)
-    kept=[act for act in record['option']['acts'] if act.get('skill')!=skill or act.get('res')]
-    result['option']['acts']=[act for name in saved['skillOrder'] for act in kept+tasks if act.get('skill')==name]
-    kept_ids={act['id'] for act in kept}
-    result['selectedIds']=[aid for aid in record['selectedIds'] if aid in kept_ids]+[act['id'] for act in tasks]
-    result.setdefault('skillSummaries',{}).setdefault(skill,replacement['skillSummaries'][skill])
-    result['changedSkill']=skill
+def validate_repropose_skill(saved, draft, skill):
+    record = current_record(saved, draft)
+    if not record:
+        raise ApiError(409, 'ACTIVITIES_REQUIRED', '최초 과제 제안을 먼저 받아 주세요.')
+    target = skill.strip() if isinstance(skill, str) else ''
+    choices = saved.get('resourceChoices') or {}
+    if not target or target not in (saved.get('skillOrder') or []) or target not in choices or not (choices[target] or {}).get('enabled', True):
+        raise ApiError(422, 'SKILL_REQUIRED', '계획에 포함된 스킬을 선택해 주세요.')
+    return record, target
+
+
+def repropose_skill(saved, draft, skill, generate, source):
+    record, skill = validate_repropose_skill(saved, draft, skill)
+    scoped = deepcopy(saved)
+    scoped['skillOrder'] = [skill]
+    scoped['resourceChoices'] = {skill: deepcopy(saved['resourceChoices'][skill])}
+    if isinstance((scoped.get('selection') or {}).get('skills'), list):
+        scoped['selection']['skills'] = [row for row in scoped['selection']['skills'] if row.get('name') == skill]
+    scoped_draft = deepcopy(draft)
+    course_opt = ((scoped_draft.get('gen') or {}).get('options') or {}).get(scoped_draft.get('chosen'))
+    if isinstance(course_opt, dict) and isinstance(course_opt.get('learningSkills'), list):
+        filtered = [row for row in course_opt['learningSkills'] if isinstance(row, dict) and row.get('name') == skill]
+        if filtered:
+            course_opt['learningSkills'] = filtered
+    history = versions(saved, draft) or [record]
+    previous = []
+    for item in history:
+        item_copy = deepcopy(item)
+        item_copy['option']['acts'] = [act for act in item_copy['option']['acts'] if act.get('skill') == skill]
+        if isinstance(item_copy.get('skillSummaries'), dict) and skill in item_copy['skillSummaries']:
+            item_copy['skillSummaries'] = {skill: item_copy['skillSummaries'][skill]}
+        previous.append(item_copy)
+    replacement = propose(scoped, scoped_draft, generate, source, previous=previous)
+    tasks = [dict(act, id=f"task-{uuid4()}") for act in replacement['option']['acts'] if not act.get('res') and act.get('skill') == skill]
+    if not tasks:
+        raise ApiError(422, 'ACTIVITIES_INVALID', f'「{skill}」의 산출물 과제를 확인하지 못했어요. 다시 제안받아 주세요.')
+    result = deepcopy(record)
+    result['id'] = str(uuid4())
+    result['key'] = fingerprint(saved, draft)
+    kept = [act for act in record['option']['acts'] if act.get('skill') != skill or act.get('res')]
+    result['option']['acts'] = [act for name in saved['skillOrder'] for act in kept + tasks if act.get('skill') == name]
+    kept_ids = {act['id'] for act in kept}
+    result['selectedIds'] = [aid for aid in record['selectedIds'] if aid in kept_ids] + [act['id'] for act in tasks]
+    result.setdefault('skillSummaries', {}).setdefault(skill, replacement['skillSummaries'][skill])
+    if isinstance(result.get('skillProposalIds'), dict) and skill in result['skillProposalIds']:
+        result['skillProposalIds'] = {**result['skillProposalIds'], skill: result['id']}
+    result['changedSkill'] = skill
     return result

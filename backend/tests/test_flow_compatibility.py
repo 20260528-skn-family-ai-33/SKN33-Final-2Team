@@ -185,3 +185,16 @@ class FlowCompatibilityTests(unittest.TestCase):
   base={'generationId':'g','project':{'selectedSkills':[{'name':'S','application':'검색'}]},'selection':{'skills':[{'name':'S','application':'검색'}]}}
   result=scope_view(base,'A1',None)
   self.assertIsNone(result['recommendations']);self.assertEqual(result['skillOrder'],['S'])
+
+ def test_missing_survey_or_quiz_answer_blocks_confirm_without_neutral_default(self):
+  for answers,missing in (({},'s1_surveys_1'),({'s1_surveys_1':4},'s1_quizzes_1'),({'s1_surveys_1':None,'s1_quizzes_1':0},'s1_surveys_1')):
+   w,scoped=self.state()
+   scoped['survey']={'groups':[{'skill':'S','surveys':[{'id':'s1_surveys_1','text':'수행 가능'}],'quizzes':[{'id':'s1_quizzes_1','q':'질문','options':['1','2','3','4','5'],'answer':0,'explain':'해설'}]}]}
+   scoped['answers']=dict(answers)
+   t=Mock();t.all.return_value=[{'resource_key':'c','cost_won':0}]
+   with self.subTest(missing=missing),patch.object(drafts.db,'tx',side_effect=lambda:nullcontext(t)),patch.object(drafts,'_row',return_value={'draft_choices':w}),patch.object(activity_selection,'context',return_value=(scoped,w['draft'])),patch.object(drafts.RM,'_res',return_value={'hours':8,'cost':0,'estimated':[]}),patch.object(drafts.PL,'insert_roadmap') as insert:
+    with self.assertRaises(ApiError) as caught:
+     drafts.confirm(1,'p')
+    self.assertEqual(caught.exception.status,409)
+    self.assertEqual(caught.exception.code,'ASSESSMENT_INCOMPLETE')
+    insert.assert_not_called()

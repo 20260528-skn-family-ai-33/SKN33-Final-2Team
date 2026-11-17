@@ -224,6 +224,20 @@ class SurveyTests(unittest.TestCase):
         self.assertEqual(len(result['groups'][0]['surveys']), 3)
         self.assertEqual(len(result['groups'][0]['quizzes']), 0)
 
+    def test_truncated_quiz_options_rejected_while_complete_options_allowed(self):
+        from app.agents.survey_generation import SYSTEM
+        self.assertIn('말줄임표', SYSTEM)
+        self.assertIn('공식 영문 표기 그대로 통일', SYSTEM)
+        for bad_option in ('데이터를 전처리한 뒤...', '결측치를 제거하는 방법…', '비동기 처리를 수행 (예: async', '컬럼을 기준으로 병합,'):
+            raw = self.result(2)
+            raw['groups'][0]['quizzes'][0]['options'][0] = bad_option
+            with self.subTest(bad_option=bad_option), self.assertRaisesRegex(SurveyError, '잘려'):
+                self.run_result(raw)
+        raw = self.result(2)
+        raw['groups'][0]['quizzes'][0]['options'] = ['1) 방법 (예: FastAPI)', '2) 방법 B', '3) 방법 C', '4) 방법 D', '5) 방법 E']
+        result = self.run_result(raw)
+        self.assertEqual(len(result['groups'][0]['quizzes'][0]['options']), 5)
+
 
 if __name__ == '__main__':
     unittest.main()

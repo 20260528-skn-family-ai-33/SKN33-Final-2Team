@@ -31,6 +31,7 @@ hrContext는 업무 맥락·예시·필요한 적용 범위의 참고, 직급·�
 재제안은 같은 스킬·순서·코스·선택 자료·강좌 근거·도달 수준 유지, 구체적 구현 대상·문제 변경 및 그에 맞는 제출물·평가 기준 조정. previousProposals 제공 시 기존안과 구별되는 프로젝트 적용 과제·산출물 제안.
 
 [출력 계약]
+문장은 자연스러운 한국어로 작성하되, 스킬명과 고유명사(Python, SQL, FastAPI, Docker, RAG, API, JSON, DataFrame, LLM 등)뿐 아니라 실무·기술 문서에서 영문 그대로 널리 쓰이는 범용 기술·개념 단어(예: rerank, embedding, chunking, token, prompt, fine-tuning, pipeline, indexing, schema, payload, endpoint, async, batch, vector, context, fallback, cache 등)는 굳이 '재랭크·재순위화'처럼 억지로 한글로 번역하거나 음차·혼용하지 말고 공식 영문 표기 그대로 통일해 사용한다.
 JSON: """ + json.dumps(SCHEMA, ensure_ascii=False)
 
 CHALLENGE = """

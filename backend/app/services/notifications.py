@@ -169,6 +169,7 @@ def _item(n: dict) -> dict:
             'reportId': str(n['report_id']) if n['report_id'] else None,
             'draftId': str(n['draft_id']) if n['draft_id'] else None, 'commentId': str(n['comment_id']) if n['comment_id'] else None,
             'taskId': str(n['task_id']) if n['task_id'] else None,
+            'revisionId': str(n['revision_id']) if n.get('revision_id') else None,
             'jobKind': n['job_kind'], 'jobStatus': n['job_status'],
             'createdAt': n['created_at'].isoformat(), 'read': n['read_at'] is not None}
 
@@ -179,6 +180,11 @@ def inbox(employee_id: int, limit: int = LIMIT) -> dict:
                               CASE WHEN n.kind IN ('task', 'task_result')  -- 과제는 로드맵에 묶여 있다. 보고서를 다시 만들어도 지금 보고서로 간다
                                    THEN (SELECT g.report_id FROM public.growth_reports g WHERE g.roadmap_id = n.roadmap_id ORDER BY g.created_at DESC LIMIT 1)
                                    ELSE n.report_id END AS report_id,
+                              CASE WHEN n.kind = 'job' AND n.job_kind = 'revision'
+                                   THEN (SELECT v.revision_id FROM app_ext.roadmap_revisions v
+                                          WHERE v.roadmap_id = n.roadmap_id AND v.created_at <= n.created_at
+                                          ORDER BY v.created_at DESC LIMIT 1)
+                              END AS revision_id,
                               n.job_kind, n.job_status, n.created_at, n.read_at,
                               coalesce(nullif(r.content->>'displayTitle', ''), r.content->>'goal', p.draft_choices->'draft'->>'goal', p.project_name) AS plan_title,
                               r.content->>'opt' AS track

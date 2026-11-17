@@ -14,11 +14,12 @@ class RoadmapOutputLimitTests(TestCase):
             self.assertNotIn('max_completion_tokens',call.call_args.args[1])
 
     def test_ollama_roadmap_sets_prediction_cap_and_default_context(self):
-        for configured,expected in ((0,20480),(16384,16384),(32768,32768)):
-            with self.subTest(configured=configured),patch.object(llm,'ollama',return_value={'message':{'content':'{}'}}) as call,patch.object(llm,'S',replace(llm.S,ollama_num_ctx=configured)):
-                llm.chat('ollama',[{'role':'user','content':'mock'}],role='roadmap')
-                options=call.call_args.args[1]['options']
-                self.assertEqual(options['num_predict'],7000)
-                self.assertEqual(options['num_ctx'],expected)
-                llm.chat('ollama',[{'role':'user','content':'mock'}])
-                self.assertNotIn('num_predict',call.call_args.args[1].get('options',{}))
+        for role in ('roadmap', 'resources', 'quiz', 'assessment'):
+            for configured,expected in ((0,20480),(16384,16384),(32768,32768)):
+                with self.subTest(role=role,configured=configured),patch.object(llm,'ollama',return_value={'message':{'content':'{}'}}) as call,patch.object(llm,'S',replace(llm.S,ollama_num_ctx=configured)):
+                    llm.chat('ollama',[{'role':'user','content':'mock'}],role=role)
+                    options=call.call_args.args[1]['options']
+                    self.assertEqual(options['num_predict'],7000)
+                    self.assertEqual(options['num_ctx'],expected)
+                    llm.chat('ollama',[{'role':'user','content':'mock'}])
+                    self.assertNotIn('num_predict',call.call_args.args[1].get('options',{}))
