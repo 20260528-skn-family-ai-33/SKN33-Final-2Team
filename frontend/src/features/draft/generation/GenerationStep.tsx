@@ -9,7 +9,8 @@ import { paths } from '@/app/paths';
 import { D } from '@/shared/constants/data';
 import { useGo } from '@/shared/hooks/useGo';
 import { won } from '@/shared/lib/format';
-import { ai, cause, userText, userTodo } from '@/shared/state/ai';
+import { SLOW_WAIT } from '@/shared/lib/waitTime';
+import { ai, cause, userText, userTodo, useSlowAi } from '@/shared/state/ai';
 import { updateWs, useWs, ws } from '@/shared/state/workspace';
 import { Icon } from '@/shared/ui/Icon';
 import { AgentRow, FailPage, OpsBox, Page, via } from '@/shared/ui/parts';
@@ -151,6 +152,7 @@ export function GenerationStep() {
   const d = useWs((s) => s.draft);
   const h = d.handoff;
   const r = curGen(d);
+  const slow = useSlowAi();
   useDraftWatch();
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -240,8 +242,8 @@ export function GenerationStep() {
         lead={
           done
             ? '‘세 코스 비교하기’를 눌러 코스를 고르고 자료를 정해 보세요.'
-            : ai.mode() === 'ollama'
-              ? '방식이 다른 세 코스를 함께 요청했어요. AI 서버 사정에 따라 차례대로 처리돼 시간이 더 걸릴 수 있어요. 다른 화면에 다녀와도 계속 만들어요.'
+            : slow
+              ? `방식이 다른 세 코스를 함께 요청했어요. AI 서버 사정에 따라 차례대로 처리돼 ${SLOW_WAIT}. 다른 화면에 다녀와도 계속 만들어요.`
               : '방식이 다른 세 코스를 동시에 만들고 있어요. 보통 1~2분 걸리고, 다른 화면에 다녀와도 계속 만들어요.'
         }
         foot={

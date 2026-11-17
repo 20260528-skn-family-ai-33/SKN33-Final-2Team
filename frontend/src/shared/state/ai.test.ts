@@ -1,11 +1,12 @@
-/* 실패 원인 바꾸기: 서버 오류 본문·작업에 저장된 원인·네트워크 오류를 화면이 쓰는 한 모양(Cause)으로
+/* 걸리는 시간 안내: RunPod-Ollama 모드인지(관리자 지정·가데이터·사용 불가 포함)
+   실패 원인 바꾸기: 서버 오류 본문·작업에 저장된 원인·네트워크 오류를 화면이 쓰는 한 모양(Cause)으로
    역할별 모델 이름: 진단·로드맵·규정 모델 고르기 (#33)
    추론 정도: 모드별 고를 수 있는 단계·기본값 순서·저장과 실패 때 되돌리기 · 규정 에이전트 모델은 고르지 않음 (#28) */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/api/client';
 import { aiApi, type ProviderInfo, type ProvidersResponse } from '@/api/endpoints/account';
 import type { ReasoningPicks } from '@/api/types/account';
-import { ai, applySettings, canSelectModel, cause, checkStatus, errText, levelLabel, setChoice, setReasoning, useAi } from './ai';
+import { ai, applySettings, canSelectModel, cause, checkStatus, errText, levelLabel, setChoice, setReasoning, slowAi, useAi } from './ai';
 
 const useOllama = (models: ProviderInfo['models']) =>
   useAi.setState({
@@ -301,5 +302,34 @@ describe('추론 정도', () => {
     expect(levelLabel('xhigh')).toBe('매우 높음');
     expect(levelLabel('off')).toBe('끔');
     expect(levelLabel('turbo')).toBe('turbo');
+  });
+});
+
+describe('걸리는 시간 안내를 길게 할 모드(slowAi · 화면은 useSlowAi 로 구독)', () => {
+  const provider = (id: 'ollama' | 'openai', available = true): ProviderInfo =>
+    ({ id, label: id, available, reason: '', models: { default: 'm', roadmap: 'm', embed: 'e', vision: 'v' } });
+  const slowWith = (o: { pick: 'ollama' | 'openai'; policy?: 'employee' | 'ollama' | 'openai'; ollama?: boolean; demoMock?: boolean }): boolean => {
+    useAi.setState({
+      status: { checked: true, docLibs: {}, policy: o.policy ?? 'employee', fixedProvider: o.policy && o.policy !== 'employee' ? o.policy : undefined,
+        providers: { ollama: provider('ollama', o.ollama ?? true), openai: provider('openai') } },
+      settings: { aiProvider: o.pick, demoMock: !!o.demoMock, failSim: {}, reasoning: {} },
+    });
+    return slowAi(useAi.getState());
+  };
+  afterEach(() => useAi.setState(useAi.getInitialState()));
+
+  it('직원이 RunPod-Ollama 를 고르면 길게, OpenAI 면 보통 시간으로 안내한다', () => {
+    expect(slowWith({ pick: 'ollama' })).toBe(true);
+    expect(slowWith({ pick: 'openai' })).toBe(false);
+  });
+
+  it('관리자가 지정한 모드를 따른다(직원이 예전에 고른 값과 달라도)', () => {
+    expect(slowWith({ pick: 'openai', policy: 'ollama' })).toBe(true);
+    expect(slowWith({ pick: 'ollama', policy: 'openai' })).toBe(false);
+  });
+
+  it('가데이터로 보거나 RunPod-Ollama 를 쓸 수 없으면 길게 안내하지 않는다', () => {
+    expect(slowWith({ pick: 'ollama', demoMock: true })).toBe(false);
+    expect(slowWith({ pick: 'ollama', ollama: false })).toBe(false);
   });
 });

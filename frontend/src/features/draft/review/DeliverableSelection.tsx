@@ -8,6 +8,8 @@ import { reviewScope } from './reviewScope';
 import { reviewTasks } from './reviewTasks';
 import { flush, takeDraft } from '../draftSync';
 import { Skeleton } from '@/shared/ui/Skeleton';
+import { waitTime } from '@/shared/lib/waitTime';
+import { useSlowAi } from '@/shared/state/ai';
 import { reviewPlan, reviewTaskDisplay, type ReviewActivity as Activity, type ReviewProposal as Proposal, type ReviewPlanState } from './reviewPlan';
 import { initializeReview, readExisting, reviewPath, type ProposalResponse } from './reviewInitial';
 
@@ -26,6 +28,7 @@ export function DeliverableSelection(props: SelectionProps) {
 }
 function ScopedDeliverableSelection({ ref, onReadyChange, onBusyChange, onPlanChange, onChangeMaterials, scope }: SelectionProps & { scope: string }) {
   const current = () => reviewScope(ws()) === scope;
+  const slow = useSlowAi();
   const id = useWs(s => s.draftId);
   const course = useWs(s => s.draft.chosen);
   const handoff = useWs(s => s.draft.handoff);
@@ -154,7 +157,7 @@ function ScopedDeliverableSelection({ ref, onReadyChange, onBusyChange, onPlanCh
       </div>
       {skillsWithTasks.length ? <span className="tag acc step-sec-right">{skillsWithTasks.length}개 중 {chosenCount}개 선택</span> : null}
     </header>
-    {loading ? <p className="rv-status" role="status"><span className="sp" aria-hidden="true" />선택한 자료를 바탕으로 역량 요약과 산출물 과제를 준비하고 있어요. 30초에서 1분쯤 걸려요.</p>
+    {loading ? <p className="rv-status" role="status"><span className="sp" aria-hidden="true" />선택한 자료를 바탕으로 역량 요약과 산출물 과제를 준비하고 있어요. {waitTime('30초에서 1분쯤 걸려요', slow)}.</p>
       : generatingSkill ? <p className="rv-status" role="status"><span className="sp" aria-hidden="true" />새 과제를 제안받고 있어요.</p> : null}
     {(error || preview.error) && <div className="rv-error"><p className="err" role="alert">{error || preview.error}</p><button type="button" className="btn line sm" disabled={busy || loading} onClick={() => { reviewTasks.forget(scope); setLoading(true); setError(''); setAttempt(n => n + 1); }}>다시 불러오기</button></div>}
     {!materials && loading && !error ? <Skeleton kind="rows" count={3} /> : null}

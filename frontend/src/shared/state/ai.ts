@@ -101,6 +101,11 @@ export const useAiMode = (): { mode: Mode; choice: UiProvider; demo: boolean; ch
     useShallow((s) => ({ mode: modeOf(s), choice: choiceOf(s), demo: !!s.settings.demoMock, checked: s.status.checked, conn: s.conn })),
   );
 
+/** AI 모드가 RunPod-Ollama 인지 — 걸리는 시간을 길게 안내한다(shared/lib/waitTime). 관리자가 지정한 모드도 따르고, 가데이터·사용 불가면 false */
+export const slowAi = (s: AiState): boolean => modeOf(s) === 'ollama';
+/** 화면 구독용: 기다리는 중에 모드를 바꾸면 그 모드의 문구로 바로 다시 그린다 */
+export const useSlowAi = (): boolean => useAi(slowAi);
+
 export const DOC_CHARS = 6000;
 export const SIM_KINDS = ['goal', 'doc', 'quiz', 'diag', 'gen', 'sup', 'report', 'reg', 'rev'];
 

@@ -2,6 +2,7 @@
    진단 에이전트 연결 상태: 가데이터 / 확인 중 / 연결됨 / 모델 대기 중(Ollama · 모델이 아직 GPU에 없음) / 연결 안 됨 */
 import { ai, connFor, ping, PROV, unavailableWhyText, userText, userTodo, useAiMode, type Conn } from '@/shared/state/ai';
 import { useAi } from '@/shared/state/ai';
+import { SLOW_WAIT } from '@/shared/lib/waitTime';
 import { Icon } from './Icon';
 import { OpsBox, via } from './parts';
 
@@ -54,7 +55,7 @@ export function AimStatus() {
           </>
         ) : st === 'cold' ? (
           <>
-            <small>첫 응답은 1~2분 걸릴 수 있어요</small>
+            <small>첫 응답은 {SLOW_WAIT}</small>
             <ColdOps c={c} cls="sm" />
           </>
         ) : null}
@@ -120,7 +121,7 @@ export function ConnErr() {
       <div className="conn-err cold">
         <Icon name="info" />
         <div>
-          <b>AI 모델을 준비하고 있어요.</b> 첫 문항 생성은 1~2분 걸릴 수 있어요.
+          <b>AI 모델을 준비하고 있어요.</b> 첫 문항 생성은 {SLOW_WAIT}.
           <ColdOps c={c} />
         </div>
       </div>
