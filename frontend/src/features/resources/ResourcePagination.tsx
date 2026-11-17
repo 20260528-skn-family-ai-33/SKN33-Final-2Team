@@ -1,5 +1,6 @@
-import { Fragment } from 'react';
+import { Fragment, useSyncExternalStore } from 'react';
 import { Icon } from '@/shared/ui/Icon';
+import { pageNumbers } from './resourceBrowse';
 
 interface Props {
   page: number;
@@ -9,12 +10,19 @@ interface Props {
   onChange: (page: number) => void;
 }
 
+/* 좁은 화면에서는 현재 페이지 양옆 번호를 하나씩만 보여 이전·다음 버튼이 화면 밖으로 밀리지 않게 한다(resourceBrowse.css와 같은 폭) */
+const NARROW = '(max-width: 480px)';
+const subscribeNarrow = (notify: () => void) => {
+  const query = window.matchMedia(NARROW);
+  query.addEventListener('change', notify);
+  return () => query.removeEventListener('change', notify);
+};
+const useNarrow = () => useSyncExternalStore(subscribeNarrow, () => window.matchMedia(NARROW).matches, () => false);
+
 export function ResourcePagination({ page, pages, label, disabled, onChange }: Props) {
+  const narrow = useNarrow();
   if (pages < 2) return null;
-  const first = Math.max(1, Math.min(page - 2, pages - 4));
-  const numbers = Array.from({ length: Math.min(5, pages) }, (_, i) => first + i);
-  if (first > 1) numbers.unshift(1);
-  if (numbers[numbers.length - 1] < pages) numbers.push(pages);
+  const numbers = pageNumbers(page, pages, narrow ? 1 : 2);
   return <nav aria-label={label} className="resource-pager">
     <div className="resource-pager-nums">
       <button type="button" className="btn line sm" aria-label="이전 페이지" disabled={disabled || page === 1} onClick={() => onChange(page - 1)}>

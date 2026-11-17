@@ -1,6 +1,6 @@
 /* 학습 자료 (API-53·54 · 팀 DB 강좌·도서·자격증, 검색·쪽 나누기 · 5차 scr.resources · scr.res) */
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { Link, Navigate, useLocation, useParams, useSearchParams } from 'react-router';
 import { catalogApi } from '@/api/endpoints/catalog';
 import type { Resource, ResourceSort } from '@/api/types/catalog';
@@ -15,6 +15,7 @@ import { mergeRes, resourceDetailQuery, useRes } from '@/shared/state/catalog';
 import { Icon } from '@/shared/ui/Icon';
 import { Est, Note, Page, Thumb } from '@/shared/ui/parts';
 import { ResourcePagination } from './ResourcePagination';
+import { listSearchOf } from './resourceBrowse';
 import './resourceBrowse.css';
 
 const kinds = ['전체', '강좌', '도서', '자격'];
@@ -113,10 +114,21 @@ export function ResKv({ r, showCurriculum = false, listSearch }: { r: Resource; 
 }
 
 const PAGE_SIZE = 30;
+/* 메뉴로 다시 들어오면 직전 목록 조건(종류·검색어·필터·정렬·페이지)을 되살린다. 주소에 조건이 있으면 주소가 우선이다 */
+const keep = { search: '' };
 
 export function ResourcesPage() {
   const [params, setParams] = useSearchParams();
   const resultsTop = useRef<HTMLParagraphElement>(null);
+  const restoreTo = useRef(params.toString() ? '' : keep.search);
+  useLayoutEffect(() => {
+    const to = restoreTo.current;
+    restoreTo.current = '';
+    if (to) setParams(to, { replace: true, preventScrollReset: true });
+  }, [setParams]);
+  useEffect(() => {
+    keep.search = params.toString();
+  }, [params]);
   const requestedKind = params.get('kind') || '전체';
   const kind = kinds.includes(requestedKind) ? requestedKind : '전체';
   const q = params.get('q') || '';
@@ -133,7 +145,7 @@ export function ResourcesPage() {
         kind: kind === '전체' ? '' : kind, q: term, platform, sort, limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE,
       }, signal);
       mergeRes(Object.fromEntries(r.items.map((x) => [x.id, x])));
-      return { ...r, kind, term, page };
+      return { ...r, kind, term, page, listSearch: listSearchOf({ kind, q, platform, sort, page }) };
     },
     staleTime: 30_000,
     placeholderData: keepPreviousData,
@@ -253,7 +265,7 @@ export function ResourcesPage() {
                   </span>
                   {r.platform !== '사내교육' && (r.real ? <span className="tag line">실제 자료</span> : <span className="tag dash">가상</span>)}
                 </summary>
-                <ResKv r={r} listSearch={params.toString()} />
+                <ResKv r={r} listSearch={shown.listSearch} />
               </details>
             </div>
           ))}

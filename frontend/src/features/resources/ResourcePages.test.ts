@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { expect, it } from 'vitest';
 import { ResKv, ResourcesPage } from './ResourcePages';
 import { ResourcePagination } from './ResourcePagination';
+import { listSearchOf, pageNumbers } from './resourceBrowse';
 import { resourceImageUrl } from '@/shared/lib/resourceImageUrl';
 import type { Resource } from '@/api/types/catalog';
 
@@ -17,6 +18,20 @@ it('여러 페이지의 첫·현재·마지막 번호와 직접 이동을 제공
   expect(html).not.toContain('aria-label="20페이지"');
   expect(html).toContain('max="100"');
   expect(renderToStaticMarkup(createElement(ResourcePagination, { ...props, page: 1, pages: 1 }))).toBe('');
+});
+
+it('좁은 화면은 현재 페이지 양옆 번호를 하나씩만 남기고 첫·마지막 번호는 유지한다', () => {
+  expect(pageNumbers(40, 82, 2)).toEqual([1, 38, 39, 40, 41, 42, 82]);
+  expect(pageNumbers(40, 82, 1)).toEqual([1, 39, 40, 41, 82]);
+  expect(pageNumbers(1, 82, 1)).toEqual([1, 2, 3, 82]);
+  expect(pageNumbers(82, 82, 1)).toEqual([1, 80, 81, 82]);
+  expect(pageNumbers(2, 2, 1)).toEqual([1, 2]);
+});
+
+it('상세 복귀 주소는 표시 중인 응답의 조건으로 만든다', () => {
+  expect(listSearchOf({ kind: '강좌', q: 'Python', platform: 'K-MOOC', sort: 'title_asc', page: 2 }))
+    .toBe('kind=%EA%B0%95%EC%A2%8C&q=Python&platform=K-MOOC&sort=title_asc&page=2');
+  expect(listSearchOf({ kind: '전체', q: '', platform: '', sort: 'default', page: 1 })).toBe('');
 });
 
 it('기존 자격 종류의 목록·탭·건수에 자격증을 표시한다', () => {

@@ -6,10 +6,16 @@
 
 /* 페이지 이동: 관리자 데이터 화면의 화살표 버튼과 같은 작은 버튼(36px)으로 맞춘다 */
 .resource-pager { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px 20px; margin: 20px 0 8px; }
-.resource-pager-nums { display: flex; align-items: center; gap: 4px; }
+.resource-pager-nums { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px; }
 .resource-pager-nums .btn.sm { min-width: 36px; padding: 0 8px; }
 .resource-pager-nums .btn svg { width: 15px; height: 15px; }
 .resource-pager-gap { padding: 0 2px; color: var(--ink-4); }
 .resource-pager-jump { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-3); }
 .resource-pager-jump .input { width: 64px; height: 36px; padding: 0 8px; font-size: 14px; text-align: center; -moz-appearance: textfield; appearance: textfield; }
 .resource-pager-jump .input::-webkit-outer-spin-button, .resource-pager-jump .input::-webkit-inner-spin-button { margin: 0; -webkit-appearance: none; }
+/* 좁은 화면: 번호 수는 ResourcePagination이 줄이고, 버튼·간격도 줄여 320px에서도 한 줄에 들어가게 한다 */
+@media (max-width: 480px) {
+  .resource-pager-nums { gap: 2px; }
+  .resource-pager-nums .btn.sm { min-width: 32px; height: 32px; padding: 0 6px; }
+  .resource-pager-gap { padding: 0; }
+}
