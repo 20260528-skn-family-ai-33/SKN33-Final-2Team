@@ -73,7 +73,7 @@ app = FastAPI(title='GrowPath 5차 목업 API', version=read_project_version(), 
 @app.middleware('http')
 async def browser_preferences(request: Request, call_next):
     try:
-        settings = browser_console.from_headers(request.headers, S.demo_mode, allow_enable=S.browser_overrides)
+        settings = browser_console.from_headers(request.headers, S.demo_mode, allow_overrides=S.browser_overrides)
     except ValueError as error:
         return JSONResponse({'error': {'code': 'INVALID_CONSOLE_OPTION', 'message': str(error)}}, status_code=422)
     token = browser_console.options.set(settings)

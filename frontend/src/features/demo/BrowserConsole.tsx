@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { http } from '@/api/client';
 import { accountApi } from '@/api/endpoints/account';
 import { useLocation } from 'react-router';
 import { activeRunpodSettings, browserDemoEnabled, consoleEnabled, limits, storeOptions, useBrowserOptions, type BrowserOptions, type ConsoleDefaults } from '@/shared/lib/browserOptions';
@@ -21,6 +20,11 @@ const numeric = [
 ] as const;
 
 export function BrowserConsole() {
+  const caps = useBrowserOptions(s => s.defaults);
+  return caps?.browserOverrides === true ? <EnabledConsole caps={caps} /> : null;
+}
+
+function EnabledConsole({ caps }: { caps: ConsoleDefaults }) {
   const [openedAt, setOpenedAt] = useState<string>();
   const account = useSession(s => s.account);
   const location = useLocation();
@@ -60,10 +64,10 @@ export function BrowserConsole() {
       }).catch(() => { /* 서버 응답을 받지 못하면 현재 적용된 설정으로 표시한다. */ });
     });
   }, []);
-  return openedAt === scope ? <CommandDialog close={() => setOpenedAt(undefined)} /> : null;
+  return openedAt === scope ? <CommandDialog caps={caps} close={() => setOpenedAt(undefined)} /> : null;
 }
 
-function CommandDialog({ close }: { close: () => void }) {
+function CommandDialog({ caps, close }: { caps: ConsoleDefaults; close: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [query, setQuery] = useState('');
   const [editingRunpod, setEditingRunpod] = useState<'url' | 'key'>();
@@ -71,7 +75,6 @@ function CommandDialog({ close }: { close: () => void }) {
   const [selected, setSelected] = useState<string>();
   const [result, setResult] = useState<{ command?: string; message: string }>();
   const running = useRef(false);
-  const [caps, setCaps] = useState<ConsoleDefaults | null>();
   const options = useBrowserOptions(s => s.options);
   const screenActions = useConsoleActions(s => s.actions);
   const employee = useSession(s => s.account?.accountType === 'employee');
@@ -80,15 +83,7 @@ function CommandDialog({ close }: { close: () => void }) {
   useEffect(() => {
     const element = dialog.current!;
     element.showModal();
-    let active = true;
-    void http.get<ConsoleDefaults>('/console/capabilities').then(value => { if (active) setCaps(value); })
-      .catch(() => {
-        if (active) {
-          setCaps(null);
-          setResult(previous => previous ?? { message: '서버의 콘솔 설정을 확인하지 못했습니다.' });
-        }
-      });
-    return () => { active = false; element.close(); };
+    return () => element.close();
   }, []);
   const demo = consoleEnabled('demo', options, caps);
   const prefix = normalize(query).replace(/^tools(?= |$)/, 'demo').replace(/^도구(켜기|끄기)$/, '시연$1')
@@ -116,8 +111,6 @@ function CommandDialog({ close }: { close: () => void }) {
     const label = { picker: '로그인 직원 고르기', demo: '시연 도구와 개인 모델 설정' }[field];
     for (const enabled of [true, false]) {
       add(field + (enabled ? ' on' : ' off'), toggleNames[field] + (enabled ? '켜기' : '끄기'), `이 브라우저에서 ${label}를 ${enabled ? '켭니다' : '끕니다'}.`, () => {
-        if (enabled && !caps) return '서버 설정을 확인한 뒤 다시 시도해 주세요.';
-        if (enabled && caps && !caps.browserOverrides && !caps[field]) return '이 배포에서는 브라우저에서 이 기능을 켤 수 없어요.';
         return change(label, field, enabled);
       });
     }

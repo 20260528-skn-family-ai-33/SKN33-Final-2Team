@@ -41,13 +41,13 @@ def env(key: str, default: str = '') -> str:
     return os.environ.get(key) or _FILE.get(key) or default
 
 
-def _explicit_on(*names: str, default: bool = False) -> bool:
+def _explicit_on(*names: str) -> bool:
     # 환경변수가 파일보다 우선하며, 같은 출처에서는 새 이름을 먼저 읽는다. 빈 값은 명시적인 off다.
     for source in (os.environ, _FILE):
         for name in names:
             if name in source:
                 return source[name].strip().lower() == 'on'
-    return default
+    return False
 
 
 def _local_db_url() -> str:
@@ -166,7 +166,7 @@ def load() -> Settings:
         job_workers=job_workers,
         # 공개 저장소라 기본값을 두지 않는다(팀 database/RESTORE.md: 공용 기본 비밀번호 없음 · 2026-10-26). 비우면 시연 비밀번호를 쓰는 준비 단계를 건너뛴다
         demo_mode=_explicit_on('GP5_DEMO_MODE'),
-        browser_overrides=_explicit_on('GP5_CONSOLE_OVERRIDES', 'GP5_BROWSER_OVERRIDES', default=True),
+        browser_overrides=_explicit_on('GP5_CONSOLE_OVERRIDES', 'GP5_BROWSER_OVERRIDES'),
         console_provider_employees=frozenset(v.strip() for v in os.environ.get(
             'GP5_CONSOLE_PROVIDER_EMPLOYEE_IDS', _FILE.get('GP5_CONSOLE_PROVIDER_EMPLOYEE_IDS', '')
         ).split(',') if v.strip()),

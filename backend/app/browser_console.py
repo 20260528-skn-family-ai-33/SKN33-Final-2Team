@@ -48,15 +48,15 @@ def runpod_url(value: str) -> str:
     raise ValueError('RunPod HTTPS 프록시 또는 공개 IPv4와 TCP 포트를 입력해 주세요.')
 
 
-def from_headers(headers, demo_default: bool, *, allow_enable: bool = False) -> BrowserOptions:
+def from_headers(headers, demo_default: bool, *, allow_overrides: bool = False) -> BrowserOptions:
     def toggle(name: str) -> bool | None:
         value = headers.get(name)
         if value == 'off':
             return False
-        return True if value == 'on' and allow_enable else None
+        return True if value == 'on' and allow_overrides else None
 
     demo = toggle('x-growpath-demo')
-    enabled = demo_default if demo is None else demo
+    enabled = allow_overrides and (demo_default if demo is None else demo)
 
     def number(name: str, maximum: int) -> int | None:
         raw = headers.get(name)

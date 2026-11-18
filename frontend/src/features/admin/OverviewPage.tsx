@@ -112,7 +112,7 @@ function GoalsAllBody({ active }: { active: number }) {
         <b>적용 모델</b>
       </p>
       {q.isError ? <FailBox err={q.error} what="모델 설정을 불러오지 못했어요" /> :
-        <p>{q.data?.policyStatus === 'invalid' ? 'AI 모델 설정을 먼저 복구해 주세요.' : !policy ? '모델 설정을 불러오는 중…' : policy === 'employee' ? '직원별 선택 (베타) · 각 직원이 저장한 모델 사용' :
+        <p>{q.data?.policyStatus === 'invalid' ? 'AI 모델 설정을 먼저 복구해 주세요.' : !policy ? '모델 설정을 불러오는 중…' : policy === 'employee' ? '직원별 선택 · 각 직원이 저장한 모델 사용' :
           `${MODE_LABEL[policy]} · ${q.data!.providers[policy].model} · 추론 ${policy === 'ollama' ? '없음' : q.data?.level ? levelLabel(q.data.level) : '기본값'}`}
           {policy === 'openai' && ' · 호출 비용이 발생해요'}</p>}
     </>

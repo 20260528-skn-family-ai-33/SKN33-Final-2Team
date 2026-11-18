@@ -1,7 +1,7 @@
 /* 계정 (서버 로그인 · 직원/관리자) — 5차 gp-core.js 의 GP.ACCOUNT·setAccount·boot·logout 을 옮김.
    계정은 로그아웃한 뒤 다시 로그인해야만 바뀐다. 부서장 권한·소속 직원은 서버가 부서로 정한다.
    부서장의 소속 직원 목록은 부서장 화면에 들어갈 때 받는다(features/team/teamData.ts · 5차의 로그인 때 미리 받기는 쓰는 곳이 없어 뺌) */
-import { useBrowserOptions } from '@/shared/lib/browserOptions';
+import { applyConsoleDefaults, consoleEnabled, useBrowserOptions } from '@/shared/lib/browserOptions';
 import { create } from 'zustand';
 import { ApiError } from '@/api/client';
 import { accountApi } from '@/api/endpoints/account';
@@ -54,7 +54,8 @@ let pickerRequest = 0;
 export async function loadDemoAccounts(refresh = false): Promise<void> {
   const seq = ++pickerRequest;
   if (refresh) useSession.setState({ demo: null });
-  if (useBrowserOptions.getState().options.picker === false) {
+  const { options, defaults } = useBrowserOptions.getState();
+  if (!consoleEnabled('picker', options, defaults)) {
     useSession.setState({ demo: { accounts: [] } });
     return;
   }
@@ -69,6 +70,8 @@ export async function loadDemoAccounts(refresh = false): Promise<void> {
 
 export async function boot(): Promise<void> {
   useSession.setState({ bootError: false });
+  // 서버가 허용한 브라우저에서만 저장된 테스트 설정을 첫 계정 요청에 적용한다.
+  applyConsoleDefaults(await accountApi.consoleDefaults().catch(() => undefined));
   let acct: Account | null;
   try {
     acct = await accountApi.me();

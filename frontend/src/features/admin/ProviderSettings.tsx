@@ -8,7 +8,7 @@ import { FailBox } from './parts';
 import { RunpodConnection } from './RunpodConnection';
 
 const key = ['admin', 'ai-provider'] as const;
-const label = (p: ProviderPolicy) => p === 'employee' ? '직원별 선택 (베타)' : PROV[p];
+const label = (p: ProviderPolicy) => p === 'employee' ? '직원별 선택' : PROV[p];
 
 function ProviderKey({ provider, settings }: { provider: ServerProvider; settings: AdminProviderSettings['providers'][ServerProvider] }) {
   const cache = useQueryClient();

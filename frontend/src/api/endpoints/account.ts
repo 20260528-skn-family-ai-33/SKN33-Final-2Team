@@ -1,10 +1,12 @@
 /* 인증·내 정보 (API-01~08) · AI 모델·시연 도구 (API-10~12) */
 import { enc, http } from '../client';
+import type { ConsoleDefaults } from '@/shared/lib/browserOptions';
 import type { Account, DemoAccounts, GoalSuggestions, ProfileView, ProviderPolicy, ReasoningPicks, ServerProvider, UserSettings } from '../types/account';
 import type { JobStarted } from '../types/common';
 import type { Workspace } from '../types/plan';
 
 export const accountApi = {
+  consoleDefaults: () => http.get<ConsoleDefaults>('/console/capabilities', { signal: AbortSignal.timeout(3000) }),
   /** 로그인 화면 '직원 고르기'(시연 전용) */
   demoAccounts: () => http.get<DemoAccounts>('/demo/accounts'),
   login: (employeeNo: string, password: string, keepSignedIn: boolean) => http.post<Account>('/auth/login', { employeeNo, password, keepSignedIn }),
