@@ -208,9 +208,9 @@ docker-compose.yml DB·초기 준비·API·화면 실행 구성
 
 ## 9. 산출물
 
-[산출물 목록](docs/README.md)에서 요구사항·WBS·기획서·화면설계·수집/전처리·DB/벡터DB·모델·아키텍처 문서를 확인할 수 있습니다. [파일 manifest](docs/artifacts.manifest.json)는 반영 파일의 상대 경로·크기·SHA-256과 원본 링크를 연결합니다.
+[산출물 목록](docs/README.md)에서 요구사항·WBS·기획서·화면설계·수집/전처리·DB/벡터DB·모델·sLLM·아키텍처·시스템 구성도·테스트 보고서를 확인할 수 있습니다. [파일 manifest](docs/artifacts.manifest.json)는 반영 파일의 상대 경로·크기·SHA-256과 원본 링크를 연결합니다.
 
-README의 코드 설명은 **2026-11-15 main [`20f8a14`](https://github.com/20260528-skn-family-ai-33/SKN33-Final-2Team/tree/20f8a146baf1cf0e4ff924e411d5bcaa75ad8f22)** 기준입니다. 저장소 `docs/`에는 11월 15일에 연결된 Drive 파일에 반영한 산출물 11종을 담았습니다. 문서별 본문 갱신·문구 정리 범위는 산출물 목록에서 확인하며, 재현 기준은 manifest의 해시입니다. 화면 캡처와 실험 결과는 각 문서에 표시한 당시 기준을 따릅니다. 공식 제출 현황은 [산출물 관리 시트 2팀 탭](https://docs.google.com/spreadsheets/d/1EQeYN_FpKWzzxHUdtjG9WYaP9t43bvf-H5e1jGMTMEM/edit?gid=1029234216)을 따릅니다.
+README의 코드 설명은 **2026-11-15 main [`20f8a14`](https://github.com/20260528-skn-family-ai-33/SKN33-Final-2Team/tree/20f8a146baf1cf0e4ff924e411d5bcaa75ad8f22)** 기준입니다. 저장소 `docs/`에는 11월 18일에 Drive에서 내려받은 최신 산출물 16종을 담았습니다. 원본 링크와 수정 시각, 다운로드 시각은 manifest에서 확인하며, 파일 식별 기준은 SHA-256입니다. 화면 캡처와 실험 결과는 각 문서에 표시한 당시 기준을 따릅니다. 공식 제출 현황은 [산출물 관리 시트 2팀 탭](https://docs.google.com/spreadsheets/d/1EQeYN_FpKWzzxHUdtjG9WYaP9t43bvf-H5e1jGMTMEM/edit?gid=1029234216)을 따릅니다.
 
 ## 10. 개발과 검증
 
