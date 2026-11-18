@@ -1,5 +1,5 @@
 {
-  "synced_at": "2026-11-18T02:47:47.663558Z",
+  "synced_at": "2026-11-18T04:13:22.177325Z",
   "artifacts": [
     {
       "title": "요구사항 정의서",
@@ -14,7 +14,7 @@
       "source_mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "downloaded_at": "2026-11-18T00:34:42.133315Z",
       "drive_md5": "825253a556683c614df15c10d41dd5fc",
-      "source_checked_at": "2026-11-18T02:47:23.967695Z"
+      "source_checked_at": "2026-11-18T04:13:09.843774Z"
     },
     {
       "title": "WBS",
@@ -29,7 +29,7 @@
       "source_mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "downloaded_at": "2026-11-18T00:34:44.521076Z",
       "drive_md5": "856f51994ea3587e2b51fd6b77493043",
-      "source_checked_at": "2026-11-18T02:47:24.451778Z"
+      "source_checked_at": "2026-11-18T04:13:10.329712Z"
     },
     {
       "title": "프로젝트 기획서",
@@ -44,7 +44,7 @@
       "source_mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       "downloaded_at": "2026-11-18T00:34:48.126473Z",
       "drive_md5": "0cbde64212e0054174c02571bda019e3",
-      "source_checked_at": "2026-11-18T02:47:25.003533Z"
+      "source_checked_at": "2026-11-18T04:13:10.748653Z"
     },
     {
       "title": "수집 데이터 보고서",
@@ -59,7 +59,7 @@
       "source_mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       "downloaded_at": "2026-11-18T00:34:51.018262Z",
       "drive_md5": "62ce59e328fcdbf00e3a1a0d652d6438",
-      "source_checked_at": "2026-11-18T02:47:25.478388Z"
+      "source_checked_at": "2026-11-18T04:13:11.162629Z"
     },
     {
       "title": "화면설계서",
@@ -74,7 +74,7 @@
       "source_mime_type": "application/pdf",
       "downloaded_at": "2026-11-18T00:34:55.460323Z",
       "drive_md5": "5f73fb6254c84360b3fcd3654d2471d0",
-      "source_checked_at": "2026-11-18T02:47:26.073060Z"
+      "source_checked_at": "2026-11-18T04:13:11.615510Z"
     },
     {
       "title": "중간 발표 자료",
@@ -89,7 +89,7 @@
       "source_mime_type": "application/pdf",
       "downloaded_at": "2026-11-18T00:34:58.271195Z",
       "drive_md5": "773dc2ac7d39801a3c21883dd16985a2",
-      "source_checked_at": "2026-11-18T02:47:26.447661Z"
+      "source_checked_at": "2026-11-18T04:13:11.956678Z"
     },
     {
       "title": "데이터베이스/저장소 설계 문서",
@@ -104,7 +104,7 @@
       "source_mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       "downloaded_at": "2026-11-18T00:35:02.223839Z",
       "drive_md5": "f8bbce4df870d9a1606fbbd3e18aebea",
-      "source_checked_at": "2026-11-18T02:47:26.898010Z"
+      "source_checked_at": "2026-11-18T04:13:12.399429Z"
     },
     {
       "title": "데이터 전처리 결과서",
@@ -119,7 +119,7 @@
       "source_mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       "downloaded_at": "2026-11-18T00:35:05.218299Z",
       "drive_md5": "c3aaf79005a3cde49df566c45dbd76c2",
-      "source_checked_at": "2026-11-18T02:47:27.350089Z"
+      "source_checked_at": "2026-11-18T04:13:12.836026Z"
     },
     {
       "title": "벡터DB/GraphDB 구축 결과서",
@@ -134,7 +134,7 @@
       "source_mime_type": "application/vnd.google-apps.document",
       "downloaded_at": "2026-11-18T00:35:08.934116Z",
       "export_mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "source_checked_at": "2026-11-18T02:47:27.816054Z"
+      "source_checked_at": "2026-11-18T04:13:13.255966Z"
     },
     {
       "title": "학습한 ML/DL 모델 보고서",
@@ -149,7 +149,7 @@
       "source_mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       "downloaded_at": "2026-11-18T00:35:11.848040Z",
       "drive_md5": "195696158f24525e887872c7484dbc76",
-      "source_checked_at": "2026-11-18T02:47:28.228562Z"
+      "source_checked_at": "2026-11-18T04:13:13.622911Z"
     },
     {
       "title": "머신러닝·딥러닝 학습결과서",
@@ -164,7 +164,7 @@
       "source_mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       "downloaded_at": "2026-11-18T00:35:15.366529Z",
       "drive_md5": "6bc7e9640637f6208abccd7760f941fc",
-      "source_checked_at": "2026-11-18T02:47:28.669239Z"
+      "source_checked_at": "2026-11-18T04:13:14.020973Z"
     },
     {
       "title": "AI 시스템 아키텍처(멀티 에이전트 아키텍처)",
@@ -175,41 +175,41 @@
       "drive_file_id": "1vzqDlfZE_T4KzbM_ohYnwERUtn66CU_T",
       "drive_name": "GrowPath_AI_시스템_아키텍처_V009_20261118.pdf",
       "drive_modified_at": "2026-11-18T02:47:08.191Z",
-      "drive_version": "51",
+      "drive_version": "54",
       "source_mime_type": "application/pdf",
       "downloaded_at": "2026-11-18T02:47:37.454332Z",
       "drive_md5": "e4661fba3947d332ed6940b6fc06c022",
-      "source_checked_at": "2026-11-18T02:47:37.454332Z"
+      "source_checked_at": "2026-11-18T04:13:14.491944Z"
     },
     {
       "title": "자체 sLLM 인공지능",
       "path": "docs/13_자체_sLLM_인공지능/자체_sLLM_인공지능_33기_2팀.docx",
-      "sha256": "7c2ac630eceeb40952c37c241a381e347ae2df83de2ed6c6d925b23888e3375e",
-      "bytes": 1341060,
+      "sha256": "ae65abe9f261e75631843df7d34670b38a2d5367760886766c272a2adb29f299",
+      "bytes": 1341594,
       "drive_url": "https://drive.google.com/file/d/1D_TbgYI19lqfIhWKYqO6VqSB_R0r376c2tplexpZ83k/view",
       "drive_file_id": "1D_TbgYI19lqfIhWKYqO6VqSB_R0r376c2tplexpZ83k",
       "drive_name": "자체 sLLM 인공지능_양식_33기_2팀_수정본",
-      "drive_modified_at": "2026-11-18T01:34:55.521Z",
-      "drive_version": "77",
+      "drive_modified_at": "2026-11-18T03:35:11.064Z",
+      "drive_version": "98",
       "source_mime_type": "application/vnd.google-apps.document",
-      "downloaded_at": "2026-11-18T02:47:41.443911Z",
+      "downloaded_at": "2026-11-18T04:13:18.644446Z",
       "export_mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "source_checked_at": "2026-11-18T02:47:41.443911Z"
+      "source_checked_at": "2026-11-18T04:13:18.649986Z"
     },
     {
       "title": "멀티 에이전트 테스트 계획 및 결과 보고서",
       "path": "docs/14_멀티_에이전트_테스트/멀티_에이전트_테스트_계획_및_결과_보고서_33기_2팀.docx",
-      "sha256": "97b306393b27045fc0ebe90660247a3c8b2dba83743ada177eb308c06440dc14",
-      "bytes": 599268,
+      "sha256": "ca06faf40dbba55cc4eb85308afecc626dfb82a2ca9e83f95ebbcfd4eebc7cf1",
+      "bytes": 599712,
       "drive_url": "https://drive.google.com/file/d/1LrPTbA74JxNgbm1_dRxdc5GD2ER1GgAn/view",
       "drive_file_id": "1LrPTbA74JxNgbm1_dRxdc5GD2ER1GgAn",
       "drive_name": "멀티 에이전트 테스트 계획 및 결과 보고서_양식_33기_2팀.docx",
-      "drive_modified_at": "2026-11-18T02:09:37.507Z",
-      "drive_version": "223",
+      "drive_modified_at": "2026-11-18T03:35:30.375Z",
+      "drive_version": "242",
       "source_mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "downloaded_at": "2026-11-18T02:47:44.574555Z",
-      "drive_md5": "bfec4826067f768deb28015d1f524b03",
-      "source_checked_at": "2026-11-18T02:47:44.574555Z"
+      "downloaded_at": "2026-11-18T04:13:21.186173Z",
+      "drive_md5": "1bc61a191587b32e6402c9d090d18e9f",
+      "source_checked_at": "2026-11-18T04:13:21.188201Z"
     },
     {
       "title": "시스템 구성도",
@@ -224,7 +224,7 @@
       "source_mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       "downloaded_at": "2026-11-18T02:47:47.223403Z",
       "drive_md5": "58deb299243f6f07503a9e988141a712",
-      "source_checked_at": "2026-11-18T02:47:47.223403Z"
+      "source_checked_at": "2026-11-18T04:13:21.609456Z"
     },
     {
       "title": "서비스 테스트 계획 및 결과 보고서",
@@ -239,7 +239,7 @@
       "source_mime_type": "application/vnd.google-apps.document",
       "downloaded_at": "2026-11-18T00:35:31.294748Z",
       "export_mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "source_checked_at": "2026-11-18T02:47:47.663558Z"
+      "source_checked_at": "2026-11-18T04:13:22.177325Z"
     }
   ]
 }
