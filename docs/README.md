@@ -4,8 +4,8 @@
 
 - 자체 sLLM 인공지능, 멀티 에이전트 테스트, 시스템 구성도, 서비스 테스트 보고서를 추가했다.
 - Google Docs로 작성된 벡터DB 결과서·sLLM 보고서·서비스 테스트 보고서는 DOCX로 내보냈다. 나머지는 Drive 원본 파일을 그대로 내려받았다.
-- [산출물 manifest](artifacts.manifest.json)에 파일별 SHA-256·크기·Drive 원본 이름과 URL·수정 시각·버전·다운로드 시각을 기록했다. `drive_modified_at`은 원본 수정 시각, `downloaded_at`은 내려받은 시각이며 모두 UTC다. `export_mime_type`이 있으면 Google 문서에서 내보낸 파일이다.
-- 문서 본문은 Drive에 저장된 내용이며, 이번 반영에서는 별도 교정하지 않았다. 화면·수치·실험 결과는 각 문서에 표시된 기준과 평가 회차를 따른다.
+- [산출물 manifest](artifacts.manifest.json)에 파일별 SHA-256·크기·Drive 원본 이름과 URL·수정 시각·버전·다운로드 시각을 기록했다. `drive_modified_at`은 원본 수정 시각, `downloaded_at`은 내려받은 시각, `source_checked_at`은 원본의 최신 여부를 확인한 시각이며 모두 UTC다. `export_mime_type`이 있으면 Google 문서에서 내보낸 파일이다.
+- 아키텍처는 현재 설문·퀴즈와 과거 계획용 심화 진단을 구분하는 문구만 정리해 Drive에 먼저 반영한 뒤 내려받았다. 그 외 문서 본문은 Drive 최신본을 그대로 반영했다. 화면·수치·실험 결과는 각 문서에 표시된 기준과 평가 회차를 따른다.
 
 | 산출물 | 저장소 파일 | Drive 원본 |
 |---|---|---|
